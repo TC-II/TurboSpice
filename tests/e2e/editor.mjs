@@ -96,7 +96,7 @@ await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await page.locator('.status.ok').count()) === 1, `simulación: ${await page.locator('.status').textContent()}`);
 await page.waitForTimeout(300);
 await click(96, -32);
-const chips = await page.locator('.chip').allTextContents();
+const chips = await page.locator('.trace-chip .name').allTextContents();
 check(chips.some((c) => /^V\(n\d+\)/i.test(c)), `punta de prueba en el nodo de salida: ${chips.join(', ')}`);
 await page.screenshot({ path: `${OUT}/editor-2.png` });
 await page.keyboard.press('Escape');

@@ -3,6 +3,7 @@
 // de deshacer; los handles de la File System Access API se pueden guardar en IndexedDB y
 // permiten volver a guardar sobre el mismo archivo.
 import type { AscEncoding } from '../asc/encoding.ts';
+import type { PlotView } from '../waveform/view.ts';
 
 const DB = 'turbospice';
 const STORE = 'kv';
@@ -21,6 +22,8 @@ export interface Session {
   /** cantidad de pasos de `past` en el último guardado (para saber si hay cambios) */
   savedVersion: number;
   time: number;
+  /** vista de resultados recordada */
+  view?: PlotView;
 }
 
 export interface RecentFile {
@@ -100,3 +103,7 @@ export async function readHandle(handle: unknown): Promise<Uint8Array | null> {
     return null;
   }
 }
+
+/** Vista de resultados recordada para un archivo (por nombre) */
+export const loadView = (name: string) => quiet(get<PlotView>(`view:${name}`), undefined);
+export const saveView = (name: string, view: PlotView) => quiet(put(`view:${name}`, view), undefined);

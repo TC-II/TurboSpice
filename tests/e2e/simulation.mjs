@@ -80,8 +80,9 @@ await page.waitForTimeout(300);
 const out = await at(128, -32);
 await page.mouse.click(out.x, out.y);
 await page.waitForTimeout(300);
-const legend = await page.locator('.u-legend .u-series').count();
-check(legend === 4, `las tres corridas de V(out) se superponen (${legend - 1} curvas)`);
+await page.getByRole('button', { name: 'Medidas' }).click();
+const legend = await page.locator('.readout tbody tr').count();
+check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas)`);
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
 

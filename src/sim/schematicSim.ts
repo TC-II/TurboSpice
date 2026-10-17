@@ -5,6 +5,8 @@ import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import { ltNetlist, type LtNetlist } from '../netlist/ltnetlist.ts';
 import { prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
+import { isControlBlock } from '../netlist/directives.ts';
+import { controlPlots, type Pane } from '../waveform/view.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -27,6 +29,8 @@ export interface BuiltSimulation {
   warnings: string[];
   lt: LtNetlist;
   ng: NgspiceNetlist;
+  /** paneles pedidos con "plot" en el bloque .control */
+  controlPanes: Pane[];
 }
 
 export async function buildSimulation(doc: AscDoc, lib: Library, title: string): Promise<BuiltSimulation> {
@@ -39,7 +43,9 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   const prep = prepareSimulation(ng, (rel) => texts[rel]);
   // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba
   const netlist = prep.netlist.replace(/\n\.end\s*$/i, '\n.options savecurrents\n.end');
-  return { netlist, files: prep.files, warnings: prep.warnings, lt, ng };
+  const control = lt.texts.find((t) => isControlBlock(t.text));
+  const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
+  return { netlist, files: prep.files, warnings: prep.warnings, lt, ng, controlPanes };
 }
 
 /** Vector de ngspice con la tensión de una red */

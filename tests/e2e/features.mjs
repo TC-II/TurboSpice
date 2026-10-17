@@ -1,6 +1,8 @@
-// E2E de funciones de interfaz: nombres de redes temporales (#15) y las que se agreguen.
+// E2E de funciones de interfaz, por issue: nombres de redes (#15), compartir (#1), autoguardado
+// (#5), punto de operación (#2), elegir en el esquemático (#13), .step (#7), visor de resultados
+// (#3), vista recordada (#14) y exportaciones (#12).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
@@ -8,7 +10,7 @@ const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
 await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 const page = await context.newPage();
 const errors = [];
@@ -155,9 +157,114 @@ await page.waitForTimeout(300);
 const outStep = await at(128, -32);
 await page.mouse.click(outStep.x, outStep.y);
 await page.waitForTimeout(300);
-const series = await page.locator('.u-legend .u-series .u-label').allTextContents();
-check(series.includes('V(out) · R=1k') && series.length === 4, `leyenda con el valor de cada paso (${series.slice(1).join(', ')})`);
+await page.getByRole('button', { name: 'Medidas' }).click();
+const series = await page.locator('.readout tbody tr td:first-child').allTextContents();
+check(series.join() === 'V(out) · R=500,V(out) · R=1k,V(out) · R=2k', `cada paso identificado con su valor (${series.join(', ')})`);
+await page.getByRole('button', { name: 'Medidas' }).click();
 await page.screenshot({ path: `${OUT}/step.png` });
+
+// --- #3, #14, #12: visor de resultados, vista recordada y exportaciones ---
+const downloaded = async (action) => {
+  const [d] = await Promise.all([page.waitForEvent('download'), action()]);
+  return { name: d.suggestedFilename(), text: readFileSync(await d.path(), 'utf8') };
+};
+await page.setViewportSize({ width: 1280, height: 1100 }); // lugar para dos paneles sin scroll
+await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Bode RLC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.waitForTimeout(300);
+const outAc = await at(224, -32);
+await page.mouse.click(outAc.x, outAc.y);
+await page.getByRole('button', { name: 'Medidas' }).click();
+const rowNames = () => page.locator('.readout tbody tr td:first-child').allTextContents();
+check((await rowNames()).join() === 'V(out),V(out) (fase)', `Bode: magnitud y fase a la vez (${await rowNames()})`);
+const peak = await page.locator('.readout tbody tr').first().locator('td').nth(2).textContent();
+// f0 = 5.03 kHz; con Q ≈ 3.2 el máximo de |V(out)| cae en f0·√(1−1/2Q²) ≈ 4.9 kHz
+check(/@ 4\.9\d*k|@ 4\.89\d*k/.test(peak), `pico de resonancia cerca de 4.9 kHz (${peak})`);
+await page.getByRole('button', { name: 'Medidas' }).click();
+
+await page.getByRole('button', { name: '+ Panel' }).click();
+await page.locator('.pane').nth(1).click();
+await page.getByLabel('Expresión').fill('V(out)/V(n001)');
+await page.keyboard.press('Enter');
+const paneChips = (i) => page.locator('.pane').nth(i).locator('.trace-chip .name').allTextContents();
+check((await paneChips(1)).join() === 'V(out)/V(n001)', `expresión en el panel nuevo (${await paneChips(1)})`);
+await page.getByLabel('Expresión').fill('V(nada)');
+await page.keyboard.press('Enter');
+check(/no existe/.test(await page.locator('.plot-tools .hint.warn').textContent()), 'una expresión inválida avisa y no se agrega');
+await page.getByLabel('Expresión').fill('');
+await page.locator('.pane').nth(1).locator('.trace-chip').dragTo(page.locator('.pane').nth(0).locator('.pane-chart'));
+check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `arrastrar una traza la pasa a otro panel (${await paneChips(0)})`);
+await page.getByRole('button', { name: 'Quitar panel' }).nth(1).click();
+check((await page.locator('.pane').count()) === 1, 'se puede quitar un panel');
+
+await page.getByRole('button', { name: 'Cursores' }).click();
+const cb = await page.locator('.pane-chart').first().boundingBox();
+await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
+await page.keyboard.down('Shift');
+await page.mouse.click(cb.x + cb.width * 0.7, cb.y + cb.height / 2);
+await page.keyboard.up('Shift');
+const head = await page.locator('.readout thead').textContent();
+check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);
+await page.screenshot({ path: `${OUT}/plot-panel.png` });
+await page.getByRole('button', { name: 'Cursores' }).click();
+
+const csv = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('csv'));
+check(csv.text.startsWith('frequency,V(out),V(out) (fase),V(out)/V(n001),V(out)/V(n001) (fase)\n'), `CSV (${csv.name}): ${csv.text.split('\n')[0]}`);
+const png = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('png'));
+check(png.name === 'Bode RLC.png' && png.text.length > 1000, 'gráfico a PNG');
+
+await page.getByRole('button', { name: 'Recordar vista' }).click();
+check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'recordar la vista');
+for (let k = 0; k < 2; k++) await page.locator('.trace-chip .x').first().click();
+check((await page.locator('.trace-chip').count()) === 0, 'quitar las trazas');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.waitForTimeout(500);
+check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `al volver a simular se reaplica la vista recordada (${await paneChips(0)})`);
+const plt = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('plt'));
+check(plt.name === 'Bode RLC.plt' && plt.text.includes('[AC Analysis]') && plt.text.includes('"V(out)/V(n001)"'), `vista a .plt de LTspice (${plt.name})`);
+await page.locator('input[type=file][accept=".plt"]').setInputFiles({
+  name: 'x.plt',
+  mimeType: 'text/plain',
+  buffer: Buffer.from('[AC Analysis]\r\n{\r\n   Npanes: 2\r\n   {\r\n      traces: 1 {524290,0,"V(out)"}\r\n   },\r\n   {\r\n      traces: 1 {524291,0,"V(n002)"}\r\n   }\r\n}\r\n'),
+});
+await page.locator('.pane').nth(1).waitFor();
+check((await page.locator('.pane').count()) === 2 && (await paneChips(1)).join() === 'V(n002)', `importar un .plt de LTspice aplica sus paneles (${await paneChips(0)} | ${await paneChips(1)})`);
+await page.getByRole('button', { name: 'Compartir' }).click();
+check((await page.locator('.modal input[aria-label="Link"]').inputValue()).includes('&v='), 'el link para compartir incluye la vista');
+await page.getByRole('button', { name: 'Listo', exact: true }).click();
+
+const svgOut = await downloaded(() => page.getByRole('combobox', { name: 'Exportar esquemático' }).selectOption('svg'));
+check(svgOut.name === 'Bode RLC.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
+const net = await downloaded(() => page.getByRole('combobox', { name: 'Exportar esquemático' }).selectOption('net'));
+check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `netlist de LTspice (.net): ${net.text.split('\n')[1]}`);
+await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
+const cir = await downloaded(() => page.getByRole('button', { name: 'Descargar .cir (ngspice)' }).click());
+check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
+await page.getByRole('button', { name: 'Resultados' }).click();
+
+// .pz en el plano s
+await page.getByRole('button', { name: 'Simulación…' }).click();
+await page.getByRole('button', { name: /Polos y ceros/ }).click();
+const pzField = (label) => page.locator('.field', { hasText: label }).locator('input');
+await pzField('Entrada +').fill('N001');
+await pzField('Entrada −').fill('0');
+await pzField('Salida +').fill('out');
+await pzField('Salida −').fill('0');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.pz-plane').waitFor({ timeout: 30000 });
+const pzRows = await page.locator('.pz-view tbody tr').allTextContents();
+check(pzRows.length === 2 && pzRows.every((r) => /polo/.test(r) && /5\.03\d*kHz/.test(r) && /3\.16/.test(r)), `.pz: dos polos con f0 = 5.03 kHz y Q = 3.16 (${pzRows.join(' | ')})`);
+await page.screenshot({ path: `${OUT}/pz.png` });
+await page.keyboard.press('Control+z');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.pane-chart').first().waitFor({ timeout: 30000 });
+await page.getByRole('combobox', { name: 'Vista' }).selectOption('smith');
+check((await page.locator('.smith polyline.trace').count()) === 2, 'carta de Smith con las trazas complejas');
+await page.screenshot({ path: `${OUT}/smith.png` });
+await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

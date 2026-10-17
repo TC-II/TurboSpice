@@ -19,19 +19,29 @@ function fromBase64Url(s: string): Uint8Array {
   return out;
 }
 
-/** Hash (sin "#") para compartir el archivo */
-export async function shareHash(asc: Uint8Array, name: string): Promise<string> {
-  const data = toBase64Url(await pipe(asc, new CompressionStream('deflate-raw')));
-  return `c=${data}&n=${encodeURIComponent(name)}`;
+const zip = async (b: Uint8Array) => toBase64Url(await pipe(b, new CompressionStream('deflate-raw')));
+const unzip = (s: string) => pipe(fromBase64Url(s), new DecompressionStream('deflate-raw'));
+
+/** Hash (sin "#") para compartir el archivo y, opcionalmente, la vista de resultados (JSON) */
+export async function shareHash(asc: Uint8Array, name: string, view?: unknown): Promise<string> {
+  const v = view && Object.keys(view).length ? `&v=${await zip(new TextEncoder().encode(JSON.stringify(view)))}` : '';
+  return `c=${await zip(asc)}${v}&n=${encodeURIComponent(name)}`;
 }
 
 /** Lee un hash generado por shareHash; null si no es un circuito compartido */
-export async function readShareHash(hash: string): Promise<{ bytes: Uint8Array; name: string } | null> {
+export async function readShareHash(hash: string): Promise<{ bytes: Uint8Array; name: string; view?: unknown } | null> {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const c = params.get('c');
   if (!c) return null;
-  const bytes = await pipe(fromBase64Url(c), new DecompressionStream('deflate-raw'));
-  return { bytes, name: params.get('n') || 'Compartido.asc' };
+  const bytes = await unzip(c);
+  const v = params.get('v');
+  let view: unknown;
+  try {
+    view = v ? JSON.parse(new TextDecoder().decode(await unzip(v))) : undefined;
+  } catch {
+    view = undefined; // una vista ilegible no impide abrir el circuito
+  }
+  return { bytes, name: params.get('n') || 'Compartido.asc', ...(view ? { view } : {}) };
 }
 
 /** Largo a partir del cual el link puede no funcionar en chats o mails */

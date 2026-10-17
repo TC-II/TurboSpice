@@ -35,6 +35,9 @@ export interface EditorHandle {
   fit(): void;
   /** Posición del cursor en el esquemático (para pegar/duplicar) */
   cursor(): Point;
+  /** Elemento SVG y caja del contenido (para exportar) */
+  svg(): SVGSVGElement | null;
+  contentBox(): Box | null;
 }
 
 interface Props {
@@ -149,7 +152,11 @@ export function SchematicEditor(props: Props) {
     setView({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale });
   }, [doc, lib, size]);
 
-  useImperativeHandle(handle, () => ({ fit, cursor: () => snapPoint(cursor) }), [fit, cursor]);
+  useImperativeHandle(
+    handle,
+    () => ({ fit, cursor: () => snapPoint(cursor), svg: () => svgRef.current, contentBox: () => docBox(doc, lib) }),
+    [fit, cursor, doc, lib],
+  );
 
   // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)
   const fittedKey = useRef<number | undefined>(undefined);

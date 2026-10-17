@@ -14,4 +14,9 @@ export async function menu(page, ...path) {
   }
 }
 
-export const openExample = (page, name) => menu(page, 'Archivo', 'Ejemplos', name.replace(/\.asc$/, ''));
+/** Abre un ejemplo y espera a que esté cargado (nombre en la barra, sin cambios) */
+export async function openExample(page, name) {
+  await menu(page, 'Archivo', 'Ejemplos', name.replace(/\.asc$/, ''));
+  const file = name.endsWith('.asc') ? name : `${name}.asc`;
+  await page.waitForFunction((f) => document.querySelector('.filename')?.textContent === f, file);
+}

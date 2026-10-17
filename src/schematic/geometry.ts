@@ -101,7 +101,11 @@ export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number): ItemR
  */
 export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef[] {
   const out: ItemRef[] = [];
-  for (let i = doc.texts.length - 1; i >= 0; i--) if (inBox(p, textBox(doc.texts[i]), tol / 2)) out.push({ kind: 'text', index: i });
+  for (let i = doc.texts.length - 1; i >= 0; i--) {
+    // el programa de bloques del Estudio (";.study …") no se dibuja ni se selecciona
+    if (doc.texts[i].kind === 'comment' && doc.texts[i].text.startsWith('.study ')) continue;
+    if (inBox(p, textBox(doc.texts[i]), tol / 2)) out.push({ kind: 'text', index: i });
+  }
   for (let i = doc.flags.length - 1; i >= 0; i--) if (inBox(p, flagBox(doc, doc.flags[i]), tol)) out.push({ kind: 'flag', index: i });
   doc.wires
     .map((w, i) => ({ i, d: distToSegment(p, w) }))

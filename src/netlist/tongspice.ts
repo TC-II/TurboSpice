@@ -39,6 +39,8 @@ export interface NgspiceNetlist {
   steps?: StepRuns;
   /** líneas .meas (las evalúa TurboSpice sobre los resultados; en la netlist van comentadas) */
   measures: string[];
+  /** gráficos x-y de un programa de bloques (puntos en el log: "TS-XY id x y") */
+  xyPlots: { id: number; x: string; y: string }[];
   warnings: string[];
 }
 
@@ -230,8 +232,36 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   // .control con marcas de sección: se combina con los barridos en lugar de reemplazarlos
   const ctl = lt.texts.find((t) => isControlBlock(t.text));
   const hooks = ctl ? controlHooks(ctl.text.split('\\n').slice(1, -1)) : null;
+  // .control generado por bloques: "run" corre cada análisis y recuerda su plot, y cada
+  // "meas" se hace sobre el plot de su análisis (después de "run" el actual es el último)
+  const xyPlots: NgspiceNetlist['xyPlots'] = [];
+  const blocksCtl = ctl && ctl.text.split('\\n').some((l) => l.trim() === '* bloques') ? ctl : undefined;
+  if (blocksCtl) {
+    const analyses = lt.texts
+      .filter((t) => t.kind === 'directive')
+      .flatMap((t) => t.text.split('\\n'))
+      .map((l) => l.trim())
+      .filter((l) => /^\.(tran|ac|dc|noise|op|tf)\b/i.test(l));
+    const body: string[] = [];
+    for (const raw of blocksCtl.text.split('\\n').slice(1, -1)) {
+      const indent = /^\s*/.exec(raw)![0];
+      const l = raw.trim();
+      const g = /^\*\s*grafico\s+(\d+)\s+(\S+)\s+(\S+)/i.exec(l);
+      if (g) xyPlots.push({ id: Number(g[1]), x: g[2], y: g[3] });
+      if (l === 'run') {
+        for (const a of analyses) {
+          const kind = /^\.(\w+)/.exec(a)![1].toLowerCase();
+          body.push(`${indent}${fixTran(a, warnings).slice(1)}`, `${indent}set ts_plot_${kind} = $curplot`);
+        }
+      } else if (/^meas\s+(\w+)/i.test(l)) {
+        body.push(`${indent}setplot $ts_plot_${/^meas\s+(\w+)/i.exec(l)![1].toLowerCase()}`, raw);
+      } else body.push(raw);
+    }
+    out.push('.control', ...body, '.endc');
+  }
   for (const t of lt.texts) {
     if (hooks && t === ctl) continue;
+    if (blocksCtl && t === blocksCtl) continue;
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
     const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
     for (const raw of t.text.split('\\n')) {
@@ -313,7 +343,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures };
+  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures, xyPlots };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

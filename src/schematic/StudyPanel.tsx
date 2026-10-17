@@ -1,6 +1,7 @@
 // Panel "Estudio": barridos, tolerancias, mediciones y pasos personalizados como tarjetas,
 // sin escribir SPICE. Genera directivas que LTspice también entiende (ver src/sim/study.ts).
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useMemo, useRef, useState, type ReactNode } from 'react';
+import { compileBlocks, studyToBlocks, type WorkspaceJson } from '../sim/studyBlocks.ts';
 import { parseStep } from '../netlist/step.ts';
 import type { MeasAnalysis } from '../sim/meas.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
@@ -392,11 +393,31 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
   onApplyCode(code: string): void;
   onClose(): void;
 }) {
-  const [st, set] = useState<Study>(initial);
-  const [tab, setTab] = useState<'cards' | 'blocks' | 'code'>('cards');
+  const [st, setStudy] = useState<Study>(initial);
+  // si el estudio se armó con bloques, se abre en esa pestaña
+  const [tab, setTab] = useState<'cards' | 'blocks' | 'code'>(initial.blocks ? 'blocks' : 'cards');
+  const [blocks, setBlocks] = useState<WorkspaceJson | null>((initial.blocks as WorkspaceJson | undefined) ?? null);
+  const blocksTouched = useRef(false);
+  const cardsTouched = useRef(false);
+  const set = (x: Study) => {
+    cardsTouched.current = true;
+    setStudy(x);
+  };
+  const compiled = useMemo(() => (blocks ? compileBlocks(blocks, info.analysis) : null), [blocks, info.analysis]);
+  /** Valor original de los componentes barridos desde bloques (para la .param) */
+  const withOriginals = (x: Study): Study => ({
+    ...x,
+    sweeps: x.sweeps.map((sw) => {
+      if (sw.target.kind !== 'component' || sw.original !== undefined) return sw;
+      const name = sw.target.name;
+      const c = info.components.find((k) => k.name.toLowerCase() === name.toLowerCase());
+      const prev = initial.sweeps.find((p) => p.target.kind === 'component' && p.target.name === name)?.original;
+      return { ...sw, original: c && !/^\{/.test(c.value) ? plain(c.value) : prev };
+    }),
+  });
   const [code, setCode] = useState<string | null>(null);
   const runs = totalRuns(st);
-  const shownCode = useMemo(() => code ?? studyCode(st), [code, st]);
+  const shownCode = code ?? studyCode(blocksTouched.current && compiled && !cardsTouched.current ? compiled.study : st);
   const nextName = (base: string) => {
     for (let i = 1; ; i++) if (!st.measures.some((m) => m.name === `${base}${i}`)) return `${base}${i}`;
   };
@@ -429,7 +450,17 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       <datalist id="study-params">{info.params.map((n) => <option key={n} value={n} />)}</datalist>
       <nav className="tabs study-tabs">
         <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>Tarjetas</button>
-        <button className={tab === 'blocks' ? 'active' : ''} onClick={() => setTab('blocks')}>Bloques</button>
+        <button
+          className={tab === 'blocks' ? 'active' : ''}
+          onClick={() => {
+            // "abrir en bloques": las tarjetas se convierten en el programa equivalente
+            if (!blocks || cardsTouched.current) setBlocks(studyToBlocks(st));
+            cardsTouched.current = false;
+            setTab('blocks');
+          }}
+        >
+          Bloques
+        </button>
         <button
           className={tab === 'code' ? 'active' : ''}
           onClick={() => {
@@ -439,7 +470,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
         >
           Ver código
         </button>
-        <span className="hint study-runs">{runs} corrida{runs === 1 ? '' : 's'} en total</span>
+        {tab !== 'blocks' && <span className="hint study-runs">{runs} corrida{runs === 1 ? '' : 's'} en total</span>}
       </nav>
       {tab === 'cards' && (
         <div className="study-cards">
@@ -527,10 +558,28 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           )}
         </div>
       )}
-      {tab === 'blocks' && (
-        <Suspense fallback={<p className="empty pad">Cargando el editor de bloques…</p>}>
-          <StudyBlocks study={st} info={info} onChange={set} />
-        </Suspense>
+      {tab === 'blocks' && blocks && (
+        <>
+          <Suspense fallback={<p className="empty pad">Cargando el editor de bloques…</p>}>
+            <StudyBlocks
+              initial={blocks}
+              info={info}
+              onChange={(ws) => {
+                blocksTouched.current = true;
+                setBlocks(ws);
+              }}
+            />
+          </Suspense>
+          {compiled && (
+            <p className={`hint${compiled.errors.length ? ' warn' : ''}`}>
+              {compiled.errors.length
+                ? compiled.errors.join(' · ')
+                : compiled.ltspice
+                  ? 'Se guarda como .step y .meas: el .asc sigue simulando igual en LTspice.'
+                  : 'Usa lógica que LTspice no tiene: se guarda como bloque .control (sólo TurboSpice). Los bloques quedan guardados en el .asc.'}
+            </p>
+          )}
+        </>
       )}
       {tab === 'code' && (
         <div className="study-code">
@@ -541,13 +590,28 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           </p>
         </div>
       )}
-      {problems.length > 0 && <p className="hint warn">{[...new Set(problems)].join(' · ')}</p>}
+      {tab === 'cards' && problems.length > 0 && <p className="hint warn">{[...new Set(problems)].join(' · ')}</p>}
       <div className="buttons">
         <button onClick={onClose}>Cancelar</button>
         {tab === 'code' && code !== null ? (
           <button className="primary" onClick={() => onApplyCode(code)}>Aplicar código</button>
+        ) : tab === 'blocks' ? (
+          <button
+            className="primary"
+            disabled={!compiled || compiled.errors.length > 0}
+            onClick={() => compiled && onApply(withOriginals({ ...compiled.study, blocks: blocks ?? undefined }))}
+          >
+            Aplicar
+          </button>
         ) : (
-          <button className="primary" disabled={problems.length > 0} onClick={() => onApply(st)}>Aplicar</button>
+          <button
+            className="primary"
+            disabled={problems.length > 0}
+            // editar las tarjetas descarta el programa de bloques (ya no coincidiría)
+            onClick={() => onApply({ ...st, blocks: cardsTouched.current ? undefined : st.blocks })}
+          >
+            Aplicar
+          </button>
         )}
       </div>
     </Modal>

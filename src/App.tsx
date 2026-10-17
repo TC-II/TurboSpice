@@ -42,7 +42,7 @@ import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
 import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotView } from './waveform/view.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
-import { measSweepPlot, measureResults, type MeasTable } from './sim/measResults.ts';
+import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
@@ -429,19 +429,23 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       const meas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
       const mp = meas && measSweepPlot(meas, built);
       if (mp) result.plots.push(mp);
+      // gráficos x-y de un programa de bloques
+      const xy = xyPlotsFromLog(result.log, built.ng.xyPlots);
+      result.plots.push(...xy);
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
       setSim({ built, result, doc, meas });
       // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
       // sólo si no hay otra cosa
       const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
-      const withScale = realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
+      const withScale = xy.length ? xy : realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
       const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
       // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
       // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
       const remembered = shown && plotView[plotKind(shown.name)];
-      if (remembered) {
+      if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
+      else if (remembered) {
         setPanes(remembered);
         if (built.controlPanes.length) built.warnings.push('Se usa la vista recordada en lugar de los "plot" del .control');
       } else if (built.controlPanes.length) setPanes(built.controlPanes);

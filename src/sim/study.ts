@@ -114,6 +114,24 @@ export interface Study {
   tolerance: StudyTolerance | null;
   measures: StudyMeasure[];
   custom: StudyCustom | null;
+  /** programa de bloques (JSON de Blockly), si el estudio se armó con bloques */
+  blocks?: unknown;
+}
+
+/** Comentario del .asc que guarda el programa de bloques (base64 del JSON) */
+export const STUDY_BLOCKS = '.study ';
+export const isStudyBlocksText = (t: { kind: string; text: string }) => t.kind === 'comment' && t.text.startsWith(STUDY_BLOCKS);
+
+function toBase64(json: string): string {
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): string {
+  const bin = atob(b64);
+  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }
 
 export const emptyStudy = (): Study => ({ sweeps: [], tolerance: null, measures: [], custom: null });
@@ -379,6 +397,14 @@ export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
     st.sweeps.push({ target, mode, list, start: nums[0] ?? '', stop: nums[1] ?? '', step: nums[2] ?? '', enabled: l.enabled, original });
   }
   st.measures.push(...measureFromDefs(measDefs));
+  const blocks = doc.texts.find(isStudyBlocksText);
+  if (blocks) {
+    try {
+      st.blocks = JSON.parse(fromBase64(blocks.text.slice(STUDY_BLOCKS.length).trim()));
+    } catch {
+      // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
+    }
+  }
   const control = doc.texts.find((t) => isControlBlock(t.text));
   if (control) {
     const body = control.text.split('\\n').slice(1, -1);
@@ -416,6 +442,7 @@ function stripStudy(doc: AscDoc, swept: Set<string>, keepControl: boolean): { te
   let anchor: { x: number; y: number } | null = null;
   const texts: SchText[] = [];
   for (const t of doc.texts) {
+    if (isStudyBlocksText(t)) continue;
     if (isControlBlock(t.text)) {
       if (keepControl) texts.push(t);
       else anchor ??= { x: t.x, y: t.y };
@@ -511,7 +538,12 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
     const text = ['.control', ...customBody(st.custom), '.endc'].join('\\n');
     const i = texts.findIndex((t) => isControlBlock(t.text));
     if (i >= 0) texts[i] = { ...texts[i], kind: 'comment', text };
-    else texts.push({ x: at.x, y, align: 'Left', size: 2, kind: 'comment', text });
+    else {
+      texts.push({ x: at.x, y, align: 'Left', size: 2, kind: 'comment', text });
+      y += customBody(st.custom).length * 24 + 40;
+    }
   }
+  // programa de bloques: texto chico (tamaño 0) debajo de todo; TurboSpice no lo dibuja
+  if (st.blocks) texts.push({ x: at.x, y: y + 32, align: 'Left', size: 0, kind: 'comment', text: STUDY_BLOCKS + toBase64(JSON.stringify(st.blocks)) });
   return { ...out, texts };
 }

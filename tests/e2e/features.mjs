@@ -463,6 +463,67 @@ await page.keyboard.press('Alt+e');
 check((await page.getByLabel('Valores').inputValue()) === '1k 3k' && (await page.getByLabel('Activar Barrido de R1').isChecked()), 'el código editado a mano vuelve a ser tarjetas');
 await page.keyboard.press('Escape');
 
+// --- #23: Estudio con bloques ---
+await openExample(page, 'Filtro RC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.keyboard.press('Alt+e');
+// tarjetas → "abrir en bloques"
+await page.getByRole('button', { name: '+ Barrido' }).click();
+const lastCard = page.locator('.study-card').last();
+await lastCard.getByLabel('Componente', { exact: true }).fill('R1');
+await lastCard.getByLabel('Valores').fill('500 2k');
+await page.getByRole('button', { name: 'Bloques' }).click();
+await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });
+// Blockly dibuja los espacios como U+00A0
+const blockText = async () => (await page.locator('.study-blocks .blocklyWorkspace .blocklyText').allTextContents()).map((t) => t.replace(/\u00a0/g, ' '));
+const blockTexts = await blockText();
+check(blockTexts.some((t) => /Para cada valor/.test(t)) && blockTexts.some((t) => /Simular/.test(t)), 'las tarjetas se abren como bloques');
+check(/\.step y \.meas/.test(await page.locator('.modal .hint').last().textContent()), 'un barrido simple sigue siendo compatible con LTspice');
+// programa con lógica: medir, condición y gráfico x-y → .control
+const prog = {
+  blocks: {
+    languageVersion: 0,
+    blocks: [
+      {
+        type: 'ts_for_list', x: 20, y: 20,
+        fields: { VAR: { id: 'vR' }, TARGET: 'component:R1', VALUES: '500 1k 2k' },
+        inputs: { DO: { block: { type: 'ts_simulate', next: { block: {
+          type: 'ts_measure', fields: { KIND: 'rise', SIGNAL: 'V(out)', A: '0.1', B: '0.9', VAR: { id: 'vT' } },
+          next: { block: {
+            type: 'controls_if',
+            inputs: {
+              IF0: { block: { type: 'logic_compare', fields: { OP: 'GT' }, inputs: { A: { block: { type: 'variables_get', fields: { VAR: { id: 'vT' } } } }, B: { block: { type: 'math_number', fields: { NUM: 0.003 } } } } } },
+              DO0: { block: { type: 'ts_message', fields: { TEXT: 'R1 demasiado grande' } } },
+            },
+            next: { block: { type: 'ts_plot_xy', fields: { Y: { id: 'vT' }, X: { id: 'vR' } } } },
+          } },
+        } } } } },
+      },
+    ],
+  },
+  variables: [{ name: 'R', id: 'vR' }, { name: 'trise', id: 'vT' }],
+};
+await page.locator('.study-blocks').evaluate((el, json) => el.loadProgram(json), prog);
+check(/\.control/.test(await page.locator('.modal .hint').last().textContent()), 'con lógica se guarda como .control');
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+check((await page.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'trise vs R', 'el gráfico trise vs R aparece solo');
+await page.getByRole('button', { name: 'Medidas' }).click();
+const xyRow = await page.locator('.readout tbody tr').first().locator('td').allTextContents();
+check(xyRow[0] === 'trise' && /^1\.09\d*m @ 500$/.test(xyRow[1]) && /^4\.39\d*m @ 2k$/.test(xyRow[2]), `trise en función de R (${xyRow.slice(0, 3).join(', ')})`);
+await page.getByRole('button', { name: 'Medidas' }).click();
+await page.getByRole('button', { name: 'Log' }).click();
+const logText = await page.locator('.results-body pre').textContent();
+check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición se evalúa en cada corrida (un solo mensaje)');
+// los bloques quedan guardados en el .asc y se recuperan
+await page.keyboard.press('Alt+e');
+await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });
+const again = await blockText();
+check(again.some((t) => /R1 demasiado grande/.test(t)), 'al reabrir, el programa de bloques se recupera');
+await page.screenshot({ path: `${OUT}/blocks.png` });
+await page.keyboard.press('Escape');
+
 // bienvenida en la primera visita
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const fp = await fresh.newPage();

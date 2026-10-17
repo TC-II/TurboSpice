@@ -90,11 +90,16 @@ probe por click (Alt+click potencia), export CSV/PNG.
 | 0. Motor | ngspice WASM con todos los análisis + XSPICE, smoke test vs nativo | ✅ |
 | 1. Base web | Vite+React, Worker, netlist → simular → plot, deploy a Pages | ✅ |
 | 2. Editor | Esquemático SVG `.asc` nativo, TCLib + skin, netlister validado contra LTspice, probe | ✅ |
-| 3. Archivos | share-URL, export netlist, autoguardado | |
-| 4. Librería | `library/`, catálogo, modelos del usuario, asistente subckt | |
-| 5. Análisis | Diálogos y vistas para todos los análisis | |
-| 6. LTspice | Importador de la librería local de LTspice (modelos estándar), `.step`, `ako:` | |
-| 7. Pulido | Anotación OP, mediciones, temas, ayuda, e2e (Playwright) | |
+| 3. Archivos | share-URL (#1), export netlist/CSV/PNG/SVG (#12), autoguardado y recientes (#5) | ✅ |
+| 4. Librería | Símbolos, modelos y bloques jerárquicos del usuario, generador de símbolos (#11) | ✅ (falta catálogo de modelos libres) |
+| 5. Análisis | Diálogos (#13), visor con paneles/cursores/expresiones/Bode/Smith/.pz (#3), vista recordada `.plt` (#14) | ✅ |
+| 6. LTspice | `.step` (#7), `ako:` (#8), numeración de nodos (#9); importador de la librería estándar (#6, pendiente) | parcial |
+| 7. Pulido | Anotación OP (#2), nombres de redes (#15), menús, temas, ayuda, táctil (#4), e2e | ✅ |
+| 8. Estudio | Barridos, tolerancias, mediciones (`.meas` en JS), FFT/THD, pasos `.control`, bloques Blockly (#16–#23) | ✅ |
+
+Pendiente: #6 (modelos de la librería estándar de LTspice: decidir importador local vs librería propia)
+y #10 (oráculo de LTspice bajo `xvfb-run`: verificar anidamiento de `.step`, lectura de `.plt` escritos por
+TurboSpice, netlists jerárquicas y numeración de nodos sobre todo el corpus).
 
 ## Riesgos
 

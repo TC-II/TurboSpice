@@ -2,6 +2,7 @@
 // plot "medición vs. parámetro" cuando hay un barrido.
 import type { SimPlot } from '../engine/ngspice.ts';
 import { STEP_SCALE } from '../waveform/series.ts';
+import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import { evalMeasures, parseMeas, type MeasDef, type MeasResult } from './meas.ts';
 import type { BuiltSimulation } from './schematicSim.ts';
 import { traceResolver } from './traces.ts';
@@ -94,3 +95,28 @@ export function histogram(values: number[], bins = 12): { from: number; to: numb
   return out;
 }
 
+
+/** Gráficos "y en función de x" de un programa de bloques: puntos impresos en el log (TS-XY id x y) */
+export function xyPlotsFromLog(log: string[], specs: { id: number; x: string; y: string }[]): SimPlot[] {
+  if (!specs.length) return [];
+  const pts = new Map<number, [number, number][]>();
+  for (const l of log) {
+    const m = /^TS-XY\s+(\d+)\s+(\S+)\s+(\S+)/.exec(l.trim());
+    if (!m) continue;
+    const x = parseSpiceNumber(m[2]);
+    const y = parseSpiceNumber(m[3]);
+    if (Number.isFinite(x) && Number.isFinite(y)) (pts.get(Number(m[1])) ?? pts.set(Number(m[1]), []).get(Number(m[1]))!).push([x, y]);
+  }
+  return specs
+    .filter((s) => (pts.get(s.id)?.length ?? 0) > 0)
+    .map((s) => {
+      const p = pts.get(s.id)!.sort((a, b) => a[0] - b[0]);
+      return {
+        name: `${s.y} vs ${s.x}`,
+        vectors: [
+          { name: s.x, type: STEP_SCALE, real: Float64Array.from(p, (q) => q[0]) },
+          { name: s.y, type: 0, real: Float64Array.from(p, (q) => q[1]) },
+        ],
+      };
+    });
+}

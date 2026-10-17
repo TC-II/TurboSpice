@@ -87,6 +87,38 @@ check((await flags()) === before, 'y se puede deshacer lo anterior a la recarga'
 const recents = await page.locator('select[aria-label="Recientes"] option').allTextContents();
 check(recents.includes('Bode RLC'), `recientes: ${recents.slice(1).join(', ')}`);
 
+// --- #2: punto de operación con el mouse ---
+const svg = page.locator('svg.editor');
+const at = async (x, y) => {
+  const b = await svg.boundingBox();
+  const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
+  return { x: b.x + ((x - vx) / vw) * b.width, y: b.y + ((y - vy) / vh) * b.height };
+};
+await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Emisor común.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.waitForTimeout(300);
+const q1 = await at(236, 208);
+await page.mouse.move(q1.x, q1.y);
+const tip = await page.locator('.bias-tip').textContent().catch(() => '');
+check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.test(tip), `hover sobre Q1: ${tip}`);
+const outW = await at(280, 160);
+await page.mouse.move(outW.x, outW.y);
+const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
+check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
+await page.getByRole('button', { name: 'Anotar OP' }).click();
+const ann = await page.locator('.op-annotation').allTextContents();
+check(ann.includes('1.415mA') && ann.includes('12V'), `anota el punto de operación (${ann.length} valores)`);
+await page.screenshot({ path: `${OUT}/bias.png` });
+await page.keyboard.press('Escape');
+await page.keyboard.press('g');
+const free = await at(560, 400);
+await page.mouse.click(free.x, free.y);
+await page.keyboard.press('Escape');
+await page.mouse.move(q1.x, q1.y);
+check((await page.locator('.bias-tip').count()) === 0 && (await page.locator('.op-annotation').count()) === 0, 'al editar el circuito los valores dejan de mostrarse');
+
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E funciones OK');

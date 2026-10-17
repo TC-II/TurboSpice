@@ -288,3 +288,13 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .net-name.nameable { cursor: pointer; }
 .net-name:hover rect { stroke: var(--sch-hl); stroke-width: 2; }
 .net-name text { pointer-events: none; }
+
+/* ---------- Punto de operación ---------- */
+.canvas-wrap > .bias-tip { position: absolute; z-index: 2; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 4px 16px rgb(0 0 0 / 18%); font: 12px/1.45 var(--mono); color: var(--fg); white-space: nowrap; }
+.bias-tip strong { display: block; font-family: system-ui, sans-serif; margin-bottom: 2px; }
+.op-annotation text { stroke: none; font-family: var(--mono); font-weight: 600; }
+.op-annotation rect { stroke-width: 1; vector-effect: non-scaling-stroke; }
+.op-annotation.v rect { fill: color-mix(in srgb, var(--sch-bg) 85%, transparent); stroke: var(--sch-wire); }
+.op-annotation.v text { fill: var(--sch-wire); }
+.op-annotation.i rect { fill: color-mix(in srgb, var(--sch-bg) 85%, transparent); stroke: var(--sch-hl); }
+.op-annotation.i text { fill: var(--sch-hl); }

@@ -6,7 +6,9 @@ import { EngineClient } from './engine/client.ts';
 import type { SimResult } from './engine/ngspice.ts';
 import { Library, type LibraryBundle } from './library/library.ts';
 import { ltNetlist } from './netlist/ltnetlist.ts';
-import { netNames } from './schematic/NetNames.tsx';
+import { netNames, type Annotation } from './schematic/NetNames.tsx';
+import { biasParams, elementBias, netBias } from './sim/bias.ts';
+import { symbolBox } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
 import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
@@ -32,7 +34,7 @@ import { Plot } from './waveform/Plot.tsx';
 import { displayName, sameRuns, scaleOf, type ComplexView } from './waveform/series.ts';
 
 const BASE = import.meta.env.BASE_URL;
-const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc'];
+const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc'];
 
 type Dialog =
   | { kind: 'picker' }
@@ -103,7 +105,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
-  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult } | null>(null);
+  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult; doc: AscDoc } | null>(null);
+  const [showOp, setShowOp] = useState(false);
   const [traces, setTraces] = useState<string[]>([]);
   const [plotName, setPlotName] = useState('');
   const [view, setView] = useState<ComplexView>('db');
@@ -310,10 +313,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
     try {
       const built = await buildSimulation(doc, lib, file.name);
-      const { result, ms } = await engine.simulate(built.netlist, built.files);
+      const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
-      setSim({ built, result });
+      setSim({ built, result, doc });
       const withScale = result.plots.filter((p) => scaleOf(p));
       const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
@@ -338,6 +341,34 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
 
   const plot = sim?.result.plots.find((p) => p.name === plotName);
+
+  // Punto de operación: sólo mientras el esquemático sea el que se simuló
+  const bias = sim && sim.doc === doc ? sim.result.bias : undefined;
+  const describe = useMemo(() => {
+    if (!bias || !sim) return undefined;
+    return ({ net, symbol }: { net?: string; symbol?: number }) => {
+      if (net) return net === '0' ? null : netBias(bias, net);
+      const el = symbol !== undefined ? sim.built.lt.elements.find((e) => e.sym === symbol) : undefined;
+      return el ? elementBias(sim.built, bias, el) : null;
+    };
+  }, [bias, sim]);
+  const annotations = useMemo((): Annotation[] | undefined => {
+    if (!showOp || !bias || !sim) return undefined;
+    const out: Annotation[] = [];
+    for (const n of netNames(doc, conn, new Map())) {
+      const b = netBias(bias, n.name);
+      if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
+    }
+    for (const el of sim.built.lt.elements) {
+      if (!/^[RLVIDQMJ]/i.test(el.prefix)) continue;
+      const b = elementBias(sim.built, bias, el);
+      const s = doc.symbols[el.sym];
+      if (!b?.short || !s) continue;
+      const box = symbolBox(s, lib.symbol(s.type), lib);
+      out.push({ at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
+    }
+    return out;
+  }, [showOp, bias, sim, doc, conn, lib]);
 
   const onProbe = ({ net, symbol }: { net?: string; symbol?: number }) => {
     if (!sim || !plot) return;
@@ -551,6 +582,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             </button>
           )}
           {sim && toolBtn({ kind: 'probe' }, 'Medir', 'Punta de prueba: click en un cable (tensión) o componente (corriente)')}
+          {bias && (
+            <button className={showOp ? 'active' : ''} onClick={() => setShowOp((v) => !v)} title="Anotar el punto de operación en el esquemático (sin modificarlo)">
+              Anotar OP
+            </button>
+          )}
           <StatusText status={status} />
         </div>
         <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
@@ -574,6 +610,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             highlightNet={traceNet}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
+            describe={describe}
+            annotations={annotations}
           />
           {message && (
             <div className="toast" onClick={() => setMessage(undefined)}>

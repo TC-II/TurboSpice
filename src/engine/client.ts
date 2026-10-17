@@ -1,5 +1,5 @@
 // API del motor para la UI: promesas sobre el Worker de ngspice.
-import type { SimResult } from './ngspice.ts';
+import type { SimResult, SimulateOptions } from './ngspice.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
 
 export interface SimOutcome {
@@ -56,9 +56,9 @@ export class EngineClient {
     });
   }
 
-  async simulate(netlist: string, files?: Record<string, string | Uint8Array>): Promise<SimOutcome> {
+  async simulate(netlist: string, files?: Record<string, string | Uint8Array>, opts?: SimulateOptions): Promise<SimOutcome> {
     await this.ready;
-    return this.request({ type: 'simulate', netlist, files }) as Promise<SimOutcome>;
+    return this.request({ type: 'simulate', netlist, files, opts }) as Promise<SimOutcome>;
   }
 
   /** Corta la simulación en curso: termina el Worker y levanta uno nuevo. */

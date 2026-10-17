@@ -6,7 +6,8 @@ import type { Library } from '../library/library.ts';
 import { ltNetlist, type LtNetlist } from '../netlist/ltnetlist.ts';
 import { prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
 
-const LIB_URL = `${import.meta.env.BASE_URL}library/sub/`;
+// (import.meta.env no existe fuera de Vite: tests en Node)
+const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
 const fileCache = new Map<string, string>();
 
 async function fetchModelFile(rel: string): Promise<string> {

@@ -16,7 +16,8 @@ import {
   type Box,
   type ItemRef,
 } from './geometry.ts';
-import { NetNamesLayer, type NetName } from './NetNames.tsx';
+import { AnnotationLayer, NetNamesLayer, type Annotation, type NetName } from './NetNames.tsx';
+import type { BiasInfo } from '../sim/bias.ts';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
 
 export type Tool =
@@ -50,6 +51,10 @@ interface Props {
   netNames?: NetName[];
   /** click en una etiqueta temporal de una red sin nombre */
   onNameNet?(at: Point): void;
+  /** punto de operación de lo que está bajo el cursor (tooltip) */
+  describe?(target: { net?: string; symbol?: number }): BiasInfo | null;
+  /** valores anotados sobre el esquemático */
+  annotations?: Annotation[];
   handle?: Ref<EditorHandle>;
   /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
   docKey?: number;
@@ -110,7 +115,7 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -120,6 +125,7 @@ export function SchematicEditor(props: Props) {
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   const [labelNet, setLabelNet] = useState<string | undefined>();
+  const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
 
   useEffect(() => {
@@ -276,7 +282,13 @@ export function SchematicEditor(props: Props) {
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e);
     setCursor(p);
-    if (tool.kind === 'probe') setHoverNet(probeTarget(p)?.net);
+    const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
+    if (tool.kind === 'probe') setHoverNet(target?.net);
+    const info = target && describe ? describe(target) : null;
+    if (info) {
+      const r = svgRef.current!.getBoundingClientRect();
+      setTip({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height, info });
+    } else if (tip) setTip(null);
     if (!drag) return;
     if (drag.mode === 'pan') {
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
@@ -345,8 +357,10 @@ export function SchematicEditor(props: Props) {
   const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
 
   return (
+    <>
     <svg
       ref={svgRef}
+      onPointerLeave={() => setTip(null)}
       className={`editor tool-${cursorClass}`}
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       onWheel={onWheel}
@@ -365,6 +379,7 @@ export function SchematicEditor(props: Props) {
       {view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
       <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={selection} highlightNet={labelNet ?? highlightNet ?? hoverNet} />
       <g className="ghost">{ghost}</g>
+      {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
       )}
@@ -379,5 +394,24 @@ export function SchematicEditor(props: Props) {
       )}
       {tool.kind !== 'select' && tool.kind !== 'probe' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
+    {tip && (
+      <div
+        className="bias-tip"
+        role="tooltip"
+        // del lado del cursor que tenga lugar, para no tapar lo que se señala
+        style={{
+          left: tip.x < tip.w - 220 ? tip.x + 16 : undefined,
+          right: tip.x < tip.w - 220 ? undefined : tip.w - tip.x + 16,
+          top: tip.y < tip.h - 200 ? tip.y + 16 : undefined,
+          bottom: tip.y < tip.h - 200 ? undefined : tip.h - tip.y + 16,
+        }}
+      >
+        <strong>{tip.info.title}</strong>
+        {tip.info.lines.map((l, i) => (
+          <div key={i}>{l}</div>
+        ))}
+      </div>
+    )}
+    </>
   );
 }

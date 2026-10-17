@@ -53,7 +53,7 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     }
     if (req.files) engine.writeFiles(req.files);
     const t0 = performance.now();
-    const result = engine.simulate(req.netlist);
+    const result = engine.simulate(req.netlist, req.opts);
     const ms = performance.now() - t0;
     // Tras un error fatal ngspice queda en estado indefinido: instancia nueva para la próxima
     if (result.aborted) ng = null;

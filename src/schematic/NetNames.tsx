@@ -92,3 +92,32 @@ export function NetNamesLayer({ names, scale, onHover, onName }: Props) {
     </g>
   );
 }
+
+export interface Annotation {
+  at: Point;
+  text: string;
+  kind: 'v' | 'i';
+}
+
+/** Valores del punto de operación sobre el esquemático (como el .op de LTspice) */
+export function AnnotationLayer({ items, scale }: { items: Annotation[]; scale: number }) {
+  const fs = 11 / scale;
+  return (
+    <g className="op-annotations">
+      {items.map((a, i) => {
+        const w = (a.text.length * 0.62 + 0.9) * fs;
+        const h = fs * 1.5;
+        const y = a.kind === 'v' ? a.at.y - h - 4 / scale : a.at.y - h / 2;
+        const x = a.kind === 'v' ? a.at.x - w / 2 : a.at.x;
+        return (
+          <g key={i} className={`op-annotation ${a.kind}`}>
+            <rect x={x} y={y} width={w} height={h} rx={3 / scale} />
+            <text x={x + w / 2} y={y + h / 2} fontSize={fs} textAnchor="middle" dominantBaseline="central">
+              {a.text}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}

@@ -29,6 +29,16 @@ export interface SimResult {
   errors: string[];
   /** ngspice pidió salir (error fatal): hay que recrear el módulo */
   aborted: boolean;
+  /**
+   * Punto de operación (si se pidió con `bias`): tensiones de nodo, corrientes de rama y los
+   * parámetros de dispositivo pedidos (`@q1[gm]`…), por nombre de vector en minúsculas.
+   */
+  bias?: Record<string, number>;
+}
+
+export interface SimulateOptions {
+  /** Calcular además el punto de operación y leer estos parámetros de dispositivo */
+  bias?: string[];
 }
 
 export interface NgspiceOptions {
@@ -165,7 +175,7 @@ export class Ngspice {
    * Simula una netlist completa. Si trae bloque .control, éste decide qué correr;
    * si no, se ejecutan los análisis de la netlist con "run".
    */
-  simulate(netlist: string): SimResult {
+  simulate(netlist: string, opts: SimulateOptions = {}): SimResult {
     this.log = [];
     this.errors = [];
     this.aborted = false;
@@ -177,16 +187,44 @@ export class Ngspice {
 
     this.writeFiles({ 'circuit.cir': netlist });
     this.command(`source ${WORK_DIR}/circuit.cir`);
-    if (!this.aborted && !/^\s*\.control\b/im.test(netlist)) {
+    const control = /^\s*\.control\b/im.test(netlist);
+    if (!this.aborted && !control) {
       this.command('run');
     }
+    const plots = this.aborted ? [] : this.readPlots();
+    const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias) : undefined;
 
-    return {
-      plots: this.aborted ? [] : this.readPlots(),
-      log: this.log,
-      errors: this.errors,
-      aborted: this.aborted,
-    };
+    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias };
+  }
+
+  /**
+   * Punto de operación con un "op" extra (después de los análisis, el estado del circuito es
+   * el del final del último). Sus errores van al log pero no cuentan como errores de la
+   * simulación pedida; el plot que genera no se devuelve entre los resultados.
+   */
+  private operatingPoint(params: string[]): Record<string, number> | undefined {
+    const errors = this.errors.length;
+    this.command('op');
+    if (this.errors.length > errors || this.aborted) {
+      this.errors.length = errors;
+      return undefined;
+    }
+    const out: Record<string, number> = {};
+    const plot = this.readStringArray(this.m._ngSpice_AllPlots())[0];
+    const p = this.m.stringToNewUTF8(plot);
+    const names = this.readStringArray(this.m._ngSpice_AllVecs(p));
+    this.m._free(p);
+    for (const n of names) {
+      const v = this.readVector(`${plot}.${n}`, n);
+      if (v?.real.length) out[n.toLowerCase()] = v.real[0];
+    }
+    for (const n of params) {
+      const v = this.readVector(n, n);
+      if (v?.real.length) out[n.toLowerCase()] = v.real[0];
+    }
+    // parámetros que el modelo no tiene: no son errores de la simulación
+    this.errors.length = errors;
+    return out;
   }
 
   private readStringArray(ptr: number): string[] {

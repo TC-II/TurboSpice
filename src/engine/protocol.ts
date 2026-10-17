@@ -1,8 +1,8 @@
-import type { SimResult } from './ngspice.ts';
+import type { SimResult, SimulateOptions } from './ngspice.ts';
 
 export type WorkerRequest =
   | { id: number; type: 'init' }
-  | { id: number; type: 'simulate'; netlist: string; files?: Record<string, string | Uint8Array> };
+  | { id: number; type: 'simulate'; netlist: string; files?: Record<string, string | Uint8Array>; opts?: SimulateOptions };
 
 export type WorkerResponse =
   | { id: number; type: 'ready' }

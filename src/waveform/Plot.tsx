@@ -12,9 +12,11 @@ interface Props {
   view: ComplexView;
   /** Corridas a superponer (barridos de .control); incluye a `plot` */
   runs?: SimPlot[];
+  /** etiqueta de cada corrida (.step: "R=2k") */
+  labels?: Map<string, string>;
 }
 
-export function Plot({ plot, vectors, view, runs }: Props) {
+export function Plot({ plot, vectors, view, runs, labels }: Props) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,7 +41,7 @@ export function Plot({ plot, vectors, view, runs }: Props) {
         const y = project(rv, view);
         curves.push({
           v: rv,
-          label: displayName(rv) + (all.length > 1 ? ` · ${r.name}` : ''),
+          label: displayName(rv) + (all.length > 1 ? ` · ${labels?.get(r.name) ?? r.name}` : ''),
           y: r === plot ? y : resample(rs.real, y, scale.real),
         });
       }
@@ -87,7 +89,7 @@ export function Plot({ plot, vectors, view, runs }: Props) {
       ro.disconnect();
       u.destroy();
     };
-  }, [plot, vectors, view, runs]);
+  }, [plot, vectors, view, runs, labels]);
 
   return <div className="plot" ref={host} />;
 }

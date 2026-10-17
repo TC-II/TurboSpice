@@ -31,10 +31,10 @@ import { useHistory } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import { Plot } from './waveform/Plot.tsx';
-import { displayName, sameRuns, scaleOf, type ComplexView } from './waveform/series.ts';
+import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots, type ComplexView } from './waveform/series.ts';
 
 const BASE = import.meta.env.BASE_URL;
-const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc'];
+const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc', 'Barrido RC (.step).asc'];
 
 type Dialog =
   | { kind: 'picker' }
@@ -317,6 +317,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     try {
       const built = await buildSimulation(doc, lib, file.name);
       const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
+      result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
       setSim({ built, result, doc });
@@ -550,6 +551,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const scale = plot ? scaleOf(plot) : null;
   const chosen = plot ? plot.vectors.filter((v) => traces.includes(v.name)) : [];
   const runs = sim && plot ? sameRuns(sim.result.plots, plot) : [];
+  const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
   const toolBtn = (t: Tool, label: string, title: string) => (
     <button className={tool.kind === t.kind ? 'active' : ''} title={title} onClick={() => setTool(t)}>
@@ -676,7 +678,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <>
                   <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label="Plot">
                     {sim.result.plots.map((p) => (
-                      <option key={p.name}>{p.name}</option>
+                      <option key={p.name} value={p.name}>
+                        {p.name}
+                        {labels.has(p.name) ? ` (${labels.get(p.name)})` : ''}
+                      </option>
                     ))}
                   </select>
                   {isComplex && scale && (
@@ -712,7 +717,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             </div>
             <div className="results-body">
               {panel === 'plot' && plot && scale && chosen.length > 0 && (
-                <Plot plot={plot} vectors={chosen} view={view} runs={overlay ? runs : undefined} />
+                <Plot plot={plot} vectors={chosen} view={view} runs={overlay ? runs : undefined} labels={labels} />
               )}
               {panel === 'plot' && plot && scale && chosen.length === 0 && (
                 <p className="empty pad">Hacé click en un cable para ver su tensión, o en un componente para ver su corriente.</p>

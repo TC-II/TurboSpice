@@ -144,6 +144,21 @@ check(await page.locator('.modal').isVisible(), 'Esc cancela la elección y vuel
 check(/^\.noise V\(out\) Vin /.test(await page.locator('.sim-preview code').textContent()), `directiva: ${await page.locator('.sim-preview code').textContent()}`);
 await page.getByRole('button', { name: 'Cancelar' }).click();
 
+// --- #7: .step ---
+await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Barrido RC (.step).asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
+check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k)', `una corrida por paso (${stepPlots.join(', ')})`);
+await page.waitForTimeout(300);
+const outStep = await at(128, -32);
+await page.mouse.click(outStep.x, outStep.y);
+await page.waitForTimeout(300);
+const series = await page.locator('.u-legend .u-series .u-label').allTextContents();
+check(series.includes('V(out) · R=1k') && series.length === 4, `leyenda con el valor de cada paso (${series.slice(1).join(', ')})`);
+await page.screenshot({ path: `${OUT}/step.png` });
+
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E funciones OK');

@@ -4,11 +4,13 @@
 //  - Rser/Lser/Rpar/Cpar de L, C y V se expanden en elementos reales (ngspice no los tiene);
 //  - .model implícitos (D, NPN, NMOS…) y nombres de elemento con "§";
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
-//  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso).
-import { isNgspiceComment } from './directives.ts';
+//  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
+//  - ".step" → bucles en un bloque .control (step.ts).
+import { isControlBlock, isNgspiceComment } from './directives.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
+import { parseStep, stepPlan, type Step, type StepRuns } from './step.ts';
 
 /** Resistencia serie que LTspice agrega a todo inductor sin Rser */
 export const LTSPICE_INDUCTOR_RSER = '1m';
@@ -32,6 +34,8 @@ export interface NgspiceNetlist {
   subcktParams: Map<string, Map<string, string>>;
   /** nombre del elemento en LTspice (InstName efectivo) → nombre en ngspice */
   names: Map<string, string>;
+  /** con .step: las corridas en orden de ejecución */
+  steps?: StepRuns;
   warnings: string[];
 }
 
@@ -167,6 +171,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
 
   out.push(...lt.implicitModels);
 
+  const steps: Step[] = [];
   for (const t of lt.texts) {
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
     const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
@@ -179,11 +184,10 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       if (!line) continue;
       if (DROP_DIRECTIVES.test(line)) continue;
       if (/^\.step\b/i.test(line)) {
-        // Hasta soportar .step: se simula el primer valor del barrido
-        warnings.push('.step todavía no está soportado: se simula sólo el primer valor');
         out.push(`* ${line}`);
-        const p = /^\.step\s+(?:(?:lin|oct|dec)\s+)?param\s+(\S+)\s+(?:list\s+)?(\S+)/i.exec(line);
-        if (p) out.push(`.param ${p[1]}=${p[2]}`);
+        const st = parseStep(line);
+        if (typeof st === 'string') warnings.push(`${line}: ${st}`);
+        else steps.push(st);
         continue;
       }
       const lib = /^\.(lib|include|inc)\s+("?)([^"]+)\2(?:\s+(\S+))?\s*$/i.exec(line);
@@ -193,7 +197,8 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         out.push(r ?? `* ${line}`);
         continue;
       }
-      out.push(fixTran(line, warnings));
+      // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
+      out.push(fixTran(line, warnings).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
     }
   }
 
@@ -201,6 +206,8 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     const r = include(f);
     if (r) out.push(r);
   }
+
+  const stepRuns = steps.length ? addSteps(steps, lt, names, out, warnings) : undefined;
 
   // Modelos referenciados que no aparecen definidos en ningún lado
   const local = new Set(
@@ -220,7 +227,47 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, warnings, subcktParams };
+  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns };
+}
+
+/** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */
+function declaredParams(lt: LtNetlist): Set<string> {
+  const out = new Set<string>();
+  for (const t of lt.texts) {
+    if (t.kind !== 'directive') continue;
+    for (const line of t.text.split('\\n')) {
+      const m = /^\s*\.param\s+(.*)$/i.exec(line);
+      if (!m) continue;
+      for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) out.add(p[1].toLowerCase());
+      const bare = /^([A-Za-z_]\w*)\s+[^=\s]/.exec(m[1]);
+      if (bare) out.add(bare[1].toLowerCase());
+    }
+  }
+  return out;
+}
+
+/** .step → bloque .control (o, si ya hay uno del usuario, sólo el primer valor). Devuelve las corridas. */
+function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out: string[], warnings: string[]): StepRuns | undefined {
+  const declared = declaredParams(lt);
+  // alterparam necesita que el parámetro exista: se declara con el primer valor
+  for (const s of steps) {
+    if (s.target.kind === 'param' && !declared.has(s.target.name.toLowerCase())) {
+      out.push(`.param ${s.target.name}=${formatSpiceNumber(s.values[0])}`);
+      declared.add(s.target.name.toLowerCase());
+    }
+  }
+  if (lt.texts.some((t) => isControlBlock(t.text))) {
+    warnings.push('.step se ignora porque el esquemático tiene un bloque .control (el bloque decide qué simular)');
+    return undefined;
+  }
+  const byName = new Map([...names].map(([k, v]) => [k.toLowerCase(), v]));
+  const plan = stepPlan(steps, (n) => byName.get(n.toLowerCase()));
+  if (typeof plan === 'string') {
+    warnings.push(`.step: ${plan}`);
+    return undefined;
+  }
+  out.push(...plan.control);
+  return { names: plan.names, runs: plan.runs };
 }
 
 /**

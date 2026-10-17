@@ -1,4 +1,8 @@
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
+import type { StepRuns } from '../netlist/step.ts';
+
+/** Tipo de vector propio (no de ngspice) para el eje X de los barridos de .step */
+export const STEP_SCALE = 1000;
 
 export type ComplexView = 'db' | 'phase' | 'mag' | 're' | 'im';
 
@@ -6,12 +10,12 @@ const SCALE_NAME = /^(time|frequency|[a-z]+-sweep)$/i;
 
 /** Vector de escala (eje X) de un plot, o null si el plot es escalar (op, tf, sens, pz). */
 export function scaleOf(plot: SimPlot): SimVector | null {
-  return plot.vectors.find((v) => SCALE_NAME.test(v.name)) ?? null;
+  return plot.vectors.find((v) => v.type === STEP_SCALE || SCALE_NAME.test(v.name)) ?? null;
 }
 
 export function isLogScale(plot: SimPlot): boolean {
   const s = scaleOf(plot);
-  if (!s || s.name.toLowerCase() !== 'frequency') return false;
+  if (!s || (s.name.toLowerCase() !== 'frequency' && s.type !== STEP_SCALE)) return false;
   const f = s.real;
   // dec/oct → log; lin → lineal
   if (f.length < 3 || f[0] <= 0) return false;
@@ -97,4 +101,45 @@ export function sameRuns(plots: SimPlot[], plot: SimPlot): SimPlot[] {
   if (!m || !sc || sc.name.endsWith('-sweep')) return [plot];
   const runs = plots.filter((p) => new RegExp(`^${m[1]}\\d+$`, 'i').test(p.name) && scaleOf(p)?.name === sc.name);
   return runs.length > 1 ? runs : [plot];
+}
+
+/** Etiqueta de cada plot generado por .step ("tran3" → "R=3k"), por tipo de análisis */
+export function stepLabels(plots: SimPlot[], steps?: StepRuns): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!steps) return out;
+  const byKind = new Map<string, SimPlot[]>();
+  for (const p of plots) {
+    const k = /^([a-z]+)\d+$/i.exec(p.name)?.[1];
+    if (k) (byKind.get(k) ?? byKind.set(k, []).get(k)!).push(p);
+  }
+  for (const ps of byKind.values()) if (ps.length === steps.runs.length) ps.forEach((p, i) => out.set(p.name, steps.runs[i].label));
+  return out;
+}
+
+/**
+ * Análisis sin eje X (.op, .tf) repetidos por un único .step: un plot nuevo con cada
+ * resultado en función del valor barrido (como grafica LTspice un .op con .step).
+ */
+export function stepSweepPlots(plots: SimPlot[], steps?: StepRuns): SimPlot[] {
+  if (!steps || steps.names.length !== 1) return [];
+  const byKind = new Map<string, SimPlot[]>();
+  for (const p of plots) {
+    const k = /^([a-z]+)\d+$/i.exec(p.name)?.[1];
+    if (k && !scaleOf(p)) (byKind.get(k) ?? byKind.set(k, []).get(k)!).push(p);
+  }
+  const out: SimPlot[] = [];
+  for (const [kind, ps] of byKind) {
+    if (ps.length !== steps.runs.length) continue;
+    const scale: SimVector = { name: steps.names[0], type: STEP_SCALE, real: Float64Array.from(steps.runs, (r) => r.values[0]) };
+    // ordenar por el valor barrido (una lista puede venir desordenada)
+    const order = [...scale.real.keys()].sort((a, b) => scale.real[a] - scale.real[b]);
+    const sorted = (a: Float64Array) => Float64Array.from(order, (i) => a[i]);
+    const vectors: SimVector[] = [{ ...scale, real: sorted(scale.real) }];
+    for (const v of ps[0].vectors) {
+      const vals = ps.map((p) => p.vectors.find((x) => x.name === v.name)?.real[0]);
+      if (vals.every((x) => x !== undefined)) vectors.push({ name: v.name, type: v.type, real: sorted(Float64Array.from(vals as number[])) });
+    }
+    out.push({ name: `${kind} vs ${steps.names[0]}`, vectors });
+  }
+  return out;
 }

@@ -75,8 +75,15 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | `.end nombre` cerrando un subcircuito, `.param x 20` | `.ends`, `.param x=20` |
 | `pi` predefinido en `.param` | `.param pi=…` |
 | `.tran tstop` / `.tran 0 tstop` | `.tran tstop/1000 tstop` |
-| `.step` (todavía no soportado) | Se simula el primer valor del barrido |
+| `.step param/fuente/temp/modelo` (lin, dec, oct, list; anidados) | Bucles `foreach` en un `.control` generado: `alterparam` + `reset`, `alter fuente dc=`, `altermod`, `option temp=`; una corrida (`tran1`, `tran2`…) por paso, etiquetada `R=2k` |
+| `.step` con un `.control` propio en el esquemático | Se simula el primer valor (el bloque decide qué correr) y se avisa |
+| `.param x 20` en una directiva | `.param x=20` |
 | Integración por defecto `modified trap` | ngspice usa `trap` (diferencia conocida) |
+
+Con varios `.step`, el primero es el que varía más rápido (bucle interno). **Pendiente de verificar
+con el oráculo** (#10): LTspice no está disponible bajo `xvfb-run` en la máquina de desarrollo.
+Un `.op` (o `.tf`) con un único `.step` genera además un gráfico de cada resultado en función del
+valor barrido, como lo muestra LTspice.
 
 Corpus de la materia simulado en ngspice: 35/80 sin errores; de los restantes, 32 usan modelos de la
 librería estándar de LTspice (`BC547C`, `1N4148`, …) que no se pueden redistribuir.

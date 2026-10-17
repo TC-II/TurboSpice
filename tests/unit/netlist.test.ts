@@ -82,14 +82,16 @@ SYMATTR SpiceLine Rser=2 Cpar=1p
     expect(r.text).toContain('C__C1_par NC_03 NC_04 1p');
   });
 
-  it('.tran de un argumento y .step con el primer valor', () => {
+  it('.tran de un argumento y .step como bucle en .control', () => {
     const r = ng(`Version 4
 SHEET 1 880 680
-TEXT 0 0 Left 2 !.tran 10m\\n.step param R 1k 10k 1k
+TEXT 0 0 Left 2 !.tran 10m\\n.step param R 1k 3k 1k
 `);
     expect(r.text).toContain('.tran 0.00001 10m');
-    expect(r.text).toContain('.param R=1k');
-    expect(r.warnings.join()).toMatch(/\.step/);
+    expect(r.text).toContain('.param R=1000');
+    expect(r.text).toContain('.control\nforeach ts_step0 1000 2000 3000\n  alterparam R = $ts_step0\n  reset\n  run\nend\n.endc');
+    expect(r.steps!.runs.map((x) => x.label)).toEqual(['R=1k', 'R=2k', 'R=3k']);
+    expect(r.warnings).toEqual([]);
   });
 
   it('avisa los componentes sin valor', () => {

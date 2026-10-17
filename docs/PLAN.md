@@ -9,8 +9,8 @@ WebAssembly, interfaz para dibujar esquemáticos, hosteado como sitio estático 
 |---|---|
 | Motor | ngspice-47 compilado por nosotros (Emscripten, `libngspice`), ver `engine/README.md` |
 | Frontend | Vite + TypeScript + React; esquemático en SVG custom |
-| Archivo | JSON propio `.tsch` (versionado, modelos del usuario embebidos) + importar `.asc`/`.asy` + exportar netlist `.cir` |
-| Guardado | Abrir/Guardar local (File System Access API, fallback descarga) + compartir por URL comprimida |
+| Archivo | **`.asc` de LTspice como formato nativo** (ida y vuelta), guardado con todo explícito. Ver `docs/compatibilidad-ltspice.md` |
+| Guardado | Abrir/Guardar local (File System Access API, fallback descarga) + compartir por URL comprimida (fase 3) |
 | Modelos | Librería en el repo con metadatos de licencia + modelos del usuario + importador local de LTspice |
 | XSPICE | Completo desde v1 (analog, digital, spice2poly, xtradev, xtraevt, table, tlines) |
 | UX | Inspirada en LTspice (atajos y flujo de probe), UI moderna propia |
@@ -66,7 +66,7 @@ src/library/     catálogo, buscador, modelos del usuario
 - Componentes, cables en grilla, etiquetas de red, tierra, puertos, textos, directivas. Undo/redo.
 - Atajos tipo LTspice: `R` `C` `L` `D` `G`, `F3`/`W` cable, `F4` etiqueta, `Ctrl+R` rotar,
   `Ctrl+E` espejar, `F2` componente, `F5` borrar, `F7` mover, `F8` arrastrar.
-- Símbolos JSON: gráficos + pines + plantilla SPICE (`R{ref} {p1} {p2} {value}`).
+- Símbolos: `.asy` de LTspice (TCLib + base propios) con el skin SVG de ASC-Parser.
 - Netlister: union-find → redes; nombres desde etiquetas; `.include` de modelos usados;
   avisos de pines flotantes / nodos sin camino DC a tierra; expansión de `Rser`/`Rpar`/`Cpar` estilo LTspice.
 
@@ -88,12 +88,12 @@ probe por click (Alt+click potencia), export CSV/PNG.
 | Fase | Entregable | Estado |
 |---|---|---|
 | 0. Motor | ngspice WASM con todos los análisis + XSPICE, smoke test vs nativo | ✅ |
-| 1. Base web | Vite+React, Worker, netlist → simular → plot, deploy a Pages | ✅ (deploy pendiente de remote) |
-| 2. Editor | Esquemático SVG, símbolos básicos, netlister, op/tran/ac, probe | |
-| 3. Archivos | `.tsch` abrir/guardar, share-URL, export netlist | |
+| 1. Base web | Vite+React, Worker, netlist → simular → plot, deploy a Pages | ✅ |
+| 2. Editor | Esquemático SVG `.asc` nativo, TCLib + skin, netlister validado contra LTspice, probe | ✅ |
+| 3. Archivos | share-URL, export netlist, autoguardado | |
 | 4. Librería | `library/`, catálogo, modelos del usuario, asistente subckt | |
 | 5. Análisis | Diálogos y vistas para todos los análisis | |
-| 6. LTspice | Import `.asc`/`.asy`, importador de librería local, `.step` | |
+| 6. LTspice | Importador de la librería local de LTspice (modelos estándar), `.step`, `ako:` | |
 | 7. Pulido | Anotación OP, mediciones, temas, ayuda, e2e (Playwright) | |
 
 ## Riesgos

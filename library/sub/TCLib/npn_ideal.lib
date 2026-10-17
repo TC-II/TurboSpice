@@ -1,0 +1,75 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* This is the NPN BJT
+*
+*         C
+*     |  /
+*     | /
+* B---|
+*     | \
+*     | _\|
+*          E
+*
+*
+*  /\Ic
+*  |
+*  |
+*  |        /--------------------
+*  |       /
+*  |      /----------------------
+*  |     /
+*  |    /------------------------
+*  |   /
+*  |  /--------------------------
+*  | /
+*  |/__________________________________> Vbe
+*
+*
+
+.SUBCKT NPN_nice C B E
+
+
+
+**Voltage sources used to measure current trough terminals
+V_Ib B Vbint 0
+V_Ic C Vcint 0
+V_Ie Veint E 0
+
+**Base emiter and base colector voltage drop
+**Base emiter diode
+D5 Vbint Veint Dideal_Vbe
+**Base colector diode
+D6 Vbint Vcint Dideal_Vbc
+
+
+**Resistor value according to hfe for forward and inverse current
+
+Rf1 Vcint Vcr R = limit(10u,100Meg, abs(   (     ( V(Vcint,Vcr)*V(Vcint,Vcr)+curve ) / V(Vcint,Vcr)        ) /  ( I(V_Ib)*hfe   ) ) )
+Rr1 Veint Ver R = limit(10u,100Meg, abs(   (     ( V(Veint,Ver)*V(Veint,Ver)+curve ) / V(Veint,Ver)        )  / ( I(V_Ib)*hfe/r) ) )
+
+**Ratio between hfe direct and inverse modes
+.param r 20
+**Transition shape between saturation and active region
+.param curve 100u
+
+
+*Rf1 Vcint Vcr R = limit(1u,100Meg, abs(   (     									V(Vcint,Vcr)        ) /  ( I(V_Ib)*hfe   ) ) )
+*Rr1 Veint Ver R = limit(1u,100Meg, abs(   (     									V(Veint,Ver)        )  / ( I(V_Ib)*hfe/20) ) )
+
+
+**Saturation voltage
+D7 Vcr Veint Dideal_Vce
+D2 Ver Vcint Dideal_Vce
+
+
+**Models for the diodes
+.model Dideal D(Ron=10u Vfwd=10m)
+.model Dideal_Vbe D(Ron=10m Vfwd={Vbe})
+.model Dideal_Vce D(Ron=10u Vfwd={Vce_sat})
+.model Dideal_Vbc D(Ron=10u Vfwd={Vbe*0.98})
+
+
+
+.end NPN_nice
+*

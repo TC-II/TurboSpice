@@ -49,7 +49,13 @@ export function project(v: SimVector, view: ComplexView): Float64Array {
 export function displayName(v: SimVector): string {
   const n = v.name;
   const br = /^(.*)#branch(.*)$/i.exec(n);
-  if (br) return `I(${br[1]}${br[2]})`;
+  if (br) return `I(${br[1].toUpperCase()}${br[2]})`;
+  // corrientes de dispositivos (.options savecurrents): @r1[i], @q1[ic], @d1[id]
+  const dev = /^@([^[]+)\[(\w+)\]$/.exec(n);
+  if (dev) {
+    const name = dev[1].toUpperCase();
+    return ['i', 'id', 'current'].includes(dev[2]) ? `I(${name})` : `I${dev[2].slice(1)}(${name})`;
+  }
   if (v.type === 3 && !/[(@]/.test(n)) return `V(${n})`;
   return n;
 }

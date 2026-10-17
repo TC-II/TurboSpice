@@ -1,0 +1,19 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* This is the dual supply
+*
+*  1---+Vcc
+*  |
+*  |
+*  |3------ GND
+*  |
+*  |
+*  2----Vcc
+*
+.SUBCKT supply 1 2 3
+V01 1 3 {Vp}
+V02 3 2 {Vn}
+.ENDS
+
+

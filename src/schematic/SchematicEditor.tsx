@@ -1,0 +1,374 @@
+// Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
+// Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
+import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
+import type { Library } from '../library/library.ts';
+import type { Connectivity } from '../netlist/connectivity.ts';
+import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol } from './edit.ts';
+import {
+  boxesIntersect,
+  hitTest,
+  pinPoints,
+  snap,
+  snapPoint,
+  symbolBox,
+  textBox,
+  type Box,
+  type ItemRef,
+} from './geometry.ts';
+import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
+
+export type Tool =
+  | { kind: 'select' }
+  | { kind: 'wire'; start: Point | null }
+  | { kind: 'place'; type: string; orient: Orient }
+  | { kind: 'flag'; name: string }
+  | { kind: 'text'; text: string; textKind: 'directive' | 'comment' }
+  | { kind: 'delete' }
+  | { kind: 'probe' };
+
+export interface EditorHandle {
+  fit(): void;
+  /** Posición del cursor en el esquemático (para pegar/duplicar) */
+  cursor(): Point;
+}
+
+interface Props {
+  doc: AscDoc;
+  lib: Library;
+  conn: Connectivity;
+  commit(doc: AscDoc): void;
+  tool: Tool;
+  setTool(t: Tool): void;
+  selection: ItemRef[];
+  setSelection(s: ItemRef[]): void;
+  onEdit(ref: ItemRef): void;
+  onProbe?(ref: { net?: string; symbol?: number }): void;
+  highlightNet?: string;
+  handle?: Ref<EditorHandle>;
+  /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
+  docKey?: number;
+}
+
+interface View {
+  cx: number;
+  cy: number;
+  /** píxeles por unidad de LTspice */
+  scale: number;
+}
+
+type Drag =
+  | { mode: 'pan'; sx: number; sy: number; view: View }
+  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
+  | { mode: 'box'; start: Point; additive: boolean };
+
+function docBox(doc: AscDoc, lib: Library): Box | null {
+  const boxes: Box[] = [];
+  for (const w of doc.wires) boxes.push({ x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) });
+  for (const s of doc.symbols) boxes.push(symbolBox(s, lib.symbol(s.type), lib));
+  for (const f of doc.flags) boxes.push({ x1: f.x - 16, y1: f.y - 16, x2: f.x + 16, y2: f.y + 16 });
+  for (const t of doc.texts) boxes.push(textBox(t));
+  if (!boxes.length) return null;
+  return {
+    x1: Math.min(...boxes.map((b) => b.x1)),
+    y1: Math.min(...boxes.map((b) => b.y1)),
+    x2: Math.max(...boxes.map((b) => b.x2)),
+    y2: Math.max(...boxes.map((b) => b.y2)),
+  };
+}
+
+/** Elementos dentro de un recuadro de selección */
+function itemsIn(doc: AscDoc, b: Box, lib: Library): ItemRef[] {
+  const out: ItemRef[] = [];
+  doc.symbols.forEach((s, i) => boxesIntersect(symbolBox(s, lib.symbol(s.type), lib), b) && out.push({ kind: 'symbol', index: i }));
+  doc.wires.forEach((w, i) => {
+    const wb = { x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) };
+    if (boxesIntersect(wb, b)) out.push({ kind: 'wire', index: i });
+  });
+  doc.flags.forEach((f, i) => f.x >= b.x1 && f.x <= b.x2 && f.y >= b.y1 && f.y <= b.y2 && out.push({ kind: 'flag', index: i }));
+  doc.texts.forEach((t, i) => boxesIntersect(textBox(t), b) && out.push({ kind: 'text', index: i }));
+  return out;
+}
+
+/** ¿Hay algo conectable en p? (pin, extremo de cable, etiqueta o cable que pasa) */
+function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
+  if (doc.flags.some((f) => f.x === p.x && f.y === p.y)) return true;
+  if (doc.symbols.some((s) => pinPoints(s, lib.symbol(s.type)).some((q) => q.x === p.x && q.y === p.y))) return true;
+  return doc.wires.some((w) => {
+    const minx = Math.min(w.x1, w.x2);
+    const maxx = Math.max(w.x1, w.x2);
+    const miny = Math.min(w.y1, w.y2);
+    const maxy = Math.max(w.y1, w.y2);
+    const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
+    return cross === 0 && p.x >= minx && p.x <= maxx && p.y >= miny && p.y <= maxy;
+  });
+}
+
+export function SchematicEditor(props: Props) {
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey } = props;
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [size, setSize] = useState({ w: 800, h: 600 });
+  const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
+  const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const [preview, setPreview] = useState<AscDoc | null>(null);
+  const [boxEnd, setBoxEnd] = useState<Point | null>(null);
+  const [hoverNet, setHoverNet] = useState<string | undefined>();
+  const spaceDown = useRef(false);
+
+  useEffect(() => {
+    const el = svgRef.current!;
+    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const fit = useCallback(() => {
+    const b = docBox(doc, lib);
+    if (!b) return setView({ cx: 0, cy: 0, scale: 1 });
+    const pad = 48;
+    const scale = Math.min(4, Math.max(0.05, Math.min(size.w / (b.x2 - b.x1 + 2 * pad), size.h / (b.y2 - b.y1 + 2 * pad))));
+    setView({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale });
+  }, [doc, lib, size]);
+
+  useImperativeHandle(handle, () => ({ fit, cursor: () => snapPoint(cursor) }), [fit, cursor]);
+
+  // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)
+  const fittedKey = useRef<number | undefined>(undefined);
+  const hasSize = size.w > 0 && size.h > 0;
+  useEffect(() => {
+    if (hasSize && fittedKey.current !== docKey) {
+      fittedKey.current = docKey;
+      fit();
+    }
+  }, [docKey, hasSize, fit]);
+
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) spaceDown.current = true;
+    };
+    const up = (e: KeyboardEvent) => e.code === 'Space' && (spaceDown.current = false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+    };
+  }, []);
+
+  const vb = {
+    x: view.cx - size.w / 2 / view.scale,
+    y: view.cy - size.h / 2 / view.scale,
+    w: size.w / view.scale,
+    h: size.h / view.scale,
+  };
+  const tol = 6 / view.scale;
+
+  const toDoc = (e: { clientX: number; clientY: number }): Point => {
+    const r = svgRef.current!.getBoundingClientRect();
+    return { x: vb.x + (e.clientX - r.left) / view.scale, y: vb.y + (e.clientY - r.top) / view.scale };
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    const p = toDoc(e);
+    const k = Math.exp(-e.deltaY * 0.0015);
+    const scale = Math.min(8, Math.max(0.03, view.scale * k));
+    // mantener fijo el punto bajo el cursor
+    setView({ scale, cx: p.x - (p.x - view.cx) * (view.scale / scale), cy: p.y - (p.y - view.cy) * (view.scale / scale) });
+  };
+
+  /**
+   * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
+   * de su red; el cuerpo de un componente, su corriente.
+   */
+  const probeTarget = (p: Point): { net?: string; symbol?: number } | null => {
+    const g = snapPoint(p);
+    const near = Math.hypot(p.x - g.x, p.y - g.y) <= tol * 1.5;
+    const hit = hitTest(doc, p, lib, tol);
+    if (hit?.kind === 'wire') return { net: conn.netAt({ x: doc.wires[hit.index].x1, y: doc.wires[hit.index].y1 })?.name };
+    if (near) {
+      const net = conn.netAt(g)?.name;
+      if (net) return { net };
+    }
+    if (hit?.kind === 'symbol') return { symbol: hit.index };
+    if (hit?.kind === 'flag') return { net: conn.netAt(doc.flags[hit.index])?.name };
+    return null;
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    svgRef.current!.setPointerCapture(e.pointerId);
+    const p = toDoc(e);
+    const g = snapPoint(p);
+    if (e.button === 1 || (e.button === 0 && spaceDown.current)) {
+      setDrag({ mode: 'pan', sx: e.clientX, sy: e.clientY, view });
+      return;
+    }
+    if (e.button === 2) {
+      // Botón derecho: terminar cable / volver a seleccionar (como Esc en LTspice)
+      if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
+      else if (tool.kind !== 'select') setTool({ kind: 'select' });
+      else {
+        const hit = hitTest(doc, p, lib, tol);
+        if (hit) onEdit(hit);
+      }
+      return;
+    }
+    if (e.button !== 0) return;
+
+    switch (tool.kind) {
+      case 'select': {
+        const hit = hitTest(doc, p, lib, tol);
+        if (!hit) {
+          setDrag({ mode: 'box', start: p, additive: e.shiftKey });
+          setBoxEnd(p);
+          if (!e.shiftKey) setSelection([]);
+          return;
+        }
+        const already = selection.some((s) => s.kind === hit.kind && s.index === hit.index);
+        const sel = e.shiftKey ? (already ? selection.filter((s) => !(s.kind === hit.kind && s.index === hit.index)) : [...selection, hit]) : already ? selection : [hit];
+        setSelection(sel);
+        setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false });
+        return;
+      }
+      case 'wire': {
+        if (!tool.start) {
+          setTool({ kind: 'wire', start: g });
+          return;
+        }
+        const corner = { x: g.x, y: tool.start.y };
+        let d = addWire(doc, tool.start, corner);
+        d = addWire(d, corner, g);
+        const ends = connectsAt(doc, g, lib) && !(g.x === tool.start.x && g.y === tool.start.y);
+        commit(d);
+        setTool({ kind: 'wire', start: ends ? null : g });
+        return;
+      }
+      case 'place':
+        commit(placeSymbol(doc, tool.type, g, tool.orient, lib));
+        return;
+      case 'flag':
+        commit(addFlag(doc, g, tool.name));
+        if (tool.name !== '0') setTool({ kind: 'select' });
+        return;
+      case 'text':
+        commit(addText(doc, { x: g.x, y: g.y, align: 'Left', size: 2, kind: tool.textKind, text: tool.text }));
+        setTool({ kind: 'select' });
+        return;
+      case 'delete': {
+        const hit = hitTest(doc, p, lib, tol);
+        if (hit) commit(deleteItems(doc, [hit]));
+        return;
+      }
+      case 'probe': {
+        const target = probeTarget(p);
+        if (target) onProbe?.(target);
+        return;
+      }
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const p = toDoc(e);
+    setCursor(p);
+    if (tool.kind === 'probe') setHoverNet(probeTarget(p)?.net);
+    if (!drag) return;
+    if (drag.mode === 'pan') {
+      setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
+    } else if (drag.mode === 'move') {
+      const g = snapPoint(p);
+      const dx = g.x - drag.start.x;
+      const dy = g.y - drag.start.y;
+      if (dx || dy) setDrag({ ...drag, moved: true });
+      setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
+    } else {
+      setBoxEnd(p);
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!drag) return;
+    if (drag.mode === 'move' && preview && drag.moved) commit(preview);
+    if (drag.mode === 'box' && boxEnd) {
+      const b = {
+        x1: Math.min(drag.start.x, boxEnd.x),
+        y1: Math.min(drag.start.y, boxEnd.y),
+        x2: Math.max(drag.start.x, boxEnd.x),
+        y2: Math.max(drag.start.y, boxEnd.y),
+      };
+      const found = itemsIn(doc, b, lib);
+      setSelection(drag.additive ? [...selection, ...found] : found);
+    }
+    setDrag(null);
+    setPreview(null);
+    setBoxEnd(null);
+    svgRef.current!.releasePointerCapture(e.pointerId);
+  };
+
+  const onDoubleClick = (e: React.MouseEvent) => {
+    if (tool.kind !== 'select') return;
+    const hit = hitTest(doc, toDoc(e), lib, tol);
+    if (hit) onEdit(hit);
+  };
+
+  const shown = preview ?? doc;
+  const g = snapPoint(cursor);
+  const ghost = useMemo(() => {
+    if (tool.kind === 'place') {
+      const inst = { type: tool.type, x: g.x, y: g.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
+      return <SymbolView inst={inst} def={lib.symbol(tool.type)} lib={lib} />;
+    }
+    if (tool.kind === 'wire' && tool.start) {
+      return (
+        <path d={`M ${tool.start.x} ${tool.start.y} H ${g.x} V ${g.y}`} className="ghost-wire" />
+      );
+    }
+    if (tool.kind === 'flag') {
+      return tool.name === '0' ? (
+        <path d={`M ${g.x - 16} ${g.y} H ${g.x + 16} M ${g.x - 9} ${g.y + 6} H ${g.x + 9} M ${g.x - 3} ${g.y + 12} H ${g.x + 3}`} />
+      ) : (
+        <AlignedText x={g.x} y={g.y + 8} align="Top" size={2}>{tool.name}</AlignedText>
+      );
+    }
+    if (tool.kind === 'text') {
+      return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
+    }
+    return null;
+  }, [tool, g.x, g.y, lib]);
+
+  const gridR = Math.min(1.5, 1.1 / view.scale);
+  const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
+
+  return (
+    <svg
+      ref={svgRef}
+      className={`editor tool-${cursorClass}`}
+      viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onDoubleClick={onDoubleClick}
+      onContextMenu={(e) => e.preventDefault()}
+      style={{ ['--px' as string]: `${1 / view.scale}` }}
+    >
+      <defs>
+        <pattern id="grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
+          <circle cx={0} cy={0} r={gridR} className="grid-dot" />
+        </pattern>
+      </defs>
+      {view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
+      <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={selection} highlightNet={highlightNet ?? hoverNet} />
+      <g className="ghost">{ghost}</g>
+      {drag?.mode === 'box' && boxEnd && (
+        <rect
+          className="selbox"
+          x={Math.min(drag.start.x, boxEnd.x)}
+          y={Math.min(drag.start.y, boxEnd.y)}
+          width={Math.abs(boxEnd.x - drag.start.x)}
+          height={Math.abs(boxEnd.y - drag.start.y)}
+        />
+      )}
+      {tool.kind !== 'select' && tool.kind !== 'probe' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
+    </svg>
+  );
+}

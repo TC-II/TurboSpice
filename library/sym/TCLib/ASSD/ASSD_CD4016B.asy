@@ -1,0 +1,34 @@
+Version 4
+SymbolType CELL
+LINE Normal 0 0 256 0
+LINE Normal 0 0 0 224
+LINE Normal 0 224 256 224
+LINE Normal 256 224 256 80
+LINE Normal 256 80 256 0
+LINE Normal 119 80 48 80
+LINE Normal 135 72 119 80
+LINE Normal 192 80 137 80
+LINE Normal 128 144 96 144
+LINE Normal 128 85 128 144
+LINE Normal 130 92 128 85
+LINE Normal 126 92 128 85
+WINDOW 0 48 -18 Left 0
+SYMATTR Prefix X
+SYMATTR Description CD4016B Analog Switch - modified by Nicolas Beade and Matias Bergerman
+SYMATTR Value ASSD_CD4016B
+SYMATTR ModelFile TCLib/ASSD_CD4016B.lib
+PIN 0 80 LEFT 8
+PINATTR PinName In
+PINATTR SpiceOrder 1
+PIN 256 80 RIGHT 8
+PINATTR PinName Out
+PINATTR SpiceOrder 2
+PIN 0 144 LEFT 8
+PINATTR PinName Control
+PINATTR SpiceOrder 3
+PIN 128 0 TOP 8
+PINATTR PinName Vdd
+PINATTR SpiceOrder 4
+PIN 128 224 BOTTOM 8
+PINATTR PinName Vss
+PINATTR SpiceOrder 5

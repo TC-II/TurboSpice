@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 96">
+  <defs>
+    <style>
+      .cls-1 {
+        stroke-width: .59px;
+      }
+
+      .cls-1, .cls-2 {
+        fill: none;
+        stroke: #000;
+        stroke-linejoin: round;
+      }
+
+      .cls-2 {
+        stroke-linecap: round;
+        stroke-width: 1.5px;
+      }
+    </style>
+  </defs>
+  <rect class="cls-2" x="5" y="27" width="22" height="58"/>
+  <line class="cls-2" x1="16" y1="16" x2="16" y2="27"/>
+  <line class="cls-2" x1="16" y1="85" x2="16" y2="96"/>
+  <g>
+    <line class="cls-2" x1="64" y1="64" x2="36.6" y2="64"/>
+    <polygon points="38.6 61.1 27.7 64 38.6 66.9 38.6 61.1"/>
+  </g>
+  <g>
+    <line class="cls-1" x1="30.2" y1="73.4" x2="30.2" y2="81.52"/>
+    <polygon points="29.1 81 30.2 85.3 31.4 81 29.1 81"/>
+    <polygon points="31.4 73.9 30.2 69.6 29.1 73.9 31.4 73.9"/>
+  </g>
+  <!-- Labels the double arrow above. Same letter, size and spot as the TEXT in
+       TCLib/pot.asy: a skin replaces the .asy artwork wholesale, and the .asy's
+       TEXT primitives are only drawn when no skin exists, so the letter has to
+       live here too or it is lost. y is the baseline (the .asy centres 8pt text
+       on y=81), hence 83.4. -->
+  <text x="38" y="83.4" font-size="8">k</text>
+</svg>

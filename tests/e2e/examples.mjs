@@ -1,4 +1,4 @@
-// E2E: abre la app, simula cada ejemplo y guarda capturas.
+// E2E del modo netlist: simula cada ejemplo y guarda capturas.
 // Uso: node tests/e2e/examples.mjs [url] [carpeta-capturas]
 // Requiere un Chromium instalado (CHROMIUM o /usr/bin/chromium) y `npm run preview` corriendo.
 import { mkdirSync } from 'node:fs';
@@ -19,6 +19,7 @@ for (const scheme of ['light', 'dark']) {
   page.on('pageerror', (e) => consoleErrors.push(e.message));
 
   await page.goto(URL);
+  await page.getByRole('button', { name: 'Netlist' }).first().click();
   await page.getByText('Listo').waitFor({ timeout: 30000 });
   const examples = await page.locator('select[aria-label="Ejemplos"] option').allTextContents();
 

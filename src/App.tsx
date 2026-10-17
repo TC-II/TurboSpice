@@ -1,204 +1,528 @@
-// UI provisional de la fase 1: netlist → simular → ver resultados.
-// El editor de esquemáticos (fase 2) reemplaza al textarea.
-import { useEffect, useMemo, useRef, useState } from 'react';
+// TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { emptyDoc, type AscDoc } from './asc/model.ts';
+import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
-import type { SimPlot, SimResult } from './engine/ngspice.ts';
-import { EXAMPLES } from './examples.ts';
+import type { SimResult } from './engine/ngspice.ts';
+import { Library, type LibraryBundle } from './library/library.ts';
+import { connectivity } from './netlist/connectivity.ts';
+import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
+import { NetlistMode } from './NetlistMode.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, TextDialog } from './schematic/dialogs.tsx';
+import { deleteItems, duplicateItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
+import type { ItemRef } from './schematic/geometry.ts';
+import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
+import { useHistory } from './schematic/useHistory.ts';
+import { mirrorX, rotateCW } from './asc/transform.ts';
+import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import { Plot } from './waveform/Plot.tsx';
-import { displayName, scaleOf, si, type ComplexView } from './waveform/series.ts';
+import { displayName, scaleOf, type ComplexView } from './waveform/series.ts';
 
-type Status =
-  | { kind: 'loading' }
-  | { kind: 'idle' }
-  | { kind: 'running'; percent: number; text: string }
-  | { kind: 'done'; ms: number }
-  | { kind: 'error'; message: string };
+const BASE = import.meta.env.BASE_URL;
+const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc'];
 
-const FIRST = Object.keys(EXAMPLES)[0];
+type Dialog =
+  | { kind: 'picker' }
+  | { kind: 'attrs'; index: number }
+  | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
+  | { kind: 'flag'; index?: number };
+
+interface FileState {
+  name: string;
+  encoding?: AscEncoding;
+  handle?: Parameters<typeof saveFile>[2];
+}
+
+const isTyping = (e: KeyboardEvent) =>
+  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
 
 export function App() {
-  const engine = useRef<EngineClient | null>(null);
-  const [netlist, setNetlist] = useState(EXAMPLES[FIRST]);
-  const [status, setStatus] = useState<Status>({ kind: 'loading' });
-  const [result, setResult] = useState<SimResult | null>(null);
-  const [log, setLog] = useState<string[]>([]);
-  const [plotName, setPlotName] = useState<string>('');
-  const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [view, setView] = useState<ComplexView>('db');
+  const engine = useMemo(() => new EngineClient(), []);
+  const [mode, setMode] = useState<'schematic' | 'netlist'>('schematic');
+  const [lib, setLib] = useState<Library | null>(null);
+  const [libError, setLibError] = useState<string>();
 
   useEffect(() => {
-    const e = new EngineClient();
-    engine.current = e;
-    e.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
-    e.ready.then(
-      () => setStatus({ kind: 'idle' }),
-      (err: Error) => setStatus({ kind: 'error', message: err.message }),
-    );
-    return () => e.abort();
-  }, []);
-
-  const simulate = async () => {
-    const e = engine.current;
-    if (!e) return;
-    setStatus({ kind: 'running', percent: 0, text: '' });
-    try {
-      const { result, ms } = await e.simulate(netlist);
-      setResult(result);
-      setLog(result.log);
-      // el último plot con eje X (p.ej. noise1 = espectro, no noise2 = totales)
-      const withScale = result.plots.filter((p) => scaleOf(p));
-      const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
-      setPlotName(shown?.name ?? '');
-      setSelected({});
-      setStatus(
-        result.errors.length && !result.plots.length
-          ? { kind: 'error', message: result.errors[0] }
-          : { kind: 'done', ms },
-      );
-    } catch (err) {
-      setStatus({ kind: 'error', message: (err as Error).message });
-    }
-  };
-
-  const abort = () => {
-    engine.current?.abort();
-    engine.current!.ready.then(() => setStatus({ kind: 'idle' }));
-    setStatus({ kind: 'error', message: 'Simulación abortada' });
-  };
-
-  const plot: SimPlot | undefined = result?.plots.find((p) => p.name === plotName);
-  const scale = plot ? scaleOf(plot) : null;
-  const traces = useMemo(() => (plot ? plot.vectors.filter((v) => v !== scale) : []), [plot, scale]);
-  const chosen = useMemo(() => {
-    if (!plot) return [];
-    const names = selected[plot.name] ?? defaultTraces(traces.map((v) => v.name));
-    return traces.filter((v) => names.includes(v.name));
-  }, [plot, traces, selected]);
-  const isComplex = traces.some((v) => v.imag);
-
-  const toggle = (name: string) => {
-    if (!plot) return;
-    const cur = selected[plot.name] ?? chosen.map((v) => v.name);
-    setSelected({
-      ...selected,
-      [plot.name]: cur.includes(name) ? cur.filter((n) => n !== name) : [...cur, name],
-    });
-  };
-
-  const running = status.kind === 'running';
+    fetch(`${BASE}library/bundle.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((b: LibraryBundle) => setLib(new Library(b)))
+      .catch((e: Error) => setLibError(`No se pudo cargar la librería: ${e.message}`));
+    return () => engine.abort();
+  }, [engine]);
 
   return (
     <div className="app">
-      <header>
+      <header className="appbar">
         <h1>TurboSpice</h1>
-        <select
-          aria-label="Ejemplos"
-          onChange={(e) => setNetlist(EXAMPLES[e.target.value])}
-          defaultValue={FIRST}
-        >
-          {Object.keys(EXAMPLES).map((k) => (
-            <option key={k}>{k}</option>
-          ))}
-        </select>
-        {running ? (
-          <button onClick={abort}>Abortar</button>
-        ) : (
-          <button className="primary" onClick={simulate} disabled={status.kind === 'loading'}>
-            Simular
-          </button>
-        )}
-        <StatusText status={status} />
+        <nav className="tabs">
+          <button className={mode === 'schematic' ? 'active' : ''} onClick={() => setMode('schematic')}>Esquemático</button>
+          <button className={mode === 'netlist' ? 'active' : ''} onClick={() => setMode('netlist')}>Netlist</button>
+        </nav>
+        <div id="appbar-slot" />
       </header>
-
-      <main>
-        <section className="editor">
-          <textarea
-            spellCheck={false}
-            value={netlist}
-            onChange={(e) => setNetlist(e.target.value)}
-            onKeyDown={(e) => {
-              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !running) simulate();
-            }}
-          />
-          <pre className="log">{log.join('\n')}</pre>
-        </section>
-
-        <section className="results">
-          {result && (
-            <div className="toolbar">
-              <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label="Plot">
-                {result.plots.map((p) => (
-                  <option key={p.name}>{p.name}</option>
-                ))}
-              </select>
-              {isComplex && scale && (
-                <select value={view} onChange={(e) => setView(e.target.value as ComplexView)} aria-label="Vista">
-                  <option value="db">Magnitud (dB)</option>
-                  <option value="phase">Fase (°)</option>
-                  <option value="mag">Magnitud</option>
-                  <option value="re">Real</option>
-                  <option value="im">Imaginaria</option>
-                </select>
-              )}
-            </div>
-          )}
-          {plot && scale && (
-            <>
-              <div className="traces">
-                {traces.map((v) => (
-                  <label key={v.name}>
-                    <input type="checkbox" checked={chosen.includes(v)} onChange={() => toggle(v.name)} />
-                    {displayName(v)}
-                  </label>
-                ))}
-              </div>
-              <Plot plot={plot} vectors={chosen} view={view} />
-            </>
-          )}
-          {plot && !scale && <ScalarTable plot={plot} />}
-          {!result && <p className="empty">Escribí o elegí una netlist y presioná Simular (Ctrl+Enter).</p>}
-        </section>
-      </main>
+      {mode === 'netlist' && <NetlistMode engine={engine} />}
+      {mode === 'schematic' &&
+        (lib ? <SchematicMode engine={engine} lib={lib} /> : <p className="empty pad">{libError ?? 'Cargando librería…'}</p>)}
     </div>
   );
 }
 
-/** Por defecto mostramos tensiones de nodo (sin corrientes ni nodos internos). */
-function defaultTraces(names: string[]): string[] {
-  const nodes = names.filter((n) => !/#|[(@]/.test(n));
-  return (nodes.length ? nodes : names).slice(0, 6);
-}
+function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) {
+  const history = useHistory<AscDoc>(emptyDoc());
+  const doc = history.value;
+  const [file, setFile] = useState<FileState>({ name: 'Sin título.asc' });
+  const [savedVersion, setSavedVersion] = useState(0);
+  const [tool, setToolState] = useState<Tool>({ kind: 'select' });
+  const [selection, setSelection] = useState<ItemRef[]>([]);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
+  const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  const [message, setMessage] = useState<string>();
+  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult } | null>(null);
+  const [traces, setTraces] = useState<string[]>([]);
+  const [plotName, setPlotName] = useState('');
+  const [view, setView] = useState<ComplexView>('db');
+  const [panel, setPanel] = useState<'plot' | 'netlist' | 'log'>('plot');
+  const editor = useRef<EditorHandle>(null);
+  const [docKey, setDocKey] = useState(0);
+  const dirty = history.version !== savedVersion;
 
-function ScalarTable({ plot }: { plot: SimPlot }) {
+  const conn = useMemo(() => connectivity(doc, (t) => lib.symbol(t)), [doc, lib]);
+
+  const setTool = useCallback((t: Tool) => {
+    setToolState(t);
+    if (t.kind !== 'select') setSelection([]);
+  }, []);
+  const commit = history.commit;
+
+  useEffect(() => {
+    engine.ready.then(
+      () => setStatus({ kind: 'idle' }),
+      (e: Error) => setStatus({ kind: 'error', message: e.message }),
+    );
+  }, [engine]);
+
+  const loadDoc = useCallback(
+    (d: AscDoc, f: FileState) => {
+      history.reset(d);
+      setSavedVersion(0);
+      setFile(f);
+      setSelection([]);
+      setSim(null);
+      setTraces([]);
+      setTool({ kind: 'select' });
+      setDocKey((k) => k + 1);
+    },
+    [history, setTool],
+  );
+
+  // Primer documento: un ejemplo (salvo que el usuario ya haya empezado a trabajar)
+  const touched = useRef(false);
+  touched.current ||= docKey > 0 || history.version > 0;
+  useEffect(() => {
+    fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)
+      .then((r) => r.arrayBuffer())
+      .then((b) => {
+        if (touched.current) return;
+        const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
+        loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+      })
+      .catch(() => {});
+  }, []); // sólo al montar
+
+  // Aviso al cerrar con cambios sin guardar
+  useEffect(() => {
+    const h = (e: BeforeUnloadEvent) => {
+      if (dirty) e.preventDefault();
+    };
+    window.addEventListener('beforeunload', h);
+    return () => window.removeEventListener('beforeunload', h);
+  }, [dirty]);
+
+  const confirmDiscard = () => !dirty || window.confirm('Hay cambios sin guardar. ¿Descartarlos?');
+
+  const doOpen = async () => {
+    if (!confirmDiscard()) return;
+    try {
+      const f = await openFile();
+      if (f) loadDoc(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
+    } catch (e) {
+      setMessage(`No se pudo abrir: ${(e as Error).message}`);
+    }
+  };
+
+  const doSave = async (saveAs = false) => {
+    const { bytes, missing } = ascBytes(doc, lib, file.encoding);
+    try {
+      const r = await saveFile(bytes, file.name, file.handle, saveAs);
+      if (!r) return;
+      setFile({ ...file, name: r.name, handle: r.handle ?? file.handle });
+      setSavedVersion(history.version);
+      setMessage(
+        missing.length
+          ? `Guardado. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
+          : `Guardado: ${r.name}`,
+      );
+    } catch (e) {
+      setMessage(`No se pudo guardar: ${(e as Error).message}`);
+    }
+  };
+
+  const doNew = () => confirmDiscard() && loadDoc(emptyDoc(), { name: 'Sin título.asc' });
+
+  const doExample = async (name: string) => {
+    if (!confirmDiscard()) return;
+    const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
+    const f = readAsc(new Uint8Array(b), name);
+    loadDoc(f.doc, { name, encoding: f.encoding });
+  };
+
+  const run = async () => {
+    setStatus({ kind: 'running', percent: 0, text: '' });
+    setMessage(undefined);
+    engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
+    try {
+      const built = await buildSimulation(doc, lib, file.name);
+      const { result, ms } = await engine.simulate(built.netlist, built.files);
+      // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
+      if (!sim) setTimeout(() => editor.current?.fit(), 50);
+      setSim({ built, result });
+      const withScale = result.plots.filter((p) => scaleOf(p));
+      const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
+      setPlotName(shown?.name ?? '');
+      // conservar las puntas de prueba que sigan existiendo
+      setTraces((t) => t.filter((v) => shown?.vectors.some((x) => x.name === v)));
+      const errs = result.errors.length ? result.errors : [];
+      setStatus(errs.length && !result.plots.length ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
+      setMessage(built.warnings.length ? built.warnings.join(' · ') : undefined);
+      if (result.plots.length) {
+        setTool({ kind: 'probe' });
+        setPanel(errs.length ? 'log' : 'plot');
+      } else setPanel('log');
+    } catch (e) {
+      setStatus({ kind: 'error', message: (e as Error).message });
+    }
+  };
+
+  const abort = () => {
+    engine.abort();
+    engine.ready.then(() => setStatus({ kind: 'idle' }));
+    setStatus({ kind: 'error', message: 'Simulación abortada' });
+  };
+
+  const plot = sim?.result.plots.find((p) => p.name === plotName);
+
+  const onProbe = ({ net, symbol }: { net?: string; symbol?: number }) => {
+    if (!sim || !plot) return;
+    let vec: string | null = null;
+    if (net && net !== '0') vec = netVector(net);
+    if (symbol !== undefined) {
+      const el = sim.built.lt.elements.find((e) => e.sym === symbol);
+      if (el) vec = elementVector(sim.built, el.name);
+    }
+    if (!vec) return;
+    const v = vec;
+    if (!plot.vectors.some((x) => x.name.toLowerCase() === v)) {
+      setMessage(`No hay datos de ${v} en ${plot.name}`);
+      return;
+    }
+    setTraces((t) => (t.includes(v) ? t.filter((x) => x !== v) : [...t, v]));
+    setPanel('plot');
+  };
+
+  const rotateOrMirror = (op: 'rotate' | 'mirror') => {
+    if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
+    else if (selection.length) commit(transformItems(doc, selection, op, lib));
+  };
+
+  const editItem = (ref: ItemRef) => {
+    if (ref.kind === 'symbol') setDialog({ kind: 'attrs', index: ref.index });
+    else if (ref.kind === 'text') setDialog({ kind: 'text', index: ref.index, textKind: doc.texts[ref.index].kind });
+    else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
+  };
+
+  // Atajos de teclado estilo LTspice
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (dialog || isTyping(e)) return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      const k = e.key;
+      const handled = () => e.preventDefault();
+      if (ctrl && (k === 'z' || k === 'Z') && !e.shiftKey) return handled(), history.undo();
+      if (ctrl && (k === 'y' || ((k === 'z' || k === 'Z') && e.shiftKey))) return handled(), history.redo();
+      if (ctrl && (k === 's' || k === 'S')) return handled(), doSave(e.shiftKey);
+      if (ctrl && (k === 'o' || k === 'O')) return handled(), doOpen();
+      if (ctrl && (k === 'r' || k === 'R')) return handled(), rotateOrMirror('rotate');
+      if (ctrl && (k === 'e' || k === 'E')) return handled(), rotateOrMirror('mirror');
+      if (ctrl && k === 'Enter') return handled(), run();
+      if (ctrl) return;
+      switch (k) {
+        case 'Escape':
+          setTool({ kind: 'select' });
+          setSelection([]);
+          return;
+        case 'F2':
+          return handled(), setDialog({ kind: 'picker' });
+        case 'F3':
+        case 'w':
+          return handled(), setTool({ kind: 'wire', start: null });
+        case 'F4':
+        case 'n':
+          return handled(), setDialog({ kind: 'flag' });
+        case 'F5':
+        case 'Delete':
+        case 'Backspace':
+          handled();
+          if (selection.length) {
+            commit(deleteItems(doc, selection));
+            setSelection([]);
+          } else setTool({ kind: 'delete' });
+          return;
+        case 'F6':
+          handled();
+          if (selection.length) {
+            const r = duplicateItems(doc, selection, 32, 32, lib);
+            commit(r.doc);
+            setSelection(r.refs);
+          }
+          return;
+        case 'F7':
+        case 'F8':
+          return handled(), setTool({ kind: 'select' });
+        case 'r':
+          return setTool({ kind: 'place', type: 'res', orient: 'R0' });
+        case 'c':
+          return setTool({ kind: 'place', type: 'cap', orient: 'R0' });
+        case 'l':
+          return setTool({ kind: 'place', type: 'ind', orient: 'R0' });
+        case 'd':
+          return setTool({ kind: 'place', type: 'diode', orient: 'R0' });
+        case 'v':
+          return setTool({ kind: 'place', type: 'voltage', orient: 'R0' });
+        case 'g':
+          return setTool({ kind: 'flag', name: '0' });
+        case 's':
+          return setDialog({ kind: 'text', textKind: 'directive' });
+        case 't':
+          return setDialog({ kind: 'text', textKind: 'comment' });
+        case 'Home':
+          return handled(), editor.current?.fit();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
+  // Arrastrar y soltar un .asc
+  useEffect(() => {
+    const over = (e: DragEvent) => e.preventDefault();
+    const drop = async (e: DragEvent) => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files[0];
+      if (!f || !f.name.toLowerCase().endsWith('.asc') || !confirmDiscard()) return;
+      const r = readAsc(new Uint8Array(await f.arrayBuffer()), f.name);
+      loadDoc(r.doc, { name: r.name, encoding: r.encoding });
+    };
+    window.addEventListener('dragover', over);
+    window.addEventListener('drop', drop);
+    return () => {
+      window.removeEventListener('dragover', over);
+      window.removeEventListener('drop', drop);
+    };
+  });
+
+  const running = status.kind === 'running';
+  const scale = plot ? scaleOf(plot) : null;
+  const chosen = plot ? plot.vectors.filter((v) => traces.includes(v.name)) : [];
+  const isComplex = plot?.vectors.some((v) => v.imag);
+  const toolBtn = (t: Tool, label: string, title: string) => (
+    <button className={tool.kind === t.kind ? 'active' : ''} title={title} onClick={() => setTool(t)}>
+      {label}
+    </button>
+  );
+
   return (
-    <table className="scalars">
-      <tbody>
-        {plot.vectors.map((v) => (
-          <tr key={v.name}>
-            <th>{displayName(v)}</th>
-            <td>
-              {Array.from(v.real, (re, i) =>
-                v.imag ? `${si(re)} ${v.imag[i] < 0 ? '−' : '+'} j${si(Math.abs(v.imag[i]))}` : si(re),
-              ).join(', ')}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="schematic-mode">
+      <div className="toolbar">
+        <div className="group">
+          <button onClick={doNew} title="Nuevo esquemático">Nuevo</button>
+          <button onClick={doOpen} title="Abrir .asc (Ctrl+O)">Abrir</button>
+          <button onClick={() => doSave(false)} title="Guardar (Ctrl+S)">Guardar</button>
+          <button onClick={() => doSave(true)} title="Guardar como (Ctrl+Shift+S)">Guardar como</button>
+          <select aria-label="Ejemplos" value="" onChange={(e) => e.target.value && doExample(e.target.value)}>
+            <option value="">Ejemplos…</option>
+            {EXAMPLES.map((x) => (
+              <option key={x} value={x}>{x.replace('.asc', '')}</option>
+            ))}
+          </select>
+        </div>
+        <div className="group">
+          {toolBtn({ kind: 'select' }, 'Seleccionar', 'Seleccionar y mover (Esc)')}
+          {toolBtn({ kind: 'wire', start: null }, 'Cable', 'Cable (F3 / W)')}
+          <button className={tool.kind === 'place' ? 'active' : ''} title="Componente (F2)" onClick={() => setDialog({ kind: 'picker' })}>
+            Componente
+          </button>
+          {toolBtn({ kind: 'flag', name: '0' }, 'Tierra', 'Tierra (G)')}
+          <button title="Etiqueta de red (F4 / N)" onClick={() => setDialog({ kind: 'flag' })}>Etiqueta</button>
+          <button title="Directiva SPICE (S)" onClick={() => setDialog({ kind: 'text', textKind: 'directive' })}>.op</button>
+          {toolBtn({ kind: 'delete' }, 'Borrar', 'Borrar (F5 / Supr)')}
+        </div>
+        <div className="group">
+          <button onClick={() => rotateOrMirror('rotate')} title="Rotar (Ctrl+R)">Rotar</button>
+          <button onClick={() => rotateOrMirror('mirror')} title="Espejar (Ctrl+E)">Espejar</button>
+          <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶</button>
+          <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷</button>
+          <button onClick={() => editor.current?.fit()} title="Ajustar a la vista (Inicio)">Ajustar</button>
+        </div>
+        <div className="group">
+          {running ? (
+            <button onClick={abort}>Abortar</button>
+          ) : (
+            <button className="primary" onClick={run} disabled={status.kind === 'loading'} title="Simular (Ctrl+Enter)">
+              Simular
+            </button>
+          )}
+          {sim && toolBtn({ kind: 'probe' }, 'Medir', 'Punta de prueba: click en un cable (tensión) o componente (corriente)')}
+          <StatusText status={status} />
+        </div>
+        <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
+      </div>
+
+      <div className="workspace">
+        <div className="canvas-wrap">
+          <SchematicEditor
+            handle={editor}
+            docKey={docKey}
+            doc={doc}
+            lib={lib}
+            conn={conn}
+            commit={commit}
+            tool={tool}
+            setTool={setTool}
+            selection={selection}
+            setSelection={setSelection}
+            onEdit={editItem}
+            onProbe={onProbe}
+          />
+          {message && (
+            <div className="toast" onClick={() => setMessage(undefined)}>
+              {message}
+            </div>
+          )}
+          <div className="hint-bar">{toolHint(tool)}</div>
+        </div>
+
+        {sim && (
+          <section className="results-panel">
+            <div className="toolbar small">
+              <nav className="tabs">
+                <button className={panel === 'plot' ? 'active' : ''} onClick={() => setPanel('plot')}>Resultados</button>
+                <button className={panel === 'netlist' ? 'active' : ''} onClick={() => setPanel('netlist')}>Netlist</button>
+                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')}>
+                  Log{sim.result.errors.length ? ` (${sim.result.errors.length} errores)` : ''}
+                </button>
+              </nav>
+              {panel === 'plot' && (
+                <>
+                  <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label="Plot">
+                    {sim.result.plots.map((p) => (
+                      <option key={p.name}>{p.name}</option>
+                    ))}
+                  </select>
+                  {isComplex && scale && (
+                    <select value={view} onChange={(e) => setView(e.target.value as ComplexView)} aria-label="Vista">
+                      <option value="db">Magnitud (dB)</option>
+                      <option value="phase">Fase (°)</option>
+                      <option value="mag">Magnitud</option>
+                    </select>
+                  )}
+                  <div className="trace-chips">
+                    {chosen.map((v) => (
+                      <button key={v.name} className="chip" onClick={() => setTraces((t) => t.filter((x) => x !== v.name))} title="Quitar">
+                        {displayName(v)} ✕
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              <button className="close" onClick={() => setSim(null)} title="Cerrar resultados">✕</button>
+            </div>
+            <div className="results-body">
+              {panel === 'plot' && plot && scale && chosen.length > 0 && <Plot plot={plot} vectors={chosen} view={view} />}
+              {panel === 'plot' && plot && scale && chosen.length === 0 && (
+                <p className="empty pad">Hacé click en un cable para ver su tensión, o en un componente para ver su corriente.</p>
+              )}
+              {panel === 'plot' && plot && !scale && <ScalarTable plot={plot} />}
+              {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
+              {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
+            </div>
+          </section>
+        )}
+      </div>
+
+      {dialog?.kind === 'picker' && (
+        <ComponentPicker
+          lib={lib}
+          onClose={() => setDialog(null)}
+          onPick={(type) => {
+            setDialog(null);
+            setTool({ kind: 'place', type, orient: 'R0' });
+          }}
+        />
+      )}
+      {dialog?.kind === 'attrs' && doc.symbols[dialog.index] && (
+        <AttributeDialog
+          inst={doc.symbols[dialog.index]}
+          def={lib.symbol(doc.symbols[dialog.index].type)}
+          onClose={() => setDialog(null)}
+          onApply={(attrs) => {
+            setDialog(null);
+            if (Object.keys(attrs).length) commit(setSymbolAttrs(doc, dialog.index, attrs));
+          }}
+        />
+      )}
+      {dialog?.kind === 'text' && (
+        <TextDialog
+          initial={dialog.index !== undefined ? doc.texts[dialog.index].text : ''}
+          kind={dialog.textKind}
+          onClose={() => setDialog(null)}
+          onApply={(text, kind) => {
+            setDialog(null);
+            if (dialog.index !== undefined) commit(setText(doc, dialog.index, { text, kind }));
+            else setTool({ kind: 'text', text, textKind: kind });
+          }}
+        />
+      )}
+      {dialog?.kind === 'flag' && (
+        <FlagDialog
+          initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
+          onClose={() => setDialog(null)}
+          onApply={(name) => {
+            setDialog(null);
+            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
+            else setTool({ kind: 'flag', name });
+          }}
+        />
+      )}
+    </div>
   );
 }
 
-function StatusText({ status }: { status: Status }) {
-  switch (status.kind) {
-    case 'loading':
-      return <span className="status">Cargando motor…</span>;
-    case 'idle':
-      return <span className="status">Listo</span>;
-    case 'running':
-      return <span className="status">Simulando… {status.percent ? `${status.percent.toFixed(0)}%` : ''}</span>;
-    case 'done':
-      return <span className="status ok">Completado en {status.ms.toFixed(0)} ms</span>;
-    case 'error':
-      return <span className="status err">{status.message}</span>;
+function toolHint(t: Tool): string {
+  switch (t.kind) {
+    case 'select':
+      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar · rueda: zoom · botón medio o espacio: desplazar';
+    case 'wire':
+      return t.start ? 'Click para fijar el tramo · click derecho o Esc para terminar' : 'Click para empezar el cable';
+    case 'place':
+      return `Colocando ${t.type} · Ctrl+R rotar · Ctrl+E espejar · Esc para terminar`;
+    case 'flag':
+      return t.name === '0' ? 'Click para colocar tierra · Esc para terminar' : `Click para colocar la etiqueta "${t.name}"`;
+    case 'text':
+      return 'Click para ubicar el texto';
+    case 'delete':
+      return 'Click en un elemento para borrarlo · Esc para terminar';
+    case 'probe':
+      return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
   }
 }

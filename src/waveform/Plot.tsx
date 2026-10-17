@@ -27,6 +27,12 @@ export function Plot({ plot, vectors, view }: Props) {
     const grid = css.getPropertyValue('--grid').trim();
     const height = () => Math.max(240, el.clientHeight - 50);
     const data: uPlot.AlignedData = [scale.real, ...vectors.map((v) => project(v, view))];
+    // Como LTspice: tensiones en el eje izquierdo y corrientes en el derecho
+    const isCurrent = (v: SimVector) => displayName(v).startsWith('I');
+    const hasV = vectors.some((v) => !isCurrent(v));
+    const hasI = vectors.some(isCurrent);
+    const yScale = (v: SimVector) => (isCurrent(v) && hasV ? 'i' : 'y');
+    const ticks = (_u: uPlot, t: number[]) => t.map((x) => si(x, 3));
     const opts: uPlot.Options = {
       width: el.clientWidth,
       height: height(),
@@ -41,12 +47,14 @@ export function Plot({ plot, vectors, view }: Props) {
           stroke: muted,
           grid: { stroke: grid },
         },
-        { values: (_u, ticks) => ticks.map((t) => si(t, 3)), stroke: muted, grid: { stroke: grid }, size: 60 },
+        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid }, size: 60, label: view === 'phase' ? '°' : hasV ? 'V' : 'A' },
+        ...(hasV && hasI ? [{ scale: 'i', side: 1, values: ticks, stroke: muted, grid: { show: false }, size: 60, label: 'A' } as uPlot.Axis] : []),
       ],
       series: [
         { label: scale.name, value: (_u, x) => (x == null ? '—' : si(x)) },
         ...vectors.map((v, i) => ({
           label: displayName(v),
+          scale: yScale(v),
           stroke: PALETTE[i % PALETTE.length],
           width: 1.5,
           value: (_u: uPlot, y: number | null) => (y == null ? '—' : si(y)),

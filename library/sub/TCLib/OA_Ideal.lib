@@ -1,0 +1,21 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+*OA Ideal
+* Connections: 
+*                Non-Inverting Input
+*                |   Inverting Input
+*                |   |   
+*                |   |   |   
+*                |   |   |   |   Output
+*                |   |   |   |   |
+.SUBCKT OA_Ideal 1   2   3   4   5
+E1 N001 0 1 2 1
+RF1 N002 N001 1
+CF1 N002 0 {CF1}
+E3 5 0 N002 0 {Av}
+.param Av={Avol}
+.param f1={GBWP/Avol}
+.param CF1={1/(2*PI*f1)}
+.ends OA_Ideal
+*

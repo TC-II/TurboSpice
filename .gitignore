@@ -7,3 +7,4 @@ public/engine/
 .DS_Store
 *.tsbuildinfo
 test-results/
+public/library/

@@ -1,0 +1,18 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* This is the FDNR
+*
+*   1
+*   |
+* ------
+* ------
+* ------
+* ------
+*   |
+*   2
+*
+.SUBCKT fdnr 1 2
+G1 1 2 1 2 Laplace=(s^2)*{D}
+R1 1 2 1000Meg
+.ENDS

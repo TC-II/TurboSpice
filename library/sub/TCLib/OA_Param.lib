@@ -1,0 +1,35 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* OA Paramétrico
+* Connections: 
+*                Non-Inverting Input
+*                |   Inverting Input
+*                |   |   
+*                |   |   |   
+*                |   |   |   |   Output
+*                |   |   |   |   |
+.SUBCKT OA_Param 1   2   3   4   5
+
+*Second pole and Avol
+
+E2 N001 0 1 2 {Av}
+R2 V_F2_Av N001 1
+C2 V_F2_Av 0 {C2}
+
+*First pole and Slew Rate
+
+E1 N002 0 V_F2_Av 0 1
+R1 V_F1_SR N002 1
+C1 V_F1_SR 0 {C1}
+
+*Output buffer
+
+E3 5 0 V_F1_SR 0 1
+
+.param C1={1/(2*PI*f1)}
+.param C2={1/(2*PI*f2)}
+
+.ends OA_Param
+
+*

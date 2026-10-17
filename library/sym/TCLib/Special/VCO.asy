@@ -1,0 +1,37 @@
+Version 4
+SymbolType CELL
+LINE Normal 64 -48 -64 -48
+LINE Normal 64 48 64 -48
+LINE Normal -64 48 64 48
+LINE Normal -64 -48 -64 48
+TEXT -25 0 Left 2 VCO
+TEXT 0 39 Bottom 0 GND
+TEXT -56 0 Left 0 Vi
+TEXT 56 0 Right 0 Vo
+TEXT 0 -39 Top 0 VCC
+TEXT 56 32 Right 0 Fo
+WINDOW 3 24 59 Left 0
+WINDOW 123 24 74 Left 0
+WINDOW 39 24 89 Left 0
+SYMATTR Value Vi_min=0.5
+SYMATTR Value2 F_min=10
+SYMATTR SpiceLine Delta_F=1k
+SYMATTR Prefix X
+SYMATTR SpiceModel VCO
+SYMATTR Description VCO
+SYMATTR ModelFile TCLib/VCO.lib
+PIN -64 0 NONE 8
+PINATTR PinName Vi
+PINATTR SpiceOrder 1
+PIN 64 0 NONE 8
+PINATTR PinName Vo
+PINATTR SpiceOrder 2
+PIN 0 -48 NONE 8
+PINATTR PinName VCC
+PINATTR SpiceOrder 3
+PIN 0 48 NONE 8
+PINATTR PinName GND
+PINATTR SpiceOrder 4
+PIN 64 32 NONE 8
+PINATTR PinName Fo
+PINATTR SpiceOrder 5

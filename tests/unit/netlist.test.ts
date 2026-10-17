@@ -22,12 +22,12 @@ function netFromAsc(src: string) {
 }
 
 describe('netlist estilo LTspice', () => {
-  it.each(fixtures)('%s: equivalente a la que genera LTspice', (f) => {
+  it.each(fixtures)('%s: idéntica a la que genera LTspice (incluidos los nombres N001…)', (f) => {
     const ref = normalizeLtspice(readNet(join(FIX, f.replace(/\.asc$/, '.net'))));
     const ours = ltNetlistText(ltNetlist(parseAsc(readText(join(FIX, f))), lib));
     const r = compareNetlists(ref, ours);
     expect(r.reason ?? '').toBe('');
-    expect(r.equivalent).toBe(true);
+    expect(r.exact).toBe(true);
   });
 
   it('conexiones: T sobre el segmento, cruces sin conexión, tierra gana a la etiqueta', () => {

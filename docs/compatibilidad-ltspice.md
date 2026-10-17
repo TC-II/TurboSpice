@@ -41,8 +41,10 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
 - Etiquetas con el mismo nombre son la misma red, **distinguiendo mayúsculas** (`-v` y `-V` quedan como
   redes distintas en la netlist; SPICE las une después).
 - Nombre de red: tierra (`0`) > etiqueta (la primera en orden alfabético) > `N001`, `N002`…
-  La numeración de LTspice no es exactamente "de arriba hacia abajo"; TurboSpice la aproxima así
-  (sólo cambia el nombre, no la conectividad: **130/130** netlists equivalentes, 84 idénticas con nombres).
+  Las redes sin nombre se numeran según **el primer cable de cada red en el orden del archivo**
+  (el `WIRE` de menor índice), no por posición: con esa regla las netlists de los 23 fixtures son
+  idénticas a las de LTspice incluidos los nombres (antes, con "de arriba hacia abajo", 130/130
+  equivalentes y 84 idénticas). Las redes sin cables (pines que se tocan) van al final.
 - Pines sueltos: `NC_xx`; `SpiceOrder` faltantes en subcircuitos: `MP_xx` (mismo contador, en orden de
   elementos).
 - Nombre del elemento: si `InstName` no empieza con la letra del prefijo → `P§InstName` (`R§5`, `X§U1`).

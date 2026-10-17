@@ -4,7 +4,7 @@
 // - dos cables que se cruzan por el medio NO se conectan;
 // - etiquetas con el mismo nombre (distinguiendo mayúsculas) son la misma red; "0" es tierra;
 // - nombre de red: tierra > etiqueta (la primera en orden alfabético) > N001, N002…
-//   numeradas de arriba hacia abajo y de izquierda a derecha.
+//   numeradas según el primer cable de cada red en el archivo.
 import { toWorld } from '../asc/transform.ts';
 import type { AscDoc, Point, SymbolDef } from '../asc/model.ts';
 
@@ -150,11 +150,15 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
     else if (n.pins.length === 1 && !n.wires.length) n.name = ''; // pin suelto → NC_xx
     else unnamed.push(n);
   }
+  // LTspice numera según el primer cable de cada red en el orden del archivo (verificado
+  // contra LTspice -netlist); las redes sin cables (pines que se tocan) van al final, de
+  // arriba hacia abajo y de izquierda a derecha.
   const topLeft = (n: Net) =>
     n.points.reduce((a, b) => (b.y < a.y || (b.y === a.y && b.x < a.x) ? b : a));
+  const firstWire = (n: Net) => (n.wires.length ? Math.min(...n.wires) : Infinity);
   unnamed
-    .map((n) => [n, topLeft(n)] as const)
-    .sort(([, a], [, b]) => a.y - b.y || a.x - b.x)
+    .map((n) => [n, firstWire(n), topLeft(n)] as const)
+    .sort(([, wa, a], [, wb, b]) => wa - wb || a.y - b.y || a.x - b.x)
     .forEach(([n], i) => (n.name = `N${String(i + 1).padStart(3, '0')}`));
 
   const pinNet = new Map<string, Net>();

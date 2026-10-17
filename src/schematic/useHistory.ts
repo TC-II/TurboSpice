@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-interface History<T> {
+export interface History<T> {
   past: T[];
   present: T;
   future: T[];
@@ -25,5 +25,19 @@ export function useHistory<T>(initial: T) {
     [],
   );
 
-  return { value: h.present, commit, reset, undo, redo, canUndo: h.past.length > 0, canRedo: h.future.length > 0, version: h.past.length };
+  /** Restaura un historial completo (autoguardado) */
+  const restore = useCallback((next: History<T>) => setH(next), []);
+
+  return {
+    value: h.present,
+    state: h,
+    commit,
+    reset,
+    restore,
+    undo,
+    redo,
+    canUndo: h.past.length > 0,
+    canRedo: h.future.length > 0,
+    version: h.past.length,
+  };
 }

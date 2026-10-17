@@ -68,6 +68,25 @@ await other.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await other.locator('.status.ok').count()) === 1, 'y simula');
 await other.close();
 
+// --- #5: autoguardado y recientes ---
+const flags = () => page.locator('.flags .flag').count();
+const before = await flags();
+const box = await page.locator('svg.editor').boundingBox();
+await page.keyboard.press('g');
+await page.mouse.click(box.x + 60, box.y + 60);
+await page.keyboard.press('Escape');
+check((await flags()) === before + 1, 'agrega una tierra');
+await page.waitForTimeout(1200); // autoguardado
+await page.reload();
+await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('svg.editor .sym').first().waitFor();
+check((await flags()) === before + 1, 'al recargar se recupera el trabajo sin guardar');
+check((await page.locator('.filename').textContent()) === 'Bode RLC.asc •', 'con su nombre y marcado como modificado');
+await page.keyboard.press('Control+z');
+check((await flags()) === before, 'y se puede deshacer lo anterior a la recarga');
+const recents = await page.locator('select[aria-label="Recientes"] option').allTextContents();
+check(recents.includes('Bode RLC'), `recientes: ${recents.slice(1).join(', ')}`);
+
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E funciones OK');

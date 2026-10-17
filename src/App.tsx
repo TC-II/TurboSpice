@@ -12,6 +12,9 @@ import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, ShareDialog, TextDialog } from './schematic/dialogs.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
+import { addRecent, loadRecent, loadSession, readHandle, saveSession, type RecentFile } from './schematic/autosave.ts';
+import { parseAsc } from './asc/parse.ts';
+import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
@@ -45,6 +48,16 @@ interface FileState {
   encoding?: AscEncoding;
   handle?: Parameters<typeof saveFile>[2];
 }
+
+// Serialización cacheada por documento (el autoguardado guarda todo el historial)
+const ascCache = new WeakMap<AscDoc, string>();
+const ascText = (d: AscDoc) => {
+  let t = ascCache.get(d);
+  if (t === undefined) ascCache.set(d, (t = serializeAsc(d)));
+  return t;
+};
+/** Pasos de deshacer que se conservan en el autoguardado */
+const SAVED_UNDO = 50;
 
 const isTyping = (e: KeyboardEvent) =>
   e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
@@ -134,6 +147,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     [history, setTool],
   );
 
+  const [recent, setRecent] = useState<RecentFile[]>([]);
+  const remember = useCallback((d: AscDoc, f: FileState, unsaved = false) => {
+    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, time: Date.now(), unsaved }).then(setRecent);
+  }, []);
+
   // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
   const openShared = useCallback(async (): Promise<boolean> => {
     let shared;
@@ -147,25 +165,66 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (!shared) return false;
     const f = readAsc(shared.bytes, shared.name);
     loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+    remember(f.doc, { name: f.name, encoding: f.encoding });
     return true;
   }, [loadDoc]);
 
-  // Primer documento: el del link, o un ejemplo (salvo que el usuario ya haya empezado a trabajar)
+  // Primer documento: el del link, el último en el que se estaba trabajando (autoguardado)
+  // o un ejemplo. Nada de esto pisa lo que el usuario ya haya empezado a hacer.
   const touched = useRef(false);
   touched.current ||= docKey > 0 || history.version > 0;
+  const [restored, setRestored] = useState(false);
   useEffect(() => {
-    openShared().then((opened) => {
-      if (opened) return;
-      fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)
-        .then((r) => r.arrayBuffer())
-        .then((b) => {
-          if (touched.current) return;
-          const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
-          loadDoc(f.doc, { name: f.name, encoding: f.encoding });
-        })
-        .catch(() => {});
-    });
+    (async () => {
+      setRecent(await loadRecent());
+      const session = await loadSession();
+      const sessionDirty = !!session && session.past.length !== session.savedVersion;
+      if (await openShared()) {
+        // el trabajo sin guardar anterior queda en recientes
+        if (session && sessionDirty) remember(parseAsc(session.present), { name: session.name, encoding: session.encoding }, true);
+        return;
+      }
+      if (touched.current) return;
+      if (session) {
+        try {
+          history.restore({ past: session.past.map(parseAsc), present: parseAsc(session.present), future: session.future.map(parseAsc) });
+          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'] });
+          setSavedVersion(session.savedVersion);
+          setDocKey((k) => k + 1);
+          if (sessionDirty) setMessage(`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`);
+          return;
+        } catch {
+          // sesión ilegible: seguir con el ejemplo
+        }
+      }
+      const b = await (await fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)).arrayBuffer();
+      if (touched.current) return;
+      const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
+      loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+    })()
+      .catch(() => {})
+      .finally(() => setRestored(true));
   }, []); // sólo al montar
+
+  // Autoguardado (con el historial de deshacer), un momento después de cada cambio
+  useEffect(() => {
+    if (!restored) return;
+    const t = setTimeout(() => {
+      const h = history.state;
+      const drop = Math.max(0, h.past.length - SAVED_UNDO);
+      saveSession({
+        name: file.name,
+        encoding: file.encoding,
+        handle: file.handle,
+        past: h.past.slice(drop).map(ascText),
+        present: ascText(h.present),
+        future: h.future.slice(0, SAVED_UNDO).map(ascText),
+        savedVersion: savedVersion - drop,
+        time: Date.now(),
+      });
+    }, 600);
+    return () => clearTimeout(t);
+  }, [restored, history.state, file, savedVersion]);
 
   // Un link compartido abierto con la app ya cargada
   useEffect(() => {
@@ -191,7 +250,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (!confirmDiscard()) return;
     try {
       const f = await openFile();
-      if (f) loadDoc(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
+      if (f) {
+        loadDoc(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
+        remember(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
+      }
     } catch (e) {
       setMessage(`No se pudo abrir: ${(e as Error).message}`);
     }
@@ -202,8 +264,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     try {
       const r = await saveFile(bytes, file.name, file.handle, saveAs);
       if (!r) return;
-      setFile({ ...file, name: r.name, handle: r.handle ?? file.handle });
+      const saved = { ...file, name: r.name, handle: r.handle ?? file.handle };
+      setFile(saved);
       setSavedVersion(history.version);
+      remember(doc, saved);
       setMessage(
         missing.length
           ? `Guardado. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
@@ -218,6 +282,17 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const { bytes } = ascBytes(doc, lib, file.encoding);
     const hash = await shareHash(bytes, file.name);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
+  };
+
+  const doRecent = async (i: number) => {
+    const r = recent[i];
+    if (!r || !confirmDiscard()) return;
+    // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
+    const bytes = r.unsaved ? null : await readHandle(r.handle);
+    const f = bytes ? readAsc(bytes, r.name) : { doc: parseAsc(r.asc), name: r.name, encoding: r.encoding };
+    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'] };
+    loadDoc(f.doc, state);
+    if (!r.unsaved) remember(f.doc, state);
   };
 
   const doNew = () => confirmDiscard() && loadDoc(emptyDoc(), { name: 'Sin título.asc' });
@@ -397,6 +472,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (!f || !f.name.toLowerCase().endsWith('.asc') || !confirmDiscard()) return;
       const r = readAsc(new Uint8Array(await f.arrayBuffer()), f.name);
       loadDoc(r.doc, { name: r.name, encoding: r.encoding });
+      remember(r.doc, { name: r.name, encoding: r.encoding });
     };
     window.addEventListener('dragover', over);
     window.addEventListener('drop', drop);
@@ -432,6 +508,16 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               <option key={x} value={x}>{x.replace('.asc', '')}</option>
             ))}
           </select>
+          {recent.length > 0 && (
+            <select aria-label="Recientes" value="" onChange={(e) => e.target.value && doRecent(Number(e.target.value))}>
+              <option value="">Recientes…</option>
+              {recent.map((r, i) => (
+                <option key={`${r.name}${r.time}`} value={i} title={new Date(r.time).toLocaleString()}>
+                  {r.name.replace(/\.asc$/i, '')}{r.unsaved ? ' (sin guardar)' : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="group">
           {toolBtn({ kind: 'select' }, 'Seleccionar', 'Seleccionar y mover (Esc)')}

@@ -148,3 +148,27 @@ describe('modelos ako:', () => {
     expect(r.warnings).toEqual(['Y: no se encontró el modelo base NADA (ako:)']);
   });
 });
+
+describe('símbolos y bloques del usuario', () => {
+  it('símbolo de un .subckt y jerarquía con un .asc como bloque', async () => {
+    const { makeSymbol, subcktPins, schematicPorts } = await import('../../src/library/makeSymbol.ts');
+    const { Library } = await import('../../src/library/library.ts');
+    const { buildBundle } = await import('../../scripts/build-library.mjs');
+    const mine = new Library(buildBundle());
+    expect(subcktPins('* x\n.SUBCKT amp in out\n+ vcc 0 params: G=10\n.ends', 'AMP')).toEqual(['in', 'out', 'vcc', '0']);
+    // bloque "div": divisor resistivo con puertos in/out
+    const block = `Version 4\nSHEET 1 880 680\nWIRE 16 96 16 112\nFLAG 16 16 in\nIOPIN 16 16 In\nFLAG 16 112 out\nIOPIN 16 112 Out\nFLAG 16 192 0\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k\nSYMBOL res 0 96 R0\nSYMATTR InstName R2\nSYMATTR Value {R}\nTEXT 0 240 Left 2 !.param R=2k\n`;
+    mine.addSchematic('div.asc', block);
+    const ports = schematicPorts(parseAsc(block).flags);
+    expect(ports).toEqual(['in', 'out']);
+    mine.addSymbol('div', makeSymbol({ name: 'div', pins: ports, block: true }));
+    const top = parseAsc(`Version 4\nSHEET 1 880 680\nFLAG -32 0 a\nFLAG 32 0 b\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nTEXT 0 100 Left 2 !.op\n`);
+    const lt = ltNetlist(top, mine);
+    expect(lt.warnings).toEqual([]);
+    const text = ltNetlistText(lt);
+    expect(text).toContain('X1 a b div');
+    expect(text).toContain('.subckt div in out\nR1 in out 1k\nR2 out 0 {R}');
+    const ng = toNgspice(lt, 't', { resolve: () => undefined });
+    expect(ng.text).toMatch(/\.subckt div in out\nR1 in out 1k\nR2 out 0 \{R\}\n\.param R=2k\n\.ends div/);
+  });
+});

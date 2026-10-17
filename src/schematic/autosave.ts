@@ -107,3 +107,17 @@ export async function readHandle(handle: unknown): Promise<Uint8Array | null> {
 /** Vista de resultados recordada para un archivo (por nombre) */
 export const loadView = (name: string) => quiet(get<PlotView>(`view:${name}`), undefined);
 export const saveView = (name: string, view: PlotView) => quiet(put(`view:${name}`, view), undefined);
+
+/** Archivos propios del usuario: símbolos (.asy), modelos (.lib…) y bloques (.asc) */
+export interface UserFile {
+  name: string;
+  kind: 'symbol' | 'model' | 'schematic';
+  text: string;
+  time: number;
+}
+
+export const loadUserFiles = async () => (await quiet(get<UserFile[]>('userfiles'), undefined)) ?? [];
+
+export async function saveUserFiles(files: UserFile[]): Promise<void> {
+  await quiet(put('userfiles', files), undefined);
+}

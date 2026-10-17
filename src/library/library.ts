@@ -1,7 +1,7 @@
 // Librería de símbolos, skins y subcircuitos. Se construye con scripts/build-library.mjs
 // en un único bundle JSON que la app descarga una vez.
-import { parseAsy } from '../asc/parse.ts';
-import { baseName, symbolPath, type SymbolDef } from '../asc/model.ts';
+import { parseAsc, parseAsy } from '../asc/parse.ts';
+import { baseName, symbolPath, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import type { SymbolSource, WindowDefaults } from '../asc/resolve.ts';
 
 export interface LibraryBundle {
@@ -14,6 +14,22 @@ export interface LibraryBundle {
   subs: Record<string, { subckts: string[]; models: string[] }>;
 }
 
+/** Prefijo de las rutas de archivos de modelos del usuario en el FS del motor */
+export const USER_PREFIX = 'user/';
+/** Carpeta con que se muestran los símbolos del usuario en el buscador */
+export const USER_DIR = 'Mis símbolos';
+
+/** Nombres de .subckt y .model definidos en un archivo de modelos */
+export function scanModels(text: string): { subckts: string[]; models: string[] } {
+  const subckts: string[] = [];
+  const models: string[] = [];
+  for (const line of text.split(/\r\n|\r|\n/)) {
+    const m = /^\s*\.(subckt|model)\s+(\S+)/i.exec(line);
+    if (m) (m[1].toLowerCase() === 'subckt' ? subckts : models).push(m[2]);
+  }
+  return { subckts, models };
+}
+
 export class Library implements SymbolSource {
   readonly windowDefaults: WindowDefaults;
   private byPath = new Map<string, string>();
@@ -21,6 +37,11 @@ export class Library implements SymbolSource {
   private cache = new Map<string, SymbolDef>();
   /** Símbolos agregados por el usuario o importados de su LTspice (ganan a los del bundle) */
   private extra = new Map<string, string>();
+  /** Archivos de modelos del usuario: nombre de archivo (minúsculas) → texto */
+  private userModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
+  /** Esquemáticos del usuario usados como bloques jerárquicos: nombre sin .asc (minúsculas) → texto */
+  private userSchematics = new Map<string, { name: string; text: string }>();
+  private schCache = new Map<string, AscDoc>();
 
   readonly bundle: LibraryBundle;
 
@@ -58,6 +79,57 @@ export class Library implements SymbolSource {
     this.cache.delete(`extra:${name.toLowerCase()}`);
   }
 
+  removeSymbol(name: string): void {
+    this.extra.delete(name.toLowerCase());
+    this.cache.delete(`extra:${name.toLowerCase()}`);
+  }
+
+  /** Nombres de los símbolos del usuario */
+  userSymbols(): string[] {
+    return [...this.extra.keys()];
+  }
+
+  /** Archivo de modelos del usuario (.lib, .sub, .mod…): se resuelve antes que los de la librería */
+  addModelFile(name: string, text: string): void {
+    this.userModels.set(name.toLowerCase(), { name, text, ...scanModels(text) });
+  }
+
+  removeModelFile(name: string): void {
+    this.userModels.delete(name.toLowerCase());
+  }
+
+  /** Esquemático del usuario que hace de bloque jerárquico (X.asc para el símbolo X) */
+  addSchematic(name: string, text: string): void {
+    const key = name.replace(/\.asc$/i, '').toLowerCase();
+    this.userSchematics.set(key, { name, text });
+    this.schCache.delete(key);
+  }
+
+  removeSchematic(name: string): void {
+    const key = name.replace(/\.asc$/i, '').toLowerCase();
+    this.userSchematics.delete(key);
+    this.schCache.delete(key);
+  }
+
+  schematic(name: string): AscDoc | undefined {
+    const key = baseName(name).replace(/\.asc$/i, '').toLowerCase();
+    const f = this.userSchematics.get(key);
+    if (!f) return undefined;
+    let doc = this.schCache.get(key);
+    if (!doc) this.schCache.set(key, (doc = parseAsc(f.text)));
+    return doc;
+  }
+
+  /** Archivos de modelos del usuario (para el diálogo y para crear símbolos de sus .subckt) */
+  userModelFiles(): { name: string; text: string; subckts: string[]; models: string[] }[] {
+    return [...this.userModels.values()];
+  }
+
+  /** Contenido de un archivo de modelos del usuario resuelto con resolveModelFile ("user/x.lib") */
+  userFile(rel: string): string | undefined {
+    return rel.startsWith(USER_PREFIX) ? this.userModels.get(rel.slice(USER_PREFIX.length).toLowerCase())?.text : undefined;
+  }
+
   skin(type: string) {
     const name = baseName(type);
     return this.bundle.skins[name] ?? this.bundle.skins[name.toLowerCase()];
@@ -69,8 +141,11 @@ export class Library implements SymbolSource {
    */
   resolveModelFile(path: string): string | undefined {
     const norm = path.replace(/\\/g, '/').replace(/^"|"$/g, '');
-    const files = Object.keys(this.bundle.subs);
     const lower = norm.toLowerCase();
+    // los archivos del usuario ganan (como los que están junto al .asc en LTspice)
+    const user = this.userModels.get(lower.split('/').pop()!);
+    if (user) return USER_PREFIX + user.name.toLowerCase();
+    const files = Object.keys(this.bundle.subs);
     const exact = files.find((f) => lower === f.toLowerCase() || lower.endsWith(`/${f.toLowerCase()}`));
     if (exact) return exact;
     const base = lower.split('/').pop();
@@ -80,13 +155,14 @@ export class Library implements SymbolSource {
   /** ¿Algún archivo de modelos de la librería define este .model/.subckt? */
   definesModel(name: string): boolean {
     const n = name.toLowerCase();
-    return Object.values(this.bundle.subs).some(
+    return [...Object.values(this.bundle.subs), ...this.userModels.values()].some(
       (s) => s.subckts.some((x) => x.toLowerCase() === n) || s.models.some((x) => x.toLowerCase() === n),
     );
   }
 
   /** Todas las rutas de símbolos, para el buscador (F2) */
   symbolPaths(): string[] {
-    return Object.keys(this.bundle.symbols).sort((a, b) => a.localeCompare(b));
+    const user = [...this.extra.keys()].map((n) => `${USER_DIR}/${n}`);
+    return [...user, ...Object.keys(this.bundle.symbols).sort((a, b) => a.localeCompare(b))];
   }
 }

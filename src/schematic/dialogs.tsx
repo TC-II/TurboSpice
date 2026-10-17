@@ -392,3 +392,97 @@ export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
     </Modal>
   );
 }
+
+export interface UserFileInfo {
+  name: string;
+  kind: 'symbol' | 'model' | 'schematic';
+  /** .subckt definidos (modelos) o puertos (bloques) */
+  items: string[];
+}
+
+/** Símbolos, modelos y bloques propios del usuario (guardados en el navegador) */
+export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose }: {
+  files: UserFileInfo[];
+  hasSymbol(name: string): boolean;
+  onAdd(files: File[]): void;
+  onRemove(name: string): void;
+  onMakeSymbol(file: string, name: string): void;
+  onClose(): void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const section = (kind: UserFileInfo['kind'], title: string, empty: string) => {
+    const list = files.filter((f) => f.kind === kind);
+    return (
+      <section className="userfiles-section">
+        <h3>{title}</h3>
+        {list.length ? (
+          <ul>
+            {list.map((f) => (
+              <li key={f.name}>
+                <div className="uf-head">
+                  <code>{f.name}</code>
+                  <button className="danger small" onClick={() => onRemove(f.name)} aria-label={`Quitar ${f.name}`}>Quitar</button>
+                </div>
+                {kind === 'model' && f.items.length > 0 && (
+                  <div className="uf-items">
+                    {f.items.map((sub) =>
+                      hasSymbol(sub) ? (
+                        <span key={sub} className="uf-done" title="Ya hay un símbolo con este nombre">✓ {sub}</span>
+                      ) : (
+                        <button key={sub} onClick={() => onMakeSymbol(f.name, sub)} title={`Crear un símbolo para el subcircuito ${sub}`}>
+                          Crear símbolo de {sub}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+                {kind === 'schematic' && (
+                  <div className="uf-items">
+                    <span className="hint">Puertos: {f.items.join(', ') || '(sin etiquetas)'}</span>
+                    {hasSymbol(f.name.replace(/\.asc$/i, '')) ? (
+                      <span className="uf-done">✓ símbolo de bloque</span>
+                    ) : (
+                      <button onClick={() => onMakeSymbol(f.name, f.name.replace(/\.asc$/i, ''))}>Crear símbolo de bloque</button>
+                    )}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="hint">{empty}</p>
+        )}
+      </section>
+    );
+  };
+  return (
+    <Modal title="Mis símbolos y modelos" onClose={onClose} wide>
+      <p className="hint">
+        Se guardan en este navegador. Los símbolos (<code>.asy</code>) aparecen en el buscador (F2); los modelos (<code>.lib</code>,{' '}
+        <code>.sub</code>, <code>.mod</code>) se usan al simular como si estuvieran junto al <code>.asc</code>; un <code>.asc</code> con
+        su símbolo de bloque se usa como subcircuito (jerarquía, como en LTspice).
+      </p>
+      <div className="buttons left">
+        <button className="primary" onClick={() => input.current?.click()}>Agregar archivos…</button>
+        <input
+          ref={input}
+          type="file"
+          multiple
+          hidden
+          accept=".asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb,.asc"
+          aria-label="Archivos de símbolos y modelos"
+          onChange={(e) => {
+            if (e.target.files?.length) onAdd([...e.target.files]);
+            e.target.value = '';
+          }}
+        />
+      </div>
+      {section('symbol', 'Símbolos', 'Ninguno todavía.')}
+      {section('model', 'Modelos y subcircuitos', 'Ninguno todavía.')}
+      {section('schematic', 'Bloques jerárquicos (.asc)', 'Ninguno todavía.')}
+      <div className="buttons">
+        <button className="primary" onClick={onClose}>Cerrar</button>
+      </div>
+    </Modal>
+  );
+}

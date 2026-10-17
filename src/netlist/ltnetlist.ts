@@ -1,6 +1,6 @@
 // .asc → netlist con la misma forma que genera LTspice (LTspice -netlist), que es la
 // referencia para validar. La traducción a ngspice está en tongspice.ts.
-import { baseName, type AscDoc } from '../asc/model.ts';
+import { baseName, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { connectivity, type Connectivity } from './connectivity.ts';
 
@@ -36,7 +36,17 @@ export interface LtNetlist {
   conn: Connectivity;
   /** nombre NC_xx de cada pin suelto ("sym:pin") */
   ncNames: Map<string, string>;
+  /** bloques jerárquicos usados (símbolo BLOCK + su .asc), incluidos los anidados */
+  blocks: Block[];
   warnings: string[];
+}
+
+export interface Block {
+  /** nombre del subcircuito (= nombre del símbolo) */
+  name: string;
+  /** puertos en el orden de SpiceOrder del símbolo */
+  ports: string[];
+  lt: LtNetlist;
 }
 
 // Familias con modelo implícito: LTspice agrega estos .model y su librería estándar
@@ -56,8 +66,32 @@ export function elementName(prefix: string, instName: string): string {
   return instName[0]?.toUpperCase() === letter.toUpperCase() ? instName : `${letter}§${instName}`;
 }
 
-export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
+export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []): LtNetlist {
   const warnings: string[] = [];
+  const blocks: Block[] = [];
+  const addBlock = (name: string, def: SymbolDef) => {
+    if (blocks.some((b) => b.name.toLowerCase() === name.toLowerCase())) return;
+    if (parents.some((p) => p.toLowerCase() === name.toLowerCase())) {
+      warnings.push(`El bloque ${name} se contiene a sí mismo`);
+      return;
+    }
+    const sub = lib.schematic?.(name);
+    if (!sub) {
+      warnings.push(`Falta el esquemático ${name}.asc del bloque ${name}`);
+      return;
+    }
+    const lt = ltNetlist(sub, lib, [...parents, name]);
+    // puertos: nombres de los pines del símbolo, escritos como la etiqueta del .asc
+    const ports = [...def.pins]
+      .sort((a, b) => Number(a.attrs.get('SpiceOrder') ?? 0) - Number(b.attrs.get('SpiceOrder') ?? 0))
+      .map((p) => {
+        const pin = p.attrs.get('PinName') ?? '';
+        return sub.flags.find((f) => f.name.toLowerCase() === pin.toLowerCase())?.name ?? pin;
+      });
+    warnings.push(...lt.warnings.map((w) => `${name}: ${w}`));
+    for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
+    blocks.push({ name, ports, lt });
+  };
   const conn = connectivity(doc, (t) => lib.symbol(t));
   let ncCounter = 0;
   const nc = (kind: 'NC' | 'MP') => `${kind}_${String(++ncCounter).padStart(2, '0')}`;
@@ -109,12 +143,18 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
     }
     if (FAMILIES[P]) families.add(P);
 
-    const value = ['SpiceModel', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2']
+    let value = ['SpiceModel', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2']
       .map((k) => attrs.get(k) ?? '')
       .filter((v) => v !== '')
       .join(' ')
       // LTspice escribe el prefijo micro como "u" en la netlist
       .replace(/[µμ]/g, 'u');
+    // Bloque jerárquico: el subcircuito es el .asc con el nombre del símbolo
+    if (def.symbolType.toUpperCase() === 'BLOCK') {
+      const name = baseName(s.type);
+      if (!value) value = name;
+      addBlock(name, def);
+    }
 
     const modelFile = attrs.get('ModelFile');
     if (modelFile && !modelFiles.includes(modelFile)) modelFiles.push(modelFile);
@@ -131,7 +171,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
   }
 
   const texts: Directive[] = doc.texts.map((t) => ({ kind: t.kind, text: t.text }));
-  return { elements, implicitModels, standardLibs, texts, modelFiles, conn, ncNames, warnings };
+  return { elements, implicitModels, standardLibs, texts, modelFiles, conn, ncNames, blocks, warnings };
 }
 
 /** Texto de la netlist con el formato de LTspice -netlist (sin la línea de título) */
@@ -161,6 +201,14 @@ export function ltNetlistText(n: LtNetlist): string {
   }
   // LTspice lista los ModelFile en orden alfabético
   for (const f of [...n.modelFiles].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) out.push(`.lib ${f}`);
+  if (n.blocks.length) {
+    out.push('', '* block symbol definitions');
+    for (const b of n.blocks) {
+      out.push(`.subckt ${b.name} ${b.ports.join(' ')}`);
+      out.push(...ltNetlistText({ ...b.lt, blocks: [] }).split('\n').filter((l) => !/^\.(backanno|end)$/.test(l)));
+      out.push(`.ends ${b.name}`, '');
+    }
+  }
   out.push('.backanno', '.end');
   return out.join('\n');
 }

@@ -57,6 +57,22 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   `NMOS`/`PMOS` + `standard.mos`; `NJF`/`PJF` + `standard.jft`.
 - Comentarios `;x` → `* x`; directivas multilínea se separan; al final `.backanno` y `.end`.
 
+## Símbolos, modelos y jerarquía del usuario
+
+En LTspice los `.asy` y `.lib` propios suelen estar junto al `.asc`. En TurboSpice se agregan en
+**Archivo › Mis símbolos y modelos** (o arrastrándolos) y quedan guardados en el navegador:
+
+- un símbolo se busca por nombre (como los que están junto al `.asc`) y gana a los de la librería;
+- un archivo de modelos se resuelve antes que los de la librería en `.lib`/`.include`/`ModelFile`;
+- **jerarquía**: un símbolo `SymbolType BLOCK` cuyo nombre coincide con un `.asc` del usuario se
+  convierte en `.subckt NOMBRE puertos…` (puertos en el orden de `SpiceOrder` de los pines del
+  símbolo, conectados a las etiquetas del `.asc` con el mismo nombre). Los `.model`/`.param` del
+  bloque quedan locales al subcircuito; los análisis del bloque se ignoran. En la netlist estilo
+  LTspice va en una sección `* block symbol definitions` al final (formato pendiente de verificar
+  con el oráculo, #10).
+- Se pueden generar símbolos: uno rectangular para un `.subckt` (con `ModelFile`) o uno de bloque
+  para un `.asc` (puertos = etiquetas con `IOPIN`, o todas si no hay).
+
 ## Directivas que sólo tiene ngspice
 
 El bloque `.control … .endc` y los análisis `.pz`, `.sens`, `.disto`, `.sp` y `.pss` no existen en

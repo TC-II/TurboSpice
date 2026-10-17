@@ -55,16 +55,8 @@ export function normalizeSkin(svg) {
   return { viewBox, body };
 }
 
-/** Nombres de .subckt y .model definidos en un archivo de modelos */
-export function scanModels(text) {
-  const subckts = [];
-  const models = [];
-  for (const line of text.split(/\r\n|\r|\n/)) {
-    const m = /^\s*\.(subckt|model)\s+(\S+)/i.exec(line);
-    if (m) (m[1].toLowerCase() === 'subckt' ? subckts : models).push(m[2]);
-  }
-  return { subckts, models };
-}
+export { scanModels } from '../src/library/library.ts';
+import { scanModels } from '../src/library/library.ts';
 
 export function buildBundle() {
   const symbols = {};

@@ -39,7 +39,9 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
     resolve: (p) => lib.resolveModelFile(p),
     defines: (m) => lib.definesModel(m),
   });
-  const texts = Object.fromEntries(await Promise.all(ng.includes.map(async (rel) => [rel, await fetchModelFile(rel)] as const)));
+  const texts = Object.fromEntries(
+    await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),
+  );
   const prep = prepareSimulation(ng, (rel) => texts[rel]);
   // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba
   const netlist = prep.netlist.replace(/\n\.end\s*$/i, '\n.options savecurrents\n.end');

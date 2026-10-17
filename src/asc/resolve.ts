@@ -8,6 +8,8 @@ export type WindowDefaults = Record<string, Record<string, Record<string, [numbe
 export interface SymbolSource {
   symbol(type: string): SymbolDef | undefined;
   windowDefaults: WindowDefaults;
+  /** Esquemático de un bloque jerárquico (mismo nombre que su símbolo BLOCK), si existe */
+  schematic?(name: string): AscDoc | undefined;
 }
 
 /** Atributos que afectan la netlist: siempre se escriben explícitos, en este orden */

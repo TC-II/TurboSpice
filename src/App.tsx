@@ -1,10 +1,10 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { emptyDoc, type AscDoc } from './asc/model.ts';
+import { baseName, emptyDoc, type AscDoc } from './asc/model.ts';
 import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
-import { Library, type LibraryBundle } from './library/library.ts';
+import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { biasParams, elementBias, netBias } from './sim/bias.ts';
@@ -14,11 +14,12 @@ import { StatusText, type Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, ResultTable } from './waveform/ScalarViews.tsx';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ShareDialog, TextDialog, WelcomeDialog } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { MenuBar, type MenuDef } from './ui/Menu.tsx';
 import { Icon, type IconName } from './ui/icons.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
-import { addRecent, loadRecent, loadSession, readHandle, saveSession, type RecentFile } from './schematic/autosave.ts';
+import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker } from './schematic/simDialogs.tsx';
@@ -57,6 +58,7 @@ type Dialog =
   | { kind: 'control'; index: number }
   | { kind: 'share'; url: string }
   | { kind: 'help' }
+  | { kind: 'userfiles' }
   | { kind: 'welcome' };
 
 interface FileState {
@@ -117,6 +119,16 @@ const lsSet = (k: string, v: string) => {
   }
 };
 
+/** Registra un archivo del usuario en la librería (símbolo, modelos o bloque) */
+function registerUserFile(lib: Library, f: UserFile) {
+  if (f.kind === 'symbol') lib.addSymbol(f.name.replace(/\.asy$/i, ''), f.text);
+  else if (f.kind === 'model') lib.addModelFile(f.name, f.text);
+  else lib.addSchematic(f.name, f.text);
+}
+
+const userFileKind = (name: string): UserFile['kind'] | null =>
+  /\.asy$/i.test(name) ? 'symbol' : /\.(lib|sub|mod|inc|cir|txt|lb)$/i.test(name) ? 'model' : /\.asc$/i.test(name) ? 'schematic' : null;
+
 /** Copia interna por si el navegador no deja leer el portapapeles */
 let clipboardFallback = '';
 
@@ -129,7 +141,11 @@ export function App() {
   useEffect(() => {
     fetch(`${BASE}library/bundle.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((b: LibraryBundle) => setLib(new Library(b)))
+      .then(async (b: LibraryBundle) => {
+        const l = new Library(b);
+        for (const f of await loadUserFiles()) registerUserFile(l, f);
+        setLib(l);
+      })
       .catch((e: Error) => setLibError(`No se pudo cargar la librería: ${e.message}`));
     return () => engine.abort();
   }, [engine]);
@@ -181,7 +197,14 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [docKey, setDocKey] = useState(0);
   const dirty = history.version !== savedVersion;
 
-  const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib]);
+  // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
+  const [userFiles, setUserFiles] = useState<UserFile[]>([]);
+  const [libVersion, setLibVersion] = useState(0);
+  useEffect(() => {
+    loadUserFiles().then(setUserFiles);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib, libVersion]);
   const conn = lt.conn;
   const [showNets, setShowNets] = useState(false);
   const shownNets = useMemo(() => (showNets ? netNames(doc, conn, lt.ncNames) : undefined), [showNets, doc, conn, lt]);
@@ -335,6 +358,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (f) {
         loadDoc(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
         remember(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
+        warnMissing(f.doc);
       }
     } catch (e) {
       setMessage(`No se pudo abrir: ${(e as Error).message}`);
@@ -563,6 +587,59 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     return () => window.removeEventListener('keydown', k);
   });
 
+  const missingSymbols = (d: AscDoc) => [...new Set(d.symbols.filter((x) => !lib.symbol(x.type)).map((x) => `${baseName(x.type)}.asy`))];
+  /** Avisa si el circuito usa símbolos que no están en la librería ni entre los del usuario */
+  const warnMissing = (d: AscDoc) => {
+    const miss = missingSymbols(d);
+    if (miss.length) setMessage(`Faltan símbolos: ${miss.join(', ')}. Agregalos en Archivo › Mis símbolos y modelos.`);
+  };
+  const storeUserFiles = (next: UserFile[]) => {
+    setUserFiles(next);
+    saveUserFiles(next);
+    setLibVersion((v) => v + 1);
+  };
+  const addUserFiles = async (files: File[]) => {
+    const next = [...userFiles];
+    const added: string[] = [];
+    for (const f of files) {
+      const kind = userFileKind(f.name);
+      if (!kind) continue;
+      const uf: UserFile = { name: f.name, kind, text: decode(new Uint8Array(await f.arrayBuffer())).text, time: Date.now() };
+      const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
+      if (i >= 0) next[i] = uf;
+      else next.push(uf);
+      registerUserFile(lib, uf);
+      added.push(f.name);
+    }
+    storeUserFiles(next);
+    if (added.length) setMessage(`Agregados: ${added.join(', ')}`);
+  };
+  const removeUserFile = (name: string) => {
+    const f = userFiles.find((x) => x.name === name);
+    if (!f) return;
+    if (f.kind === 'symbol') lib.removeSymbol(name.replace(/\.asy$/i, ''));
+    else if (f.kind === 'model') lib.removeModelFile(name);
+    else lib.removeSchematic(name);
+    storeUserFiles(userFiles.filter((x) => x !== f));
+  };
+  /** Símbolo para un .subckt de un archivo de modelos, o de bloque para un .asc */
+  const makeUserSymbol = (file: string, name: string) => {
+    const f = userFiles.find((x) => x.name === file);
+    if (!f) return;
+    const pins = f.kind === 'schematic' ? schematicPorts(parseAsc(f.text).flags) : subcktPins(f.text, name);
+    if (!pins) return setMessage(`No se encontró .subckt ${name} en ${file}`);
+    const uf: UserFile = { name: `${name}.asy`, kind: 'symbol', text: makeSymbol({ name, pins, block: f.kind === 'schematic', modelFile: f.kind === 'model' ? file : undefined }), time: Date.now() };
+    registerUserFile(lib, uf);
+    storeUserFiles([...userFiles.filter((x) => x.name.toLowerCase() !== uf.name.toLowerCase()), uf]);
+    setMessage(`Símbolo ${name} creado: está en el buscador de componentes (F2) en "${USER_DIR}"`);
+  };
+  const userFileInfo = (): UserFileInfo[] =>
+    userFiles.map((f) => ({
+      name: f.name,
+      kind: f.kind,
+      items: f.kind === 'model' ? scanModels(f.text).subckts : f.kind === 'schematic' ? schematicPorts(parseAsc(f.text).flags) : [],
+    }));
+
   // Portapapeles: la selección como texto .asc (se puede pegar en otra pestaña o en un editor)
   const copySelection = async (cut = false) => {
     if (!selection.length) return;
@@ -708,12 +785,17 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const over = (e: DragEvent) => e.preventDefault();
     const drop = async (e: DragEvent) => {
       e.preventDefault();
-      const f = e.dataTransfer?.files[0];
+      const all = [...(e.dataTransfer?.files ?? [])];
+      const f = all[0];
       if (f?.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
+      // símbolos y modelos propios (un .asc suelto se abre; junto con otros archivos, es un bloque)
+      const own = all.filter((x) => userFileKind(x.name) && (!/\.asc$/i.test(x.name) || all.length > 1));
+      if (own.length && !(all.length === 1 && /\.asc$/i.test(f.name))) return addUserFiles(own);
       if (!f || !f.name.toLowerCase().endsWith('.asc') || !confirmDiscard()) return;
       const r = readAsc(new Uint8Array(await f.arrayBuffer()), f.name);
       loadDoc(r.doc, { name: r.name, encoding: r.encoding });
       remember(r.doc, { name: r.name, encoding: r.encoding });
+      warnMissing(r.doc);
     };
     window.addEventListener('dragover', over);
     window.addEventListener('drop', drop);
@@ -745,6 +827,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
         'sep',
         { label: 'Compartir link…', onClick: doShare },
+        { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
         'sep',
         { label: 'Ejemplos', items: EXAMPLES.map((x) => ({ label: x.replace('.asc', ''), onClick: () => doExample(x) })) },
         {
@@ -1137,7 +1220,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           onClose={() => setDialog(null)}
           onPick={(type) => {
             setDialog(null);
-            setTool({ kind: 'place', type, orient: 'R0' });
+            // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
+            setTool({ kind: 'place', type: type.startsWith(`${USER_DIR}/`) ? type.slice(USER_DIR.length + 1) : type, orient: 'R0' });
           }}
         />
       )}
@@ -1202,6 +1286,16 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         />
       )}
       {dialog?.kind === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'userfiles' && (
+        <UserFilesDialog
+          files={userFileInfo()}
+          hasSymbol={(n) => !!lib.symbol(n)}
+          onAdd={addUserFiles}
+          onRemove={removeUserFile}
+          onMakeSymbol={makeUserSymbol}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'welcome' && (
         <WelcomeDialog
           examples={EXAMPLES}

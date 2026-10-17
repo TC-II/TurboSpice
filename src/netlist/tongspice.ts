@@ -128,6 +128,38 @@ function fixTran(line: string, warnings: string[]): string {
 
 const DROP_DIRECTIVES = /^\.(backanno|wave|save\s+none|loadbias|savebias)\b/i;
 
+/** Líneas de ngspice de los elementos de una netlist (con los parásitos expandidos) */
+function convertElements(
+  lt: LtNetlist,
+  used: Set<string>,
+  names: Map<string, string>,
+  warnings: string[],
+  subcktParams: Map<string, Map<string, string>>,
+): string[] {
+  const out: string[] = [];
+  for (const e of lt.elements) {
+    const name = ngspiceName(e, used);
+    names.set(e.name, name);
+    const letter = name[0].toUpperCase();
+    // Valor por defecto del símbolo sin cambiar ("R", "C", "L"…): falta asignarlo.
+    // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
+    if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {
+      warnings.push(`${e.name} no tiene valor asignado`);
+    }
+    if (letter === 'X') {
+      const { main, params, order } = splitParams(e.value);
+      const sub = main.split(/\s+/)[0]?.toLowerCase();
+      if (sub && order.length) {
+        const known = subcktParams.get(sub) ?? subcktParams.set(sub, new Map()).get(sub)!;
+        for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
+      }
+    }
+    out.push(...expandElement(name, letter, e.nodes, e.value, warnings));
+  }
+
+  return out;
+}
+
 export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): NgspiceNetlist {
   const warnings = [...lt.warnings];
   const names = new Map<string, string>();
@@ -150,27 +182,10 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     return section ? `.lib ${rel} ${section}` : `.include ${rel}`;
   };
 
-  for (const e of lt.elements) {
-    const name = ngspiceName(e, used);
-    names.set(e.name, name);
-    const letter = name[0].toUpperCase();
-    // Valor por defecto del símbolo sin cambiar ("R", "C", "L"…): falta asignarlo.
-    // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
-    if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {
-      warnings.push(`${e.name} no tiene valor asignado`);
-    }
-    if (letter === 'X') {
-      const { main, params, order } = splitParams(e.value);
-      const sub = main.split(/\s+/)[0]?.toLowerCase();
-      if (sub && order.length) {
-        const known = subcktParams.get(sub) ?? subcktParams.set(sub, new Map()).get(sub)!;
-        for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
-      }
-    }
-    out.push(...expandElement(name, letter, e.nodes, e.value, warnings));
-  }
-
-  out.push(...lt.implicitModels);
+  out.push(...convertElements(lt, used, names, warnings, subcktParams));
+  const implicit = [...lt.implicitModels];
+  for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
+  out.push(...implicit);
 
   const steps: Step[] = [];
   for (const t of lt.texts) {
@@ -225,6 +240,27 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         warnings.push(`${e.name}: no se encontró el modelo "${model}"`);
       }
     }
+  }
+
+  // Bloques jerárquicos: un .subckt por esquemático (sus .model/.param quedan locales)
+  for (const b of lt.blocks) {
+    out.push(`.subckt ${b.name} ${b.ports.join(' ')}`);
+    out.push(...convertElements(b.lt, new Set(), new Map(), warnings, subcktParams));
+    for (const t of b.lt.texts) {
+      if (t.kind !== 'directive') continue;
+      for (const raw of t.text.split('\\n')) {
+        const line = raw.trim();
+        if (/^\.(model|param|func|subckt|ends|include|inc|lib)\b/i.test(line) || /^[+]/.test(line)) {
+          const lib = /^\.(lib|include|inc)\s+("?)([^"]+)\2(?:\s+(\S+))?\s*$/i.exec(line);
+          out.push(lib ? (include(lib[3].trim(), lib[1].toLowerCase() === 'lib' ? lib[4] : undefined) ?? `* ${line}`) : line);
+        } else if (/^\./.test(line)) out.push(`* ${line} (dentro del bloque ${b.name}: se ignora)`);
+      }
+    }
+    for (const f of b.lt.modelFiles) {
+      const r = include(f);
+      if (r) out.push(r);
+    }
+    out.push(`.ends ${b.name}`);
   }
 
   out.push('.end');

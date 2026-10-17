@@ -345,6 +345,36 @@ check(await page.locator('.workspace.side .results-panel').isVisible(), 'resulta
 await page.screenshot({ path: `${OUT}/side.png` });
 await menu(page, 'Ver', 'Resultados al costado');
 
+// --- #11: símbolos, modelos y bloques del usuario ---
+await menu(page, 'Archivo', 'Mis símbolos y modelos…');
+const block = 'Version 4\nSHEET 1 880 680\nWIRE 16 96 16 112\nFLAG 16 16 in\nIOPIN 16 16 In\nFLAG 16 112 out\nIOPIN 16 112 Out\nFLAG 16 192 0\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k\nSYMBOL res 0 96 R0\nSYMATTR InstName R2\nSYMATTR Value {R}\nTEXT 0 240 Left 2 !.param R=2k\n';
+const libText = '* amplificador de ganancia 3\n.subckt amp3 in out\nE1 out 0 in 0 3\n.ends amp3\n';
+await page.getByLabel('Archivos de símbolos y modelos').setInputFiles([
+  { name: 'div.asc', mimeType: 'text/plain', buffer: Buffer.from(block) },
+  { name: 'amps.lib', mimeType: 'text/plain', buffer: Buffer.from(libText) },
+]);
+await page.getByRole('button', { name: 'Crear símbolo de bloque' }).click();
+await page.getByRole('button', { name: 'Crear símbolo de amp3' }).click();
+const ufText = await page.locator('.modal').textContent();
+check(/✓ símbolo de bloque/.test(ufText) && /✓ amp3/.test(ufText) && /div\.asy/.test(ufText) && /amp3\.asy/.test(ufText), 'agregar un bloque .asc y un .lib, y crear sus símbolos');
+await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+await page.keyboard.press('F2');
+await page.locator('.modal input').fill('amp3');
+check((await page.locator('.picker-list li', { hasText: 'Mis símbolos' }).filter({ hasText: 'amp3' }).count()) === 1, 'los símbolos propios aparecen en el buscador');
+await page.keyboard.press('Escape');
+// circuito que usa los dos: V1=3 → div (2 V) → amp3 (6 V)
+const top = 'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nWIRE 32 0 96 0\nWIRE 160 0 224 0\nFLAG -96 64 0\nFLAG 32 0 b\nFLAG 224 0 c\nSYMBOL voltage -96 -32 R0\nSYMATTR InstName V1\nSYMATTR Value 3\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMBOL amp3 128 0 R0\nSYMATTR InstName X2\nTEXT -96 128 Left 2 !.op\n';
+await page.getByRole('button', { name: 'Nuevo' }).click();
+await page.evaluate((t) => navigator.clipboard.writeText(t), top);
+await page.keyboard.press('Control+v');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+const opRows = await page.locator('.result-table tbody tr').allTextContents();
+check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
+await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
+check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
+await page.getByRole('button', { name: 'Cerrar resultados' }).click();
+
 // bienvenida en la primera visita
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const fp = await fresh.newPage();

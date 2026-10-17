@@ -243,6 +243,50 @@ await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
 check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);
 await page.screenshot({ path: `${OUT}/plot-panel.png` });
+// #30: el gráfico no se recrea por estado ajeno a los datos (marca en el canvas de uPlot)
+const canvas = page.locator('.pane-chart canvas').first();
+await canvas.evaluate((c) => (c.dataset.e2e = 'mismo'));
+await page.locator('.trace-chip').first().hover();
+await page.locator('.pane-chart').first().hover();
+await page.locator('.pane').first().click({ position: { x: 5, y: 5 } });
+check((await canvas.evaluate((c) => c.dataset.e2e).catch(() => undefined)) === 'mismo', 'el gráfico no se recrea al pasar por una traza ni al activar el panel');
+// clicks seguidos y rápidos (sin esperar el doble click) colocan siempre el cursor A
+const headA = async () => /A \(([^)]+)\)/.exec(await page.locator('.readout thead').textContent())?.[1];
+const headB = async () => /B \(([^)]+)\)/.exec(await page.locator('.readout thead').textContent())?.[1];
+const bBefore = await headB();
+let placed = 0;
+let lastA = await headA();
+for (let k = 0; k < 20; k++) {
+  const r = await page.locator('.pane-chart').first().boundingBox();
+  await page.mouse.click(r.x + r.width * (0.15 + 0.035 * k), r.y + r.height * 0.4);
+  const now = await headA();
+  if (now && now !== lastA) placed++;
+  lastA = now;
+}
+check(placed === 20 && (await headB()) === bBefore, `20 clicks seguidos mueven siempre el cursor A (${placed}/20) y no el B`);
+// arrastrar el cursor B actualiza la tabla en vivo
+const rb = await page.locator('.pane-chart').first().boundingBox();
+await page.mouse.click(rb.x + rb.width * 0.8, rb.y + rb.height / 2, { button: 'right' });
+const b0 = await headB();
+const dx0 = await page.locator('.readout tr.dx').textContent();
+await page.mouse.move(rb.x + rb.width * 0.8, rb.y + rb.height / 2);
+await page.mouse.down();
+await page.mouse.move(rb.x + rb.width * 0.6, rb.y + rb.height / 2, { steps: 8 });
+const bMid = await headB();
+await page.mouse.move(rb.x + rb.width * 0.5, rb.y + rb.height / 2, { steps: 4 });
+await page.mouse.up();
+const b1 = await headB();
+check(b0 !== bMid && bMid !== b1 && lastA === (await headA()) && dx0 !== (await page.locator('.readout tr.dx').textContent()), `arrastrar el cursor B lo mueve en vivo (${b0} → ${bMid} → ${b1}), A queda`);
+// flechas: punto a punto; borrar e intercambiar
+await page.keyboard.press('ArrowRight');
+check((await headB()) !== b1, `flecha → mueve el cursor B un punto (${await headB()})`);
+await page.getByLabel('Traza del cursor A').selectOption({ index: 1 });
+check(/followed/.test((await page.locator('.readout tbody tr').first().getAttribute('class')) ?? ''), 'el cursor A sigue una traza');
+const [a2, b2] = [await headA(), await headB()];
+await page.getByRole('button', { name: 'A ⇄ B' }).click();
+check((await headA()) === b2 && (await headB()) === a2, 'intercambiar A y B');
+await page.getByRole('button', { name: 'Borrar B' }).click();
+check((await headB()) === undefined && (await headA()) === b2, 'borrar el cursor B');
 await page.getByRole('button', { name: 'Cursores' }).click();
 
 const csv = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('csv'));

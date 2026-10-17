@@ -23,6 +23,7 @@ import {
 import type { PickWhat } from './simDialogs.tsx';
 import { AnnotationLayer, NetNamesLayer, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
+import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
 
 export type Tool =
@@ -67,6 +68,8 @@ interface Props {
   describe?(target: { net?: string; symbol?: number }): BiasInfo | null;
   /** valores anotados sobre el esquemático */
   annotations?: Annotation[];
+  /** flechitas con el sentido positivo de la corriente en los pines */
+  currentArrows?: CurrentArrow[];
   /** herramienta pick: valor que se elegiría en ese lugar (nombre de red o de fuente) */
   pickValue?(target: { net?: string; symbol?: number }): string | null;
   onPicked?(value: string): void;
@@ -132,7 +135,7 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, pickValue, onPicked } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -504,6 +507,7 @@ export function SchematicEditor(props: Props) {
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
       />
       <g className="ghost">{ghost}</g>
+      {currentArrows && currentArrows.length > 0 && <CurrentArrowsLayer items={currentArrows} />}
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />

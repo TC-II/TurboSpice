@@ -298,6 +298,9 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .op-annotation.v text { fill: var(--sch-wire); }
 .op-annotation.i rect { fill: color-mix(in srgb, var(--sch-bg) 85%, transparent); stroke: var(--sch-hl); }
 .op-annotation.i text { fill: var(--sch-hl); }
+.current-arrow { pointer-events: none; }
+.current-arrow line { stroke: var(--sch-hl); stroke-width: 1.25; vector-effect: non-scaling-stroke; }
+.current-arrow polygon { fill: var(--sch-hl); stroke: none; }
 
 /* ---------- Elegir en el esquemático desde un diálogo ---------- */
 .modal-backdrop.picking { display: none; }

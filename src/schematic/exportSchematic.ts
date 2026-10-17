@@ -30,7 +30,7 @@ const PROPS = [
 ];
 
 /** Capas que no son parte del dibujo (grilla, fantasmas, selección, ayudas temporales) */
-const DROP = '.ghost, .selbox, .snap-cursor, .net-names, .op-annotations, .net-hl, .loose, rect[fill="url(#grid)"], defs';
+const DROP = '.ghost, .selbox, .snap-cursor, .wire-crosshair, .net-names, .op-annotations, .net-hl, .loose, rect[fill="url(#grid)"], defs';
 
 /**
  * SVG autónomo del esquemático. `box` es la caja del contenido en unidades del esquemático.

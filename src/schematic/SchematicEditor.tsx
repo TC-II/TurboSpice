@@ -520,6 +520,13 @@ export function SchematicEditor(props: Props) {
           height={Math.abs(boxEnd.y - drag.start.y)}
         />
       )}
+      {tool.kind === 'wire' && (
+        // cruz de pantalla completa en el punto de la grilla (reemplaza al cursor del mouse)
+        <g className="wire-crosshair">
+          <line x1={vb.x} y1={g.y} x2={vb.x + vb.w} y2={g.y} />
+          <line x1={g.x} y1={vb.y} x2={g.x} y2={vb.y + vb.h} />
+        </g>
+      )}
       {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (

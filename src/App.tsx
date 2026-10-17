@@ -10,7 +10,8 @@ import { netNames } from './schematic/NetNames.tsx';
 import type { Point } from './asc/model.ts';
 import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, TextDialog } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, ShareDialog, TextDialog } from './schematic/dialogs.tsx';
+import { readShareHash, shareHash } from './schematic/share.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
@@ -36,7 +37,8 @@ type Dialog =
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point }
   | { kind: 'sim'; found: FoundLine | null }
-  | { kind: 'control'; index: number };
+  | { kind: 'control'; index: number }
+  | { kind: 'share'; url: string };
 
 interface FileState {
   name: string;
@@ -132,19 +134,47 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     [history, setTool],
   );
 
-  // Primer documento: un ejemplo (salvo que el usuario ya haya empezado a trabajar)
+  // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
+  const openShared = useCallback(async (): Promise<boolean> => {
+    let shared;
+    try {
+      shared = await readShareHash(location.hash);
+    } catch {
+      setMessage('El link no contiene un circuito válido');
+    }
+    if (shared === undefined && !/[#&]c=/.test(location.hash)) return false;
+    window.history.replaceState(null, '', location.pathname + location.search);
+    if (!shared) return false;
+    const f = readAsc(shared.bytes, shared.name);
+    loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+    return true;
+  }, [loadDoc]);
+
+  // Primer documento: el del link, o un ejemplo (salvo que el usuario ya haya empezado a trabajar)
   const touched = useRef(false);
   touched.current ||= docKey > 0 || history.version > 0;
   useEffect(() => {
-    fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)
-      .then((r) => r.arrayBuffer())
-      .then((b) => {
-        if (touched.current) return;
-        const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
-        loadDoc(f.doc, { name: f.name, encoding: f.encoding });
-      })
-      .catch(() => {});
+    openShared().then((opened) => {
+      if (opened) return;
+      fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)
+        .then((r) => r.arrayBuffer())
+        .then((b) => {
+          if (touched.current) return;
+          const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
+          loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+        })
+        .catch(() => {});
+    });
   }, []); // sólo al montar
+
+  // Un link compartido abierto con la app ya cargada
+  useEffect(() => {
+    const h = () => {
+      if (/[#&]c=/.test(location.hash) && confirmDiscard()) openShared();
+    };
+    window.addEventListener('hashchange', h);
+    return () => window.removeEventListener('hashchange', h);
+  });
 
   // Aviso al cerrar con cambios sin guardar
   useEffect(() => {
@@ -182,6 +212,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     } catch (e) {
       setMessage(`No se pudo guardar: ${(e as Error).message}`);
     }
+  };
+
+  const doShare = async () => {
+    const { bytes } = ascBytes(doc, lib, file.encoding);
+    const hash = await shareHash(bytes, file.name);
+    setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
   const doNew = () => confirmDiscard() && loadDoc(emptyDoc(), { name: 'Sin título.asc' });
@@ -389,6 +425,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           <button onClick={doOpen} title="Abrir .asc (Ctrl+O)">Abrir</button>
           <button onClick={() => doSave(false)} title="Guardar (Ctrl+S)">Guardar</button>
           <button onClick={() => doSave(true)} title="Guardar como (Ctrl+Shift+S)">Guardar como</button>
+          <button onClick={doShare} title="Copiar un link que abre este circuito">Compartir</button>
           <select aria-label="Ejemplos" value="" onChange={(e) => e.target.value && doExample(e.target.value)}>
             <option value="">Ejemplos…</option>
             {EXAMPLES.map((x) => (
@@ -586,6 +623,16 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             const text = controlBlock(body).split('\n').join('\\n');
             if (dialog.index >= 0) commit(setText(doc, dialog.index, { text, kind: 'comment' }));
             else setTool({ kind: 'text', text, textKind: 'comment' });
+          }}
+        />
+      )}
+      {dialog?.kind === 'share' && (
+        <ShareDialog
+          url={dialog.url}
+          onClose={() => setDialog(null)}
+          onDownload={() => {
+            setDialog(null);
+            doSave(true);
           }}
         />
       )}

@@ -4,6 +4,7 @@ import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs } from '../asc/resolve.ts';
 import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
+import { LONG_LINK } from './share.ts';
 import { SymbolView } from './SchematicCanvas.tsx';
 
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose(): void; wide?: boolean }) {
@@ -228,6 +229,44 @@ export function FlagDialog({ initial, onApply, onClose }: { initial: string; onA
           <button type="submit" className="primary">Aceptar</button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+/** Link para compartir el circuito: se copia al portapapeles al abrir */
+export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose(): void; onDownload(): void }) {
+  const [copied, setCopied] = useState<boolean | null>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const copy = () =>
+    navigator.clipboard.writeText(url).then(
+      () => setCopied(true),
+      () => {
+        setCopied(false);
+        input.current?.select();
+      },
+    );
+  useEffect(() => {
+    input.current?.select();
+    copy();
+  }, []);
+  const kb = (url.length / 1024).toFixed(1);
+  return (
+    <Modal title="Compartir circuito" onClose={onClose}>
+      <div className="textdlg">
+        <input ref={input} readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()} />
+        <p className="hint">
+          {copied ? 'Link copiado al portapapeles. ' : copied === false ? 'Copiá el link con Ctrl+C. ' : ''}
+          El circuito va dentro del link ({kb} KB): no se sube a ningún servidor.
+        </p>
+        {url.length > LONG_LINK && (
+          <p className="hint warn">Es un link largo: puede cortarse en algunos chats o mails. Si pasa, mandá el archivo .asc.</p>
+        )}
+        <div className="buttons">
+          <button type="button" onClick={onDownload}>Descargar .asc</button>
+          <button type="button" onClick={copy}>Copiar</button>
+          <button type="button" className="primary" onClick={onClose}>Listo</button>
+        </div>
+      </div>
     </Modal>
   );
 }

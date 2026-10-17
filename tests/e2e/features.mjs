@@ -9,6 +9,7 @@ mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 const page = await context.newPage();
 const errors = [];
 const watch = (p) => {
@@ -45,6 +46,27 @@ check((await page.locator('.flags .flagname', { hasText: 'in' }).count()) === 1,
 await page.screenshot({ path: `${OUT}/net-names.png` });
 await page.keyboard.press('Control+z');
 await page.getByRole('button', { name: 'Redes' }).click();
+
+// --- #1: compartir con un link ---
+await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Bode RLC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.getByRole('button', { name: 'Compartir' }).click();
+const link = await page.locator('.modal input[aria-label="Link"]').inputValue();
+check(/#c=[\w-]+&n=Bode%20RLC\.asc$/.test(link), `genera el link (${link.length} caracteres)`);
+await page.getByRole('button', { name: 'Listo', exact: true }).click();
+const other = await context.newPage();
+watch(other);
+await other.goto(link);
+await other.getByText('Listo').waitFor({ timeout: 30000 });
+await other.locator('svg.editor .sym').first().waitFor();
+check((await other.locator('.filename').textContent()) === 'Bode RLC.asc', 'el link abre el circuito con su nombre');
+check(!(await other.evaluate(() => location.hash)), 'y limpia el hash');
+const symsA = await page.locator('svg.editor .sym').count();
+check((await other.locator('svg.editor .sym').count()) === symsA, 'con los mismos componentes');
+await other.getByRole('button', { name: 'Simular' }).click();
+await other.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+check((await other.locator('.status.ok').count()) === 1, 'y simula');
+await other.close();
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

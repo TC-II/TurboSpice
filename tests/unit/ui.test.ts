@@ -29,3 +29,26 @@ describe('nombres de redes temporales', () => {
     }
   });
 });
+
+describe('compartir con un link', () => {
+  it.each(fixtures.slice(0, 6))('%s: el link reproduce el mismo archivo', async (f) => {
+    const { readShareHash, shareHash } = await import('../../src/schematic/share.ts');
+    const { ascBytes, readAsc } = await import('../../src/schematic/fileio.ts');
+    const { ltNetlistText } = await import('../../src/netlist/ltnetlist.ts');
+    const orig = readAsc(new Uint8Array(readFileSync(join(FIX, f))), f);
+    const { bytes } = ascBytes(orig.doc, lib, orig.encoding);
+    const hash = await shareHash(bytes, f);
+    expect(hash.length).toBeLessThan(bytes.length);
+    const back = await readShareHash(`#${hash}`);
+    expect(back!.name).toBe(f);
+    expect(back!.bytes).toEqual(bytes);
+    const reread = readAsc(back!.bytes, back!.name);
+    expect(ltNetlistText(ltNetlist(reread.doc, lib))).toBe(ltNetlistText(ltNetlist(orig.doc, lib)));
+  });
+
+  it('un hash sin circuito no es un link compartido', async () => {
+    const { readShareHash } = await import('../../src/schematic/share.ts');
+    expect(await readShareHash('#x=1')).toBeNull();
+    expect(await readShareHash('')).toBeNull();
+  });
+});

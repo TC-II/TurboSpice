@@ -133,3 +133,18 @@ describe('números SPICE', () => {
   ])('%s', (s, v) => expect(parseSpiceNumber(s)).toBeCloseTo(v, 15));
   it('expresiones no son números', () => expect(parseSpiceNumber('{a*2}')).toBeNaN());
 });
+
+describe('modelos ako:', () => {
+  it('hereda los parámetros del modelo base y cambia los indicados', async () => {
+    const { collectModels, replaceAko } = await import('../../src/netlist/ako.ts');
+    const lib = '.model TIP32C PNP(IS=1e-13 BF=50 VAF=100\n+ RB=1)\n.model D1N D(IS=1e-14)';
+    const net = '.model TIP32Cm AKO: TIP32C (Bf=20)\n.MODEL QP AKO:TIP32Cm PNP(VAF=50)\n.model X ako:D1N N=2\n.model Y ako:NADA (BF=1)';
+    const r = replaceAko(net, collectModels(lib));
+    expect(r.text.split('\n').filter((l) => !l.startsWith('*'))).toEqual([
+      '.model TIP32Cm PNP(IS=1e-13 VAF=100 RB=1 Bf=20)',
+      '.model QP PNP(IS=1e-13 RB=1 Bf=20 VAF=50)',
+      '.model X D(IS=1e-14 N=2)',
+    ]);
+    expect(r.warnings).toEqual(['Y: no se encontró el modelo base NADA (ako:)']);
+  });
+});

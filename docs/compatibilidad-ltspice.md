@@ -80,6 +80,7 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | `.step param/fuente/temp/modelo` (lin, dec, oct, list; anidados) | Bucles `foreach` en un `.control` generado: `alterparam` + `reset`, `alter fuente dc=`, `altermod`, `option temp=`; una corrida (`tran1`, `tran2`…) por paso, etiquetada `R=2k` |
 | `.step` con un `.control` propio en el esquemático | Se simula el primer valor (el bloque decide qué correr) y se avisa |
 | `.param x 20` en una directiva | `.param x=20` |
+| `.model X ako:BASE [tipo] (params)` (a-kind-of, también encadenados) | `.model X tipo(params de BASE + los nuevos)`; si BASE no está, se comenta y se avisa |
 | Integración por defecto `modified trap` | ngspice usa `trap` (diferencia conocida) |
 
 Con varios `.step`, el primero es el que varía más rápido (bucle interno). **Pendiente de verificar

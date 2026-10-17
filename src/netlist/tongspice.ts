@@ -7,6 +7,7 @@
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
 import { isControlBlock, isNgspiceComment } from './directives.ts';
+import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
@@ -314,20 +315,27 @@ export interface PreparedSimulation {
 }
 
 /**
- * Último paso antes de simular: adapta los archivos de modelos incluidos (patchModelFile) y
- * reemplaza los diodos ideales de LTspice, tanto en esos archivos como en la netlist.
+ * Último paso antes de simular: adapta los archivos de modelos incluidos (patchModelFile),
+ * resuelve los modelos ako: y reemplaza los diodos ideales de LTspice, tanto en esos archivos
+ * como en la netlist.
  */
 export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) => string): PreparedSimulation {
   const warnings = [...net.warnings];
   const files: Record<string, string> = {};
+  for (const rel of net.includes) files[rel] = patchModelFile(readFile(rel), net.subcktParams);
+  // ako: se resuelve con los modelos de todos los archivos y de la netlist
+  const models = collectModels(net.text);
+  for (const t of Object.values(files)) collectModels(t, models);
   const external = new Map();
   for (const rel of net.includes) {
-    const r = replaceIdealDiodes(patchModelFile(readFile(rel), net.subcktParams));
+    const a = replaceAko(files[rel], models);
+    const r = replaceIdealDiodes(a.text);
     files[rel] = r.text;
-    warnings.push(...r.warnings);
+    warnings.push(...a.warnings, ...r.warnings);
     for (const [k, v] of r.found) external.set(k, v);
   }
-  const main = replaceIdealDiodes(net.text, external);
-  warnings.push(...main.warnings);
+  const ako = replaceAko(net.text, models);
+  const main = replaceIdealDiodes(ako.text, external);
+  warnings.push(...ako.warnings, ...main.warnings);
   return { netlist: main.text, files, warnings };
 }

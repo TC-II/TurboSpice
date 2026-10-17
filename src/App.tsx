@@ -17,7 +17,7 @@ import { readShareHash, shareHash } from './schematic/share.ts';
 import { addRecent, loadRecent, loadSession, readHandle, saveSession, type RecentFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
-import { ControlDialog, SimulationDialog, type CircuitInfo } from './schematic/simDialogs.tsx';
+import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
@@ -122,6 +122,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const shownNets = useMemo(() => (showNets ? netNames(doc, conn, lt.ncNames) : undefined), [showNets, doc, conn, lt]);
   // red resaltada desde el panel de resultados (al pasar por una traza)
   const [traceNet, setTraceNet] = useState<string>();
+
+  // Elegir una red o fuente en el esquemático desde un diálogo (que queda oculto mientras)
+  const [picking, setPicking] = useState<{ what: 'net' | 'source'; resolve(v: string | null): void; prev: Tool } | null>(null);
 
   const setTool = useCallback((t: Tool) => {
     setToolState(t);
@@ -405,6 +408,36 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
   };
 
+  const picker: Picker = (what) =>
+    new Promise((resolve) => {
+      setPicking({ what, resolve, prev: tool });
+      setToolState({ kind: 'pick', what });
+    });
+  const endPick = (v: string | null) => {
+    if (!picking) return;
+    picking.resolve(v);
+    setToolState(picking.prev);
+    setPicking(null);
+  };
+  const pickValue = ({ net, symbol }: { net?: string; symbol?: number }): string | null => {
+    if (!picking) return null;
+    if (picking.what === 'net') return net && net !== '0' ? net : null;
+    if (symbol === undefined) return null;
+    const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
+    return /^[VI]$/i.test(a.get('Prefix') ?? '') ? (a.get('InstName') ?? null) : null;
+  };
+  useEffect(() => {
+    if (!picking) return;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        endPick(null);
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  });
+
   const openSimulation = () => setDialog({ kind: 'sim', found: findAnalysis(doc) });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
@@ -612,7 +645,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
             describe={describe}
             annotations={annotations}
+            pickValue={pickValue}
+            onPicked={endPick}
           />
+          {picking && (
+            <div className="pick-banner">
+              {picking.what === 'net' ? 'Elegí una red en el esquemático' : 'Elegí una fuente (V o I) en el esquemático'}
+              <button onClick={() => endPick(null)}>Cancelar</button>
+            </div>
+          )}
           {message && (
             <div className="toast" onClick={() => setMessage(undefined)}>
               {message}
@@ -721,6 +762,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         <SimulationDialog
           initial={dialog.found?.value ?? null}
           info={circuitInfo()}
+          picker={picker}
+          hidden={!!picking}
           onClose={() => setDialog(null)}
           onApply={(line, ngspiceOnly) => {
             setDialog(null);
@@ -732,6 +775,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       {dialog?.kind === 'control' && (
         <ControlDialog
           initial={dialog.index >= 0 ? controlBody(doc.texts[dialog.index].text.split('\\n').join('\n')) : 'run\n'}
+          picker={picker}
+          hidden={!!picking}
           onClose={() => setDialog(null)}
           onRemove={
             dialog.index >= 0
@@ -792,5 +837,7 @@ function toolHint(t: Tool): string {
       return 'Click en un elemento para borrarlo · Esc para terminar';
     case 'probe':
       return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
+    case 'pick':
+      return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : 'Click en una fuente V o I para elegirla · Esc cancela';
   }
 }

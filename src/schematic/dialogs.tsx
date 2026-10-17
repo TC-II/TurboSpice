@@ -7,14 +7,22 @@ import { localBox } from './geometry.ts';
 import { LONG_LINK } from './share.ts';
 import { SymbolView } from './SchematicCanvas.tsx';
 
-export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose(): void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide, hidden }: {
+  title: string;
+  children: ReactNode;
+  onClose(): void;
+  wide?: boolean;
+  /** oculto mientras se elige algo en el esquemático (conserva su estado) */
+  hidden?: boolean;
+}) {
   useEffect(() => {
+    if (hidden) return;
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
-  }, [onClose]);
+  }, [onClose, hidden]);
   return (
-    <div className="modal-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`modal-backdrop${hidden ? ' picking' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}

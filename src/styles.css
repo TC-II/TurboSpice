@@ -166,7 +166,7 @@ svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg
 svg.editor.tool-grabbing { cursor: grabbing; }
 svg.editor.tool-wire, svg.editor.tool-place, svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
 svg.editor.tool-delete { cursor: not-allowed; }
-svg.editor.tool-probe { cursor: crosshair; }
+svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
 .grid-dot { fill: var(--sch-grid); }
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
@@ -298,3 +298,12 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .op-annotation.v text { fill: var(--sch-wire); }
 .op-annotation.i rect { fill: color-mix(in srgb, var(--sch-bg) 85%, transparent); stroke: var(--sch-hl); }
 .op-annotation.i text { fill: var(--sch-hl); }
+
+/* ---------- Elegir en el esquemático desde un diálogo ---------- */
+.modal-backdrop.picking { display: none; }
+.field .with-pick { display: flex; gap: 4px; }
+.field .with-pick input { flex: 1; min-width: 0; }
+.pick-btn { padding: 2px 8px; font-size: 13px; }
+.pick-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 6px 14px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; box-shadow: 0 4px 16px rgb(0 0 0 / 20%); display: flex; gap: 12px; align-items: center; }
+.pick-banner button { background: transparent; color: #fff; border-color: rgb(255 255 255 / 60%); padding: 1px 8px; }
+.pick-row { display: flex; flex-direction: column; gap: 6px; }

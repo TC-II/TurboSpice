@@ -27,7 +27,9 @@ export type Tool =
   | { kind: 'flag'; name: string }
   | { kind: 'text'; text: string; textKind: 'directive' | 'comment' }
   | { kind: 'delete' }
-  | { kind: 'probe' };
+  | { kind: 'probe' }
+  /** elegir una red o una fuente para un diálogo (Esc cancela) */
+  | { kind: 'pick'; what: 'net' | 'source' };
 
 export interface EditorHandle {
   fit(): void;
@@ -55,6 +57,9 @@ interface Props {
   describe?(target: { net?: string; symbol?: number }): BiasInfo | null;
   /** valores anotados sobre el esquemático */
   annotations?: Annotation[];
+  /** herramienta pick: valor que se elegiría en ese lugar (nombre de red o de fuente) */
+  pickValue?(target: { net?: string; symbol?: number }): string | null;
+  onPicked?(value: string): void;
   handle?: Ref<EditorHandle>;
   /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
   docKey?: number;
@@ -115,7 +120,7 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, pickValue, onPicked } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -125,6 +130,7 @@ export function SchematicEditor(props: Props) {
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   const [labelNet, setLabelNet] = useState<string | undefined>();
+  const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
 
@@ -276,6 +282,12 @@ export function SchematicEditor(props: Props) {
         if (target) onProbe?.(target);
         return;
       }
+      case 'pick': {
+        const target = probeTarget(p);
+        const v = target && pickValue?.(target);
+        if (v) onPicked?.(v);
+        return;
+      }
     }
   };
 
@@ -284,6 +296,12 @@ export function SchematicEditor(props: Props) {
     setCursor(p);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
     if (tool.kind === 'probe') setHoverNet(target?.net);
+    if (tool.kind === 'pick') {
+      const t = probeTarget(p);
+      const v = t && pickValue?.(t);
+      setPickHover(v ? { value: v, symbol: t?.symbol } : null);
+      setHoverNet(v && t?.net ? t.net : undefined);
+    }
     const info = target && describe ? describe(target) : null;
     if (info) {
       const r = svgRef.current!.getBoundingClientRect();
@@ -377,7 +395,13 @@ export function SchematicEditor(props: Props) {
         </pattern>
       </defs>
       {view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
-      <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={selection} highlightNet={labelNet ?? highlightNet ?? hoverNet} />
+      <SchematicCanvas
+        doc={shown}
+        lib={lib}
+        conn={conn}
+        selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
+        highlightNet={labelNet ?? highlightNet ?? hoverNet}
+      />
       <g className="ghost">{ghost}</g>
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
@@ -392,7 +416,7 @@ export function SchematicEditor(props: Props) {
           height={Math.abs(boxEnd.y - drag.start.y)}
         />
       )}
-      {tool.kind !== 'select' && tool.kind !== 'probe' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

@@ -119,6 +119,31 @@ await page.keyboard.press('Escape');
 await page.mouse.move(q1.x, q1.y);
 check((await page.locator('.bias-tip').count()) === 0 && (await page.locator('.op-annotation').count()) === 0, 'al editar el circuito los valores dejan de mostrarse');
 
+// --- #13: elegir nodos y fuentes en el esquemático desde el menú de simulación ---
+await page.keyboard.press('Control+z'); // sacar la tierra agregada
+await page.getByRole('button', { name: 'Simulación…' }).click();
+await page.getByRole('button', { name: 'Ruido' }).click();
+await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
+check(await page.locator('.pick-banner').isVisible(), 'el diálogo se oculta y pide elegir una red');
+const outPick = await at(280, 160);
+await page.mouse.move(outPick.x, outPick.y);
+await page.mouse.click(outPick.x, outPick.y);
+const outVal = await page.locator('.field', { hasText: 'Nodo de salida' }).locator('input').inputValue();
+check(outVal === 'out', `click en el cable completa el nodo (${outVal})`);
+await page.getByRole('button', { name: 'Elegir Fuente de entrada en el esquemático' }).click();
+const rcBody = await at(256, 96); // una resistencia no es una fuente: no se elige
+await page.mouse.click(rcBody.x, rcBody.y);
+check(await page.locator('.pick-banner').isVisible(), 'una resistencia no se puede elegir como fuente');
+const vin = await at(32, 272);
+await page.mouse.click(vin.x, vin.y);
+const srcVal = await page.locator('.field', { hasText: 'Fuente de entrada' }).locator('input').inputValue();
+check(srcVal === 'Vin', `click en la fuente la elige (${srcVal})`);
+await page.getByRole('button', { name: 'Elegir Referencia en el esquemático' }).click();
+await page.keyboard.press('Escape');
+check(await page.locator('.modal').isVisible(), 'Esc cancela la elección y vuelve al diálogo');
+check(/^\.noise V\(out\) Vin /.test(await page.locator('.sim-preview code').textContent()), `directiva: ${await page.locator('.sim-preview code').textContent()}`);
+await page.getByRole('button', { name: 'Cancelar' }).click();
+
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E funciones OK');

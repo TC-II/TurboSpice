@@ -18,7 +18,12 @@ import { Modal } from './dialogs.tsx';
 /** Valor numérico SPICE (1k, 10meg…) o expresión entre llaves */
 const validNumber = (s: string) => /^\{.+\}$/.test(s.trim()) || Number.isFinite(parseSpiceNumber(s));
 
-function Field({ label, value, onChange, placeholder, hint, required, number, list }: {
+/** Elegir una red o una fuente haciendo click en el esquemático (null si se cancela) */
+export type Picker = (what: 'net' | 'source') => Promise<string | null>;
+
+const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
+
+function Field({ label, value, onChange, placeholder, hint, required, number, list, pick }: {
   label: string;
   value: string;
   onChange(v: string): void;
@@ -27,13 +32,39 @@ function Field({ label, value, onChange, placeholder, hint, required, number, li
   required?: boolean;
   number?: boolean;
   list?: string;
+  /** botón para elegir el valor en el esquemático */
+  pick?: { what: 'net' | 'source'; picker: Picker };
 }) {
   const bad = (required && !value.trim()) || (number && value.trim() !== '' && !validNumber(value));
+  const input = <input value={value} placeholder={placeholder} spellCheck={false} list={list} onChange={(e) => onChange(e.target.value.trim())} />;
+  const auto = pick?.what === 'net' && AUTO_NET.test(value);
   return (
     <label className={`field${bad ? ' bad' : ''}`}>
       <span>{label}</span>
-      <input value={value} placeholder={placeholder} spellCheck={false} list={list} onChange={(e) => onChange(e.target.value.trim())} />
-      {hint && <small>{hint}</small>}
+      {pick ? (
+        <span className="with-pick">
+          {input}
+          <button
+            type="button"
+            className="pick-btn"
+            title={pick.what === 'net' ? 'Elegir la red en el esquemático' : 'Elegir la fuente en el esquemático'}
+            aria-label={`Elegir ${label} en el esquemático`}
+            onClick={(e) => {
+              e.preventDefault();
+              pick.picker(pick.what).then((v) => v && onChange(v));
+            }}
+          >
+            ⌖
+          </button>
+        </span>
+      ) : (
+        input
+      )}
+      {auto ? (
+        <small>Nombre automático: puede cambiar al editar el circuito. Conviene ponerle una etiqueta a la red (F4).</small>
+      ) : (
+        hint && <small>{hint}</small>
+      )}
     </label>
   );
 }
@@ -89,12 +120,12 @@ export interface CircuitInfo {
   sources: string[];
 }
 
-function AnalysisForm({ a, set }: { a: Analysis; set(a: Analysis): void }): ReactNode {
+function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
   const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true) => (
-    <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} />
+    <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker }} />
   );
   const source = (label: string, value: string, onChange: (v: string) => void) => (
-    <Field label={label} value={value} onChange={onChange} list="sim-sources" required />
+    <Field label={label} value={value} onChange={onChange} list="sim-sources" required pick={picker && { what: 'source', picker }} />
   );
   switch (a.kind) {
     case 'tran':
@@ -125,7 +156,7 @@ function AnalysisForm({ a, set }: { a: Analysis; set(a: Analysis): void }): Reac
             return (
               <fieldset key={i}>
                 <legend>{i === 0 ? 'Fuente a barrer' : 'Segunda fuente (opcional, genera una familia de curvas)'}</legend>
-                <Field label="Fuente" value={s.src} list="sim-sources" required={i === 0} onChange={(src) => upd({ src })} />
+                <Field label="Fuente" value={s.src} list="sim-sources" required={i === 0} onChange={(src) => upd({ src })} pick={picker && { what: 'source', picker }} />
                 <Field label="Inicio" value={s.start} number required={!!s.src} onChange={(start) => upd({ start })} />
                 <Field label="Fin" value={s.stop} number required={!!s.src} onChange={(stop) => upd({ stop })} />
                 <Field label="Incremento" value={s.step} number required={!!s.src} onChange={(step) => upd({ step })} />
@@ -210,11 +241,13 @@ function AnalysisForm({ a, set }: { a: Analysis; set(a: Analysis): void }): Reac
 }
 
 /** Comando de análisis: elegir tipo y completar parámetros */
-export function SimulationDialog({ initial, info, onApply, onClose }: {
+export function SimulationDialog({ initial, info, onApply, onClose, picker, hidden }: {
   initial: string | null;
   info: CircuitInfo;
   onApply(line: string, ngspiceOnly: boolean): void;
   onClose(): void;
+  picker?: Picker;
+  hidden?: boolean;
 }) {
   const parsed = initial ? parseAnalysis(initial) : null;
   const [byKind, setByKind] = useState<Partial<Record<AnalysisKind, Analysis>>>(parsed ? { [parsed.kind]: parsed } : {});
@@ -226,7 +259,7 @@ export function SimulationDialog({ initial, info, onApply, onClose }: {
   const errors = validateAnalysis(a);
 
   return (
-    <Modal title="Comando de simulación" onClose={onClose} wide>
+    <Modal title="Comando de simulación" onClose={onClose} wide hidden={hidden}>
       <datalist id="sim-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       {initial && !parsed && (
@@ -245,7 +278,7 @@ export function SimulationDialog({ initial, info, onApply, onClose }: {
         </nav>
         <div className="analysis-form">
           <p className="hint">{meta.help}</p>
-          <AnalysisForm a={a} set={set} />
+          <AnalysisForm a={a} set={set} picker={picker} />
         </div>
       </div>
       <div className="sim-preview">
@@ -264,11 +297,13 @@ export function SimulationDialog({ initial, info, onApply, onClose }: {
 }
 
 /** Editor del bloque .control de ngspice */
-export function ControlDialog({ initial, onApply, onRemove, onClose }: {
+export function ControlDialog({ initial, onApply, onRemove, onClose, picker, hidden }: {
   initial: string;
   onApply(body: string): void;
   onRemove?(): void;
   onClose(): void;
+  picker?: Picker;
+  hidden?: boolean;
 }) {
   const [body, setBody] = useState(initial);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -280,9 +315,19 @@ export function ControlDialog({ initial, onApply, onRemove, onClose }: {
     const sep = before && !before.endsWith('\n') ? '\n' : '';
     setBody(`${before}${sep}${code}\n${body.slice(at)}`);
   };
+  /** inserta en el cursor, sin saltos de línea (p.ej. "v(out)") */
+  const insertInline = (code: string) => {
+    const el = ta.current;
+    const at = el ? el.selectionStart : body.length;
+    setBody(`${body.slice(0, at)}${code}${body.slice(el ? el.selectionEnd : at)}`);
+    setTimeout(() => {
+      el?.focus();
+      el?.setSelectionRange(at + code.length, at + code.length);
+    });
+  };
   const hasRun = useMemo(() => /^\s*(run|tran|ac|dc|op|noise|tf|pz|sens|disto|sp)\b/im.test(body), [body]);
   return (
-    <Modal title="Bloque .control (scripts de ngspice)" onClose={onClose} wide>
+    <Modal title="Bloque .control (scripts de ngspice)" onClose={onClose} wide hidden={hidden}>
       <div className="controldlg">
         <div className="control-editor">
           <div className="control-frame">.control</div>
@@ -313,6 +358,18 @@ export function ControlDialog({ initial, onApply, onRemove, onClose }: {
         </div>
         <div className="snippets">
           <h3>Insertar</h3>
+          {picker && (
+            <div className="pick-row">
+              <button type="button" title="Elegir una red en el esquemático e insertar v(red) en el cursor" onClick={() => picker('net').then((v) => v && insertInline(`v(${v.toLowerCase()})`))}>
+                <strong>⌖ v(red)</strong>
+                <small>Tensión de una red elegida en el esquemático</small>
+              </button>
+              <button type="button" title="Elegir una fuente en el esquemático e insertar i(fuente) en el cursor" onClick={() => picker('source').then((v) => v && insertInline(`i(${v.toLowerCase()})`))}>
+                <strong>⌖ i(fuente)</strong>
+                <small>Corriente de una fuente elegida en el esquemático</small>
+              </button>
+            </div>
+          )}
           {CONTROL_SNIPPETS.map((s) => (
             <button key={s.label} title={`${s.help}\n\n${s.code}`} onClick={() => insert(s.code)}>
               <strong>{s.label}</strong>

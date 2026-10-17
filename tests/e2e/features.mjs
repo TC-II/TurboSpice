@@ -1,6 +1,6 @@
 // E2E de funciones de interfaz, por issue: nombres de redes (#15), compartir (#1), autoguardado
 // (#5), punto de operación (#2), elegir en el esquemático (#13), .step (#7), visor de resultados
-// (#3), vista recordada (#14) y exportaciones (#12).
+// (#3), vista recordada (#14), exportaciones (#12) y expandir esquemático/resultados (#24).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
@@ -371,7 +371,41 @@ check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).inc
 await menu(page, 'Ver', 'Resultados al costado');
 check(await page.locator('.workspace.side .results-panel').isVisible(), 'resultados al costado');
 await page.screenshot({ path: `${OUT}/side.png` });
-await menu(page, 'Ver', 'Resultados al costado');
+
+// --- #24: expandir esquemático / resultados (al costado y abajo) ---
+const splitter = page.locator('.splitter');
+const rect = (sel) => page.locator(sel).boundingBox();
+for (const where of ['al costado', 'abajo']) {
+  const dim = where === 'abajo' ? 'height' : 'width';
+  const before = (await rect('.results-panel'))[dim];
+  check(!(await page.getByRole('button', { name: 'Expandir resultados' }).isVisible()), `${where}: los botones no se ven sin hover`);
+  await splitter.hover();
+  check(await page.getByRole('button', { name: 'Expandir esquemático' }).isVisible(), `${where}: el hover sobre el divisor muestra los botones`);
+  await page.screenshot({ path: `${OUT}/expand-${where === 'abajo' ? 'bottom' : 'side'}.png` });
+  await page.getByRole('button', { name: 'Expandir resultados' }).click();
+  check(!(await page.locator('.canvas-wrap').isVisible()) && (await rect('.results-panel'))[dim] > before + 100, `${where}: Expandir resultados oculta el esquemático`);
+  await page.getByRole('button', { name: 'Mostrar esquemático' }).click();
+  check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: restaurar vuelve al mismo tamaño (${before})`);
+  await page.keyboard.press('Control+1');
+  check(!(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()), `${where}: Ctrl+1 deja sólo el esquemático, con pestaña para restaurar`);
+  await page.keyboard.press('Control+0');
+  check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: Ctrl+0 restaura`);
+  await page.keyboard.press('Control+2');
+  check(!(await page.locator('.canvas-wrap').isVisible()), `${where}: Ctrl+2 deja sólo los resultados`);
+  await page.keyboard.press('Control+0');
+  const ws = (await rect('.workspace'))[dim];
+  await splitter.dblclick({ position: { x: 1, y: 1 } });
+  check(Math.abs((await rect('.results-panel'))[dim] - ws / 2) < 4, `${where}: doble click en el divisor lleva a 50 %`);
+  await splitter.dblclick({ position: { x: 1, y: 1 } });
+  check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: otro doble click vuelve a la división guardada`);
+  if (where === 'al costado') await menu(page, 'Ver', 'Resultados al costado'), await page.waitForTimeout(500);
+}
+// simular con el esquemático expandido muestra los resultados
+await page.keyboard.press('Control+1');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.locator('.results-panel').waitFor({ timeout: 10000 });
+check(await page.locator('.results-panel').isVisible(), 'simular con el esquemático expandido muestra los resultados');
 
 // --- #11: símbolos, modelos y bloques del usuario ---
 await menu(page, 'Archivo', 'Mis símbolos y modelos…');

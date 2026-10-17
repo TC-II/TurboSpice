@@ -50,6 +50,7 @@ import { parseAnalysis } from './sim/analyses.ts';
 import { loadView, saveView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
+import { ResultsSplitter, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -197,6 +198,13 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const sizeKey = resultsSide ? 'turbospice.resultsW' : 'turbospice.resultsH';
   const [resultsH, setResultsH] = useState<number>(() => Number(lsGet(sizeKey)) || 0);
   useEffect(() => setResultsH(Number(lsGet(sizeKey)) || 0), [sizeKey]);
+  // esquemático o resultados expandidos a toda la ventana (#24)
+  const [expanded, setExpandedState] = useExpanded(!!sim && !dialog);
+  const setExpanded = (e: Expanded) => {
+    // al volver al esquemático, reajustar la vista (estaba oculto)
+    if (expanded === 'results' && e !== 'results') setTimeout(() => editor.current?.fit(), 50);
+    setExpandedState(e);
+  };
   const [theme, setTheme] = useTheme();
   const [panel, setPanel] = useState<'plot' | 'netlist' | 'log' | 'problems' | 'meas'>('plot');
   const [overlay, setOverlay] = useState(true);
@@ -434,6 +442,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       result.plots.push(...xy);
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
+      // con el esquemático expandido, los resultados no quedan ocultos
+      if (expanded === 'schematic') setExpanded('');
       setSim({ built, result, doc, meas });
       // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
       // sólo si no hay otra cosa
@@ -1079,7 +1089,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         <StatusText status={status} />
       </div>
 
-      <div className={`workspace${resultsSide ? ' side' : ''}`}>
+      <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div className="canvas-wrap">
           <SchematicEditor
             handle={editor}
@@ -1117,29 +1127,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         </div>
 
         {sim && (
-          <div
-            className="splitter"
-            role="separator"
-            aria-orientation={resultsSide ? 'vertical' : 'horizontal'}
-            title="Arrastrar para cambiar el tamaño de los resultados"
-            onPointerDown={(e) => {
-              const wrap = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
-              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              const move = (ev: PointerEvent) =>
-                setResultsH(
-                  resultsSide
-                    ? Math.min(wrap.width - 240, Math.max(280, wrap.right - ev.clientX))
-                    : Math.min(wrap.height - 120, Math.max(140, wrap.bottom - ev.clientY)),
-                );
-              const up = () => {
-                window.removeEventListener('pointermove', move);
-                window.removeEventListener('pointerup', up);
-                setResultsH((h) => (lsSet(sizeKey, String(h)), h));
-              };
-              window.addEventListener('pointermove', move);
-              window.addEventListener('pointerup', up);
-            }}
-          />
+          <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
         )}
         {sim && (
           <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>

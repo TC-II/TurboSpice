@@ -454,3 +454,23 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .study-code textarea { width: 100%; font: 13px/1.5 var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 240px; }
 .plot-info { margin: 0; } .fft-tools { padding: 4px 0; }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+/* ---------- Expandir esquemático / resultados (#24) ---------- */
+.split-actions { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; gap: 4px; z-index: 3; }
+.splitter:hover .split-actions, .splitter.touched .split-actions, .splitter.expanded .split-actions, .split-actions:focus-within { display: flex; }
+.workspace.side .split-actions { flex-direction: column; }
+.split-btn { padding: 0; width: 26px; height: 20px; font-size: 11px; line-height: 1; border-radius: 6px; background: var(--bg-alt); border: 1px solid var(--border); color: var(--fg); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); cursor: pointer; }
+.workspace.side .split-btn { width: 20px; height: 26px; }
+.split-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+@media (pointer: coarse) { .split-btn { width: 36px; height: 28px; } .workspace.side .split-btn { width: 28px; height: 36px; } }
+/* expandido: el divisor queda como pestaña en el borde */
+.splitter.expanded { cursor: default; margin: 0; height: 0; }
+.splitter.expanded:hover { background: transparent; }
+.splitter.expanded.schematic .split-actions { top: auto; bottom: 0; transform: translate(-50%, 0); }
+.splitter.expanded.results .split-actions { top: 0; transform: translate(-50%, 0); }
+.workspace.side .splitter.expanded { width: 0; margin: 0; }
+.workspace.side .splitter.expanded .split-actions { top: 50%; left: auto; right: 0; transform: translate(0, -50%); }
+.workspace.side .splitter.expanded.results .split-actions { left: 0; right: auto; }
+.workspace.expand-schematic .results-panel { display: none; }
+.workspace.expand-results .canvas-wrap { display: none; }
+.workspace.expand-results .results-panel { flex: 1 1 auto !important; border: 0; }

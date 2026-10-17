@@ -1,7 +1,8 @@
 // Flechitas con el sentido positivo de la corriente en los pines de cada componente (punta de
 // prueba y anotación del punto de operación). Convención de SPICE: en los de dos terminales
 // (R, C, L, V, I, D, B) la corriente entra por el primer nodo y sale por el segundo; en los
-// dispositivos (Q, M, J, Z) cada corriente de terminal es positiva entrando al dispositivo.
+// dispositivos (Q, M, J, Z) y en los subcircuitos (X, como Ix(U1:pin) de LTspice) cada corriente
+// de terminal es positiva entrando al dispositivo.
 import type { AscDoc, Point, SymbolDef } from '../asc/model.ts';
 import { transformOffset } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
@@ -17,7 +18,7 @@ export interface CurrentArrow {
 }
 
 const TWO_TERMINAL = /^[RCLVIDB]/i;
-const DEVICE = /^[QMJZ]/i;
+const DEVICE = /^[QMJZX]/i;
 
 /** Dirección (local al símbolo) del pin hacia el cuerpo: a lo largo de la línea que sale del pin */
 export function pinInward(def: SymbolDef, k: number): Point | null {

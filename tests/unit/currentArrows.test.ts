@@ -50,4 +50,13 @@ describe('flechas de sentido positivo de corriente', () => {
       { x: -1, y: 0 },
     ]);
   });
+
+  it('subcircuitos: las corrientes de los puertos entran (como Ix(U1:pin))', () => {
+    const doc = parseAsc('Version 4\nSHEET 1 880 680\nSYMBOL TCLib\\Amp_Current 0 0 R0\nSYMATTR InstName X1\n');
+    const pins = lib.symbol(doc.symbols[0].type)!.pins.length;
+    const a = currentArrows(doc, lib, [{ sym: 0, prefix: 'X' }]);
+    expect(a.length).toBeGreaterThan(0);
+    expect(a.length).toBeLessThanOrEqual(pins);
+    expect(a.every((x) => x.enters)).toBe(true);
+  });
 });

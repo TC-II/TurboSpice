@@ -1,0 +1,79 @@
+name: Build y deploy a GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  EMSDK_VERSION: 4.0.10
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # El motor sólo se recompila si cambian sus fuentes de build
+      - name: Caché del motor
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine/dist-engine
+          key: engine-${{ env.EMSDK_VERSION }}-${{ hashFiles('engine/build.sh', 'engine/spinit') }}
+
+      - name: Setup emsdk
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+
+      - name: Compilar ngspice a WASM
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y bison flex
+          bash engine/build.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: Smoke test del motor
+        run: npm run smoke
+      - run: npm test --if-present
+      - run: npm run build
+      - name: E2E en Chrome
+        env:
+          CHROMIUM: /usr/bin/google-chrome
+        run: |
+          npx vite preview --port 4173 --strictPort &
+          timeout 30 bash -c 'until curl -sf http://localhost:4173/TurboSpice/ >/dev/null; do sleep 1; done'
+          npm run e2e -- http://localhost:4173/TurboSpice/ test-results
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

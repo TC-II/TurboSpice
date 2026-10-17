@@ -1,0 +1,9 @@
+node_modules/
+dist/
+engine/build/
+engine/dist-engine/
+public/engine/
+*.log
+.DS_Store
+*.tsbuildinfo
+test-results/

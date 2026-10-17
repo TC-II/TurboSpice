@@ -1,0 +1,17 @@
+* TurboSpice spinit (ngspice en WebAssembly)
+alias exit quit
+set noaskquit
+set nomoremode
+unset osdi_enabled
+
+* Compatibilidad con netlists/modelos de LTspice y PSpice
+set ngbehavior=ltpsa
+
+* Code models XSPICE (side modules wasm, escritos en el FS virtual por el runtime)
+codemodel /usr/local/lib/ngspice/spice2poly.cm
+codemodel /usr/local/lib/ngspice/analog.cm
+codemodel /usr/local/lib/ngspice/digital.cm
+codemodel /usr/local/lib/ngspice/xtradev.cm
+codemodel /usr/local/lib/ngspice/xtraevt.cm
+codemodel /usr/local/lib/ngspice/table.cm
+codemodel /usr/local/lib/ngspice/tlines.cm

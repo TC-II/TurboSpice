@@ -288,7 +288,13 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
       if (def.trig) from = cross(def.trig, ctx);
       if (def.targ) to = cross(def.targ, ctx);
       if (!Number.isFinite(from) || !Number.isFinite(to)) throw new ExprError('el rango TRIG/TARG no ocurre');
-      return aggregate(def.kind, x, realPart(wave(def.expr!, ctx)), Math.min(from, to), Math.max(from, to));
+      const y = realPart(wave(def.expr!, ctx));
+      // ruido: INTEG de una densidad (V/√Hz) es el valor eficaz en la banda, √∫v²df (como LTspice)
+      if (def.kind === 'integ' && /^noise/i.test(ctx.plot.name)) {
+        const r = aggregate('integ', x, y.map((v) => v * v), Math.min(from, to), Math.max(from, to));
+        return { value: Math.sqrt(r.value) };
+      }
+      return aggregate(def.kind, x, y, Math.min(from, to), Math.max(from, to));
     }
   }
 }

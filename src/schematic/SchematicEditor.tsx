@@ -20,6 +20,7 @@ import {
   type Box,
   type ItemRef,
 } from './geometry.ts';
+import type { PickWhat } from './simDialogs.tsx';
 import { AnnotationLayer, NetNamesLayer, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
@@ -33,7 +34,7 @@ export type Tool =
   | { kind: 'delete' }
   | { kind: 'probe' }
   /** elegir una red o una fuente para un diálogo (Esc cancela) */
-  | { kind: 'pick'; what: 'net' | 'source' };
+  | { kind: 'pick'; what: PickWhat };
 
 export interface EditorHandle {
   fit(): void;

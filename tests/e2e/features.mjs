@@ -114,6 +114,16 @@ const outW = await at(280, 160);
 await page.mouse.move(outW.x, outW.y);
 const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
 check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
+// FFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
+await page.mouse.click(outW.x, outW.y);
+await page.getByRole('button', { name: 'FFT…' }).click();
+await page.getByLabel('Traza para la FFT').selectOption('V(out)');
+await page.getByRole('button', { name: 'Calcular' }).click();
+const fftInfo = await page.locator('.plot-info').textContent();
+check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
+check((await page.getByRole('combobox', { name: 'Plot' }).inputValue()).startsWith('fft V(out)'), 'la FFT queda como un plot más');
+await page.getByRole('combobox', { name: 'Plot' }).selectOption('tran1');
+check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al volver al transitorio se recuperan sus trazas');
 await page.getByRole('button', { name: 'Anotar OP' }).click();
 const ann = await page.locator('.op-annotation').allTextContents();
 check(ann.includes('1.415mA') && ann.includes('12V'), `anota el punto de operación (${ann.length} valores)`);
@@ -392,6 +402,66 @@ check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcir
 await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
 check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
 await page.getByRole('button', { name: 'Cerrar resultados' }).click();
+
+// --- #16-#20: Estudio (barrido + medición + tolerancias, ver código) ---
+await openExample(page, 'Filtro RC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.keyboard.press('Alt+e');
+await page.getByRole('button', { name: '+ Barrido' }).click();
+await page.getByRole('button', { name: 'Elegir Componente en el esquemático' }).click();
+const rcR1 = await at(72, -32);
+await page.mouse.click(rcR1.x, rcR1.y);
+check((await page.locator('.modal').getByLabel('Componente', { exact: true }).inputValue()) === 'R1', 'barrido: el componente se elige con un click');
+check(await page.getByText('Valor original: 1k').isVisible(), 'y se toma su valor original');
+await page.getByLabel('Valores').fill('500 1k 2k');
+await page.getByRole('button', { name: '+ Medición' }).click();
+await page.getByLabel('Qué medir').selectOption('rise');
+await page.getByRole('button', { name: 'Elegir Señal en el esquemático' }).click();
+const rcOut = await at(128, -32);
+await page.mouse.click(rcOut.x, rcOut.y);
+await page.getByLabel('Desde el nivel').fill('0.1');
+await page.getByLabel('Hasta el nivel').fill('0.9');
+check((await page.locator('.study-line').last().textContent()) === '.meas tran m1 TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1', 'medición: genera el .meas');
+check(await page.getByText('3 corridas en total').isVisible(), 'muestra el total de corridas');
+await page.getByRole('button', { name: 'Ver código' }).click();
+const code = await page.getByLabel('Código del estudio').inputValue();
+check(code.startsWith('.param R1=1k\n.step param R1 list 500 1k 2k\n.meas tran m1'), `ver código (${code.split('\n').length} líneas)`);
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+check((await page.locator('svg.editor .sym text.win', { hasText: '{R1}' }).count()) === 1, 'R1 pasa a valer {R1}');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.getByRole('button', { name: /^Mediciones/ }).click();
+const studyRows = await page.locator('.meas-table tbody tr').allTextContents();
+check(studyRows.length === 3 && /R1=1k.*2\.19\d*m/.test(studyRows[1]), `simula el estudio (${studyRows.join(' | ')})`);
+// reabrir: las tarjetas se reconstruyen desde las directivas; agregar tolerancias Monte Carlo
+await page.keyboard.press('Alt+e');
+check((await page.locator('.study-card').count()) === 2 && (await page.getByLabel('Valores').inputValue()) === '500 1k 2k', 'al reabrir, las tarjetas se reconstruyen');
+await page.getByLabel('Activar Barrido de R1').uncheck();
+await page.getByRole('button', { name: '+ Tolerancias' }).click();
+await page.getByRole('button', { name: 'Todos los capacitores 10 %' }).click();
+await page.getByLabel('Corridas').fill('30');
+check(await page.getByText('30 corridas en total').isVisible(), 'el barrido desactivado no cuenta');
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+check((await page.locator('svg.editor .sym text.win', { hasText: '{mc(1u,0.1)}' }).count()) === 1, 'C1 con tolerancia: {mc(1u,0.1)}');
+check((await page.locator('svg.editor .texts .comment', { hasText: '.step param R1 list 500 1k 2k' }).count()) === 1, 'el barrido desactivado queda como comentario');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.getByRole('button', { name: /^Mediciones/ }).click();
+const mcRows = await page.locator('.meas-table tbody tr').allTextContents();
+const tvals = (await page.locator('.meas-table tbody tr td:nth-child(2)').allTextContents()).map((t) => parseFloat(t));
+const spread = Math.max(...tvals) - Math.min(...tvals);
+check(mcRows.length === 30 && spread > 0.05 && Math.min(...tvals) > 1.9 && Math.max(...tvals) < 2.5, `Monte Carlo: 30 corridas distintas dentro de ±10 % (${Math.min(...tvals)}m … ${Math.max(...tvals)}m)`);
+check((await page.locator('.histogram').count()) === 1, 'histograma de la medición');
+await page.screenshot({ path: `${OUT}/montecarlo.png` });
+// "Ver código" editado a mano vuelve a ser tarjetas
+await page.keyboard.press('Alt+e');
+await page.getByRole('button', { name: 'Ver código' }).click();
+const code2 = (await page.getByLabel('Código del estudio').inputValue()).replace(';.step param R1 list 500 1k 2k', '.step param R1 list 1k 3k');
+await page.getByLabel('Código del estudio').fill(code2);
+await page.getByRole('button', { name: 'Aplicar código' }).click();
+await page.keyboard.press('Alt+e');
+check((await page.getByLabel('Valores').inputValue()) === '1k 3k' && (await page.getByLabel('Activar Barrido de R1').isChecked()), 'el código editado a mano vuelve a ser tarjetas');
+await page.keyboard.press('Escape');
 
 // bienvenida en la primera visita
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });

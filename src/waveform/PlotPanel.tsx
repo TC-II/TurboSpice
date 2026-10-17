@@ -9,6 +9,7 @@ import type { Resolver } from './expr.ts';
 import { bandwidth3dB, stats, toCsv, valueAt } from './measure.ts';
 import { si } from './series.ts';
 import { sameExpr, traceColor, type Pane, type Trace } from './view.ts';
+import { WINDOWS, type FftWindow } from './fft.ts';
 
 export interface PlotPanelHandle {
   csv(): string;
@@ -28,6 +29,8 @@ interface Props {
   setActive(i: number): void;
   /** traza bajo el mouse (para resaltar su red en el esquemático) */
   onHoverExpr?(expr: string | undefined): void;
+  /** FFT de una traza del transitorio en el rango dado (crea un plot derivado) */
+  onFft?(o: { expr: string; window: FftWindow; from?: number; to?: number }): void;
   handle?: Ref<PlotPanelHandle>;
 }
 
@@ -47,7 +50,10 @@ const safeRange: uPlot.Range.Function = (_u, min, max) => {
 };
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle }: Props) {
+  const [fftOpen, setFftOpen] = useState(false);
+  const [fftExpr, setFftExpr] = useState('');
+  const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
   const [xRange, setXRange] = useState<Range | null>(null);
   const [cursorMode, setCursorMode] = useState(false);
   const [cursors, setCursors] = useState<Cursors>({});
@@ -131,8 +137,40 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           Medidas
         </button>
         <button onClick={() => setXRange(null)} title="Ver todo el eje X (doble click en el gráfico)">Ajustar</button>
+        {onFft && data[0]?.xName === 'time' && (
+          <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title="Espectro (FFT) y distorsión armónica de una traza">
+            FFT…
+          </button>
+        )}
         {exprError && <span className="hint warn">{exprError}</span>}
       </div>
+      {fftOpen && onFft && (
+        <div className="plot-tools fft-tools">
+          <select value={fftExpr} aria-label="Traza para la FFT" onChange={(e) => setFftExpr(e.target.value)}>
+            <option value="">Traza…</option>
+            {[...new Set(panes.flatMap((p) => p.traces.map((t) => t.expr)))].map((e) => (
+              <option key={e} value={e}>{e}</option>
+            ))}
+          </select>
+          <select value={fftWindow} aria-label="Ventana" onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
+            {WINDOWS.map(([w, l]) => (
+              <option key={w} value={w}>Ventana {l}</option>
+            ))}
+          </select>
+          <span className="hint">{range ? `Rango visible: ${si(range[0])}s … ${si(range[1])}s` : 'Todo el transitorio (hacé zoom para elegir un rango, p.ej. sin el arranque)'}</span>
+          <button
+            className="primary"
+            disabled={!fftExpr}
+            onClick={() => {
+              onFft({ expr: fftExpr, window: fftWindow, from: range?.[0], to: range?.[1] });
+              setFftOpen(false);
+            }}
+          >
+            Calcular
+          </button>
+        </div>
+      )}
+      {plot.info && <p className="hint plot-info">{plot.info}</p>}
       <div className="panes">
         {panes.map((p, i) => (
           <PaneView

@@ -172,3 +172,14 @@ describe('símbolos y bloques del usuario', () => {
     expect(ng.text).toMatch(/\.subckt div in out\nR1 in out 1k\nR2 out 0 \{R\}\n\.param R=2k\n\.ends div/);
   });
 });
+
+describe('funciones aleatorias (Monte Carlo)', () => {
+  it('mc, flat y gauss de LTspice → unif, aunif y agauss de ngspice', async () => {
+    const { translateRandom } = await import('../../src/netlist/tongspice.ts');
+    expect(translateRandom('{mc(1k, tol)}')).toBe('{unif(1k, tol)}');
+    expect(translateRandom('{1k*(1+gauss(tol/3))}')).toBe('{1k*(1+agauss(0, tol/3, 1))}');
+    expect(translateRandom('{flat(1)+mc(max(1,2), 0.1)}')).toBe('{aunif(0, 1)+unif(max(1,2), 0.1)}');
+    // ya en sintaxis de ngspice: no se toca
+    expect(translateRandom('{gauss(1k, 0.1, 3)}')).toBe('{gauss(1k, 0.1, 3)}');
+  });
+});

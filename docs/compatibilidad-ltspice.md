@@ -73,6 +73,24 @@ En LTspice los `.asy` y `.lib` propios suelen estar junto al `.asc`. En TurboSpi
 - Se pueden generar símbolos: uno rectangular para un `.subckt` (con `ModelFile`) o uno de bloque
   para un `.asc` (puertos = etiquetas con `IOPIN`, o todas si no hay).
 
+## Estudio (barridos, tolerancias, mediciones)
+
+El panel **Estudio** genera directivas que LTspice entiende, así que un estudio va y viene:
+
+| Tarjeta | En el `.asc` |
+|---|---|
+| Barrer un componente | Valor `{R1}` + `.param R1=<original>` + `.step param R1 …` |
+| Barrer un parámetro, fuente, temperatura o modelo | `.step param X …`, `.step V1 …`, `.step temp …`, `.step NPN 2N2222(BF) …` |
+| Tolerancias Monte Carlo | `{mc(1k,0.05)}` (uniforme) o `{1k*(1+gauss(0.05/3))}` (normal, tol = 3σ) + `.step param run 1 N 1` |
+| Tolerancias, caso peor | `{1k*(1+0.05*(2*binary(run,i)-1))}` + `.func binary(run,index) …` + `.step param run 0 2^n−1 1` |
+| Mediciones | `.meas` (tiempo de subida, f a −3 dB, margen de fase… con plantillas reconocibles) |
+| Tarjeta desactivada | La misma directiva en un comentario (`;.step …`), como se apaga a mano en LTspice |
+| Paso personalizado | Bloque `;.control` (sólo TurboSpice); con las marcas `* antes de cada corrida`, `* después de cada corrida` y `* al final`, sus comandos se ubican dentro de los bucles del `.step` |
+
+En ngspice: `mc()`, `gauss(x)` y `flat(x)` se traducen a `unif()`, `agauss()` y `aunif()` (se sortean de
+nuevo en cada corrida); los `.meas` **no** se pasan a ngspice: TurboSpice los evalúa sobre los resultados
+de cada corrida con la semántica de LTspice (`INTEG` de una densidad de ruido es √∫v²df).
+
 ## Directivas que sólo tiene ngspice
 
 El bloque `.control … .endc` y los análisis `.pz`, `.sens`, `.disto`, `.sp` y `.pss` no existen en

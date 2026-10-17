@@ -106,7 +106,14 @@ export interface StepPlan extends StepRuns {
  * elemento de LTspice al de la netlist de ngspice. Cada corrida: alterparam → reset (re-lee
  * la netlist con los parámetros nuevos) → alter de fuentes, modelos y temperatura → run.
  */
-export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefined): StepPlan | string {
+/** Comandos del usuario alrededor de cada corrida y al final (paso personalizado del Estudio) */
+export interface StepHooks {
+  before: string[];
+  after: string[];
+  final: string[];
+}
+
+export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefined, hooks?: StepHooks): StepPlan | string {
   const total = steps.reduce((n, s) => n * s.values.length, 1);
   if (total > MAX_RUNS) return `el barrido tiene ${total} corridas (máximo ${MAX_RUNS})`;
   const body: string[] = [];
@@ -125,7 +132,7 @@ export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefin
       body.push(`alter ${n.toLowerCase()} dc = ${v}`);
     }
   }
-  body.push('run');
+  body.push(...(hooks?.before ?? []), 'run', ...(hooks?.after ?? []));
   // El primer .step es el bucle interno: se abren de afuera (último) hacia adentro
   const control = ['.control'];
   for (let i = steps.length - 1; i >= 0; i--) {
@@ -134,7 +141,7 @@ export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefin
   }
   control.push(...body.map((l) => `${'  '.repeat(steps.length)}${l}`));
   for (let i = 0; i < steps.length; i++) control.push(`${'  '.repeat(steps.length - 1 - i)}end`);
-  control.push('.endc');
+  control.push(...(hooks?.final ?? []), '.endc');
 
   // Etiquetas en el mismo orden: índice mixto con el primer .step más rápido
   const runs: StepRuns['runs'] = [];

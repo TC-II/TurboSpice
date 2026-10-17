@@ -21,6 +21,8 @@ export interface SimPlot {
   /** p.ej. "tran1", "ac1", "op1", "pz1" */
   name: string;
   vectors: SimVector[];
+  /** texto informativo de un plot derivado (p.ej. la THD de una FFT) */
+  info?: string;
 }
 
 export interface SimResult {

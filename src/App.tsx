@@ -22,7 +22,7 @@ import { readShareHash, shareHash } from './schematic/share.ts';
 import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
-import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker } from './schematic/simDialogs.tsx';
+import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
@@ -36,13 +36,17 @@ import { useHistory } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import { PlotPanel, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
-import { sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
+import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
+import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
 import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotView } from './waveform/view.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
+import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
+import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
+import { parseAnalysis } from './sim/analyses.ts';
 import { loadView, saveView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
@@ -61,6 +65,7 @@ type Dialog =
   | { kind: 'share'; url: string }
   | { kind: 'help' }
   | { kind: 'userfiles' }
+  | { kind: 'study' }
   | { kind: 'welcome' };
 
 interface FileState {
@@ -214,7 +219,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [traceNet, setTraceNet] = useState<string>();
 
   // Elegir una red o fuente en el esquemático desde un diálogo (que queda oculto mientras)
-  const [picking, setPicking] = useState<{ what: 'net' | 'source'; resolve(v: string | null): void; prev: Tool } | null>(null);
+  const [picking, setPicking] = useState<{ what: PickWhat; resolve(v: string | null): void; prev: Tool } | null>(null);
 
   const setTool = useCallback((t: Tool) => {
     setToolState(t);
@@ -464,10 +469,37 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
 
   const plot = sim?.result.plots.find((p) => p.name === plotName);
-  const selectPlot = (name: string) => {
+  // paneles de cada tipo de análisis (al cambiar de plot se recuperan los de ese tipo)
+  const panesByKind = useRef(new Map<string, Pane[]>());
+  const selectPlot = (name: string, next?: Pane[]) => {
+    if (plotName) panesByKind.current.set(plotKind(plotName), panes);
     setPlotName(name);
-    const r = plotView[plotKind(name)];
+    const kind = plotKind(name);
+    const r = next ?? plotView[kind] ?? panesByKind.current.get(kind);
     if (r) setPanes(r);
+  };
+  const doFft = (o: { expr: string; window: FftWindow; from?: number; to?: number }) => {
+    if (!sim || !plot) return;
+    const sc = scaleOf(plot)!;
+    let w;
+    try {
+      w = evalTrace(o.expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+    } catch (e) {
+      return setMessage((e as Error).message);
+    }
+    const sp = spectrum(sc.real, w.re, o);
+    const t = thd(sp);
+    const name = `fft ${o.expr} (${plot.name})`;
+    const derived: SimPlot = {
+      name,
+      vectors: [
+        { name: 'frequency', type: 2, real: sp.freq },
+        { name: 'mag', type: 0, real: sp.amp },
+      ],
+      info: `${o.expr}: fundamental ${si(t.fundamental)}Hz, amplitud ${si(t.amplitude)} · THD ${t.thd.toFixed(3)} % (armónicas 2 a ${t.harmonics.length + 1}) · ${sp.n} puntos, ventana ${o.window}`,
+    };
+    setSim({ ...sim, result: { ...sim.result, plots: [...sim.result.plots.filter((p) => p.name !== name), derived] } });
+    selectPlot(name, panesByKind.current.get('fft') ?? [{ traces: [{ expr: 'db(mag)' }] }]);
   };
   const pltInput = useRef<HTMLInputElement>(null);
 
@@ -583,6 +615,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (picking.what === 'net') return net && net !== '0' ? net : null;
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
+    if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;
     return /^[VI]$/i.test(a.get('Prefix') ?? '') ? (a.get('InstName') ?? null) : null;
   };
   useEffect(() => {
@@ -706,6 +739,29 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (svg && box) exportSchematic(svg, box, file.name.replace(/\.asc$/i, ''), f);
   };
 
+  const openStudy = () => setDialog({ kind: 'study' });
+  const studyInfo = (): StudyInfo => {
+    const found = findAnalysis(doc);
+    const kind = found ? parseAnalysis(found.value)?.kind : undefined;
+    const analysis = kind === 'ac' || kind === 'dc' || kind === 'noise' || kind === 'op' || kind === 'tf' ? kind : 'tran';
+    const params = new Set<string>();
+    for (const t of doc.texts) {
+      if (t.kind !== 'directive') continue;
+      for (const l of t.text.split('\\n')) for (const m of l.matchAll(/^\s*\.param\s+(.*)$/gi)) for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) params.add(p[1]);
+    }
+    return {
+      components: doc.symbols
+        .map((x) => effectiveAttrs(x, lib.symbol(x.type)))
+        .filter((a) => a.get('Prefix'))
+        .map((a) => ({ name: a.get('InstName') ?? '', prefix: (a.get('Prefix') ?? '')[0], value: a.get('Value') ?? '' }))
+        .filter((c) => c.name),
+      sources: circuitInfo().sources,
+      nets: circuitInfo().nets,
+      params: [...params],
+      analysis,
+    };
+  };
+
   const openSimulation = () => setDialog({ kind: 'sim', found: findAnalysis(doc) });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
@@ -740,6 +796,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (e.altKey && (k === 's' || k === 'S')) return handled(), openSimulation();
       if (e.altKey && (k === 'c' || k === 'C')) return handled(), openControl();
       if (e.altKey && (k === 'n' || k === 'N')) return handled(), setShowNets((v) => !v);
+      if (e.altKey && (k === 'e' || k === 'E')) return handled(), openStudy();
       if (e.altKey) return;
       if (ctrl) return;
       switch (k) {
@@ -896,6 +953,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Abortar', onClick: abort, disabled: !running },
         'sep',
         { label: 'Comando de simulación…', shortcut: 'Alt+S', onClick: openSimulation },
+        { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
         { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
         'sep',
         { label: 'Punta de prueba', onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
@@ -996,6 +1054,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         {iconBtn('nets', 'Redes', 'Mostrar los nombres de todas las redes, sin modificar el esquemático (Alt+N)', () => setShowNets((v) => !v), { active: showNets })}
         <span className="sep" />
         {iconBtn('sim', 'Simulación…', 'Tipo de simulación y parámetros (Alt+S)', openSimulation)}
+        {iconBtn('study', 'Estudio…', 'Estudio: barridos, tolerancias, mediciones (Alt+E)', openStudy)}
         {iconBtn('control', '.control…', 'Bloque .control: scripts de ngspice (Alt+C)', openControl)}
         {running ? (
           <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación">
@@ -1041,7 +1100,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           />
           {picking && (
             <div className="pick-banner">
-              {picking.what === 'net' ? 'Elegí una red en el esquemático' : 'Elegí una fuente (V o I) en el esquemático'}
+              {picking.what === 'net' ? 'Elegí una red en el esquemático' : picking.what === 'source' ? 'Elegí una fuente (V o I) en el esquemático' : 'Elegí un componente en el esquemático'}
               <button onClick={() => endPick(null)}>Cancelar</button>
             </div>
           )}
@@ -1197,6 +1256,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                   mode={mode}
                   active={activePane}
                   setActive={setActivePane}
+                  onFft={doFft}
                   onHoverExpr={(e) => {
                     const net = e && /^\s*V\(([^,()]+)\)\s*$/i.exec(e)?.[1];
                     setTraceNet(net ? conn.nets.find((n) => n.name.toLowerCase() === net.toLowerCase())?.name : undefined);
@@ -1302,6 +1362,23 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         />
       )}
       {dialog?.kind === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'study' && (
+        <StudyPanel
+          initial={studyFromDoc(doc, lib)}
+          info={studyInfo()}
+          picker={picker}
+          hidden={!!picking}
+          onClose={() => setDialog(null)}
+          onApply={(st) => {
+            setDialog(null);
+            commit(applyStudy(doc, lib, st));
+          }}
+          onApplyCode={(code) => {
+            setDialog(null);
+            commit(applyStudyCode(doc, lib, code));
+          }}
+        />
+      )}
       {dialog?.kind === 'userfiles' && (
         <UserFilesDialog
           files={userFileInfo()}
@@ -1370,6 +1447,6 @@ function toolHint(t: Tool): string {
     case 'probe':
       return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
     case 'pick':
-      return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : 'Click en una fuente V o I para elegirla · Esc cancela';
+      return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : t.what === 'source' ? 'Click en una fuente V o I para elegirla · Esc cancela' : 'Click en un componente para elegirlo · Esc cancela';
   }
 }

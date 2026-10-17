@@ -20,7 +20,8 @@ export function traceResolver(sim: BuiltSimulation | null, plot: SimPlot): Resol
       const len = plot.vectors[0]?.real.length ?? 0;
       return { re: new Float64Array(len) };
     }
-    return wave(findVector(plot, netVector(name)) ?? findVector(plot, name));
+    // V(onoise)/V(inoise) de LTspice son los espectros de ruido de ngspice
+    return wave(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`));
   };
   const element = (name: string) => sim?.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
   return (fn, args) => {

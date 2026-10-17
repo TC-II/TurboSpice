@@ -20,6 +20,7 @@ const P: Record<string, ReactNode> = {
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,
   nets: <path d="M2.5 13.5h4M13.5 13.5h4M6.5 11h7v5h-7zM8.5 13.5h3M10 11V5M7 5h6" />,
+  study: <path d="M4 3.5h12v13H4zM7 7h6M7 10h6M7 13h3.5M13.5 12.5l1.5 1.5 2.5-3" />,
   sim: <path d="M3 4.5h14M3 10h14M3 15.5h14M7 2.5v4M13 8v4M9 13.5v4" />,
   control: <path d="M6 4H4.5v12H6M14 4h1.5v12H14M7.5 8l2 2-2 2M10.5 12.5h2" />,
   run: <path d="M6 4l10 6-10 6z" />,

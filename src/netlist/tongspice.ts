@@ -6,12 +6,12 @@
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
-import { isControlBlock, isNgspiceComment } from './directives.ts';
+import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
 import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
-import { parseStep, stepPlan, type Step, type StepRuns } from './step.ts';
+import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
 
 /** Resistencia serie que LTspice agrega a todo inductor sin Rser */
 export const LTSPICE_INDUCTOR_RSER = '1m';
@@ -113,6 +113,42 @@ function expandElement(name: string, letter: string, nodes: string[], value: str
   return lines;
 }
 
+/**
+ * Funciones aleatorias de LTspice → ngspice (se vuelven a sortear en cada corrida de .step):
+ * mc(x, tol) → unif(x, tol) (uniforme en x·(1±tol)); flat(x) → aunif(0, x) (uniforme en ±x);
+ * gauss(x) → agauss(0, x, 1) (normal con σ = x).
+ */
+export function translateRandom(text: string): string {
+  if (!/\b(mc|flat|gauss)\s*\(/i.test(text)) return text;
+  let out = '';
+  let i = 0;
+  const re = /\b(mc|flat|gauss)\s*\(/gi;
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    // argumentos hasta el paréntesis que cierra
+    let depth = 1;
+    let k = m.index + m[0].length;
+    const start = k;
+    const commas: number[] = [];
+    for (; k < text.length && depth; k++) {
+      if (text[k] === '(') depth++;
+      else if (text[k] === ')') depth--;
+      else if (text[k] === ',' && depth === 1) commas.push(k);
+    }
+    if (depth) break;
+    const args = text.slice(start, k - 1);
+    const fn = m[1].toLowerCase();
+    let rep: string | null = null;
+    if (fn === 'mc' && commas.length === 1) rep = `unif(${args})`;
+    else if (fn === 'flat' && !commas.length) rep = `aunif(0, ${args})`;
+    else if (fn === 'gauss' && !commas.length) rep = `agauss(0, ${args}, 1)`;
+    if (rep === null) continue;
+    out += text.slice(i, m.index) + rep;
+    i = k;
+    re.lastIndex = k;
+  }
+  return out + text.slice(i);
+}
+
 /** ".tran tstop" o ".tran 0 tstop ..." → ".tran paso tstop ..." (ngspice exige paso > 0) */
 function fixTran(line: string, warnings: string[]): string {
   const m = /^\.tran\s+(.*)$/i.exec(line.trim());
@@ -156,7 +192,7 @@ function convertElements(
         for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
       }
     }
-    out.push(...expandElement(name, letter, e.nodes, e.value, warnings));
+    out.push(...expandElement(name, letter, e.nodes, translateRandom(e.value), warnings));
   }
 
   return out;
@@ -191,7 +227,11 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
 
   const steps: Step[] = [];
   const measures: string[] = [];
+  // .control con marcas de sección: se combina con los barridos en lugar de reemplazarlos
+  const ctl = lt.texts.find((t) => isControlBlock(t.text));
+  const hooks = ctl ? controlHooks(ctl.text.split('\\n').slice(1, -1)) : null;
   for (const t of lt.texts) {
+    if (hooks && t === ctl) continue;
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
     const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
     for (const raw of t.text.split('\\n')) {
@@ -222,7 +262,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         continue;
       }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
-      out.push(fixTran(line, warnings).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
+      out.push(translateRandom(fixTran(line, warnings)).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
     }
   }
 
@@ -231,7 +271,8 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     if (r) out.push(r);
   }
 
-  const stepRuns = steps.length ? addSteps(steps, lt, names, out, warnings) : undefined;
+  const stepRuns = steps.length ? addSteps(steps, lt, names, out, warnings, hooks ?? undefined) : undefined;
+  if (hooks && !steps.length) out.push('.control', ...hooks.before, 'run', ...hooks.after, ...hooks.final, '.endc');
 
   // Modelos referenciados que no aparecen definidos en ningún lado
   const local = new Set(
@@ -292,7 +333,7 @@ function declaredParams(lt: LtNetlist): Set<string> {
 }
 
 /** .step → bloque .control (o, si ya hay uno del usuario, sólo el primer valor). Devuelve las corridas. */
-function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out: string[], warnings: string[]): StepRuns | undefined {
+function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out: string[], warnings: string[], hooks?: StepHooks): StepRuns | undefined {
   const declared = declaredParams(lt);
   // alterparam necesita que el parámetro exista: se declara con el primer valor
   for (const s of steps) {
@@ -301,12 +342,12 @@ function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out:
       declared.add(s.target.name.toLowerCase());
     }
   }
-  if (lt.texts.some((t) => isControlBlock(t.text))) {
+  if (!hooks && lt.texts.some((t) => isControlBlock(t.text))) {
     warnings.push('.step se ignora porque el esquemático tiene un bloque .control (el bloque decide qué simular)');
     return undefined;
   }
   const byName = new Map([...names].map(([k, v]) => [k.toLowerCase(), v]));
-  const plan = stepPlan(steps, (n) => byName.get(n.toLowerCase()));
+  const plan = stepPlan(steps, (n) => byName.get(n.toLowerCase()), hooks);
   if (typeof plan === 'string') {
     warnings.push(`.step: ${plan}`);
     return undefined;

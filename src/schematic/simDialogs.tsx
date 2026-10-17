@@ -18,8 +18,11 @@ import { Modal } from './dialogs.tsx';
 /** Valor numérico SPICE (1k, 10meg…) o expresión entre llaves */
 const validNumber = (s: string) => /^\{.+\}$/.test(s.trim()) || Number.isFinite(parseSpiceNumber(s));
 
-/** Elegir una red o una fuente haciendo click en el esquemático (null si se cancela) */
-export type Picker = (what: 'net' | 'source') => Promise<string | null>;
+/** Qué se elige en el esquemático: una red, una fuente V/I o cualquier componente */
+export type PickWhat = 'net' | 'source' | 'component';
+
+/** Elegir una red, fuente o componente haciendo click en el esquemático (null si se cancela) */
+export type Picker = (what: PickWhat) => Promise<string | null>;
 
 const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
 
@@ -33,7 +36,7 @@ function Field({ label, value, onChange, placeholder, hint, required, number, li
   number?: boolean;
   list?: string;
   /** botón para elegir el valor en el esquemático */
-  pick?: { what: 'net' | 'source'; picker: Picker };
+  pick?: { what: PickWhat; picker: Picker };
 }) {
   const bad = (required && !value.trim()) || (number && value.trim() !== '' && !validNumber(value));
   const input = <input value={value} placeholder={placeholder} spellCheck={false} list={list} onChange={(e) => onChange(e.target.value.trim())} />;

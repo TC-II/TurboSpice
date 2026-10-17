@@ -48,16 +48,17 @@ const click = async (x, y) => {
   await page.mouse.click(p.x, p.y);
 };
 
-// Fuente, resistencia horizontal (Ctrl+R), capacitor
+// Fuente, resistencia horizontal (Ctrl+R), capacitor. El cursor marca el centro
+// del símbolo: los orígenes quedan en V1 (0,0), R1 (112,-48) y C1 (80,-32)
 await page.keyboard.press('v');
-await click(0, 0);
+await click(0, 48);
 await page.keyboard.press('Escape');
 await page.keyboard.press('r');
 await page.keyboard.press('Control+r');
-await click(112, -48);
+await click(64, -32);
 await page.keyboard.press('Escape');
 await page.keyboard.press('c');
-await click(80, -32);
+await click(96, 0);
 await page.keyboard.press('Escape');
 // Cable de V1+ al pin izquierdo de R1 (termina solo al llegar a un pin)
 await page.keyboard.press('w');

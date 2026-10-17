@@ -16,6 +16,7 @@ import {
   type Box,
   type ItemRef,
 } from './geometry.ts';
+import { NetNamesLayer, type NetName } from './NetNames.tsx';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
 
 export type Tool =
@@ -45,6 +46,10 @@ interface Props {
   onEdit(ref: ItemRef): void;
   onProbe?(ref: { net?: string; symbol?: number }): void;
   highlightNet?: string;
+  /** etiquetas temporales con los nombres de las redes */
+  netNames?: NetName[];
+  /** click en una etiqueta temporal de una red sin nombre */
+  onNameNet?(at: Point): void;
   handle?: Ref<EditorHandle>;
   /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
   docKey?: number;
@@ -105,7 +110,7 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -114,6 +119,7 @@ export function SchematicEditor(props: Props) {
   const [preview, setPreview] = useState<AscDoc | null>(null);
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
+  const [labelNet, setLabelNet] = useState<string | undefined>();
   const spaceDown = useRef(false);
 
   useEffect(() => {
@@ -357,8 +363,11 @@ export function SchematicEditor(props: Props) {
         </pattern>
       </defs>
       {view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
-      <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={selection} highlightNet={highlightNet ?? hoverNet} />
+      <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={selection} highlightNet={labelNet ?? highlightNet ?? hoverNet} />
       <g className="ghost">{ghost}</g>
+      {netNames && netNames.length > 0 && !drag && (
+        <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
+      )}
       {drag?.mode === 'box' && boxEnd && (
         <rect
           className="selbox"

@@ -5,7 +5,9 @@ import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
 import type { SimResult } from './engine/ngspice.ts';
 import { Library, type LibraryBundle } from './library/library.ts';
-import { connectivity } from './netlist/connectivity.ts';
+import { ltNetlist } from './netlist/ltnetlist.ts';
+import { netNames } from './schematic/NetNames.tsx';
+import type { Point } from './asc/model.ts';
 import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, TextDialog } from './schematic/dialogs.tsx';
@@ -15,7 +17,7 @@ import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { deleteItems, duplicateItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, deleteItems, duplicateItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -32,7 +34,7 @@ type Dialog =
   | { kind: 'picker' }
   | { kind: 'attrs'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
-  | { kind: 'flag'; index?: number }
+  | { kind: 'flag'; index?: number; at?: Point }
   | { kind: 'sim'; found: FoundLine | null }
   | { kind: 'control'; index: number };
 
@@ -96,7 +98,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [docKey, setDocKey] = useState(0);
   const dirty = history.version !== savedVersion;
 
-  const conn = useMemo(() => connectivity(doc, (t) => lib.symbol(t)), [doc, lib]);
+  const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib]);
+  const conn = lt.conn;
+  const [showNets, setShowNets] = useState(false);
+  const shownNets = useMemo(() => (showNets ? netNames(doc, conn, lt.ncNames) : undefined), [showNets, doc, conn, lt]);
+  // red resaltada desde el panel de resultados (al pasar por una traza)
+  const [traceNet, setTraceNet] = useState<string>();
 
   const setTool = useCallback((t: Tool) => {
     setToolState(t);
@@ -285,6 +292,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (ctrl && k === 'Enter') return handled(), run();
       if (e.altKey && (k === 's' || k === 'S')) return handled(), openSimulation();
       if (e.altKey && (k === 'c' || k === 'C')) return handled(), openControl();
+      if (e.altKey && (k === 'n' || k === 'N')) return handled(), setShowNets((v) => !v);
       if (e.altKey) return;
       if (ctrl) return;
       switch (k) {
@@ -405,6 +413,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           <button onClick={history.undo} disabled={!history.canUndo} title="Deshacer (Ctrl+Z)">↶</button>
           <button onClick={history.redo} disabled={!history.canRedo} title="Rehacer (Ctrl+Y)">↷</button>
           <button onClick={() => editor.current?.fit()} title="Ajustar a la vista (Inicio)">Ajustar</button>
+          <button className={showNets ? 'active' : ''} onClick={() => setShowNets((v) => !v)} title="Mostrar los nombres de todas las redes, sin modificar el esquemático (Alt+N)">
+            Redes
+          </button>
         </div>
         <div className="group">
           <button onClick={openSimulation} title="Tipo de simulación y parámetros (Alt+S)">Simulación…</button>
@@ -437,6 +448,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             setSelection={setSelection}
             onEdit={editItem}
             onProbe={onProbe}
+            highlightNet={traceNet}
+            netNames={shownNets}
+            onNameNet={(at) => setDialog({ kind: 'flag', at })}
           />
           {message && (
             <div className="toast" onClick={() => setMessage(undefined)}>
@@ -478,7 +492,14 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                   )}
                   <div className="trace-chips">
                     {chosen.map((v) => (
-                      <button key={v.name} className="chip" onClick={() => setTraces((t) => t.filter((x) => x !== v.name))} title="Quitar">
+                      <button
+                        key={v.name}
+                        className="chip"
+                        onClick={() => setTraces((t) => t.filter((x) => x !== v.name))}
+                        onPointerEnter={() => setTraceNet(conn.nets.find((n) => n.name && netVector(n.name) === v.name)?.name)}
+                        onPointerLeave={() => setTraceNet(undefined)}
+                        title="Quitar"
+                      >
                         {displayName(v)} ✕
                       </button>
                     ))}
@@ -575,6 +596,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           onApply={(name) => {
             setDialog(null);
             if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
+            else if (dialog.at) commit(addFlag(doc, dialog.at, name));
             else setTool({ kind: 'flag', name });
           }}
         />

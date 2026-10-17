@@ -34,6 +34,8 @@ export interface LtNetlist {
   /** .lib de los ModelFile de los símbolos usados */
   modelFiles: string[];
   conn: Connectivity;
+  /** nombre NC_xx de cada pin suelto ("sym:pin") */
+  ncNames: Map<string, string>;
   warnings: string[];
 }
 
@@ -63,6 +65,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
   const elements: Element[] = [];
   const families = new Set<string>();
   const modelFiles: string[] = [];
+  const ncNames = new Map<string, string>();
 
   doc.symbols.forEach((s, si) => {
     const def = lib.symbol(s.type);
@@ -77,18 +80,19 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
     const instName = attrs.get('InstName') ?? '';
 
     // Nodos por SpiceOrder; órdenes faltantes → MP_xx
-    const byOrder = new Map<number, { node: string; name: string }>();
+    const byOrder = new Map<number, { node: string; name: string; key: string }>();
     def.pins.forEach((p, pi) => {
       const net = conn.pinNet.get(`${si}:${pi}`);
       const order = Number(p.attrs.get('SpiceOrder') ?? pi + 1);
-      byOrder.set(order, { node: net?.name || '', name: p.attrs.get('PinName') ?? '' });
+      byOrder.set(order, { node: net?.name || '', name: p.attrs.get('PinName') ?? '', key: `${si}:${pi}` });
     });
     const maxOrder = Math.max(0, ...byOrder.keys());
     const nodes: string[] = [];
     const pinNames: string[] = [];
     for (let o = 1; o <= maxOrder; o++) {
       const p = byOrder.get(o);
-      nodes.push(p ? p.node || nc('NC') : nc('MP'));
+      if (p && !p.node) ncNames.set(p.key, (p.node = nc('NC')));
+      nodes.push(p ? p.node : nc('MP'));
       pinNames.push(p?.name ?? '');
     }
     // Nodos implícitos: sustrato del BJT a tierra, bulk del MOSFET de 3 pines a la fuente
@@ -97,8 +101,10 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
       nodes.push('0');
       pinNames.push('');
     } else if ((P === 'MN' || P === 'MP') && nodes.length === 3) {
-      // si la fuente está suelta, el bulk es otro nodo suelto
-      nodes.push(byOrder.get(3)?.node || nc('NC'));
+      // si la fuente está suelta, el bulk es otro nodo suelto (el nombre de la fuente ya es
+      // NC_xx y LTspice usa uno nuevo)
+      const src = byOrder.get(3);
+      nodes.push(src && !ncNames.has(src.key) ? src.node : nc('NC'));
       pinNames.push('');
     }
     if (FAMILIES[P]) families.add(P);
@@ -125,7 +131,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource): LtNetlist {
   }
 
   const texts: Directive[] = doc.texts.map((t) => ({ kind: t.kind, text: t.text }));
-  return { elements, implicitModels, standardLibs, texts, modelFiles, conn, warnings };
+  return { elements, implicitModels, standardLibs, texts, modelFiles, conn, ncNames, warnings };
 }
 
 /** Texto de la netlist con el formato de LTspice -netlist (sin la línea de título) */

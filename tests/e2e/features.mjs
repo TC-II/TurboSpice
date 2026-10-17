@@ -1,0 +1,52 @@
+// E2E de funciones de interfaz: nombres de redes temporales (#15) y las que se agreguen.
+// Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
+import { mkdirSync } from 'node:fs';
+import { chromium } from 'playwright-core';
+
+const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
+const OUT = process.argv[3] ?? 'test-results';
+mkdirSync(OUT, { recursive: true });
+
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const page = await context.newPage();
+const errors = [];
+const watch = (p) => {
+  p.on('pageerror', (e) => errors.push(e.message));
+  p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+  p.on('dialog', (d) => d.accept());
+};
+watch(page);
+
+let failed = 0;
+const check = (ok, msg) => {
+  console.log(`${ok ? '✓' : '✗'} ${msg}`);
+  if (!ok) failed++;
+};
+
+await page.goto(URL);
+await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
+
+// --- #15: nombres de redes temporales ---
+const names = () => page.locator('.net-name text').allTextContents();
+await page.getByRole('button', { name: 'Redes' }).click();
+check((await names()).sort().join() === 'N001,out', `muestra el nombre de cada red (${(await names()).join(', ')})`);
+check((await page.locator('.net-name.auto').count()) === 1, 'las redes sin etiqueta se distinguen');
+await page.keyboard.press('Alt+n');
+check((await page.locator('.net-name').count()) === 0, 'Alt+N las oculta');
+check(!(await page.locator('.filename').textContent()).includes('•'), 'mostrarlas no modifica el documento');
+await page.keyboard.press('Alt+n');
+await page.locator('.net-name.auto').click();
+await page.locator('.modal input').fill('in');
+await page.keyboard.press('Enter');
+check((await names()).sort().join() === 'in,out', `click en N001 le pone nombre con una etiqueta (${(await names()).join(', ')})`);
+check((await page.locator('.flags .flagname', { hasText: 'in' }).count()) === 1, 'y la etiqueta queda en el esquemático');
+await page.screenshot({ path: `${OUT}/net-names.png` });
+await page.keyboard.press('Control+z');
+await page.getByRole('button', { name: 'Redes' }).click();
+
+check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
+await browser.close();
+console.log(failed ? `\n${failed} fallo(s)` : '\nE2E funciones OK');
+process.exit(failed ? 1 : 0);

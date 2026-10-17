@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -b",
-    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs",
+    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs && node tests/e2e/features.mjs",
     "assets": "node scripts/copy-engine.mjs && node scripts/build-library.mjs",
     "corpus": "node tests/corpus/roundtrip.mjs && node tests/corpus/explicit.mjs && node tests/corpus/netlist.mjs"
   },

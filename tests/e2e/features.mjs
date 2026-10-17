@@ -207,9 +207,9 @@ check((await page.locator('.pane').count()) === 1, 'se puede quitar un panel');
 await page.getByRole('button', { name: 'Cursores' }).click();
 const cb = await page.locator('.pane-chart').first().boundingBox();
 await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
-await page.keyboard.down('Shift');
-await page.mouse.click(cb.x + cb.width * 0.7, cb.y + cb.height / 2);
-await page.keyboard.up('Shift');
+await page.waitForTimeout(400); // que no cuente como doble click
+await page.mouse.click(cb.x + cb.width * 0.7, cb.y + cb.height / 2, { button: 'right' });
+await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
 check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);
 await page.screenshot({ path: `${OUT}/plot-panel.png` });

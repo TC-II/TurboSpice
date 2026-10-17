@@ -50,6 +50,9 @@ import { parseAnalysis } from './sim/analyses.ts';
 import { loadView, saveView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
+import { AccountButton, DriveDialog } from './cloud/AccountButton.tsx';
+import { drive, useGoogle } from './cloud/google.ts';
+import type { DriveFile } from './cloud/drive.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -66,12 +69,15 @@ type Dialog =
   | { kind: 'help' }
   | { kind: 'userfiles' }
   | { kind: 'study' }
-  | { kind: 'welcome' };
+  | { kind: 'welcome' }
+  | { kind: 'drive' };
 
 interface FileState {
   name: string;
   encoding?: AscEncoding;
   handle?: Parameters<typeof saveFile>[2];
+  /** id del archivo en Google Drive (si se abrió o guardó ahí) */
+  driveId?: string;
 }
 
 // Serialización cacheada por documento (el autoguardado guarda todo el historial)
@@ -166,6 +172,7 @@ export function App() {
           <button className={mode === 'netlist' ? 'active' : ''} onClick={() => setMode('netlist')}>Netlist</button>
         </nav>
         <div id="appbar-slot" />
+        <AccountButton />
       </header>
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
@@ -182,6 +189,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
   const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult; doc: AscDoc; meas: MeasTable | null } | null>(null);
@@ -252,7 +260,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const [recent, setRecent] = useState<RecentFile[]>([]);
   const remember = useCallback((d: AscDoc, f: FileState, unsaved = false) => {
-    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, time: Date.now(), unsaved }).then(setRecent);
+    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }).then(setRecent);
   }, []);
 
   // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
@@ -293,7 +301,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (session) {
         try {
           history.restore({ past: session.past.map(parseAsc), present: parseAsc(session.present), future: session.future.map(parseAsc) });
-          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'] });
+          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'], driveId: session.driveId });
           setSavedVersion(session.savedVersion);
           if (session.view) setPlotView(session.view);
           setDocKey((k) => k + 1);
@@ -322,6 +330,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         name: file.name,
         encoding: file.encoding,
         handle: file.handle,
+        driveId: file.driveId,
         past: h.past.slice(drop).map(ascText),
         present: ascText(h.present),
         future: h.future.slice(0, SAVED_UNDO).map(ascText),
@@ -372,22 +381,67 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     }
   };
 
-  const doSave = async (saveAs = false) => {
+  const savedAs = (saved: FileState, missing: string[], where = '') => {
+    setFile(saved);
+    setSavedVersion(history.version);
+    remember(doc, saved);
+    setMessage(
+      missing.length
+        ? `Guardado${where}. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
+        : `Guardado${where}: ${saved.name}`,
+    );
+  };
+
+  /** Guardar en el equipo (como siempre) */
+  const doSaveLocal = async (saveAs = false) => {
     const { bytes, missing } = ascBytes(doc, lib, file.encoding);
     try {
       const r = await saveFile(bytes, file.name, file.handle, saveAs);
-      if (!r) return;
-      const saved = { ...file, name: r.name, handle: r.handle ?? file.handle };
-      setFile(saved);
-      setSavedVersion(history.version);
-      remember(doc, saved);
-      setMessage(
-        missing.length
-          ? `Guardado. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
-          : `Guardado: ${r.name}`,
-      );
+      if (r) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, missing);
     } catch (e) {
       setMessage(`No se pudo guardar: ${(e as Error).message}`);
+    }
+  };
+
+  /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo, o uno nuevo */
+  const doSaveDrive = async (saveAs = false) => {
+    let name = file.name;
+    let id = saveAs ? undefined : file.driveId;
+    if (!id && saveAs) {
+      const n = window.prompt('Nombre del archivo en Google Drive', name)?.trim();
+      if (!n) return;
+      name = /\.asc$/i.test(n) ? n : `${n}.asc`;
+    }
+    const { bytes, missing } = ascBytes(doc, lib, file.encoding);
+    try {
+      if (!id) {
+        const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
+        if (same) {
+          if (!window.confirm(`Ya hay un «${same.name}» en Google Drive. ¿Reemplazarlo?`)) return;
+          id = same.id;
+        }
+      }
+      const r = await drive.save(name, bytes, id);
+      savedAs({ ...file, name: r.name, driveId: r.id }, missing, ' en Google Drive');
+    } catch (e) {
+      setMessage(`No se pudo guardar en Google Drive: ${(e as Error).message}`);
+    }
+  };
+
+  // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
+  const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
+
+  const openDriveFile = async (d: DriveFile) => {
+    if (!confirmDiscard()) return;
+    try {
+      const f = readAsc(await drive.download(d.id), d.name);
+      const state = { name: f.name, encoding: f.encoding, driveId: d.id };
+      setDialog(null);
+      loadDoc(f.doc, state);
+      remember(f.doc, state);
+      warnMissing(f.doc);
+    } catch (e) {
+      setMessage(`No se pudo abrir de Google Drive: ${(e as Error).message}`);
     }
   };
 
@@ -401,9 +455,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const r = recent[i];
     if (!r || !confirmDiscard()) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
-    const bytes = r.unsaved ? null : await readHandle(r.handle);
+    const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
     const f = bytes ? readAsc(bytes, r.name) : { doc: parseAsc(r.asc), name: r.name, encoding: r.encoding };
-    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'] };
+    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'], driveId: r.driveId };
     loadDoc(f.doc, state);
     if (!r.unsaved) remember(f.doc, state);
   };
@@ -894,8 +948,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       items: [
         { label: 'Nuevo', onClick: doNew },
         { label: 'Abrir…', shortcut: 'Ctrl+O', onClick: doOpen },
-        { label: 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: 'Abrir de Google Drive…', onClick: () => setDialog({ kind: 'drive' }) }] : []),
+        { label: google.account ? 'Guardar en Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { label: google.account ? 'Guardar en Drive como…' : 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: 'Guardar en el equipo…', onClick: () => doSaveLocal(true) }] : []),
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
@@ -1038,7 +1094,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       <div className="iconbar" role="toolbar" aria-label="Herramientas">
         {iconBtn('new', 'Nuevo', 'Nuevo esquemático', doNew)}
         {iconBtn('open', 'Abrir', 'Abrir .asc (Ctrl+O)', doOpen)}
-        {iconBtn('save', 'Guardar', 'Guardar (Ctrl+S)', () => doSave(false))}
+        {iconBtn('save', 'Guardar', google.account ? 'Guardar en Google Drive (Ctrl+S)' : 'Guardar (Ctrl+S)', () => doSave(false))}
         {iconBtn('share', 'Compartir', 'Copiar un link que abre este circuito', doShare)}
         <span className="sep" />
         {iconBtn('undo', 'Deshacer', 'Deshacer (Ctrl+Z)', history.undo, { disabled: !history.canUndo })}
@@ -1408,6 +1464,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           }}
         />
       )}
+      {dialog?.kind === 'drive' && <DriveDialog onOpen={openDriveFile} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'share' && (
         <ShareDialog
           url={dialog.url}

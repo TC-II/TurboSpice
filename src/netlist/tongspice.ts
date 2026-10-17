@@ -37,6 +37,8 @@ export interface NgspiceNetlist {
   names: Map<string, string>;
   /** con .step: las corridas en orden de ejecución */
   steps?: StepRuns;
+  /** líneas .meas (las evalúa TurboSpice sobre los resultados; en la netlist van comentadas) */
+  measures: string[];
   warnings: string[];
 }
 
@@ -188,6 +190,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   out.push(...implicit);
 
   const steps: Step[] = [];
+  const measures: string[] = [];
   for (const t of lt.texts) {
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
     const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
@@ -199,6 +202,11 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       const line = raw.trim();
       if (!line) continue;
       if (DROP_DIRECTIVES.test(line)) continue;
+      if (/^\.meas(ure)?\b/i.test(line)) {
+        measures.push(line);
+        out.push(`* ${line}`);
+        continue;
+      }
       if (/^\.step\b/i.test(line)) {
         out.push(`* ${line}`);
         const st = parseStep(line);
@@ -264,7 +272,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns };
+  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

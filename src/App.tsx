@@ -41,6 +41,8 @@ import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
 import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotView } from './waveform/view.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
+import { measSweepPlot, measureResults, type MeasTable } from './sim/measResults.ts';
+import { MeasPanel } from './sim/MeasPanel.tsx';
 import { loadView, saveView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
@@ -177,7 +179,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
-  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult; doc: AscDoc } | null>(null);
+  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult; doc: AscDoc; meas: MeasTable | null } | null>(null);
   const [showOp, setShowOp] = useState(false);
   const [panes, setPanes] = useState<Pane[]>(emptyPanes);
   const [activePane, setActivePane] = useState(0);
@@ -191,7 +193,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [resultsH, setResultsH] = useState<number>(() => Number(lsGet(sizeKey)) || 0);
   useEffect(() => setResultsH(Number(lsGet(sizeKey)) || 0), [sizeKey]);
   const [theme, setTheme] = useTheme();
-  const [panel, setPanel] = useState<'plot' | 'netlist' | 'log' | 'problems'>('plot');
+  const [panel, setPanel] = useState<'plot' | 'netlist' | 'log' | 'problems' | 'meas'>('plot');
   const [overlay, setOverlay] = useState(true);
   const editor = useRef<EditorHandle>(null);
   const [docKey, setDocKey] = useState(0);
@@ -418,10 +420,17 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       const built = await buildSimulation(doc, lib, file.name);
       const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
+      // .meas: se evalúan sobre los resultados de cada corrida
+      const meas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
+      const mp = meas && measSweepPlot(meas, built);
+      if (mp) result.plots.push(mp);
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
-      setSim({ built, result, doc });
-      const withScale = result.plots.filter((p) => scaleOf(p));
+      setSim({ built, result, doc, meas });
+      // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
+      // sólo si no hay otra cosa
+      const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
+      const withScale = realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
       const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
       // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
@@ -440,7 +449,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       );
       if (result.plots.length) {
         setTool({ kind: 'probe' });
-        setPanel(errs.length ? 'problems' : 'plot');
+        const nothingPlotted = !(remembered ?? panes).some((p) => p.traces.length) && !built.controlPanes.length;
+        setPanel(errs.length ? 'problems' : meas?.rows.length && nothingPlotted ? 'meas' : 'plot');
       } else setPanel(errs.length ? 'problems' : 'log');
     } catch (e) {
       setStatus({ kind: 'error', message: (e as Error).message });
@@ -1085,6 +1095,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               <nav className="tabs">
                 <button className={panel === 'plot' ? 'active' : ''} onClick={() => setPanel('plot')}>Resultados</button>
                 <button className={panel === 'netlist' ? 'active' : ''} onClick={() => setPanel('netlist')}>Netlist</button>
+                {sim.meas && (
+                  <button className={panel === 'meas' ? 'active' : ''} onClick={() => setPanel('meas')}>
+                    Mediciones ({sim.meas.names.length})
+                  </button>
+                )}
                 <button className={panel === 'problems' ? 'active' : ''} onClick={() => setPanel('problems')}>
                   Problemas{problems.length ? ` (${problems.length})` : ''}
                 </button>
@@ -1191,6 +1206,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               {panel === 'plot' && plot && !scale && (isPzPlot(plot) ? <PzPlane plot={plot} /> : <ResultTable plot={plot} />)}
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
+              {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}
               {panel === 'problems' &&
                 (problems.length ? (
                   <ul className="problems">

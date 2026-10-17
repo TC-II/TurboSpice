@@ -218,6 +218,8 @@ export interface EvalContext {
   scale: Float64Array;
   /** nombre del eje X: se puede usar en la expresión (time, frequency) */
   scaleName: string;
+  /** variables con valor (resultados de .meas, parámetros barridos); ganan a los nodos */
+  vars?: Record<string, number>;
 }
 
 export function evaluate(n: Node, ctx: EvalContext): Wave {
@@ -233,6 +235,7 @@ function ev(n: Node, ctx: EvalContext): C {
     case 'var': {
       const v = n.name.toLowerCase();
       if (v === ctx.scaleName.toLowerCase() || v === 'time' || v === 'frequency' || v === 'x') return { re: ctx.scale, im: null };
+      if (ctx.vars && v in ctx.vars) return { re: fill(1, ctx.vars[v]), im: null };
       if (v === 'pi') return { re: fill(1, Math.PI), im: null };
       if (v === 'e') return { re: fill(1, Math.E), im: null };
       if (v === 'j') return { re: fill(1, 0), im: fill(1, 1) };

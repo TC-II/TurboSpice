@@ -418,3 +418,11 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
 .uf-done { color: var(--ok); }
 button.small { font-size: 12px; padding: 1px 8px; }
 .buttons.left { justify-content: flex-start; }
+.meas-panel { display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.meas-table tfoot th, .meas-table tfoot td { color: var(--fg-muted); border-top: 1px solid var(--border); }
+.histograms { display: flex; flex-wrap: wrap; gap: 16px; }
+.histogram { margin: 0; }
+.histogram svg { width: 240px; height: 104px; }
+.histogram rect { fill: var(--accent); opacity: 0.8; }
+.histogram text { fill: var(--fg-muted); font: 9px system-ui, sans-serif; }
+.histogram figcaption { font: 12px var(--mono); color: var(--fg-muted); text-align: center; }

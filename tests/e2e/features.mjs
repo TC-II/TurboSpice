@@ -156,8 +156,10 @@ await openExample(page, 'Barrido RC (.step).asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+check(await page.getByRole('button', { name: /^Mediciones/ }).evaluate((b) => b.classList.contains('active')), 'con .meas y nada graficado, abre en Mediciones');
+await page.getByRole('button', { name: 'Resultados', exact: true }).click();
 const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
-check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k)', `una corrida por paso (${stepPlots.join(', ')})`);
+check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k),meas vs R', `una corrida por paso (${stepPlots.join(', ')})`);
 await page.waitForTimeout(300);
 const outStep = await at(128, -32);
 await page.mouse.click(outStep.x, outStep.y);
@@ -167,6 +169,22 @@ const series = await page.locator('.readout tbody tr td:first-child').allTextCon
 check(series.join() === 'V(out) · R=500,V(out) · R=1k,V(out) · R=2k', `cada paso identificado con su valor (${series.join(', ')})`);
 await page.getByRole('button', { name: 'Medidas' }).click();
 await page.screenshot({ path: `${OUT}/step.png` });
+// .meas por corrida (#20): tiempo de subida 10-90 % = 2.2·RC
+await page.getByRole('button', { name: /^Mediciones/ }).click();
+const measRows = await page.locator('.meas-table tbody tr').allTextContents();
+check(
+  measRows.length === 3 && /R=500.*1\.09\d*m/.test(measRows[0]) && /R=1k.*2\.19\d*m/.test(measRows[1]) && /R=2k.*4\.39\d*m/.test(measRows[2]),
+  `tiempo de subida por paso = 2.2·RC (${measRows.join(' | ')})`,
+);
+check((await page.locator('.meas-table tfoot tr').count()) === 4, 'con media, σ, mínimo y máximo');
+await page.getByRole('button', { name: 'Resultados', exact: true }).click();
+await page.getByRole('combobox', { name: 'Plot' }).selectOption('meas vs R');
+await page.getByLabel('Expresión').fill('tsubida');
+await page.keyboard.press('Enter');
+await page.getByRole('button', { name: 'Medidas' }).click();
+const vsR = await page.locator('.readout tbody tr').first().locator('td').allTextContents();
+check(vsR[0] === 'tsubida' && /^1\.09\d*m @ 500$/.test(vsR[1]) && /^4\.39\d*m @ 2k$/.test(vsR[2]), `medición en función del parámetro barrido (${vsR.slice(0, 3).join(', ')})`);
+await page.getByRole('button', { name: 'Medidas' }).click();
 
 // --- #3, #14, #12: visor de resultados, vista recordada y exportaciones ---
 const downloaded = async (action) => {

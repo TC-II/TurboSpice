@@ -208,7 +208,9 @@ await page.getByRole('button', { name: 'Cursores' }).click();
 const cb = await page.locator('.pane-chart').first().boundingBox();
 await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
 await page.waitForTimeout(400); // que no cuente como doble click
-await page.mouse.click(cb.x + cb.width * 0.7, cb.y + cb.height / 2, { button: 'right' });
+// al aparecer la tabla de cursores el gráfico se achica: volver a medirlo
+const cb2 = await page.locator('.pane-chart').first().boundingBox();
+await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2, { button: 'right' });
 await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
 check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);

@@ -93,8 +93,7 @@ export function textBox(t: { x: number; y: number; size: number; text: string; a
 export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef | null {
   for (let i = doc.texts.length - 1; i >= 0; i--) if (inBox(p, textBox(doc.texts[i]), tol / 2)) return { kind: 'text', index: i };
   for (let i = doc.flags.length - 1; i >= 0; i--) {
-    const f = doc.flags[i];
-    if (Math.hypot(p.x - f.x, p.y - f.y) <= tol * 1.5) return { kind: 'flag', index: i };
+    if (inBox(p, flagBox(doc, doc.flags[i]), tol)) return { kind: 'flag', index: i };
   }
   let best: { i: number; d: number } | null = null;
   doc.wires.forEach((w, i) => {
@@ -129,4 +128,40 @@ export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' 
   if (!dirs.has('bottom')) return 'top';
   if (!dirs.has('left')) return 'right';
   return 'left';
+}
+
+/**
+ * Caja de una etiqueta o tierra, según hacia dónde queda el dibujo (opuesto al cable):
+ * la tierra ocupa ±18 × 14 unidades; una etiqueta, su punto y el texto.
+ */
+export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }): Box {
+  const dir = flagDirection(doc, f);
+  // Caja local con el dibujo hacia +y (cable desde arriba), luego rotada según la dirección
+  let local: Box;
+  if (f.name === '0') local = { x1: -18, y1: -4, x2: 18, y2: 16 };
+  else {
+    const w = Math.max(16, f.name.length * fontSize(2) * 0.6);
+    local = { x1: -w / 2, y1: -6, x2: w / 2, y2: 8 + fontSize(2) };
+  }
+  const rot = (x: number, y: number) =>
+    dir === 'top' ? { x, y } : dir === 'bottom' ? { x: -x, y: -y } : dir === 'left' ? { x: y, y: -x } : { x: -y, y: x };
+  const a = rot(local.x1, local.y1);
+  const b = rot(local.x2, local.y2);
+  // Las etiquetas con texto a izquierda/derecha se extienden horizontalmente
+  if (f.name !== '0' && (dir === 'left' || dir === 'right')) {
+    const w = Math.max(16, f.name.length * fontSize(2) * 0.6) + 10;
+    const sx = dir === 'left' ? 1 : -1;
+    return {
+      x1: f.x + Math.min(0, sx * w) - 6,
+      y1: f.y - fontSize(2) / 2 - 2,
+      x2: f.x + Math.max(0, sx * w) + 6,
+      y2: f.y + fontSize(2) / 2 + 2,
+    };
+  }
+  return {
+    x1: f.x + Math.min(a.x, b.x),
+    y1: f.y + Math.min(a.y, b.y),
+    x2: f.x + Math.max(a.x, b.x),
+    y2: f.y + Math.max(a.y, b.y),
+  };
 }

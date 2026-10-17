@@ -5,6 +5,7 @@
 //  - .model implícitos (D, NPN, NMOS…) y nombres de elemento con "§";
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso).
+import { isNgspiceComment } from './directives.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
@@ -167,8 +168,10 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   out.push(...lt.implicitModels);
 
   for (const t of lt.texts) {
+    // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
+    const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
     for (const raw of t.text.split('\\n')) {
-      if (t.kind === 'comment') {
+      if (comment) {
         out.push(`* ${raw}`);
         continue;
       }

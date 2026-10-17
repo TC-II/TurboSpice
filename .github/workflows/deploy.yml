@@ -62,6 +62,7 @@ jobs:
           timeout 30 bash -c 'until curl -sf http://localhost:4173/TurboSpice/ >/dev/null; do sleep 1; done'
           node tests/e2e/examples.mjs http://localhost:4173/TurboSpice/ test-results
           node tests/e2e/editor.mjs http://localhost:4173/TurboSpice/ test-results
+          node tests/e2e/simulation.mjs http://localhost:4173/TurboSpice/ test-results
 
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'

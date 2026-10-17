@@ -9,6 +9,12 @@ import { connectivity } from './netlist/connectivity.ts';
 import { ScalarTable, StatusText, type Status } from './NetlistMode.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, TextDialog } from './schematic/dialogs.tsx';
+import { ControlDialog, SimulationDialog, type CircuitInfo } from './schematic/simDialogs.tsx';
+import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
+import { controlBlock, controlBody } from './sim/controlSnippets.ts';
+import { ANALYSIS_LINE } from './sim/analyses.ts';
+import { isControlBlock } from './netlist/directives.ts';
+import { effectiveAttrs } from './asc/resolve.ts';
 import { deleteItems, duplicateItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
@@ -17,7 +23,7 @@ import { useHistory } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import { Plot } from './waveform/Plot.tsx';
-import { displayName, scaleOf, type ComplexView } from './waveform/series.ts';
+import { displayName, sameRuns, scaleOf, type ComplexView } from './waveform/series.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc'];
@@ -26,7 +32,9 @@ type Dialog =
   | { kind: 'picker' }
   | { kind: 'attrs'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
-  | { kind: 'flag'; index?: number };
+  | { kind: 'flag'; index?: number }
+  | { kind: 'sim'; found: FoundLine | null }
+  | { kind: 'control'; index: number };
 
 interface FileState {
   name: string;
@@ -83,6 +91,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [plotName, setPlotName] = useState('');
   const [view, setView] = useState<ComplexView>('db');
   const [panel, setPanel] = useState<'plot' | 'netlist' | 'log'>('plot');
+  const [overlay, setOverlay] = useState(true);
   const editor = useRef<EditorHandle>(null);
   const [docKey, setDocKey] = useState(0);
   const dirty = history.version !== savedVersion;
@@ -237,9 +246,28 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const editItem = (ref: ItemRef) => {
     if (ref.kind === 'symbol') setDialog({ kind: 'attrs', index: ref.index });
-    else if (ref.kind === 'text') setDialog({ kind: 'text', index: ref.index, textKind: doc.texts[ref.index].kind });
-    else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
+    else if (ref.kind === 'text') {
+      const t = doc.texts[ref.index];
+      const ls = t.text.split('\\n');
+      // Como en LTspice: un comando de análisis abre el menú de simulación
+      if (isControlBlock(t.text)) setDialog({ kind: 'control', index: ref.index });
+      else if (ls.length === 1 && ANALYSIS_LINE.test(ls[0])) setDialog({ kind: 'sim', found: { text: ref.index, line: 0, value: ls[0].trim() } });
+      else setDialog({ kind: 'text', index: ref.index, textKind: t.kind });
+    } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
   };
+
+  const openSimulation = () => setDialog({ kind: 'sim', found: findAnalysis(doc) });
+  const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
+
+  // Redes y fuentes del circuito, para los selectores del menú de simulación
+  const circuitInfo = (): CircuitInfo => ({
+    nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    sources: doc.symbols
+      .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
+      .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
+      .map((a) => a.get('InstName') ?? '')
+      .filter(Boolean),
+  });
 
   // Atajos de teclado estilo LTspice
   useEffect(() => {
@@ -255,6 +283,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (ctrl && (k === 'r' || k === 'R')) return handled(), rotateOrMirror('rotate');
       if (ctrl && (k === 'e' || k === 'E')) return handled(), rotateOrMirror('mirror');
       if (ctrl && k === 'Enter') return handled(), run();
+      if (e.altKey && (k === 's' || k === 'S')) return handled(), openSimulation();
+      if (e.altKey && (k === 'c' || k === 'C')) return handled(), openControl();
+      if (e.altKey) return;
       if (ctrl) return;
       switch (k) {
         case 'Escape':
@@ -334,6 +365,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const running = status.kind === 'running';
   const scale = plot ? scaleOf(plot) : null;
   const chosen = plot ? plot.vectors.filter((v) => traces.includes(v.name)) : [];
+  const runs = sim && plot ? sameRuns(sim.result.plots, plot) : [];
   const isComplex = plot?.vectors.some((v) => v.imag);
   const toolBtn = (t: Tool, label: string, title: string) => (
     <button className={tool.kind === t.kind ? 'active' : ''} title={title} onClick={() => setTool(t)}>
@@ -364,7 +396,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           </button>
           {toolBtn({ kind: 'flag', name: '0' }, 'Tierra', 'Tierra (G)')}
           <button title="Etiqueta de red (F4 / N)" onClick={() => setDialog({ kind: 'flag' })}>Etiqueta</button>
-          <button title="Directiva SPICE (S)" onClick={() => setDialog({ kind: 'text', textKind: 'directive' })}>.op</button>
+          <button title="Directiva SPICE libre (S)" onClick={() => setDialog({ kind: 'text', textKind: 'directive' })}>Directiva</button>
           {toolBtn({ kind: 'delete' }, 'Borrar', 'Borrar (F5 / Supr)')}
         </div>
         <div className="group">
@@ -375,6 +407,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           <button onClick={() => editor.current?.fit()} title="Ajustar a la vista (Inicio)">Ajustar</button>
         </div>
         <div className="group">
+          <button onClick={openSimulation} title="Tipo de simulación y parámetros (Alt+S)">Simulación…</button>
+          <button onClick={openControl} title="Bloque .control: scripts de ngspice (Alt+C)">.control…</button>
           {running ? (
             <button onClick={abort}>Abortar</button>
           ) : (
@@ -436,6 +470,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                       <option value="mag">Magnitud</option>
                     </select>
                   )}
+                  {runs.length > 1 && (
+                    <label className="check inline">
+                      <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> Superponer las{' '}
+                      {runs.length} corridas
+                    </label>
+                  )}
                   <div className="trace-chips">
                     {chosen.map((v) => (
                       <button key={v.name} className="chip" onClick={() => setTraces((t) => t.filter((x) => x !== v.name))} title="Quitar">
@@ -448,7 +488,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               <button className="close" onClick={() => setSim(null)} title="Cerrar resultados">✕</button>
             </div>
             <div className="results-body">
-              {panel === 'plot' && plot && scale && chosen.length > 0 && <Plot plot={plot} vectors={chosen} view={view} />}
+              {panel === 'plot' && plot && scale && chosen.length > 0 && (
+                <Plot plot={plot} vectors={chosen} view={view} runs={overlay ? runs : undefined} />
+              )}
               {panel === 'plot' && plot && scale && chosen.length === 0 && (
                 <p className="empty pad">Hacé click en un cable para ver su tensión, o en un componente para ver su corriente.</p>
               )}
@@ -490,6 +532,39 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             setDialog(null);
             if (dialog.index !== undefined) commit(setText(doc, dialog.index, { text, kind }));
             else setTool({ kind: 'text', text, textKind: kind });
+          }}
+        />
+      )}
+      {dialog?.kind === 'sim' && (
+        <SimulationDialog
+          initial={dialog.found?.value ?? null}
+          info={circuitInfo()}
+          onClose={() => setDialog(null)}
+          onApply={(line, ngspiceOnly) => {
+            setDialog(null);
+            if (dialog.found) commit(replaceAnalysis(doc, dialog.found, line, ngspiceOnly));
+            else setTool({ kind: 'text', text: line, textKind: ngspiceOnly ? 'comment' : 'directive' });
+          }}
+        />
+      )}
+      {dialog?.kind === 'control' && (
+        <ControlDialog
+          initial={dialog.index >= 0 ? controlBody(doc.texts[dialog.index].text.split('\\n').join('\n')) : 'run\n'}
+          onClose={() => setDialog(null)}
+          onRemove={
+            dialog.index >= 0
+              ? () => {
+                  setDialog(null);
+                  commit(deleteItems(doc, [{ kind: 'text', index: dialog.index }]));
+                }
+              : undefined
+          }
+          onApply={(body) => {
+            setDialog(null);
+            // En el archivo los saltos de línea son "\n" literales; se guarda como comentario
+            const text = controlBlock(body).split('\n').join('\\n');
+            if (dialog.index >= 0) commit(setText(doc, dialog.index, { text, kind: 'comment' }));
+            else setTool({ kind: 'text', text, textKind: 'comment' });
           }}
         />
       )}

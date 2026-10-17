@@ -108,6 +108,28 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   }
   const mv = (p: Point) => ({ x: p.x + dx, y: p.y + dy });
 
+  // Conexiones directas (pin con pin, etiqueta sobre pin) sin cable que estirar: como el
+  // "drag" de LTspice, se agrega un cable en L para que sigan conectadas
+  const extra: Wire[] = [];
+  if (drag) {
+    const stay = new Set<string>();
+    doc.symbols.forEach((sym, i) => !s.has(i) && pinPoints(sym, lib.symbol(sym.type)).forEach((p) => stay.add(key(p))));
+    doc.flags.forEach((fl, i) => !f.has(i) && stay.add(key(fl)));
+    const wireEnds = new Set(doc.wires.flatMap((wr) => ends(wr).map(key)));
+    const done = new Set<string>();
+    const moved: Point[] = [];
+    doc.symbols.forEach((sym, i) => s.has(i) && moved.push(...pinPoints(sym, lib.symbol(sym.type))));
+    doc.flags.forEach((fl, i) => f.has(i) && moved.push(fl));
+    for (const p of moved) {
+      const k = key(p);
+      if (!stay.has(k) || wireEnds.has(k) || done.has(k)) continue;
+      done.add(k);
+      const corner = { x: p.x + dx, y: p.y };
+      if (dx) extra.push({ x1: p.x, y1: p.y, x2: corner.x, y2: corner.y });
+      if (dy) extra.push({ x1: corner.x, y1: corner.y, x2: p.x + dx, y2: p.y + dy });
+    }
+  }
+
   return {
     ...doc,
     symbols: doc.symbols.map((sym, i) => (s.has(i) ? { ...sym, x: sym.x + dx, y: sym.y + dy } : sym)),
@@ -120,7 +142,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
       const na = moving.has(key(a)) ? mv(a) : a;
       const nb = moving.has(key(b)) ? mv(b) : b;
       return { x1: na.x, y1: na.y, x2: nb.x, y2: nb.y };
-    }),
+    }).concat(extra),
   };
 }
 

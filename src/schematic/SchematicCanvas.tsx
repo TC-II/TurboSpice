@@ -5,6 +5,7 @@ import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
+import { isNgspiceComment } from '../netlist/directives.ts';
 import { flagDirection, fontSize, pinPoints, sameRef, type ItemRef } from './geometry.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
@@ -74,11 +75,13 @@ export function ShapeView({ s }: { s: Shape }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hideLabels }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
   selected?: boolean;
+  /** sin rótulos (miniaturas) */
+  hideLabels?: boolean;
 }) {
   const skin = lib.skin(inst.type);
   const cls = `sym${selected ? ' sel' : ''}${def ? '' : ' missing'}`;
@@ -93,7 +96,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected }:
   const attrs = effectiveAttrs(inst, def);
   const prefix = attrs.get('Prefix') ?? '';
   const labels: ReactNode[] = [];
-  for (const [idx, w] of effectiveWindows(inst, def, lib.windowDefaults)) {
+  for (const [idx, w] of hideLabels ? [] : effectiveWindows(inst, def, lib.windowDefaults)) {
     const key = WINDOW_ATTR[idx];
     if (!key) continue;
     if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(prefix)) continue;
@@ -212,10 +215,13 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="loose">{loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((t, i) => (
-          <g key={i} className={`${t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}>
+          <g
+            key={i}
+            className={`${t.kind === 'comment' && isNgspiceComment(t.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}
+          >
             {t.text.split('\\n').map((line, j) => (
               <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
-                {t.kind === 'directive' ? line : line}
+                {line}
               </AlignedText>
             ))}
           </g>

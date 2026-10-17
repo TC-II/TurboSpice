@@ -68,3 +68,33 @@ export function si(x: number, digits = 4): string {
   const e = Math.min(4, Math.max(-5, Math.floor(Math.log10(Math.abs(x)) / 3)));
   return `${parseFloat((x / 10 ** (3 * e)).toPrecision(digits))}${SI[e + 5]}`;
 }
+
+/** Interpola linealmente (xs, ys) en los puntos xd (xs creciente). Fuera de rango: NaN */
+export function resample(xs: Float64Array, ys: Float64Array, xd: Float64Array): Float64Array {
+  const out = new Float64Array(xd.length);
+  let j = 0;
+  for (let i = 0; i < xd.length; i++) {
+    const x = xd[i];
+    if (x < xs[0] || x > xs[xs.length - 1]) {
+      out[i] = NaN;
+      continue;
+    }
+    while (j < xs.length - 2 && xs[j + 1] < x) j++;
+    const x0 = xs[j];
+    const x1 = xs[j + 1] ?? x0;
+    out[i] = x1 === x0 ? ys[j] : ys[j] + ((ys[j + 1] - ys[j]) * (x - x0)) / (x1 - x0);
+  }
+  return out;
+}
+
+/**
+ * Corridas del mismo análisis que conviene superponer (tran1, tran2… generadas por un
+ * barrido en .control). Devuelve [plot] si no hay otras o si el eje no es monótono.
+ */
+export function sameRuns(plots: SimPlot[], plot: SimPlot): SimPlot[] {
+  const m = /^([a-z]+)\d+$/i.exec(plot.name);
+  const sc = scaleOf(plot);
+  if (!m || !sc || sc.name.endsWith('-sweep')) return [plot];
+  const runs = plots.filter((p) => new RegExp(`^${m[1]}\\d+$`, 'i').test(p.name) && scaleOf(p)?.name === sc.name);
+  return runs.length > 1 ? runs : [plot];
+}

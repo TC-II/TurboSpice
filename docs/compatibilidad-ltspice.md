@@ -55,6 +55,14 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   `NMOS`/`PMOS` + `standard.mos`; `NJF`/`PJF` + `standard.jft`.
 - Comentarios `;x` → `* x`; directivas multilínea se separan; al final `.backanno` y `.end`.
 
+## Directivas que sólo tiene ngspice
+
+El bloque `.control … .endc` y los análisis `.pz`, `.sens`, `.disto`, `.sp` y `.pss` no existen en
+LTspice. Se guardan como **comentario** (`TEXT … ;.control\n…`): LTspice los muestra como comentario y
+los ignora, así que el `.asc` sigue simulando igual en LTspice; TurboSpice reconoce los comentarios que
+empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta). Un comentario común como
+`;.step …` sigue siendo un comentario.
+
 ## Traducción a ngspice (lo implícito de LTspice, explícito)
 
 | LTspice | ngspice |

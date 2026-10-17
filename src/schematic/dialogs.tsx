@@ -6,7 +6,7 @@ import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
 import { SymbolView } from './SchematicCanvas.tsx';
 
-function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose(): void; wide?: boolean }) {
+export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose(): void; wide?: boolean }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
@@ -22,15 +22,21 @@ function Modal({ title, children, onClose, wide }: { title: string; children: Re
   );
 }
 
-function SymbolPreview({ path, lib }: { path: string; lib: Library }) {
+/** Dibujo del símbolo (cuerpo, sin rótulos salvo `labels`), ajustado a su caja */
+function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Library; className: string; labels?: boolean }) {
   const def = lib.symbol(path);
-  if (!def) return null;
+  if (!def) return <svg className={className} />;
   const b = localBox(def, lib.skin(path)?.viewBox);
-  const pad = 24;
+  const pad = Math.max(8, 0.12 * Math.max(b.x2 - b.x1, b.y2 - b.y1));
   const inst: SymbolInst = { type: path, x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map() };
   return (
-    <svg className="symbol-preview" viewBox={`${b.x1 - pad} ${b.y1 - pad} ${b.x2 - b.x1 + 2 * pad} ${b.y2 - b.y1 + 2 * pad}`}>
-      <SymbolView inst={inst} def={def} lib={lib} />
+    <svg className={`schematic-mini ${className}`} viewBox={`${b.x1 - pad} ${b.y1 - pad} ${b.x2 - b.x1 + 2 * pad} ${b.y2 - b.y1 + 2 * pad}`}>
+      <g className="schematic">
+        <SymbolView inst={inst} def={def} lib={lib} hideLabels={!labels} />
+        {def.pins.map((p, i) => (
+          <circle key={i} cx={p.x} cy={p.y} r={2.5} className="pin-dot" />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -76,15 +82,22 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
                 onPointerEnter={() => setSel(i)}
                 onClick={() => onPick(it.path)}
               >
-                <span className="path">{it.path}</span>
-                <span className="desc">{it.desc}</span>
+                <SymbolPreview path={it.path} lib={lib} className="thumb" />
+                <span className="path">{it.path.split('/').pop()}</span>
+                <span className="desc">{it.path.includes('/') ? `${it.path.split('/').slice(0, -1).join('/')} · ` : ''}{it.desc}</span>
               </li>
             ))}
           </ul>
         </div>
         <div className="picker-preview">
-          {current && <SymbolPreview path={current.path} lib={lib} />}
+          {current && <SymbolPreview path={current.path} lib={lib} className="big" labels />}
+          {current && <strong>{current.path}</strong>}
           {current && <p>{current.desc}</p>}
+          {current && (
+            <p className="pins">
+              Pines: {lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
+            </p>
+          )}
         </div>
       </div>
     </Modal>

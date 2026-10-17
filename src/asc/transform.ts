@@ -41,6 +41,14 @@ export function transformAlign(align: string, o: Orient): string {
   return isMirrored(o) ? (MIRROR[a] ?? a) : a;
 }
 
+/** Alineaciones de texto de LTspice (sin Invisible) */
+export const ALIGNS = ['Left', 'Center', 'Right', 'Top', 'Bottom', 'VLeft', 'VCenter', 'VRight', 'VTop', 'VBottom'] as const;
+
+/** Inversa de transformAlign: alineación vista en el esquemático → la que va en el WINDOW */
+export function localAlign(world: string, o: Orient): string {
+  return ALIGNS.find((a) => transformAlign(a, o) === world) ?? world;
+}
+
 /** Componer: aplicar `next` a un símbolo que ya tiene orientación `o` (rotar/espejar en el editor) */
 export function rotateCW(o: Orient): Orient {
   // Rotar el resultado visual 90° horario. Con espejo, la rotación visual horaria

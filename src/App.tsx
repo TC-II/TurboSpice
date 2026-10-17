@@ -28,7 +28,7 @@ import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagDir, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -57,7 +57,7 @@ const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rec
 
 type Dialog =
   | { kind: 'picker' }
-  | { kind: 'attrs'; index: number }
+  | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point }
   | { kind: 'sim'; found: FoundLine | null }
@@ -1093,6 +1093,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             selection={selection}
             setSelection={setSelection}
             onEdit={editItem}
+            onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             highlightNet={traceNet}
             netNames={shownNets}
@@ -1309,10 +1310,16 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         <AttributeDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}
+          windowDefaults={lib.windowDefaults}
+          focusLabel={dialog.label}
+          others={selection.filter((r) => r.kind === 'symbol' && r.index !== dialog.index).length}
           onClose={() => setDialog(null)}
-          onApply={(attrs) => {
+          onApply={(attrs, labels, toSelection) => {
             setDialog(null);
-            if (Object.keys(attrs).length) commit(setSymbolAttrs(doc, dialog.index, attrs));
+            let d = Object.keys(attrs).length ? setSymbolAttrs(doc, dialog.index, attrs) : doc;
+            const syms = toSelection ? [dialog.index, ...selection.filter((r) => r.kind === 'symbol' && r.index !== dialog.index).map((r) => r.index)] : [dialog.index];
+            d = patchLabels(d, syms, labels, lib);
+            if (d !== doc) commit(d);
           }}
         />
       )}
@@ -1421,10 +1428,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
+          dir={dialog.index !== undefined ? (doc.flags[dialog.index].dir ?? null) : undefined}
           onClose={() => setDialog(null)}
-          onApply={(name) => {
+          onApply={(name, dir) => {
             setDialog(null);
-            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
+            if (dialog.index !== undefined) {
+              let d = setFlagName(doc, dialog.index, name);
+              if (dir !== undefined) d = setFlagDir(d, dialog.index, name === '0' ? undefined : (dir ?? undefined));
+              commit(d);
+            }
             else if (dialog.at) commit(addFlag(doc, dialog.at, name));
             else setTool({ kind: 'flag', name });
           }}

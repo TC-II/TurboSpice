@@ -1,7 +1,9 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
-import { effectiveAttrs } from '../asc/resolve.ts';
+import { baseName, WINDOW_ATTR, type FlagDir, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
+import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
+import { ALIGNS, transformAlign } from '../asc/transform.ts';
+import type { LabelPatch } from './edit.ts';
 import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
 import { LONG_LINK } from './share.ts';
@@ -137,10 +139,63 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
 }
 
 /** Atributos de un componente (InstName, Value, SpiceLine…) */
-export function AttributeDialog({ inst, def, onApply, onClose }: {
+// Nombres de LTspice entre paréntesis: el texto queda del lado opuesto al ancla (Top = el punto arriba)
+const ALIGN_LABEL: Record<string, string> = {
+  Left: 'Izquierda (Left)',
+  Center: 'Centro (Center)',
+  Right: 'Derecha (Right)',
+  Top: 'Arriba (Top)',
+  Bottom: 'Abajo (Bottom)',
+  VLeft: 'Vertical izquierda (VLeft)',
+  VCenter: 'Vertical centro (VCenter)',
+  VRight: 'Vertical derecha (VRight)',
+  VTop: 'Vertical arriba (VTop)',
+  VBottom: 'Vertical abajo (VBottom)',
+};
+
+interface LabelRow {
+  win: number;
+  attr: string;
+  visible: boolean;
+  /** alineación tal como se ve en el esquemático */
+  align: string;
+  size: number;
+  /** distinto de lo que pone el símbolo (se puede volver a la posición por defecto) */
+  moved: boolean;
+}
+
+const sameWin = (a: TextWindow | undefined, b: TextWindow | undefined) =>
+  !!a && !!b && a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;
+
+/** Rótulos del componente que muestran un atributo (InstName, Value…), en orden de WINDOW */
+export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: WindowDefaults): LabelRow[] {
+  if (!def) return [];
+  const eff = effectiveWindows(inst, def, table);
+  const dflt = defaultWindows(def, inst.orient, table);
+  const attrs = effectiveAttrs(inst, def);
+  const rows: LabelRow[] = [];
+  for (const [win, w] of [...eff].sort((a, b) => a[0] - b[0])) {
+    const attr = WINDOW_ATTR[win];
+    if (!attr || !attrs.has(attr)) continue;
+    const d = dflt.get(win);
+    const hidden = w.align === 'Invisible';
+    // un rótulo oculto se muestra con la alineación por defecto
+    const local = hidden ? (d && d.align !== 'Invisible' ? d.align : 'Left') : w.align;
+    rows.push({ win, attr, visible: !hidden, align: transformAlign(local, inst.orient), size: w.size, moved: !sameWin(w, d) });
+  }
+  return rows;
+}
+
+/** Atributos de un componente y, por rótulo, ocultar/mostrar, alineación, tamaño y posición por defecto */
+export function AttributeDialog({ inst, def, windowDefaults, focusLabel, others = 0, onApply, onClose }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
-  onApply(attrs: Record<string, string>): void;
+  windowDefaults: WindowDefaults;
+  /** rótulo desde el que se abrió (botón derecho o doble click sobre el texto) */
+  focusLabel?: number;
+  /** otros componentes seleccionados a los que se pueden aplicar los mismos cambios de rótulos */
+  others?: number;
+  onApply(attrs: Record<string, string>, labels: Map<number, LabelPatch>, toSelection: boolean): void;
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
@@ -148,18 +203,35 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
     (k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine',
   );
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
+  const [rows, setRows] = useState(() => labelRows(inst, def, windowDefaults));
+  const [patches, setPatches] = useState(new Map<number, LabelPatch>());
+  const [toSelection, setToSelection] = useState(false);
   const first = useRef<HTMLInputElement>(null);
+  const focusRow = useRef<HTMLSelectElement>(null);
   useEffect(() => {
+    if (focusLabel !== undefined && focusRow.current) return focusRow.current.focus();
     first.current?.focus();
     first.current?.select();
   }, []);
   const prefix = eff.get('Prefix') ?? '';
   const check = checkValue(prefix, vals.Value ?? '');
+  const patch = (win: number, p: LabelPatch, row: Partial<LabelRow>) => {
+    setPatches(new Map(patches).set(win, { ...patches.get(win), ...p }));
+    setRows(rows.map((r) => (r.win === win ? { ...r, ...row, moved: true } : r)));
+  };
+  const reset = (win: number) => {
+    // vuelve a lo del símbolo: se descartan los cambios hechos a ese rótulo en el diálogo
+    const d = def && defaultWindows(def, inst.orient, windowDefaults).get(win);
+    if (!d) return;
+    setPatches(new Map(patches).set(win, { reset: true }));
+    const hidden = d.align === 'Invisible';
+    setRows(rows.map((r) => (r.win === win ? { ...r, visible: !hidden, align: hidden ? r.align : transformAlign(d.align, inst.orient), size: d.size, moved: false } : r)));
+  };
   const submit = () => {
     const out = { ...vals, ...(vals.Value !== undefined ? { Value: check.value } : {}) };
     // Sólo se guardan los que cambiaron respecto al valor efectivo
     const changed = Object.fromEntries(Object.entries(out).filter(([k, v]) => v !== (eff.get(k) ?? '')));
-    onApply(changed);
+    onApply(changed, patches, toSelection);
   };
   return (
     <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose}>
@@ -183,6 +255,50 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
           </label>
         ))}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
+        {rows.length > 0 && (
+          <fieldset className="labels">
+            <legend>Rótulos</legend>
+            {rows.map((r) => (
+              <div key={r.win} className={`label-row${r.win === focusLabel ? ' focus' : ''}`}>
+                <label className="label-vis" title="Mostrar u ocultar el rótulo (WINDOW … Invisible)">
+                  <input type="checkbox" checked={r.visible} onChange={(e) => patch(r.win, { visible: e.target.checked }, { visible: e.target.checked })} />
+                  <span>{r.attr}</span>
+                </label>
+                <select
+                  ref={r.win === focusLabel ? focusRow : undefined}
+                  aria-label={`Alineación de ${r.attr}`}
+                  value={r.align}
+                  disabled={!r.visible}
+                  onChange={(e) => patch(r.win, { align: e.target.value }, { align: e.target.value })}
+                >
+                  {ALIGNS.map((a) => (
+                    <option key={a} value={a}>{ALIGN_LABEL[a]}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label={`Tamaño de ${r.attr}`}
+                  title="Tamaño (0–7)"
+                  value={r.size}
+                  onChange={(e) => patch(r.win, { size: Number(e.target.value) }, { size: Number(e.target.value) })}
+                >
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                <button type="button" disabled={!r.moved} onClick={() => reset(r.win)} title="Borra el WINDOW explícito: el rótulo vuelve a donde lo pone el símbolo">
+                  Por defecto
+                </button>
+              </div>
+            ))}
+            {others > 0 && (
+              <label className="label-all">
+                <input type="checkbox" checked={toSelection} onChange={(e) => setToSelection(e.target.checked)} />
+                <span>Aplicar los cambios de rótulos también a {others === 1 ? 'el otro componente seleccionado' : `los otros ${others} componentes seleccionados`}</span>
+              </label>
+            )}
+            <p className="hint">Los rótulos también se arrastran con el mouse (snap a 8 unidades; Shift: libre).</p>
+          </fieldset>
+        )}
         <div className="buttons">
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="submit" className="primary">Aceptar</button>
@@ -238,8 +354,23 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
 }
 
 /** F4: nombre de red (o tierra) */
-export function FlagDialog({ initial, onApply, onClose }: { initial: string; onApply(name: string): void; onClose(): void }) {
+/** Lado del texto de una etiqueta → desde dónde se considera que llega el cable (Flag.dir) */
+const FLAG_SIDES: { dir: FlagDir; label: string }[] = [
+  { dir: 'top', label: 'Abajo' },
+  { dir: 'bottom', label: 'Arriba' },
+  { dir: 'left', label: 'A la derecha' },
+  { dir: 'right', label: 'A la izquierda' },
+];
+
+export function FlagDialog({ initial, dir, onApply, onClose }: {
+  initial: string;
+  /** lado del texto de una etiqueta existente: elegido a mano, o null = automático (según el cable) */
+  dir?: FlagDir | null;
+  onApply(name: string, dir?: FlagDir | null): void;
+  onClose(): void;
+}) {
   const [name, setName] = useState(initial);
+  const [side, setSide] = useState<FlagDir | null>(dir ?? null);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -251,13 +382,24 @@ export function FlagDialog({ initial, onApply, onClose }: { initial: string; onA
         className="attrs"
         onSubmit={(e) => {
           e.preventDefault();
-          if (name.trim()) onApply(name.trim());
+          if (name.trim()) onApply(name.trim(), side);
         }}
       >
         <label>
           <span>Nombre</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
+        {dir !== undefined && name !== '0' && (
+          <label>
+            <span>Texto</span>
+            <select value={side ?? ''} onChange={(e) => setSide((e.target.value || null) as FlagDir | null)}>
+              <option value="">Automático (según el cable)</option>
+              {FLAG_SIDES.map((s) => (
+                <option key={s.dir} value={s.dir}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="buttons">
           <button type="button" onClick={() => onApply('0')}>Tierra (0)</button>
           <button type="button" onClick={onClose}>Cancelar</button>

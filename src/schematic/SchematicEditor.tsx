@@ -4,8 +4,9 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindow } from './edit.ts';
-import { inverseOffset } from '../asc/transform.ts';
+import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindows } from './edit.ts';
+import { inverseOffset, toWorld } from '../asc/transform.ts';
+import { effectiveWindows } from '../asc/resolve.ts';
 import type { TextWindow } from '../asc/model.ts';
 import {
   boxesIntersect,
@@ -14,9 +15,11 @@ import {
   labelAt,
   pinPoints,
   snap,
+  snapLabel,
   snapPoint,
   symbolBox,
   textBox,
+  sameRef,
   type Box,
   type ItemRef,
 } from './geometry.ts';
@@ -57,6 +60,8 @@ interface Props {
   selection: ItemRef[];
   setSelection(s: ItemRef[]): void;
   onEdit(ref: ItemRef): void;
+  /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
+  onEditLabel?(sym: number, win: number): void;
   onProbe?(ref: { net?: string; symbol?: number }): void;
   highlightNet?: string;
   /** etiquetas temporales con los nombres de las redes */
@@ -86,8 +91,11 @@ type Drag =
   | { mode: 'pan'; sx: number; sy: number; view: View }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
-  /** arrastrar un rótulo (InstName/Value) de un símbolo */
-  | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
+  /**
+   * arrastrar un rótulo (InstName/Value) de un símbolo; si su componente está seleccionado junto
+   * con otros, el mismo rótulo de todos. `at` es el ancla de cada uno en el esquemático.
+   */
+  | { mode: 'label'; start: Point; sym: number; shift: boolean; items: { sym: number; win: number; w: TextWindow; at: Point }[]; moved: boolean };
 
 function docBox(doc: AscDoc, lib: Library): Box | null {
   const boxes: Box[] = [];
@@ -132,7 +140,7 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, pickValue, onPicked } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, pickValue, onPicked } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -141,6 +149,8 @@ export function SchematicEditor(props: Props) {
   const [preview, setPreview] = useState<AscDoc | null>(null);
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
+  /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
+  const [hoverLabel, setHoverLabel] = useState<number | undefined>();
   const [labelNet, setLabelNet] = useState<string | undefined>();
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
@@ -276,6 +286,8 @@ export function SchematicEditor(props: Props) {
       if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
       else if (tool.kind !== 'select') setTool({ kind: 'select' });
       else {
+        const label = labelAt(doc, p, lib, tol);
+        if (label && onEditLabel) return onEditLabel(label.sym, label.win);
         const hit = hitTest(doc, p, lib, tol);
         if (hit) onEdit(hit);
       }
@@ -285,10 +297,18 @@ export function SchematicEditor(props: Props) {
 
     switch (tool.kind) {
       case 'select': {
-        // un rótulo de un componente ya seleccionado se arrastra solo (como en LTspice)
+        // un rótulo se arrastra directamente; con su componente seleccionado junto a otros, se
+        // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
         const label = labelAt(doc, p, lib, tol);
-        if (label && selection.some((r) => r.kind === 'symbol' && r.index === label.sym) && !e.shiftKey) {
-          setDrag({ mode: 'label', start: p, sym: label.sym, win: label.win, w: label.w, moved: false });
+        if (label) {
+          const selSyms = selection.filter((r) => r.kind === 'symbol').map((r) => r.index);
+          const syms = selSyms.includes(label.sym) ? selSyms : [label.sym];
+          const items = syms.flatMap((si) => {
+            const inst = doc.symbols[si];
+            const w = si === label.sym ? label.w : effectiveWindows(inst, lib.symbol(inst.type), lib.windowDefaults).get(label.win);
+            return w && w.align !== 'Invisible' ? [{ sym: si, win: label.win, w, at: toWorld(inst, w.x, w.y) }] : [];
+          });
+          setDrag({ mode: 'label', start: p, sym: label.sym, shift: e.shiftKey, items, moved: false });
           return;
         }
         // clicks repetidos en el mismo lugar alternan entre elementos superpuestos
@@ -380,6 +400,8 @@ export function SchematicEditor(props: Props) {
     }
     const p = toDoc(e);
     setCursor(p);
+    const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
+    if (lh !== hoverLabel) setHoverLabel(lh);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
     if (tool.kind === 'probe') setHoverNet(target?.net);
     if (tool.kind === 'pick') {
@@ -397,11 +419,18 @@ export function SchematicEditor(props: Props) {
     if (drag.mode === 'pan') {
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
     } else if (drag.mode === 'label') {
-      const inst = doc.symbols[drag.sym];
-      const d = inverseOffset(p.x - drag.start.x, p.y - drag.start.y, inst.orient);
-      const w = { ...drag.w, x: Math.round(drag.w.x + d.x), y: Math.round(drag.w.y + d.y) };
-      if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > tol) setDrag({ ...drag, moved: true });
-      setPreview(setWindow(doc, drag.sym, drag.win, w));
+      // snap del ancla a la grilla de 8; Shift: libre
+      const dx = p.x - drag.start.x;
+      const dy = p.y - drag.start.y;
+      const free = e.shiftKey;
+      const edits = drag.items.map((it) => {
+        const inst = doc.symbols[it.sym];
+        const to = free ? { x: Math.round(it.at.x + dx), y: Math.round(it.at.y + dy) } : { x: snapLabel(it.at.x + dx), y: snapLabel(it.at.y + dy) };
+        const d = inverseOffset(to.x - inst.x, to.y - inst.y, inst.orient);
+        return { sym: it.sym, win: it.win, w: { ...it.w, x: d.x, y: d.y } };
+      });
+      if (!drag.moved && Math.hypot(dx, dy) > tol) setDrag({ ...drag, moved: true });
+      setPreview(setWindows(doc, edits));
     } else if (drag.mode === 'move') {
       const g = snapPoint(p);
       const dx = g.x - drag.start.x;
@@ -424,6 +453,12 @@ export function SchematicEditor(props: Props) {
     }
     if (!drag) return;
     if ((drag.mode === 'move' || drag.mode === 'label') && preview && drag.moved) commit(preview);
+    if (drag.mode === 'label' && !drag.moved) {
+      // click sobre un rótulo sin moverlo: selecciona su componente (Shift: agrega/quita)
+      const ref: ItemRef = { kind: 'symbol', index: drag.sym };
+      const already = selection.some((r) => sameRef(r, ref));
+      setSelection(drag.shift ? (already ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref]) : already ? selection : [ref]);
+    }
     if (drag.mode === 'box' && boxEnd) {
       const b = {
         x1: Math.min(drag.start.x, boxEnd.x),
@@ -442,6 +477,8 @@ export function SchematicEditor(props: Props) {
 
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool.kind !== 'select') return;
+    const label = labelAt(doc, toDoc(e), lib, tol);
+    if (label && onEditLabel) return onEditLabel(label.sym, label.win);
     const hit = hitTest(doc, toDoc(e), lib, tol);
     if (hit) onEdit(hit);
   };
@@ -472,7 +509,7 @@ export function SchematicEditor(props: Props) {
   }, [tool, g.x, g.y, lib]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
-  const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
+  const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : hoverLabel !== undefined ? 'label' : '') : tool.kind;
 
   return (
     <>
@@ -502,6 +539,7 @@ export function SchematicEditor(props: Props) {
         conn={conn}
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
+        hoverSymbol={hoverLabel}
       />
       <g className="ghost">{ghost}</g>
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}

@@ -1,11 +1,14 @@
 // Geometría del esquemático: cajas de símbolos, detección bajo el cursor, grilla.
-import { GRID, WINDOW_ATTR, type AscDoc, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
+import { GRID, WINDOW_ATTR, type AscDoc, type FlagDir, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 export const snapPoint = (p: Point): Point => ({ x: snap(p.x), y: snap(p.y) });
+/** Grilla de los rótulos de texto (media grilla de LTspice) */
+export const LABEL_GRID = 8;
+export const snapLabel = (v: number) => Math.round(v / LABEL_GRID) * LABEL_GRID;
 
 export interface Box {
   x1: number;
@@ -120,7 +123,8 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): It
 }
 
 /** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
-export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' | 'right' {
+export function flagDirection(doc: AscDoc, f: Point & { dir?: FlagDir }): FlagDir {
+  if (f.dir) return f.dir;
   const dirs = new Set<string>();
   for (const w of doc.wires) {
     for (const [a, b] of [
@@ -134,7 +138,7 @@ export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' 
       else if (b.x > a.x) dirs.add('right');
     }
   }
-  if (dirs.size <= 1) return (dirs.values().next().value as 'top' | 'bottom' | 'left' | 'right') ?? 'top';
+  if (dirs.size <= 1) return (dirs.values().next().value as FlagDir) ?? 'top';
   if (!dirs.has('top')) return 'bottom';
   if (!dirs.has('bottom')) return 'top';
   if (!dirs.has('left')) return 'right';
@@ -145,7 +149,7 @@ export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' 
  * Caja de una etiqueta o tierra, según hacia dónde queda el dibujo (opuesto al cable):
  * la tierra ocupa ±18 × 14 unidades; una etiqueta, su punto y el texto.
  */
-export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }): Box {
+export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string; dir?: FlagDir }): Box {
   const dir = flagDirection(doc, f);
   // Caja local con el dibujo hacia +y (cable desde arriba), luego rotada según la dirección
   let local: Box;

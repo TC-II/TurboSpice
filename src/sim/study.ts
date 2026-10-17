@@ -7,6 +7,7 @@
 //  - los valores de los componentes barridos ({R1}) o con tolerancia ({mc(1k,0.05)});
 //  - el bloque .control (comentario) si hay un paso personalizado.
 // Al abrir un archivo se reconstruyen las tarjetas a partir de eso, aunque venga de LTspice.
+import { belowTexts, dataText, DATA_TAGS, isDataTextOf, readData } from '../asc/dataText.ts';
 import type { AscDoc, SchText } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { controlHooks, HOOK_MARKS, isControlBlock } from '../netlist/directives.ts';
@@ -119,20 +120,8 @@ export interface Study {
 }
 
 /** Comentario del .asc que guarda el programa de bloques (base64 del JSON) */
-export const STUDY_BLOCKS = '.study ';
-export const isStudyBlocksText = (t: { kind: string; text: string }) => t.kind === 'comment' && t.text.startsWith(STUDY_BLOCKS);
-
-function toBase64(json: string): string {
-  const bytes = new TextEncoder().encode(json);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-
-function fromBase64(b64: string): string {
-  const bin = atob(b64);
-  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-}
+export const STUDY_BLOCKS = DATA_TAGS.study;
+export const isStudyBlocksText = (t: { kind: string; text: string }) => isDataTextOf(t, 'study');
 
 export const emptyStudy = (): Study => ({ sweeps: [], tolerance: null, measures: [], custom: null });
 
@@ -397,14 +386,9 @@ export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
     st.sweeps.push({ target, mode, list, start: nums[0] ?? '', stop: nums[1] ?? '', step: nums[2] ?? '', enabled: l.enabled, original });
   }
   st.measures.push(...measureFromDefs(measDefs));
-  const blocks = doc.texts.find(isStudyBlocksText);
-  if (blocks) {
-    try {
-      st.blocks = JSON.parse(fromBase64(blocks.text.slice(STUDY_BLOCKS.length).trim()));
-    } catch {
-      // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
-    }
-  }
+  // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
+  const blocks = readData(doc, 'study');
+  if (blocks !== undefined) st.blocks = blocks;
   const control = doc.texts.find((t) => isControlBlock(t.text));
   if (control) {
     const body = control.text.split('\\n').slice(1, -1);
@@ -459,12 +443,6 @@ function stripStudy(doc: AscDoc, swept: Set<string>, keepControl: boolean): { te
     }
   }
   return { texts, anchor };
-}
-
-/** Ubicación para textos nuevos: debajo de los existentes */
-function belowTexts(doc: AscDoc): { x: number; y: number } {
-  const ys = doc.texts.map((t) => t.y + t.text.split('\\n').length * 24);
-  return { x: doc.texts[0]?.x ?? 0, y: ys.length ? Math.max(...ys) + 16 : 0 };
 }
 
 /**
@@ -544,6 +522,6 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
     }
   }
   // programa de bloques: texto chico (tamaño 0) debajo de todo; TurboSpice no lo dibuja
-  if (st.blocks) texts.push({ x: at.x, y: y + 32, align: 'Left', size: 0, kind: 'comment', text: STUDY_BLOCKS + toBase64(JSON.stringify(st.blocks)) });
+  if (st.blocks) texts.push(dataText('study', st.blocks, { x: at.x, y: y + 32 }));
   return { ...out, texts };
 }

@@ -252,6 +252,10 @@ check(png.name === 'Bode RLC.png' && png.text.length > 1000, 'gráfico a PNG');
 
 await page.getByRole('button', { name: 'Recordar vista' }).click();
 check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'recordar la vista');
+await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
+check(await page.getByRole('button', { name: 'Recordar vista' }).isVisible(), 'deshacer revierte "Recordar vista" (la vista va dentro del .asc)');
+await page.getByRole('button', { name: 'Rehacer', exact: true }).click();
+check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'rehacer la vista recordada');
 for (let k = 0; k < 2; k++) await page.locator('.trace-chip .x').first().click();
 check((await page.locator('.trace-chip').count()) === 0, 'quitar las trazas');
 await page.getByRole('button', { name: 'Simular' }).click();
@@ -267,8 +271,25 @@ await page.locator('input[type=file][accept=".plt"]').setInputFiles({
 await page.locator('.pane').nth(1).waitFor();
 check((await page.locator('.pane').count()) === 2 && (await paneChips(1)).join() === 'V(n002)', `importar un .plt de LTspice aplica sus paneles (${await paneChips(0)} | ${await paneChips(1)})`);
 await page.getByRole('button', { name: 'Compartir' }).click();
-check((await page.locator('.modal input[aria-label="Link"]').inputValue()).includes('&v='), 'el link para compartir incluye la vista');
+const viewLink = await page.locator('.modal input[aria-label="Link"]').inputValue();
+check(!viewLink.includes('&v='), 'el link ya no lleva la vista aparte (va dentro del .asc)');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
+{
+  // #26: el link (o el .asc) abierto en otro navegador trae la vista y se aplica al simular
+  const other = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await skipWelcome(other);
+  const op = await other.newPage();
+  watch(op);
+  await op.goto(viewLink);
+  await op.getByText('Listo').waitFor({ timeout: 30000 });
+  await op.locator('svg.editor .sym').first().waitFor();
+  check((await op.locator('svg.editor text', { hasText: '.plot ' }).count()) === 0, 'el comentario ;.plot no se dibuja');
+  await op.getByRole('button', { name: 'Simular' }).click();
+  await op.locator('.pane').nth(1).waitFor({ timeout: 30000 });
+  const chips = (i) => op.locator('.pane').nth(i).locator('.trace-chip .name').allTextContents();
+  check((await op.locator('.pane').count()) === 2 && (await chips(1)).join() === 'V(n002)', `en otro navegador, el link trae la vista (${await chips(0)} | ${await chips(1)})`);
+  await other.close();
+}
 
 const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar esquemático a SVG'));
 check(svgOut.name === 'Bode RLC.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);

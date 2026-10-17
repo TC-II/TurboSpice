@@ -154,3 +154,32 @@ TEXT 0 240 Left 2 !.tran 1m
 ${extra}
 `;
 }
+
+describe('vista de ploteo dentro del .asc (;.plot)', () => {
+  it('va y viene con el archivo, no cambia la netlist y sobrevive al Estudio', async () => {
+    const { serializeAsc } = await import('../../src/asc/serialize.ts');
+    const { asPlotView, viewFromDoc, withView } = await import('../../src/waveform/view.ts');
+    const { ltNetlistText } = await import('../../src/netlist/ltnetlist.ts');
+    const view = { tran: [{ traces: [{ expr: 'V(out)', color: '#e03131' }] }, { traces: [{ expr: 'I(R1)', hidden: true }] }], ac: [{ traces: [{ expr: 'V(out)/V(in)' }] }] };
+    expect(viewFromDoc(DOC)).toBeNull();
+    const doc = withView(DOC, view);
+    const text = serializeAsc(doc);
+    expect(text).toMatch(/^TEXT -?\d+ \d+ Left 0 ;\.plot [A-Za-z0-9+/=]+$/m);
+    const back = parseAsc(text);
+    expect(viewFromDoc(back)).toEqual(view);
+    // como en LTspice, el comentario queda como "* .plot …" en la netlist y no se ejecuta
+    const net = ltNetlistText(ltNetlist(back, lib)).split('\n');
+    expect(net.filter((l) => !l.startsWith('* .plot ')).join('\n')).toBe(ltNetlistText(ltNetlist(DOC, lib)));
+    expect(toNgspice(ltNetlist(back, lib), 't', { resolve: () => undefined }).text).not.toMatch(/^\.plot/m);
+    // reemplazar la vista no agrega otro texto; una vista vacía lo saca
+    const other = withView(back, { dc: [{ traces: [{ expr: 'V(out)' }] }] });
+    expect(other.texts.length).toBe(back.texts.length);
+    expect(withView(other, {}).texts).toEqual(DOC.texts);
+    // el Estudio no la pisa
+    const st = applyStudy(back, lib, { ...emptyStudy(), measures: [{ enabled: true, name: 'm', analysis: 'tran', kind: 'max', signal: 'V(out)' }] });
+    expect(viewFromDoc(st)).toEqual(view);
+    // JSON ajeno (links viejos, IndexedDB): se valida
+    expect(asPlotView({ tran: [{ traces: [{ expr: 'V(a)', x: 1 }, { nada: 1 }] }], ac: 'x' })).toEqual({ tran: [{ traces: [{ expr: 'V(a)' }] }] });
+    expect(asPlotView(null)).toBeNull();
+  });
+});

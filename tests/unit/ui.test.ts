@@ -52,3 +52,17 @@ describe('compartir con un link', () => {
     expect(await readShareHash('')).toBeNull();
   });
 });
+
+describe('valores amigables', () => {
+  it('4k7 → 4.7k, aviso de M (mili) y de valores no numéricos', async () => {
+    const { checkValue } = await import('../../src/schematic/dialogs.tsx');
+    expect(checkValue('R', '4k7')).toEqual({ value: '4.7k', info: '= 4.7kΩ' });
+    expect(checkValue('R', '4R7')).toEqual({ value: '4.7', info: '= 4.7Ω' });
+    expect(checkValue('C', '2u2 Rser=1')).toEqual({ value: '2.2u Rser=1', info: '= 2.2µF' });
+    expect(checkValue('R', '1M').info).toMatch(/mili/);
+    expect(checkValue('L', '{L0*2}')).toEqual({ value: '{L0*2}' });
+    expect(checkValue('R', 'R=V(a)/2')).toEqual({ value: 'R=V(a)/2' });
+    expect(checkValue('R', 'abc').warn).toMatch(/no parece/);
+    expect(checkValue('V', 'SINE(0 1 1k)')).toEqual({ value: 'SINE(0 1 1k)' });
+  });
+});

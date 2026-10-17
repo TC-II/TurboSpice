@@ -5,6 +5,29 @@ import { effectiveAttrs } from '../asc/resolve.ts';
 import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
 import { LONG_LINK } from './share.ts';
+import { fromRkm, parseSpiceNumber } from '../netlist/spicenum.ts';
+import { si } from '../waveform/series.ts';
+
+const UNITS: Record<string, string> = { R: 'Ω', C: 'F', L: 'H' };
+
+/**
+ * Valor de un R, C o L: normaliza la notación 4k7 → 4.7k y dice cómo se interpreta, o avisa
+ * si no parece un valor (las expresiones {…} y los parámetros "R=…" se aceptan tal cual).
+ */
+export function checkValue(prefix: string, value: string): { value: string; info?: string; warn?: string } {
+  const unit = UNITS[prefix.toUpperCase()];
+  if (!unit || !value.trim()) return { value };
+  const [first, ...rest] = value.trim().split(/\s+/);
+  const rkm = fromRkm(first);
+  const main = rkm ?? first;
+  const v = [main, ...rest].join(' ');
+  if (/^\{.*\}$/.test(main) || /=/.test(main)) return { value: v };
+  const x = parseSpiceNumber(main);
+  if (!Number.isFinite(x)) return { value: v, warn: `"${first}" no parece un valor numérico (ej.: 4.7k, 4k7, 10u, 1meg, {R})` };
+  // "1M" es mili en SPICE: avisar, es un error clásico
+  const milli = /^[\d.]+M$/.test(main) ? ' — ojo: M es mili; mega es "meg"' : '';
+  return { value: v, info: `= ${si(x, 4)}${unit}${milli}` };
+}
 import { SymbolView } from './SchematicCanvas.tsx';
 
 export function Modal({ title, children, onClose, wide, hidden }: {
@@ -130,9 +153,12 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
     first.current?.focus();
     first.current?.select();
   }, []);
+  const prefix = eff.get('Prefix') ?? '';
+  const check = checkValue(prefix, vals.Value ?? '');
   const submit = () => {
+    const out = { ...vals, ...(vals.Value !== undefined ? { Value: check.value } : {}) };
     // Sólo se guardan los que cambiaron respecto al valor efectivo
-    const changed = Object.fromEntries(Object.entries(vals).filter(([k, v]) => v !== (eff.get(k) ?? '')));
+    const changed = Object.fromEntries(Object.entries(out).filter(([k, v]) => v !== (eff.get(k) ?? '')));
     onApply(changed);
   };
   return (
@@ -153,6 +179,7 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
               spellCheck={false}
               onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
             />
+            {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
           </label>
         ))}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
@@ -274,6 +301,93 @@ export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose
           <button type="button" onClick={copy}>Copiar</button>
           <button type="button" className="primary" onClick={onClose}>Listo</button>
         </div>
+      </div>
+    </Modal>
+  );
+}
+
+const SHORTCUTS: [string, string][] = [
+  ['F2', 'Componente (buscador)'],
+  ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
+  ['G', 'Tierra'],
+  ['F3 · W', 'Cable (click derecho o Esc termina)'],
+  ['F4 · N', 'Etiqueta de red'],
+  ['S · T', 'Directiva SPICE · comentario'],
+  ['F5 · Supr', 'Borrar'],
+  ['F6', 'Duplicar la selección'],
+  ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
+  ['Ctrl+A', 'Seleccionar todo'],
+  ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
+  ['Ctrl+Z · Ctrl+Y', 'Deshacer · rehacer'],
+  ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
+  ['Click repetido', 'Alterna entre elementos superpuestos'],
+  ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
+  ['Rueda · botón medio · Espacio', 'Zoom · desplazar'],
+  ['Inicio', 'Ajustar a la vista'],
+  ['Alt+N', 'Mostrar los nombres de las redes'],
+  ['Alt+S · Alt+C', 'Comando de simulación · bloque .control'],
+  ['Ctrl+Enter', 'Simular'],
+  ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
+  ['?', 'Esta ayuda'],
+];
+
+export function HelpDialog({ onClose }: { onClose(): void }) {
+  return (
+    <Modal title="Atajos de teclado" onClose={onClose} wide>
+      <table className="shortcuts">
+        <tbody>
+          {SHORTCUTS.map(([k, d]) => (
+            <tr key={k}>
+              <th>
+                {k.split(' · ').map((x, i) => (
+                  <span key={i}>
+                    {i > 0 && ' · '}
+                    <kbd>{x}</kbd>
+                  </span>
+                ))}
+              </th>
+              <td>{d}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="hint">En táctil: pellizcar para zoom, dos dedos para desplazar, mantener apretado para editar.</p>
+      <div className="buttons">
+        <button className="primary" onClick={onClose}>Cerrar</button>
+      </div>
+    </Modal>
+  );
+}
+
+export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
+  examples: string[];
+  onExample(name: string): void;
+  onClose(): void;
+  onHelp(): void;
+}) {
+  return (
+    <Modal title="Bienvenido a TurboSpice" onClose={onClose} wide>
+      <div className="welcome">
+        <p>
+          Un simulador de circuitos tipo LTspice que corre entero en tu navegador (ngspice en WebAssembly): nada se sube a
+          ningún servidor. Abre y guarda <code>.asc</code> de LTspice, así que podés ir y volver entre los dos.
+        </p>
+        <ul>
+          <li>Dibujá con los mismos atajos de LTspice (<kbd>F2</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
+          <li>Configurá el análisis en <strong>Simulación…</strong> y apretá <strong>Simular</strong> (<kbd>Ctrl+Enter</kbd>).</li>
+          <li>Medí con un click en un cable (tensión) o en un componente (corriente); pasá el mouse para ver el punto de operación.</li>
+          <li>Compartí un circuito con un link; el trabajo se autoguarda en el navegador.</li>
+        </ul>
+        <h3>Empezá con un ejemplo</h3>
+        <div className="welcome-examples">
+          {examples.map((x) => (
+            <button key={x} onClick={() => onExample(x)}>{x.replace(/\.asc$/, '')}</button>
+          ))}
+        </div>
+      </div>
+      <div className="buttons">
+        <button onClick={onHelp}>Ver atajos</button>
+        <button className="primary" onClick={onClose}>Empezar</button>
       </div>
     </Modal>
   );

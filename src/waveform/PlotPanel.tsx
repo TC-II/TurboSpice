@@ -38,6 +38,13 @@ interface Cursors {
 }
 
 const MAX_ROWS = 16;
+
+/** Rango de un eje Y; uno fijo si no hay datos finitos o son constantes */
+const safeRange: uPlot.Range.Function = (_u, min, max) => {
+  if (min == null || max == null || !Number.isFinite(min) || !Number.isFinite(max)) return [-1, 1];
+  if (min === max) return [min - (Math.abs(min) || 1) * 0.1, max + (Math.abs(max) || 1) * 0.1];
+  return uPlot.rangeNum(min, max, 0.1, true);
+};
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
 
 export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle }: Props) {
@@ -204,6 +211,9 @@ function PaneView(props: {
       legend: { show: false },
       scales: {
         x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : {}) },
+        y: { range: safeRange },
+        i: { range: safeRange },
+        ph: { range: safeRange },
       },
       axes: [
         {
@@ -279,7 +289,9 @@ function PaneView(props: {
         ],
       },
     };
-    const u = new uPlot(opts, [data.x, ...data.curves.map((c) => c.y)] as uPlot.AlignedData, el);
+    // valores no finitos (dB de 0, divisiones por 0) como huecos: uPlot no los admite
+    const ys = data.curves.map((c) => Array.from(c.y, (v) => (Number.isFinite(v) ? v : null)));
+    const u = new uPlot(opts, [data.x, ...ys] as uPlot.AlignedData, el);
     chart.current = u;
     props.register(u);
     const over = u.over;

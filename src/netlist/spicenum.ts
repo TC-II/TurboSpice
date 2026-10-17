@@ -29,3 +29,11 @@ export function parseSpiceNumber(s: string): number {
 export function formatSpiceNumber(x: number): string {
   return Number(x.toPrecision(12)).toString();
 }
+
+/** Notación RKM (4k7, 2u2, 4R7 = 4.7k, 2.2u, 4.7) → notación SPICE; null si no es RKM */
+export function fromRkm(s: string): string | null {
+  const m = /^(\d+)(meg|[tgkmunpfrµμ])(\d+)$/i.exec(s.trim());
+  if (!m) return null;
+  const unit = /^r$/i.test(m[2]) ? '' : m[2];
+  return `${m[1]}.${m[3]}${unit}`;
+}

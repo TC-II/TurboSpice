@@ -3,6 +3,7 @@
 // Requiere un Chromium instalado (CHROMIUM o /usr/bin/chromium) y `npm run preview` corriendo.
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -12,6 +13,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? 
 let failed = 0;
 for (const scheme of ['light', 'dark']) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: scheme });
+  await skipWelcome(page);
   const consoleErrors = [];
   // la consola no dice qué URL falló: las respuestas con error se registran aparte
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));

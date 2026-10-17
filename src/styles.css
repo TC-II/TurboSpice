@@ -363,3 +363,49 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .smith .grid text { fill: var(--fg-muted); font: 8px system-ui, sans-serif; }
 .smith .trace { fill: none; stroke-width: 2; }
 .smith-legend { list-style: none; margin: 0; padding: 0; font: 13px var(--mono); }
+
+/* ---------- Menús, barra de íconos, ayuda ---------- */
+.menurow { display: flex; align-items: center; gap: 8px; padding: 2px 12px; border-bottom: 1px solid var(--border); }
+.menubar { display: flex; gap: 2px; }
+.menu-top { position: relative; }
+.menu-top > button { border: 0; background: transparent; padding: 4px 10px; font-size: 13px; }
+.menu-top > button.open, .menu-top > button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.menu-list { position: absolute; top: 100%; left: 0; z-index: 20; min-width: 230px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 22%); display: flex; flex-direction: column; }
+.menu-item { position: relative; }
+.menu-item > button { width: 100%; display: flex; justify-content: space-between; gap: 24px; border: 0; background: transparent; padding: 5px 10px; font-size: 13px; text-align: left; border-radius: 5px; }
+.menu-item > button:hover:not(:disabled), .menu-item > button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
+.menu-item .sc { color: var(--fg-muted); font-size: 12px; }
+.menu-item .check-mark { display: inline-block; width: 16px; }
+.menu-item.has-sub > .menu-list { top: -5px; left: 100%; }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.iconbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 4px 12px; border-bottom: 1px solid var(--border); }
+.iconbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+.iconbar button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-color: transparent; background: transparent; border-radius: 6px; }
+.iconbar button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.iconbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.iconbar button.primary { background: var(--accent); color: #fff; padding: 4px 12px; }
+.iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
+.iconbar .status { margin-left: 8px; font-size: 13px; }
+.iconbar .spacer { flex: 1; }
+.icon { display: block; flex: none; }
+.shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
+.shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }
+.shortcuts td { padding: 4px 0; color: var(--fg-muted); }
+kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-alt); }
+.welcome p, .welcome li { font-size: 14px; line-height: 1.5; }
+.welcome h3 { font-size: 14px; margin: 16px 0 8px; }
+.welcome-examples { display: flex; flex-wrap: wrap; gap: 8px; }
+.problems { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.problems li { display: flex; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--grid); }
+.problems .kind { font-size: 11px; padding: 0 6px; border-radius: 999px; flex: none; }
+.problems .kind.err { color: var(--err); border: 1px solid var(--err); }
+.problems .kind.warn { color: #e67700; border: 1px solid #e67700; }
+.problems button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; }
+.workspace.side { flex-direction: row; }
+.workspace.side .splitter { width: 6px; height: auto; margin: 0 0 0 -3px; cursor: col-resize; }
+.workspace.side .results-panel { border-top: 0; border-left: 1px solid var(--border); flex: 0 0 45%; }
+@media (max-width: 720px) { .workspace.side { flex-direction: column; } }
+.theme-btn { position: relative; border: 0; background: transparent; padding: 4px 6px; }
+.theme-btn .auto { position: absolute; right: 0; bottom: 0; font: 600 9px system-ui, sans-serif; }
+.menurow .filename { margin-left: auto; }
+.attrs label small { grid-column: 2; margin: -4px 0 0; }

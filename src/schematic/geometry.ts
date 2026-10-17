@@ -1,6 +1,7 @@
 // Geometría del esquemático: cajas de símbolos, detección bajo el cursor, grilla.
-import { GRID, type AscDoc, type Point, type SymbolDef, type SymbolInst, type Wire } from '../asc/model.ts';
-import { toWorld } from '../asc/transform.ts';
+import { GRID, WINDOW_ATTR, type AscDoc, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
+import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
+import { toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
@@ -91,21 +92,27 @@ export function textBox(t: { x: number; y: number; size: number; text: string; a
  * `tol` es la tolerancia en unidades del esquemático (depende del zoom).
  */
 export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef | null {
-  for (let i = doc.texts.length - 1; i >= 0; i--) if (inBox(p, textBox(doc.texts[i]), tol / 2)) return { kind: 'text', index: i };
-  for (let i = doc.flags.length - 1; i >= 0; i--) {
-    if (inBox(p, flagBox(doc, doc.flags[i]), tol)) return { kind: 'flag', index: i };
-  }
-  let best: { i: number; d: number } | null = null;
-  doc.wires.forEach((w, i) => {
-    const d = distToSegment(p, w);
-    if (d <= tol && (!best || d < best.d)) best = { i, d };
-  });
-  if (best) return { kind: 'wire', index: (best as { i: number }).i };
+  return hitTestAll(doc, p, lib, tol)[0] ?? null;
+}
+
+/**
+ * Todos los elementos bajo el cursor, en el mismo orden de prioridad que hitTest (para
+ * alternar entre elementos superpuestos con clicks repetidos). Los cables, del más cercano.
+ */
+export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef[] {
+  const out: ItemRef[] = [];
+  for (let i = doc.texts.length - 1; i >= 0; i--) if (inBox(p, textBox(doc.texts[i]), tol / 2)) out.push({ kind: 'text', index: i });
+  for (let i = doc.flags.length - 1; i >= 0; i--) if (inBox(p, flagBox(doc, doc.flags[i]), tol)) out.push({ kind: 'flag', index: i });
+  doc.wires
+    .map((w, i) => ({ i, d: distToSegment(p, w) }))
+    .filter((x) => x.d <= tol)
+    .sort((a, b) => a.d - b.d)
+    .forEach((x) => out.push({ kind: 'wire', index: x.i }));
   for (let i = doc.symbols.length - 1; i >= 0; i--) {
     const s = doc.symbols[i];
-    if (inBox(p, symbolBox(s, lib.symbol(s.type), lib), tol / 2)) return { kind: 'symbol', index: i };
+    if (inBox(p, symbolBox(s, lib.symbol(s.type), lib), tol / 2)) out.push({ kind: 'symbol', index: i });
   }
-  return null;
+  return out;
 }
 
 /** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
@@ -164,4 +171,54 @@ export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }):
     x2: f.x + Math.max(a.x, b.x),
     y2: f.y + Math.max(a.y, b.y),
   };
+}
+
+/** Caja de un texto de una línea con alineación de LTspice (Left…VBottom) anclado en (x, y) */
+export function alignedBox(x: number, y: number, align: string, size: number, len: number): Box {
+  const fs = fontSize(size);
+  const w = len * fs * 0.6;
+  const h = fs;
+  switch (align) {
+    case 'Left':
+      return { x1: x, y1: y - h / 2, x2: x + w, y2: y + h / 2 };
+    case 'Right':
+      return { x1: x - w, y1: y - h / 2, x2: x, y2: y + h / 2 };
+    case 'Top':
+      return { x1: x - w / 2, y1: y, x2: x + w / 2, y2: y + h };
+    case 'Bottom':
+      return { x1: x - w / 2, y1: y - h, x2: x + w / 2, y2: y };
+    case 'VLeft':
+      return { x1: x - h / 2, y1: y - w, x2: x + h / 2, y2: y };
+    case 'VRight':
+      return { x1: x - h / 2, y1: y, x2: x + h / 2, y2: y + w };
+    case 'VCenter':
+      return { x1: x - h / 2, y1: y - w / 2, x2: x + h / 2, y2: y + w / 2 };
+    case 'VTop':
+      return { x1: x, y1: y - w / 2, x2: x + h, y2: y + w / 2 };
+    case 'VBottom':
+      return { x1: x - h, y1: y - w / 2, x2: x, y2: y + w / 2 };
+    default:
+      return { x1: x - w / 2, y1: y - h / 2, x2: x + w / 2, y2: y + h / 2 };
+  }
+}
+
+const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
+
+/** Rótulo visible (InstName, Value…) de un símbolo bajo el cursor: índice de WINDOW y su ventana local */
+export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number): { sym: number; win: number; w: TextWindow } | null {
+  for (let i = doc.symbols.length - 1; i >= 0; i--) {
+    const inst = doc.symbols[i];
+    const def = lib.symbol(inst.type);
+    if (!def) continue;
+    const attrs = effectiveAttrs(inst, def);
+    for (const [idx, w] of effectiveWindows(inst, def, lib.windowDefaults)) {
+      const key = WINDOW_ATTR[idx];
+      const text = key && attrs.get(key);
+      if (!text || w.align === 'Invisible') continue;
+      if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(attrs.get('Prefix') ?? '')) continue;
+      const at = toWorld(inst, w.x, w.y);
+      if (inBox(p, alignedBox(at.x, at.y, transformAlign(w.align, inst.orient), w.size, text.length), tol / 2)) return { sym: i, win: idx, w };
+    }
+  }
+  return null;
 }

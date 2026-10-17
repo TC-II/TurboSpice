@@ -4,10 +4,14 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol } from './edit.ts';
+import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindow } from './edit.ts';
+import { inverseOffset } from '../asc/transform.ts';
+import type { TextWindow } from '../asc/model.ts';
 import {
   boxesIntersect,
   hitTest,
+  hitTestAll,
+  labelAt,
   pinPoints,
   snap,
   snapPoint,
@@ -38,6 +42,8 @@ export interface EditorHandle {
   /** Elemento SVG y caja del contenido (para exportar) */
   svg(): SVGSVGElement | null;
   contentBox(): Box | null;
+  /** Centra la vista en una caja (p.ej. el componente de un problema) */
+  centerOn(b: Box): void;
 }
 
 interface Props {
@@ -78,7 +84,9 @@ interface View {
 type Drag =
   | { mode: 'pan'; sx: number; sy: number; view: View }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
-  | { mode: 'box'; start: Point; additive: boolean };
+  | { mode: 'box'; start: Point; additive: boolean }
+  /** arrastrar un rótulo (InstName/Value) de un símbolo */
+  | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
 
 function docBox(doc: AscDoc, lib: Library): Box | null {
   const boxes: Box[] = [];
@@ -136,6 +144,11 @@ export function SchematicEditor(props: Props) {
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
+  const lastClick = useRef<{ p: Point; i: number; t: number } | null>(null);
+  // táctil: punteros activos, pellizco (zoom + paneo con dos dedos) y toque largo (editar)
+  const touches = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d: number; cx: number; cy: number; view: View } | null>(null);
+  const longPress = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const el = svgRef.current!;
@@ -154,8 +167,15 @@ export function SchematicEditor(props: Props) {
 
   useImperativeHandle(
     handle,
-    () => ({ fit, cursor: () => snapPoint(cursor), svg: () => svgRef.current, contentBox: () => docBox(doc, lib) }),
-    [fit, cursor, doc, lib],
+    () => ({
+      fit,
+      cursor: () => snapPoint(cursor),
+      svg: () => svgRef.current,
+      contentBox: () => docBox(doc, lib),
+      centerOn: (b: Box) =>
+        setView((v) => ({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale: Math.max(v.scale, Math.min(2, size.w / (b.x2 - b.x1 + 200))) })),
+    }),
+    [fit, cursor, doc, lib, size.w],
   );
 
   // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)
@@ -222,6 +242,28 @@ export function SchematicEditor(props: Props) {
 
   const onPointerDown = (e: React.PointerEvent) => {
     svgRef.current!.setPointerCapture(e.pointerId);
+    if (e.pointerType === 'touch') {
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      clearTimeout(longPress.current);
+      if (touches.current.size === 2) {
+        // segundo dedo: se cancela lo que hacía el primero y empieza el pellizco
+        const [a, b] = [...touches.current.values()];
+        pinch.current = { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2, view };
+        setDrag(null);
+        setPreview(null);
+        setBoxEnd(null);
+        return;
+      }
+      const at = toDoc(e);
+      longPress.current = window.setTimeout(() => {
+        const hit = hitTest(doc, at, lib, tol * 2);
+        if (hit && touches.current.size === 1) {
+          setDrag(null);
+          setPreview(null);
+          onEdit(hit);
+        }
+      }, 550);
+    }
     const p = toDoc(e);
     const g = snapPoint(p);
     if (e.button === 1 || (e.button === 0 && spaceDown.current)) {
@@ -242,7 +284,25 @@ export function SchematicEditor(props: Props) {
 
     switch (tool.kind) {
       case 'select': {
-        const hit = hitTest(doc, p, lib, tol);
+        // un rótulo de un componente ya seleccionado se arrastra solo (como en LTspice)
+        const label = labelAt(doc, p, lib, tol);
+        if (label && selection.some((r) => r.kind === 'symbol' && r.index === label.sym) && !e.shiftKey) {
+          setDrag({ mode: 'label', start: p, sym: label.sym, win: label.win, w: label.w, moved: false });
+          return;
+        }
+        // clicks repetidos en el mismo lugar alternan entre elementos superpuestos
+        const all = hitTestAll(doc, p, lib, tol);
+        // (un doble click, más rápido, edita y no alterna)
+        const lc = lastClick.current;
+        const again = !!lc && Math.hypot(lc.p.x - p.x, lc.p.y - p.y) < tol && all.length > 1 && e.timeStamp - lc.t > 350;
+        const pickIdx = again ? (lc!.i + 1) % all.length : 0;
+        lastClick.current = { p, i: pickIdx, t: e.timeStamp };
+        const hit = all[pickIdx] ?? null;
+        if (again && hit && !e.shiftKey) {
+          setSelection([hit]);
+          setDrag({ mode: 'move', start: g, refs: [hit], detach: e.ctrlKey || e.metaKey, moved: false });
+          return;
+        }
         if (!hit) {
           setDrag({ mode: 'box', start: p, additive: e.shiftKey });
           setBoxEnd(p);
@@ -299,6 +359,24 @@ export function SchematicEditor(props: Props) {
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
+      const prev = touches.current.get(e.pointerId)!;
+      if (Math.hypot(prev.x - e.clientX, prev.y - e.clientY) > 6) clearTimeout(longPress.current);
+      touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch.current && touches.current.size >= 2) {
+        const [a, b] = [...touches.current.values()];
+        const pc = pinch.current;
+        const scale = Math.min(8, Math.max(0.03, pc.view.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pc.d)));
+        const r = svgRef.current!.getBoundingClientRect();
+        // el punto del esquemático bajo el centro inicial queda bajo el centro actual
+        const docX = pc.view.cx + (pc.cx - r.left - r.width / 2) / pc.view.scale;
+        const docY = pc.view.cy + (pc.cy - r.top - r.height / 2) / pc.view.scale;
+        const cx = (a.x + b.x) / 2 - r.left - r.width / 2;
+        const cy = (a.y + b.y) / 2 - r.top - r.height / 2;
+        setView({ scale, cx: docX - cx / scale, cy: docY - cy / scale });
+        return;
+      }
+    }
     const p = toDoc(e);
     setCursor(p);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
@@ -317,6 +395,12 @@ export function SchematicEditor(props: Props) {
     if (!drag) return;
     if (drag.mode === 'pan') {
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
+    } else if (drag.mode === 'label') {
+      const inst = doc.symbols[drag.sym];
+      const d = inverseOffset(p.x - drag.start.x, p.y - drag.start.y, inst.orient);
+      const w = { ...drag.w, x: Math.round(drag.w.x + d.x), y: Math.round(drag.w.y + d.y) };
+      if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > tol) setDrag({ ...drag, moved: true });
+      setPreview(setWindow(doc, drag.sym, drag.win, w));
     } else if (drag.mode === 'move') {
       const g = snapPoint(p);
       const dx = g.x - drag.start.x;
@@ -329,8 +413,16 @@ export function SchematicEditor(props: Props) {
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch') {
+      touches.current.delete(e.pointerId);
+      clearTimeout(longPress.current);
+      if (pinch.current) {
+        if (touches.current.size < 2) pinch.current = null;
+        return;
+      }
+    }
     if (!drag) return;
-    if (drag.mode === 'move' && preview && drag.moved) commit(preview);
+    if ((drag.mode === 'move' || drag.mode === 'label') && preview && drag.moved) commit(preview);
     if (drag.mode === 'box' && boxEnd) {
       const b = {
         x1: Math.min(drag.start.x, boxEnd.x),
@@ -392,6 +484,7 @@ export function SchematicEditor(props: Props) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
       style={{ ['--px' as string]: `${1 / view.scale}` }}

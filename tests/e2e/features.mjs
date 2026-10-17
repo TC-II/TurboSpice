@@ -4,6 +4,7 @@
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
+import { menu, openExample, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -12,10 +13,11 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
 const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
 await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+await skipWelcome(context);
 const page = await context.newPage();
 const errors = [];
 const watch = (p) => {
-  p.on('pageerror', (e) => errors.push(e.message));
+  p.on('pageerror', (e) => errors.push(process.env.STACK ? e.stack : e.message));
   p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   p.on('dialog', (d) => d.accept());
 };
@@ -50,7 +52,7 @@ await page.keyboard.press('Control+z');
 await page.getByRole('button', { name: 'Redes' }).click();
 
 // --- #1: compartir con un link ---
-await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Bode RLC.asc');
+await openExample(page, 'Bode RLC.asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Compartir' }).click();
 const link = await page.locator('.modal input[aria-label="Link"]').inputValue();
@@ -86,8 +88,11 @@ check((await flags()) === before + 1, 'al recargar se recupera el trabajo sin gu
 check((await page.locator('.filename').textContent()) === 'Bode RLC.asc •', 'con su nombre y marcado como modificado');
 await page.keyboard.press('Control+z');
 check((await flags()) === before, 'y se puede deshacer lo anterior a la recarga');
-const recents = await page.locator('select[aria-label="Recientes"] option').allTextContents();
-check(recents.includes('Bode RLC'), `recientes: ${recents.slice(1).join(', ')}`);
+await page.getByRole('menubar').getByRole('menuitem', { name: 'Archivo', exact: true }).click();
+await page.getByRole('menu').getByRole('menuitem', { name: 'Recientes' }).hover();
+const recents = await page.getByRole('menu', { name: 'Recientes' }).getByRole('menuitem').allTextContents();
+await page.keyboard.press('Escape');
+check(recents.includes('Bode RLC'), `recientes: ${recents.join(', ')}`);
 
 // --- #2: punto de operación con el mouse ---
 const svg = page.locator('svg.editor');
@@ -96,7 +101,7 @@ const at = async (x, y) => {
   const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
   return { x: b.x + ((x - vx) / vw) * b.width, y: b.y + ((y - vy) / vh) * b.height };
 };
-await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Emisor común.asc');
+await openExample(page, 'Emisor común.asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -147,7 +152,7 @@ check(/^\.noise V\(out\) Vin /.test(await page.locator('.sim-preview code').text
 await page.getByRole('button', { name: 'Cancelar' }).click();
 
 // --- #7: .step ---
-await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Barrido RC (.step).asc');
+await openExample(page, 'Barrido RC (.step).asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -169,7 +174,7 @@ const downloaded = async (action) => {
   return { name: d.suggestedFilename(), text: readFileSync(await d.path(), 'utf8') };
 };
 await page.setViewportSize({ width: 1280, height: 1100 }); // lugar para dos paneles sin scroll
-await page.getByRole('combobox', { name: 'Ejemplos' }).selectOption('Bode RLC.asc');
+await openExample(page, 'Bode RLC.asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -235,14 +240,14 @@ await page.getByRole('button', { name: 'Compartir' }).click();
 check((await page.locator('.modal input[aria-label="Link"]').inputValue()).includes('&v='), 'el link para compartir incluye la vista');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
 
-const svgOut = await downloaded(() => page.getByRole('combobox', { name: 'Exportar esquemático' }).selectOption('svg'));
+const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar esquemático a SVG'));
 check(svgOut.name === 'Bode RLC.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
-const net = await downloaded(() => page.getByRole('combobox', { name: 'Exportar esquemático' }).selectOption('net'));
+const net = await downloaded(() => menu(page, 'Archivo', 'Exportar netlist de LTspice (.net)'));
 check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `netlist de LTspice (.net): ${net.text.split('\n')[1]}`);
 await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
 const cir = await downloaded(() => page.getByRole('button', { name: 'Descargar .cir (ngspice)' }).click());
 check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
-await page.getByRole('button', { name: 'Resultados' }).click();
+await page.getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // .pz en el plano s
 await page.getByRole('button', { name: 'Simulación…' }).click();
@@ -265,6 +270,92 @@ await page.getByRole('combobox', { name: 'Vista' }).selectOption('smith');
 check((await page.locator('.smith polyline.trace').count()) === 2, 'carta de Smith con las trazas complejas');
 await page.screenshot({ path: `${OUT}/smith.png` });
 await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
+
+// --- #4: interfaz ---
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.getByRole('button', { name: 'Cerrar resultados' }).click();
+check((await page.locator('.results-panel').count()) === 0, 'cerrar resultados vuelve a la edición');
+await page.keyboard.press('?');
+check(await page.getByRole('dialog', { name: 'Atajos de teclado' }).isVisible(), '"?" muestra los atajos');
+await page.keyboard.press('Escape');
+const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+await page.getByRole('button', { name: 'Cambiar tema' }).click();
+const t1 = await theme();
+await page.getByRole('button', { name: 'Cambiar tema' }).click();
+const t2 = await theme();
+await page.getByRole('button', { name: 'Cambiar tema' }).click();
+check(t1 === 'light' && t2 === 'dark' && (await theme()) === null, `tema claro → oscuro → automático (${t1}, ${t2})`);
+
+// copiar y pegar
+const syms = () => page.locator('svg.editor .symbols .sym').count();
+const nSyms = await syms();
+await page.keyboard.press('Escape');
+const r1 = await at(56, -32);
+await page.mouse.click(r1.x, r1.y);
+await page.keyboard.press('Control+c');
+const dest = await at(320, 160);
+await page.mouse.move(dest.x, dest.y);
+await page.keyboard.press('Control+v');
+check((await syms()) === nSyms + 1, 'Ctrl+C / Ctrl+V pega una copia');
+check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'la copia recibe un nombre nuevo (R2)');
+await page.keyboard.press('Control+a');
+check((await page.locator('svg.editor .sym.sel').count()) === nSyms + 1, 'Ctrl+A selecciona todo');
+await page.keyboard.press('Control+z');
+
+// mover un rótulo
+await page.mouse.click(r1.x, r1.y);
+const label = page.locator('svg.editor .sym.sel text.win', { hasText: /^R1$/ });
+const y0 = Number(await label.getAttribute('y'));
+const lp = await at(56, -56);
+const lq = await at(56, -88);
+await page.mouse.move(lp.x, lp.y);
+await page.mouse.down();
+await page.mouse.move(lq.x, lq.y, { steps: 5 });
+await page.mouse.up();
+const y1 = Number(await page.locator('svg.editor .sym text.win', { hasText: /^R1$/ }).getAttribute('y'));
+check(y1 === y0 - 32, `arrastrar el rótulo de un componente seleccionado lo mueve (${y0} → ${y1})`);
+check((await syms()) === nSyms, 'sin mover el componente');
+await page.keyboard.press('Control+z');
+
+// valores amigables: 4k7
+await page.mouse.dblclick(r1.x, r1.y);
+await page.locator('.modal input').nth(1).fill('4k7');
+check((await page.locator('.modal .attrs small').textContent()) === '= 4.7kΩ', 'el diálogo interpreta 4k7');
+await page.keyboard.press('Enter');
+check((await page.locator('svg.editor .sym text.win', { hasText: '4.7k' }).count()) === 1, 'y lo guarda como 4.7k (compatible con LTspice)');
+
+// panel de problemas con link al componente
+await page.keyboard.press('r');
+const free2 = await at(400, 64);
+await page.mouse.click(free2.x, free2.y);
+await page.keyboard.press('Escape');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await page.getByRole('button', { name: /^Problemas/ }).click();
+const prob = page.locator('.problems li', { hasText: 'R2 no tiene valor asignado' });
+check((await prob.count()) === 1, 'Problemas lista el componente sin valor');
+await prob.getByRole('button', { name: 'ver en el esquemático' }).click();
+check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'y el link lo selecciona en el esquemático');
+
+// resultados al costado
+await menu(page, 'Ver', 'Resultados al costado');
+check(await page.locator('.workspace.side .results-panel').isVisible(), 'resultados al costado');
+await page.screenshot({ path: `${OUT}/side.png` });
+await menu(page, 'Ver', 'Resultados al costado');
+
+// bienvenida en la primera visita
+const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const fp = await fresh.newPage();
+await fp.goto(URL);
+check(await fp.getByRole('dialog', { name: 'Bienvenido a TurboSpice' }).waitFor({ timeout: 15000 }).then(() => true, () => false), 'bienvenida en la primera visita');
+await fp.getByRole('dialog').getByRole('button', { name: 'Emisor común' }).click();
+await fp.locator('svg.editor .sym').first().waitFor();
+await fp.waitForTimeout(500);
+check((await fp.locator('.filename').textContent()) === 'Emisor común.asc', `abre el ejemplo elegido (${await fp.locator('.filename').textContent()})`);
+await fp.reload();
+await fp.getByText('Listo').waitFor({ timeout: 30000 });
+check((await fp.getByRole('dialog').count()) === 0, 'y no vuelve a aparecer');
+await fresh.close();
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

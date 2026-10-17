@@ -60,3 +60,11 @@ export function orientMatrix(o: Orient): [number, number, number, number] {
   const ey = transformOffset(0, 1, o);
   return [ex.x, ex.y, ey.x, ey.y];
 }
+
+/** Inversa de transformOffset: desplazamiento en el esquemático → desplazamiento local */
+export function inverseOffset(x: number, y: number, o: Orient): Point {
+  const ex = transformOffset(1, 0, o);
+  const ey = transformOffset(0, 1, o);
+  // la matriz de orientación es ortogonal: la inversa es la traspuesta
+  return { x: x * ex.x + y * ex.y + 0, y: x * ey.x + y * ey.y + 0 };
+}

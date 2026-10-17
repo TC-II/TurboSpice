@@ -240,3 +240,70 @@ export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: num
   }
   return { doc: out, refs: newRefs };
 }
+
+/** Todos los elementos del documento (Ctrl+A) */
+export function allItems(doc: AscDoc): ItemRef[] {
+  return [
+    ...doc.symbols.map((_, index) => ({ kind: 'symbol' as const, index })),
+    ...doc.wires.map((_, index) => ({ kind: 'wire' as const, index })),
+    ...doc.flags.map((_, index) => ({ kind: 'flag' as const, index })),
+    ...doc.texts.map((_, index) => ({ kind: 'text' as const, index })),
+  ];
+}
+
+/** Documento con sólo los elementos seleccionados (para copiar al portapapeles como .asc) */
+export function extractItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
+  const has = (kind: ItemRef['kind'], i: number) => refs.some((r) => r.kind === kind && r.index === i);
+  return {
+    ...doc,
+    symbols: doc.symbols.filter((_, i) => has('symbol', i)),
+    wires: doc.wires.filter((_, i) => has('wire', i)),
+    flags: doc.flags.filter((_, i) => has('flag', i)),
+    texts: doc.texts.filter((_, i) => has('text', i)),
+    shapes: [],
+    dataFlags: [],
+  };
+}
+
+/**
+ * Pega un fragmento con su esquina superior izquierda en `at` (sobre la grilla). Los
+ * componentes cuyo nombre ya existe en el documento reciben uno nuevo, como al duplicar.
+ */
+export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
+  const pts: Point[] = [...frag.symbols, ...frag.flags, ...frag.texts, ...frag.wires.flatMap(ends)];
+  if (!pts.length) return { doc, refs: [] };
+  const dx = snap(at.x - Math.min(...pts.map((p) => p.x)));
+  const dy = snap(at.y - Math.min(...pts.map((p) => p.y)));
+  const nameOf = (s: SymbolInst) => (s.attrs.get('InstName') ?? lib.symbol(s.type)?.attrs.get('InstName') ?? '').toUpperCase();
+  let symbols = doc.symbols;
+  for (const s of frag.symbols) {
+    const attrs = new Map(s.attrs);
+    const name = nameOf(s);
+    if (name && symbols.some((o) => nameOf(o) === name)) {
+      attrs.set('InstName', nextInstName({ ...doc, symbols }, instLetter(lib.symbol(s.type)?.attrs.get('Prefix') ?? 'X'), lib));
+    }
+    symbols = [...symbols, { ...s, x: s.x + dx, y: s.y + dy, attrs, windows: new Map(s.windows) }];
+  }
+  const out: AscDoc = {
+    ...doc,
+    symbols,
+    wires: [...doc.wires, ...frag.wires.map((w) => ({ x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }))],
+    flags: [...doc.flags, ...frag.flags.map((f) => ({ ...f, x: f.x + dx, y: f.y + dy }))],
+    texts: [...doc.texts, ...frag.texts.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))],
+  };
+  const refs: ItemRef[] = [
+    ...frag.symbols.map((_, i) => ({ kind: 'symbol' as const, index: doc.symbols.length + i })),
+    ...frag.wires.map((_, i) => ({ kind: 'wire' as const, index: doc.wires.length + i })),
+    ...frag.flags.map((_, i) => ({ kind: 'flag' as const, index: doc.flags.length + i })),
+    ...frag.texts.map((_, i) => ({ kind: 'text' as const, index: doc.texts.length + i })),
+  ];
+  return { doc: out, refs };
+}
+
+/** Mueve el rótulo `win` (0 = InstName, 3 = Value…) de un símbolo: queda como WINDOW explícito */
+export function setWindow(doc: AscDoc, index: number, win: number, w: { x: number; y: number; align: string; size: number }): AscDoc {
+  return {
+    ...doc,
+    symbols: doc.symbols.map((s, i) => (i === index ? { ...s, windows: new Map(s.windows).set(win, w) } : s)),
+  };
+}

@@ -20,7 +20,7 @@ import {
   sameConnections,
   splitWire,
 } from '../../src/schematic/edit.ts';
-import { junctionPoints } from '../../src/schematic/geometry.ts';
+import { junctionPoints, pinPoints } from '../../src/schematic/geometry.ts';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
 const fixtures = readdirSync(FIX).filter((f) => f.endsWith('.asc'));
@@ -258,6 +258,65 @@ SYMATTR InstName R3
     const t = asc('WIRE 0 0 128 0\nWIRE 64 0 64 64\nFLAG 0 0 a\nFLAG 64 64 b\n');
     const mt = moveItems(t, [{ kind: 'wire', index: 0 }, { kind: 'flag', index: 0 }], 0, -32, true, lib);
     expect(sameConnections(t, mt, lib)).toBe(true);
+  });
+});
+
+describe('un cable no atraviesa componentes (#45)', () => {
+  // R1 vertical: pines en (16,16) y (16,96)
+  const R = asc('SYMBOL res 0 0 R0\nSYMATTR InstName R1\nFLAG 16 -64 a\nFLAG 16 176 b\n');
+  const series = asc('WIRE 16 -64 16 16\nWIRE 16 96 16 176\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nFLAG 16 -64 a\nFLAG 16 176 b\n');
+
+  it('dibujar un cable a través de una resistencia deja dos cables, sin nodos, con R en serie', () => {
+    const d = addWire(R, { x: 16, y: -64 }, { x: 16, y: 176 }, lib);
+    expect(ws(d)).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+    expect(junctionPoints(d, lib)).toEqual([]);
+    expect(net(d)).toBe(net(series));
+    expect(net(d)).toMatch(/^R1 a b /m);
+  });
+
+  it('también horizontal, con el componente rotado, y en el sentido inverso', () => {
+    const h = asc('SYMBOL res 0 0 R90\nSYMATTR InstName R1\n');
+    const [p, q] = pinPoints(h.symbols[0], lib.symbol('res')).sort((a, b) => a.x - b.x);
+    expect(p.y).toBe(q.y);
+    const d = addWire(h, { x: q.x + 64, y: p.y }, { x: p.x - 64, y: p.y }, lib);
+    expect(ws(d)).toEqual([[q.x + 64, p.y, q.x, p.y], [p.x, p.y, p.x - 64, p.y]]);
+  });
+
+  it('un transistor: el cable que pasa por colector y emisor se corta, la base queda', () => {
+    // npn: C (64,0), B (0,48), E (64,96)
+    const q = asc('SYMBOL npn 0 0 R0\nSYMATTR InstName Q1\n');
+    expect(ws(addWire(q, { x: 64, y: -64 }, { x: 64, y: 160 }, lib))).toEqual([[64, -64, 64, 0], [64, 96, 64, 160]]);
+    // pasar sólo por la base (T) no corta nada
+    expect(ws(addWire(q, { x: 0, y: 48 }, { x: -64, y: 48 }, lib))).toEqual([[0, 48, -64, 48]]);
+  });
+
+  it('terminar en un pin o pasar por un solo pin (T) se conserva como antes', () => {
+    expect(ws(addWire(R, { x: 16, y: -64 }, { x: 16, y: 16 }, lib))).toEqual([[16, -64, 16, 16]]);
+    expect(ws(addWire(R, { x: -64, y: 96 }, { x: 96, y: 96 }, lib))).toEqual([[-64, 96, 96, 96]]);
+  });
+
+  it('si algo llega entre los dos pines no se corta (no rompe uniones)', () => {
+    const f = asc('SYMBOL res 0 0 R0\nFLAG 16 48 x\n');
+    expect(ws(addWire(f, { x: 16, y: -64 }, { x: 16, y: 176 }, lib))).toEqual([[16, -64, 16, 176]]);
+  });
+
+  it('un corto que ya estaba en el archivo no se toca al dibujar otro cable', () => {
+    const short = asc('WIRE 16 -64 16 176\nSYMBOL res 0 0 R0\n');
+    expect(ws(addWire(short, { x: 200, y: 0 }, { x: 300, y: 0 }, lib))).toEqual([[16, -64, 16, 176], [200, 0, 300, 0]]);
+  });
+
+  it('mover un componente sobre un cable lo deja en serie (estirando o no)', () => {
+    const d = asc('WIRE 16 -64 16 176\nSYMBOL res -96 0 R0\nSYMATTR InstName R1\nFLAG 16 -64 a\nFLAG 16 176 b\n');
+    for (const drag of [true, false]) {
+      const m = moveItems(d, [{ kind: 'symbol', index: 0 }], 96, 0, drag, lib);
+      expect(ws(m), `drag ${drag}`).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+      expect(net(m)).toMatch(/^R1 a b /m);
+    }
+  });
+
+  it('mover un cable sobre un componente también lo parte', () => {
+    const d = asc('WIRE 112 -64 112 176\nSYMBOL res 0 0 R0\n');
+    expect(ws(moveItems(d, [{ kind: 'wire', index: 0 }], -96, 0, false, lib))).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
   });
 });
 

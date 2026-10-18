@@ -34,7 +34,12 @@ export function addWire(doc: AscDoc, a: Point, b: Point, lib?: Library): AscDoc 
   for (const w of wires) for (const e of ends(w)) if (!samePt(e, a) && !samePt(e, b) && onSegment(e, nw)) stops.push(e);
   const dist = (p: Point) => Math.hypot(p.x - a.x, p.y - a.y);
   const pts = [a, ...stops.sort((p, q) => dist(p) - dist(q)), b].filter((p, i, arr) => i === 0 || !samePt(p, arr[i - 1]));
-  for (let i = 1; i < pts.length; i++) wires.push({ x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y });
+  const added = new Set<Wire>();
+  for (let i = 1; i < pts.length; i++) {
+    const w = { x1: pts[i - 1].x, y1: pts[i - 1].y, x2: pts[i].x, y2: pts[i].y };
+    added.add(w);
+    wires.push(w);
+  }
   // Sin duplicados exactos
   const seen = new Set<string>();
   wires = wires.filter((w) => {
@@ -44,7 +49,44 @@ export function addWire(doc: AscDoc, a: Point, b: Point, lib?: Library): AscDoc 
     seen.add(k);
     return true;
   });
+  // el cable nuevo no atraviesa componentes: se parte en sus pines (como LTspice)
+  if (lib) wires = cutThroughBodies(doc, wires, lib, (_, w) => added.has(w));
   return mergeCollinear({ ...doc, wires }, lib);
+}
+
+/**
+ * Un cable que pasa por dos pines del mismo componente lo pondría en corto. Como LTspice, se
+ * quita el tramo entre esos pines (el que va sobre el cuerpo) y quedan dos cables que terminan
+ * en ellos. Sólo para los pares que `applies` acepta (lo recién dibujado o movido) y si entre
+ * los dos pines no llega nada más (otro pin, una etiqueta o el extremo de otro cable).
+ */
+function cutThroughBodies(doc: AscDoc, wires: Wire[], lib: Library, applies: (sym: number, w: Wire) => boolean): Wire[] {
+  const pins = doc.symbols.flatMap((s, sym) => pinPoints(s, lib.symbol(s.type)).map((p) => ({ p, sym })));
+  if (!pins.length) return wires;
+  const marks: Point[] = [...pins.map((q) => q.p), ...doc.flags, ...wires.flatMap(ends)];
+  return wires.flatMap((w) => {
+    if (isZero(w) || !doc.symbols.some((_, i) => applies(i, w))) return [w];
+    // posición a lo largo del cable (las coordenadas son enteras: comparaciones exactas)
+    const along = (p: Point) => (w.x1 !== w.x2 ? (p.x - w.x1) / (w.x2 - w.x1) : (p.y - w.y1) / (w.y2 - w.y1));
+    const on = pins.filter((q) => applies(q.sym, w) && onSegment(q.p, w)).map((q) => ({ ...q, t: along(q.p) }));
+    const cuts: { from: Point; to: Point; t0: number; t1: number }[] = [];
+    for (const a of on)
+      for (const b of on) {
+        if (a.sym !== b.sym || a.t >= b.t) continue;
+        if (marks.some((m) => onSegment(m, w) && along(m) > a.t && along(m) < b.t)) continue;
+        cuts.push({ from: a.p, to: b.p, t0: a.t, t1: b.t });
+      }
+    if (!cuts.length) return [w];
+    cuts.sort((c, d) => c.t0 - d.t0);
+    const out: Wire[] = [];
+    let start: Point = { x: w.x1, y: w.y1 };
+    for (const c of cuts) {
+      if (!samePt(start, c.from)) out.push(seg(start, c.from));
+      start = c.to;
+    }
+    if (!samePt(start, { x: w.x2, y: w.y2 })) out.push(seg(start, { x: w.x2, y: w.y2 }));
+    return out;
+  });
 }
 
 /** Letra de InstName que usa LTspice para un prefijo (X → U, QN → Q, MN → M…) */
@@ -111,7 +153,16 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     flags: doc.flags.map((fl, i): Flag => (f.has(i) ? { ...fl, ...mv(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...mv(tx) } : tx)),
   };
-  if (!drag) return mergeCollinear({ ...base, wires: doc.wires.map((wr, i) => (w.has(i) ? shift(wr) : wr)) }, lib);
+  // un componente movido sobre un cable (o un cable movido sobre un componente) no queda en corto
+  const moved = new Set<Wire>();
+  const moveWire = (wr: Wire) => {
+    const m = shift(wr);
+    moved.add(m);
+    return m;
+  };
+  const finish = (wires: Wire[]) =>
+    mergeCollinear({ ...base, wires: cutThroughBodies(base, wires, lib, (sym, wr) => s.has(sym) || moved.has(wr)) }, lib);
+  if (!drag) return finish(doc.wires.map((wr, i) => (w.has(i) ? moveWire(wr) : wr)));
 
   // Puntos que se mueven: pines y etiquetas seleccionados, extremos de cables seleccionados
   const moving = new Map<string, Point>();
@@ -141,7 +192,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
 
   const wires: Wire[] = [];
   doc.wires.forEach((wr, i) => {
-    if (w.has(i)) return wires.push(shift(wr));
+    if (w.has(i)) return wires.push(moveWire(wr));
     const [a, b] = ends(wr);
     const [sa, sb] = [stretches(a), stretches(b)];
     if (!sa && !sb) return wires.push(wr);
@@ -157,7 +208,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     if (dx) wires.push(seg(p, corner));
     if (dy) wires.push(seg(corner, mv(p)));
   }
-  return mergeCollinear({ ...base, wires }, lib);
+  return finish(wires);
 }
 
 // ---------------------------------------------------------------------------------------------

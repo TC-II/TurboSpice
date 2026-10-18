@@ -66,8 +66,9 @@ const ortho = (d) => d.wires.every((w) => w.x1 === w.x2 || w.y1 === w.y2);
 
 // R1 y R2 verticales unidos abajo por un cable en U, tierra arriba de R2
 await page.keyboard.press('r');
-await click(0, 0);
-await click(160, 0);
+// (la colocación queda centrada en el cuerpo: el origen va 16,48 arriba a la izquierda)
+await click(16, 48);
+await click(176, 48);
 await page.keyboard.press('Escape');
 await page.keyboard.press('w');
 await click(16, 96);
@@ -125,6 +126,38 @@ await drag([16, 56], [16, 120]);
   const d = await saved();
   check(d.doc.wires.every((w) => w.x1 !== w.x2 || w.y1 !== w.y2) && d.net === ref.net, `mover R1 sobre su cable no deja cables de largo 0: ${d.wires.join(' | ')}`);
   check((await page.locator('svg.editor .junctions circle').count()) === 0, 'y no deja nodo');
+}
+
+// #45: un cable que atraviesa una resistencia se parte en sus pines (R en serie, no en corto)
+const rNodes = (net, name) => net.match(new RegExp(`^${name} (\\S+) (\\S+)`, 'm'))?.slice(1) ?? [];
+await page.keyboard.press('r');
+await click(336, 48); // R3: pines en (336,16) y (336,96)
+await page.keyboard.press('Escape');
+const before = await saved();
+await page.keyboard.press('w');
+await click(336, -64);
+await click(336, 176);
+await page.keyboard.press('Escape');
+{
+  const d = await saved();
+  const [a, b] = rNodes(d.net, 'R3');
+  check(d.wires.includes('336 -64 336 16') && d.wires.includes('336 96 336 176') && !d.wires.some((w) => w === '336 -64 336 176'), `el cable queda partido en dos: ${d.wires.join(' | ')}`);
+  check(a && b && a !== b, `R3 queda en serie, no en corto (${a} ${b})`);
+  check((await page.locator('svg.editor .junctions circle').count()) === 0, 'sin nodos sobre el cuerpo');
+  await page.keyboard.press('Control+z');
+  check((await saved()).wires.join() === before.wires.join(), 'Ctrl+Z deshace el cable entero en un paso');
+}
+// …y mover un componente sobre un cable también lo deja en serie
+await page.keyboard.press('w');
+await click(416, -64);
+await click(416, 176);
+await page.keyboard.press('Escape');
+await drag([336, 56], [416, 56]);
+{
+  const d = await saved();
+  const [a, b] = rNodes(d.net, 'R3');
+  check(d.wires.includes('416 -64 416 16') && d.wires.includes('416 96 416 176'), `mover R3 sobre un cable lo parte: ${d.wires.join(' | ')}`);
+  check(a && b && a !== b, `y R3 queda en serie (${a} ${b})`);
 }
 
 await page.screenshot({ path: `${OUT}/wires.png` });

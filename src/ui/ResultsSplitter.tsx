@@ -74,6 +74,7 @@ export function ResultsSplitter({
 }) {
   // en táctil no hay hover: los botones se muestran un rato al tocar el divisor
   const [touched, setTouched] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const touchTimer = useRef<number>();
   useEffect(() => () => window.clearTimeout(touchTimer.current), []);
   // tamaño anterior al último doble click (para volver de 50 %)
@@ -113,7 +114,7 @@ export function ResultsSplitter({
 
   return (
     <div
-      className={`splitter${touched ? ' touched' : ''}`}
+      className={`splitter${touched ? ' touched' : ''}${dragging ? ' dragging' : ''}`}
       role="separator"
       aria-orientation={side ? 'vertical' : 'horizontal'}
       title="Arrastrar para cambiar el tamaño de los resultados; doble click alterna con 50 %"
@@ -123,17 +124,24 @@ export function ResultsSplitter({
           window.clearTimeout(touchTimer.current);
           touchTimer.current = window.setTimeout(() => setTouched(false), 4000);
         }
-        const wrap = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
-        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        const el = e.currentTarget as HTMLElement;
+        const wrap = (el.parentElement as HTMLElement).getBoundingClientRect();
+        // distancia del puntero al borde del panel: se conserva al arrastrar, así al soltar
+        // el puntero sigue sobre el divisor
+        const panel = (el.nextElementSibling as HTMLElement | null)?.getBoundingClientRect();
+        const off = panel ? (side ? panel.left - e.clientX : panel.top - e.clientY) : 0;
+        el.setPointerCapture(e.pointerId);
+        setDragging(true);
         const move = (ev: PointerEvent) =>
           setSize(() =>
             side
-              ? Math.min(wrap.width - 240, Math.max(280, wrap.right - ev.clientX))
-              : Math.min(wrap.height - 120, Math.max(140, wrap.bottom - ev.clientY)),
+              ? Math.min(wrap.width - 240, Math.max(280, wrap.right - (ev.clientX + off)))
+              : Math.min(wrap.height - 120, Math.max(140, wrap.bottom - (ev.clientY + off))),
           );
         const up = () => {
           window.removeEventListener('pointermove', move);
           window.removeEventListener('pointerup', up);
+          setDragging(false);
           setSize(save);
         };
         window.addEventListener('pointermove', move);

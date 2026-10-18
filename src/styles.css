@@ -463,6 +463,14 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .split-actions { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; gap: 4px; z-index: 3; }
 .splitter:hover .split-actions, .splitter.touched .split-actions, .splitter.expanded .split-actions, .split-actions:focus-within { display: flex; }
 .workspace.side .split-actions { flex-direction: column; }
+/* zona de agarre con histéresis: al entrar se agranda, así el cursor no oscila al rozar el borde */
+.splitter:not(.expanded)::before { content: ''; position: absolute; inset: -3px 0; }
+.splitter:not(.expanded):hover::before, .splitter.dragging::before { inset: -10px 0; }
+.workspace.side .splitter:not(.expanded)::before { inset: 0 -3px; }
+.workspace.side .splitter:not(.expanded):hover::before, .workspace.side .splitter.dragging::before { inset: 0 -10px; }
+/* al costado, el contenido (el gráfico) no impone un ancho mínimo: si no, aplasta el esquemático */
+.workspace.side .results-panel { min-width: 0; }
+.workspace.side .canvas-wrap { min-width: 240px; }
 .split-btn { padding: 0; width: 26px; height: 20px; font-size: 11px; line-height: 1; border-radius: 6px; background: var(--bg-alt); border: 1px solid var(--border); color: var(--fg); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); cursor: pointer; }
 .workspace.side .split-btn { width: 20px; height: 26px; }
 .split-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }

@@ -7,13 +7,31 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { scaleOf, si } from './series.ts';
+import { displayName, scaleOf, si } from './series.ts';
 import { sameExpr, traceColor, type Pane, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
+
+/** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
+export type PlotAction =
+  | 'fit' // Espacio
+  | 'zoomBox' // Z
+  | 'zoomPrev' // Shift+Z
+  | 'autoY' // Ctrl+Y
+  | 'grid' // Ctrl+G
+  | 'addTrace' // A
+  | 'addPane' // P
+  | 'addPaneBelow' // B
+  | 'paneUp' // U
+  | 'paneDown' // D
+  | 'removeTraces' // Backspace
+  | 'cursor' // C
+  | 'clearCursors' // Shift+C
+  | 'cancel'; // Esc
 
 export interface PlotPanelHandle {
   csv(): string;
   png(): Promise<Blob | null>;
+  action(a: PlotAction): void;
 }
 
 interface Props {
@@ -79,6 +97,14 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [expr, setExpr] = useState('');
   const [exprError, setExprError] = useState<string>();
   const charts = useRef(new Map<number, uPlot>());
+  const exprInput = useRef<HTMLInputElement>(null);
+  // eje Y fijado por un zoom a recuadro (por panel; sin entrada = autoescala)
+  const [yRanges, setYRanges] = useState<Record<number, Range>>({});
+  const [zoomMode, setZoomMode] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
+  // vistas anteriores (Shift+Z)
+  const zoomHistory = useRef<{ x: Range | null; y: Record<number, Range> }[]>([]);
 
   const data = useMemo(
     () => panes.map((p) => paneCurves(p, { plot, runs, labels, resolver, mode })),
@@ -91,6 +117,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const scaleName = scale?.name;
   useEffect(() => {
     setXRange(null);
+    setYRanges({});
+    zoomHistory.current = [];
     setCursors({});
   }, [scaleName]);
   useEffect(() => {
@@ -98,6 +126,21 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     if (!xs?.length) return;
     setXRange((r) => (r && (r[1] < xs[0] || r[0] > xs[xs.length - 1]) ? null : r));
   }, [scale]);
+
+  // (los gráficos guardan los callbacks de cuando se crearon: el zoom actual va por refs)
+  const zoomNow = useRef({ x: xRange, y: yRanges });
+  zoomNow.current = { x: xRange, y: yRanges };
+  /** Cambio de zoom que se deshace con Shift+Z */
+  const zoomTo = (x: Range | null, y: Record<number, Range> = zoomNow.current.y) => {
+    const cur = zoomNow.current;
+    const same = (a: Range | null, b: Range | null) => (a && b ? a[0] === b[0] && a[1] === b[1] : a === b);
+    if (same(x, cur.x) && y === cur.y) return;
+    zoomHistory.current.push(cur);
+    zoomNow.current = { x, y };
+    if (zoomHistory.current.length > 50) zoomHistory.current.shift();
+    setXRange(x);
+    setYRanges(y);
+  };
   useEffect(() => {
     if (active >= panes.length) setActive(Math.max(0, panes.length - 1));
   }, [panes.length, active, setActive]);
@@ -128,7 +171,69 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       return toCsv(d.xName, d.x, cols);
     },
     png: () => exportPng(panes, data, charts.current),
+    action: (a) => {
+      const i = Math.min(active, panes.length - 1);
+      switch (a) {
+        case 'fit':
+          return zoomTo(null, {});
+        case 'zoomBox':
+          setRemoving(false);
+          return setZoomMode(true);
+        case 'zoomPrev': {
+          const prev = zoomHistory.current.pop();
+          if (prev) {
+            zoomNow.current = prev;
+            setXRange(prev.x);
+            setYRanges(prev.y);
+          }
+          return;
+        }
+        case 'autoY':
+          return zoomTo(xRange, {});
+        case 'grid':
+          return setShowGrid((v) => !v);
+        case 'addTrace':
+          return exprInput.current?.focus();
+        case 'addPane':
+          setPanes([...panes, { traces: [] }]);
+          return setActive(panes.length);
+        case 'addPaneBelow':
+          setPanes([...panes.slice(0, i + 1), { traces: [] }, ...panes.slice(i + 1)]);
+          return setActive(i + 1);
+        case 'paneUp':
+        case 'paneDown': {
+          const j = a === 'paneUp' ? i - 1 : i + 1;
+          if (j < 0 || j >= panes.length) return;
+          const next = [...panes];
+          [next[i], next[j]] = [next[j], next[i]];
+          setPanes(next);
+          return setActive(j);
+        }
+        case 'removeTraces':
+          setZoomMode(false);
+          return setRemoving(true);
+        case 'cursor': {
+          setCursorMode(true);
+          const d = data.find((x) => x.x.length);
+          if (cursors.a !== undefined || !d) return;
+          const [lo, hi] = xRange ?? [d.x[0], d.x[d.x.length - 1]];
+          return setCursors({ ...cursors, a: d.log ? Math.sqrt(lo * hi) : (lo + hi) / 2 });
+        }
+        case 'clearCursors':
+          setCursors({});
+          return setCursorMode(false);
+        case 'cancel':
+          setZoomMode(false);
+          return setRemoving(false);
+      }
+    },
   }));
+
+  // nombres para autocompletar el campo de expresión
+  const names = useMemo(() => {
+    const sc = scaleOf(plot);
+    return [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))];
+  }, [plot]);
 
   const range: Range | null = xRange;
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
@@ -144,6 +249,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           }}
         >
           <input
+            ref={exprInput}
+            list="trace-names"
             value={expr}
             spellCheck={false}
             placeholder="Agregar traza: V(out)/V(in), I(R1)*V(n1), d(V(c))…"
@@ -153,26 +260,33 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
               setExprError(undefined);
             }}
           />
-          <button type="submit">Agregar</button>
+          <datalist id="trace-names">
+            {names.map((n) => (
+              <option key={n} value={n} />
+            ))}
+          </datalist>
+          <button type="submit" title="Agregar la traza (A: ir al campo)">Agregar</button>
         </form>
-        <button onClick={() => setPanes([...panes, { traces: [] }])} title="Agregar un panel (las trazas nuevas van al panel activo)">+ Panel</button>
+        <button onClick={() => setPanes([...panes, { traces: [] }])} title="Agregar un panel; las trazas nuevas van al panel activo (P; B: debajo del activo)">+ Panel</button>
         <button
           className={cursorMode ? 'active' : ''}
           onClick={() => setCursorMode((v) => !v)}
-          title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto)"
+          title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto; C; Shift+C los borra)"
         >
           Cursores
         </button>
         <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title="Máximo, mínimo, pico a pico, promedio, eficaz y frecuencia en el rango visible">
           Medidas
         </button>
-        <button onClick={() => setXRange(null)} title="Ver todo el eje X (doble click en el gráfico)">Ajustar</button>
+        <button onClick={() => zoomTo(null, {})} title="Ver todo (Espacio o doble click en el gráfico; Z: zoom a un recuadro, Shift+Z: zoom anterior)">Ajustar</button>
         {onFft && data[0]?.xName === 'time' && (
           <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title="Espectro (FFT) y distorsión armónica de una traza">
             FFT…
           </button>
         )}
         {exprError && <span className="hint warn">{exprError}</span>}
+        {zoomMode && <span className="hint">Arrastrá un recuadro para hacer zoom · Esc cancela</span>}
+        {removing && <span className="hint">Click en el nombre de una traza para quitarla · Esc termina</span>}
       </div>
       {fftOpen && onFft && (
         <div className="plot-tools fft-tools">
@@ -215,7 +329,19 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onChange={(f) => update(i, f)}
             onDropTrace={(from, ti) => moveTrace(from, ti, i)}
             xRange={range}
-            onZoom={setXRange}
+            yRange={yRanges[i] ?? null}
+            onZoom={(r) => zoomTo(r)}
+            onWheelZoom={(r) => {
+              zoomNow.current = { ...zoomNow.current, x: r };
+              setXRange(r);
+            }}
+            onBoxZoom={(x, y) => {
+              setZoomMode(false);
+              zoomTo(x, { ...zoomNow.current.y, [i]: y });
+            }}
+            zoomMode={zoomMode}
+            removing={removing}
+            showGrid={showGrid}
             cursorMode={cursorMode}
             cursors={cursors}
             onCursor={(c) => setCursors((old) => ({ ...old, ...c }))}
@@ -249,7 +375,14 @@ function PaneView(props: {
   onChange(f: (p: Pane) => Pane): void;
   onDropTrace(fromPane: number, trace: number): void;
   xRange: Range | null;
+  /** eje Y fijo (zoom a recuadro); null = autoescala */
+  yRange: Range | null;
   onZoom(r: Range | null): void;
+  onWheelZoom(r: Range | null): void;
+  onBoxZoom(x: Range, y: Range): void;
+  zoomMode: boolean;
+  removing: boolean;
+  showGrid: boolean;
   cursorMode: boolean;
   cursors: Cursors;
   onCursor(c: Cursors): void;
@@ -257,7 +390,7 @@ function PaneView(props: {
   marks?: PzMark[];
   register(u: uPlot | null): void;
 }) {
-  const { index, pane, data, xRange, cursorMode, cursors, onCursor } = props;
+  const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<uPlot | null>(null);
   const cursorsRef = useRef(cursors);
@@ -267,6 +400,8 @@ function PaneView(props: {
   live.current = props;
   const marksRef = useRef(props.marks);
   marksRef.current = props.marks;
+  const yRef = useRef(yRange);
+  yRef.current = yRange;
   const programmatic = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -291,7 +426,7 @@ function PaneView(props: {
       legend: { show: false },
       scales: {
         x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : {}) },
-        y: { range: safeRange },
+        y: { range: (u, min, max) => yRef.current ?? safeRange(u, min, max, 'y') },
         i: { range: safeRange },
         ph: { range: safeRange },
       },
@@ -299,10 +434,10 @@ function PaneView(props: {
         {
           values: (_u, t) => t.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
           stroke: muted,
-          grid: { stroke: grid },
+          grid: { stroke: grid, show: showGrid },
           ticks: { stroke: grid },
         },
-        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid }, ticks: { stroke: grid }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
+        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid, show: showGrid }, ticks: { stroke: grid }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
         ...(hasRight
           ? [{ scale: data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i', side: 1, values: ticks, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
           : []),
@@ -321,8 +456,9 @@ function PaneView(props: {
       ],
       cursor: {
         sync: { key: 'turbospice' },
-        // con los cursores activos no hay zoom por arrastre (se cambia en vivo, sin recrear el gráfico)
-        drag: { x: !live.current.cursorMode, y: false, setScale: !live.current.cursorMode },
+        // con los cursores activos no hay zoom por arrastre; Z: recuadro en X e Y (lo aplica setSelect).
+        // Se cambia en vivo, sin recrear el gráfico.
+        drag: live.current.zoomMode ? { x: true, y: true, setScale: false } : { x: !live.current.cursorMode, y: false, setScale: !live.current.cursorMode },
         points: { size: 6 },
         bind: {
           // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
@@ -333,6 +469,17 @@ function PaneView(props: {
         },
       },
       hooks: {
+        setSelect: [
+          (u) => {
+            if (!live.current.zoomMode) return;
+            const s = u.select;
+            if (s.width < 4 || s.height < 4) return;
+            const x: Range = [u.posToVal(s.left, 'x'), u.posToVal(s.left + s.width, 'x')];
+            const y: Range = [u.posToVal(s.top + s.height, 'y'), u.posToVal(s.top, 'y')];
+            u.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false);
+            live.current.onBoxZoom(x, y);
+          },
+        ],
         setCursor: [
           (u) => {
             cancelAnimationFrame(raf);
@@ -469,7 +616,7 @@ function PaneView(props: {
     };
     let dragging: CursorKey | null = null;
     const down = (e: PointerEvent) => {
-      if (!live.current.cursorMode || (e.button !== 0 && e.button !== 2)) return;
+      if (!live.current.cursorMode || live.current.zoomMode || (e.button !== 0 && e.button !== 2)) return;
       e.preventDefault();
       el.focus({ preventScroll: true });
       const grab = grabbed(e);
@@ -500,7 +647,7 @@ function PaneView(props: {
       if (data.log) [lo, hi] = [10 ** lo, 10 ** hi];
       const x0 = data.x[0];
       const x1 = data.x[data.x.length - 1];
-      live.current.onZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
+      live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     };
     root.addEventListener('pointerdown', down);
     root.addEventListener('pointermove', move);
@@ -526,24 +673,26 @@ function PaneView(props: {
     };
     // el gráfico se recrea sólo si cambian los datos; xRange y los cursores se aplican aparte
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data]);
+  }, [data, showGrid]);
 
   useEffect(() => {
     const u = chart.current;
     if (!u) return;
-    u.cursor.drag!.x = !cursorMode;
-    u.cursor.drag!.setScale = !cursorMode;
+    u.cursor.drag!.x = zoomMode || !cursorMode;
+    u.cursor.drag!.y = zoomMode;
+    u.cursor.drag!.setScale = !zoomMode && !cursorMode;
     if (!cursorMode) u.over.style.cursor = '';
     u.redraw(false);
-  }, [cursorMode]);
+  }, [cursorMode, zoomMode]);
 
+  // (al fijar el eje X, uPlot vuelve a calcular el Y: el rango de yRef o la autoescala)
   useEffect(() => {
     const u = chart.current;
     if (!u) return;
     programmatic.current = true;
     u.setScale('x', xRange ? { min: xRange[0], max: xRange[1] } : { min: data.x[0], max: data.x[data.x.length - 1] });
     programmatic.current = false;
-  }, [xRange, data]);
+  }, [xRange, yRange, data, cursorMode, zoomMode, showGrid]);
 
   useEffect(() => {
     chart.current?.redraw(false);
@@ -558,7 +707,7 @@ function PaneView(props: {
 
   return (
     <div
-      className={`pane${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}`}
+      className={`pane${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
       onPointerDown={props.onActivate}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/x-trace')) {
@@ -598,7 +747,14 @@ function PaneView(props: {
                   onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, color: e.target.value } : x)) }))}
                 />
               </label>
-              <button className="name" onClick={() => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, hidden: !x.hidden } : x)) }))}>
+              <button
+                className="name"
+                onClick={() =>
+                  props.onChange((p) => ({
+                    traces: removing ? p.traces.filter((_, k) => k !== ti) : p.traces.map((x, k) => (k === ti ? { ...x, hidden: !x.hidden } : x)),
+                  }))
+                }
+              >
                 {t.expr}
               </button>
               {err ? <span className="err">{err}</span> : hover !== null && <span className="val">{fmt(v, unitOf(c))}</span>}

@@ -170,9 +170,11 @@ export interface CanvasProps {
   highlightNet?: string;
   /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
   hoverSymbol?: number;
+  /** marcas de pines sueltos (Ctrl+U) */
+  showLoose?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, showLoose = true }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
@@ -213,7 +215,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
           <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} />
         ))}
       </g>
-      <g className="loose">{loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
+      <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((t, i) =>
           isStudyBlocksText(t) ? null : (

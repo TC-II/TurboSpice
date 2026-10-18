@@ -90,9 +90,9 @@ type Drag =
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
-  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean; straight?: boolean }
+  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
   /** desplazar un tramo de cable en forma perpendicular */
-  | { mode: 'segment'; start: Point; index: number; straight?: boolean }
+  | { mode: 'segment'; start: Point; index: number }
   /** arrastrar un rótulo (InstName/Value) de un símbolo */
   | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
 
@@ -157,6 +157,8 @@ export function SchematicEditor(props: Props) {
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
+  const cursorRef = useRef(cursor);
+  cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
   const [preview, setPreview] = useState<AscDoc | null>(null);
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
@@ -344,15 +346,15 @@ export function SchematicEditor(props: Props) {
           if (e.altKey && at && !v) {
             const base = splitWire(doc, hit.index, at);
             setSelection([]);
-            setDrag({ mode: 'vertex', base, at, free: false, commitBase: base !== doc, straight });
+            setDrag({ mode: 'vertex', base, at, free: false, commitBase: base !== doc });
             return;
           }
           if (v || at || straight) {
             setSelection([hit]);
             setDrag(
               v
-                ? { mode: 'vertex', base: doc, at: v, free: freeEnd(doc, v), commitBase: false, straight }
-                : { mode: 'segment', start: g, index: hit.index, straight },
+                ? { mode: 'vertex', base: doc, at: v, free: freeEnd(doc, v), commitBase: false }
+                : { mode: 'segment', start: g, index: hit.index },
             );
             return;
           }
@@ -405,6 +407,34 @@ export function SchematicEditor(props: Props) {
     }
   };
 
+  // arrastre de un codo o un tramo: cambia el recorrido pero no la conectividad (si el nuevo
+  // lugar crearía o rompería una unión, el cable se queda en la última posición válida).
+  // Con Ctrl (apretado en cualquier momento del arrastre) va en línea recta, sin codos.
+  const wirePreview = (d: Drag & { mode: 'vertex' | 'segment' }, g: Point, straight: boolean) => {
+    const from = d.mode === 'vertex' ? d.base : doc;
+    const nd =
+      d.mode === 'vertex'
+        ? (straight ? moveVertexStraight : moveVertex)(d.base, d.at, g, lib)
+        : (straight ? dragSegmentStraight : dragSegment)(doc, d.index, g.x - d.start.x, g.y - d.start.y, lib);
+    if (nd === from) setPreview(null);
+    else if ((d.mode === 'vertex' && d.free) || sameConnections(doc, nd, lib)) setPreview(nd);
+  };
+  const wirePreviewRef = useRef(wirePreview);
+  wirePreviewRef.current = wirePreview;
+  const dragging = drag?.mode === 'vertex' || drag?.mode === 'segment' ? drag : null;
+  useEffect(() => {
+    if (!dragging) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Control' || e.key === 'Meta') wirePreviewRef.current(dragging, snapPoint(cursorRef.current), e.ctrlKey || e.metaKey);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+    };
+  }, [dragging]);
+
   const onPointerMove = (e: React.PointerEvent) => {
     if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
       const prev = touches.current.get(e.pointerId)!;
@@ -455,17 +485,7 @@ export function SchematicEditor(props: Props) {
       if (dx || dy) setDrag({ ...drag, moved: true });
       setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
     } else if (drag.mode === 'vertex' || drag.mode === 'segment') {
-      // cambia el recorrido pero no la conectividad: si el nuevo lugar crearía o rompería
-      // una unión, el cable se queda en la última posición válida
-      const g = snapPoint(p);
-      const from = drag.mode === 'vertex' ? drag.base : doc;
-      const [dx, dy] = drag.mode === 'segment' ? [g.x - drag.start.x, g.y - drag.start.y] : [0, 0];
-      const nd =
-        drag.mode === 'vertex'
-          ? (drag.straight ? moveVertexStraight : moveVertex)(drag.base, drag.at, g, lib)
-          : (drag.straight ? dragSegmentStraight : dragSegment)(doc, drag.index, dx, dy, lib);
-      if (nd === from) setPreview(null);
-      else if ((drag.mode === 'vertex' && drag.free) || sameConnections(doc, nd, lib)) setPreview(nd);
+      wirePreview(drag, snapPoint(p), e.ctrlKey || e.metaKey);
     } else {
       setBoxEnd(p);
     }

@@ -163,7 +163,7 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
   const q = query.trim().toLowerCase();
   const shown = (files ?? []).filter((f) => !q || f.name.toLowerCase().includes(q));
   return (
-    <Modal title="Mis simulaciones" onClose={onClose}>
+    <Modal title="Mis simulaciones" onClose={onClose} large>
       <div className="drive-browser">
         <p className="hint">Carpeta «{FOLDER_NAME}» de tu Google Drive.</p>
         <input

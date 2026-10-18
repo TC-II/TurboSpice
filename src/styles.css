@@ -227,6 +227,7 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 35%); display: grid; place-items: center; z-index: 10; padding: 16px; }
 .modal { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; width: min(460px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 10px 40px rgb(0 0 0 / 30%); }
 .modal.wide { width: min(860px, 100%); }
+.modal.large { width: min(1280px, 100%); height: min(88vh, 1000px); max-height: none; display: flex; flex-direction: column; overflow: hidden; }
 .modal h2 { font-size: 15px; margin: 0 0 12px; }
 .modal input, .modal textarea { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%; }
 .attrs { display: flex; flex-direction: column; gap: 8px; }
@@ -636,13 +637,18 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .drive-list button:hover, .drive-list button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
 .drive-list .hint { margin: 0; white-space: nowrap; }
 /* Mis simulaciones: buscador y acciones por archivo */
-.drive-browser { display: flex; flex-direction: column; gap: 8px; min-width: min(560px, 80vw); }
+.drive-browser { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
+.modal.large .drive-list { flex: 1; max-height: none; border: 1px solid var(--border); border-radius: 8px; padding: 4px; }
+.modal.large .drive-list button { font-size: 14px; padding: 9px 10px; }
+.modal.large .drive-search { font-size: 14px; padding: 8px 10px; }
 .drive-browser > .hint { margin: 0; }
 .drive-search { width: 100%; }
 .drive-list li { display: flex; align-items: center; gap: 2px; border-radius: 5px; }
 .drive-list li.current { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .drive-list li.current .drive-open > span:first-child { font-weight: 600; }
 .drive-list .drive-open { flex: 1; min-width: 0; }
-.drive-list .drive-open > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-list .drive-open > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-list .drive-open > .hint { flex: none; }
+@media (max-width: 560px) { .drive-list .drive-open > .hint { display: none; } }
 .drive-list .drive-act { width: 30px; flex: none; justify-content: center; padding: 6px 0; opacity: 0.55; }
 .drive-list li:hover .drive-act, .drive-list .drive-act:focus-visible { opacity: 1; }

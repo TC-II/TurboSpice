@@ -32,11 +32,13 @@ export function checkValue(prefix: string, value: string): { value: string; info
 }
 import { SymbolView } from './SchematicCanvas.tsx';
 
-export function Modal({ title, children, onClose, wide, hidden }: {
+export function Modal({ title, children, onClose, wide, large, hidden }: {
   title: string;
   children: ReactNode;
   onClose(): void;
   wide?: boolean;
+  /** casi toda la ventana (exploradores de archivos) */
+  large?: boolean;
   /** oculto mientras se elige algo en el esquemático (conserva su estado) */
   hidden?: boolean;
 }) {
@@ -48,7 +50,7 @@ export function Modal({ title, children, onClose, wide, hidden }: {
   }, [onClose, hidden]);
   return (
     <div className={`modal-backdrop${hidden ? ' picking' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-label={title}>
+      <div className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>

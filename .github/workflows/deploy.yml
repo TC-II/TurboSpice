@@ -62,6 +62,9 @@ jobs:
         run: npm run smoke
       - run: npm test --if-present
       - run: npm run build
+        env:
+          # OAuth Client ID público (Settings → Variables); vacío = sin inicio de sesión con Google
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - name: E2E en Chrome
         env:
           CHROMIUM: /usr/bin/google-chrome

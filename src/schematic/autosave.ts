@@ -15,6 +15,8 @@ export interface Session {
   name: string;
   encoding?: AscEncoding;
   handle?: unknown;
+  /** id en Google Drive */
+  driveId?: string;
   /** historial serializado (.asc) */
   past: string[];
   present: string;
@@ -31,6 +33,8 @@ export interface RecentFile {
   asc: string;
   encoding?: AscEncoding;
   handle?: unknown;
+  /** id en Google Drive */
+  driveId?: string;
   time: number;
   /** trabajo sin guardar recuperado */
   unsaved?: boolean;

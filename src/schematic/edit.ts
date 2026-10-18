@@ -1,5 +1,5 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
-import type { AscDoc, Flag, FlagDir, Orient, Point, SchText, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
+import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
 import { defaultWindows, effectiveWindows } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { localAlign, mirrorX, rotateCW } from '../asc/transform.ts';
@@ -439,9 +439,6 @@ function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolI
   return { ...sym, orient, windows };
 }
 
-const ROTATE_DIR: Record<FlagDir, FlagDir> = { top: 'right', right: 'bottom', bottom: 'left', left: 'top' };
-const MIRROR_DIR: Record<FlagDir, FlagDir> = { top: 'top', bottom: 'bottom', left: 'right', right: 'left' };
-
 /** Rota (90° horario) o espeja la selección alrededor de su centro, sobre la grilla */
 export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
   if (!refs.length) return doc;
@@ -474,12 +471,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
       const [a, b] = ends(wr).map(tp);
       return { x1: a.x, y1: a.y, x2: b.x, y2: b.y };
     }),
-    flags: doc.flags.map((fl, i) => {
-      if (!f.has(i)) return fl;
-      const out = { ...fl, ...tp(fl) };
-      if (fl.dir) out.dir = (op === 'rotate' ? ROTATE_DIR : MIRROR_DIR)[fl.dir];
-      return out;
-    }),
+    flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
   }, lib);
 }
@@ -507,17 +499,6 @@ export function setFlagName(doc: AscDoc, index: number, name: string): AscDoc {
   return { ...doc, flags: doc.flags.map((f, i) => (i === index ? { ...f, name } : f)) };
 }
 
-/** Lado elegido para una etiqueta (desde dónde llega el cable); undefined = automático */
-export function setFlagDir(doc: AscDoc, index: number, dir: FlagDir | undefined): AscDoc {
-  return {
-    ...doc,
-    flags: doc.flags.map((f, i) => {
-      if (i !== index) return f;
-      const { dir: _, ...rest } = f;
-      return dir ? { ...rest, dir } : rest;
-    }),
-  };
-}
 
 /** Copia de los elementos seleccionados desplazada (F6 duplicar / pegar) */
 export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, lib: Library): { doc: AscDoc; refs: ItemRef[] } {

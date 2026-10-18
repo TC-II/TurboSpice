@@ -32,14 +32,9 @@ cualquier otra orientación escribe posiciones propias por símbolo (p.ej. `res`
 derivada del corpus (Mxx usa la misma que Rxx; para R180 sin dato se intercambian las ventanas 0 y 3).
 
 **Rótulos movidos a mano** (#28): se guardan como `WINDOW` explícito (posición local del símbolo,
-alineación y tamaño); ocultar un rótulo es `WINDOW n x y Invisible size`. "Por defecto" borra el
-`WINDOW` explícito, así que el archivo queda igual que si nunca se hubiera movido. Al rotar o espejar,
+alineación y tamaño); ocultar un rótulo es `WINDOW n x y Invisible size`. Al rotar o espejar,
 los rótulos que estaban en la posición por defecto pasan a la de la nueva orientación; los movidos
 conservan su `WINDOW` (acompañan al cuerpo del símbolo) y los ocultos siguen ocultos.
-
-**Lado del texto de una etiqueta** (`FLAG`): LTspice lo decide según el cable y no lo guarda. Si se
-elige a mano, TurboSpice lo escribe en un comentario `TEXT … ;.flagdir x,y,lado …` debajo del circuito
-(lado = desde dónde llega el cable: `top`, `bottom`, `left`, `right`); al abrir se lee y se quita.
 
 Verificado: la netlist que genera LTspice del archivo guardado por TurboSpice es idéntica a la del
 original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquiera en el original).

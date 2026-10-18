@@ -206,8 +206,7 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): It
 }
 
 /** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
-export function flagDirection(doc: AscDoc, f: Point & { dir?: FlagDir }): FlagDir {
-  if (f.dir) return f.dir;
+export function flagDirection(doc: AscDoc, f: Point): FlagDir {
   const dirs = new Set<string>();
   for (const w of doc.wires) {
     for (const [a, b] of [
@@ -232,7 +231,7 @@ export function flagDirection(doc: AscDoc, f: Point & { dir?: FlagDir }): FlagDi
  * Caja de una etiqueta o tierra, según hacia dónde queda el dibujo (opuesto al cable):
  * la tierra ocupa ±18 × 14 unidades; una etiqueta, su punto y el texto.
  */
-export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string; dir?: FlagDir }): Box {
+export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }): Box {
   const dir = flagDirection(doc, f);
   // Caja local con el dibujo hacia +y (cable desde arriba), luego rotada según la dirección
   let local: Box;

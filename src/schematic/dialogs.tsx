@@ -1,6 +1,6 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { baseName, WINDOW_ATTR, type FlagDir, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
+import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
 import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
 import type { LabelPatch } from './edit.ts';
@@ -300,23 +300,12 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
 }
 
 /** F4: nombre de red (o tierra) */
-/** Lado del texto de una etiqueta → desde dónde se considera que llega el cable (Flag.dir) */
-const FLAG_SIDES: { dir: FlagDir; label: string }[] = [
-  { dir: 'top', label: 'Abajo' },
-  { dir: 'bottom', label: 'Arriba' },
-  { dir: 'left', label: 'A la derecha' },
-  { dir: 'right', label: 'A la izquierda' },
-];
-
-export function FlagDialog({ initial, dir, onApply, onClose }: {
+export function FlagDialog({ initial, onApply, onClose }: {
   initial: string;
-  /** lado del texto de una etiqueta existente: elegido a mano, o null = automático (según el cable) */
-  dir?: FlagDir | null;
-  onApply(name: string, dir?: FlagDir | null): void;
+  onApply(name: string): void;
   onClose(): void;
 }) {
   const [name, setName] = useState(initial);
-  const [side, setSide] = useState<FlagDir | null>(dir ?? null);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -328,24 +317,13 @@ export function FlagDialog({ initial, dir, onApply, onClose }: {
         className="attrs"
         onSubmit={(e) => {
           e.preventDefault();
-          if (name.trim()) onApply(name.trim(), side);
+          if (name.trim()) onApply(name.trim());
         }}
       >
         <label>
           <span>Nombre</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
-        {dir !== undefined && name !== '0' && (
-          <label>
-            <span>Texto</span>
-            <select value={side ?? ''} onChange={(e) => setSide((e.target.value || null) as FlagDir | null)}>
-              <option value="">Automático (según el cable)</option>
-              {FLAG_SIDES.map((s) => (
-                <option key={s.dir} value={s.dir}>{s.label}</option>
-              ))}
-            </select>
-          </label>
-        )}
         <div className="buttons">
           <button type="button" onClick={() => onApply('0')}>Tierra (0)</button>
           <button type="button" onClick={onClose}>Cancelar</button>

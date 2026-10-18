@@ -45,17 +45,9 @@ export interface Flag {
   name: string;
   /** Línea IOPIN asociada (puerto de jerarquía): In, Out, BiDir */
   ioPin?: string;
-  /**
-   * Lado desde el que se considera que llega el cable (el texto va del lado opuesto), elegido
-   * a mano. LTspice no lo guarda: TurboSpice lo escribe en un comentario ";.flagdir" (FLAGDIR_TEXT).
-   */
-  dir?: FlagDir;
 }
 
 export type FlagDir = 'top' | 'bottom' | 'left' | 'right';
-export const FLAG_DIRS: readonly FlagDir[] = ['top', 'bottom', 'left', 'right'];
-/** Comentario TEXT con los lados elegidos de las etiquetas: ";.flagdir x,y,dir x,y,dir…" */
-export const FLAGDIR_TEXT = '.flagdir ';
 
 export interface DataFlag {
   x: number;

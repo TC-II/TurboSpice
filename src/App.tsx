@@ -29,7 +29,7 @@ import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagDir, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -1440,15 +1440,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
-          dir={dialog.index !== undefined ? (doc.flags[dialog.index].dir ?? null) : undefined}
           onClose={() => setDialog(null)}
-          onApply={(name, dir) => {
+          onApply={(name) => {
             setDialog(null);
-            if (dialog.index !== undefined) {
-              let d = setFlagName(doc, dialog.index, name);
-              if (dir !== undefined) d = setFlagDir(d, dialog.index, name === '0' ? undefined : (dir ?? undefined));
-              commit(d);
-            }
+            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
             else if (dialog.at) commit(addFlag(doc, dialog.at, name));
             else setTool({ kind: 'flag', name });
           }}

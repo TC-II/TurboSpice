@@ -1,5 +1,5 @@
 // Rótulos de los componentes (#28): mover, ocultar, alinear, volver a la posición por defecto,
-// rotar/espejar y lado del texto de las etiquetas.
+// rotar/espejar.
 import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { ORIENTS } from '../../src/asc/model.ts';
@@ -8,8 +8,7 @@ import { effectiveWindows, makeExplicit } from '../../src/asc/resolve.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { ALIGNS, localAlign, transformAlign } from '../../src/asc/transform.ts';
 import { Library } from '../../src/library/library.ts';
-import { patchLabels, setFlagDir, setWindow, transformItems } from '../../src/schematic/edit.ts';
-import { flagDirection } from '../../src/schematic/geometry.ts';
+import { patchLabels, setWindow, transformItems } from '../../src/schematic/edit.ts';
 
 const lib = new Library(buildBundle());
 const lines = (t: string) => t.split(/\r\n|\r|\n/).filter((l) => l.trim());
@@ -74,28 +73,3 @@ describe('rótulos de componentes', () => {
   });
 });
 
-describe('lado del texto de las etiquetas (FLAG)', () => {
-  const NET = 'Version 4\nSHEET 1 880 680\nWIRE 0 0 0 64\nFLAG 0 0 out\n';
-
-  it('se elige a mano, se guarda en ";.flagdir" y se vuelve a leer', () => {
-    const doc = parseAsc(NET);
-    expect(flagDirection(doc, doc.flags[0])).toBe('bottom');
-    const left = setFlagDir(doc, 0, 'left');
-    expect(flagDirection(left, left.flags[0])).toBe('left');
-    const text = serializeAsc(left);
-    expect(lines(text).some((l) => l.startsWith('TEXT') && l.endsWith(';.flagdir 0,0,left'))).toBe(true);
-    const again = parseAsc(text);
-    expect(again.flags[0].dir).toBe('left');
-    expect(again.texts).toEqual([]);
-    expect(serializeAsc(again)).toBe(text);
-    // automático otra vez: no queda el comentario
-    expect(serializeAsc(setFlagDir(again, 0, undefined))).toBe(serializeAsc(doc));
-  });
-
-  it('acompaña al rotar y espejar', () => {
-    const doc = setFlagDir(parseAsc(NET), 0, 'left');
-    const ref = [{ kind: 'flag' as const, index: 0 }];
-    expect(transformItems(doc, ref, 'rotate', lib).flags[0].dir).toBe('top');
-    expect(transformItems(doc, ref, 'mirror', lib).flags[0].dir).toBe('right');
-  });
-});

@@ -75,6 +75,74 @@ export function distToSegment(p: Point, w: Wire): number {
   return Math.hypot(p.x - (w.x1 + t * dx), p.y - (w.y1 + t * dy));
 }
 
+/**
+ * Puntos de unión que dibuja LTspice: donde se juntan tres o más conexiones contando cada
+ * extremo de cable y cada pin como una, y un cable que pasa por el medio como dos (una T
+ * sobre el medio de un cable sí se marca; un pin contra el extremo de un cable, no).
+ */
+export function junctionPoints(doc: AscDoc, lib: Library): Point[] {
+  const count = new Map<string, number>();
+  const pts = new Map<string, Point>();
+  const add = (p: Point) => {
+    const k = `${p.x},${p.y}`;
+    pts.set(k, p);
+    count.set(k, (count.get(k) ?? 0) + 1);
+  };
+  const wires = doc.wires.filter((w) => w.x1 !== w.x2 || w.y1 !== w.y2);
+  for (const w of wires) {
+    add({ x: w.x1, y: w.y1 });
+    add({ x: w.x2, y: w.y2 });
+  }
+  const wireEnds = new Set(count.keys());
+  for (const s of doc.symbols) for (const p of pinPoints(s, lib.symbol(s.type))) add(p);
+  // cables horizontales y verticales indexados por coordenada (los diagonales, aparte)
+  const horiz = new Map<number, Wire[]>();
+  const vert = new Map<number, Wire[]>();
+  const diag: Wire[] = [];
+  const push = (m: Map<number, Wire[]>, k: number, w: Wire) => (m.get(k) ?? m.set(k, []).get(k)!).push(w);
+  for (const w of wires) {
+    if (w.y1 === w.y2) push(horiz, w.y1, w);
+    else if (w.x1 === w.x2) push(vert, w.x1, w);
+    else diag.push(w);
+  }
+  const out: Point[] = [];
+  for (const [k, p] of pts) {
+    let n = count.get(k)!;
+    let passes = false;
+    for (const w of [...(horiz.get(p.y) ?? []), ...(vert.get(p.x) ?? []), ...diag]) {
+      const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
+      const inside =
+        cross === 0 &&
+        p.x >= Math.min(w.x1, w.x2) && p.x <= Math.max(w.x1, w.x2) && p.y >= Math.min(w.y1, w.y2) && p.y <= Math.max(w.y1, w.y2) &&
+        !(p.x === w.x1 && p.y === w.y1) && !(p.x === w.x2 && p.y === w.y2);
+      if (inside) {
+        n += 2;
+        passes = true;
+      }
+    }
+    if (n >= 3 && (passes || wireEnds.has(k))) out.push(p);
+  }
+  return out;
+}
+
+/**
+ * Codo de cable bajo el cursor: extremo de cable a menos de `tol` que no está sobre un pin
+ * ni una etiqueta (esos se mueven arrastrando el tramo).
+ */
+export function wireVertexAt(doc: AscDoc, p: Point, lib: Library, tol: number): Point | null {
+  const fixed = new Set(doc.flags.map((f) => `${f.x},${f.y}`));
+  for (const s of doc.symbols) for (const q of pinPoints(s, lib.symbol(s.type))) fixed.add(`${q.x},${q.y}`);
+  let best: Point | null = null;
+  let bd = tol;
+  for (const w of doc.wires) {
+    for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) {
+      const d = Math.hypot(e.x - p.x, e.y - p.y);
+      if (d <= bd && !fixed.has(`${e.x},${e.y}`)) [best, bd] = [e, d];
+    }
+  }
+  return best;
+}
+
 export const inBox = (p: Point, b: Box, pad = 0) =>
   p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad;
 

@@ -1,6 +1,6 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
 import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, Wire } from '../asc/model.ts';
-import { onSegment } from '../netlist/connectivity.ts';
+import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { mirrorX, rotateCW } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { pinPoints, snap, type ItemRef } from './geometry.ts';
@@ -23,7 +23,7 @@ function splitAt(wires: Wire[], p: Point): Wire[] {
   return out;
 }
 
-export function addWire(doc: AscDoc, a: Point, b: Point): AscDoc {
+export function addWire(doc: AscDoc, a: Point, b: Point, lib?: Library): AscDoc {
   if (samePt(a, b)) return doc;
   let wires = splitAt(splitAt(doc.wires, a), b);
   // Cortar el cable nuevo donde terminan otros cables o hay pines (para que conecten igual
@@ -43,7 +43,7 @@ export function addWire(doc: AscDoc, a: Point, b: Point): AscDoc {
     seen.add(k);
     return true;
   });
-  return { ...doc, wires };
+  return mergeCollinear({ ...doc, wires }, lib);
 }
 
 /** Letra de InstName que usa LTspice para un prefijo (X → U, QN → Q, MN → M…) */
@@ -77,73 +77,297 @@ export function addText(doc: AscDoc, t: SchText): AscDoc {
   return { ...doc, texts: [...doc.texts, t] };
 }
 
-export function deleteItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
+export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc {
   const del = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [del('symbol'), del('wire'), del('flag'), del('text')];
-  return {
+  const out = {
     ...doc,
     symbols: doc.symbols.filter((_, i) => !s.has(i)),
     wires: doc.wires.filter((_, i) => !w.has(i)),
     flags: doc.flags.filter((_, i) => !f.has(i)),
     texts: doc.texts.filter((_, i) => !t.has(i)),
   };
+  // sin el cable de una T, los dos tramos que quedan alineados vuelven a ser uno
+  return w.size ? mergeCollinear(out, lib) : out;
 }
 
 /**
- * Mueve los elementos. Con `drag` (F8 de LTspice) los cables no seleccionados que tocan
- * pines, etiquetas o extremos movidos se estiran para seguir conectados.
+ * Mueve los elementos. Con `drag` (F8 de LTspice) se conservan las uniones con lo que no se
+ * mueve: los cables no seleccionados que llegan a un punto movido se estiran (en L si eran
+ * horizontales o verticales) y donde algo fijo (pin, etiqueta, cable que pasa) tocaba algo
+ * movido se agrega un cable en L que los une. Al final se limpian los cables (mergeCollinear).
  */
 export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, drag: boolean, lib: Library): AscDoc {
   if (!dx && !dy) return doc;
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
-
-  // Puntos que se mueven (para estirar cables conectados)
-  const moving = new Set<string>();
   const key = (p: Point) => `${p.x},${p.y}`;
-  if (drag) {
-    doc.symbols.forEach((sym, i) => s.has(i) && pinPoints(sym, lib.symbol(sym.type)).forEach((p) => moving.add(key(p))));
-    doc.flags.forEach((fl, i) => f.has(i) && moving.add(key(fl)));
-    doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.add(key(p))));
-  }
   const mv = (p: Point) => ({ x: p.x + dx, y: p.y + dy });
-
-  // Conexiones directas (pin con pin, etiqueta sobre pin) sin cable que estirar: como el
-  // "drag" de LTspice, se agrega un cable en L para que sigan conectadas
-  const extra: Wire[] = [];
-  if (drag) {
-    const stay = new Set<string>();
-    doc.symbols.forEach((sym, i) => !s.has(i) && pinPoints(sym, lib.symbol(sym.type)).forEach((p) => stay.add(key(p))));
-    doc.flags.forEach((fl, i) => !f.has(i) && stay.add(key(fl)));
-    const wireEnds = new Set(doc.wires.flatMap((wr) => ends(wr).map(key)));
-    const done = new Set<string>();
-    const moved: Point[] = [];
-    doc.symbols.forEach((sym, i) => s.has(i) && moved.push(...pinPoints(sym, lib.symbol(sym.type))));
-    doc.flags.forEach((fl, i) => f.has(i) && moved.push(fl));
-    for (const p of moved) {
-      const k = key(p);
-      if (!stay.has(k) || wireEnds.has(k) || done.has(k)) continue;
-      done.add(k);
-      const corner = { x: p.x + dx, y: p.y };
-      if (dx) extra.push({ x1: p.x, y1: p.y, x2: corner.x, y2: corner.y });
-      if (dy) extra.push({ x1: corner.x, y1: corner.y, x2: p.x + dx, y2: p.y + dy });
-    }
-  }
-
-  return {
+  const shift = (wr: Wire): Wire => ({ x1: wr.x1 + dx, y1: wr.y1 + dy, x2: wr.x2 + dx, y2: wr.y2 + dy });
+  const base: AscDoc = {
     ...doc,
     symbols: doc.symbols.map((sym, i) => (s.has(i) ? { ...sym, x: sym.x + dx, y: sym.y + dy } : sym)),
     flags: doc.flags.map((fl, i): Flag => (f.has(i) ? { ...fl, ...mv(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...mv(tx) } : tx)),
-    wires: doc.wires.map((wr, i) => {
-      if (w.has(i)) return { x1: wr.x1 + dx, y1: wr.y1 + dy, x2: wr.x2 + dx, y2: wr.y2 + dy };
-      if (!drag) return wr;
-      const [a, b] = ends(wr);
-      const na = moving.has(key(a)) ? mv(a) : a;
-      const nb = moving.has(key(b)) ? mv(b) : b;
-      return { x1: na.x, y1: na.y, x2: nb.x, y2: nb.y };
-    }).concat(extra),
   };
+  if (!drag) return mergeCollinear({ ...base, wires: doc.wires.map((wr, i) => (w.has(i) ? shift(wr) : wr)) }, lib);
+
+  // Puntos que se mueven: pines y etiquetas seleccionados, extremos de cables seleccionados
+  const moving = new Map<string, Point>();
+  const stayPins = new Set<string>();
+  doc.symbols.forEach((sym, i) =>
+    pinPoints(sym, lib.symbol(sym.type)).forEach((p) => (s.has(i) ? moving.set(key(p), p) : stayPins.add(key(p)))),
+  );
+  const stayFlags = new Set<string>();
+  doc.flags.forEach((fl, i) => (f.has(i) ? moving.set(key(fl), fl) : stayFlags.add(key(fl))));
+  doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.set(key(p), p)));
+  // …y lo fijo que se apoya en el interior de un cable seleccionado (una T) también lo sigue
+  const selWires = doc.wires.filter((_, i) => w.has(i));
+  const inSelInterior = (p: Point) => selWires.some((sw) => onSegment(p, sw) && !ends(sw).some((e) => samePt(e, p)));
+  const stayPoints: Point[] = [
+    ...doc.symbols.flatMap((sym, i) => (s.has(i) ? [] : pinPoints(sym, lib.symbol(sym.type)))),
+    ...doc.flags.filter((_, i) => !f.has(i)),
+    ...doc.wires.flatMap((wr, i) => (w.has(i) ? [] : ends(wr))),
+  ];
+  for (const p of stayPoints) if (!moving.has(key(p)) && inSelInterior(p)) moving.set(key(p), p);
+
+  // Puntos movidos donde queda algo fijo: se unen con un cable nuevo en vez de estirar
+  const passes = (p: Point) =>
+    doc.wires.some((wr, i) => !w.has(i) && onSegment(p, wr) && !ends(wr).some((e) => samePt(e, p)));
+  const anchored = [...moving.values()].filter((p) => stayPins.has(key(p)) || stayFlags.has(key(p)) || passes(p));
+  const anchoredKeys = new Set(anchored.map(key));
+  const stretches = (p: Point) => moving.has(key(p)) && !anchoredKeys.has(key(p));
+
+  const wires: Wire[] = [];
+  doc.wires.forEach((wr, i) => {
+    if (w.has(i)) return wires.push(shift(wr));
+    const [a, b] = ends(wr);
+    const [sa, sb] = [stretches(a), stretches(b)];
+    if (!sa && !sb) return wires.push(wr);
+    if (sa && sb) return wires.push(shift(wr));
+    // un extremo fijo (q) y otro que se mueve: el tramo conserva su dirección desde q
+    const q = sa ? b : a;
+    const m = mv(sa ? a : b);
+    const c = wr.y1 === wr.y2 ? { x: m.x, y: q.y } : wr.x1 === wr.x2 ? { x: q.x, y: m.y } : m;
+    pushPath(wires, sa ? [m, c, q] : [q, c, m]);
+  });
+  for (const p of anchored) {
+    const corner = { x: p.x + dx, y: p.y };
+    if (dx) wires.push(seg(p, corner));
+    if (dy) wires.push(seg(corner, mv(p)));
+  }
+  return mergeCollinear({ ...base, wires }, lib);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Edición de cables: codos (vértices) y tramos. Conservan la conectividad (las reglas de
+// src/netlist/connectivity.ts) y terminan limpiando los cables con mergeCollinear.
+
+const isH = (w: Wire) => w.y1 === w.y2 && w.x1 !== w.x2;
+const isV = (w: Wire) => w.x1 === w.x2 && w.y1 !== w.y2;
+const isZero = (w: Wire) => w.x1 === w.x2 && w.y1 === w.y2;
+const seg = (a: Point, b: Point): Wire => ({ x1: a.x, y1: a.y, x2: b.x, y2: b.y });
+const ptKey = (p: Point) => `${p.x},${p.y}`;
+/**
+ * Agrega los tramos de un recorrido. Si todo queda en un punto se agrega igual un cable de
+ * largo 0: mergeCollinear lo quita pero le pasa su lugar en el archivo a los cables vecinos.
+ */
+function pushPath(wires: Wire[], path: Point[]) {
+  const segs = path.slice(1).flatMap((p, j) => (samePt(path[j], p) ? [] : [seg(path[j], p)]));
+  wires.push(...(segs.length ? segs : [seg(path[0], path[0])]));
+}
+/** ¿p está en el interior de w (sin contar los extremos)? */
+const inInterior = (p: Point, w: Wire) => onSegment(p, w) && !ends(w).some((e) => samePt(e, p));
+
+/** Pines y etiquetas: ahí un cable partido no se vuelve a unir */
+function fixedPoints(doc: AscDoc, lib?: Library): Set<string> {
+  const out = new Set(doc.flags.map(ptKey));
+  if (lib) for (const s of doc.symbols) for (const p of pinPoints(s, lib.symbol(s.type))) out.add(ptKey(p));
+  return out;
+}
+
+/**
+ * Limpieza de cables: quita los de largo 0 y los duplicados, y fusiona los superpuestos o
+ * colineales contiguos en uno solo. Sólo se conservan los cortes donde llega algo más (pin,
+ * etiqueta, otro cable que termina o pasa por ahí), así que la conectividad no cambia, y
+ * tampoco el orden relativo de los cables (que define los nombres N001…).
+ */
+export function mergeCollinear(doc: AscDoc, lib?: Library): AscDoc {
+  const src = doc.wires;
+  const fixed = fixedPoints(doc, lib);
+  // Orden de cada cable en el resultado. Uno de largo 0 que se quita le pasa su lugar a los
+  // que llegan a ese punto (son de su misma red), así la red no cambia de número.
+  const order = src.map((_, i) => i);
+  src.forEach((z, i) => {
+    if (!isZero(z)) return;
+    src.forEach((w, j) => {
+      if (!isZero(w) && ends(w).some((e) => e.x === z.x1 && e.y === z.y1)) order[j] = Math.min(order[j], i);
+    });
+  });
+  const out: { key: number; w: Wire }[] = [];
+  const lines = new Map<string, { i: number; lo: number; hi: number }[]>();
+  const push = (k: string, v: { i: number; lo: number; hi: number }) => {
+    const l = lines.get(k);
+    if (l) l.push(v);
+    else lines.set(k, [v]);
+  };
+  const seenDiag = new Set<string>();
+  src.forEach((w, i) => {
+    if (isZero(w)) return;
+    if (isH(w)) push(`h${w.y1}`, { i, lo: Math.min(w.x1, w.x2), hi: Math.max(w.x1, w.x2) });
+    else if (isV(w)) push(`v${w.x1}`, { i, lo: Math.min(w.y1, w.y2), hi: Math.max(w.y1, w.y2) });
+    else {
+      const k = [w.x1, w.y1, w.x2, w.y2].join();
+      if (seenDiag.has(k) || seenDiag.has([w.x2, w.y2, w.x1, w.y1].join())) return;
+      seenDiag.add(k);
+      out.push({ key: order[i], w });
+    }
+  });
+  for (const [lk, items] of lines) {
+    const horiz = lk[0] === 'h';
+    const c = Number(lk.slice(1));
+    const at = (v: number): Point => (horiz ? { x: v, y: c } : { x: c, y: v });
+    const inLine = new Set(items.map((it) => it.i));
+    const isCut = (v: number) => {
+      const p = at(v);
+      return fixed.has(ptKey(p)) || src.some((o, j) => !inLine.has(j) && !isZero(o) && onSegment(p, o));
+    };
+    items.sort((a, b) => a.lo - b.lo || a.hi - b.hi);
+    for (let g = 0; g < items.length; ) {
+      // tramos de la misma línea que se superponen o se tocan
+      let hi = items[g].hi;
+      let e = g + 1;
+      while (e < items.length && items[e].lo <= hi) hi = Math.max(hi, items[e++].hi);
+      const group = items.slice(g, e);
+      const lo = group[0].lo;
+      const cuts = [...new Set(group.flatMap((it) => [it.lo, it.hi]))].filter((v) => v > lo && v < hi && isCut(v));
+      const stops = [lo, ...cuts.sort((a, b) => a - b), hi];
+      for (let j = 1; j < stops.length; j++) {
+        const [a, b] = [stops[j - 1], stops[j]];
+        const same = group.find((it) => it.lo === a && it.hi === b);
+        const first = group.filter((it) => it.lo < b && it.hi > a).reduce((m, it) => (order[it.i] < order[m.i] ? it : m));
+        const key = order[first.i];
+        if (same) out.push({ key, w: src[same.i] });
+        else {
+          // con el sentido del cable más antiguo del tramo
+          const o = src[first.i];
+          const fwd = horiz ? o.x1 < o.x2 : o.y1 < o.y2;
+          out.push({ key, w: fwd ? seg(at(a), at(b)) : seg(at(b), at(a)) });
+        }
+      }
+      g = e;
+    }
+  }
+  out.sort((a, b) => a.key - b.key);
+  if (out.length === src.length && out.every((o, i) => o.w === src[i])) return doc;
+  return { ...doc, wires: out.map((o) => o.w) };
+}
+
+/** Parte el cable `index` en `p` (que debe caer en su interior): deja un codo arrastrable */
+export function splitWire(doc: AscDoc, index: number, p: Point): AscDoc {
+  const w = doc.wires[index];
+  if (!w || !inInterior(p, w)) return doc;
+  const wires = [...doc.wires];
+  wires.splice(index, 1, seg({ x: w.x1, y: w.y1 }, p), seg(p, { x: w.x2, y: w.y2 }));
+  return { ...doc, wires };
+}
+
+/** Quita el codo en `p` si une exactamente dos tramos alineados y nada más llega ahí */
+export function removeVertex(doc: AscDoc, p: Point, lib?: Library): AscDoc {
+  if (fixedPoints(doc, lib).has(ptKey(p))) return doc;
+  if (doc.wires.some((w) => inInterior(p, w))) return doc;
+  const at = doc.wires.flatMap((w, i) => (!isZero(w) && ends(w).some((e) => samePt(e, p)) ? [i] : []));
+  if (at.length !== 2) return doc;
+  const far = (w: Wire) => (samePt({ x: w.x1, y: w.y1 }, p) ? { x: w.x2, y: w.y2 } : { x: w.x1, y: w.y1 });
+  const [ia, ib] = at;
+  const [fa, fb] = [far(doc.wires[ia]), far(doc.wires[ib])];
+  // alineados y uno a cada lado de p
+  const cross = (fa.x - p.x) * (fb.y - p.y) - (fa.y - p.y) * (fb.x - p.x);
+  const dot = (fa.x - p.x) * (fb.x - p.x) + (fa.y - p.y) * (fb.y - p.y);
+  if (cross !== 0 || dot >= 0) return doc;
+  const wires = [...doc.wires];
+  wires[ia] = seg(fa, fb);
+  wires.splice(ib, 1);
+  return { ...doc, wires };
+}
+
+/**
+ * Mueve el codo (extremo de uno o más cables) de `p` a `to`. Cada tramo conserva su
+ * dirección desde su otro extremo y se agrega el codo necesario para seguir siendo
+ * ortogonal; si dos tramos llegarían a `to` por el mismo lado, el segundo entra por el otro.
+ */
+export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library): AscDoc {
+  if (samePt(p, to)) return doc;
+  const used = new Set<string>();
+  const side = (e: Point) => `${Math.sign(e.x - to.x)},${Math.sign(e.y - to.y)}`;
+  let touched = false;
+  const wires: Wire[] = [];
+  for (const w of doc.wires) {
+    const [a, b] = ends(w);
+    const atA = samePt(a, p);
+    if (isZero(w) || (!atA && !samePt(b, p))) {
+      wires.push(w);
+      continue;
+    }
+    touched = true;
+    const q = atA ? b : a;
+    let c = to;
+    if (isH(w) || isV(w)) {
+      const keep = isH(w) ? { x: to.x, y: q.y } : { x: q.x, y: to.y };
+      const other = isH(w) ? { x: q.x, y: to.y } : { x: to.x, y: q.y };
+      c = !samePt(keep, to) && used.has(side(keep)) ? other : keep;
+      used.add(side(c));
+    }
+    pushPath(wires, atA ? [to, c, q] : [q, c, to]);
+  }
+  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+}
+
+/**
+ * Desplaza un tramo horizontal en vertical (o uno vertical en horizontal), como en
+ * LTspice/KiCad: un tramo vecino perpendicular se estira; si en el extremo hay otra cosa
+ * (pin, etiqueta, unión en T, tramo alineado) se agrega un cable que la sigue uniendo.
+ */
+export function dragSegment(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library): AscDoc {
+  const w = doc.wires[index];
+  if (!w || !(isH(w) || isV(w))) return doc;
+  const d = isH(w) ? { x: 0, y: dy } : { x: dx, y: 0 };
+  if (!d.x && !d.y) return doc;
+  const fixed = fixedPoints(doc, lib);
+  const mvp = (p: Point) => ({ x: p.x + d.x, y: p.y + d.y });
+  const wires = [...doc.wires];
+  const stubs: Wire[] = [];
+  const others = doc.wires.flatMap((o, j) => (j !== index && !isZero(o) ? [j] : []));
+  for (const e of ends(w)) {
+    const endHere = others.filter((j) => ends(doc.wires[j]).some((q) => samePt(q, e)));
+    const passHere = others.some((j) => inInterior(e, doc.wires[j]));
+    const n = !fixed.has(ptKey(e)) && !passHere && endHere.length === 1 ? doc.wires[endHere[0]] : null;
+    if (n && (isH(w) ? isV(n) : isH(n))) {
+      // vecino perpendicular: se estira hasta el nuevo extremo
+      const ne = mvp(e);
+      wires[endHere[0]] = samePt({ x: n.x1, y: n.y1 }, e) ? { ...n, x1: ne.x, y1: ne.y } : { ...n, x2: ne.x, y2: ne.y };
+    } else if (endHere.length || passHere || fixed.has(ptKey(e))) stubs.push(seg(e, mvp(e)));
+  }
+  wires.splice(index, 1, { x1: w.x1 + d.x, y1: w.y1 + d.y, x2: w.x2 + d.x, y2: w.y2 + d.y }, ...stubs);
+  return mergeCollinear({ ...doc, wires }, lib);
+}
+
+/** Índices de los cables de `doc` que caen sobre alguno de los tramos `segs` (para la selección) */
+export function wiresOn(doc: AscDoc, segs: Wire[]): number[] {
+  return doc.wires.flatMap((w, i) => (!isZero(w) && segs.some((s) => ends(w).every((e) => onSegment(e, s))) ? [i] : []));
+}
+
+/**
+ * ¿Las dos versiones tienen la misma conectividad? (los mismos pines y etiquetas en cada
+ * red). Editar codos y tramos la usa para no crear ni romper uniones por accidente.
+ */
+export function sameConnections(a: AscDoc, b: AscDoc, lib: Library): boolean {
+  const sig = (d: AscDoc) =>
+    connectivity(d, (t) => lib.symbol(t))
+      .nets.map((n) => [n.wires.length ? '~' : '', ...n.pins.map((p) => `${p.sym}:${p.pin}`), ...n.labels.map((l) => `@${l}`)].sort().join(' '))
+      .sort()
+      .join('|');
+  return sig(a) === sig(b);
 }
 
 /** Rótulos al rotar: los que no están ocultos vuelven a la posición por defecto de la nueva orientación */
@@ -171,7 +395,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
-  return {
+  return mergeCollinear({
     ...doc,
     symbols: doc.symbols.map((sym, i) => {
       if (!s.has(i)) return sym;
@@ -186,7 +410,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     }),
     flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
-  };
+  }, lib);
 }
 
 export function setSymbolAttrs(doc: AscDoc, index: number, attrs: Record<string, string | null>): AscDoc {

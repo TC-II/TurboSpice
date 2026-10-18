@@ -7,7 +7,7 @@ import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { isStudyBlocksText } from '../sim/study.ts';
-import { flagDirection, fontSize, pinPoints, sameRef, type ItemRef } from './geometry.ts';
+import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, type ItemRef } from './geometry.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
@@ -171,12 +171,8 @@ export interface CanvasProps {
 export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
-  // Puntos de unión: 3 o más extremos de cable en el mismo punto (spec §8.3)
-  const count = new Map<string, number>();
-  for (const w of doc.wires) {
-    for (const k of [`${w.x1},${w.y1}`, `${w.x2},${w.y2}`]) count.set(k, (count.get(k) ?? 0) + 1);
-  }
-  const junctions = [...count].filter(([, n]) => n >= 3).map(([k]) => k.split(',').map(Number));
+  // Puntos de unión, como los marca LTspice (spec §8.3)
+  const junctions = junctionPoints(doc, lib);
 
   // Pines sueltos (LTspice los marca con un cuadradito)
   const loose: { x: number; y: number }[] = [];
@@ -207,7 +203,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
           {hl.pins.map((p, i) => <circle key={i} cx={p.at.x} cy={p.at.y} r={4} />)}
         </g>
       )}
-      <g className="junctions">{junctions.map(([x, y]) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
+      <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
           <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} />

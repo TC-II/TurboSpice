@@ -122,14 +122,14 @@ export interface Study {
 export const STUDY_BLOCKS = '.study ';
 export const isStudyBlocksText = (t: { kind: string; text: string }) => t.kind === 'comment' && t.text.startsWith(STUDY_BLOCKS);
 
-function toBase64(json: string): string {
+export function toBase64(json: string): string {
   const bytes = new TextEncoder().encode(json);
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
   return btoa(bin);
 }
 
-function fromBase64(b64: string): string {
+export function fromBase64(b64: string): string {
   const bin = atob(b64);
   return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
 }

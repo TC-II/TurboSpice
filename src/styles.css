@@ -422,6 +422,18 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
 .iconbar .status { margin-left: 8px; font-size: 13px; }
 .iconbar .spacer { flex: 1; }
+/* barra de la simulación elegida (#39): parámetros en una o dos líneas */
+.simbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 3px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.simbar .sb-name { font-weight: 600; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.simbar .sb-rows { display: flex; flex-direction: column; gap: 2px; }
+.simbar .sb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.simbar .sb-field { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
+.simbar .sb-field input, .simbar .sb-field select { font: 12px var(--mono); padding: 1px 4px; color: var(--fg); }
+.simbar .sb-check { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
+.simbar .sb-hint { color: var(--fg-muted); }
+.simbar .sb-hint.warn { color: var(--err); }
+.simbar .sb-line { font: 12px var(--mono); }
+.simbar .sb-run, .simbar .sb-edit { padding: 2px 10px; }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }

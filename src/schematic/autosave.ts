@@ -3,6 +3,7 @@
 // de deshacer; los handles de la File System Access API se pueden guardar en IndexedDB y
 // permiten volver a guardar sobre el mismo archivo.
 import type { AscEncoding } from '../asc/encoding.ts';
+import type { SimList } from '../sim/simList.ts';
 import type { PlotView } from '../waveform/view.ts';
 
 const DB = 'turbospice';
@@ -24,6 +25,8 @@ export interface Session {
   time: number;
   /** vista de resultados recordada */
   view?: PlotView;
+  /** lista de simulaciones, con la vista de cada una (#39) */
+  sims?: SimList;
 }
 
 export interface RecentFile {

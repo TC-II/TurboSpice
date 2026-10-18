@@ -7,6 +7,12 @@ export const NGSPICE_ONLY = /^\s*\.(control|pz|sens|disto|sp|pss)\b/i;
 /** ¿Este comentario de esquemático es una directiva de ngspice activa? */
 export const isNgspiceComment = (text: string) => NGSPICE_ONLY.test(text);
 
+/**
+ * Textos propios de TurboSpice que no se dibujan ni se seleccionan: el programa de bloques del
+ * Estudio (";.study …") y la lista de simulaciones (";.sims …", #39)
+ */
+export const isHiddenText = (t: { kind: string; text: string }) => t.kind === 'comment' && /^\.(study|sims) /.test(t.text);
+
 /** ¿El texto (directiva o comentario) es un bloque .control? */
 export const isControlBlock = (text: string) => /^\s*\.control\b/i.test(text);
 

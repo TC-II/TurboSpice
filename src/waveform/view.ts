@@ -16,6 +16,26 @@ export interface Pane {
 /** Paneles por tipo de análisis ("tran", "ac", "dc", "noise"…) */
 export type PlotView = Record<string, Pane[]>;
 
+export type CursorKey = 'a' | 'b';
+export interface Cursors {
+  a?: number;
+  b?: number;
+  /** traza (etiqueta de la curva) que sigue cada cursor */
+  ta?: string;
+  tb?: string;
+  /** último cursor movido: el que mueven las flechas */
+  sel?: CursorKey;
+}
+
+/** Estado del visor que no son las trazas: zoom y cursores (vale para un eje X) */
+export interface PlotState {
+  /** nombre del eje X ("time", "frequency"…) en el que valen el zoom y los cursores */
+  scale?: string;
+  xRange: [number, number] | null;
+  cursors: Cursors;
+  cursorMode: boolean;
+}
+
 /** Paleta por defecto (se distingue en fondo claro y oscuro) */
 export const PALETTE = ['#2f9e44', '#1c7ed6', '#e03131', '#0c8599', '#ae3ec9', '#868e96', '#e8590c', '#5c940d', '#c2255c', '#1864ab'];
 

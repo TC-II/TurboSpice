@@ -24,9 +24,29 @@ import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSess
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
+import { findAnalysis, findControl, replaceAnalysis, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
-import { ANALYSIS_LINE } from './sim/analyses.ts';
+import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
+import {
+  activeSim,
+  addSim,
+  defaultLine,
+  duplicateSim,
+  emptySims,
+  followLine,
+  keepResult,
+  MAX_SIMS,
+  removeSim,
+  renameSim,
+  selectSim,
+  setSimView,
+  simName,
+  takeSims,
+  withSims,
+  type SimList,
+  type SimView,
+} from './sim/simList.ts';
+import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
@@ -41,7 +61,7 @@ import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
-import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotView } from './waveform/view.ts';
+import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -69,6 +89,14 @@ type Dialog =
   | { kind: 'userfiles' }
   | { kind: 'study' }
   | { kind: 'welcome' };
+
+/** Resultados de una simulación */
+interface SimRun {
+  built: BuiltSimulation;
+  result: SimResult;
+  doc: AscDoc;
+  meas: MeasTable | null;
+}
 
 interface FileState {
   name: string;
@@ -186,7 +214,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
-  const [sim, setSim] = useState<{ built: BuiltSimulation; result: SimResult; doc: AscDoc; meas: MeasTable | null } | null>(null);
+  // resultados de la simulación que se está viendo
+  const [sim, setSim] = useState<SimRun | null>(null);
+  // lista de simulaciones (#39) y resultados en memoria de las que no se están viendo
+  const [sims, setSimsState] = useState<SimList>(emptySims);
+  const simsRef = useRef(sims);
+  simsRef.current = sims;
+  const kept = useRef(new Map<string, SimRun>());
+  // zoom y cursores del visor (los avisa PlotPanel; se guardan con la simulación)
+  const plotState = useRef<PlotState>();
   const [showOp, setShowOp] = useState(false);
   const [panes, setPanes] = useState<Pane[]>(emptyPanes);
   const [activePane, setActivePane] = useState(0);
@@ -245,15 +281,28 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     );
   }, [engine]);
 
+  /** Muestra la vista guardada de una simulación (o una vacía) */
+  const showView = (v?: SimView) => {
+    setPanes(v?.panes ?? emptyPanes());
+    setActivePane(v?.active ?? 0);
+    setPlotName(v?.plot ?? '');
+    setMode(v?.mode ?? 'bode');
+    plotState.current = v?.plotState;
+    panesByKind.current.clear();
+  };
+
   const loadDoc = useCallback(
     (d: AscDoc, f: FileState) => {
-      history.reset(d);
+      // la lista de simulaciones guardada en el archivo sale del documento
+      const { doc: clean, sims: list } = takeSims(d, findAnalysis(d)?.value ?? null);
+      history.reset(clean);
       setSavedVersion(0);
       setFile(f);
       setSelection([]);
       setSim(null);
-      setPanes(emptyPanes());
-      setActivePane(0);
+      kept.current.clear();
+      setSimsState(list);
+      showView(activeSim(list)?.view);
       setPlotView({});
       setTool({ kind: 'select' });
       setDocKey((k) => k + 1);
@@ -307,6 +356,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'] });
           setSavedVersion(session.savedVersion);
           if (session.view) setPlotView(session.view);
+          if (session.sims) {
+            setSimsState(session.sims);
+            showView(activeSim(session.sims)?.view);
+          }
           setDocKey((k) => k + 1);
           if (sessionDirty) setMessage(`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`);
           return;
@@ -339,10 +392,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         savedVersion: savedVersion - drop,
         time: Date.now(),
         view: plotView,
+        sims: currentSims(),
       });
     }, 600);
     return () => clearTimeout(t);
-  }, [restored, history.state, file, savedVersion, plotView]);
+  }, [restored, history.state, file, savedVersion, plotView, sims, panes, activePane, plotName, mode]);
 
   // Vista recordada para este archivo (si no vino ya con el link o la sesión)
   useEffect(() => {
@@ -384,14 +438,16 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
 
   const doSave = async (saveAs = false) => {
-    const { bytes, missing } = ascBytes(doc, lib, file.encoding);
+    // en el archivo va también la lista de simulaciones (comentario que TurboSpice no dibuja)
+    const full = withSims(doc, currentSims());
+    const { bytes, missing } = ascBytes(full, lib, file.encoding);
     try {
       const r = await saveFile(bytes, file.name, file.handle, saveAs);
       if (!r) return;
       const saved = { ...file, name: r.name, handle: r.handle ?? file.handle };
       setFile(saved);
       setSavedVersion(history.version);
-      remember(doc, saved);
+      remember(full, saved);
       setMessage(
         missing.length
           ? `Guardado. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
@@ -403,7 +459,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
 
   const doShare = async () => {
-    const { bytes } = ascBytes(doc, lib, file.encoding);
+    const { bytes } = ascBytes(withSims(doc, currentSims()), lib, file.encoding);
     const hash = await shareHash(bytes, file.name, plotView);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
@@ -432,6 +488,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
+    // simulación de la lista a la que van los resultados
+    const id = sims.active;
     try {
       const built = await buildSimulation(doc, lib, file.name);
       const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
@@ -443,6 +501,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // gráficos x-y de un programa de bloques
       const xy = xyPlotsFromLog(result.log, built.ng.xyPlots);
       result.plots.push(...xy);
+      // si mientras tanto se eligió otra simulación, los resultados quedan guardados para ésta
+      if (simsRef.current.active !== id) {
+        if (simsRef.current.items.some((s) => s.id === id)) keepResult(kept.current, id, { built, result, doc, meas });
+        setStatus({ kind: 'done', ms });
+        return;
+      }
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
       // con el esquemático expandido, los resultados no quedan ocultos
@@ -497,6 +561,62 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const r = next ?? plotView[kind] ?? panesByKind.current.get(kind);
     if (r) setPanes(r);
   };
+
+  // --- Lista de simulaciones (#39) ---
+  /** Lo que se está viendo de la simulación activa */
+  const liveView = (): SimView => ({ panes, active: activePane, plot: plotName, mode, plotState: plotState.current });
+  /** La lista con la vista actual guardada en la activa (para guardar el archivo o la sesión) */
+  const currentSims = () => (activeSim(sims) ? setSimView(sims, sims.active, liveView()) : sims);
+  /**
+   * Cambia la lista. Si cambia la activa, la anterior se lleva su vista y sus resultados (los de
+   * las últimas MAX_KEPT quedan en memoria) y se muestra lo que se veía de la nueva. Con
+   * `toDoc`, su comando pasa al esquemático.
+   */
+  const changeSims = (next: SimList, toDoc = false) => {
+    // (la primera simulación de la lista se queda con lo que se estaba viendo)
+    if (next.active !== sims.active && activeSim(sims)) {
+      if (next.items.some((s) => s.id === sims.active)) {
+        next = setSimView(next, sims.active, liveView());
+        if (sim) keepResult(kept.current, sims.active, sim);
+      }
+      const r = kept.current.get(next.active);
+      kept.current.delete(next.active);
+      setSim(r ?? null);
+      showView(activeSim(next)?.view);
+      if (!r) setShowOp(false);
+    }
+    const line = activeSim(next)?.line;
+    if (toDoc && line && next.active !== sims.active) commit(setAnalysisLine(doc, line));
+    // resultados de las que se borraron
+    for (const id of [...kept.current.keys()]) if (!next.items.some((s) => s.id === id)) kept.current.delete(id);
+    setSimsState(next);
+  };
+  // El comando del esquemático manda: si se edita (a mano, con el diálogo o deshaciendo), la
+  // lista lo sigue
+  useEffect(() => {
+    const next = followLine(sims, findAnalysis(doc)?.value ?? null);
+    if (next !== sims) changeSims(next);
+  }, [doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const newSim = (kind: AnalysisKind) => {
+    // del mismo tipo que otra: se parte de sus parámetros
+    const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
+    changeSims(addSim(sims, same?.line ?? defaultLine(kind, circuitInfo())), true);
+  };
+  const renameActive = () => {
+    const cur = activeSim(sims);
+    const name = cur && window.prompt('Nombre de la simulación (vacío: el automático)', simName(cur));
+    if (cur && name !== null && name !== undefined) changeSims(renameSim(sims, cur.id, name));
+  };
+  const duplicateActive = () => {
+    // la copia arranca con los mismos resultados (son del mismo comando)
+    const r = sim;
+    changeSims(duplicateSim(currentSims(), sims.active), true);
+    if (r) setSim(r);
+  };
+  const curSim = activeSim(sims);
+  const onPlotState = useCallback((s: PlotState) => {
+    plotState.current = s;
+  }, []);
   const doFft = (o: { expr: string; window: FftWindow; from?: number; to?: number }) => {
     if (!sim || !plot) return;
     const sc = scaleOf(plot)!;
@@ -522,8 +642,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
   const pltInput = useRef<HTMLInputElement>(null);
 
-  // Punto de operación: sólo mientras el esquemático sea el que se simuló
-  const bias = sim && sim.doc === doc ? sim.result.bias : undefined;
+  // Punto de operación: sólo mientras el esquemático sea el que se simuló (o uno igual, p. ej.
+  // al volver a una simulación de la lista)
+  const bias = sim && (sim.doc === doc || ascText(sim.doc) === ascText(doc)) ? sim.result.bias : undefined;
   const describe = useMemo(() => {
     if (!bias || !sim) return undefined;
     return ({ net, symbol }: { net?: string; symbol?: number }) => {
@@ -971,6 +1092,22 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Simular', shortcut: 'Ctrl+Enter', onClick: run, disabled: running || status.kind === 'loading' },
         { label: 'Abortar', onClick: abort, disabled: !running },
         'sep',
+        // simulaciones guardadas: se elige cuál ver (#39)
+        ...sims.items.map((s) => ({
+          label: simName(s),
+          title: s.line,
+          checked: s.id === sims.active,
+          onClick: () => changeSims(selectSim(sims, s.id), true),
+        })),
+        {
+          label: 'Nueva simulación',
+          disabled: sims.items.length >= MAX_SIMS,
+          items: ANALYSES.map((x) => ({ label: x.label, onClick: () => newSim(x.kind) })),
+        },
+        { label: 'Duplicar simulación', onClick: duplicateActive, disabled: !curSim || sims.items.length >= MAX_SIMS },
+        { label: 'Renombrar simulación…', onClick: renameActive, disabled: !curSim },
+        { label: 'Borrar simulación', onClick: () => changeSims(removeSim(sims, sims.active), true), disabled: sims.items.length < 2 },
+        'sep',
         { label: 'Comando de simulación…', shortcut: 'Alt+S', onClick: openSimulation },
         { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
         { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
@@ -1103,6 +1240,18 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         )}
         <StatusText status={status} />
       </div>
+      {curSim && (
+        <SimBar
+          name={simName(curSim)}
+          line={curSim.line}
+          info={circuitInfo()}
+          stale={!sim && !!curSim.view?.panes.some((p) => p.traces.length)}
+          running={running}
+          onApply={(line) => commit(setAnalysisLine(doc, line))}
+          onRun={run}
+          onEdit={openSimulation}
+        />
+      )}
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div className="canvas-wrap">
@@ -1258,6 +1407,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
               {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
                 <PlotPanel
+                  key={sims.active}
+                  initial={plotState.current}
+                  onState={onPlotState}
                   handle={plotPanel}
                   plot={plot}
                   runs={runs}

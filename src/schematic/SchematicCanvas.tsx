@@ -5,8 +5,7 @@ import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { isNgspiceComment } from '../netlist/directives.ts';
-import { isStudyBlocksText } from '../sim/study.ts';
+import { isHiddenText, isNgspiceComment } from '../netlist/directives.ts';
 import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, type ItemRef } from './geometry.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
@@ -212,7 +211,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="loose">{loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((t, i) =>
-          isStudyBlocksText(t) ? null : (
+          isHiddenText(t) ? null : (
           <g
             key={i}
             className={`${t.kind === 'comment' && isNgspiceComment(t.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}

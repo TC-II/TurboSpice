@@ -1,9 +1,13 @@
 // E2E de los menús de simulación: comando de análisis, bloque .control con barrido
-// superpuesto, selección de la tierra y miniaturas del selector de componentes.
+// superpuesto, selección de la tierra, miniaturas del selector de componentes y lista de
+// simulaciones (#39).
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
 import { menu, openExample, skipWelcome } from './lib.mjs';
+import { decode } from '../../src/asc/encoding.ts';
+import { parseAsc } from '../../src/asc/parse.ts';
+import { takeSims } from '../../src/sim/simList.ts';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -87,6 +91,76 @@ const legend = await page.locator('.readout tbody tr').count();
 check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas)`);
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
+
+// --- #39: varias simulaciones; cada una conserva su gráfico ---
+await openExample(page, 'Filtro RC');
+const directive = () => page.locator('.texts .directive').first().textContent();
+const chipNames = () => page.locator('.trace-chip .name').allTextContents();
+const simulate = async () => {
+  await page.getByRole('button', { name: 'Simular', exact: true }).click();
+  await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+  await page.waitForTimeout(300);
+};
+const probe = async (x, y) => {
+  const p = await at(x, y);
+  await page.mouse.click(p.x, p.y);
+  await page.waitForTimeout(200);
+};
+await menu(page, 'Simular', 'Nueva simulación', 'Barrido DC');
+check((await directive()) === '.dc V1 0 5 0.1', `nueva simulación DC con la fuente del circuito (${await directive()})`);
+check((await page.locator('.simbar .sb-name').textContent()) === 'Barrido DC V1 0–5 V', 'la barra muestra su nombre');
+await simulate();
+await probe(128, -32); // red out
+check((await chipNames()).join() === 'V(out)', `primera DC: V(out) (${(await chipNames()).join()})`);
+// otra del mismo tipo con otros parámetros, desde la barra
+await menu(page, 'Simular', 'Nueva simulación', 'Barrido DC');
+await page.getByLabel('Fin 1').fill('2');
+await page.getByLabel('Incremento 1').fill('0.01');
+await page.getByLabel('Incremento 1').press('Enter');
+check((await directive()) === '.dc V1 0 2 0.01', `los parámetros de la barra van al esquemático (${await directive()})`);
+check((await page.locator('.results-panel').count()) === 0, 'la nueva simulación arranca sin resultados');
+await simulate();
+await probe(0, -16); // red N001 (V1–R1)
+check((await chipNames()).join() === 'V(N001)', `segunda DC: V(N001) (${(await chipNames()).join()})`);
+const items = async () => (await page.getByRole('menu').getByRole('menuitemcheckbox').allTextContents()).filter((t) => /Barrido DC/.test(t));
+await page.getByRole('menubar').getByRole('menuitem', { name: 'Simular', exact: true }).click();
+const listed = await items();
+await page.keyboard.press('Escape');
+check(listed.length === 2 && listed[1].startsWith('✓'), `el menú lista las dos y marca la activa (${listed.join(' | ')})`);
+// alternar: cada una conserva sus trazas y sus resultados (sin volver a simular)
+await menu(page, 'Simular', 'Barrido DC V1 0–5 V');
+check((await directive()) === '.dc V1 0 5 0.1', 'al elegir la primera, su comando vuelve al esquemático');
+check((await chipNames()).join() === 'V(out)', `la primera conserva su gráfico (${(await chipNames()).join()})`);
+// máximo de la traza (tabla de Medidas): 5 V en la primera, 2 V en la segunda
+const maxOf = async () => {
+  await page.getByRole('button', { name: 'Medidas' }).click();
+  const t = await page.locator('.readout tbody tr td').nth(2).textContent();
+  await page.getByRole('button', { name: 'Medidas' }).click();
+  return t;
+};
+check((await maxOf()).startsWith('5 @'), `con sus resultados en memoria, sin volver a simular (máximo ${await maxOf()})`);
+await menu(page, 'Simular', 'Barrido DC V1 0–2 V');
+check((await chipNames()).join() === 'V(N001)', `la segunda conserva el suyo (${(await chipNames()).join()})`);
+check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxOf()})`);
+// el archivo guarda la lista (en un comentario que TurboSpice no dibuja) y la activa como directiva
+await page.evaluate(() => delete window.showSaveFilePicker);
+const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
+const savedText = decode(new Uint8Array(readFileSync(await download.path()))).text;
+check(/^TEXT .* !\.dc V1 0 2 0\.01$/m.test(savedText) && /^TEXT .* ;\.sims \S+$/m.test(savedText), 'el .asc guardado tiene la activa y la lista');
+const reopened = takeSims(parseAsc(savedText), '.dc V1 0 2 0.01').sims;
+const views = reopened.items.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join());
+// (la primera es el .tran del ejemplo, sin trazas)
+check(views.join(' | ') === ' | V(out) | V(N001)', `la lista del archivo conserva la vista de cada una (${views.join(' | ')})`);
+// y el autoguardado también: al recargar sigue la lista
+await page.waitForTimeout(1000); // autoguardado
+await page.reload();
+await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.getByRole('menubar').getByRole('menuitem', { name: 'Simular', exact: true }).click();
+check((await items()).length === 2, 'al recargar se recupera la lista');
+await page.keyboard.press('Escape');
+await menu(page, 'Simular', 'Borrar simulación');
+check((await directive()) === '.dc V1 0 5 0.1', 'borrar la activa pasa a la otra');
+await page.screenshot({ path: `${OUT}/simulaciones.png` });
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

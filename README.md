@@ -9,6 +9,8 @@ compartir. Ver [docs/PLAN.md](docs/PLAN.md) y [docs/compatibilidad-ltspice.md](d
 
 ## Desarrollo
 
+En Windows: [docs/setup-windows.md](docs/setup-windows.md) (doble clic en `start-turbospice.bat`).
+
 ```sh
 bash engine/build.sh     # compila ngspice a WASM (requiere emsdk, ver engine/README.md)
 npm install

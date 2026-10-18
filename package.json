@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "engine": "bash engine/build.sh",
+    "engine:fetch": "node scripts/fetch-engine.mjs",
     "smoke": "node engine/smoke/run.mjs",
     "dev": "npm run assets && vite",
     "build": "npm run assets && tsc -b && vite build",

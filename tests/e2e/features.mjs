@@ -44,7 +44,7 @@ await page.keyboard.press('Escape');
 check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  toolbarNames.slice(0, 13).join() === 'Nuevo,Guardar,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Directiva,Rotar' && toolbarNames.includes('Borrar'),
+  toolbarNames.slice(0, 14).join() === 'Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Directiva,Rotar' && toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');
@@ -102,6 +102,13 @@ check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ by
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
 check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
+// #44: Exportar a PDF abre ASC-Parser con el circuito en el hash
+const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Exportar a PDF' }).click()]);
+await pdfTab.waitForURL(/ASC-Parser\/#c=[\w-]+&n=Bode%20RLC\.asc$/, { waitUntil: 'commit', timeout: 15000 }).then(
+  () => check(true, 'Exportar a PDF abre ASC-Parser con el circuito en el hash'),
+  () => check(false, `Exportar a PDF abre ASC-Parser con el circuito (${pdfTab.url().slice(0, 80)})`),
+);
+await pdfTab.close();
 const other = await context.newPage();
 watch(other);
 await other.goto(link);

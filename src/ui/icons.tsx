@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 const P: Record<string, ReactNode> = {
   new: <path d="M5 2.5h7l3 3v12H5zM12 2.5v3h3" />,
+  pdf: <path d="M5 2.5h7l3 3v12H5zM12 2.5v3h3M10 8v5M7.8 11l2.2 2.2 2.2-2.2" />,
   open: <path d="M2.5 5.5v10h13l2-7h-13l-2 7M2.5 5.5h5l1.5 1.5h6v1.5" />,
   save: <path d="M3.5 3.5h11l2 2v11h-13zM6.5 3.5v4h6v-4M6 16.5v-5h8v5" />,
   share: <path d="M8 12a3 3 0 0 0 4.2 0l3-3a3 3 0 0 0-4.2-4.2L9.8 6M12 8a3 3 0 0 0-4.2 0l-3 3A3 3 0 0 0 9 15.2l1.2-1.2" />,

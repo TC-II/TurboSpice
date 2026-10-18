@@ -83,6 +83,8 @@ import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
+/** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
+const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
 const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc', 'Barrido RC (.step).asc'];
 
 type Dialog =
@@ -595,6 +597,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
     const hash = await shareHash(bytes, file.name);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
+  };
+
+  // Exportar a PDF: abre ASC-Parser con el circuito en el hash (nunca viaja a un servidor)
+  const doExportPdf = async () => {
+    // la pestaña se abre ya, dentro del click, para que no la bloquee el navegador
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
+    const hash = await shareHash(bytes, file.name);
+    const url = `${PDF_TOOL}#${hash}`;
+    if (tab) tab.location.href = url;
+    else setMessage('El navegador bloqueó la pestaña nueva: permitila para exportar a PDF.');
   };
 
   const doRecent = async (i: number) => {
@@ -1322,6 +1336,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
         ...(google.account ? [{ label: 'Exportar a la PC…', onClick: () => doSaveLocal(true) }] : []),
+        { label: 'Exportar a PDF', title: 'Abre ASC-Parser con este circuito; no se sube a ningún servidor', onClick: doExportPdf },
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
@@ -1470,6 +1485,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'new', label: 'Nuevo', title: 'Nuevo esquemático', onClick: doNew },
         { icon: 'save', label: 'Guardar', title: google.account ? 'Guardar en Google Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { icon: 'pdf', label: 'Exportar a PDF', title: 'Exportar a PDF (se abre ASC-Parser con este circuito)', onClick: doExportPdf },
         { icon: 'open', label: 'Abrir', title: google.account ? 'Mis simulaciones (Google Drive)' : 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },

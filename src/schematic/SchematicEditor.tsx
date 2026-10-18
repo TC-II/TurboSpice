@@ -2,6 +2,7 @@
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type Wire } from '../asc/model.ts';
+import { isDataText } from '../asc/dataText.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
@@ -130,7 +131,7 @@ function docBox(doc: AscDoc, lib: Library): Box | null {
   for (const w of doc.wires) boxes.push({ x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) });
   for (const s of doc.symbols) boxes.push(symbolBox(s, lib.symbol(s.type), lib));
   for (const f of doc.flags) boxes.push({ x1: f.x - 16, y1: f.y - 16, x2: f.x + 16, y2: f.y + 16 });
-  for (const t of doc.texts) if (!(t.kind === 'comment' && t.text.startsWith('.study '))) boxes.push(textBox(t));
+  for (const t of doc.texts) if (!isDataText(t)) boxes.push(textBox(t));
   if (!boxes.length) return null;
   return {
     x1: Math.min(...boxes.map((b) => b.x1)),
@@ -149,7 +150,7 @@ function itemsIn(doc: AscDoc, b: Box, lib: Library): ItemRef[] {
     if (boxesIntersect(wb, b)) out.push({ kind: 'wire', index: i });
   });
   doc.flags.forEach((f, i) => f.x >= b.x1 && f.x <= b.x2 && f.y >= b.y1 && f.y <= b.y2 && out.push({ kind: 'flag', index: i }));
-  doc.texts.forEach((t, i) => !(t.kind === 'comment' && t.text.startsWith('.study ')) && boxesIntersect(textBox(t), b) && out.push({ kind: 'text', index: i }));
+  doc.texts.forEach((t, i) => !isDataText(t) && boxesIntersect(textBox(t), b) && out.push({ kind: 'text', index: i }));
   return out;
 }
 

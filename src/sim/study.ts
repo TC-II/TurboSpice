@@ -5,12 +5,18 @@
 //  - un texto "!" con las directivas de las tarjetas activas, y otro ";" con las desactivadas
 //    (comentar una directiva es la forma habitual de apagarla en LTspice);
 //  - los valores de los componentes barridos ({R1}) o con tolerancia ({mc(1k,0.05)});
-//  - el bloque .control (comentario) si hay un paso personalizado.
+//  - el bloque .control (comentario) si hay un paso personalizado;
+//  - los análisis: el primero activo como directiva (el que corre LTspice) y los demás en un
+//    comentario que sólo ejecuta TurboSpice (ver EXTRA_ANALYSES);
+//  - la vista de ploteo (";.plot …", la misma que "Recordar vista" del visor).
 // Al abrir un archivo se reconstruyen las tarjetas a partir de eso, aunque venga de LTspice.
+import { belowTexts, dataText, DATA_TAGS, isDataText, isDataTextOf, readData } from '../asc/dataText.ts';
 import type { AscDoc, SchText } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
-import { controlHooks, HOOK_MARKS, isControlBlock } from '../netlist/directives.ts';
+import { controlHooks, EXTRA_ANALYSES, HOOK_MARKS, isControlBlock, isNgspiceComment, NGSPICE_ONLY } from '../netlist/directives.ts';
 import { parseStep } from '../netlist/step.ts';
+import { viewFromDoc, withView, type PlotView } from '../waveform/view.ts';
+import { ANALYSIS_LINE } from './analyses.ts';
 import { parseMeas, type MeasAnalysis, type MeasDef } from './meas.ts';
 
 export type SweepTarget =
@@ -109,7 +115,17 @@ export function customBody(c: StudyCustom): string[] {
   return [...sec(HOOK_MARKS.before, c.before), ...sec(HOOK_MARKS.after, c.after), ...sec(HOOK_MARKS.final, c.final)];
 }
 
+/** Un análisis (.tran, .ac…), como línea SPICE (se edita con los formularios de analyses.ts) */
+export interface StudyAnalysis {
+  enabled: boolean;
+  line: string;
+}
+
 export interface Study {
+  /** análisis a correr; undefined = no tocar los del esquemático */
+  analyses?: StudyAnalysis[];
+  /** qué graficar, por análisis; undefined = no tocar la vista guardada */
+  plot?: PlotView;
   sweeps: StudySweep[];
   tolerance: StudyTolerance | null;
   measures: StudyMeasure[];
@@ -119,20 +135,8 @@ export interface Study {
 }
 
 /** Comentario del .asc que guarda el programa de bloques (base64 del JSON) */
-export const STUDY_BLOCKS = '.study ';
-export const isStudyBlocksText = (t: { kind: string; text: string }) => t.kind === 'comment' && t.text.startsWith(STUDY_BLOCKS);
-
-function toBase64(json: string): string {
-  const bytes = new TextEncoder().encode(json);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-
-function fromBase64(b64: string): string {
-  const bin = atob(b64);
-  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-}
+export const STUDY_BLOCKS = DATA_TAGS.study;
+export const isStudyBlocksText = (t: { kind: string; text: string }) => isDataTextOf(t, 'study');
 
 export const emptyStudy = (): Study => ({ sweeps: [], tolerance: null, measures: [], custom: null });
 
@@ -241,6 +245,58 @@ export function studyLines(st: Study): { on: string[]; off: string[] } {
   return { on, off };
 }
 
+// --- análisis ------------------------------------------------------------------------------
+
+/** Primera línea del comentario con análisis desactivados que, si no, se ejecutarían (;.pz) */
+export const OFF_ANALYSES = '* análisis desactivados';
+const isAnalysisMark = (l: string) => l.trim() === EXTRA_ANALYSES || l.trim() === OFF_ANALYSES;
+
+/**
+ * Análisis del esquemático: los de directivas y comentarios de ngspice (activos) y los
+ * comentados con ";" (desactivados, como se apagan en LTspice).
+ */
+export function analysesFromDoc(doc: AscDoc): StudyAnalysis[] {
+  const out: StudyAnalysis[] = [];
+  for (const t of doc.texts) {
+    if (isDataText(t) || isControlBlock(t.text)) continue;
+    const enabled = t.kind === 'directive' || isNgspiceComment(t.text);
+    for (const l of t.text.split('\\n')) if (ANALYSIS_LINE.test(l)) out.push({ enabled, line: l.trim() });
+  }
+  return out;
+}
+
+/** Análisis que corren, en orden: el primero es el principal (el que corre LTspice) */
+export const activeAnalyses = (list: StudyAnalysis[]) => list.filter((a) => a.enabled && a.line.trim());
+
+/**
+ * Reemplaza los análisis del esquemático: el principal donde estaba el anterior (directiva, o
+ * comentario si LTspice no lo tiene), los adicionales en un comentario que sólo ejecuta
+ * TurboSpice y los desactivados comentados.
+ */
+export function applyAnalyses(doc: AscDoc, list: StudyAnalysis[]): AscDoc {
+  let anchor: { x: number; y: number } | null = null;
+  const texts: SchText[] = [];
+  for (const t of doc.texts) {
+    const lines = t.text.split('\\n');
+    const keep = isDataText(t) || isControlBlock(t.text) ? lines : lines.filter((l) => !ANALYSIS_LINE.test(l) && !isAnalysisMark(l));
+    if (keep.length === lines.length) {
+      texts.push(t);
+      continue;
+    }
+    const left = keep.filter((l) => l.trim());
+    anchor ??= { x: t.x, y: t.y + (left.length ? left.length * 24 + 16 : 0) };
+    if (left.length) texts.push({ ...t, text: keep.join('\\n') });
+  }
+  const text = (at: { x: number; y: number }, kind: SchText['kind'], lines: string[]): SchText => ({ x: at.x, y: at.y, align: 'Left', size: 2, kind, text: lines.join('\\n') });
+  const [main, ...extra] = activeAnalyses(list).map((a) => a.line.trim());
+  if (main) texts.push(text(anchor ?? belowTexts(doc), NGSPICE_ONLY.test(main) ? 'comment' : 'directive', [main]));
+  if (extra.length) texts.push(text(belowTexts({ ...doc, texts }), 'comment', [EXTRA_ANALYSES, ...extra]));
+  const off = list.filter((a) => !a.enabled && a.line.trim()).map((a) => a.line.trim());
+  // un ";.pz" solo se ejecutaría: la marca de la primera línea lo apaga
+  if (off.length) texts.push(text(belowTexts({ ...doc, texts }), 'comment', NGSPICE_ONLY.test(off[0]) ? [OFF_ANALYSES, ...off] : off));
+  return { ...doc, texts };
+}
+
 // --- directivas → tarjetas ----------------------------------------------------------------
 
 const STUDY_LINE = /^\s*\.(step|meas(ure)?)\b/i;
@@ -331,7 +387,9 @@ function measureFromDefs(defs: { def: MeasDef; enabled: boolean }[]): StudyMeasu
 
 /** Reconstruye el estudio de un documento (también uno hecho en LTspice) */
 export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
-  const st = emptyStudy();
+  const st: Study = { ...emptyStudy(), analyses: analysesFromDoc(doc) };
+  const plot = viewFromDoc(doc);
+  if (plot) st.plot = plot;
   const lines = directiveLines(doc);
   const params = new Map<string, string>();
   for (const l of lines) {
@@ -397,14 +455,9 @@ export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
     st.sweeps.push({ target, mode, list, start: nums[0] ?? '', stop: nums[1] ?? '', step: nums[2] ?? '', enabled: l.enabled, original });
   }
   st.measures.push(...measureFromDefs(measDefs));
-  const blocks = doc.texts.find(isStudyBlocksText);
-  if (blocks) {
-    try {
-      st.blocks = JSON.parse(fromBase64(blocks.text.slice(STUDY_BLOCKS.length).trim()));
-    } catch {
-      // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
-    }
-  }
+  // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
+  const blocks = readData(doc, 'study');
+  if (blocks !== undefined) st.blocks = blocks;
   const control = doc.texts.find((t) => isControlBlock(t.text));
   if (control) {
     const body = control.text.split('\\n').slice(1, -1);
@@ -461,12 +514,6 @@ function stripStudy(doc: AscDoc, swept: Set<string>, keepControl: boolean): { te
   return { texts, anchor };
 }
 
-/** Ubicación para textos nuevos: debajo de los existentes */
-function belowTexts(doc: AscDoc): { x: number; y: number } {
-  const ys = doc.texts.map((t) => t.y + t.text.split('\\n').length * 24);
-  return { x: doc.texts[0]?.x ?? 0, y: ys.length ? Math.max(...ys) + 16 : 0 };
-}
-
 /**
  * Reemplaza el estudio por código escrito a mano ("Ver código"): las líneas con ";" quedan
  * desactivadas (comentario) y un bloque .control es el paso personalizado. No toca los valores
@@ -508,6 +555,8 @@ export function applyStudyCode(doc: AscDoc, lib: SymbolSource, code: string): As
 export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
   const prev = studyFromDoc(doc, lib);
   let out = doc;
+  // análisis: sólo si cambiaron (así no se mueven los textos del esquemático)
+  if (st.analyses && JSON.stringify(st.analyses) !== JSON.stringify(prev.analyses)) out = applyAnalyses(out, st.analyses);
   // valores originales de lo que deja de estar barrido o con tolerancia
   for (const s of prev.sweeps) {
     if (s.target.kind === 'component' && s.original !== undefined && !st.sweeps.some((n) => n.target.kind === 'component' && n.target.name === (s.target as { name: string }).name)) {
@@ -544,6 +593,7 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
     }
   }
   // programa de bloques: texto chico (tamaño 0) debajo de todo; TurboSpice no lo dibuja
-  if (st.blocks) texts.push({ x: at.x, y: y + 32, align: 'Left', size: 0, kind: 'comment', text: STUDY_BLOCKS + toBase64(JSON.stringify(st.blocks)) });
-  return { ...out, texts };
+  if (st.blocks) texts.push(dataText('study', st.blocks, { x: at.x, y: y + 32 }));
+  // qué graficar: la vista guardada (";.plot …")
+  return st.plot ? withView({ ...out, texts }, st.plot) : { ...out, texts };
 }

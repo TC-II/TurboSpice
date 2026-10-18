@@ -42,14 +42,15 @@ import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
-import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotView } from './waveform/view.ts';
+import { asPlotView, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, viewFromDoc, withView, type Pane, type PlotView } from './waveform/view.ts';
+import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
-import { loadView, saveView } from './schematic/autosave.ts';
+import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
@@ -192,8 +193,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [showOp, setShowOp] = useState(false);
   const [panes, setPanes] = useState<Pane[]>(emptyPanes);
   const [activePane, setActivePane] = useState(0);
-  // vista recordada (paneles por tipo de análisis) de este circuito
-  const [plotView, setPlotView] = useState<PlotView>({});
+  // vista recordada (paneles por tipo de análisis): va dentro del .asc (";.plot …"), así que
+  // cambiarla es editar el documento (entra al historial de deshacer)
+  const plotView = useMemo(() => viewFromDoc(doc) ?? {}, [doc]);
+  const setPlotView = (v: PlotView) => history.commit(withView(doc, v));
+  // vista de una versión anterior (guardada en el navegador por nombre de archivo) para incorporar
+  const [offerView, setOfferView] = useState<PlotView | null>(null);
   const [plotName, setPlotName] = useState('');
   const [mode, setMode] = useState<ComplexMode>('bode');
   const plotPanel = useRef<PlotPanelHandle>(null);
@@ -270,7 +275,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       setSim(null);
       setPanes(emptyPanes());
       setActivePane(0);
-      setPlotView({});
+      setOfferView(null);
       setTool({ kind: 'select' });
       setDocKey((k) => k + 1);
     },
@@ -294,9 +299,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     window.history.replaceState(null, '', location.pathname + location.search);
     if (!shared) return false;
     const f = readAsc(shared.bytes, shared.name);
-    loadDoc(f.doc, { name: f.name, encoding: f.encoding });
-    remember(f.doc, { name: f.name, encoding: f.encoding });
-    if (shared.view) setPlotView(shared.view as PlotView);
+    // links viejos: la vista venía aparte (&v=…); ahora va dentro del .asc
+    const view = asPlotView(shared.view);
+    const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
+    loadDoc(d, { name: f.name, encoding: f.encoding });
+    remember(d, { name: f.name, encoding: f.encoding });
     return true;
   }, [loadDoc]);
 
@@ -322,7 +329,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           history.restore({ past: session.past.map(parseAsc), present: parseAsc(session.present), future: session.future.map(parseAsc) });
           setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'] });
           setSavedVersion(session.savedVersion);
-          if (session.view) setPlotView(session.view);
+          // sesiones anteriores: la vista estaba aparte del documento
+          const old = asPlotView(session.view);
+          if (old && !viewFromDoc(parseAsc(session.present))) setOfferView(old);
           setDocKey((k) => k + 1);
           if (sessionDirty) setMessage(`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`);
           return;
@@ -354,16 +363,20 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         future: h.future.slice(0, SAVED_UNDO).map(ascText),
         savedVersion: savedVersion - drop,
         time: Date.now(),
-        view: plotView,
       });
     }, 600);
     return () => clearTimeout(t);
-  }, [restored, history.state, file, savedVersion, plotView]);
+  }, [restored, history.state, file, savedVersion]);
 
-  // Vista recordada para este archivo (si no vino ya con el link o la sesión)
+  // Migración: vista guardada en el navegador para este nombre de archivo (versiones
+  // anteriores) y el .asc no trae la suya: se ofrece incorporarla
   useEffect(() => {
-    loadView(file.name).then((v) => v && setPlotView((cur) => (Object.keys(cur).length ? cur : v)));
-  }, [file.name]);
+    if (!doc.symbols.length || viewFromDoc(doc)) return;
+    loadView(file.name).then((v) => {
+      const pv = asPlotView(v);
+      if (pv) setOfferView((cur) => cur ?? pv);
+    });
+  }, [docKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Un link compartido abierto con la app ya cargada
   useEffect(() => {
@@ -420,7 +433,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const doShare = async () => {
     const { bytes } = ascBytes(doc, lib, file.encoding);
-    const hash = await shareHash(bytes, file.name, plotView);
+    const hash = await shareHash(bytes, file.name);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
@@ -561,7 +574,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const pltInput = useRef<HTMLInputElement>(null);
 
   // Punto de operación: sólo mientras el esquemático sea el que se simuló
-  const bias = sim && sim.doc === doc ? sim.result.bias : undefined;
+  const bias = sim && sameExceptData(sim.doc, doc) ? sim.result.bias : undefined;
   const describe = useMemo(() => {
     if (!bias || !sim) return undefined;
     return ({ net, symbol }: { net?: string; symbol?: number }) => {
@@ -620,10 +633,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const rememberView = () => {
     if (!plot) return;
     const kind = plotKind(plot.name);
-    const next = { ...plotView, [kind]: panes };
-    setPlotView(next);
-    saveView(file.name, next);
-    setMessage(`Vista recordada para .${kind}: se aplica en cada simulación (y se guarda con el link y en el .plt)`);
+    setPlotView({ ...plotView, [kind]: panes });
+    setMessage(`Vista recordada para .${kind}: se aplica en cada simulación y se guarda dentro del .asc`);
   };
   /** Ctrl+Espacio: volver a aplicar la vista recordada */
   const reapplyView = () => {
@@ -635,14 +646,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (!plot) return;
     const { [plotKind(plot.name)]: _, ...rest } = plotView;
     setPlotView(rest);
-    saveView(file.name, rest);
+  };
+  const acceptOfferedView = () => {
+    if (offerView) setPlotView({ ...offerView, ...plotView });
+    setOfferView(null);
   };
   const importPlt = (bytes: Uint8Array) => {
     const v = parsePlt(decode(bytes).text);
     if (!Object.keys(v).length) return setMessage('El .plt no tiene vistas que TurboSpice entienda');
-    const next = { ...plotView, ...v };
-    setPlotView(next);
-    saveView(file.name, next);
+    setPlotView({ ...plotView, ...v });
     if (plot && v[plotKind(plot.name)]) setPanes(v[plotKind(plot.name)]);
     setMessage(`Vista importada del .plt (${Object.keys(v).map((k) => `.${k}`).join(', ')})`);
   };
@@ -799,7 +811,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = file.name.replace(/\.asc$/i, '');
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${file.name}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
-    const built = sim?.doc === doc ? sim.built : await buildSimulation(doc, lib, file.name);
+    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, file.name);
     download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
   };
   const exportImage = (f: 'svg' | 'png') => {
@@ -1277,6 +1289,13 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             <div className="pick-banner">
               {picking.what === 'net' ? 'Elegí una red en el esquemático' : picking.what === 'source' ? 'Elegí una fuente (V o I) en el esquemático' : 'Elegí un componente en el esquemático'}
               <button onClick={() => endPick(null)}>Cancelar</button>
+            </div>
+          )}
+          {offerView && !picking && (
+            <div className="pick-banner">
+              Hay una vista de resultados de {file.name} guardada en este navegador. ¿Incorporarla al .asc?
+              <button onClick={acceptOfferedView}>Incorporar</button>
+              <button onClick={() => setOfferView(null)}>No</button>
             </div>
           )}
           {message && (

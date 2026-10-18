@@ -123,7 +123,7 @@ export interface CircuitInfo {
   sources: string[];
 }
 
-function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
+export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
   const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true) => (
     <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker }} />
   );

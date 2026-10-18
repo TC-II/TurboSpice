@@ -238,7 +238,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   const blocksCtl = ctl && ctl.text.split('\\n').some((l) => l.trim() === '* bloques') ? ctl : undefined;
   if (blocksCtl) {
     const analyses = lt.texts
-      .filter((t) => t.kind === 'directive')
+      .filter((t) => (t.kind === 'directive' || isNgspiceComment(t.text)) && !isControlBlock(t.text))
       .flatMap((t) => t.text.split('\\n'))
       .map((l) => l.trim())
       .filter((l) => /^\.(tran|ac|dc|noise|op|tf)\b/i.test(l));

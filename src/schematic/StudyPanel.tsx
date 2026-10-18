@@ -5,7 +5,10 @@ import { compileBlocks, studyToBlocks, type WorkspaceJson } from '../sim/studyBl
 import { parseStep } from '../netlist/step.ts';
 import type { MeasAnalysis } from '../sim/meas.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
+import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, validateAnalysis, type AnalysisKind } from '../sim/analyses.ts';
+import { traceColor, type Pane, type PlotView, type Trace } from '../waveform/view.ts';
 import {
+  activeAnalyses,
   customBody,
   MEASURE_KINDS,
   measureLines,
@@ -13,13 +16,14 @@ import {
   studyLines,
   type MeasureKind,
   type Study,
+  type StudyAnalysis,
   type StudyMeasure,
   type StudySweep,
   type SweepTarget,
   type ToleranceItem,
 } from '../sim/study.ts';
 import { Modal } from './dialogs.tsx';
-import type { Picker } from './simDialogs.tsx';
+import { AnalysisForm, type Picker } from './simDialogs.tsx';
 
 const StudyBlocks = lazy(() => import('./StudyBlocks.tsx'));
 
@@ -384,6 +388,156 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
   );
 }
 
+function AnalysisCard({ a, index, primary, set, remove, picker }: {
+  a: StudyAnalysis;
+  index: number;
+  /** es el análisis principal (el que corre LTspice) */
+  primary: boolean;
+  set(a: StudyAnalysis): void;
+  remove(): void;
+  picker?: Picker;
+}) {
+  const parsed = parseAnalysis(a.line);
+  const kind = parsed?.kind ?? (/^\s*\.(\w+)/.exec(a.line)?.[1].toLowerCase() as AnalysisKind | undefined);
+  const meta = ANALYSES.find((x) => x.kind === kind);
+  const errors = parsed ? validateAnalysis(parsed) : [];
+  return (
+    <Card
+      title={`Simulación ${index + 1}${meta ? `: ${meta.label}` : ''}`}
+      enabled={a.enabled}
+      onToggle={(enabled) => set({ ...a, enabled })}
+      onRemove={remove}
+      extra={
+        a.enabled && (
+          <span className="hint">{primary && !meta?.ngspiceOnly ? 'principal (la que corre LTspice)' : 'sólo TurboSpice'}</span>
+        )
+      }
+    >
+      <Row label="Análisis">
+        <select
+          value={kind ?? ''}
+          aria-label="Tipo de análisis"
+          onChange={(e) => set({ ...a, line: formatAnalysis(defaultAnalysis(e.target.value as AnalysisKind)) })}
+        >
+          {!meta && <option value="">(otro)</option>}
+          {ANALYSES.map((x) => (
+            <option key={x.kind} value={x.kind}>
+              {x.label}
+              {x.ngspiceOnly ? ' (ngspice)' : ''}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {parsed ? (
+        <div className="study-analysis">
+          <AnalysisForm a={parsed} set={(x) => set({ ...a, line: formatAnalysis(x) })} picker={picker} />
+        </div>
+      ) : (
+        <Row label="Directiva" hint="Opciones que el formulario no maneja: se edita como texto">
+          <input value={a.line} spellCheck={false} aria-label="Directiva del análisis" onChange={(e) => set({ ...a, line: e.target.value })} />
+        </Row>
+      )}
+      <code className="study-line">{a.line}</code>
+      {errors.length > 0 && <span className="hint warn">{errors.join(' · ')}</span>}
+    </Card>
+  );
+}
+
+const kindOf = (line: string) => /^\s*\.(\w+)/.exec(line)?.[1].toLowerCase() ?? '';
+
+/** Vista sin señales vacías ni paneles vacíos */
+function cleanPlot(v: PlotView | undefined): PlotView | undefined {
+  if (!v) return v;
+  const out: PlotView = {};
+  for (const [k, panes] of Object.entries(v)) {
+    const ps = panes.map((p) => ({ traces: p.traces.filter((t) => t.expr.trim()) })).filter((p) => p.traces.length);
+    if (ps.length) out[k] = ps;
+  }
+  return out;
+}
+
+const PLOT_KINDS: [string, string][] = [
+  ['tran', 'Transitorio'],
+  ['ac', 'AC (Bode)'],
+  ['dc', 'Barrido DC'],
+  ['noise', 'Ruido'],
+];
+
+function PlotCard({ view, set, remove, picker, preferred }: {
+  view: PlotView;
+  set(v: PlotView): void;
+  remove(): void;
+  picker?: Picker;
+  /** análisis a mostrar primero (los del estudio) */
+  preferred: string[];
+}) {
+  const kinds = [...new Set([...preferred, ...Object.keys(view)])].filter(Boolean);
+  const [kind, setKind] = useState(kinds[0] ?? 'tran');
+  const panes = view[kind] ?? [];
+  const setPanes = (p: Pane[]) => {
+    const { [kind]: _, ...rest } = view;
+    set(p.length ? { ...rest, [kind]: p } : rest);
+  };
+  const setTrace = (pi: number, ti: number, t: Trace | null) =>
+    setPanes(panes.map((p, k) => (k === pi ? { traces: t ? p.traces.map((x, j) => (j === ti ? t : x)) : p.traces.filter((_, j) => j !== ti) } : p)));
+  const addTrace = (pi: number, expr: string) => setPanes(panes.map((p, k) => (k === pi ? { traces: [...p.traces, { expr }] } : p)));
+  const label = (k: string) => PLOT_KINDS.find(([x]) => x === k)?.[1] ?? `.${k}`;
+  return (
+    <Card title="Gráfico" enabled onToggle={(v) => !v && remove()} onRemove={remove}>
+      <Row label="Análisis">
+        <select value={kind} aria-label="Análisis del gráfico" onChange={(e) => setKind(e.target.value)}>
+          {[...new Set([...kinds, ...PLOT_KINDS.map(([k]) => k)])].map((k) => (
+            <option key={k} value={k}>
+              {label(k)}
+              {view[k]?.length ? ` (${view[k].length} panel${view[k].length === 1 ? '' : 'es'})` : ''}
+            </option>
+          ))}
+        </select>
+      </Row>
+      {panes.map((p, pi) => (
+        <fieldset key={pi} className="study-pane">
+          <legend>
+            Panel {pi + 1}
+            <button className="x" aria-label={`Quitar el panel ${pi + 1}`} title="Quitar el panel" onClick={() => setPanes(panes.filter((_, k) => k !== pi))}>
+              ✕
+            </button>
+          </legend>
+          {p.traces.map((t, ti) => (
+            <div key={ti} className="study-trace">
+              <input
+                type="color"
+                className="color"
+                aria-label={`Color de ${t.expr || 'la señal'}`}
+                value={traceColor(t, ti)}
+                onChange={(e) => setTrace(pi, ti, { ...t, color: e.target.value })}
+              />
+              <PickInput value={t.expr} onChange={(expr) => setTrace(pi, ti, { ...t, expr })} picker={picker} what="net" list="sim-nets-v" label={`Señal ${ti + 1} del panel ${pi + 1}`} placeholder="V(out) o V(out)/V(in)" />
+              <button className="x" aria-label={`Quitar ${t.expr || 'la señal'}`} title="Quitar" onClick={() => setTrace(pi, ti, null)}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <div className="tol-quick">
+            <button onClick={() => addTrace(pi, '')}>+ Señal</button>
+            {picker && (
+              <button onClick={() => picker('net').then((v) => v && addTrace(pi, `V(${v})`))} title="Elegir una red en el esquemático">
+                + Señal del esquemático ⌖
+              </button>
+            )}
+          </div>
+        </fieldset>
+      ))}
+      <div className="tol-quick">
+        <button onClick={() => setPanes([...panes, { traces: [] }])}>+ Panel de {label(kind)}</button>
+      </div>
+      <p className="hint">
+        Es la misma vista que "Recordar vista" en los resultados: se aplica en cada simulación y se guarda dentro del .asc.
+        {kind === 'ac' ? ' En AC cada señal se muestra como Bode (magnitud y fase).' : ''}
+      </p>
+    </Card>
+  );
+}
+
 export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode, onClose }: {
   initial: Study;
   info: StudyInfo;
@@ -417,6 +571,11 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
   });
   const [code, setCode] = useState<string | null>(null);
   const runs = totalRuns(st);
+  const analyses = st.analyses ?? [];
+  const active = activeAnalyses(analyses);
+  const setAnalyses = (list: StudyAnalysis[]) => set({ ...st, analyses: list });
+  // tarjeta "Gráfico": la vista guardada en el .asc (la misma que "Recordar vista")
+  const [plotOpen, setPlotOpen] = useState(!!initial.plot);
   const shownCode = code ?? studyCode(blocksTouched.current && compiled && !cardsTouched.current ? compiled.study : st);
   const nextName = (base: string) => {
     for (let i = 1; ; i++) if (!st.measures.some((m) => m.name === `${base}${i}`)) return `${base}${i}`;
@@ -437,8 +596,21 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
         ],
       }),
     custom: () => set({ ...st, custom: { mode: 'hooks', body: 'run\n', before: '', after: '', final: '' } }),
+    analysis: () => {
+      const used = new Set(analyses.map((a) => kindOf(a.line)));
+      const kind = (['tran', 'ac', 'dc', 'noise', 'op'] as AnalysisKind[]).find((k) => !used.has(k)) ?? 'tran';
+      setAnalyses([...analyses, { enabled: true, line: formatAnalysis(defaultAnalysis(kind)) }]);
+    },
+    plot: () => {
+      setPlotOpen(true);
+      set({ ...st, plot: st.plot ?? {} });
+    },
   };
   const problems = [
+    ...analyses.flatMap((a, i) => {
+      const p = parseAnalysis(a.line);
+      return a.enabled && p && validateAnalysis(p).length ? [`Revisá los datos de la simulación ${i + 1}`] : [];
+    }),
     ...st.sweeps.filter((s) => s.enabled && sweepRuns(s) === null).map(() => 'Hay un barrido con valores inválidos'),
     ...st.sweeps.filter((s) => s.target.kind === 'component' && (!s.target.name || s.original === undefined)).map(() => 'Elegí el componente a barrer'),
     ...st.measures.filter((m) => m.kind !== 'raw' && !m.signal).map((m) => `Falta la señal de ${m.name}`),
@@ -448,6 +620,9 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       <datalist id="study-components">{info.components.map((c) => <option key={c.name} value={c.name}>{c.value}</option>)}</datalist>
       <datalist id="study-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="study-params">{info.params.map((n) => <option key={n} value={n} />)}</datalist>
+      <datalist id="sim-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
+      <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
+      <datalist id="sim-nets-v">{info.nets.map((n) => <option key={n} value={`V(${n})`} />)}</datalist>
       <nav className="tabs study-tabs">
         <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>Tarjetas</button>
         <button
@@ -470,10 +645,32 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
         >
           Ver código
         </button>
-        {tab !== 'blocks' && <span className="hint study-runs">{runs} corrida{runs === 1 ? '' : 's'} en total</span>}
+        {tab !== 'blocks' && (
+          <span className="hint study-runs">
+            {runs} corrida{runs === 1 ? '' : 's'} en total
+            {active.length > 0 && ` · cada una corre ${active.map((a) => `.${kindOf(a.line)}`).join(', ')}`}
+          </span>
+        )}
       </nav>
       {tab === 'cards' && (
         <div className="study-cards">
+          {analyses.map((a, i) => (
+            <AnalysisCard
+              key={`a${i}`}
+              a={a}
+              index={i}
+              primary={active[0] === a}
+              picker={picker}
+              set={(n) => setAnalyses(analyses.map((x, k) => (k === i ? n : x)))}
+              remove={() => setAnalyses(analyses.filter((_, k) => k !== i))}
+            />
+          ))}
+          {active.length > 1 && (
+            <p className="hint warn">
+              LTspice corre un solo análisis por simulación: en el .asc la primera simulación activa queda como directiva y las demás como
+              comentario que LTspice ignora y sólo ejecuta TurboSpice.
+            </p>
+          )}
           {st.sweeps.map((s, i) => (
             <SweepCard
               key={i}
@@ -544,15 +741,29 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
               </p>
             </Card>
           )}
+          {plotOpen && st.plot && (
+            <PlotCard
+              view={st.plot}
+              picker={picker}
+              preferred={active.map((a) => kindOf(a.line)).filter((k) => PLOT_KINDS.some(([x]) => x === k))}
+              set={(plot) => set({ ...st, plot })}
+              remove={() => {
+                setPlotOpen(false);
+                set({ ...st, plot: initial.plot ? {} : undefined });
+              }}
+            />
+          )}
           <div className="study-add">
+            <button onClick={add.analysis}>+ Simulación</button>
             <button onClick={add.sweep}>+ Barrido</button>
             <button onClick={add.tolerance} disabled={!!st.tolerance}>+ Tolerancias</button>
             <button onClick={add.measure}>+ Medición</button>
             <button onClick={add.custom} disabled={!!st.custom}>+ Paso personalizado</button>
+            <button onClick={add.plot} disabled={plotOpen}>+ Gráfico</button>
           </div>
-          {!st.sweeps.length && !st.tolerance && !st.measures.length && !st.custom && (
+          {!analyses.length && !st.sweeps.length && !st.tolerance && !st.measures.length && !st.custom && !plotOpen && (
             <p className="empty pad">
-              Agregá un barrido (variar un componente, una fuente, la temperatura…), tolerancias (Monte Carlo o caso peor) o mediciones
+              Agregá simulaciones (.tran, .ac…), qué graficar, un barrido (variar un componente, una fuente, la temperatura…), tolerancias (Monte Carlo o caso peor) o mediciones
               (tiempo de subida, f a −3 dB…). Se guardan como .step y .meas, así que el .asc sigue simulando igual en LTspice.
             </p>
           )}
@@ -599,7 +810,9 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           <button
             className="primary"
             disabled={!compiled || compiled.errors.length > 0}
-            onClick={() => compiled && onApply(withOriginals({ ...compiled.study, blocks: blocks ?? undefined }))}
+            onClick={() =>
+              compiled && onApply(withOriginals({ ...compiled.study, analyses: st.analyses, plot: cleanPlot(compiled.study.plot ?? st.plot), blocks: blocks ?? undefined }))
+            }
           >
             Aplicar
           </button>
@@ -608,7 +821,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             className="primary"
             disabled={problems.length > 0}
             // editar las tarjetas descarta el programa de bloques (ya no coincidiría)
-            onClick={() => onApply({ ...st, blocks: cardsTouched.current ? undefined : st.blocks })}
+            onClick={() => onApply({ ...st, plot: cleanPlot(st.plot), blocks: cardsTouched.current ? undefined : st.blocks })}
           >
             Aplicar
           </button>

@@ -22,13 +22,15 @@ function fromBase64Url(s: string): Uint8Array {
 const zip = async (b: Uint8Array) => toBase64Url(await pipe(b, new CompressionStream('deflate-raw')));
 const unzip = (s: string) => pipe(fromBase64Url(s), new DecompressionStream('deflate-raw'));
 
-/** Hash (sin "#") para compartir el archivo y, opcionalmente, la vista de resultados (JSON) */
-export async function shareHash(asc: Uint8Array, name: string, view?: unknown): Promise<string> {
-  const v = view && Object.keys(view).length ? `&v=${await zip(new TextEncoder().encode(JSON.stringify(view)))}` : '';
-  return `c=${await zip(asc)}${v}&n=${encodeURIComponent(name)}`;
+/** Hash (sin "#") para compartir el archivo (la vista de resultados va dentro del .asc) */
+export async function shareHash(asc: Uint8Array, name: string): Promise<string> {
+  return `c=${await zip(asc)}&n=${encodeURIComponent(name)}`;
 }
 
-/** Lee un hash generado por shareHash; null si no es un circuito compartido */
+/**
+ * Lee un hash generado por shareHash; null si no es un circuito compartido. Los links viejos
+ * traen además la vista de resultados aparte (&v=…).
+ */
 export async function readShareHash(hash: string): Promise<{ bytes: Uint8Array; name: string; view?: unknown } | null> {
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const c = params.get('c');

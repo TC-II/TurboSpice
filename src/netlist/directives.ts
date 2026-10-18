@@ -4,8 +4,15 @@
 
 export const NGSPICE_ONLY = /^\s*\.(control|pz|sens|disto|sp|pss)\b/i;
 
+/**
+ * Primera línea del comentario con los análisis adicionales del Estudio: LTspice corre un solo
+ * análisis por simulación (la directiva "!"), los demás van en este comentario que sólo
+ * ejecuta TurboSpice.
+ */
+export const EXTRA_ANALYSES = '* TurboSpice: análisis adicionales (LTspice simula sólo la directiva)';
+
 /** ¿Este comentario de esquemático es una directiva de ngspice activa? */
-export const isNgspiceComment = (text: string) => NGSPICE_ONLY.test(text);
+export const isNgspiceComment = (text: string) => NGSPICE_ONLY.test(text) || text.startsWith(EXTRA_ANALYSES);
 
 /** ¿El texto (directiva o comentario) es un bloque .control? */
 export const isControlBlock = (text: string) => /^\s*\.control\b/i.test(text);

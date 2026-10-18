@@ -53,7 +53,7 @@ import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
-import { ResultsSplitter, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import type { DriveFile } from './cloud/drive.ts';
@@ -217,8 +217,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   // esquemático o resultados expandidos a toda la ventana (#24)
   const [expanded, setExpandedState] = useExpanded(!!sim && !dialog);
   const setExpanded = (e: Expanded) => {
-    // al volver al esquemático, reajustar la vista (estaba oculto)
-    if (expanded === 'results' && e !== 'results') setTimeout(() => editor.current?.fit(), 50);
+    // al volver al esquemático o colapsar/mostrar los resultados, reajustar la vista (cambió el
+    // tamaño del lienzo o estaba oculto)
+    if (refitsSchematic(expanded, e)) setTimeout(() => editor.current?.fit(), 50);
     setExpandedState(e);
   };
   const [theme, setTheme] = useTheme();
@@ -669,6 +670,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const expr = probeExpr(sim.built, target);
     if (!expr) return;
     setPanel('plot');
+    // con los resultados colapsados, mostrarlos para ver la traza
+    if (expanded === 'schematic') setExpanded('');
     if (panes.some((p) => p.traces.some((t) => sameExpr(t.expr, expr)))) {
       editPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
       return;
@@ -1093,11 +1096,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       <Icon name={icon} />
     </button>
   );
-  const closeResults = () => {
-    setSim(null);
-    setShowOp(false);
-    setTool({ kind: 'select' });
-  };
+  // Colapsar o mostrar el panel de resultados (#36): el resultado, las trazas, los cursores y la
+  // vista se conservan; sólo se reemplazan al volver a simular o al abrir otro circuito
+  const resultsShown = !!sim && expanded !== 'schematic';
+  const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
   const menus: MenuDef[] = [
     {
@@ -1181,7 +1183,6 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         'sep',
         { label: 'Punta de prueba', onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
         { label: 'Anotar punto de operación', onClick: () => setShowOp((v) => !v), disabled: !bias, checked: showOp },
-        { label: 'Cerrar resultados', onClick: closeResults, disabled: !sim },
       ],
     },
     {
@@ -1201,6 +1202,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           },
           checked: resultsSide,
         },
+        { label: 'Panel de resultados', shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
         'sep',
         { label: 'Tema automático (del sistema)', onClick: () => setTheme('auto'), checked: theme === 'auto' },
         { label: 'Tema claro', onClick: () => setTheme('light'), checked: theme === 'light' },
@@ -1307,8 +1309,14 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         {sim && iconBtn('probe', 'Medir', 'Punta de prueba: click en un cable (tensión) o componente (corriente)', () => setTool({ kind: 'probe' }), { active: tool.kind === 'probe' })}
         {bias && iconBtn('op', 'Anotar OP', 'Anotar el punto de operación en el esquemático (sin modificarlo)', () => setShowOp((v) => !v), { active: showOp })}
         {sim && (
-          <button className="labeled" onClick={closeResults} title="Cerrar los resultados y volver a editar">
-            <Icon name="close" /> Cerrar resultados
+          <button
+            className={`labeled${resultsShown ? ' active' : ''}`}
+            onClick={toggleResultsPanel}
+            aria-label="Panel de resultados"
+            aria-pressed={resultsShown}
+            title={resultsShown ? 'Ocultar el panel de resultados (no se pierden)' : 'Mostrar el panel de resultados'}
+          >
+            <Icon name="results" /> Resultados
           </button>
         )}
         <StatusText status={status} />
@@ -1478,7 +1486,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                   </button>
                 </>
               )}
-              <button className="close" onClick={() => setSim(null)} title="Cerrar resultados">✕</button>
+              <button className="close" onClick={() => setExpanded('schematic')} aria-label="Ocultar resultados" title="Ocultar resultados (Ctrl+1)">
+                {resultsSide ? '▶' : '▼'}
+              </button>
             </div>
             <div className="results-body">
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}

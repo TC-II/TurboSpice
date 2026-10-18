@@ -1,6 +1,7 @@
 // E2E de funciones de interfaz, por issue: nombres de redes (#15), compartir (#1), autoguardado
 // (#5), punto de operación (#2), elegir en el esquemático (#13), .step (#7), visor de resultados
-// (#3), vista recordada (#14), exportaciones (#12) y expandir esquemático/resultados (#24).
+// (#3), vista recordada (#14), exportaciones (#12), expandir esquemático/resultados (#24) y
+// colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
@@ -425,8 +426,30 @@ await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
 
 // --- #4: interfaz ---
 await page.setViewportSize({ width: 1280, height: 800 });
-await page.getByRole('button', { name: 'Cerrar resultados' }).click();
-check((await page.locator('.results-panel').count()) === 0, 'cerrar resultados vuelve a la edición');
+// #36: los resultados no se cierran, se colapsan y se vuelven a mostrar intactos
+const resultsState = async () =>
+  JSON.stringify({
+    plot: await page.getByRole('combobox', { name: 'Plot' }).inputValue(),
+    vista: await page.getByRole('combobox', { name: 'Vista' }).inputValue(),
+    trazas: await page.locator('.trace-chip .name').allTextContents(),
+    paneles: await page.locator('.pane').count(),
+  });
+const shownBefore = await resultsState();
+check((await page.getByRole('button', { name: 'Cerrar resultados' }).count()) === 0, 'no hay botón para cerrar (descartar) los resultados');
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+check(
+  !(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()),
+  'ocultar resultados colapsa el panel y deja la pestaña para mostrarlos',
+);
+check((await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).getAttribute('aria-pressed')) === 'false', 'el botón Panel de resultados de la barra queda sin marcar');
+await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).click();
+await page.locator('.results-panel').waitFor();
+check((await resultsState()) === shownBefore, `al mostrarlos de nuevo, los resultados siguen intactos (${shownBefore})`);
+await menu(page, 'Ver', 'Panel de resultados');
+check(!(await page.locator('.results-panel').isVisible()), 'Ver › Panel de resultados también los colapsa');
+await page.getByRole('button', { name: 'Mostrar resultados' }).click();
+check((await resultsState()) === shownBefore, 'y la pestaña del borde los vuelve a mostrar');
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
 await page.keyboard.press('?');
 check(await page.getByRole('dialog', { name: 'Atajos de teclado' }).isVisible(), '"?" muestra los atajos');
 await page.keyboard.press('Escape');
@@ -448,6 +471,8 @@ await page.keyboard.press('Control+c');
 const dest = await at(320, 160);
 await page.mouse.move(dest.x, dest.y);
 await page.keyboard.press('Control+v');
+// con los resultados colapsados (no descartados) el pegado puede tardar un poco más en dibujarse
+await page.waitForFunction((n) => document.querySelectorAll('svg.editor .symbols .sym').length === n, nSyms + 1, { timeout: 3000 }).catch(() => {});
 check((await syms()) === nSyms + 1, 'Ctrl+C / Ctrl+V pega una copia');
 check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'la copia recibe un nombre nuevo (R2)');
 await page.keyboard.press('Control+a');
@@ -557,7 +582,7 @@ const opRows = await page.locator('.result-table tbody tr').allTextContents();
 check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
 await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
 check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
-await page.getByRole('button', { name: 'Cerrar resultados' }).click();
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
 
 // --- #16-#20: Estudio (barrido + medición + tolerancias, ver código) ---
 await openExample(page, 'Filtro RC.asc');

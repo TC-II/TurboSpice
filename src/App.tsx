@@ -1972,7 +1972,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           }}
         />
       )}
-      {dialog?.kind === 'drive' && <DriveDialog onOpen={openDriveFile} onClose={() => setDialog(null)} onError={(m) => setMessage(`No se pudo abrir de Google Drive: ${m}`)} />}
+      {dialog?.kind === 'drive' && <DriveDialog onOpen={openDriveFile} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'share' && (
         <ShareDialog
           url={dialog.url}

@@ -53,12 +53,6 @@ Para crear el Client ID (no hay secreto: el ID es público y va en el JavaScript
    - local: `cp .env.example .env.local` y completar `VITE_GOOGLE_CLIENT_ID` (`.env.local` no se commitea);
    - deploy: en el repo, *Settings → Secrets and variables → Actions → Variables*, crear la variable
      `VITE_GOOGLE_CLIENT_ID` (el workflow de deploy la pasa al build).
-6. Para abrir cualquier `.asc` del Drive (no sólo los que guardó TurboSpice) se usa el
-   [Google Picker](https://developers.google.com/drive/picker): habilitar **Google Picker API** y crear
-   una **API key** (*Credenciales → Crear credenciales → Clave de API*), restringida a la *Google Picker
-   API* y a los sitios `http://localhost:5173/*`, `http://localhost:4173/*` y `https://tc-ii.github.io/*`.
-   Va en `VITE_GOOGLE_API_KEY` (local y variable del repo, igual que el Client ID). Es pública; el
-   archivo elegido queda accesible para la app y nada más (sigue siendo `drive.file`).
 
 ## Licencias
 

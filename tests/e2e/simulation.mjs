@@ -75,7 +75,7 @@ await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('');
 await page.getByRole('button', { name: /Barrer un componente/ }).click();
 await page.getByRole('button', { name: 'Aceptar' }).click();
-const free = await at(400, 120);
+const free = await at(128, 48); // lugar libre dentro del circuito (siempre visible)
 await page.mouse.click(free.x, free.y);
 check((await page.locator('.texts .ngspice').count()) === 1, 'el bloque .control queda en el esquemático (comentario activo)');
 await page.getByRole('button', { name: 'Simular' }).click();

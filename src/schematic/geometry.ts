@@ -1,12 +1,15 @@
 // Geometría del esquemático: cajas de símbolos, detección bajo el cursor, grilla.
-import { GRID, WINDOW_ATTR, type AscDoc, type Orient, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
+import { GRID, WINDOW_ATTR, type AscDoc, type FlagDir, type Orient, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { toWorld, transformAlign, transformOffset } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
-import { isHiddenText } from '../netlist/directives.ts';
+import { isDataText } from '../asc/dataText.ts';
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 export const snapPoint = (p: Point): Point => ({ x: snap(p.x), y: snap(p.y) });
+/** Grilla de los rótulos de texto (media grilla de LTspice) */
+export const LABEL_GRID = 8;
+export const snapLabel = (v: number) => Math.round(v / LABEL_GRID) * LABEL_GRID;
 
 export interface Box {
   x1: number;
@@ -62,6 +65,37 @@ export function placementOrigin(def: SymbolDef | undefined, orient: Orient, at: 
   // referencia de grilla: el primer pin (o el origen si no tiene pines)
   const ref = def.pins.length ? toWorld({ ...o, orient }, def.pins[0].x, def.pins[0].y) : o;
   return { x: o.x + snap(ref.x) - ref.x + 0, y: o.y + snap(ref.y) - ref.y + 0 };
+}
+
+/**
+ * Punto fijo para rotar/espejar más cercano a `c`: sólo sirven los puntos de la grilla de `ref`
+ * y los centros de sus celdas (girar 90° alrededor de ellos deja la grilla sobre sí misma).
+ * Los empates se resuelven siempre igual: grilla antes que centro de celda, después menor y,
+ * después menor x.
+ */
+export function pivotNear(c: Point, ref: Point): Point {
+  const cands: { p: Point; d: number; k: number }[] = [];
+  for (const k of [0, GRID / 2]) {
+    const bx = ref.x + k;
+    const by = ref.y + k;
+    for (const x of [Math.floor((c.x - bx) / GRID), Math.ceil((c.x - bx) / GRID)].map((i) => bx + i * GRID))
+      for (const y of [Math.floor((c.y - by) / GRID), Math.ceil((c.y - by) / GRID)].map((i) => by + i * GRID))
+        cands.push({ p: { x: x + 0, y: y + 0 }, d: (x - c.x) ** 2 + (y - c.y) ** 2, k });
+  }
+  cands.sort((a, b) => a.d - b.d || a.k - b.k || a.p.y - b.p.y || a.p.x - b.p.x);
+  return cands[0].p;
+}
+
+/**
+ * Punto fijo de un símbolo para rotar/espejar, en coordenadas locales (no depende de la
+ * orientación, así que 4 rotaciones o 2 espejados lo devuelven exactamente al mismo lugar):
+ * el centro de la geometría (sin textos ni skin) llevado al punto más cercano que deja los
+ * pines sobre la grilla. Con una cantidad impar de tramos de grilla queda en uno de los puntos
+ * vecinos, elegido de forma determinista.
+ */
+export function symbolPivot(def: SymbolDef): Point {
+  const b = localBox(def);
+  return pivotNear({ x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 }, def.pins[0] ?? { x: 0, y: 0 });
 }
 
 export function pinPoints(inst: SymbolInst, def: SymbolDef | undefined): Point[] {
@@ -186,8 +220,8 @@ export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number): ItemR
 export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef[] {
   const out: ItemRef[] = [];
   for (let i = doc.texts.length - 1; i >= 0; i--) {
-    // el programa de bloques del Estudio y la lista de simulaciones no se dibujan ni se seleccionan
-    if (isHiddenText(doc.texts[i])) continue;
+    // los comentarios con datos (";.study …", ";.plot …") no se dibujan ni se seleccionan
+    if (isDataText(doc.texts[i])) continue;
     if (inBox(p, textBox(doc.texts[i]), tol / 2)) out.push({ kind: 'text', index: i });
   }
   for (let i = doc.flags.length - 1; i >= 0; i--) if (inBox(p, flagBox(doc, doc.flags[i]), tol)) out.push({ kind: 'flag', index: i });
@@ -204,7 +238,7 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): It
 }
 
 /** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
-export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' | 'right' {
+export function flagDirection(doc: AscDoc, f: Point): FlagDir {
   const dirs = new Set<string>();
   for (const w of doc.wires) {
     for (const [a, b] of [
@@ -218,7 +252,7 @@ export function flagDirection(doc: AscDoc, f: Point): 'top' | 'bottom' | 'left' 
       else if (b.x > a.x) dirs.add('right');
     }
   }
-  if (dirs.size <= 1) return (dirs.values().next().value as 'top' | 'bottom' | 'left' | 'right') ?? 'top';
+  if (dirs.size <= 1) return (dirs.values().next().value as FlagDir) ?? 'top';
   if (!dirs.has('top')) return 'bottom';
   if (!dirs.has('bottom')) return 'top';
   if (!dirs.has('left')) return 'right';

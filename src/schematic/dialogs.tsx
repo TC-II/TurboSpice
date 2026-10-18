@@ -1,7 +1,9 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
-import { effectiveAttrs } from '../asc/resolve.ts';
+import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
+import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
+import { transformAlign } from '../asc/transform.ts';
+import type { LabelPatch } from './edit.ts';
 import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
 import { LONG_LINK } from './share.ts';
@@ -137,10 +139,47 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
 }
 
 /** Atributos de un componente (InstName, Value, SpiceLine…) */
-export function AttributeDialog({ inst, def, onApply, onClose }: {
+interface LabelRow {
+  win: number;
+  attr: string;
+  visible: boolean;
+  /** alineación tal como se ve en el esquemático */
+  align: string;
+  size: number;
+  /** distinto de lo que pone el símbolo (se puede volver a la posición por defecto) */
+  moved: boolean;
+}
+
+const sameWin = (a: TextWindow | undefined, b: TextWindow | undefined) =>
+  !!a && !!b && a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;
+
+/** Rótulos del componente que muestran un atributo (InstName, Value…), en orden de WINDOW */
+export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: WindowDefaults): LabelRow[] {
+  if (!def) return [];
+  const eff = effectiveWindows(inst, def, table);
+  const dflt = defaultWindows(def, inst.orient, table);
+  const attrs = effectiveAttrs(inst, def);
+  const rows: LabelRow[] = [];
+  for (const [win, w] of [...eff].sort((a, b) => a[0] - b[0])) {
+    const attr = WINDOW_ATTR[win];
+    if (!attr || !attrs.has(attr)) continue;
+    const d = dflt.get(win);
+    const hidden = w.align === 'Invisible';
+    // un rótulo oculto se muestra con la alineación por defecto
+    const local = hidden ? (d && d.align !== 'Invisible' ? d.align : 'Left') : w.align;
+    rows.push({ win, attr, visible: !hidden, align: transformAlign(local, inst.orient), size: w.size, moved: !sameWin(w, d) });
+  }
+  return rows;
+}
+
+/** Atributos de un componente y, a la derecha de cada uno, si su rótulo se ve en el esquemático */
+export function AttributeDialog({ inst, def, windowDefaults, focusLabel, onApply, onClose }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
-  onApply(attrs: Record<string, string>): void;
+  windowDefaults: WindowDefaults;
+  /** rótulo desde el que se abrió (botón derecho o doble click sobre el texto) */
+  focusLabel?: number;
+  onApply(attrs: Record<string, string>, labels: Map<number, LabelPatch>, toSelection: boolean): void;
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
@@ -148,6 +187,9 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
     (k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine',
   );
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
+  const [rows, setRows] = useState(() => labelRows(inst, def, windowDefaults));
+  const [patches, setPatches] = useState(new Map<number, LabelPatch>());
+  const focusAttr = rows.find((r) => r.win === focusLabel)?.attr ?? 'Value';
   const first = useRef<HTMLInputElement>(null);
   useEffect(() => {
     first.current?.focus();
@@ -155,11 +197,15 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
   }, []);
   const prefix = eff.get('Prefix') ?? '';
   const check = checkValue(prefix, vals.Value ?? '');
+  const setVisible = (win: number, visible: boolean) => {
+    setPatches(new Map(patches).set(win, { ...patches.get(win), visible }));
+    setRows(rows.map((r) => (r.win === win ? { ...r, visible, moved: true } : r)));
+  };
   const submit = () => {
     const out = { ...vals, ...(vals.Value !== undefined ? { Value: check.value } : {}) };
     // Sólo se guardan los que cambiaron respecto al valor efectivo
     const changed = Object.fromEntries(Object.entries(out).filter(([k, v]) => v !== (eff.get(k) ?? '')));
-    onApply(changed);
+    onApply(changed, patches, false);
   };
   return (
     <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose}>
@@ -170,18 +216,34 @@ export function AttributeDialog({ inst, def, onApply, onClose }: {
           submit();
         }}
       >
-        {keys.map((k) => (
-          <label key={k}>
-            <span>{k}</span>
-            <input
-              ref={k === 'Value' ? first : undefined}
-              value={vals[k]}
-              spellCheck={false}
-              onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
-            />
-            {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
-          </label>
-        ))}
+        {keys.map((k) => {
+          const row = rows.find((r) => r.attr === k);
+          return (
+            <label key={k} className="attr-row">
+              <span>{k}</span>
+              <input
+                ref={k === focusAttr ? first : undefined}
+                value={vals[k]}
+                spellCheck={false}
+                onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
+              />
+              {row ? (
+                <input
+                  type="checkbox"
+                  className="attr-vis"
+                  checked={row.visible}
+                  title="Visible en el esquemático"
+                  aria-label={`${k} visible en el esquemático`}
+                  onChange={(e) => setVisible(row.win, e.target.checked)}
+                />
+              ) : (
+                <span className="attr-vis" />
+              )}
+              {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
+            </label>
+          );
+        })}
+        {rows.length > 0 && <p className="hint">☑ = visible en el esquemático. Los rótulos se arrastran con el mouse (Shift: libre).</p>}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
         <div className="buttons">
           <button type="button" onClick={onClose}>Cancelar</button>
@@ -238,7 +300,11 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
 }
 
 /** F4: nombre de red (o tierra) */
-export function FlagDialog({ initial, onApply, onClose }: { initial: string; onApply(name: string): void; onClose(): void }) {
+export function FlagDialog({ initial, onApply, onClose }: {
+  initial: string;
+  onApply(name: string): void;
+  onClose(): void;
+}) {
   const [name, setName] = useState(initial);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -259,7 +325,6 @@ export function FlagDialog({ initial, onApply, onClose }: { initial: string; onA
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
         <div className="buttons">
-          <button type="button" onClick={() => onApply('0')}>Tierra (0)</button>
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="submit" className="primary">Aceptar</button>
         </div>
@@ -306,54 +371,135 @@ export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['F2', 'Componente (buscador)'],
-  ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
-  ['G', 'Tierra'],
-  ['F3 · W', 'Cable (click derecho o Esc termina)'],
-  ['F4 · N', 'Etiqueta de red'],
-  ['S · T', 'Directiva SPICE · comentario'],
-  ['F5 · Supr', 'Borrar'],
-  ['F6', 'Duplicar la selección'],
-  ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
-  ['Ctrl+A', 'Seleccionar todo'],
-  ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
-  ['Ctrl+Z · Ctrl+Y', 'Deshacer · rehacer'],
-  ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
-  ['Click repetido', 'Alterna entre elementos superpuestos'],
-  ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
-  ['Rueda · botón medio · Espacio', 'Zoom · desplazar'],
-  ['Inicio', 'Ajustar a la vista'],
-  ['Alt+N', 'Mostrar los nombres de las redes'],
-  ['Alt+S · Alt+C', 'Comando de simulación · bloque .control'],
-  ['Ctrl+Enter', 'Simular'],
-  ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
-  ['?', 'Esta ayuda'],
+// Los de la configuración de LTspice que usamos (LTspice.ini): dependen de dónde está el mouse
+const SHORTCUTS: [string, [string, string][]][] = [
+  [
+    'Esquemático',
+    [
+      ['P · F2', 'Componente (buscador)'],
+      ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
+      ['G', 'Tierra'],
+      ['W · F3', 'Cable (click derecho o Esc termina)'],
+      ['N · F4', 'Etiqueta de red'],
+      ['. · T', 'Directiva SPICE · comentario'],
+      ['J · K', 'Línea · rectángulo (decorativos)'],
+      ['M', 'Mover: click en un elemento (o recuadro), sigue al cursor hasta el próximo click; los cables no se estiran'],
+      ['S', 'Arrastrar: igual que M, pero los cables se estiran'],
+      ['Backspace · F5', 'Borrar la selección (sin selección: modo borrar)'],
+      ['F6', 'Duplicar la selección'],
+      ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
+      ['Ctrl+A', 'Seleccionar todo'],
+      ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
+      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer (también Ctrl+Y)'],
+      ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
+      ['Click repetido', 'Alterna entre elementos superpuestos'],
+      ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
+      ['Rueda', 'Zoom'],
+      ['Botón medio · Espacio+arrastrar', 'Desplazar'],
+      ['Espacio · Inicio', 'Ajustar a la vista'],
+      ['Z · Shift+Z', 'Zoom a un recuadro · zoom anterior'],
+      ['Ctrl+G · Ctrl+U', 'Mostrar/ocultar la grilla · las marcas de pines sueltos'],
+      ['Alt+N', 'Mostrar los nombres de las redes'],
+      ['A · Alt+E · Alt+C', 'Comando de simulación · estudio · bloque .control'],
+      ['Alt+R · Ctrl+Enter', 'Simular'],
+      ['Alt+S', 'Abortar la simulación'],
+      ['Ctrl+L', 'Ver el log (o los problemas) de la simulación'],
+      ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
+      ['?', 'Esta ayuda'],
+    ],
+  ],
+  [
+    'Visor de resultados (con el mouse sobre los gráficos)',
+    [
+      ['Espacio', 'Ajustar (ver todo)'],
+      ['Z · Shift+Z', 'Zoom a un recuadro (X e Y) · zoom anterior'],
+      ['Ctrl+Y', 'Autoescala vertical'],
+      ['Ctrl+G', 'Mostrar/ocultar la grilla'],
+      ['A', 'Agregar traza (campo de expresión, con autocompletado)'],
+      ['P · B', 'Agregar panel · agregar panel debajo del activo'],
+      ['U · D', 'Mover el panel activo arriba · abajo'],
+      ['Backspace', 'Quitar trazas: click en el nombre (Esc termina)'],
+      ['C · Shift+C', 'Cursores · borrar los cursores'],
+      ['Shift+S', 'Elegir qué corridas de un .step mostrar'],
+      ['O · Ctrl+Espacio', 'Abrir una vista .plt · volver a aplicar la vista recordada'],
+      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer los cambios de la vista (trazas, paneles, colores)'],
+      ['Alt+R · Alt+S · Ctrl+L', 'Simular · abortar · log'],
+    ],
+  ],
+  [
+    'Modo Netlist',
+    [
+      ['Alt+R · Ctrl+Enter', 'Simular'],
+      ['Alt+S', 'Abortar'],
+      ['Ctrl+L', 'Ver el log'],
+      ['Ctrl+G', 'Ir a una línea'],
+    ],
+  ],
 ];
 
 export function HelpDialog({ onClose }: { onClose(): void }) {
   return (
     <Modal title="Atajos de teclado" onClose={onClose} wide>
-      <table className="shortcuts">
-        <tbody>
-          {SHORTCUTS.map(([k, d]) => (
-            <tr key={k}>
-              <th>
-                {k.split(' · ').map((x, i) => (
-                  <span key={i}>
-                    {i > 0 && ' · '}
-                    <kbd>{x}</kbd>
-                  </span>
-                ))}
-              </th>
-              <td>{d}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {SHORTCUTS.map(([section, rows]) => (
+        <section key={section}>
+          <h3>{section}</h3>
+          <table className="shortcuts">
+            <tbody>
+              {rows.map(([k, d]) => (
+                <tr key={k}>
+                  <th>
+                    {k.split(' · ').map((x, i) => (
+                      <span key={i}>
+                        {i > 0 && ' · '}
+                        <kbd>{x}</kbd>
+                      </span>
+                    ))}
+                  </th>
+                  <td>{d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
       <p className="hint">En táctil: pellizcar para zoom, dos dedos para desplazar, mantener apretado para editar.</p>
       <div className="buttons">
         <button className="primary" onClick={onClose}>Cerrar</button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Shift+S en el visor: qué corridas de un .step se muestran */
+export function RunsDialog({ runs, hidden, onApply, onClose }: {
+  runs: { name: string; label: string }[];
+  hidden: Set<string>;
+  onApply(hidden: Set<string>): void;
+  onClose(): void;
+}) {
+  const [off, setOff] = useState(() => new Set(hidden));
+  const toggle = (name: string) => {
+    const next = new Set(off);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setOff(next);
+  };
+  return (
+    <Modal title="Corridas a mostrar" onClose={onClose}>
+      <div className="runs-list">
+        {runs.map((r) => (
+          <label key={r.name} className="check">
+            <input type="checkbox" checked={!off.has(r.name)} onChange={() => toggle(r.name)} /> {r.label}
+          </label>
+        ))}
+      </div>
+      <div className="buttons">
+        <button onClick={() => setOff(new Set())}>Todas</button>
+        <button onClick={() => setOff(new Set(runs.map((r) => r.name)))}>Ninguna</button>
+        <button onClick={onClose}>Cancelar</button>
+        <button className="primary" disabled={off.size === runs.length} onClick={() => onApply(off)}>
+          Aceptar
+        </button>
       </div>
     </Modal>
   );
@@ -373,8 +519,8 @@ export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
           ningún servidor. Abre y guarda <code>.asc</code> de LTspice, así que podés ir y volver entre los dos.
         </p>
         <ul>
-          <li>Dibujá con los mismos atajos de LTspice (<kbd>F2</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
-          <li>Configurá el análisis en <strong>Simulación…</strong> y apretá <strong>Simular</strong> (<kbd>Ctrl+Enter</kbd>).</li>
+          <li>Dibujá con los mismos atajos de LTspice (<kbd>P</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
+          <li>Elegí el tipo de análisis en la flecha de <strong>Simular</strong> y apretá <strong>Simular</strong> (<kbd>Alt+R</kbd>).</li>
           <li>Medí con un click en un cable (tensión) o en un componente (corriente); pasá el mouse para ver el punto de operación.</li>
           <li>Compartí un circuito con un link; el trabajo se autoguarda en el navegador.</li>
         </ul>

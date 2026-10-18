@@ -171,7 +171,7 @@ export function SimBar({ name, line, info, stale, running, onApply, onRun, onEdi
         ))}
       </div>
       {errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
-      <button className="sb-edit" onClick={onEdit} title="Todas las opciones del comando de análisis (Alt+S)">
+      <button className="sb-edit" onClick={onEdit} title="Todas las opciones del comando de análisis (A)">
         Más opciones…
       </button>
       {stale && !running && (

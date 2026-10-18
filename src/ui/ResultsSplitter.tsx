@@ -1,12 +1,22 @@
 // Divisor entre el esquemático y los resultados: arrastrar para cambiar el tamaño, doble click
 // alterna con 50 %, y botones flotantes (o Ctrl+1 / Ctrl+2 / Ctrl+0) para expandir uno de los
-// dos paneles a toda la ventana y restaurar la división anterior.
+// dos paneles a toda la ventana y restaurar la división anterior. Expandir el esquemático es
+// también la forma de colapsar los resultados (#36): no hay forma de descartarlos.
 import { useEffect, useRef, useState } from 'react';
 
 /** Panel expandido a toda la ventana ('' = dividido) */
 export type Expanded = '' | 'schematic' | 'results';
 
 const EXPAND_KEY = 'turbospice.resultsExpand';
+
+/**
+ * Colapsar u ocultar los resultados = expandir el esquemático (queda la pestaña en el borde
+ * para volver a mostrarlos). Los resultados no se descartan: sólo se reemplazan al simular.
+ */
+export const toggleResults = (e: Expanded): Expanded => (e === 'schematic' ? '' : 'schematic');
+
+/** El lienzo del esquemático cambia de tamaño (o vuelve a verse): hay que reajustar la vista */
+export const refitsSchematic = (from: Expanded, to: Expanded) => from !== to && to !== 'results';
 
 const lsGet = (k: string) => {
   try {

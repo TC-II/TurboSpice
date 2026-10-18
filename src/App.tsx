@@ -1,5 +1,6 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc } from './asc/model.ts';
 import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
@@ -7,6 +8,7 @@ import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
+import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasParams, elementBias, netBias } from './sim/bias.ts';
 import { symbolBox } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
@@ -15,10 +17,11 @@ import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.t
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
-import { MenuBar, type MenuDef } from './ui/Menu.tsx';
-import { Icon, type IconName } from './ui/icons.tsx';
+import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
+import { Icon } from './ui/icons.tsx';
+import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
@@ -49,29 +52,33 @@ import {
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
 import { useHistory } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
-import { PlotPanel, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
+import { PlotPanel, type PlotAction, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import type { ComplexMode } from './waveform/curves.ts';
 import { evalTrace } from './waveform/expr.ts';
-import { emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { asPlotView, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
-import { loadView, saveView } from './schematic/autosave.ts';
+import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
-import { ResultsSplitter, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { AccountButton, DriveDialog } from './cloud/AccountButton.tsx';
+import { drive, useGoogle } from './cloud/google.ts';
+import type { DriveFile } from './cloud/drive.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -79,16 +86,18 @@ const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rec
 
 type Dialog =
   | { kind: 'picker' }
-  | { kind: 'attrs'; index: number }
+  | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point }
-  | { kind: 'sim'; found: FoundLine | null }
+  | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
   | { kind: 'share'; url: string }
   | { kind: 'help' }
   | { kind: 'userfiles' }
   | { kind: 'study' }
-  | { kind: 'welcome' };
+  | { kind: 'runs' }
+  | { kind: 'welcome' }
+  | { kind: 'drive' };
 
 /** Resultados de una simulación */
 interface SimRun {
@@ -102,6 +111,8 @@ interface FileState {
   name: string;
   encoding?: AscEncoding;
   handle?: Parameters<typeof saveFile>[2];
+  /** id del archivo en Google Drive (si se abrió o guardó ahí) */
+  driveId?: string;
 }
 
 // Serialización cacheada por documento (el autoguardado guarda todo el historial)
@@ -187,24 +198,36 @@ export function App() {
     return () => engine.abort();
   }, [engine]);
 
+  // lugares de la barra superior que llena el modo esquemático: el menú (junto al nombre) y,
+  // arriba a la derecha, archivo, tema y compartir (#38)
+  const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null);
+  const [rightSlot, setRightSlot] = useState<HTMLElement | null>(null);
+
   return (
     <div className="app">
       <header className="appbar">
+        <div className="appbar-slot" ref={setMenuSlot} />
         <h1>TurboSpice</h1>
         <nav className="tabs">
           <button className={mode === 'schematic' ? 'active' : ''} onClick={() => setMode('schematic')}>Esquemático</button>
           <button className={mode === 'netlist' ? 'active' : ''} onClick={() => setMode('netlist')}>Netlist</button>
         </nav>
-        <div id="appbar-slot" />
+        <div className="appbar-slot appbar-right" ref={setRightSlot} />
+        {/* el usuario / login (#35), al final, después de Compartir */}
+        <AccountButton />
       </header>
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
-        (lib ? <SchematicMode engine={engine} lib={lib} /> : <p className="empty pad">{libError ?? 'Cargando librería…'}</p>)}
+        (lib ? (
+          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, right: rightSlot }} />
+        ) : (
+          <p className="empty pad">{libError ?? 'Cargando librería…'}</p>
+        ))}
     </div>
   );
 }
 
-function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) {
+function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Library; slots: { menu: HTMLElement | null; right: HTMLElement | null } }) {
   const history = useHistory<AscDoc>(emptyDoc());
   const doc = history.value;
   const [file, setFile] = useState<FileState>({ name: 'Sin título.asc' });
@@ -212,6 +235,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
   // resultados de la simulación que se está viendo
@@ -226,8 +250,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [showOp, setShowOp] = useState(false);
   const [panes, setPanes] = useState<Pane[]>(emptyPanes);
   const [activePane, setActivePane] = useState(0);
-  // vista recordada (paneles por tipo de análisis) de este circuito
-  const [plotView, setPlotView] = useState<PlotView>({});
+  // vista recordada (paneles por tipo de análisis): va dentro del .asc (";.plot …"), así que
+  // cambiarla es editar el documento (entra al historial de deshacer)
+  const plotView = useMemo(() => viewFromDoc(doc) ?? {}, [doc]);
+  const setPlotView = (v: PlotView) => history.commit(withView(doc, v));
+  // vista de una versión anterior (guardada en el navegador por nombre de archivo) para incorporar
+  const [offerView, setOfferView] = useState<PlotView | null>(null);
   const [plotName, setPlotName] = useState('');
   const [mode, setMode] = useState<ComplexMode>('bode');
   const plotPanel = useRef<PlotPanelHandle>(null);
@@ -238,8 +266,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   // esquemático o resultados expandidos a toda la ventana (#24)
   const [expanded, setExpandedState] = useExpanded(!!sim && !dialog);
   const setExpanded = (e: Expanded) => {
-    // al volver al esquemático, reajustar la vista (estaba oculto)
-    if (expanded === 'results' && e !== 'results') setTimeout(() => editor.current?.fit(), 50);
+    // al volver al esquemático o colapsar/mostrar los resultados, reajustar la vista (cambió el
+    // tamaño del lienzo o estaba oculto)
+    if (refitsSchematic(expanded, e)) setTimeout(() => editor.current?.fit(), 50);
     setExpandedState(e);
   };
   const [theme, setTheme] = useTheme();
@@ -270,7 +299,21 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const setTool = useCallback((t: Tool) => {
     setToolState(t);
-    if (t.kind !== 'select') setSelection([]);
+    if (t.kind !== 'select' && t.kind !== 'move' && t.kind !== 'zoom') setSelection([]);
+  }, []);
+  // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
+  const [showGrid, setShowGrid] = useState(true);
+  const [showLoose, setShowLoose] = useState(true);
+  // corridas de un .step ocultas (Shift+S)
+  const [hiddenRuns, setHiddenRuns] = useState<Set<string>>(new Set());
+  // Los atajos dependen de dónde está el mouse, como en LTspice: esquemático o visor
+  const area = useRef<'schematic' | 'viewer'>('schematic');
+  useEffect(() => {
+    const h = (e: PointerEvent) => {
+      area.current = e.target instanceof Element && e.target.closest('.results-panel') ? 'viewer' : 'schematic';
+    };
+    window.addEventListener('pointermove', h);
+    return () => window.removeEventListener('pointermove', h);
   }, []);
   const commit = history.commit;
 
@@ -303,7 +346,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       kept.current.clear();
       setSimsState(list);
       showView(activeSim(list)?.view);
-      setPlotView({});
+      setOfferView(null);
       setTool({ kind: 'select' });
       setDocKey((k) => k + 1);
     },
@@ -312,7 +355,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const [recent, setRecent] = useState<RecentFile[]>([]);
   const remember = useCallback((d: AscDoc, f: FileState, unsaved = false) => {
-    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, time: Date.now(), unsaved }).then(setRecent);
+    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }).then(setRecent);
   }, []);
 
   // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
@@ -327,9 +370,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     window.history.replaceState(null, '', location.pathname + location.search);
     if (!shared) return false;
     const f = readAsc(shared.bytes, shared.name);
-    loadDoc(f.doc, { name: f.name, encoding: f.encoding });
-    remember(f.doc, { name: f.name, encoding: f.encoding });
-    if (shared.view) setPlotView(shared.view as PlotView);
+    // links viejos: la vista venía aparte (&v=…); ahora va dentro del .asc
+    const view = asPlotView(shared.view);
+    const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
+    loadDoc(d, { name: f.name, encoding: f.encoding });
+    remember(d, { name: f.name, encoding: f.encoding });
     return true;
   }, [loadDoc]);
 
@@ -353,9 +398,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (session) {
         try {
           history.restore({ past: session.past.map(parseAsc), present: parseAsc(session.present), future: session.future.map(parseAsc) });
-          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'] });
+          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'], driveId: session.driveId });
           setSavedVersion(session.savedVersion);
-          if (session.view) setPlotView(session.view);
+          // sesiones anteriores: la vista estaba aparte del documento
+          const old = asPlotView(session.view);
+          if (old && !viewFromDoc(parseAsc(session.present))) setOfferView(old);
           if (session.sims) {
             setSimsState(session.sims);
             showView(activeSim(session.sims)?.view);
@@ -386,22 +433,27 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         name: file.name,
         encoding: file.encoding,
         handle: file.handle,
+        driveId: file.driveId,
         past: h.past.slice(drop).map(ascText),
         present: ascText(h.present),
         future: h.future.slice(0, SAVED_UNDO).map(ascText),
         savedVersion: savedVersion - drop,
         time: Date.now(),
-        view: plotView,
         sims: currentSims(),
       });
     }, 600);
     return () => clearTimeout(t);
-  }, [restored, history.state, file, savedVersion, plotView, sims, panes, activePane, plotName, mode]);
+  }, [restored, history.state, file, savedVersion, sims, panes, activePane, plotName, mode]);
 
-  // Vista recordada para este archivo (si no vino ya con el link o la sesión)
+  // Migración: vista guardada en el navegador para este nombre de archivo (versiones
+  // anteriores) y el .asc no trae la suya: se ofrece incorporarla
   useEffect(() => {
-    loadView(file.name).then((v) => v && setPlotView((cur) => (Object.keys(cur).length ? cur : v)));
-  }, [file.name]);
+    if (!doc.symbols.length || viewFromDoc(doc)) return;
+    loadView(file.name).then((v) => {
+      const pv = asPlotView(v);
+      if (pv) setOfferView((cur) => cur ?? pv);
+    });
+  }, [docKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Un link compartido abierto con la app ya cargada
   useEffect(() => {
@@ -437,30 +489,76 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     }
   };
 
-  const doSave = async (saveAs = false) => {
-    // en el archivo va también la lista de simulaciones (comentario que TurboSpice no dibuja)
-    const full = withSims(doc, currentSims());
-    const { bytes, missing } = ascBytes(full, lib, file.encoding);
+  /** El documento tal como va al archivo: con la lista de simulaciones (comentario ";.sims") */
+  const fileDoc = () => withSims(doc, currentSims());
+
+  const savedAs = (saved: FileState, missing: string[], where = '') => {
+    setFile(saved);
+    setSavedVersion(history.version);
+    remember(fileDoc(), saved);
+    setMessage(
+      missing.length
+        ? `Guardado${where}. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
+        : `Guardado${where}: ${saved.name}`,
+    );
+  };
+
+  /** Guardar en el equipo (como siempre) */
+  const doSaveLocal = async (saveAs = false) => {
+    const { bytes, missing } = ascBytes(fileDoc(), lib, file.encoding);
     try {
       const r = await saveFile(bytes, file.name, file.handle, saveAs);
-      if (!r) return;
-      const saved = { ...file, name: r.name, handle: r.handle ?? file.handle };
-      setFile(saved);
-      setSavedVersion(history.version);
-      remember(full, saved);
-      setMessage(
-        missing.length
-          ? `Guardado. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
-          : `Guardado: ${r.name}`,
-      );
+      if (r) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, missing);
     } catch (e) {
       setMessage(`No se pudo guardar: ${(e as Error).message}`);
     }
   };
 
+  /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo, o uno nuevo */
+  const doSaveDrive = async (saveAs = false) => {
+    let name = file.name;
+    let id = saveAs ? undefined : file.driveId;
+    if (!id && saveAs) {
+      const n = window.prompt('Nombre del archivo en Google Drive', name)?.trim();
+      if (!n) return;
+      name = /\.asc$/i.test(n) ? n : `${n}.asc`;
+    }
+    const { bytes, missing } = ascBytes(fileDoc(), lib, file.encoding);
+    try {
+      if (!id) {
+        const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
+        if (same) {
+          if (!window.confirm(`Ya hay un «${same.name}» en Google Drive. ¿Reemplazarlo?`)) return;
+          id = same.id;
+        }
+      }
+      const r = await drive.save(name, bytes, id);
+      savedAs({ ...file, name: r.name, driveId: r.id }, missing, ' en Google Drive');
+    } catch (e) {
+      setMessage(`No se pudo guardar en Google Drive: ${(e as Error).message}`);
+    }
+  };
+
+  // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
+  const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
+
+  const openDriveFile = async (d: DriveFile) => {
+    if (!confirmDiscard()) return;
+    try {
+      const f = readAsc(await drive.download(d.id), d.name);
+      const state = { name: f.name, encoding: f.encoding, driveId: d.id };
+      setDialog(null);
+      loadDoc(f.doc, state);
+      remember(f.doc, state);
+      warnMissing(f.doc);
+    } catch (e) {
+      setMessage(`No se pudo abrir de Google Drive: ${(e as Error).message}`);
+    }
+  };
+
   const doShare = async () => {
-    const { bytes } = ascBytes(withSims(doc, currentSims()), lib, file.encoding);
-    const hash = await shareHash(bytes, file.name, plotView);
+    const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
+    const hash = await shareHash(bytes, file.name);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
@@ -468,9 +566,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const r = recent[i];
     if (!r || !confirmDiscard()) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
-    const bytes = r.unsaved ? null : await readHandle(r.handle);
+    const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
     const f = bytes ? readAsc(bytes, r.name) : { doc: parseAsc(r.asc), name: r.name, encoding: r.encoding };
-    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'] };
+    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'], driveId: r.driveId };
     loadDoc(f.doc, state);
     if (!r.unsaved) remember(f.doc, state);
   };
@@ -512,6 +610,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // con el esquemático expandido, los resultados no quedan ocultos
       if (expanded === 'schematic') setExpanded('');
       setSim({ built, result, doc, meas });
+      setHiddenRuns(new Set());
+      paneUndo.current = { past: [], future: [] };
       // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
       // sólo si no hay otra cosa
       const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
@@ -549,6 +649,26 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     engine.abort();
     engine.ready.then(() => setStatus({ kind: 'idle' }));
     setStatus({ kind: 'error', message: 'Simulación abortada' });
+  };
+  /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
+  const showLog = () => {
+    if (!sim) return setMessage('Todavía no hay simulación: simulá con Alt+R');
+    setPanel(sim.result.errors.length ? 'problems' : 'log');
+  };
+
+  // Deshacer / rehacer los cambios de la vista de resultados (trazas, paneles, colores)
+  const paneUndo = useRef<{ past: Pane[][]; future: Pane[][] }>({ past: [], future: [] });
+  const editPanes = (next: Pane[]) => {
+    paneUndo.current.past.push(panes);
+    paneUndo.current.future = [];
+    setPanes(next);
+  };
+  const undoPanes = (redo = false) => {
+    const u = paneUndo.current;
+    const p = (redo ? u.future : u.past).pop();
+    if (!p) return;
+    (redo ? u.past : u.future).push(panes);
+    setPanes(p);
   };
 
   const plot = sim?.result.plots.find((p) => p.name === plotName);
@@ -642,9 +762,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
   const pltInput = useRef<HTMLInputElement>(null);
 
-  // Punto de operación: sólo mientras el esquemático sea el que se simuló (o uno igual, p. ej.
-  // al volver a una simulación de la lista)
-  const bias = sim && (sim.doc === doc || ascText(sim.doc) === ascText(doc)) ? sim.result.bias : undefined;
+  // Punto de operación: sólo mientras el esquemático sea el que se simuló
+  const bias = sim && sameExceptData(sim.doc, doc) ? sim.result.bias : undefined;
   const describe = useMemo(() => {
     if (!bias || !sim) return undefined;
     return ({ net, symbol }: { net?: string; symbol?: number }) => {
@@ -671,6 +790,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     return out;
   }, [showOp, bias, sim, doc, conn, lib]);
 
+  // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
+  const arrows = useMemo(() => {
+    if (!sim || sim.doc !== doc || !(showOp || tool.kind === 'probe')) return undefined;
+    return currentArrows(doc, lib, sim.built.lt.elements);
+  }, [sim, doc, lib, showOp, tool.kind]);
+
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p), [sim]);
 
   // Punta de prueba: agrega la traza al panel activo (o la quita si ya estaba)
@@ -679,8 +804,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     const expr = probeExpr(sim.built, target);
     if (!expr) return;
     setPanel('plot');
+    // con los resultados colapsados, mostrarlos para ver la traza
+    if (expanded === 'schematic') setExpanded('');
     if (panes.some((p) => p.traces.some((t) => sameExpr(t.expr, expr)))) {
-      setPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
+      editPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
       return;
     }
     const sc = scaleOf(plot);
@@ -691,29 +818,34 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       return setMessage(`No hay datos de ${expr} en ${plot.name}`);
     }
     const i = Math.min(activePane, panes.length - 1);
-    setPanes(panes.map((p, k) => (k === i ? { traces: [...p.traces, { expr }] } : p)));
+    editPanes(panes.map((p, k) => (k === i ? { traces: [...p.traces, { expr }] } : p)));
   };
 
   const rememberView = () => {
     if (!plot) return;
     const kind = plotKind(plot.name);
-    const next = { ...plotView, [kind]: panes };
-    setPlotView(next);
-    saveView(file.name, next);
-    setMessage(`Vista recordada para .${kind}: se aplica en cada simulación (y se guarda con el link y en el .plt)`);
+    setPlotView({ ...plotView, [kind]: panes });
+    setMessage(`Vista recordada para .${kind}: se aplica en cada simulación y se guarda dentro del .asc`);
+  };
+  /** Ctrl+Espacio: volver a aplicar la vista recordada */
+  const reapplyView = () => {
+    const v = plot && plotView[plotKind(plot.name)];
+    if (v) editPanes(v);
+    else setMessage('No hay una vista recordada para este análisis (botón "Recordar vista")');
   };
   const forgetView = () => {
     if (!plot) return;
     const { [plotKind(plot.name)]: _, ...rest } = plotView;
     setPlotView(rest);
-    saveView(file.name, rest);
+  };
+  const acceptOfferedView = () => {
+    if (offerView) setPlotView({ ...offerView, ...plotView });
+    setOfferView(null);
   };
   const importPlt = (bytes: Uint8Array) => {
     const v = parsePlt(decode(bytes).text);
     if (!Object.keys(v).length) return setMessage('El .plt no tiene vistas que TurboSpice entienda');
-    const next = { ...plotView, ...v };
-    setPlotView(next);
-    saveView(file.name, next);
+    setPlotView({ ...plotView, ...v });
     if (plot && v[plotKind(plot.name)]) setPanes(v[plotKind(plot.name)]);
     setMessage(`Vista importada del .plt (${Object.keys(v).map((k) => `.${k}`).join(', ')})`);
   };
@@ -870,7 +1002,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = file.name.replace(/\.asc$/i, '');
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${file.name}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
-    const built = sim?.doc === doc ? sim.built : await buildSimulation(doc, lib, file.name);
+    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, file.name);
     download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
   };
   const exportImage = (f: 'svg' | 'png') => {
@@ -902,7 +1034,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     };
   };
 
-  const openSimulation = () => setDialog({ kind: 'sim', found: findAnalysis(doc) });
+  /** Menú de simulación; con un tipo de análisis, abre en ese tipo */
+  const openSimulation = (analysis?: AnalysisKind) => setDialog({ kind: 'sim', found: findAnalysis(doc), analysis });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
@@ -915,37 +1048,105 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       .filter(Boolean),
   });
 
-  // Atajos de teclado estilo LTspice
+  // Atajos de teclado: los de la configuración de LTspice que usamos (LTspice.ini,
+  // [SchKeyBoardShortCut] y [RawKeyBoardShortCut]); los del visor, con el mouse sobre los gráficos
+  const startMove = (stretch: boolean) =>
+    setTool(selection.length ? { kind: 'move', stretch, refs: selection, start: editor.current?.cursor() ?? null } : { kind: 'move', stretch, refs: null, start: null });
+  const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
+  const viewerKeys = () => area.current === 'viewer' && !!sim && panel === 'plot' && !!plotPanel.current;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (dialog || isTyping(e)) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const k = e.key;
+      // letra sin importar Shift/Bloq Mayús (Shift se mira aparte)
+      const lk = k.length === 1 ? k.toLowerCase() : k;
       const handled = () => e.preventDefault();
-      if (ctrl && (k === 'z' || k === 'Z') && !e.shiftKey) return handled(), history.undo();
-      if (ctrl && (k === 'y' || ((k === 'z' || k === 'Z') && e.shiftKey))) return handled(), history.redo();
-      if (ctrl && (k === 's' || k === 'S')) return handled(), doSave(e.shiftKey);
-      if (ctrl && (k === 'o' || k === 'O')) return handled(), doOpen();
-      if (ctrl && (k === 'r' || k === 'R')) return handled(), rotateOrMirror('rotate');
-      if (ctrl && (k === 'e' || k === 'E')) return handled(), rotateOrMirror('mirror');
-      if (ctrl && (k === 'c' || k === 'C')) return handled(), copySelection();
-      if (ctrl && (k === 'x' || k === 'X')) return handled(), copySelection(true);
-      if (ctrl && (k === 'v' || k === 'V')) return handled(), paste();
-      if (ctrl && (k === 'a' || k === 'A')) return handled(), setTool({ kind: 'select' }), setSelection(allItems(doc));
+      // en los dos contextos
+      if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && run();
+      if (e.altKey && lk === 's') return handled(), running && abort();
+      if (ctrl && lk === 'l') return handled(), showLog();
       if (ctrl && k === 'Enter') return handled(), run();
-      if (e.altKey && (k === 's' || k === 'S')) return handled(), openSimulation();
-      if (e.altKey && (k === 'c' || k === 'C')) return handled(), openControl();
-      if (e.altKey && (k === 'n' || k === 'N')) return handled(), setShowNets((v) => !v);
-      if (e.altKey && (k === 'e' || k === 'E')) return handled(), openStudy();
+      if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
+      if (ctrl && lk === 'o') return handled(), doOpen();
+      if (k === ' ' && !e.altKey) {
+        // Espacio tocado = ajustar (al soltarlo); mantenido + arrastrar desplaza
+        handled();
+        if (ctrl && viewerKeys()) reapplyView();
+        return;
+      }
+      if (viewerKeys()) {
+        const act = (a: PlotAction) => (handled(), plotPanel.current?.action(a));
+        if (ctrl && lk === 'z') return handled(), undoPanes(e.shiftKey);
+        if (ctrl && lk === 'y') return act('autoY');
+        if (ctrl && lk === 'g') return act('grid');
+        if (!ctrl && !e.altKey) {
+          switch (lk) {
+            case 'z':
+              return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
+            case 'a':
+              return act('addTrace');
+            case 'p':
+              return act('addPane');
+            case 'b':
+              return act('addPaneBelow');
+            case 'u':
+              return act('paneUp');
+            case 'd':
+              return act('paneDown');
+            case 'Backspace':
+              return act('removeTraces');
+            case 'c':
+              return act(e.shiftKey ? 'clearCursors' : 'cursor');
+            case 's':
+              if (!e.shiftKey) return;
+              handled();
+              if (allRuns.length > 1) setDialog({ kind: 'runs' });
+              else setMessage('Este análisis no tiene varias corridas (.step)');
+              return;
+            case 'o':
+              return handled(), pltInput.current?.click();
+            case 'Escape':
+              plotPanel.current?.action('cancel');
+              return;
+          }
+          // el resto de las letras no van al esquemático
+          if (k.length === 1) return;
+        }
+      }
+      if (ctrl && lk === 'z') return handled(), e.shiftKey ? history.redo() : history.undo();
+      if (ctrl && lk === 'y') return handled(), history.redo();
+      if (ctrl && lk === 'r') return handled(), rotateOrMirror('rotate');
+      if (ctrl && lk === 'e') return handled(), rotateOrMirror('mirror');
+      if (ctrl && lk === 'c') return handled(), copySelection();
+      if (ctrl && lk === 'x') return handled(), copySelection(true);
+      if (ctrl && lk === 'v') return handled(), paste();
+      if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), setSelection(allItems(doc));
+      if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
+      if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
+      if (e.altKey && lk === 'c') return handled(), openControl();
+      if (e.altKey && lk === 'n') return handled(), setShowNets((v) => !v);
+      if (e.altKey && lk === 'e') return handled(), openStudy();
       if (e.altKey) return;
       if (ctrl) return;
+      if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
       switch (k) {
         case 'Escape':
+          plotPanel.current?.action('cancel');
           setTool({ kind: 'select' });
           setSelection([]);
           return;
+        case 'a':
+          return handled(), openSimulation();
         case 'F2':
+        case 'p':
           return handled(), setDialog({ kind: 'picker' });
+        case 'm':
+          return handled(), startMove(false);
+        case 'j':
+          return handled(), setTool({ kind: 'shape', shape: 'LINE', start: null });
+        case 'k':
+          return handled(), setTool({ kind: 'shape', shape: 'RECTANGLE', start: null });
         case 'F3':
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
@@ -976,15 +1177,27 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         case 'g':
           return setTool({ kind: 'flag', name: '0' });
         case 's':
-          return setDialog({ kind: 'text', textKind: 'directive' });
+          return handled(), startMove(true);
+        case '.':
+          return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
-          return setDialog({ kind: 'text', textKind: 'comment' });
+          return handled(), setDialog({ kind: 'text', textKind: 'comment' });
         case 'Home':
           return handled(), editor.current?.fit();
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== ' ' || e.ctrlKey || e.metaKey || e.altKey || dialog || isTyping(e)) return;
+      e.preventDefault();
+      if (viewerKeys()) plotPanel.current?.action('fit');
+      else if (area.current === 'schematic' && !editor.current?.spacePanned()) editor.current?.fit();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   });
 
   // Arrastrar y soltar un .asc
@@ -1013,25 +1226,53 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   });
 
   const running = status.kind === 'running';
-  const iconBtn = (icon: IconName, label: string, title: string, onClick: () => void, o: { active?: boolean; disabled?: boolean } = {}) => (
-    <button className={o.active ? 'active' : ''} aria-label={label} title={title} onClick={onClick} disabled={o.disabled}>
-      <Icon name={icon} />
-    </button>
-  );
-  const closeResults = () => {
-    setSim(null);
-    setShowOp(false);
-    setTool({ kind: 'select' });
-  };
+  // Colapsar o mostrar el panel de resultados (#36): el resultado, las trazas, los cursores y la
+  // vista se conservan; sólo se reemplazan al volver a simular o al abrir otro circuito
+  const resultsShown = !!sim && expanded !== 'schematic';
+  const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
+  // Tipos de análisis: el elegido abre el menú de simulación en ese tipo. Marcado, el de la
+  // directiva actual
+  const currentAnalysis = useMemo(() => {
+    const found = findAnalysis(doc);
+    return found ? parseAnalysis(found.value)?.kind : undefined;
+  }, [doc]);
+  const analysisItems: MenuItem[] = ANALYSES.map((x) => ({
+    label: x.label,
+    title: x.help,
+    onClick: () => openSimulation(x.kind),
+    checked: x.kind === currentAnalysis,
+  }));
+  // Desplegable de la flecha de Simular: por ahora, los tipos de análisis (#38)
+  // simulaciones guardadas (#39): se elige cuál ver; nueva, duplicar, renombrar y borrar
+  const savedSimItems: MenuItem[] = [
+    ...sims.items.map((x) => ({
+      label: simName(x),
+      title: x.line,
+      checked: x.id === sims.active,
+      onClick: () => changeSims(selectSim(sims, x.id), true),
+    })),
+    {
+      label: 'Nueva simulación',
+      disabled: sims.items.length >= MAX_SIMS,
+      items: ANALYSES.map((x) => ({ label: x.label, title: x.help, onClick: () => newSim(x.kind) })),
+    },
+    { label: 'Duplicar simulación', onClick: duplicateActive, disabled: !curSim || sims.items.length >= MAX_SIMS },
+    { label: 'Renombrar simulación…', onClick: renameActive, disabled: !curSim },
+    { label: 'Borrar simulación', onClick: () => changeSims(removeSim(sims, sims.active), true), disabled: sims.items.length < 2 },
+  ];
+  // Desplegable de la flecha de Simular: las simulaciones guardadas y los tipos de análisis (#38)
+  const simItems: MenuItem[] = [...savedSimItems, 'sep', ...analysisItems, 'sep', { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() }];
   const menus: MenuDef[] = [
     {
       label: 'Archivo',
       items: [
         { label: 'Nuevo', onClick: doNew },
         { label: 'Abrir…', shortcut: 'Ctrl+O', onClick: doOpen },
-        { label: 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: 'Abrir de Google Drive…', onClick: () => setDialog({ kind: 'drive' }) }] : []),
+        { label: google.account ? 'Guardar en Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { label: google.account ? 'Guardar en Drive como…' : 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: 'Guardar en el equipo…', onClick: () => doSaveLocal(true) }] : []),
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
@@ -1056,24 +1297,27 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       label: 'Editar',
       items: [
         { label: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
-        { label: 'Rehacer', shortcut: 'Ctrl+Y', onClick: history.redo, disabled: !history.canRedo },
+        { label: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
         'sep',
         { label: 'Cortar', shortcut: 'Ctrl+X', onClick: () => copySelection(true), disabled: !selection.length },
         { label: 'Copiar', shortcut: 'Ctrl+C', onClick: () => copySelection(), disabled: !selection.length },
         { label: 'Pegar', shortcut: 'Ctrl+V', onClick: paste },
         { label: 'Duplicar', shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
-        { label: 'Borrar', shortcut: 'Supr', onClick: deleteSelection },
+        { label: 'Borrar', shortcut: 'Backspace', onClick: deleteSelection },
         { label: 'Seleccionar todo', shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), setSelection(allItems(doc))) },
         'sep',
         { label: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { label: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        'sep',
+        { label: 'Mover (sin estirar cables)', shortcut: 'M', onClick: () => startMove(false) },
+        { label: 'Arrastrar (estirando cables)', shortcut: 'S', onClick: () => startMove(true) },
       ],
     },
     {
       label: 'Dibujar',
       items: [
         { label: 'Cable', shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }) },
-        { label: 'Componente…', shortcut: 'F2', onClick: () => setDialog({ kind: 'picker' }) },
+        { label: 'Componente…', shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }) },
         { label: 'Resistencia', shortcut: 'R', onClick: placeTool('res') },
         { label: 'Capacitor', shortcut: 'C', onClick: placeTool('cap') },
         { label: 'Inductor', shortcut: 'L', onClick: placeTool('ind') },
@@ -1082,45 +1326,38 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Tierra', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }) },
         { label: 'Etiqueta de red…', shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
-        { label: 'Directiva SPICE…', shortcut: 'S', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+        { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
         { label: 'Comentario…', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: 'Línea', shortcut: 'J', onClick: () => setTool({ kind: 'shape', shape: 'LINE', start: null }) },
+        { label: 'Rectángulo', shortcut: 'K', onClick: () => setTool({ kind: 'shape', shape: 'RECTANGLE', start: null }) },
       ],
     },
     {
       label: 'Simular',
       items: [
-        { label: 'Simular', shortcut: 'Ctrl+Enter', onClick: run, disabled: running || status.kind === 'loading' },
-        { label: 'Abortar', onClick: abort, disabled: !running },
+        { label: 'Simular', shortcut: 'Alt+R', onClick: run, disabled: running || status.kind === 'loading' },
+        { label: 'Abortar', shortcut: 'Alt+S', onClick: abort, disabled: !running },
+        { label: 'Ver el log', shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
         'sep',
-        // simulaciones guardadas: se elige cuál ver (#39)
-        ...sims.items.map((s) => ({
-          label: simName(s),
-          title: s.line,
-          checked: s.id === sims.active,
-          onClick: () => changeSims(selectSim(sims, s.id), true),
-        })),
-        {
-          label: 'Nueva simulación',
-          disabled: sims.items.length >= MAX_SIMS,
-          items: ANALYSES.map((x) => ({ label: x.label, onClick: () => newSim(x.kind) })),
-        },
-        { label: 'Duplicar simulación', onClick: duplicateActive, disabled: !curSim || sims.items.length >= MAX_SIMS },
-        { label: 'Renombrar simulación…', onClick: renameActive, disabled: !curSim },
-        { label: 'Borrar simulación', onClick: () => changeSims(removeSim(sims, sims.active), true), disabled: sims.items.length < 2 },
+        ...savedSimItems,
         'sep',
-        { label: 'Comando de simulación…', shortcut: 'Alt+S', onClick: openSimulation },
+        { label: 'Tipo de simulación', items: analysisItems },
+        { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() },
         { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
         { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
         'sep',
         { label: 'Punta de prueba', onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
         { label: 'Anotar punto de operación', onClick: () => setShowOp((v) => !v), disabled: !bias, checked: showOp },
-        { label: 'Cerrar resultados', onClick: closeResults, disabled: !sim },
       ],
     },
     {
       label: 'Ver',
       items: [
-        { label: 'Ajustar a la vista', shortcut: 'Inicio', onClick: () => editor.current?.fit() },
+        { label: 'Ajustar a la vista', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
+        { label: 'Zoom a un recuadro', shortcut: 'Z', onClick: zoomBox },
+        { label: 'Zoom anterior', shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
+        { label: 'Grilla', shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
+        { label: 'Marcas de pines sueltos', shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
         { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         {
           label: 'Resultados al costado',
@@ -1130,6 +1367,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           },
           checked: resultsSide,
         },
+        { label: 'Panel de resultados', shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
         'sep',
         { label: 'Tema automático (del sistema)', onClick: () => setTheme('auto'), checked: theme === 'auto' },
         { label: 'Tema claro', onClick: () => setTheme('light'), checked: theme === 'light' },
@@ -1170,7 +1408,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const scale = plot ? scaleOf(plot) : null;
   // memoizadas: un arreglo nuevo en cada render recrearía los gráficos (y perdería clicks, #30)
   const allRuns = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
-  const runs = useMemo(() => (overlay ? allRuns : plot ? [plot] : []), [overlay, allRuns, plot]);
+  // corridas que se muestran: todas (salvo las ocultas, Shift+S) al superponer, o sólo la elegida
+  const visibleRuns = useMemo(() => allRuns.filter((r) => !hiddenRuns.has(r.name)), [allRuns, hiddenRuns]);
+  const runs = useMemo(() => (plot ? (overlay && visibleRuns.length ? visibleRuns : [plot]) : []), [overlay, visibleRuns, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
   // corridas de .pz (pz1…pzN con .step) y sus f₀ para marcar en el Bode
@@ -1182,64 +1422,134 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const marks = useMemo(() => pzMarks(pzRoots(pzAll)), [pzAll]);
   const withPz = !!pzAll.length && scale?.name.toLowerCase() === 'frequency';
 
+  // Barra de herramientas (#38): archivo, historial, dibujo, edición, vista y análisis; si falta
+  // lugar, los grupos de la derecha pasan al desplegable "Más herramientas"
+  const toolGroups: ToolGroup[] = [
+    {
+      id: 'file',
+      label: 'Archivo',
+      tools: [
+        { icon: 'new', label: 'Nuevo', title: 'Nuevo esquemático', onClick: doNew },
+        { icon: 'save', label: 'Guardar', title: google.account ? 'Guardar en Google Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { icon: 'open', label: 'Abrir', title: 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
+      ],
+    },
+    {
+      id: 'history',
+      label: 'Historial',
+      tools: [
+        { icon: 'undo', label: 'Deshacer', title: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
+        { icon: 'redo', label: 'Rehacer', title: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
+      ],
+    },
+    {
+      id: 'draw',
+      label: 'Dibujo',
+      tools: [
+        { icon: 'select', label: 'Seleccionar', title: 'Seleccionar y mover', shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
+        { icon: 'wire', label: 'Cable', title: 'Cable', shortcut: 'F3 / W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
+        { icon: 'component', label: 'Componente', title: 'Componente', shortcut: 'P / F2', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
+        { icon: 'ground', label: 'Tierra', title: 'Tierra (GND)', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
+        { icon: 'label', label: 'Etiqueta', title: 'Etiqueta de red', shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
+        { icon: 'text', label: 'Texto', title: 'Texto (comentario)', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'directive', label: 'Directiva', title: 'Directiva SPICE libre', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edición',
+      tools: [
+        { icon: 'rotate', label: 'Rotar', title: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
+        { icon: 'mirror', label: 'Espejar', title: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        { icon: 'delete', label: 'Borrar', title: 'Borrar', shortcut: 'F5 / Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'Vista',
+      tools: [
+        { icon: 'fit', label: 'Ajustar', title: 'Ajustar a la vista (Z: zoom a un recuadro, Shift+Z: zoom anterior)', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
+        { icon: 'nets', label: 'Redes', title: 'Mostrar los nombres de todas las redes, sin modificar el esquemático', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
+      ],
+    },
+    {
+      id: 'analysis',
+      label: 'Análisis',
+      tools: [
+        { icon: 'study', label: 'Estudio…', title: 'Estudio: barridos, tolerancias, mediciones', shortcut: 'Alt+E', onClick: openStudy },
+        { icon: 'control', label: '.control…', title: 'Bloque .control: scripts de ngspice', shortcut: 'Alt+C', onClick: openControl },
+      ],
+    },
+  ];
+
   return (
     <div className="schematic-mode">
-      <div className="menurow">
-        <MenuBar menus={menus} />
-        <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
-        <button
-          className="theme-btn"
-          aria-label="Cambiar tema"
-          title={`Tema: ${theme === 'auto' ? 'automático (del sistema)' : theme === 'light' ? 'claro' : 'oscuro'}`}
-          onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
-        >
-          <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
-          {theme === 'auto' && <span className="auto">A</span>}
-        </button>
-      </div>
-      <div className="iconbar" role="toolbar" aria-label="Herramientas">
-        {iconBtn('new', 'Nuevo', 'Nuevo esquemático', doNew)}
-        {iconBtn('open', 'Abrir', 'Abrir .asc (Ctrl+O)', doOpen)}
-        {iconBtn('save', 'Guardar', 'Guardar (Ctrl+S)', () => doSave(false))}
-        {iconBtn('share', 'Compartir', 'Copiar un link que abre este circuito', doShare)}
-        <span className="sep" />
-        {iconBtn('undo', 'Deshacer', 'Deshacer (Ctrl+Z)', history.undo, { disabled: !history.canUndo })}
-        {iconBtn('redo', 'Rehacer', 'Rehacer (Ctrl+Y)', history.redo, { disabled: !history.canRedo })}
-        <span className="sep" />
-        {iconBtn('select', 'Seleccionar', 'Seleccionar y mover (Esc)', () => setTool({ kind: 'select' }), { active: tool.kind === 'select' })}
-        {iconBtn('wire', 'Cable', 'Cable (F3 / W)', () => setTool({ kind: 'wire', start: null }), { active: tool.kind === 'wire' })}
-        {iconBtn('component', 'Componente', 'Componente (F2)', () => setDialog({ kind: 'picker' }), { active: tool.kind === 'place' })}
-        {iconBtn('ground', 'Tierra', 'Tierra (G)', () => setTool({ kind: 'flag', name: '0' }), { active: tool.kind === 'flag' && tool.name === '0' })}
-        {iconBtn('label', 'Etiqueta', 'Etiqueta de red (F4 / N)', () => setDialog({ kind: 'flag' }))}
-        {iconBtn('directive', 'Directiva', 'Directiva SPICE libre (S)', () => setDialog({ kind: 'text', textKind: 'directive' }))}
-        {iconBtn('delete', 'Borrar', 'Borrar (F5 / Supr)', deleteSelection, { active: tool.kind === 'delete' })}
-        <span className="sep" />
-        {iconBtn('rotate', 'Rotar', 'Rotar (Ctrl+R)', () => rotateOrMirror('rotate'))}
-        {iconBtn('mirror', 'Espejar', 'Espejar (Ctrl+E)', () => rotateOrMirror('mirror'))}
-        {iconBtn('fit', 'Ajustar', 'Ajustar a la vista (Inicio)', () => editor.current?.fit())}
-        {iconBtn('nets', 'Redes', 'Mostrar los nombres de todas las redes, sin modificar el esquemático (Alt+N)', () => setShowNets((v) => !v), { active: showNets })}
-        <span className="sep" />
-        {iconBtn('sim', 'Simulación…', 'Tipo de simulación y parámetros (Alt+S)', openSimulation)}
-        {iconBtn('study', 'Estudio…', 'Estudio: barridos, tolerancias, mediciones (Alt+E)', openStudy)}
-        {iconBtn('control', '.control…', 'Bloque .control: scripts de ngspice (Alt+C)', openControl)}
-        {running ? (
-          <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación">
-            <Icon name="stop" /> Abortar
-          </button>
-        ) : (
-          <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" title="Simular (Ctrl+Enter)">
-            <Icon name="run" /> Simular
-          </button>
+      {slots.menu && createPortal(<AppMenu menus={menus} />, slots.menu)}
+      {slots.right &&
+        createPortal(
+          <>
+            <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
+            <button
+              className="theme-btn"
+              aria-label="Cambiar tema"
+              title={`Tema: ${theme === 'auto' ? 'automático (del sistema)' : theme === 'light' ? 'claro' : 'oscuro'}`}
+              onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
+            >
+              <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
+              {theme === 'auto' && <span className="auto">A</span>}
+            </button>
+            <button className="share-btn" aria-label="Compartir" title="Copiar un link que abre este circuito" onClick={doShare}>
+              <Icon name="share" />
+              <span className="txt">Compartir</span>
+            </button>
+          </>,
+          slots.right,
         )}
-        {sim && iconBtn('probe', 'Medir', 'Punta de prueba: click en un cable (tensión) o componente (corriente)', () => setTool({ kind: 'probe' }), { active: tool.kind === 'probe' })}
-        {bias && iconBtn('op', 'Anotar OP', 'Anotar el punto de operación en el esquemático (sin modificarlo)', () => setShowOp((v) => !v), { active: showOp })}
-        {sim && (
-          <button className="labeled" onClick={closeResults} title="Cerrar los resultados y volver a editar">
-            <Icon name="close" /> Cerrar resultados
-          </button>
-        )}
-        <StatusText status={status} />
-      </div>
+      <Toolbar
+        label="Herramientas"
+        groups={toolGroups}
+        fixed={
+          <>
+            {/* Simular partido: la acción principal simula y la flecha despliega los tipos de análisis */}
+            <div className="split" role="group" aria-label="Simulación">
+              {running ? (
+                <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
+                  <Icon name="stop" /> Abortar
+                </button>
+              ) : (
+                <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" aria-keyshortcuts="Alt+R Control+Enter" title="Simular (Alt+R / Ctrl+Enter)">
+                  <Icon name="run" /> Simular
+                </button>
+              )}
+              <MenuButton items={simItems} label="Tipo de simulación" title="Tipo de simulación y parámetros (A)" className={running ? 'labeled' : 'primary'}>
+                <Icon name="caret" size={14} />
+              </MenuButton>
+            </div>
+            {sim && (
+              <button className={tool.kind === 'probe' ? 'active' : ''} aria-label="Medir" title="Punta de prueba: click en un cable (tensión) o componente (corriente)" onClick={() => setTool({ kind: 'probe' })}>
+                <Icon name="probe" />
+              </button>
+            )}
+            {bias && (
+              <button className={showOp ? 'active' : ''} aria-label="Anotar OP" title="Anotar el punto de operación en el esquemático (sin modificarlo)" onClick={() => setShowOp((v) => !v)}>
+                <Icon name="op" />
+              </button>
+            )}
+            {sim && (
+              <button
+                className={`labeled${resultsShown ? ' active' : ''}`}
+                onClick={toggleResultsPanel}
+                aria-label="Panel de resultados"
+                aria-pressed={resultsShown}
+                title={resultsShown ? 'Ocultar el panel de resultados (no se pierden)' : 'Mostrar el panel de resultados'}
+              >
+                <Icon name="results" /> <span className="txt">Resultados</span>
+              </button>
+            )}
+          </>
+        }
+        after={<StatusText status={status} />}
+      />
       {curSim && (
         <SimBar
           name={simName(curSim)}
@@ -1249,7 +1559,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           running={running}
           onApply={(line) => commit(setAnalysisLine(doc, line))}
           onRun={run}
-          onEdit={openSimulation}
+          onEdit={() => openSimulation()}
         />
       )}
 
@@ -1267,19 +1577,30 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             selection={selection}
             setSelection={setSelection}
             onEdit={editItem}
+            onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             highlightNet={traceNet}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
             describe={describe}
             annotations={annotations}
+            currentArrows={arrows}
             pickValue={pickValue}
             onPicked={endPick}
+            showGrid={showGrid}
+            showLoose={showLoose}
           />
           {picking && (
             <div className="pick-banner">
               {picking.what === 'net' ? 'Elegí una red en el esquemático' : picking.what === 'source' ? 'Elegí una fuente (V o I) en el esquemático' : 'Elegí un componente en el esquemático'}
               <button onClick={() => endPick(null)}>Cancelar</button>
+            </div>
+          )}
+          {offerView && !picking && (
+            <div className="pick-banner">
+              Hay una vista de resultados de {file.name} guardada en este navegador. ¿Incorporarla al .asc?
+              <button onClick={acceptOfferedView}>Incorporar</button>
+              <button onClick={() => setOfferView(null)}>No</button>
             </div>
           )}
           {message && (
@@ -1318,7 +1639,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <button className={panel === 'problems' ? 'active' : ''} onClick={() => setPanel('problems')}>
                   Problemas{problems.length ? ` (${problems.length})` : ''}
                 </button>
-                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')}>
+                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')} title="Log de ngspice (Ctrl+L)">
                   Log
                 </button>
               </nav>
@@ -1353,6 +1674,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                       {allRuns.length} corridas
                     </label>
                   )}
+                  {allRuns.length > 1 && overlay && (
+                    <button onClick={() => setDialog({ kind: 'runs' })} title="Elegir qué corridas mostrar (Shift+S)">
+                      Corridas{hiddenRuns.size ? ` (${visibleRuns.length}/${allRuns.length})` : ''}…
+                    </button>
+                  )}
                   {scale && (
                     <>
                       {plot && plotView[plotKind(plot.name)] ? (
@@ -1360,7 +1686,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                           Vista recordada ✓
                         </button>
                       ) : (
-                        <button onClick={rememberView} title="Reaplicar estas trazas, paneles y colores en cada simulación">Recordar vista</button>
+                        <button onClick={rememberView} title="Reaplicar estas trazas, paneles y colores en cada simulación (Ctrl+Espacio la vuelve a aplicar)">Recordar vista</button>
                       )}
                       <select
                         aria-label="Exportar resultados"
@@ -1401,7 +1727,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                   </button>
                 </>
               )}
-              <button className="close" onClick={() => setSim(null)} title="Cerrar resultados">✕</button>
+              <button className="close" onClick={() => setExpanded('schematic')} aria-label="Ocultar resultados" title="Ocultar resultados (Ctrl+1)">
+                {resultsSide ? '▶' : '▼'}
+              </button>
             </div>
             <div className="results-body">
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
@@ -1415,7 +1743,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                   runs={runs}
                   labels={labels}
                   panes={panes}
-                  setPanes={setPanes}
+                  setPanes={editPanes}
                   resolver={resolver}
                   mode={mode}
                   active={activePane}
@@ -1474,10 +1802,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         <AttributeDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}
+          windowDefaults={lib.windowDefaults}
+          focusLabel={dialog.label}
           onClose={() => setDialog(null)}
-          onApply={(attrs) => {
+          onApply={(attrs, labels, toSelection) => {
             setDialog(null);
-            if (Object.keys(attrs).length) commit(setSymbolAttrs(doc, dialog.index, attrs));
+            let d = Object.keys(attrs).length ? setSymbolAttrs(doc, dialog.index, attrs) : doc;
+            const syms = toSelection ? [dialog.index, ...selection.filter((r) => r.kind === 'symbol' && r.index !== dialog.index).map((r) => r.index)] : [dialog.index];
+            d = patchLabels(d, syms, labels, lib);
+            if (d !== doc) commit(d);
           }}
         />
       )}
@@ -1496,6 +1829,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       {dialog?.kind === 'sim' && (
         <SimulationDialog
           initial={dialog.found?.value ?? null}
+          analysis={dialog.analysis}
           info={circuitInfo()}
           picker={picker}
           hidden={!!picking}
@@ -1531,6 +1865,18 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         />
       )}
       {dialog?.kind === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'runs' && (
+        <RunsDialog
+          runs={allRuns.map((r) => ({ name: r.name, label: labels.get(r.name) ?? r.name }))}
+          hidden={hiddenRuns}
+          onClose={() => setDialog(null)}
+          onApply={(h) => {
+            setDialog(null);
+            setHiddenRuns(h);
+            setOverlay(true);
+          }}
+        />
+      )}
       {dialog?.kind === 'study' && (
         <StudyPanel
           initial={studyFromDoc(doc, lib)}
@@ -1573,6 +1919,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           }}
         />
       )}
+      {dialog?.kind === 'drive' && <DriveDialog onOpen={openDriveFile} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'share' && (
         <ShareDialog
           url={dialog.url}
@@ -1602,7 +1949,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 function toolHint(t: Tool): string {
   switch (t.kind) {
     case 'select':
-      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables; en un cable o codo: en línea recta) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o espacio: desplazar';
+      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables; en un cable o codo: en línea recta) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o Espacio+arrastrar: desplazar · Espacio: ajustar';
     case 'wire':
       return t.start ? 'Click para fijar el tramo (Ctrl: en línea recta) · click derecho o Esc para terminar' : 'Click para empezar el cable';
     case 'place':
@@ -1615,6 +1962,14 @@ function toolHint(t: Tool): string {
       return 'Click en un elemento para borrarlo · Esc para terminar';
     case 'probe':
       return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
+    case 'move':
+      return t.refs
+        ? `Click para soltar${t.stretch ? ' (los cables se estiran)' : ''} · click derecho o Esc cancela`
+        : `${t.stretch ? 'Arrastrar (los cables se estiran)' : 'Mover (sin estirar cables)'}: click en un elemento o recuadro para elegir · Esc para terminar`;
+    case 'shape':
+      return t.start ? 'Click para terminar · click derecho cancela' : `Click para empezar ${t.shape === 'LINE' ? 'la línea' : 'el rectángulo'} · Esc para terminar`;
+    case 'zoom':
+      return 'Arrastrá un recuadro para hacer zoom (click: acercar) · Shift+Z: zoom anterior';
     case 'pick':
       return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : t.what === 'source' ? 'Click en una fuente V o I para elegirla · Esc cancela' : 'Click en un componente para elegirlo · Esc cancela';
   }

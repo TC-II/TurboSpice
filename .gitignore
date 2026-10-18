@@ -8,3 +8,6 @@ public/engine/
 *.tsbuildinfo
 test-results/
 public/library/
+.env
+.env.local
+.env.*.local

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc } from '../../src/asc/model.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
-import { isHiddenText } from '../../src/netlist/directives.ts';
+import { isDataText } from '../../src/asc/dataText.ts';
 import { findAnalysis, setAnalysisLine } from '../../src/schematic/directivesEdit.ts';
 import {
   activeSim,
@@ -130,16 +130,16 @@ describe('lista en el .asc', () => {
     });
     const doc = setAnalysisLine(docWith('.dc V1 0 5 0.1'), '.dc V1 0 2 0.01');
     const saved = withSims(doc, l);
-    const hidden = saved.texts.filter(isHiddenText);
+    const hidden = saved.texts.filter(isDataText);
     expect(hidden.length).toBe(1);
     expect(hidden[0].text.startsWith('.sims ')).toBe(true);
     // ida y vuelta por el archivo
     const back = parseAsc(serializeAsc(saved));
     const t = takeSims(back, findAnalysis(back)?.value ?? null);
     expect(t.sims).toEqual(l);
-    expect(t.doc.texts.some(isHiddenText)).toBe(false);
+    expect(t.doc.texts.some(isDataText)).toBe(false);
     // guardar de nuevo reemplaza el comentario anterior
-    expect(withSims(saved, l).texts.filter(isHiddenText).length).toBe(1);
+    expect(withSims(saved, l).texts.filter(isDataText).length).toBe(1);
   });
   it('una sola simulación sin nada propio no agrega nada', () => {
     const doc = docWith('.tran 1m');

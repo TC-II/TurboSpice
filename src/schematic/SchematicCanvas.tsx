@@ -5,7 +5,8 @@ import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { isHiddenText, isNgspiceComment } from '../netlist/directives.ts';
+import { isNgspiceComment } from '../netlist/directives.ts';
+import { isDataText } from '../asc/dataText.ts';
 import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, type ItemRef } from './geometry.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
@@ -75,16 +76,18 @@ export function ShapeView({ s }: { s: Shape }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hideLabels }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, hideLabels }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
   selected?: boolean;
+  /** el cursor está sobre uno de sus rótulos */
+  hover?: boolean;
   /** sin rótulos (miniaturas) */
   hideLabels?: boolean;
 }) {
   const skin = lib.skin(inst.type);
-  const cls = `sym${selected ? ' sel' : ''}${def ? '' : ' missing'}`;
+  const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}`;
   if (!def) {
     return (
       <g className={cls}>
@@ -165,9 +168,13 @@ export interface CanvasProps {
   selection: ItemRef[];
   /** red resaltada (probe o hover) */
   highlightNet?: string;
+  /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
+  hoverSymbol?: number;
+  /** marcas de pines sueltos (Ctrl+U) */
+  showLoose?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, showLoose = true }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
@@ -205,13 +212,13 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} />
+          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} />
         ))}
       </g>
-      <g className="loose">{loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
+      <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((t, i) =>
-          isHiddenText(t) ? null : (
+          isDataText(t) ? null : (
           <g
             key={i}
             className={`${t.kind === 'comment' && isNgspiceComment(t.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}

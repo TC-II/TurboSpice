@@ -1,9 +1,10 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
-import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, Wire } from '../asc/model.ts';
+import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
+import { defaultWindows, effectiveWindows } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
-import { mirrorX, rotateCW } from '../asc/transform.ts';
+import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
-import { pinPoints, snap, type ItemRef } from './geometry.ts';
+import { localBox, pinPoints, pivotNear, snap, symbolPivot, type ItemRef } from './geometry.ts';
 
 const samePt = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const ends = (w: Wire): [Point, Point] => [
@@ -415,38 +416,86 @@ export function sameConnections(a: AscDoc, b: AscDoc, lib: Library): boolean {
   return sig(a) === sig(b);
 }
 
-/** Rótulos al rotar: los que no están ocultos vuelven a la posición por defecto de la nueva orientación */
-function resetWindows(sym: SymbolInst): SymbolInst {
-  const windows = new Map([...sym.windows].filter(([, w]) => w.align === 'Invisible'));
-  return { ...sym, windows };
+const sameWindow = (a: TextWindow, b: TextWindow) => a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;
+
+/**
+ * Rótulos al rotar o espejar, como LTspice: los que estaban en la posición por defecto pasan a
+ * la por defecto de la nueva orientación; los movidos a mano conservan su WINDOW (en coordenadas
+ * del símbolo, así que acompañan al cuerpo); los ocultos siguen ocultos.
+ */
+function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolInst {
+  const def = lib.symbol(sym.type);
+  if (!def) return { ...sym, orient };
+  const before = defaultWindows(def, sym.orient, lib.windowDefaults);
+  const after = defaultWindows(def, orient, lib.windowDefaults);
+  const windows = new Map<number, TextWindow>();
+  for (const [i, w] of sym.windows) {
+    const d = before.get(i);
+    const n = after.get(i);
+    if (d && sameWindow(w, d)) continue;
+    if (w.align === 'Invisible' && d && n && w.x === d.x && w.y === d.y) windows.set(i, { ...n, align: 'Invisible', size: w.size });
+    else windows.set(i, w);
+  }
+  return { ...sym, orient, windows };
 }
 
-/** Rota (90° horario) o espeja la selección alrededor de su centro, sobre la grilla */
-export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
-  if (!refs.length) return doc;
+/** Último punto fijo usado por documento resultante: rotar/espejar otra vez lo reutiliza */
+const lastPivot = new WeakMap<AscDoc, { key: string; c: Point }>();
+const refsKey = (refs: ItemRef[]) => refs.map((r) => `${r.kind}${r.index}`).sort().join(' ');
+
+/**
+ * Punto fijo para rotar/espejar la selección. Un símbolo solo gira alrededor de su
+ * symbolPivot; varios elementos, alrededor del centro de su geometría llevado a la grilla
+ * (pivotNear). Si se rota otra vez el resultado de la rotación anterior se usa el mismo punto,
+ * así 4 rotaciones o 2 espejados siempre vuelven exactamente al lugar de partida.
+ */
+export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Point {
+  const last = lastPivot.get(doc);
+  if (last && last.key === refsKey(refs)) return last.c;
+  const one = refs.length === 1 && refs[0].kind === 'symbol' ? doc.symbols[refs[0].index] : undefined;
+  const oneDef = one && lib.symbol(one.type);
+  if (one && oneDef) {
+    const p = symbolPivot(oneDef);
+    return toWorld(one, p.x, p.y);
+  }
   const pts: Point[] = [];
   for (const r of refs) {
-    if (r.kind === 'symbol') pts.push(...pinPoints(doc.symbols[r.index], lib.symbol(doc.symbols[r.index].type)), doc.symbols[r.index]);
+    if (r.kind === 'symbol') {
+      const sym = doc.symbols[r.index];
+      const def = lib.symbol(sym.type);
+      if (!def) pts.push(sym);
+      else {
+        const b = localBox(def);
+        pts.push(...pinPoints(sym, def), ...[[b.x1, b.y1], [b.x2, b.y2]].map(([x, y]) => toWorld(sym, x, y)));
+      }
+    }
     if (r.kind === 'wire') pts.push(...ends(doc.wires[r.index]));
     if (r.kind === 'flag') pts.push(doc.flags[r.index]);
     if (r.kind === 'text') pts.push(doc.texts[r.index]);
   }
   const c = {
-    x: snap((Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2),
-    y: snap((Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2),
+    x: (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2,
+    y: (Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2,
   };
+  return pivotNear(c, { x: 0, y: 0 });
+}
+
+/** Rota (90° horario) o espeja la selección alrededor de un punto fijo (transformPivot) */
+export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
+  if (!refs.length) return doc;
+  const c = transformPivot(doc, refs, lib);
   const tp = (p: Point): Point =>
-    op === 'rotate' ? { x: c.x - (p.y - c.y), y: c.y + (p.x - c.x) } : { x: 2 * c.x - p.x, y: p.y };
+    op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y };
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
-  return mergeCollinear({
+  const out = mergeCollinear({
     ...doc,
     symbols: doc.symbols.map((sym, i) => {
       if (!s.has(i)) return sym;
       const at = tp(sym);
       const orient = op === 'rotate' ? rotateCW(sym.orient) : mirrorX(sym.orient);
-      return resetWindows({ ...sym, ...at, orient });
+      return reorientWindows({ ...sym, ...at }, orient, lib);
     }),
     wires: doc.wires.map((wr, i) => {
       if (!w.has(i)) return wr;
@@ -456,6 +505,8 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
   }, lib);
+  lastPivot.set(out, { key: refsKey(refs), c });
+  return out;
 }
 
 export function setSymbolAttrs(doc: AscDoc, index: number, attrs: Record<string, string | null>): AscDoc {
@@ -480,6 +531,7 @@ export function setText(doc: AscDoc, index: number, patch: Partial<SchText>): As
 export function setFlagName(doc: AscDoc, index: number, name: string): AscDoc {
   return { ...doc, flags: doc.flags.map((f, i) => (i === index ? { ...f, name } : f)) };
 }
+
 
 /** Copia de los elementos seleccionados desplazada (F6 duplicar / pegar) */
 export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
@@ -570,9 +622,69 @@ export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): 
 }
 
 /** Mueve el rótulo `win` (0 = InstName, 3 = Value…) de un símbolo: queda como WINDOW explícito */
-export function setWindow(doc: AscDoc, index: number, win: number, w: { x: number; y: number; align: string; size: number }): AscDoc {
+export function setWindow(doc: AscDoc, index: number, win: number, w: TextWindow): AscDoc {
+  return setWindows(doc, [{ sym: index, win, w }]);
+}
+
+/**
+ * Cambia varios rótulos a la vez. `w: null` borra el WINDOW explícito: el rótulo vuelve a la
+ * posición por defecto (la del .asy o la de window-defaults.json para la orientación).
+ */
+export function setWindows(doc: AscDoc, edits: { sym: number; win: number; w: TextWindow | null }[]): AscDoc {
+  if (!edits.length) return doc;
   return {
     ...doc,
-    symbols: doc.symbols.map((s, i) => (i === index ? { ...s, windows: new Map(s.windows).set(win, w) } : s)),
+    symbols: doc.symbols.map((s, i) => {
+      const mine = edits.filter((e) => e.sym === i);
+      if (!mine.length) return s;
+      const windows = new Map(s.windows);
+      for (const e of mine) {
+        if (e.w) windows.set(e.win, e.w);
+        else windows.delete(e.win);
+      }
+      return { ...s, windows };
+    }),
   };
+}
+
+/**
+ * Cambio de un rótulo desde el diálogo: `reset` vuelve a la posición por defecto (borra el
+ * WINDOW explícito); además ocultar/mostrar, alineación (tal como se ve en el esquemático) y
+ * tamaño. Los campos ausentes no cambian.
+ */
+export interface LabelPatch {
+  reset?: boolean;
+  visible?: boolean;
+  align?: string;
+  size?: number;
+}
+
+/** Aplica los mismos cambios de rótulos (por índice de WINDOW) a varios símbolos */
+export function patchLabels(doc: AscDoc, syms: number[], patches: Map<number, LabelPatch>, lib: Library): AscDoc {
+  const edits: { sym: number; win: number; w: TextWindow | null }[] = [];
+  for (const si of syms) {
+    const inst = doc.symbols[si];
+    const def = inst && lib.symbol(inst.type);
+    if (!def) continue;
+    const eff = effectiveWindows(inst, def, lib.windowDefaults);
+    const dflt = defaultWindows(def, inst.orient, lib.windowDefaults);
+    for (const [win, p] of patches) {
+      const cur = eff.get(win);
+      const base = p.reset ? dflt.get(win) : cur;
+      if (!cur || !base) continue;
+      const hidden = base.align === 'Invisible';
+      const visible = p.visible ?? !hidden;
+      let align = base.align;
+      if (!visible) align = 'Invisible';
+      else if (p.align) align = localAlign(p.align, inst.orient);
+      else if (hidden) align = dflt.get(win)?.align !== 'Invisible' ? (dflt.get(win)?.align ?? 'Left') : 'Left';
+      const w = { ...base, align, size: p.size ?? base.size };
+      // igual a la posición por defecto: sin WINDOW explícito, como si nunca se hubiera tocado
+      const d = dflt.get(win);
+      if (d && sameWindow(w, d)) {
+        if (inst.windows.has(win)) edits.push({ sym: si, win, w: null });
+      } else if (!sameWindow(w, cur)) edits.push({ sym: si, win, w });
+    }
+  }
+  return setWindows(doc, edits);
 }

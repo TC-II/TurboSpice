@@ -1,5 +1,6 @@
 // Abrir/guardar .asc en la máquina del usuario. Usa la File System Access API cuando existe
 // (Chrome/Edge: Ctrl+S guarda sobre el mismo archivo); si no, <input type=file> y descarga.
+import { placeDataTexts } from '../asc/dataText.ts';
 import { decode, encode, type AscEncoding } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
@@ -60,7 +61,8 @@ export async function openFile(): Promise<OpenedFile | null> {
 /** Bytes del .asc tal como se guardan: todo explícito, en la codificación original si se puede */
 export function ascBytes(doc: AscDoc, lib: SymbolSource, encoding?: AscEncoding): { bytes: Uint8Array; missing: string[] } {
   const { doc: explicit, missing } = makeExplicit(doc, lib);
-  return { bytes: encode(serializeAsc(explicit), encoding).bytes, missing };
+  // los comentarios con datos (;.study, ;.plot), debajo del dibujo: en LTspice se ven
+  return { bytes: encode(serializeAsc(placeDataTexts(explicit)), encoding).bytes, missing };
 }
 
 /**

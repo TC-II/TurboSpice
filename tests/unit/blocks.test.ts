@@ -94,4 +94,16 @@ describe('Estudio con bloques', () => {
     expect(back.study.sweeps).toEqual(st.sweeps.map(({ original: _, ...s }) => s));
     expect(back.study.measures).toEqual(st.measures);
   });
+
+  it('"Graficar señal" arma la vista de resultados (no cambia el programa)', () => {
+    const sig = (SIGNAL: string, PANE: number, ANALYSIS: string, COLOR = 'auto'): BlockJson => ({ type: 'ts_plot_signal', fields: { SIGNAL, PANE, COLOR, ANALYSIS } });
+    const chainOf = (...bs: BlockJson[]) => bs.reduceRight<BlockJson | undefined>((next, b) => ({ ...b, ...(next ? { next: { block: next } } : {}) }), undefined)!;
+    const r = compileBlocks(ws(chainOf(loop(chainOf({ type: 'ts_simulate' }, measure)), sig('V(out)', 1, 'tran', '#e03131'), sig('V(in)', 2, 'tran'), sig('V(out)/V(in)', 1, 'ac'))), 'tran');
+    expect(r.ltspice).toBe(true);
+    expect(r.study.plot).toEqual({ tran: [{ traces: [{ expr: 'V(out)', color: '#e03131' }] }, { traces: [{ expr: 'V(in)' }] }], ac: [{ traces: [{ expr: 'V(out)/V(in)' }] }] });
+    // y vuelve a bloques
+    const back = compileBlocks(studyToBlocks({ ...emptyStudy(), plot: r.study.plot }), 'tran');
+    expect(back.study.plot).toEqual(r.study.plot);
+    expect(compileBlocks(ws(loop({ type: 'ts_simulate' })), 'tran').study.plot).toBeUndefined();
+  });
 });

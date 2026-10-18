@@ -47,6 +47,8 @@ export interface Flag {
   ioPin?: string;
 }
 
+export type FlagDir = 'top' | 'bottom' | 'left' | 'right';
+
 export interface DataFlag {
   x: number;
   y: number;

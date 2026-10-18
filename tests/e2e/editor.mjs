@@ -70,8 +70,8 @@ await page.keyboard.press('g');
 await click(0, 96);
 await click(96, 32);
 await page.keyboard.press('Escape');
-// Directiva
-await page.keyboard.press('s');
+// Directiva (".", como en la configuración de LTspice)
+await page.keyboard.press('.');
 await page.locator('.modal textarea').fill('.tran 5m');
 await page.keyboard.press('Control+Enter');
 await click(0, 160);

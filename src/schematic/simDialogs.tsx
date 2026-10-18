@@ -123,7 +123,7 @@ export interface CircuitInfo {
   sources: string[];
 }
 
-function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
+export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
   const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true) => (
     <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker }} />
   );
@@ -244,8 +244,10 @@ function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void;
 }
 
 /** Comando de análisis: elegir tipo y completar parámetros */
-export function SimulationDialog({ initial, info, onApply, onClose, picker, hidden }: {
+export function SimulationDialog({ initial, analysis, info, onApply, onClose, picker, hidden }: {
   initial: string | null;
+  /** Tipo de análisis con que abre (el elegido en la flecha de Simular); si no, el de `initial` */
+  analysis?: AnalysisKind;
   info: CircuitInfo;
   onApply(line: string, ngspiceOnly: boolean): void;
   onClose(): void;
@@ -254,7 +256,7 @@ export function SimulationDialog({ initial, info, onApply, onClose, picker, hidd
 }) {
   const parsed = initial ? parseAnalysis(initial) : null;
   const [byKind, setByKind] = useState<Partial<Record<AnalysisKind, Analysis>>>(parsed ? { [parsed.kind]: parsed } : {});
-  const [kind, setKind] = useState<AnalysisKind>(parsed?.kind ?? 'tran');
+  const [kind, setKind] = useState<AnalysisKind>(analysis ?? parsed?.kind ?? 'tran');
   const a = byKind[kind] ?? defaultAnalysis(kind);
   const set = (x: Analysis) => setByKind({ ...byKind, [x.kind]: x });
   const meta = ANALYSES.find((x) => x.kind === kind)!;

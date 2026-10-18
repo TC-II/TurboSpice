@@ -31,6 +31,11 @@ cualquier otra orientación escribe posiciones propias por símbolo (p.ej. `res`
 `WINDOW 0 0 56 VBottom 2` / `WINDOW 3 32 56 VTop 2`). La tabla está en `library/window-defaults.json`,
 derivada del corpus (Mxx usa la misma que Rxx; para R180 sin dato se intercambian las ventanas 0 y 3).
 
+**Rótulos movidos a mano** (#28): se guardan como `WINDOW` explícito (posición local del símbolo,
+alineación y tamaño); ocultar un rótulo es `WINDOW n x y Invisible size`. Al rotar o espejar,
+los rótulos que estaban en la posición por defecto pasan a la de la nueva orientación; los movidos
+conservan su `WINDOW` (acompañan al cuerpo del símbolo) y los ocultos siguen ocultos.
+
 Verificado: la netlist que genera LTspice del archivo guardado por TurboSpice es idéntica a la del
 original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquiera en el original).
 

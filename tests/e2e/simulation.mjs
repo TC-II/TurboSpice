@@ -4,7 +4,7 @@
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, skipWelcome } from './lib.mjs';
+import { menu, openExample, simType, skipWelcome } from './lib.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { takeSims } from '../../src/sim/simList.ts';
@@ -59,7 +59,7 @@ check(wires.some((w) => w === '96,32,96,64' || w === '96,64,96,32'), `al arrastr
 await page.keyboard.press('Control+z');
 
 // --- Comando de simulación ---
-await page.getByRole('button', { name: 'Simulación…' }).click();
+await simType(page, 'Transitorio');
 check((await page.locator('.field', { hasText: 'Tiempo final' }).locator('input').inputValue()) === '20m', 'el menú lee la directiva existente (.tran 20m)');
 await page.getByRole('button', { name: 'AC (Bode)' }).click();
 check((await page.locator('.sim-preview code').textContent()) === '.ac dec 100 1 1meg', 'AC: vista previa de la directiva');
@@ -122,10 +122,16 @@ check((await page.locator('.results-panel').count()) === 0, 'la nueva simulació
 await simulate();
 await probe(0, -16); // red N001 (V1–R1)
 check((await chipNames()).join() === 'V(N001)', `segunda DC: V(N001) (${(await chipNames()).join()})`);
-const items = async () => (await page.getByRole('menu').getByRole('menuitemcheckbox').allTextContents()).filter((t) => /Barrido DC/.test(t));
-await page.getByRole('menubar').getByRole('menuitem', { name: 'Simular', exact: true }).click();
+// simulaciones listadas en el menú Simular (✓ la activa)
+const items = async () => {
+  await page.getByRole('button', { name: 'Menú', exact: true }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: 'Simular', exact: true }).hover();
+  const t = (await page.getByRole('menu').getByRole('menuitemcheckbox').allTextContents()).filter((x) => /Barrido DC/.test(x));
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  return t;
+};
 const listed = await items();
-await page.keyboard.press('Escape');
 check(listed.length === 2 && listed[1].startsWith('✓'), `el menú lista las dos y marca la activa (${listed.join(' | ')})`);
 // alternar: cada una conserva sus trazas y sus resultados (sin volver a simular)
 await menu(page, 'Simular', 'Barrido DC V1 0–5 V');
@@ -139,7 +145,8 @@ const maxOf = async () => {
   return t;
 };
 check((await maxOf()).startsWith('5 @'), `con sus resultados en memoria, sin volver a simular (máximo ${await maxOf()})`);
-await menu(page, 'Simular', 'Barrido DC V1 0–2 V');
+// (también desde la flecha del botón Simular)
+await simType(page, 'Barrido DC V1 0–2 V');
 check((await chipNames()).join() === 'V(N001)', `la segunda conserva el suyo (${(await chipNames()).join()})`);
 check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxOf()})`);
 // el archivo guarda la lista (en un comentario que TurboSpice no dibuja) y la activa como directiva
@@ -155,9 +162,7 @@ check(views.join(' | ') === ' | V(out) | V(N001)', `la lista del archivo conserv
 await page.waitForTimeout(1000); // autoguardado
 await page.reload();
 await page.getByText('Listo').waitFor({ timeout: 30000 });
-await page.getByRole('menubar').getByRole('menuitem', { name: 'Simular', exact: true }).click();
 check((await items()).length === 2, 'al recargar se recupera la lista');
-await page.keyboard.press('Escape');
 await menu(page, 'Simular', 'Borrar simulación');
 check((await directive()) === '.dc V1 0 5 0.1', 'borrar la activa pasa a la otra');
 await page.screenshot({ path: `${OUT}/simulaciones.png` });

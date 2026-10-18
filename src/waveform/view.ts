@@ -1,5 +1,8 @@
 // Vista de resultados: qué trazas se grafican, en qué panel y con qué color. Se puede
-// recordar por tipo de análisis y va y viene con el .plt de LTspice.
+// recordar por tipo de análisis; se guarda dentro del .asc (";.plot …") y va y viene con el
+// .plt de LTspice.
+import { readData, writeData } from '../asc/dataText.ts';
+import type { AscDoc } from '../asc/model.ts';
 
 export interface Trace {
   /** expresión con nombres de LTspice: "V(out)", "I(R1)", "V(out)/V(in)" */
@@ -32,6 +35,8 @@ export interface PlotState {
   /** nombre del eje X ("time", "frequency"…) en el que valen el zoom y los cursores */
   scale?: string;
   xRange: [number, number] | null;
+  /** eje Y fijado por un zoom a recuadro, por panel */
+  yRanges?: Record<number, [number, number]>;
   cursors: Cursors;
   cursorMode: boolean;
 }
@@ -48,6 +53,29 @@ export const emptyPanes = (): Pane[] => [{ traces: [] }];
 
 /** ¿La traza ya está en algún panel? (comparación sin espacios ni mayúsculas) */
 export const sameExpr = (a: string, b: string) => a.replace(/\s+/g, '').toLowerCase() === b.replace(/\s+/g, '').toLowerCase();
+
+// --- dentro del .asc -----------------------------------------------------------------
+
+/** Vista válida a partir de un JSON cualquiera (link viejo, IndexedDB, .asc); null si no hay */
+export function asPlotView(v: unknown): PlotView | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const out: PlotView = {};
+  for (const [kind, panes] of Object.entries(v as Record<string, unknown>)) {
+    if (!Array.isArray(panes)) continue;
+    out[kind] = panes.map((p) => ({
+      traces: (Array.isArray(p?.traces) ? (p.traces as unknown[]) : [])
+        .filter((t): t is Trace => !!t && typeof (t as Trace).expr === 'string')
+        .map((t) => ({ expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}) })),
+    }));
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Vista guardada en el documento (comentario ";.plot …"), o null */
+export const viewFromDoc = (doc: AscDoc): PlotView | null => asPlotView(readData(doc, 'plot'));
+
+/** Documento con la vista guardada (una vista vacía saca el comentario) */
+export const withView = (doc: AscDoc, view: PlotView): AscDoc => writeData(doc, 'plot', Object.keys(view).length ? view : undefined);
 
 // --- "plot" del bloque .control ------------------------------------------------------
 

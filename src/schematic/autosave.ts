@@ -16,6 +16,8 @@ export interface Session {
   name: string;
   encoding?: AscEncoding;
   handle?: unknown;
+  /** id en Google Drive */
+  driveId?: string;
   /** historial serializado (.asc) */
   past: string[];
   present: string;
@@ -23,7 +25,7 @@ export interface Session {
   /** cantidad de pasos de `past` en el último guardado (para saber si hay cambios) */
   savedVersion: number;
   time: number;
-  /** vista de resultados recordada */
+  /** vista de resultados de versiones anteriores (ahora va dentro del documento) */
   view?: PlotView;
   /** lista de simulaciones, con la vista de cada una (#39) */
   sims?: SimList;
@@ -34,6 +36,8 @@ export interface RecentFile {
   asc: string;
   encoding?: AscEncoding;
   handle?: unknown;
+  /** id en Google Drive */
+  driveId?: string;
   time: number;
   /** trabajo sin guardar recuperado */
   unsaved?: boolean;
@@ -107,9 +111,8 @@ export async function readHandle(handle: unknown): Promise<Uint8Array | null> {
   }
 }
 
-/** Vista de resultados recordada para un archivo (por nombre) */
+/** Vista de resultados recordada por nombre de archivo en versiones anteriores (para migrarla al .asc) */
 export const loadView = (name: string) => quiet(get<PlotView>(`view:${name}`), undefined);
-export const saveView = (name: string, view: PlotView) => quiet(put(`view:${name}`, view), undefined);
 
 /** Archivos propios del usuario: símbolos (.asy), modelos (.lib…) y bloques (.asc) */
 export interface UserFile {

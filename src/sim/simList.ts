@@ -1,15 +1,15 @@
 // Lista de simulaciones (#39): cada una es un comando de análisis con su nombre y la vista
 // del visor (trazas, paneles, cursores, zoom y colores). En el .asc va sólo la activa como
 // directiva (así LTspice lo abre igual) y la lista entera en un comentario ";.sims …" que
-// TurboSpice no dibuja. Los resultados quedan en memoria (ver keepResult), no en el archivo.
-import type { AscDoc, SchText } from '../asc/model.ts';
-import { isHiddenText } from '../netlist/directives.ts';
+// TurboSpice no dibuja (asc/dataText.ts). Los resultados quedan en memoria (ver keepResult),
+// no en el archivo.
+import { isDataTextOf, readData, writeData } from '../asc/dataText.ts';
+import type { AscDoc } from '../asc/model.ts';
 import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import type { ComplexMode } from '../waveform/curves.ts';
 import { si } from '../waveform/series.ts';
 import type { Pane, PlotState } from '../waveform/view.ts';
 import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, type AnalysisKind, type Sweep } from './analyses.ts';
-import { fromBase64, toBase64 } from './study.ts';
 
 /** Lo que se veía de una simulación: se recupera al volver a elegirla */
 export interface SimView {
@@ -206,27 +206,19 @@ export function keepResult<T>(kept: Map<string, T>, id: string, value: T, max = 
 }
 
 // --- en el .asc --------------------------------------------------------------------------------
-
-/** Comentario del .asc con la lista de simulaciones (base64 del JSON) */
-export const SIMS_MARK = '.sims ';
-export const isSimsText = (t: SchText) => t.kind === 'comment' && t.text.startsWith(SIMS_MARK);
+// La lista va en el comentario ";.sims …" (asc/dataText.ts) sólo en el archivo que se guarda: en
+// el documento que se edita no está (cambiar de vista no es un paso de deshacer). La vista
+// recordada por tipo de análisis (";.plot …", #14/#26) es aparte y vale para todas: es la que
+// se reaplica al simular; la de cada simulación es lo último que se vio en ella.
 
 /**
  * ¿Hay una lista que guardar? (varias simulaciones o un nombre propio). Con una sola, el .asc
- * queda como siempre: su vista va en el autoguardado (el estilo en el .asc es #26).
+ * queda como siempre: su vista va en el autoguardado.
  */
 const worthSaving = (l: SimList) => l.items.length > 1 || l.items.some((s) => s.name);
 
 /** El documento con la lista en su comentario (reemplaza el anterior; sin lista, lo saca) */
-export function withSims(doc: AscDoc, l: SimList): AscDoc {
-  const texts = doc.texts.filter((t) => !isSimsText(t));
-  if (worthSaving(l)) {
-    const shown = texts.filter((t) => !isHiddenText(t));
-    const y = shown.length ? Math.max(...shown.map((t) => t.y + t.text.split('\\n').length * 24)) + 48 : 0;
-    texts.push({ x: shown[0]?.x ?? 0, y, align: 'Left', size: 0, kind: 'comment', text: SIMS_MARK + toBase64(JSON.stringify(l)) });
-  } else if (texts.length === doc.texts.length) return doc;
-  return { ...doc, texts };
-}
+export const withSims = (doc: AscDoc, l: SimList): AscDoc => writeData(doc, 'sims', worthSaving(l) ? l : undefined);
 
 const validList = (v: unknown): v is SimList => {
   const l = v as SimList;
@@ -243,15 +235,8 @@ const validList = (v: unknown): v is SimList => {
  * si el archivo se editó en LTspice): si no está en la lista, cambia el comando de la activa.
  */
 export function takeSims(doc: AscDoc, line: string | null): { doc: AscDoc; sims: SimList } {
-  const t = doc.texts.find(isSimsText);
-  if (!t) return { doc, sims: simsFromLine(line) };
-  const clean = { ...doc, texts: doc.texts.filter((x) => x !== t) };
-  let sims: SimList | null = null;
-  try {
-    const v: unknown = JSON.parse(fromBase64(t.text.slice(SIMS_MARK.length).trim()));
-    if (validList(v)) sims = v.items.some((s) => s.id === v.active) ? v : { ...v, active: v.items[0]?.id ?? '' };
-  } catch {
-    // lista ilegible: queda sólo la del comando
-  }
-  return { doc: clean, sims: sims ? followLine(sims, line) : simsFromLine(line) };
+  if (!doc.texts.some((t) => isDataTextOf(t, 'sims'))) return { doc, sims: simsFromLine(line) };
+  const v = readData(doc, 'sims');
+  const sims = validList(v) ? (v.items.some((s) => s.id === v.active) ? v : { ...v, active: v.items[0]?.id ?? '' }) : null;
+  return { doc: writeData(doc, 'sims', undefined), sims: sims ? followLine(sims, line) : simsFromLine(line) };
 }

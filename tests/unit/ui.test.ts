@@ -53,6 +53,27 @@ describe('compartir con un link', () => {
   });
 });
 
+describe('colapsar los resultados (#36)', () => {
+  it('ocultar y mostrar alternan con el esquemático expandido, sin otra forma de cerrarlos', async () => {
+    const { toggleResults } = await import('../../src/ui/ResultsSplitter.tsx');
+    expect(toggleResults('')).toBe('schematic');
+    expect(toggleResults('results')).toBe('schematic');
+    expect(toggleResults('schematic')).toBe('');
+    expect(toggleResults(toggleResults(''))).toBe('');
+  });
+
+  it('se reajusta la vista cuando cambia el lienzo del esquemático', async () => {
+    const { refitsSchematic } = await import('../../src/ui/ResultsSplitter.tsx');
+    expect(refitsSchematic('', 'schematic')).toBe(true);
+    expect(refitsSchematic('schematic', '')).toBe(true);
+    expect(refitsSchematic('results', '')).toBe(true);
+    expect(refitsSchematic('results', 'schematic')).toBe(true);
+    // sin cambios, o con el esquemático oculto, no
+    expect(refitsSchematic('schematic', 'schematic')).toBe(false);
+    expect(refitsSchematic('', 'results')).toBe(false);
+  });
+});
+
 describe('valores amigables', () => {
   it('4k7 → 4.7k, aviso de M (mili) y de valores no numéricos', async () => {
     const { checkValue } = await import('../../src/schematic/dialogs.tsx');
@@ -64,5 +85,24 @@ describe('valores amigables', () => {
     expect(checkValue('R', 'R=V(a)/2')).toEqual({ value: 'R=V(a)/2' });
     expect(checkValue('R', 'abc').warn).toMatch(/no parece/);
     expect(checkValue('V', 'SINE(0 1 1k)')).toEqual({ value: 'SINE(0 1 1k)' });
+  });
+});
+
+describe('barra de herramientas (#38)', () => {
+  it('los grupos que no entran pasan al desplegable, de derecha a izquierda', async () => {
+    const { groupsThatFit } = await import('../../src/ui/Toolbar.tsx');
+    const w = [100, 70, 230, 100, 70];
+    expect(groupsThatFit(w, 600)).toBe(5);
+    expect(groupsThatFit(w, 570)).toBe(5);
+    // si no entran todos, se reserva lugar para el botón "Más herramientas"
+    expect(groupsThatFit(w, 569, 40)).toBe(4);
+    expect(groupsThatFit(w, 500, 40)).toBe(3);
+    expect(groupsThatFit(w, 200, 40)).toBe(1);
+    expect(groupsThatFit(w, 100, 40)).toBe(0);
+  });
+
+  it('menús: cada tipo de análisis tiene su ítem en la flecha de Simular', async () => {
+    const { ANALYSES } = await import('../../src/sim/analyses.ts');
+    expect(new Set(ANALYSES.map((a) => a.label)).size).toBe(ANALYSES.length);
   });
 });

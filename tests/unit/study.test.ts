@@ -29,6 +29,11 @@ SYMATTR InstName R2
 SYMATTR Value 2k
 TEXT 0 240 Left 2 !.tran 1m
 `);
+/** Tarjetas reconstruidas, sin los análisis (el .tran del documento) */
+const cards = (doc: typeof DOC) => {
+  const { analyses: _, ...rest } = studyFromDoc(doc, lib);
+  return rest;
+};
 const value = (doc: typeof DOC, name: string) =>
   doc.symbols.map((s) => effectiveAttrs(s, lib.symbol(s.type))).find((a) => a.get('InstName') === name)?.get('Value');
 
@@ -49,7 +54,7 @@ describe('Estudio: tarjetas ↔ directivas', () => {
     const dir = doc.texts.find((t) => t.kind === 'directive' && t.text.includes('.step'))!.text.split('\\n');
     expect(dir).toEqual(['.param R1=1k', '.step param R1 list 1k 2k 5k', '.step V1 0 5 1', '.step dec param k 1 100 5', '.step 2N2222(BF) list 50 100']);
     expect(doc.texts.find((t) => t.kind === 'comment')!.text).toBe('.step temp -40 85 25');
-    expect(studyFromDoc(doc, lib)).toEqual({ ...st, sweeps: [st.sweeps[0], st.sweeps[1], st.sweeps[3], st.sweeps[4], st.sweeps[2]] });
+    expect(cards(doc)).toEqual({ ...st, sweeps: [st.sweeps[0], st.sweeps[1], st.sweeps[3], st.sweeps[4], st.sweeps[2]] });
     // al quitar el barrido del componente vuelve su valor original y desaparecen sus directivas
     const back = applyStudy(doc, lib, emptyStudy());
     expect(value(back, 'R1')).toBe('1k');
@@ -66,12 +71,12 @@ describe('Estudio: tarjetas ↔ directivas', () => {
     expect(value(doc, 'R1')).toBe('{mc(1k,0.05)}');
     expect(value(doc, 'R2')).toBe('{2k*(1+gauss(0.01/3))}');
     expect(doc.texts.some((t) => t.text.includes('.step param run 1 100 1'))).toBe(true);
-    expect(studyFromDoc(doc, lib)).toEqual(mc);
+    expect(cards(doc)).toEqual(mc);
     const wc: Study = { ...emptyStudy(), tolerance: { enabled: true, mode: 'worst', runs: '4', items: items.map((i) => ({ ...i, dist: 'uniform' as const })) } };
     const doc2 = applyStudy(DOC, lib, wc);
     expect(value(doc2, 'R2')).toBe('{2k*(1+0.01*(2*binary(run,1)-1))}');
     expect(doc2.texts.find((t) => t.text.includes('binary'))!.text).toContain('.step param run 0 3 1');
-    expect(studyFromDoc(doc2, lib)).toEqual(wc);
+    expect(cards(doc2)).toEqual(wc);
     expect(value(applyStudy(doc2, lib, emptyStudy()), 'R2')).toBe('2k');
   });
 
@@ -125,7 +130,7 @@ describe('Estudio: tarjetas ↔ directivas', () => {
       custom: { mode: 'hooks', body: '', before: 'echo empieza', after: 'print v(out)', final: 'echo fin' },
     };
     const d2 = applyStudy(DOC, lib, hooks);
-    expect(studyFromDoc(d2, lib)).toEqual(hooks);
+    expect(cards(d2)).toEqual(hooks);
     const ng = toNgspice(ltNetlist(d2, lib), 't', { resolve: () => undefined });
     expect(ng.text).toContain('.control\nforeach ts_step0 1000 2000\n  alterparam R1 = $ts_step0\n  reset\n  echo empieza\n  run\n  print v(out)\nend\necho fin\n.endc');
     expect(ng.warnings).toEqual([]);
@@ -154,3 +159,85 @@ TEXT 0 240 Left 2 !.tran 1m
 ${extra}
 `;
 }
+
+describe('vista de ploteo dentro del .asc (;.plot)', () => {
+  it('va y viene con el archivo, no cambia la netlist y sobrevive al Estudio', async () => {
+    const { serializeAsc } = await import('../../src/asc/serialize.ts');
+    const { asPlotView, viewFromDoc, withView } = await import('../../src/waveform/view.ts');
+    const { ltNetlistText } = await import('../../src/netlist/ltnetlist.ts');
+    const view = { tran: [{ traces: [{ expr: 'V(out)', color: '#e03131' }] }, { traces: [{ expr: 'I(R1)', hidden: true }] }], ac: [{ traces: [{ expr: 'V(out)/V(in)' }] }] };
+    expect(viewFromDoc(DOC)).toBeNull();
+    const doc = withView(DOC, view);
+    const text = serializeAsc(doc);
+    expect(text).toMatch(/^TEXT -?\d+ \d+ Left 0 ;\.plot [A-Za-z0-9+/=]+$/m);
+    const back = parseAsc(text);
+    expect(viewFromDoc(back)).toEqual(view);
+    // como en LTspice, el comentario queda como "* .plot …" en la netlist y no se ejecuta
+    const net = ltNetlistText(ltNetlist(back, lib)).split('\n');
+    expect(net.filter((l) => !l.startsWith('* .plot ')).join('\n')).toBe(ltNetlistText(ltNetlist(DOC, lib)));
+    expect(toNgspice(ltNetlist(back, lib), 't', { resolve: () => undefined }).text).not.toMatch(/^\.plot/m);
+    // reemplazar la vista no agrega otro texto; una vista vacía lo saca
+    const other = withView(back, { dc: [{ traces: [{ expr: 'V(out)' }] }] });
+    expect(other.texts.length).toBe(back.texts.length);
+    expect(withView(other, {}).texts).toEqual(DOC.texts);
+    // el Estudio no la pisa
+    const st = applyStudy(back, lib, { ...emptyStudy(), measures: [{ enabled: true, name: 'm', analysis: 'tran', kind: 'max', signal: 'V(out)' }] });
+    expect(viewFromDoc(st)).toEqual(view);
+    // JSON ajeno (links viejos, IndexedDB): se valida
+    expect(asPlotView({ tran: [{ traces: [{ expr: 'V(a)', x: 1 }, { nada: 1 }] }], ac: 'x' })).toEqual({ tran: [{ traces: [{ expr: 'V(a)' }] }] });
+    expect(asPlotView(null)).toBeNull();
+  });
+
+  it('queda debajo de todo el dibujo (en LTspice se ve como comentario)', async () => {
+    const { withView } = await import('../../src/waveform/view.ts');
+    const doc = withView(DOC, { tran: [{ traces: [{ expr: 'V(out)' }] }] });
+    const t = doc.texts.find((x) => x.text.startsWith('.plot '))!;
+    const ys = [...DOC.wires.flatMap((w) => [w.y1, w.y2]), ...DOC.symbols.map((s) => s.y + 128), ...DOC.texts.map((x) => x.y)];
+    expect(t.y).toBeGreaterThan(Math.max(...ys) + 100);
+    expect(t.x).toBeLessThanOrEqual(Math.min(...DOC.wires.flatMap((w) => [w.x1, w.x2])));
+  });
+});
+
+describe('Estudio: análisis y gráfico', () => {
+  it('el primero activo es la directiva, los demás un comentario que sólo corre TurboSpice', async () => {
+    const { EXTRA_ANALYSES } = await import('../../src/netlist/directives.ts');
+    const { OFF_ANALYSES } = await import('../../src/sim/study.ts');
+    const { viewFromDoc } = await import('../../src/waveform/view.ts');
+    const analyses = [
+      { enabled: true, line: '.tran 2m' },
+      { enabled: true, line: '.ac dec 50 10 100k' },
+      { enabled: false, line: '.pz in 0 out 0 vol pz' },
+      { enabled: false, line: '.op' },
+    ];
+    const plot = { tran: [{ traces: [{ expr: 'V(out)' }] }], ac: [{ traces: [{ expr: 'V(out)' }] }] };
+    const st: Study = { ...emptyStudy(), analyses, plot, measures: [{ enabled: true, name: 'fc', analysis: 'ac', kind: 'f3db', signal: 'V(out)' }] };
+    const doc = applyStudy(DOC, lib, st);
+    const texts = doc.texts.filter((t) => !t.text.startsWith('.plot '));
+    // LTspice ve un solo análisis: la directiva (en el lugar del .tran anterior)
+    expect(texts.filter((t) => t.kind === 'directive').map((t) => t.text)).toEqual(['.tran 2m', '.meas ac fc_max MAX mag(V(out))\\n.meas ac fc WHEN mag(V(out))=fc_max/sqrt(2) FALL=last']);
+    expect(doc.texts.find((t) => t.text === '.tran 2m')).toMatchObject({ x: 0, y: 240 });
+    expect(texts.filter((t) => t.kind === 'comment').map((t) => t.text)).toEqual([`${EXTRA_ANALYSES}\\n.ac dec 50 10 100k`, `${OFF_ANALYSES}\\n.pz in 0 out 0 vol pz\\n.op`]);
+    // al reabrir se reconstruyen las tarjetas de simulación y de gráfico
+    const back = studyFromDoc(doc, lib);
+    expect(back.analyses).toEqual(analyses);
+    expect(back.plot).toEqual(plot);
+    expect(viewFromDoc(doc)).toEqual(plot);
+    // ngspice corre los dos activos; el .pz desactivado no
+    const ng = toNgspice(ltNetlist(doc, lib), 't', { resolve: () => undefined }).text.split('\n');
+    expect(ng).toContain('.ac dec 50 10 100k');
+    expect(ng.some((l) => /^\.tran /.test(l))).toBe(true);
+    expect(ng.some((l) => /^\.(pz|op)\b/.test(l))).toBe(false);
+    // sin cambios en los análisis, el documento no se toca
+    const sorted = (d: typeof DOC) => [...d.texts].sort((x, y) => x.text.localeCompare(y.text));
+    expect(sorted(applyStudy(doc, lib, back))).toEqual(sorted(doc));
+    // volver a uno solo deja el esquemático como antes
+    const one = applyStudy(doc, lib, { ...emptyStudy(), analyses: [{ enabled: true, line: '.tran 1m' }], plot: {} });
+    expect(one.texts).toEqual(DOC.texts);
+  });
+
+  it('un análisis que LTspice no tiene como principal queda como comentario de ngspice', () => {
+    const doc = applyStudy(DOC, lib, { ...emptyStudy(), analyses: [{ enabled: true, line: '.pz in 0 out 0 vol pz' }] });
+    expect(doc.texts.map((t) => [t.kind, t.text])).toEqual([['comment', '.pz in 0 out 0 vol pz']]);
+    expect(studyFromDoc(doc, lib).analyses).toEqual([{ enabled: true, line: '.pz in 0 out 0 vol pz' }]);
+  });
+});

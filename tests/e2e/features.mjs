@@ -1,10 +1,11 @@
 // E2E de funciones de interfaz, por issue: nombres de redes (#15), compartir (#1), autoguardado
 // (#5), punto de operación (#2), elegir en el esquemático (#13), .step (#7), visor de resultados
-// (#3), vista recordada (#14), exportaciones (#12) y expandir esquemático/resultados (#24).
+// (#3), vista recordada (#14), exportaciones (#12), expandir esquemático/resultados (#24) y
+// colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, skipWelcome } from './lib.mjs';
+import { menu, openExample, simType, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -32,6 +33,35 @@ const check = (ok, msg) => {
 await page.goto(URL);
 await page.getByText('Listo').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
+
+// --- #38: barra de herramientas y menú colapsado ---
+check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
+await page.getByRole('button', { name: 'Menú', exact: true }).click();
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Ayuda▸', 'el botón junto al nombre despliega todos los menús');
+await page.keyboard.press('ArrowRight');
+check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
+await page.keyboard.press('Escape');
+check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
+const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+check(
+  toolbarNames.slice(0, 13).join() === 'Nuevo,Guardar,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Directiva,Rotar' && toolbarNames.includes('Borrar'),
+  `orden de la barra (${toolbarNames.join(', ')})`,
+);
+await page.getByRole('button', { name: 'Texto', exact: true }).click();
+check(await page.locator('.modal .seg input[type=radio]').nth(1).isChecked(), 'Texto abre el diálogo de comentario');
+await page.keyboard.press('Escape');
+// en ancho de celular la barra no desborda: los grupos que no entran van a "Más herramientas"
+await page.setViewportSize({ width: 375, height: 760 });
+await page.waitForTimeout(300);
+const overflow = await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector('.iconbar').scrollWidth, document.querySelector('.appbar').scrollWidth]);
+check(overflow.every((w) => w <= 375), `en 375 px no hay desborde (${overflow.join(', ')})`);
+await page.getByRole('button', { name: 'Más herramientas' }).click();
+await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exact: true }).click();
+check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');
+await page.keyboard.press('Escape');
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.waitForTimeout(300);
+await page.keyboard.press('Home');
 
 // --- #15: nombres de redes temporales ---
 const names = () => page.locator('.net-name text').allTextContents();
@@ -88,7 +118,8 @@ check((await flags()) === before + 1, 'al recargar se recupera el trabajo sin gu
 check((await page.locator('.filename').textContent()) === 'Bode RLC.asc •', 'con su nombre y marcado como modificado');
 await page.keyboard.press('Control+z');
 check((await flags()) === before, 'y se puede deshacer lo anterior a la recarga');
-await page.getByRole('menubar').getByRole('menuitem', { name: 'Archivo', exact: true }).click();
+await page.getByRole('button', { name: 'Menú', exact: true }).click();
+await page.getByRole('menu').getByRole('menuitem', { name: 'Archivo', exact: true }).hover();
 await page.getByRole('menu').getByRole('menuitem', { name: 'Recientes' }).hover();
 const recents = await page.getByRole('menu', { name: 'Recientes' }).getByRole('menuitem').allTextContents();
 await page.keyboard.press('Escape');
@@ -138,8 +169,8 @@ check((await page.locator('.bias-tip').count()) === 0 && (await page.locator('.o
 
 // --- #13: elegir nodos y fuentes en el esquemático desde el menú de simulación ---
 await page.keyboard.press('Control+z'); // sacar la tierra agregada
-await page.getByRole('button', { name: 'Simulación…' }).click();
-await page.getByRole('button', { name: 'Ruido' }).click();
+await simType(page, 'Ruido');
+check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'la flecha de Simular abre el menú en el tipo elegido');
 await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
 check(await page.locator('.pick-banner').isVisible(), 'el diálogo se oculta y pide elegir una red');
 const outPick = await at(280, 160);
@@ -296,6 +327,10 @@ check(png.name === 'Bode RLC.png' && png.text.length > 1000, 'gráfico a PNG');
 
 await page.getByRole('button', { name: 'Recordar vista' }).click();
 check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'recordar la vista');
+await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
+check(await page.getByRole('button', { name: 'Recordar vista' }).isVisible(), 'deshacer revierte "Recordar vista" (la vista va dentro del .asc)');
+await page.getByRole('button', { name: 'Rehacer', exact: true }).click();
+check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'rehacer la vista recordada');
 for (let k = 0; k < 2; k++) await page.locator('.trace-chip .x').first().click();
 check((await page.locator('.trace-chip').count()) === 0, 'quitar las trazas');
 await page.getByRole('button', { name: 'Simular' }).click();
@@ -311,8 +346,25 @@ await page.locator('input[type=file][accept=".plt"]').setInputFiles({
 await page.locator('.pane').nth(1).waitFor();
 check((await page.locator('.pane').count()) === 2 && (await paneChips(1)).join() === 'V(n002)', `importar un .plt de LTspice aplica sus paneles (${await paneChips(0)} | ${await paneChips(1)})`);
 await page.getByRole('button', { name: 'Compartir' }).click();
-check((await page.locator('.modal input[aria-label="Link"]').inputValue()).includes('&v='), 'el link para compartir incluye la vista');
+const viewLink = await page.locator('.modal input[aria-label="Link"]').inputValue();
+check(!viewLink.includes('&v='), 'el link ya no lleva la vista aparte (va dentro del .asc)');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
+{
+  // #26: el link (o el .asc) abierto en otro navegador trae la vista y se aplica al simular
+  const other = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await skipWelcome(other);
+  const op = await other.newPage();
+  watch(op);
+  await op.goto(viewLink);
+  await op.getByText('Listo').waitFor({ timeout: 30000 });
+  await op.locator('svg.editor .sym').first().waitFor();
+  check((await op.locator('svg.editor text', { hasText: '.plot ' }).count()) === 0, 'el comentario ;.plot no se dibuja');
+  await op.getByRole('button', { name: 'Simular' }).click();
+  await op.locator('.pane').nth(1).waitFor({ timeout: 30000 });
+  const chips = (i) => op.locator('.pane').nth(i).locator('.trace-chip .name').allTextContents();
+  check((await op.locator('.pane').count()) === 2 && (await chips(1)).join() === 'V(n002)', `en otro navegador, el link trae la vista (${await chips(0)} | ${await chips(1)})`);
+  await other.close();
+}
 
 const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar esquemático a SVG'));
 check(svgOut.name === 'Bode RLC.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
@@ -324,8 +376,7 @@ check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
 await page.getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // .pz en el plano s
-await page.getByRole('button', { name: 'Simulación…' }).click();
-await page.getByRole('button', { name: /Polos y ceros/ }).click();
+await simType(page, 'Polos y ceros');
 const pzField = (label) => page.locator('.field', { hasText: label }).locator('input');
 await pzField('Entrada +').fill('N001');
 await pzField('Entrada −').fill('0');
@@ -404,8 +455,30 @@ await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
 
 // --- #4: interfaz ---
 await page.setViewportSize({ width: 1280, height: 800 });
-await page.getByRole('button', { name: 'Cerrar resultados' }).click();
-check((await page.locator('.results-panel').count()) === 0, 'cerrar resultados vuelve a la edición');
+// #36: los resultados no se cierran, se colapsan y se vuelven a mostrar intactos
+const resultsState = async () =>
+  JSON.stringify({
+    plot: await page.getByRole('combobox', { name: 'Plot' }).inputValue(),
+    vista: await page.getByRole('combobox', { name: 'Vista' }).inputValue(),
+    trazas: await page.locator('.trace-chip .name').allTextContents(),
+    paneles: await page.locator('.pane').count(),
+  });
+const shownBefore = await resultsState();
+check((await page.getByRole('button', { name: 'Cerrar resultados' }).count()) === 0, 'no hay botón para cerrar (descartar) los resultados');
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+check(
+  !(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()),
+  'ocultar resultados colapsa el panel y deja la pestaña para mostrarlos',
+);
+check((await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).getAttribute('aria-pressed')) === 'false', 'el botón Panel de resultados de la barra queda sin marcar');
+await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).click();
+await page.locator('.results-panel').waitFor();
+check((await resultsState()) === shownBefore, `al mostrarlos de nuevo, los resultados siguen intactos (${shownBefore})`);
+await menu(page, 'Ver', 'Panel de resultados');
+check(!(await page.locator('.results-panel').isVisible()), 'Ver › Panel de resultados también los colapsa');
+await page.getByRole('button', { name: 'Mostrar resultados' }).click();
+check((await resultsState()) === shownBefore, 'y la pestaña del borde los vuelve a mostrar');
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
 await page.keyboard.press('?');
 check(await page.getByRole('dialog', { name: 'Atajos de teclado' }).isVisible(), '"?" muestra los atajos');
 await page.keyboard.press('Escape');
@@ -427,6 +500,8 @@ await page.keyboard.press('Control+c');
 const dest = await at(320, 160);
 await page.mouse.move(dest.x, dest.y);
 await page.keyboard.press('Control+v');
+// con los resultados colapsados (no descartados) el pegado puede tardar un poco más en dibujarse
+await page.waitForFunction((n) => document.querySelectorAll('svg.editor .symbols .sym').length === n, nSyms + 1, { timeout: 3000 }).catch(() => {});
 check((await syms()) === nSyms + 1, 'Ctrl+C / Ctrl+V pega una copia');
 check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'la copia recibe un nombre nuevo (R2)');
 await page.keyboard.press('Control+a');
@@ -536,7 +611,7 @@ const opRows = await page.locator('.result-table tbody tr').allTextContents();
 check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
 await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
 check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
-await page.getByRole('button', { name: 'Cerrar resultados' }).click();
+await page.getByRole('button', { name: 'Ocultar resultados' }).click();
 
 // --- #16-#20: Estudio (barrido + medición + tolerancias, ver código) ---
 await openExample(page, 'Filtro RC.asc');
@@ -570,7 +645,8 @@ const studyRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(studyRows.length === 3 && /R1=1k.*2\.19\d*m/.test(studyRows[1]), `simula el estudio (${studyRows.join(' | ')})`);
 // reabrir: las tarjetas se reconstruyen desde las directivas; agregar tolerancias Monte Carlo
 await page.keyboard.press('Alt+e');
-check((await page.locator('.study-card').count()) === 2 && (await page.getByLabel('Valores').inputValue()) === '500 1k 2k', 'al reabrir, las tarjetas se reconstruyen');
+// (la tarjeta de simulación del .tran, el barrido y la medición)
+check((await page.locator('.study-card').count()) === 3 && (await page.getByLabel('Valores').inputValue()) === '500 1k 2k', 'al reabrir, las tarjetas se reconstruyen');
 await page.getByLabel('Activar Barrido de R1').uncheck();
 await page.getByRole('button', { name: '+ Tolerancias' }).click();
 await page.getByRole('button', { name: 'Todos los capacitores 10 %' }).click();
@@ -596,6 +672,47 @@ await page.getByLabel('Código del estudio').fill(code2);
 await page.getByRole('button', { name: 'Aplicar código' }).click();
 await page.keyboard.press('Alt+e');
 check((await page.getByLabel('Valores').inputValue()) === '1k 3k' && (await page.getByLabel('Activar Barrido de R1').isChecked()), 'el código editado a mano vuelve a ser tarjetas');
+await page.keyboard.press('Escape');
+
+// --- #25: simulaciones y gráfico desde el Estudio (.tran y .ac, barrer R1, f −3 dB, dos paneles) ---
+await openExample(page, 'Filtro RC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.keyboard.press('Alt+e');
+await page.getByRole('button', { name: '+ Simulación' }).click();
+check((await page.locator('.study-line', { hasText: '.ac dec 100 1 1meg' }).count()) === 1, 'agregar un .ac junto al .tran');
+check(await page.getByText('cada una corre .tran, .ac').isVisible(), 'el resumen muestra qué análisis corren');
+await page.getByRole('button', { name: '+ Barrido' }).click();
+await page.locator('.study-card').last().getByLabel('Componente', { exact: true }).fill('R1');
+await page.locator('.study-card').last().getByLabel('Valores').fill('1k 2k');
+await page.getByRole('button', { name: '+ Medición' }).click();
+await page.locator('.study-card').last().getByLabel('Análisis de la medición').selectOption('ac');
+await page.locator('.study-card').last().getByLabel('Qué medir').selectOption('f3db');
+await page.locator('.study-card').last().getByLabel('Señal', { exact: true }).fill('V(out)');
+await page.getByRole('button', { name: '+ Gráfico' }).click();
+await page.getByRole('button', { name: '+ Panel de Transitorio' }).click();
+await page.getByRole('button', { name: '+ Señal', exact: true }).click();
+await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
+await page.getByLabel('Análisis del gráfico').selectOption('ac');
+await page.getByRole('button', { name: '+ Panel de AC (Bode)' }).click();
+await page.getByRole('button', { name: '+ Señal', exact: true }).click();
+await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+check((await page.locator('svg.editor .texts .directive', { hasText: '.tran 20m' }).count()) === 1, 'el .tran sigue siendo la directiva (la que corre LTspice)');
+check((await page.locator('svg.editor .texts .ngspice', { hasText: 'análisis adicionales' }).count()) === 1, 'el .ac queda como comentario que sólo corre TurboSpice');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+const studyPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
+check(studyPlots.some((p) => /^tran/.test(p)) && studyPlots.some((p) => /^ac/.test(p)), `corren el .tran y el .ac con el barrido (${studyPlots.join(', ')})`);
+for (const p of [studyPlots.find((x) => /^tran/.test(x)), studyPlots.find((x) => /^ac/.test(x))]) {
+  await page.getByRole('combobox', { name: 'Plot' }).selectOption(p);
+  check((await paneChips(0)).join() === 'V(out)' && (await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible()), `${p}: aparece el gráfico definido en el Estudio`);
+}
+await page.getByRole('button', { name: /^Mediciones/ }).click();
+const fcRows = await page.locator('.meas-table tbody tr').allTextContents();
+check(fcRows.length === 2, `la medición de f −3 dB, una por corrida (${fcRows.join(' | ')})`);
+// al reabrir se reconstruyen las tarjetas de simulación y de gráfico
+await page.keyboard.press('Alt+e');
+check((await page.locator('.study-card', { hasText: 'Simulación 2: AC (Bode)' }).count()) === 1 && (await page.locator('.study-card', { hasText: 'Gráfico' }).count()) === 1, 'al reabrir, vuelven las tarjetas de simulación y de gráfico');
 await page.keyboard.press('Escape');
 
 // --- #23: Estudio con bloques ---

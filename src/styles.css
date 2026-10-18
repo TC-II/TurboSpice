@@ -164,7 +164,10 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 
 svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg); touch-action: none; user-select: none; cursor: default; }
 svg.editor.tool-grabbing { cursor: grabbing; }
-svg.editor.tool-wire, svg.editor.tool-place, svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
+svg.editor.tool-place, svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
+/* cable: la cruz punteada en el punto de la grilla reemplaza al cursor */
+svg.editor.tool-wire { cursor: none; }
+.wire-cross line { stroke: var(--fg-muted); stroke-width: 1; stroke-dasharray: 3 5; opacity: 0.45; vector-effect: non-scaling-stroke; pointer-events: none; }
 svg.editor.tool-delete { cursor: not-allowed; }
 svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
 .grid-dot { fill: var(--sch-grid); }

@@ -142,6 +142,7 @@ export function SchematicEditor(props: Props) {
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   const [labelNet, setLabelNet] = useState<string | undefined>();
+  const [pointerIn, setPointerIn] = useState(false);
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
@@ -380,6 +381,7 @@ export function SchematicEditor(props: Props) {
     }
     const p = toDoc(e);
     setCursor(p);
+    if (!pointerIn) setPointerIn(true);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
     if (tool.kind === 'probe') setHoverNet(target?.net);
     if (tool.kind === 'pick') {
@@ -478,7 +480,11 @@ export function SchematicEditor(props: Props) {
     <>
     <svg
       ref={svgRef}
-      onPointerLeave={() => setTip(null)}
+      onPointerLeave={() => {
+        setTip(null);
+        setPointerIn(false);
+      }}
+      onPointerEnter={() => setPointerIn(true)}
       className={`editor tool-${cursorClass}`}
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       onWheel={onWheel}
@@ -516,6 +522,13 @@ export function SchematicEditor(props: Props) {
           width={Math.abs(boxEnd.x - drag.start.x)}
           height={Math.abs(boxEnd.y - drag.start.y)}
         />
+      )}
+      {tool.kind === 'wire' && pointerIn && (
+        // cruz de todo el lienzo en el punto de la grilla (reemplaza al cursor del sistema)
+        <g className="wire-cross">
+          <line x1={vb.x} y1={g.y} x2={vb.x + vb.w} y2={g.y} />
+          <line x1={g.x} y1={vb.y} x2={g.x} y2={vb.y + vb.h} />
+        </g>
       )}
       {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>

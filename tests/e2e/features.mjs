@@ -323,6 +323,17 @@ check((await page.locator('.smith polyline.trace').count()) === 2, 'carta de Smi
 await page.screenshot({ path: `${OUT}/smith.png` });
 await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
 
+// --- #33: cruz del cable en el punto de la grilla ---
+await page.keyboard.press('Escape');
+await page.keyboard.press('w');
+const cp = await at(100, 37); // fuera de la grilla: la cruz va a (96, 32)
+await page.mouse.move(cp.x, cp.y);
+const cross = await page.locator('.wire-cross line').evaluateAll((ls) => ls.map((l) => [l.getAttribute('y1'), l.getAttribute('x1')]));
+check(cross.length === 2 && cross[0][0] === '32' && cross[1][1] === '96', `cable: cruz de todo el lienzo en el punto de la grilla (${JSON.stringify(cross)})`);
+check((await page.locator('svg.editor').evaluate((e) => getComputedStyle(e).cursor)) === 'none', 'sin el cursor del sistema');
+await page.keyboard.press('Escape');
+check((await page.locator('.wire-cross').count()) === 0, 'sólo con la herramienta Cable');
+
 // --- #4: interfaz ---
 await page.setViewportSize({ width: 1280, height: 800 });
 await page.getByRole('button', { name: 'Cerrar resultados' }).click();

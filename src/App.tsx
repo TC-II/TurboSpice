@@ -7,6 +7,7 @@ import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
+import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasParams, elementBias, netBias } from './sim/bias.ts';
 import { symbolBox } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
@@ -549,6 +550,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     }
     return out;
   }, [showOp, bias, sim, doc, conn, lib]);
+
+  // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
+  const arrows = useMemo(() => {
+    if (!sim || sim.doc !== doc || !(showOp || tool.kind === 'probe')) return undefined;
+    return currentArrows(doc, lib, sim.built.lt.elements);
+  }, [sim, doc, lib, showOp, tool.kind]);
 
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p), [sim]);
 
@@ -1125,6 +1132,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
             describe={describe}
             annotations={annotations}
+            currentArrows={arrows}
             pickValue={pickValue}
             onPicked={endPick}
           />

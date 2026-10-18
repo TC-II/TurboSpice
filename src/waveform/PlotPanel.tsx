@@ -671,16 +671,17 @@ function PaneView(props: {
       chart.current = null;
       u.destroy();
     };
-    // el gráfico se recrea sólo si cambian los datos; xRange y los cursores se aplican aparte
+    // el gráfico se recrea sólo si cambian los datos, la grilla o el modo zoom (Z, el recuadro en X e Y
+    // se configura al crearlo); xRange y los cursores se aplican aparte
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, showGrid]);
+  }, [data, showGrid, zoomMode]);
 
   useEffect(() => {
     const u = chart.current;
     if (!u) return;
-    u.cursor.drag!.x = zoomMode || !cursorMode;
-    u.cursor.drag!.y = zoomMode;
-    u.cursor.drag!.setScale = !zoomMode && !cursorMode;
+    if (zoomMode) return;
+    u.cursor.drag!.x = !cursorMode;
+    u.cursor.drag!.setScale = !cursorMode;
     if (!cursorMode) u.over.style.cursor = '';
     u.redraw(false);
   }, [cursorMode, zoomMode]);

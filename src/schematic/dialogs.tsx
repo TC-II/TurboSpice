@@ -325,7 +325,6 @@ export function FlagDialog({ initial, onApply, onClose }: {
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
         <div className="buttons">
-          <button type="button" onClick={() => onApply('0')}>Tierra (0)</button>
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="submit" className="primary">Aceptar</button>
         </div>

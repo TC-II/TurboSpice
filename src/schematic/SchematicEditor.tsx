@@ -101,6 +101,8 @@ interface Props {
   /** Ctrl+G: grilla; Ctrl+U: marcas de pines sueltos */
   showGrid?: boolean;
   showLoose?: boolean;
+  /** elemento bajo el mouse (con la herramienta de selección) y punto de la grilla más cercano; null al salir */
+  onHover?(h: { ref: ItemRef | null; at: Point } | null): void;
 }
 
 interface View {
@@ -199,7 +201,8 @@ function shapeAt(doc: AscDoc, p: Point, tol: number): number {
 
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
-  const { showGrid = true, showLoose = true } = props;
+  const { showGrid = true, showLoose = true, onHover } = props;
+  const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
@@ -634,6 +637,15 @@ export function SchematicEditor(props: Props) {
     }
     const p = toDoc(e);
     setCursor(p);
+    if (onHover && !drag) {
+      const ref = tool.kind === 'select' ? hitTest(doc, p, lib, tol) : null;
+      const at = snapPoint(p);
+      const k = `${ref ? `${ref.kind}${ref.index}` : ''}@${at.x},${at.y}`;
+      if (k !== lastHover.current) {
+        lastHover.current = k;
+        onHover({ ref, at });
+      }
+    }
     const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
@@ -832,7 +844,6 @@ export function SchematicEditor(props: Props) {
     <>
     <svg
       ref={svgRef}
-      onPointerLeave={() => setTip(null)}
       className={`editor tool-${cursorClass}`}
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       onWheel={onWheel}
@@ -840,6 +851,11 @@ export function SchematicEditor(props: Props) {
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
+      onPointerLeave={() => {
+        setTip(null);
+        lastHover.current = '';
+        onHover?.(null);
+      }}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
       style={{ ['--px' as string]: `${1 / view.scale}` }}

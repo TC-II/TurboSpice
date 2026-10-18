@@ -79,6 +79,7 @@ import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton
 import { drive, useGoogle } from './cloud/google.ts';
 import type { DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
+import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -318,6 +319,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, []);
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
+  // elemento bajo el mouse: la barra de estado muestra sus propiedades
+  const [hover, setHover] = useState<{ ref: ItemRef | null; at: Point } | null>(null);
   const [showLoose, setShowLoose] = useState(true);
   // corridas de un .step ocultas (Shift+S)
   const [hiddenRuns, setHiddenRuns] = useState<Set<string>>(new Set());
@@ -1662,6 +1665,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             onPicked={endPick}
             showGrid={showGrid}
             showLoose={showLoose}
+            onHover={setHover}
           />
           {picking && (
             <div className="pick-banner">
@@ -1681,7 +1685,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
               {message}
             </div>
           )}
-          <div className="hint-bar">{toolHint(tool)}</div>
+          <div className="hint-bar">{tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool)}</div>
         </div>
 
         {sim && (
@@ -2012,7 +2016,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 function toolHint(t: Tool): string {
   switch (t.kind) {
     case 'select':
-      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables; en un cable o codo: en línea recta) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o Espacio+arrastrar: desplazar · Espacio: ajustar';
+      return '';
     case 'wire':
       return t.start ? 'Click para fijar el tramo (Ctrl: en línea recta) · click derecho o Esc para terminar' : 'Click para empezar el cable';
     case 'place':

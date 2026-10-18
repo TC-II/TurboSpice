@@ -289,6 +289,7 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .sim-preview code { font: 14px var(--mono); color: var(--fg); }
 .hint.warn { color: var(--err); }
 .hint.ok { color: var(--ok); }
+.about h3 { display: flex; align-items: center; gap: 10px; font-size: 18px; margin: 0 0 8px; }
 .controldlg { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }
 .control-editor { display: flex; flex-direction: column; gap: 4px; }
 .control-editor textarea { min-height: 280px; resize: vertical; }

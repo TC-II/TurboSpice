@@ -17,7 +17,7 @@ import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.t
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
@@ -96,7 +96,7 @@ type Dialog =
   | { kind: 'userfiles' }
   | { kind: 'study' }
   | { kind: 'runs' }
-  | { kind: 'welcome' }
+  | { kind: 'about' }
   | { kind: 'drive' };
 
 /** Resultados de una simulación */
@@ -403,7 +403,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       setRecent(await loadRecent());
       const session = await loadSession();
       const sessionDirty = !!session && session.past.length !== session.savedVersion;
-      if (!lsGet('turbospice.welcomed') && !/[#&]c=/.test(location.hash)) setDialog({ kind: 'welcome' });
       if (await openShared()) {
         // el trabajo sin guardar anterior queda en recientes
         if (session && sessionDirty) remember(parseAsc(session.present), { name: session.name, encoding: session.encoding }, true);
@@ -1415,7 +1414,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: 'Ayuda',
       items: [
         { label: 'Atajos de teclado', shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
-        { label: 'Bienvenida y ejemplos', onClick: () => setDialog({ kind: 'welcome' }) },
+        { label: 'Acerca de TurboSpice', onClick: () => setDialog({ kind: 'about' }) },
         'sep',
         { label: 'Compatibilidad con LTspice', onClick: () => window.open(`${REPO}/blob/main/docs/compatibilidad-ltspice.md`, '_blank', 'noopener') },
         { label: 'Reportar un problema', onClick: () => window.open(`${REPO}/issues`, '_blank', 'noopener') },
@@ -1978,21 +1977,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog?.kind === 'welcome' && (
-        <WelcomeDialog
-          examples={EXAMPLES}
-          onClose={() => {
-            lsSet('turbospice.welcomed', '1');
-            setDialog(null);
-          }}
-          onHelp={() => setDialog({ kind: 'help' })}
-          onExample={(x) => {
-            lsSet('turbospice.welcomed', '1');
-            setDialog(null);
-            doExample(x);
-          }}
-        />
-      )}
+      {dialog?.kind === 'about' && <AboutDialog repo={REPO} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'drive' && (
         <DriveDialog
           currentId={file.driveId}

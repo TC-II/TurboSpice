@@ -1,5 +1,6 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Logo } from '../ui/Logo.tsx';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
 import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
@@ -508,35 +509,27 @@ export function RunsDialog({ runs, hidden, onApply, onClose }: {
   );
 }
 
-export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
-  examples: string[];
-  onExample(name: string): void;
-  onClose(): void;
-  onHelp(): void;
-}) {
+export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }) {
   return (
-    <Modal title="Bienvenido a TurboSpice" onClose={onClose} wide>
-      <div className="welcome">
+    <Modal title="Acerca de TurboSpice" onClose={onClose}>
+      <div className="welcome about">
+        <h3><Logo size={28} /> <span><span className="logo">Turbo</span>Spice</span></h3>
         <p>
           Un simulador de circuitos tipo LTspice que corre entero en tu navegador (ngspice en WebAssembly): nada se sube a
           ningún servidor. Abre y guarda <code>.asc</code> de LTspice, así que podés ir y volver entre los dos.
         </p>
         <ul>
-          <li>Dibujá con los mismos atajos de LTspice (<kbd>P</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
-          <li>Elegí el tipo de análisis en la flecha de <strong>Simular</strong> y apretá <strong>Simular</strong> (<kbd>Alt+R</kbd>).</li>
-          <li>Medí con un click en un cable (tensión) o en un componente (corriente); pasá el mouse para ver el punto de operación.</li>
-          <li>Compartí un circuito con un link; el trabajo se autoguarda en el navegador.</li>
+          <li>
+            <a href={repo} target="_blank" rel="noopener noreferrer">Código fuente y reporte de problemas</a>
+          </li>
+          <li>
+            <a href="privacidad.html" target="_blank" rel="noopener noreferrer">Política de privacidad</a>
+          </li>
+          <li>Simulación con <strong>ngspice</strong>; formato de esquemáticos <code>.asc</code> de LTspice.</li>
         </ul>
-        <h3>Empezá con un ejemplo</h3>
-        <div className="welcome-examples">
-          {examples.map((x) => (
-            <button key={x} onClick={() => onExample(x)}>{x.replace(/\.asc$/, '')}</button>
-          ))}
-        </div>
       </div>
       <div className="buttons">
-        <button onClick={onHelp}>Ver atajos</button>
-        <button className="primary" onClick={onClose}>Empezar</button>
+        <button className="primary" onClick={onClose}>Cerrar</button>
       </div>
     </Modal>
   );

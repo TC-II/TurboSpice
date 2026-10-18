@@ -16,6 +16,33 @@ export function valueAt(xs: ArrayLike<number>, ys: ArrayLike<number | null>, x: 
   return xs[hi] === xs[lo] ? y0 : y0 + ((y1 - y0) * (x - xs[lo])) / (xs[hi] - xs[lo]);
 }
 
+/** Índice del punto de xs (creciente) más cercano a x */
+export function nearestIndex(xs: ArrayLike<number>, x: number): number {
+  const n = xs.length;
+  if (n < 2 || x <= xs[0]) return 0;
+  if (x >= xs[n - 1]) return n - 1;
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (xs[mid] <= x) lo = mid;
+    else hi = mid;
+  }
+  return x - xs[lo] <= xs[hi] - x ? lo : hi;
+}
+
+/** x del punto simulado que está n puntos a la derecha (n > 0) o a la izquierda (n < 0) de x */
+export function stepPoint(xs: ArrayLike<number>, x: number, n: number): number {
+  const len = xs.length;
+  if (!len || !n) return x;
+  let k = nearestIndex(xs, x);
+  // si x cae entre dos puntos, el primer paso lleva al vecino en esa dirección
+  if (n > 0 && xs[k] > x) n--;
+  if (n < 0 && xs[k] < x) n++;
+  k = Math.min(len - 1, Math.max(0, k + n));
+  return xs[k];
+}
+
 export interface Stats {
   min: number;
   max: number;

@@ -6,8 +6,8 @@ import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
-import { bandwidth3dB, stats, toCsv, valueAt } from './measure.ts';
-import { si } from './series.ts';
+import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
+import { scaleOf, si } from './series.ts';
 import { sameExpr, traceColor, type Pane, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 
@@ -35,10 +35,18 @@ interface Props {
 }
 
 type Range = [number, number];
+type CursorKey = 'a' | 'b';
 interface Cursors {
   a?: number;
   b?: number;
+  /** traza (etiqueta de la curva) que sigue cada cursor */
+  ta?: string;
+  tb?: string;
+  /** último cursor movido: el que mueven las flechas */
+  sel?: CursorKey;
 }
+/** distancia (px) a la línea de un cursor para tomarlo y arrastrarlo */
+const GRAB = 6;
 
 const MAX_ROWS = 16;
 
@@ -49,6 +57,9 @@ const safeRange: uPlot.Range.Function = (_u, min, max) => {
   return uPlot.rangeNum(min, max, 0.1, true);
 };
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
+const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName === 'frequency' ? 'Hz' : '');
+/** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
+const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
 export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
@@ -67,11 +78,19 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     [panes, plot, runs, labels, resolver, mode],
   );
 
-  // Otro plot: volver al rango completo y sin cursores
+  // Otro tipo de análisis (otro eje X): volver al rango completo y sin cursores. Al volver
+  // a simular el mismo análisis se mantienen el zoom y los cursores.
+  const scale = scaleOf(plot);
+  const scaleName = scale?.name;
   useEffect(() => {
     setXRange(null);
     setCursors({});
-  }, [plot]);
+  }, [scaleName]);
+  useEffect(() => {
+    const xs = scale?.real;
+    if (!xs?.length) return;
+    setXRange((r) => (r && (r[1] < xs[0] || r[0] > xs[xs.length - 1]) ? null : r));
+  }, [scale]);
   useEffect(() => {
     if (active >= panes.length) setActive(Math.max(0, panes.length - 1));
   }, [panes.length, active, setActive]);
@@ -130,7 +149,11 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           <button type="submit">Agregar</button>
         </form>
         <button onClick={() => setPanes([...panes, { traces: [] }])} title="Agregar un panel (las trazas nuevas van al panel activo)">+ Panel</button>
-        <button className={cursorMode ? 'active' : ''} onClick={() => setCursorMode((v) => !v)} title="Cursores: click = cursor A, Shift+click o click derecho = cursor B">
+        <button
+          className={cursorMode ? 'active' : ''}
+          onClick={() => setCursorMode((v) => !v)}
+          title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto)"
+        >
           Cursores
         </button>
         <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title="Máximo, mínimo, pico a pico, promedio, eficaz y frecuencia en el rango visible">
@@ -196,8 +219,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       </div>
       {(cursorMode || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
-          {cursorMode && (cursors.a !== undefined || cursors.b !== undefined) && <CursorTable data={data} cursors={cursors} />}
-          {cursorMode && cursors.a === undefined && <p className="hint pad-x">Click en el gráfico para ubicar el cursor A; Shift+click o click derecho para el B.</p>}
+          {cursorMode && (cursors.a !== undefined || cursors.b !== undefined) && <CursorTable data={data} cursors={cursors} setCursors={setCursors} />}
+          {cursorMode && cursors.a === undefined && cursors.b === undefined && (
+            <p className="hint pad-x">Click en el gráfico para ubicar el cursor A; Shift+click o click derecho para el B. Arrastrá las líneas para moverlas.</p>
+          )}
           {showStats && allVisible.length > 0 && <StatsTable data={data} range={range} />}
         </div>
       )}
@@ -223,11 +248,14 @@ function PaneView(props: {
   onHoverExpr?(e: string | undefined): void;
   register(u: uPlot | null): void;
 }) {
-  const { index, pane, data, xRange, onZoom, cursorMode, cursors, onCursor } = props;
+  const { index, pane, data, xRange, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<uPlot | null>(null);
   const cursorsRef = useRef(cursors);
   cursorsRef.current = cursors;
+  // lo último de las props para los manejadores del gráfico, que vive mientras no cambien los datos
+  const live = useRef(props);
+  live.current = props;
   const programmatic = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -239,9 +267,11 @@ function PaneView(props: {
     const muted = css.getPropertyValue('--fg-muted').trim();
     const grid = css.getPropertyValue('--grid').trim();
     const fg = css.getPropertyValue('--fg').trim();
+    const bg = css.getPropertyValue('--bg').trim() || '#fff';
     const ticks = (_u: uPlot, t: number[]) => t.map((x) => si(x, 3));
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
+    const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
     let raf = 0;
     const opts: uPlot.Options = {
       width: Math.max(100, el.clientWidth),
@@ -279,8 +309,16 @@ function PaneView(props: {
       ],
       cursor: {
         sync: { key: 'turbospice' },
-        drag: { x: !cursorMode, y: false, setScale: !cursorMode },
+        // con los cursores activos no hay zoom por arrastre (se cambia en vivo, sin recrear el gráfico)
+        drag: { x: !live.current.cursorMode, y: false, setScale: !live.current.cursorMode },
         points: { size: 6 },
+        bind: {
+          // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
+          dblclick: (_u, _t, handler) => (e) => {
+            if (e.button === 0 && !live.current.cursorMode) handler(e);
+            return null;
+          },
+        },
       },
       hooks: {
         setCursor: [
@@ -295,32 +333,73 @@ function PaneView(props: {
             const { min, max } = u.scales.x;
             if (min != null && max != null) {
               const full = min <= data.x[0] && max >= data.x[data.x.length - 1];
-              onZoom(full ? null : [min, max]);
+              live.current.onZoom(full ? null : [min, max]);
             }
           },
         ],
         draw: [
           (u) => {
+            if (!live.current.cursorMode) return;
             const c = cursorsRef.current;
             const ctx = u.ctx;
-            for (const [name, v] of [
-              ['A', c.a],
-              ['B', c.b],
+            const dpr = devicePixelRatio;
+            const { left, top, width, height } = u.bbox;
+            for (const [name, v, tr] of [
+              ['A', c.a, c.ta],
+              ['B', c.b, c.tb],
             ] as const) {
               if (v === undefined) continue;
               const px = u.valToPos(v, 'x', true);
-              if (px < u.bbox.left || px > u.bbox.left + u.bbox.width) continue;
+              if (!(px >= left && px <= left + width)) continue;
               ctx.save();
               ctx.strokeStyle = fg;
               ctx.setLineDash([5, 4]);
-              ctx.lineWidth = devicePixelRatio;
+              ctx.lineWidth = dpr;
               ctx.beginPath();
-              ctx.moveTo(px, u.bbox.top);
-              ctx.lineTo(px, u.bbox.top + u.bbox.height);
+              ctx.moveTo(px, top);
+              ctx.lineTo(px, top + height);
               ctx.stroke();
-              ctx.fillStyle = fg;
-              ctx.font = `${12 * devicePixelRatio}px system-ui`;
-              ctx.fillText(name, px + 4 * devicePixelRatio, u.bbox.top + 14 * devicePixelRatio);
+              ctx.font = `${12 * dpr}px system-ui`;
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'alphabetic';
+              // lectura junto al cursor: x y, si sigue una traza de este panel, su valor
+              const lines = [`${name}  ${fmt(v, xUnit(data.xName))}`];
+              const curve = tr !== undefined ? data.curves.find((k) => k.label === tr && !k.hidden) : undefined;
+              let boxY = top + 4 * dpr;
+              if (curve) {
+                const y = valueAt(data.x, curve.y, v);
+                const ph = phaseOf(data, curve);
+                lines.push(`${curve.label}: ${fmt(y, unitOf(curve))}${ph ? `  ${fmt(valueAt(data.x, ph.y, v), '°')}` : ''}`);
+                const py = u.valToPos(y, curve.axis, true);
+                if (Number.isFinite(py) && py >= top && py <= top + height) {
+                  ctx.strokeStyle = curve.color;
+                  ctx.setLineDash([2, 3]);
+                  ctx.beginPath();
+                  ctx.moveTo(left, py);
+                  ctx.lineTo(left + width, py);
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+                  ctx.fillStyle = curve.color;
+                  ctx.beginPath();
+                  ctx.arc(px, py, 4 * dpr, 0, 2 * Math.PI);
+                  ctx.fill();
+                  boxY = Math.min(Math.max(top + 4 * dpr, py - 40 * dpr), top + height - 40 * dpr);
+                }
+              } else if (tr !== undefined || index !== 0) {
+                // sin traza en este panel: la lectura de x va sólo en el primero
+                lines.length = 0;
+              }
+              if (lines.length) {
+                const lh = 15 * dpr;
+                const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 8 * dpr;
+                const bx = px + w + 6 * dpr > left + width ? px - w - 4 * dpr : px + 4 * dpr;
+                ctx.globalAlpha = 0.85;
+                ctx.fillStyle = bg;
+                ctx.fillRect(bx, boxY, w, lh * lines.length + 4 * dpr);
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = fg;
+                lines.forEach((l, k) => ctx.fillText(l, bx + 4 * dpr, boxY + lh * (k + 1) - 2 * dpr));
+              }
               ctx.restore();
             }
           },
@@ -331,18 +410,52 @@ function PaneView(props: {
     const ys = data.curves.map((c) => Array.from(c.y, (v) => (Number.isFinite(v) ? v : null)));
     const u = new uPlot(opts, [data.x, ...ys] as uPlot.AlignedData, el);
     chart.current = u;
-    props.register(u);
-    const over = u.over;
-    const place = (e: MouseEvent, which: 'a' | 'b') => {
-      const x = u.posToVal(e.offsetX, 'x');
-      onCursor({ [which]: x });
+    live.current.register(u);
+    const { over, root } = u;
+
+    // Cursores con eventos de puntero (no 'click'): se ubican al apretar, se arrastran y
+    // también se puede apretar sobre los ejes (se toma el borde del área del gráfico)
+    const posX = (e: PointerEvent) => {
+      const r = over.getBoundingClientRect();
+      return Math.min(Math.max(e.clientX - r.left, 0), r.width);
     };
-    const click = (e: MouseEvent) => cursorMode && place(e, e.shiftKey ? 'b' : 'a');
-    const context = (e: MouseEvent) => {
-      if (!cursorMode) return;
+    const valX = (e: PointerEvent) => {
+      const x = u.posToVal(posX(e), 'x');
+      return e.altKey ? data.x[nearestIndex(data.x, x)] : x;
+    };
+    const grabbed = (e: PointerEvent): CursorKey | undefined => {
+      const c = cursorsRef.current;
+      const px = posX(e);
+      let best: CursorKey | undefined;
+      let dist = GRAB;
+      for (const k of ['a', 'b'] as const) {
+        const v = c[k];
+        if (v === undefined) continue;
+        const d = Math.abs(u.valToPos(v, 'x') - px);
+        if (d <= dist) [best, dist] = [k, d];
+      }
+      return best;
+    };
+    let dragging: CursorKey | null = null;
+    const down = (e: PointerEvent) => {
+      if (!live.current.cursorMode || (e.button !== 0 && e.button !== 2)) return;
       e.preventDefault();
-      place(e, 'b');
+      el.focus({ preventScroll: true });
+      const grab = grabbed(e);
+      dragging = grab ?? (e.button === 2 || e.shiftKey ? 'b' : 'a');
+      root.setPointerCapture(e.pointerId);
+      live.current.onCursor(grab ? { sel: grab } : { [dragging]: valX(e), sel: dragging });
     };
+    const move = (e: PointerEvent) => {
+      if (dragging) live.current.onCursor({ [dragging]: valX(e) });
+      else over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : '';
+    };
+    const up = (e: PointerEvent) => {
+      if (!dragging) return;
+      dragging = null;
+      if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
+    };
+    const context = (e: MouseEvent) => live.current.cursorMode && e.preventDefault();
     // rueda: zoom en X alrededor del cursor
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -356,26 +469,42 @@ function PaneView(props: {
       if (data.log) [lo, hi] = [10 ** lo, 10 ** hi];
       const x0 = data.x[0];
       const x1 = data.x[data.x.length - 1];
-      onZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
+      live.current.onZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     };
-    over.addEventListener('click', click);
-    over.addEventListener('contextmenu', context);
+    root.addEventListener('pointerdown', down);
+    root.addEventListener('pointermove', move);
+    root.addEventListener('pointerup', up);
+    root.addEventListener('pointercancel', up);
+    root.addEventListener('contextmenu', context);
     over.addEventListener('wheel', wheel, { passive: false });
     const ro = new ResizeObserver(() => u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) }));
     ro.observe(el);
+    const reg = live.current.register;
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      over.removeEventListener('click', click);
-      over.removeEventListener('contextmenu', context);
+      root.removeEventListener('pointerdown', down);
+      root.removeEventListener('pointermove', move);
+      root.removeEventListener('pointerup', up);
+      root.removeEventListener('pointercancel', up);
+      root.removeEventListener('contextmenu', context);
       over.removeEventListener('wheel', wheel);
-      props.register(null);
+      reg(null);
       chart.current = null;
       u.destroy();
     };
-    // xRange se aplica aparte para no recrear el gráfico en cada zoom
+    // el gráfico se recrea sólo si cambian los datos; xRange y los cursores se aplican aparte
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, cursorMode]);
+  }, [data]);
+
+  useEffect(() => {
+    const u = chart.current;
+    if (!u) return;
+    u.cursor.drag!.x = !cursorMode;
+    u.cursor.drag!.setScale = !cursorMode;
+    if (!cursorMode) u.over.style.cursor = '';
+    u.redraw(false);
+  }, [cursorMode]);
 
   useEffect(() => {
     const u = chart.current;
@@ -465,7 +594,20 @@ function PaneView(props: {
         )}
       </div>
       {data.curves.length ? (
-        <div className="pane-chart" ref={host} />
+        <div
+          className={`pane-chart${cursorMode ? ' cursor-mode' : ''}`}
+          ref={host}
+          tabIndex={cursorMode ? 0 : undefined}
+          onKeyDown={(e) => {
+            // flechas: el último cursor movido, punto simulado a punto (Shift: de a 10)
+            if (!cursorMode || (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight')) return;
+            const k = cursors.sel ?? (cursors.a !== undefined ? 'a' : 'b');
+            const v = cursors[k];
+            if (v === undefined) return;
+            e.preventDefault();
+            onCursor({ [k]: stepPoint(data.x, v, (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1)), sel: k });
+          }}
+        />
       ) : (
         <p className="empty pane-empty">
           {pane.traces.length ? 'Ninguna traza se puede graficar en este análisis.' : 'Panel vacío: medí con la punta de prueba, escribí una expresión o arrastrá una traza acá.'}
@@ -475,43 +617,71 @@ function PaneView(props: {
   );
 }
 
-function CursorTable({ data, cursors }: { data: PaneData[]; cursors: Cursors }) {
+function CursorTable({ data, cursors, setCursors }: { data: PaneData[]; cursors: Cursors; setCursors(f: (c: Cursors) => Cursors): void }) {
   const { a, b } = cursors;
   const dx = a !== undefined && b !== undefined ? b - a : NaN;
   const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
+  const labels = [...new Set(data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => c.label)))];
+  const xu = xUnit(data[0]?.xName);
+  const traceSelect = (k: 'ta' | 'tb', name: string) => (
+    <select value={cursors[k] ?? ''} aria-label={`Traza del cursor ${name}`} onChange={(e) => setCursors((c) => ({ ...c, [k]: e.target.value || undefined }))}>
+      <option value="">{name}: sin traza</option>
+      {labels.map((l) => (
+        <option key={l} value={l}>
+          {name}: {l}
+        </option>
+      ))}
+    </select>
+  );
   return (
-    <table className="scalars readout">
-      <thead>
-        <tr>
-          <th>Traza</th>
-          <th>A {a !== undefined && `(${fmt(a)})`}</th>
-          <th>B {b !== undefined && `(${fmt(b)})`}</th>
-          <th>B − A</th>
-          <th>pendiente</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map(({ d, c }, i) => {
-          const ya = a !== undefined ? valueAt(d.x, c.y, a) : NaN;
-          const yb = b !== undefined ? valueAt(d.x, c.y, b) : NaN;
-          return (
-            <tr key={i}>
-              <td style={{ color: c.color }}>{c.label}</td>
-              <td>{fmt(ya)}</td>
-              <td>{fmt(yb)}</td>
-              <td>{fmt(yb - ya)}</td>
-              <td>{fmt((yb - ya) / dx)}</td>
-            </tr>
-          );
-        })}
-        <tr className="dx">
-          <td>{data[0]?.xName}</td>
-          <td colSpan={2} />
-          <td>Δx = {fmt(dx)}</td>
-          <td>1/Δx = {fmt(1 / dx)}</td>
-        </tr>
-      </tbody>
-    </table>
+    <div className="cursor-readout">
+      <div className="cursor-tools">
+        {traceSelect('ta', 'A')}
+        {traceSelect('tb', 'B')}
+        <button disabled={a === undefined} onClick={() => setCursors((c) => ({ ...c, a: undefined, sel: 'b' }))}>
+          Borrar A
+        </button>
+        <button disabled={b === undefined} onClick={() => setCursors((c) => ({ ...c, b: undefined, sel: 'a' }))}>
+          Borrar B
+        </button>
+        <button onClick={() => setCursors((c) => ({ ...c, a: c.b, b: c.a, ta: c.tb, tb: c.ta }))} title="Intercambiar A y B">
+          A ⇄ B
+        </button>
+      </div>
+      <table className="scalars readout">
+        <thead>
+          <tr>
+            <th>Traza</th>
+            <th>A {a !== undefined && `(${fmt(a, xu)})`}</th>
+            <th>B {b !== undefined && `(${fmt(b, xu)})`}</th>
+            <th>B − A</th>
+            <th>pendiente</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ d, c }, i) => {
+            const ya = a !== undefined ? valueAt(d.x, c.y, a) : NaN;
+            const yb = b !== undefined ? valueAt(d.x, c.y, b) : NaN;
+            const followed = c.label === cursors.ta || c.label === cursors.tb;
+            return (
+              <tr key={i} className={followed ? 'followed' : undefined}>
+                <td style={{ color: c.color }}>{c.label}</td>
+                <td>{fmt(ya)}</td>
+                <td>{fmt(yb)}</td>
+                <td>{fmt(yb - ya)}</td>
+                <td>{fmt((yb - ya) / dx)}</td>
+              </tr>
+            );
+          })}
+          <tr className="dx">
+            <td>{data[0]?.xName}</td>
+            <td colSpan={2} />
+            <td>Δx = {fmt(dx, xu)}</td>
+            <td>1/Δx = {fmt(1 / dx, xu === 's' ? 'Hz' : '')}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   );
 }
 

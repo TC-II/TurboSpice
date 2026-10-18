@@ -1016,7 +1016,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     editor.current?.centerOn(symbolBox(s, lib.symbol(s.type), lib));
   };
   const scale = plot ? scaleOf(plot) : null;
-  const runs = sim && plot ? sameRuns(sim.result.plots, plot) : [];
+  // memoizadas: un arreglo nuevo en cada render recrearía los gráficos (y perdería clicks, #30)
+  const allRuns = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
+  const runs = useMemo(() => (overlay ? allRuns : plot ? [plot] : []), [overlay, allRuns, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
 
@@ -1190,10 +1192,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                       <option value="smith">Carta de Smith</option>
                     </select>
                   )}
-                  {runs.length > 1 && (
+                  {allRuns.length > 1 && (
                     <label className="check inline">
                       <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> Superponer las{' '}
-                      {runs.length} corridas
+                      {allRuns.length} corridas
                     </label>
                   )}
                   {scale && (
@@ -1252,7 +1254,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <PlotPanel
                   handle={plotPanel}
                   plot={plot}
-                  runs={overlay ? runs : [plot]}
+                  runs={runs}
                   labels={labels}
                   panes={panes}
                   setPanes={setPanes}

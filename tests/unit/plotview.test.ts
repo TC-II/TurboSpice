@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandwidth3dB, stats, toCsv, valueAt } from '../../src/waveform/measure.ts';
+import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
 import { controlPlots, parsePlt, serializePlt } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
@@ -22,6 +22,21 @@ describe('medidas', () => {
     expect(bw.high).toBeGreaterThan(990);
     expect(bw.high).toBeLessThan(1010);
     expect(bw.low).toBeNaN();
+  });
+
+  it('cursores: punto más cercano y paso a paso', () => {
+    const xs = [0, 1, 2, 4, 8];
+    expect(nearestIndex(xs, -1)).toBe(0);
+    expect(nearestIndex(xs, 2.9)).toBe(2);
+    expect(nearestIndex(xs, 3.1)).toBe(3);
+    expect(nearestIndex(xs, 9)).toBe(4);
+    expect(stepPoint(xs, 2, 1)).toBe(4);
+    expect(stepPoint(xs, 2, -1)).toBe(1);
+    expect(stepPoint(xs, 2.5, 1)).toBe(4);
+    expect(stepPoint(xs, 2.5, -1)).toBe(2);
+    expect(stepPoint(xs, 3.5, -1)).toBe(2);
+    expect(stepPoint(xs, 1, 10)).toBe(8);
+    expect(stepPoint(xs, 1, -10)).toBe(0);
   });
 
   it('CSV', () => {

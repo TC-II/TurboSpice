@@ -35,9 +35,9 @@ export type AnalysisKind = Analysis['kind'];
 export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean; help: string }[] = [
   { kind: 'tran', label: 'Transitorio', ngspiceOnly: false, help: 'Respuesta en el tiempo (.tran).' },
   { kind: 'ac', label: 'AC (Bode)', ngspiceOnly: false, help: 'Respuesta en frecuencia de pequeña señal alrededor del punto de operación (.ac). Las fuentes de excitación necesitan "AC 1" en su valor.' },
+  { kind: 'op', label: 'Punto de operación', ngspiceOnly: false, help: 'Tensiones y corrientes de continua (.op).' },
   { kind: 'dc', label: 'Barrido DC', ngspiceOnly: false, help: 'Barre el valor de una o dos fuentes y resuelve el punto de operación en cada paso (.dc).' },
   { kind: 'noise', label: 'Ruido', ngspiceOnly: false, help: 'Densidad espectral de ruido en la salida y referida a la entrada (.noise).' },
-  { kind: 'op', label: 'Punto de operación', ngspiceOnly: false, help: 'Tensiones y corrientes de continua (.op).' },
   { kind: 'tf', label: 'Función de transferencia DC', ngspiceOnly: false, help: 'Ganancia, resistencia de entrada y de salida en continua (.tf).' },
   { kind: 'sens', label: 'Sensibilidad', ngspiceOnly: true, help: 'Sensibilidad de una salida respecto de cada parámetro del circuito (.sens).' },
   { kind: 'pz', label: 'Polos y ceros', ngspiceOnly: true, help: 'Polos y ceros de una función de transferencia (.pz).' },

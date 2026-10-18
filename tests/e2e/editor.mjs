@@ -34,7 +34,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await page.getByRole('button', { name: 'Nuevo' }).click();
 
 const svg = page.locator('svg.editor');

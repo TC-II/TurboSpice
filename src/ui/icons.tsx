@@ -33,6 +33,9 @@ const P: Record<string, ReactNode> = {
   sun: <path d="M10 6.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" />,
   moon: <path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8" />,
   results: <path d="M3 16.5h14M3 3.5v13M5.5 13l3-4 3 2 4.5-6" />,
+  // disposición de los resultados: al costado (dos columnas) o abajo (dos filas)
+  layoutSide: <path d="M4.5 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM12 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H12a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM3.5 6.5h5.5M11 6.5h5.5" />,
+  layoutStack: <path d="M4.5 3.5h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1zM4.5 11h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1zM6 3.5v5.5M6 11v5.5" />,
   copy: <path d="M7 7h9v10H7zM4 13V3h9" />,
   paste: <path d="M6 4H4v13h12V4h-2M7 3h6v3H7z" />,
   cut: <path d="M6 14a2 2 0 1 0 0 .01M14 14a2 2 0 1 0 0 .01M7.5 12.5 15 3M12.5 12.5 5 3" />,

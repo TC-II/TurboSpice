@@ -28,7 +28,7 @@ import {
   type ItemRef,
 } from './geometry.ts';
 import type { PickWhat } from './simDialogs.tsx';
-import { AnnotationLayer, NetNamesLayer, type Annotation, type NetName } from './NetNames.tsx';
+import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
@@ -229,6 +229,8 @@ export function SchematicEditor(props: Props) {
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
   const [labelNet, setLabelNet] = useState<string | undefined>();
+  // nombre de red y tensión del OP en el mismo punto: se acomodan para no pisarse
+  const paired = useMemo(() => (netNames && annotations ? pairedPoints(netNames, annotations) : undefined), [netNames, annotations]);
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
@@ -858,9 +860,9 @@ export function SchematicEditor(props: Props) {
         </g>
       )}
       {currentArrows && currentArrows.length > 0 && <CurrentArrowsLayer items={currentArrows} />}
-      {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
+      {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} paired={paired} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
-        <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
+        <NetNamesLayer names={netNames} paired={paired} avoid={annotations} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
       )}
       {(drag?.mode === 'box' || drag?.mode === 'zoom') && boxEnd && (
         <rect

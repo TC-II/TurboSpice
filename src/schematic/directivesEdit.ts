@@ -54,6 +54,17 @@ export function replaceAnalysis(doc: AscDoc, found: FoundLine, line: string, ngs
   return { ...doc, texts };
 }
 
+/** Saca el comando de análisis (y su texto, si no tenía otras líneas) */
+export function removeAnalysis(doc: AscDoc): AscDoc {
+  const found = findAnalysis(doc);
+  if (!found) return doc;
+  const t = doc.texts[found.text];
+  const ls = lines(t);
+  if (ls.length === 1) return { ...doc, texts: doc.texts.filter((_, i) => i !== found.text) };
+  ls.splice(found.line, 1);
+  return { ...doc, texts: doc.texts.map((x, i) => (i === found.text ? { ...t, text: ls.join('\\n') } : x)) };
+}
+
 /**
  * Pone `line` como comando de análisis del esquemático: reemplaza el que haya o, si no hay
  * ninguno, agrega un texto debajo de los demás. Los análisis de ngspice van como comentario.

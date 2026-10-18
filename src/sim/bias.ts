@@ -1,8 +1,10 @@
 // Punto de operación sobre el esquemático: qué parámetros pedirle a ngspice por dispositivo
 // y cómo describir una red o un componente (hover y anotación, como el .op de LTspice).
+import type { AscDoc } from '../asc/model.ts';
 import type { Element } from '../netlist/ltnetlist.ts';
 import { si } from '../waveform/series.ts';
 import { elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
+import { ANALYSIS_LINE } from './analyses.ts';
 
 export type Bias = Record<string, number>;
 
@@ -24,6 +26,25 @@ export function biasParams(sim: BuiltSimulation): string[] {
     for (const p of PARAMS[n[0]] ?? []) out.push(`@${n}[${p}]`);
   }
   return out;
+}
+
+/** Directivas que cambian el circuito: sin comentarios ni comandos de análisis */
+const circuitDirectives = (doc: AscDoc) =>
+  doc.texts
+    .filter((t) => t.kind === 'directive')
+    .flatMap((t) => t.text.split('\\n'))
+    .filter((l) => !ANALYSIS_LINE.test(l))
+    .join('\n');
+
+/**
+ * ¿Mismo circuito? El punto de operación no depende del comando de análisis (cambia al elegir
+ * otra simulación o editar sus parámetros) ni de los comentarios: sólo de componentes,
+ * cables, etiquetas y del resto de las directivas.
+ */
+export function sameCircuit(a: AscDoc, b: AscDoc): boolean {
+  if (a === b) return true;
+  if (a.symbols !== b.symbols || a.wires !== b.wires || a.flags !== b.flags) return false;
+  return circuitDirectives(a) === circuitDirectives(b);
 }
 
 const nodeV = (bias: Bias, node: string) => (node === '0' ? 0 : bias[netVector(node)]);

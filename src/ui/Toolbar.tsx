@@ -1,5 +1,6 @@
 // Barra de herramientas por grupos de íconos. Si falta lugar, los grupos pasan (de derecha a
-// izquierda) a un desplegable "Más herramientas"; lo que va en `fixed` queda siempre a la vista.
+// izquierda) a un desplegable "Más herramientas"; lo que va en `fixed` queda siempre a la vista
+// y lo que va en `after` (a la derecha) ocupa el lugar que sobra, con un mínimo reservado.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons.tsx';
 import { MenuButton, type MenuItem } from './Menu.tsx';
@@ -35,6 +36,8 @@ export function ToolButton({ tool }: { tool: ToolDef }) {
 
 /** Ancho que se reserva para el botón "Más herramientas" */
 const MORE_W = 38;
+/** Ancho mínimo que se reserva para lo de la derecha (`after`) */
+const AFTER_MIN = 480;
 
 /** Cuántos grupos (de izquierda a derecha) entran en `avail`; si no entran todos, se reserva
  * lugar para el botón "Más herramientas" */
@@ -59,7 +62,10 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
       for (const g of el.querySelectorAll<HTMLElement>(':scope > [data-group]')) widths.current.set(g.dataset.group!, g.offsetWidth);
       const cs = getComputedStyle(el);
       const fixedW = el.querySelector<HTMLElement>(':scope > .fixed')?.offsetWidth ?? 0;
-      const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - fixedW;
+      // ancho natural de lo de la derecha (sin achicarse)
+      // lo de la derecha se achica (sus campos pasan a más filas) hasta su mínimo
+      const afterW = el.querySelector(':scope > .bar-after') ? AFTER_MIN : 0;
+      const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - fixedW - afterW;
       setShown(groupsThatFit(groups.map((g) => widths.current.get(g.id) ?? 0), avail));
     };
     fit();
@@ -91,7 +97,7 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
         </div>
       )}
       <div className="group fixed">{fixed}</div>
-      {after}
+      {after && <div className="bar-after">{after}</div>}
     </div>
   );
 }

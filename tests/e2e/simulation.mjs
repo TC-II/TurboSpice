@@ -4,7 +4,7 @@
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, simType, skipWelcome } from './lib.mjs';
+import { menu, openExample, simCommand, simType, skipWelcome } from './lib.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { takeSims } from '../../src/sim/simList.ts';
@@ -28,7 +28,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
 
 const svg = page.locator('svg.editor');
@@ -59,11 +59,11 @@ check(wires.some((w) => w === '96,32,96,64' || w === '96,64,96,32'), `al arrastr
 await page.keyboard.press('Control+z');
 
 // --- Comando de simulación ---
-await simType(page, 'Transitorio');
+await simCommand(page, 'Transitorio');
 check((await page.locator('.field', { hasText: 'Tiempo final' }).locator('input').inputValue()) === '20m', 'el menú lee la directiva existente (.tran 20m)');
-await page.getByRole('button', { name: 'AC (Bode)' }).click();
+await page.locator('.analysis-list').getByRole('button', { name: 'AC (Bode)' }).click();
 check((await page.locator('.sim-preview code').textContent()) === '.ac dec 100 1 1meg', 'AC: vista previa de la directiva');
-await page.getByRole('button', { name: 'Transitorio' }).click();
+await page.locator('.analysis-list').getByRole('button', { name: 'Transitorio' }).click();
 await page.locator('.field', { hasText: 'Tiempo final' }).locator('input').fill('6m');
 await page.locator('.field', { hasText: 'Paso máximo' }).locator('input').fill('10u');
 check((await page.locator('.sim-preview code').textContent()) === '.tran 0 6m 0 10u', 'Transitorio con paso máximo');
@@ -71,7 +71,7 @@ await page.getByRole('button', { name: 'Aceptar' }).click();
 check((await page.locator('.texts .directive').first().textContent()) === '.tran 0 6m 0 10u', 'reemplaza la directiva en el esquemático');
 
 // --- Bloque .control con barrido ---
-await page.getByRole('button', { name: '.control…' }).click();
+await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('');
 await page.getByRole('button', { name: /Barrer un componente/ }).click();
 await page.getByRole('button', { name: 'Aceptar' }).click();
@@ -106,14 +106,17 @@ const probe = async (x, y) => {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(200);
 };
-await menu(page, 'Simular', 'Nueva simulación', 'Barrido DC');
+await simType(page, 'Barrido DC');
+check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálogo: los parámetros van en la barra');
 check((await directive()) === '.dc V1 0 5 0.1', `nueva simulación DC con la fuente del circuito (${await directive()})`);
 check((await page.locator('.simbar .sb-name').textContent()) === 'Barrido DC V1 0–5 V', 'la barra muestra su nombre');
+check((await page.locator('.simbar .sim-state.idle').count()) === 1, 'el cuadrado de estado arranca sin correr');
 await simulate();
+check((await page.locator('.simbar .sim-state.ok').count()) === 1, 'y al simular queda listo');
 await probe(128, -32); // red out
 check((await chipNames()).join() === 'V(out)', `primera DC: V(out) (${(await chipNames()).join()})`);
 // otra del mismo tipo con otros parámetros, desde la barra
-await menu(page, 'Simular', 'Nueva simulación', 'Barrido DC');
+await menu(page, 'Simular', 'Barrido DC');
 await page.getByLabel('Fin 1').fill('2');
 await page.getByLabel('Incremento 1').fill('0.01');
 await page.getByLabel('Incremento 1').press('Enter');
@@ -161,10 +164,25 @@ check(views.join(' | ') === ' | V(out) | V(N001)', `la lista del archivo conserv
 // y el autoguardado también: al recargar sigue la lista
 await page.waitForTimeout(1000); // autoguardado
 await page.reload();
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 check((await items()).length === 2, 'al recargar se recupera la lista');
-await menu(page, 'Simular', 'Borrar simulación');
-check((await directive()) === '.dc V1 0 5 0.1', 'borrar la activa pasa a la otra');
+// renombrar: click en el nombre de la barra
+await page.locator('.simbar .sb-name').click();
+await page.getByLabel('Nombre de la simulación').fill('Curva corta');
+await page.getByLabel('Nombre de la simulación').press('Enter');
+check((await page.locator('.simbar .sb-name').textContent()) === 'Curva corta', 'click en el nombre la renombra');
+await page.getByRole('button', { name: 'Borrar simulación' }).click();
+check((await directive()) === '.dc V1 0 5 0.1', 'la × borra la activa y pasa a la otra');
+// al lado de la fuente, elegirla en el esquemático (como en el menú completo)
+await page.getByRole('button', { name: 'Elegir Fuente 1 en el esquemático' }).click();
+check(await page.locator('.pick-banner').isVisible(), 'el botón de la fuente pide elegirla en el esquemático');
+await page.locator('.pick-banner').getByRole('button', { name: 'Cancelar' }).click();
+// borrar hasta la última: la barra queda vacía y Simular despliega el menú para elegir
+while (await page.getByRole('button', { name: 'Borrar simulación' }).count()) await page.getByRole('button', { name: 'Borrar simulación' }).click();
+check((await page.locator('.simbar .sb-name').count()) === 0 && (await page.locator('.simbar').textContent()).includes('Seleccionar tipo de simulación') && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'se puede borrar la única: la barra pide elegir un tipo y sale su comando del esquemático');
+await page.getByRole('button', { name: 'Simular', exact: true }).click();
+check(await page.getByRole('menu', { name: 'Tipo de simulación' }).isVisible(), 'sin simulación, Simular despliega el menú');
+await page.keyboard.press('Escape');
 await page.screenshot({ path: `${OUT}/simulaciones.png` });
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);

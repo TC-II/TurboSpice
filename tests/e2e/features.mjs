@@ -5,14 +5,14 @@
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, simType, skipWelcome } from './lib.mjs';
+import { menu, openExample, simCommand, simType, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
-const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
+const context = await browser.newContext({ viewport: { width: 1600, height: 800 }, acceptDownloads: true });
 await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 await skipWelcome(context);
 const page = await context.newPage();
@@ -31,7 +31,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
 
 // --- #38: barra de herramientas y menú colapsado ---
@@ -47,6 +47,17 @@ check(
   toolbarNames.slice(0, 13).join() === 'Nuevo,Guardar,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Directiva,Rotar' && toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
+check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');
+check(toolbarNames.includes('Medir') && toolbarNames.includes('Anotar OP'), 'la punta de prueba y el OP están siempre al lado de Simular');
+const views = page.getByRole('navigation', { name: 'Vistas' });
+check((await views.getByRole('button').allTextContents()).join() === 'Esquemático,Resultados' && (await views.getByRole('button', { name: 'Resultados' }).isDisabled()), 'arriba, Esquemático y Resultados (deshabilitado sin resultados)');
+await page.getByRole('button', { name: 'Tipo de simulación', exact: true }).click();
+const simMenu = await page.getByRole('menu').getByRole('menuitem').allTextContents();
+await page.keyboard.press('Escape');
+check(
+  simMenu.includes('Barrido DC') && simMenu.includes('Comando de simulación…A') && simMenu.includes('Directiva SPICE….') && simMenu.includes('Estudio…Alt+E') && !simMenu.some((x) => /Nueva|Duplicar|Renombrar/.test(x)),
+  `desplegable de Simular: tipos, comandos y análisis programados (${simMenu.join(' | ')})`,
+);
 await page.getByRole('button', { name: 'Texto', exact: true }).click();
 check(await page.locator('.modal .seg input[type=radio]').nth(1).isChecked(), 'Texto abre el diálogo de comentario');
 await page.keyboard.press('Escape');
@@ -59,7 +70,7 @@ await page.getByRole('button', { name: 'Más herramientas' }).click();
 await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exact: true }).click();
 check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');
 await page.keyboard.press('Escape');
-await page.setViewportSize({ width: 1280, height: 800 });
+await page.setViewportSize({ width: 1600, height: 800 });
 await page.waitForTimeout(300);
 await page.keyboard.press('Home');
 
@@ -91,7 +102,7 @@ await page.getByRole('button', { name: 'Listo', exact: true }).click();
 const other = await context.newPage();
 watch(other);
 await other.goto(link);
-await other.getByText('Listo').waitFor({ timeout: 30000 });
+await other.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await other.locator('svg.editor .sym').first().waitFor();
 check((await other.locator('.filename').textContent()) === 'Bode RLC.asc', 'el link abre el circuito con su nombre');
 check(!(await other.evaluate(() => location.hash)), 'y limpia el hash');
@@ -112,7 +123,7 @@ await page.keyboard.press('Escape');
 check((await flags()) === before + 1, 'agrega una tierra');
 await page.waitForTimeout(1200); // autoguardado
 await page.reload();
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
 check((await flags()) === before + 1, 'al recargar se recupera el trabajo sin guardar');
 check((await page.locator('.filename').textContent()) === 'Bode RLC.asc •', 'con su nombre y marcado como modificado');
@@ -169,8 +180,8 @@ check((await page.locator('.bias-tip').count()) === 0 && (await page.locator('.o
 
 // --- #13: elegir nodos y fuentes en el esquemático desde el menú de simulación ---
 await page.keyboard.press('Control+z'); // sacar la tierra agregada
-await simType(page, 'Ruido');
-check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'la flecha de Simular abre el menú en el tipo elegido');
+await simCommand(page, 'Ruido');
+check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'el comando de simulación se abre en el tipo elegido');
 await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
 check(await page.locator('.pick-banner').isVisible(), 'el diálogo se oculta y pide elegir una red');
 const outPick = await at(280, 160);
@@ -198,7 +209,7 @@ await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check(await page.getByRole('button', { name: /^Mediciones/ }).evaluate((b) => b.classList.contains('active')), 'con .meas y nada graficado, abre en Mediciones');
-await page.getByRole('button', { name: 'Resultados', exact: true }).click();
+await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k),meas vs R', `una corrida por paso (${stepPlots.join(', ')})`);
 await page.waitForTimeout(300);
@@ -218,7 +229,7 @@ check(
   `tiempo de subida por paso = 2.2·RC (${measRows.join(' | ')})`,
 );
 check((await page.locator('.meas-table tfoot tr').count()) === 4, 'con media, σ, mínimo y máximo');
-await page.getByRole('button', { name: 'Resultados', exact: true }).click();
+await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 await page.getByRole('combobox', { name: 'Plot' }).selectOption('meas vs R');
 await page.getByLabel('Expresión').fill('tsubida');
 await page.keyboard.press('Enter');
@@ -232,7 +243,7 @@ const downloaded = async (action) => {
   const [d] = await Promise.all([page.waitForEvent('download'), action()]);
   return { name: d.suggestedFilename(), text: readFileSync(await d.path(), 'utf8') };
 };
-await page.setViewportSize({ width: 1280, height: 1100 }); // lugar para dos paneles sin scroll
+await page.setViewportSize({ width: 1600, height: 1100 }); // lugar para dos paneles sin scroll
 await openExample(page, 'Bode RLC.asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
@@ -356,7 +367,7 @@ await page.getByRole('button', { name: 'Listo', exact: true }).click();
   const op = await other.newPage();
   watch(op);
   await op.goto(viewLink);
-  await op.getByText('Listo').waitFor({ timeout: 30000 });
+  await op.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
   await op.locator('svg.editor .sym').first().waitFor();
   check((await op.locator('svg.editor text', { hasText: '.plot ' }).count()) === 0, 'el comentario ;.plot no se dibuja');
   await op.getByRole('button', { name: 'Simular' }).click();
@@ -373,10 +384,10 @@ check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `ne
 await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
 const cir = await downloaded(() => page.getByRole('button', { name: 'Descargar .cir (ngspice)' }).click());
 check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
-await page.getByRole('button', { name: 'Resultados', exact: true }).click();
+await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // .pz en el plano s
-await simType(page, 'Polos y ceros');
+await simCommand(page, 'Polos y ceros');
 const pzField = (label) => page.locator('.field', { hasText: label }).locator('input');
 await pzField('Entrada +').fill('N001');
 await pzField('Entrada −').fill('0');
@@ -404,7 +415,7 @@ const rlcAsc = (extra, r = '10') =>
 const pzp = await context.newPage();
 watch(pzp);
 await pzp.goto(URL);
-await pzp.getByText('Listo').waitFor({ timeout: 30000 });
+await pzp.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 const dropAsc = (name, text) =>
   pzp.evaluate(([n, t]) => {
     const dt = new DataTransfer();
@@ -431,7 +442,7 @@ const pzCsv = { name: pzDl.suggestedFilename(), text: readFileSync(await pzDl.pa
 check(pzCsv.name === 'RLC pz.csv' && pzCsv.text.split('\n').filter(Boolean).length === 3 && pzCsv.text.startsWith('corrida,tipo'), `tabla de polos y ceros a CSV (${pzCsv.name})`);
 await pzp.getByRole('combobox', { name: 'Plot' }).selectOption('ac1');
 await pzp.locator('.pz-view.compact .pz-plane').waitFor();
-await pzp.getByRole('textbox', { name: 'Expresión' }).fill('V(out)');
+await pzp.getByLabel('Expresión', { exact: true }).fill('V(out)');
 await pzp.getByRole('button', { name: 'Agregar', exact: true }).click();
 await pzp.locator('.pane-chart').first().waitFor();
 check((await pzp.getByRole('checkbox', { name: 'Polos y ceros' }).isChecked()) && (await pzp.locator('.pz-view.compact path.pole').count()) === 2, 'en el Bode, el mapa de polos y ceros al lado');
@@ -454,7 +465,7 @@ await page.screenshot({ path: `${OUT}/smith.png` });
 await page.getByRole('combobox', { name: 'Vista' }).selectOption('bode');
 
 // --- #4: interfaz ---
-await page.setViewportSize({ width: 1280, height: 800 });
+await page.setViewportSize({ width: 1600, height: 800 });
 // #36: los resultados no se cierran, se colapsan y se vuelven a mostrar intactos
 const resultsState = async () =>
   JSON.stringify({
@@ -470,10 +481,22 @@ check(
   !(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()),
   'ocultar resultados colapsa el panel y deja la pestaña para mostrarlos',
 );
-check((await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).getAttribute('aria-pressed')) === 'false', 'el botón Panel de resultados de la barra queda sin marcar');
-await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Panel de resultados' }).click();
+const viewBtn = (name) => page.getByRole('navigation', { name: 'Vistas' }).getByRole('button', { name, exact: true });
+check((await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'arriba, Resultados queda apagado');
+await viewBtn('Resultados').click();
 await page.locator('.results-panel').waitFor();
 check((await resultsState()) === shownBefore, `al mostrarlos de nuevo, los resultados siguen intactos (${shownBefore})`);
+// apagar el esquemático deja los resultados a toda la ventana; el último prendido no se apaga
+await viewBtn('Esquemático').click();
+check((await page.locator('.workspace.expand-results').count()) === 1 && (await viewBtn('Esquemático').getAttribute('aria-pressed')) === 'false', 'apagar Esquemático deja sólo los resultados');
+await viewBtn('Resultados').click();
+check((await page.locator('.workspace.expand-results').count()) === 1, 'el último prendido no se apaga');
+await viewBtn('Esquemático').click();
+check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'con los dos prendidos, pantalla partida');
+await page.getByRole('button', { name: 'Resultados al costado' }).click();
+check((await page.locator('.workspace.side').count()) === 1 && (await page.getByRole('button', { name: 'Resultados al costado' }).getAttribute('aria-pressed')) === 'true', 'el botón de disposición pone los resultados al costado');
+await page.getByRole('button', { name: 'Resultados abajo' }).click();
+check((await page.locator('.workspace.side').count()) === 0, 'y el otro, abajo');
 await menu(page, 'Ver', 'Panel de resultados');
 check(!(await page.locator('.results-panel').isVisible()), 'Ver › Panel de resultados también los colapsa');
 await page.getByRole('button', { name: 'Mostrar resultados' }).click();
@@ -786,7 +809,7 @@ await fp.locator('svg.editor .sym').first().waitFor();
 await fp.waitForTimeout(500);
 check((await fp.locator('.filename').textContent()) === 'Emisor común.asc', `abre el ejemplo elegido (${await fp.locator('.filename').textContent()})`);
 await fp.reload();
-await fp.getByText('Listo').waitFor({ timeout: 30000 });
+await fp.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 check((await fp.getByRole('dialog').count()) === 0, 'y no vuelve a aparecer');
 await fresh.close();
 

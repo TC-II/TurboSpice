@@ -3,7 +3,7 @@
 // Uso: node tests/e2e/shortcuts.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
+import { menu, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -23,7 +23,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.getByText('Listo').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
 
 const svg = page.locator('svg.editor');
@@ -159,7 +159,7 @@ check((await page.locator('.results-panel').count()) === 1, 'Alt+R simula');
 await onSchematic();
 await page.keyboard.press('Control+l');
 check((await page.getByRole('button', { name: 'Log', exact: true }).getAttribute('class')) === 'active', 'Ctrl+L abre el log');
-await page.getByRole('button', { name: 'Resultados', exact: true }).click();
+await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // --- visor (con el mouse sobre los gráficos) ---
 const results = page.locator('.results-panel');
@@ -247,7 +247,7 @@ check(/Visor de resultados/.test(help) && /Modo Netlist/.test(help) && /Zoom a u
 await page.keyboard.press('Escape');
 
 // --- modo Netlist ---
-await page.getByRole('button', { name: 'Netlist', exact: true }).first().click();
+await menu(page, 'Ver', 'Editor de netlist (SPICE)');
 await page.locator('.netlist-editor textarea').waitFor();
 await page.locator('.netlist-editor textarea').click();
 page.once('dialog', (d) => d.accept('3'));

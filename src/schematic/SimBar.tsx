@@ -1,16 +1,25 @@
-// Barra de la simulación elegida (#39): su nombre y los parámetros del análisis en una o dos
-// líneas (el Barrido DC usa la segunda para la otra fuente). Los cambios se aplican al salir
-// del campo o con Enter y reemplazan el comando del esquemático.
+// Barra de la simulación elegida (#39), al lado de Simular: su nombre (click para renombrarla),
+// los parámetros del análisis en una o dos líneas (el Barrido DC usa la segunda para la otra
+// fuente; las redes y fuentes se pueden elegir en el esquemático), un cuadrado con su estado
+// (sin correr, corriendo, lista) y una × para borrarla. Los cambios se aplican al salir del
+// campo o con Enter y reemplazan el comando del esquemático.
 import { useEffect, useState } from 'react';
+import { Icon } from '../ui/icons.tsx';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
-import type { CircuitInfo } from './simDialogs.tsx';
+import type { CircuitInfo, Picker } from './simDialogs.tsx';
 
 type BarField =
   | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis };
 
+const POINTS: Record<Sweep['type'], string> = { dec: 'Puntos/década', oct: 'Puntos/octava', lin: 'Puntos' };
+
+/** Barrido en frecuencia: inicio, fin, puntos y tipo de barrido */
 const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
+  { kind: 'text', label: 'F inicio', value: s.start, set: (start) => set({ ...s, start }) },
+  { kind: 'text', label: 'F fin', value: s.stop, set: (stop) => set({ ...s, stop }) },
+  { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5 },
   {
     kind: 'select',
     label: 'Barrido',
@@ -22,9 +31,6 @@ const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
     ],
     set: (type) => set({ ...s, type: type as Sweep['type'] }),
   },
-  { kind: 'text', label: 'Puntos', value: s.points, set: (points) => set({ ...s, points }), width: 5 },
-  { kind: 'text', label: 'Inicio', value: s.start, set: (start) => set({ ...s, start }) },
-  { kind: 'text', label: 'Fin', value: s.stop, set: (stop) => set({ ...s, stop }) },
 ];
 
 /** Campos de la barra por línea */
@@ -97,21 +103,43 @@ function barRows(a: Analysis): BarField[][] {
   }
 }
 
-export function SimBar({ name, line, info, stale, running, onApply, onRun, onEdit }: {
-  /** nombre de la simulación elegida */
-  name: string;
-  /** su comando de análisis */
-  line: string;
+/** Estado de la simulación elegida: sin correr, corriendo, lista o con error */
+export type SimState = 'idle' | 'running' | 'ok' | 'err';
+
+const STATE_TEXT: Record<SimState, string> = { idle: 'Sin correr', running: 'Simulando…', ok: 'Lista', err: 'Error' };
+
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun, onRename, onDelete }: {
+  /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
+  sim?: {
+    name: string;
+    /** el nombre lo puso el usuario (si no, es el automático) */
+    custom: boolean;
+    /** su comando de análisis */
+    line: string;
+  };
   info: CircuitInfo;
+  state: SimState;
+  /** detalle del estado (tiempo, avance o mensaje de error), en el tooltip */
+  stateDetail?: string;
   /** se simuló pero sus resultados ya no están en memoria */
   stale: boolean;
   running: boolean;
+  /** elegir una red o una fuente haciendo click en el esquemático */
+  picker: Picker;
   onApply(line: string): void;
   onRun(): void;
-  /** abrir el diálogo completo del comando */
-  onEdit(): void;
+  /** nombre propio; vacío vuelve al automático */
+  onRename(name: string): void;
+  onDelete(): void;
 }) {
+  const line = sim?.line ?? '';
   const [draft, setDraft] = useState(() => parseAnalysis(line));
+  // nombre en edición (null: no se está renombrando)
+  const [naming, setNaming] = useState<string | null>(null);
+  const endNaming = (ok: boolean) => {
+    if (ok && sim && naming !== null && naming.trim() !== (sim.custom ? sim.name : '')) onRename(naming);
+    setNaming(null);
+  };
   useEffect(() => setDraft(parseAnalysis(line)), [line]);
   const errors = draft ? validateAnalysis(draft) : [];
   const apply = (a: Analysis | null = draft) => {
@@ -119,62 +147,109 @@ export function SimBar({ name, line, info, stale, running, onApply, onRun, onEdi
     const next = formatAnalysis(a);
     if (next !== line && !validateAnalysis(a).length) onApply(next);
   };
-  const rows = draft ? barRows(draft) : [];
+  const change = (a: Analysis) => (setDraft(a), apply(a));
+  const rows = sim && draft ? barRows(draft) : [];
 
   return (
     <div className="simbar" role="group" aria-label="Simulación elegida">
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
-      <span className="sb-name" title={`${line}\nEn el menú Simular se elige otra simulación, se crea una nueva o se duplica ésta.`}>
-        {name}
-      </span>
-      <div className="sb-rows">
-        {!draft && <code className="sb-line">{line}</code>}
-        {draft && !rows.length && <span className="sb-hint">Sin parámetros</span>}
-        {rows.map((r, i) => (
-          <div className="sb-row" key={i}>
-            {r.map((f) =>
-              f.kind === 'check' ? (
-                <label key={f.label} className="sb-check">
-                  <input type="checkbox" checked={f.value} onChange={(e) => (setDraft(f.set(e.target.checked)), apply(f.set(e.target.checked)))} /> {f.label}
-                </label>
-              ) : f.kind === 'select' ? (
-                <label key={f.label} className="sb-field">
-                  <span>{f.label}</span>
-                  <select value={f.value} aria-label={f.label} onChange={(e) => (setDraft(f.set(e.target.value)), apply(f.set(e.target.value)))}>
-                    {f.options.map(([v, l]) => (
-                      <option key={v} value={v}>{l}</option>
-                    ))}
-                  </select>
-                </label>
-              ) : (
-                <label key={f.label} className="sb-field">
-                  <span>{f.label}</span>
-                  <input
-                    value={f.value}
-                    aria-label={f.label}
-                    placeholder={f.placeholder}
-                    spellCheck={false}
-                    size={f.width ?? 7}
-                    list={f.list && `bar-${f.list}`}
-                    onChange={(e) => setDraft(f.set(e.target.value.trim()))}
-                    onBlur={() => apply()}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') apply();
-                      if (e.key === 'Escape') setDraft(parseAnalysis(line));
-                    }}
-                  />
-                </label>
-              ),
-            )}
-          </div>
-        ))}
-      </div>
-      {errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
-      <button className="sb-edit" onClick={onEdit} title="Todas las opciones del comando de análisis (A)">
-        Más opciones…
-      </button>
-      {stale && !running && (
+      {!sim ? (
+        <span className="sb-hint">Seleccionar tipo de simulación</span>
+      ) : naming !== null ? (
+        <input
+          className="sb-name-edit"
+          aria-label="Nombre de la simulación"
+          value={naming}
+          placeholder={sim.name}
+          size={Math.max(12, naming.length + 1)}
+          autoFocus
+          onChange={(e) => setNaming(e.target.value)}
+          onBlur={() => endNaming(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') endNaming(true);
+            if (e.key === 'Escape') endNaming(false);
+          }}
+        />
+      ) : (
+        <button className="sb-name" title={`${line}\nClick para renombrarla (vacío: nombre automático)`} onClick={() => setNaming(sim.custom ? sim.name : '')}>
+          {sim.name}
+        </button>
+      )}
+      {sim && (
+        <div className="sb-rows">
+          {!draft && <code className="sb-line">{line}</code>}
+          {draft && !rows.length && <span className="sb-hint">Sin parámetros</span>}
+          {rows.map((r, i) => (
+            <div className="sb-row" key={i}>
+              {r.map((f) =>
+                f.kind === 'check' ? (
+                  <label key={f.label} className="sb-check">
+                    <input type="checkbox" checked={f.value} onChange={(e) => change(f.set(e.target.checked))} /> {f.label}
+                  </label>
+                ) : f.kind === 'select' ? (
+                  <label key={f.label} className="sb-field">
+                    <span>{f.label}</span>
+                    <select value={f.value} aria-label={f.label} onChange={(e) => change(f.set(e.target.value))}>
+                      {f.options.map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <label key={f.label} className="sb-field">
+                    <span>{f.label}</span>
+                    <input
+                      value={f.value}
+                      aria-label={f.label}
+                      placeholder={f.placeholder}
+                      spellCheck={false}
+                      size={f.width ?? 7}
+                      list={f.list && `bar-${f.list}`}
+                      onChange={(e) => setDraft(f.set(e.target.value.trim()))}
+                      onBlur={() => apply()}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') apply();
+                        if (e.key === 'Escape') setDraft(parseAnalysis(line));
+                      }}
+                    />
+                    {/* como en el menú completo: elegir la red o la fuente en el esquemático */}
+                    {f.list && (
+                      <button
+                        type="button"
+                        className="pick-btn"
+                        title={f.list === 'nets' ? 'Elegir la red en el esquemático' : 'Elegir la fuente en el esquemático'}
+                        aria-label={`Elegir ${f.label} en el esquemático`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          picker(f.list === 'nets' ? 'net' : 'source').then((v) => v && change(f.set(v)));
+                        }}
+                      >
+                        ⌖
+                      </button>
+                    )}
+                  </label>
+                ),
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {sim && (
+        <span
+          className={`status sim-state ${state}`}
+          role="status"
+          aria-label={`Simulación: ${STATE_TEXT[state].toLowerCase()}`}
+          title={stateDetail ? `${STATE_TEXT[state]}: ${stateDetail}` : STATE_TEXT[state]}
+        />
+      )}
+      {sim && errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
+      {sim && (
+        <button className="sb-delete" aria-label="Borrar simulación" title="Borrar esta simulación (y sus resultados)" onClick={onDelete}>
+          <Icon name="delete" size={16} />
+        </button>
+      )}
+      {sim && stale && !running && (
         <button className="sb-run" onClick={onRun} title="Sus resultados ya no están en memoria (se conservan los de las últimas simulaciones vistas)">
           Volver a correr
         </button>

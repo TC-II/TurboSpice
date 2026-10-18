@@ -9,10 +9,10 @@ import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/lib
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
-import { biasParams, elementBias, netBias } from './sim/bias.ts';
+import { biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
 import { symbolBox } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
-import { StatusText, type Status } from './NetlistMode.tsx';
+import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
@@ -27,14 +27,13 @@ import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSess
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, replaceAnalysis, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
+import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import {
   activeSim,
   addSim,
   defaultLine,
-  duplicateSim,
   emptySims,
   followLine,
   keepResult,
@@ -79,6 +78,7 @@ import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expa
 import { AccountButton, DriveDialog } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import type { DriveFile } from './cloud/drive.ts';
+import { Logo } from './ui/Logo.tsx';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -198,20 +198,26 @@ export function App() {
     return () => engine.abort();
   }, [engine]);
 
-  // lugares de la barra superior que llena el modo esquemático: el menú (junto al nombre) y,
-  // arriba a la derecha, archivo, tema y compartir (#38)
+  // lugares de la barra superior que llena el modo esquemático: el menú (junto al nombre), las
+  // vistas (esquemático, resultados y su disposición) y, arriba a la derecha, archivo, tema y
+  // compartir (#38)
   const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null);
+  const [tabsSlot, setTabsSlot] = useState<HTMLElement | null>(null);
   const [rightSlot, setRightSlot] = useState<HTMLElement | null>(null);
 
   return (
     <div className="app">
       <header className="appbar">
         <div className="appbar-slot" ref={setMenuSlot} />
-        <h1>TurboSpice</h1>
-        <nav className="tabs">
-          <button className={mode === 'schematic' ? 'active' : ''} onClick={() => setMode('schematic')}>Esquemático</button>
-          <button className={mode === 'netlist' ? 'active' : ''} onClick={() => setMode('netlist')}>Netlist</button>
-        </nav>
+        <h1><Logo /> <span><span className="logo">Turbo</span>Spice</span></h1>
+        {mode === 'netlist' ? (
+          <nav className="tabs">
+            <button onClick={() => setMode('schematic')}>Esquemático</button>
+            <button className="active">Netlist</button>
+          </nav>
+        ) : (
+          <div className="appbar-slot" ref={setTabsSlot} />
+        )}
         <div className="appbar-slot appbar-right" ref={setRightSlot} />
         {/* el usuario / login (#35), al final, después de Compartir */}
         <AccountButton />
@@ -219,7 +225,7 @@ export function App() {
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
         (lib ? (
-          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, right: rightSlot }} />
+          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot }} onNetlist={() => setMode('netlist')} />
         ) : (
           <p className="empty pad">{libError ?? 'Cargando librería…'}</p>
         ))}
@@ -227,7 +233,13 @@ export function App() {
   );
 }
 
-function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Library; slots: { menu: HTMLElement | null; right: HTMLElement | null } }) {
+function SchematicMode({ engine, lib, slots, onNetlist }: {
+  engine: EngineClient;
+  lib: Library;
+  slots: { menu: HTMLElement | null; tabs: HTMLElement | null; right: HTMLElement | null };
+  /** pasar al editor de netlist */
+  onNetlist(): void;
+}) {
   const history = useHistory<AscDoc>(emptyDoc());
   const doc = history.value;
   const [file, setFile] = useState<FileState>({ name: 'Sin título.asc' });
@@ -248,6 +260,9 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
   // zoom y cursores del visor (los avisa PlotPanel; se guardan con la simulación)
   const plotState = useRef<PlotState>();
   const [showOp, setShowOp] = useState(false);
+  // último punto de operación calculado: sigue valiendo al elegir otra simulación de la lista
+  // (aunque todavía no tenga resultados) mientras el circuito no cambie
+  const [opPoint, setOpPoint] = useState<{ doc: AscDoc; built: BuiltSimulation; bias: Bias } | null>(null);
   const [panes, setPanes] = useState<Pane[]>(emptyPanes);
   const [activePane, setActivePane] = useState(0);
   // vista recordada (paneles por tipo de análisis): va dentro del .asc (";.plot …"), así que
@@ -591,6 +606,7 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
     try {
       const built = await buildSimulation(doc, lib, file.name);
       const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
+      if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
       const meas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
@@ -607,8 +623,8 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
       }
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
-      // con el esquemático expandido, los resultados no quedan ocultos
-      if (expanded === 'schematic') setExpanded('');
+      // al simular se ven los dos: esquemático y resultados en pantalla partida
+      if (expanded) setExpanded('');
       setSim({ built, result, doc, meas });
       setHiddenRuns(new Set());
       paneUndo.current = { past: [], future: [] };
@@ -703,7 +719,6 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
       kept.current.delete(next.active);
       setSim(r ?? null);
       showView(activeSim(next)?.view);
-      if (!r) setShowOp(false);
     }
     const line = activeSim(next)?.line;
     if (toDoc && line && next.active !== sims.active) commit(setAnalysisLine(doc, line));
@@ -722,18 +737,21 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
     changeSims(addSim(sims, same?.line ?? defaultLine(kind, circuitInfo())), true);
   };
-  const renameActive = () => {
-    const cur = activeSim(sims);
-    const name = cur && window.prompt('Nombre de la simulación (vacío: el automático)', simName(cur));
-    if (cur && name !== null && name !== undefined) changeSims(renameSim(sims, cur.id, name));
-  };
-  const duplicateActive = () => {
-    // la copia arranca con los mismos resultados (son del mismo comando)
-    const r = sim;
-    changeSims(duplicateSim(currentSims(), sims.active), true);
-    if (r) setSim(r);
+  // nombre propio desde la barra (vacío: vuelve al automático)
+  const renameActive = (name: string) => changeSims(renameSim(sims, sims.active, name));
+  // borrar la elegida: pasa a otra; si era la única, se saca su comando del esquemático y la
+  // barra queda vacía hasta elegir un tipo
+  const deleteActive = () => {
+    const next = removeSim(sims, sims.active);
+    if (next.items.length) return changeSims(next, true);
+    changeSims(next);
+    commit(removeAnalysis(doc));
   };
   const curSim = activeSim(sims);
+  // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
+  const simMenu = useRef<(() => void) | null>(null);
+  const canRun = !!curSim || findControl(doc) >= 0;
+  const simulate = () => (canRun ? run() : simMenu.current?.());
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
   }, []);
@@ -762,33 +780,44 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
   };
   const pltInput = useRef<HTMLInputElement>(null);
 
-  // Punto de operación: sólo mientras el esquemático sea el que se simuló
-  const bias = sim && sameExceptData(sim.doc, doc) ? sim.result.bias : undefined;
+  // Punto de operación: el de la simulación elegida o el último calculado, mientras el circuito
+  // sea el que se simuló (no importa el comando de análisis)
+  const op = useMemo(
+    () =>
+      sim?.result.bias && sameCircuit(sim.doc, doc)
+        ? { built: sim.built, bias: sim.result.bias }
+        : opPoint && sameCircuit(opPoint.doc, doc)
+          ? opPoint
+          : undefined,
+    [sim, opPoint, doc],
+  );
+  const bias = op?.bias;
   const describe = useMemo(() => {
-    if (!bias || !sim) return undefined;
+    if (!op) return undefined;
     return ({ net, symbol }: { net?: string; symbol?: number }) => {
-      if (net) return net === '0' ? null : netBias(bias, net);
-      const el = symbol !== undefined ? sim.built.lt.elements.find((e) => e.sym === symbol) : undefined;
-      return el ? elementBias(sim.built, bias, el) : null;
+      if (net) return net === '0' ? null : netBias(op.bias, net);
+      const el = symbol !== undefined ? op.built.lt.elements.find((e) => e.sym === symbol) : undefined;
+      return el ? elementBias(op.built, op.bias, el) : null;
     };
-  }, [bias, sim]);
+  }, [op]);
   const annotations = useMemo((): Annotation[] | undefined => {
-    if (!showOp || !bias || !sim) return undefined;
+    if (!showOp || !op) return undefined;
+    const { built, bias } = op;
     const out: Annotation[] = [];
     for (const n of netNames(doc, conn, new Map())) {
       const b = netBias(bias, n.name);
       if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
     }
-    for (const el of sim.built.lt.elements) {
+    for (const el of built.lt.elements) {
       if (!/^[RLVIDQMJ]/i.test(el.prefix)) continue;
-      const b = elementBias(sim.built, bias, el);
+      const b = elementBias(built, bias, el);
       const s = doc.symbols[el.sym];
       if (!b?.short || !s) continue;
       const box = symbolBox(s, lib.symbol(s.type), lib);
       out.push({ at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
     }
     return out;
-  }, [showOp, bias, sim, doc, conn, lib]);
+  }, [showOp, op, doc, conn, lib]);
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
@@ -1053,7 +1082,8 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
   const startMove = (stretch: boolean) =>
     setTool(selection.length ? { kind: 'move', stretch, refs: selection, start: editor.current?.cursor() ?? null } : { kind: 'move', stretch, refs: null, start: null });
   const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
-  const viewerKeys = () => area.current === 'viewer' && !!sim && panel === 'plot' && !!plotPanel.current;
+  // (con los resultados colapsados el visor no se ve: el teclado vuelve al esquemático)
+  const viewerKeys = () => area.current === 'viewer' && !!sim && expanded !== 'schematic' && panel === 'plot' && !!plotPanel.current;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (dialog || isTyping(e)) return;
@@ -1063,10 +1093,10 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
       const lk = k.length === 1 ? k.toLowerCase() : k;
       const handled = () => e.preventDefault();
       // en los dos contextos
-      if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && run();
+      if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && simulate();
       if (e.altKey && lk === 's') return handled(), running && abort();
       if (ctrl && lk === 'l') return handled(), showLog();
-      if (ctrl && k === 'Enter') return handled(), run();
+      if (ctrl && k === 'Enter') return handled(), simulate();
       if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
       if (ctrl && lk === 'o') return handled(), doOpen();
       if (k === ' ' && !e.altKey) {
@@ -1226,43 +1256,39 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
   });
 
   const running = status.kind === 'running';
-  // Colapsar o mostrar el panel de resultados (#36): el resultado, las trazas, los cursores y la
-  // vista se conservan; sólo se reemplazan al volver a simular o al abrir otro circuito
+  // Vistas (#36): esquemático y resultados prendidos = pantalla partida; con uno solo, ése a toda
+  // la ventana. Los resultados se conservan aunque no se vean; sólo se reemplazan al volver a
+  // simular o al abrir otro circuito
+  const schematicShown = !sim || expanded !== 'results';
   const resultsShown = !!sim && expanded !== 'schematic';
   const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
+  // apagar uno deja el otro a toda la ventana; el último prendido no se apaga
+  const toggleSchematicView = () => sim && (schematicShown ? resultsShown && setExpanded('results') : setExpanded(''));
+  const toggleResultsView = () => sim && (resultsShown ? schematicShown && setExpanded('schematic') : setExpanded(''));
+  const setSide = (side: boolean) => {
+    lsSet('turbospice.resultsSide', side ? '1' : '0');
+    setResultsSide(side);
+  };
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
-  // Tipos de análisis: el elegido abre el menú de simulación en ese tipo. Marcado, el de la
-  // directiva actual
-  const currentAnalysis = useMemo(() => {
-    const found = findAnalysis(doc);
-    return found ? parseAnalysis(found.value)?.kind : undefined;
-  }, [doc]);
-  const analysisItems: MenuItem[] = ANALYSES.map((x) => ({
-    label: x.label,
-    title: x.help,
-    onClick: () => openSimulation(x.kind),
-    checked: x.kind === currentAnalysis,
-  }));
-  // Desplegable de la flecha de Simular: por ahora, los tipos de análisis (#38)
-  // simulaciones guardadas (#39): se elige cuál ver; nueva, duplicar, renombrar y borrar
-  const savedSimItems: MenuItem[] = [
+  // Desplegable de Simular: las simulaciones guardadas (se elige cuál ver, #39); los tipos de
+  // análisis, que crean una simulación nueva con sus parámetros en la barra; los comandos a mano
+  // y los análisis programados
+  const simItems: MenuItem[] = [
     ...sims.items.map((x) => ({
       label: simName(x),
       title: x.line,
       checked: x.id === sims.active,
       onClick: () => changeSims(selectSim(sims, x.id), true),
     })),
-    {
-      label: 'Nueva simulación',
-      disabled: sims.items.length >= MAX_SIMS,
-      items: ANALYSES.map((x) => ({ label: x.label, title: x.help, onClick: () => newSim(x.kind) })),
-    },
-    { label: 'Duplicar simulación', onClick: duplicateActive, disabled: !curSim || sims.items.length >= MAX_SIMS },
-    { label: 'Renombrar simulación…', onClick: renameActive, disabled: !curSim },
-    { label: 'Borrar simulación', onClick: () => changeSims(removeSim(sims, sims.active), true), disabled: sims.items.length < 2 },
+    'sep',
+    ...ANALYSES.map((x) => ({ label: x.label, title: `Nueva simulación: ${x.help}`, onClick: () => newSim(x.kind), disabled: sims.items.length >= MAX_SIMS })),
+    'sep',
+    { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() },
+    { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+    'sep',
+    { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
+    { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
   ];
-  // Desplegable de la flecha de Simular: las simulaciones guardadas y los tipos de análisis (#38)
-  const simItems: MenuItem[] = [...savedSimItems, 'sep', ...analysisItems, 'sep', { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() }];
   const menus: MenuDef[] = [
     {
       label: 'Archivo',
@@ -1339,12 +1365,7 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
         { label: 'Abortar', shortcut: 'Alt+S', onClick: abort, disabled: !running },
         { label: 'Ver el log', shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
         'sep',
-        ...savedSimItems,
-        'sep',
-        { label: 'Tipo de simulación', items: analysisItems },
-        { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() },
-        { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
-        { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
+        ...simItems,
         'sep',
         { label: 'Punta de prueba', onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
         { label: 'Anotar punto de operación', onClick: () => setShowOp((v) => !v), disabled: !bias, checked: showOp },
@@ -1359,15 +1380,10 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
         { label: 'Grilla', shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: 'Marcas de pines sueltos', shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
         { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
-        {
-          label: 'Resultados al costado',
-          onClick: () => {
-            lsSet('turbospice.resultsSide', resultsSide ? '0' : '1');
-            setResultsSide(!resultsSide);
-          },
-          checked: resultsSide,
-        },
+        { label: 'Resultados al costado', onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: 'Panel de resultados', shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
+        'sep',
+        { label: 'Editor de netlist (SPICE)', onClick: onNetlist },
         'sep',
         { label: 'Tema automático (del sistema)', onClick: () => setTheme('auto'), checked: theme === 'auto' },
         { label: 'Tema claro', onClick: () => setTheme('light'), checked: theme === 'light' },
@@ -1422,7 +1438,7 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
   const marks = useMemo(() => pzMarks(pzRoots(pzAll)), [pzAll]);
   const withPz = !!pzAll.length && scale?.name.toLowerCase() === 'frequency';
 
-  // Barra de herramientas (#38): archivo, historial, dibujo, edición, vista y análisis; si falta
+  // Barra de herramientas (#38): archivo, historial, dibujo, edición y vista; si falta
   // lugar, los grupos de la derecha pasan al desplegable "Más herramientas"
   const toolGroups: ToolGroup[] = [
     {
@@ -1472,14 +1488,6 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
         { icon: 'nets', label: 'Redes', title: 'Mostrar los nombres de todas las redes, sin modificar el esquemático', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
       ],
     },
-    {
-      id: 'analysis',
-      label: 'Análisis',
-      tools: [
-        { icon: 'study', label: 'Estudio…', title: 'Estudio: barridos, tolerancias, mediciones', shortcut: 'Alt+E', onClick: openStudy },
-        { icon: 'control', label: '.control…', title: 'Bloque .control: scripts de ngspice', shortcut: 'Alt+C', onClick: openControl },
-      ],
-    },
   ];
 
   return (
@@ -1505,63 +1513,108 @@ function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Libr
           </>,
           slots.right,
         )}
+      {slots.tabs &&
+        createPortal(
+          <>
+            {/* vistas: con las dos prendidas, pantalla partida */}
+            <nav className="tabs" aria-label="Vistas">
+              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={toggleSchematicView} title="Esquemático (Ctrl+1: sólo el esquemático)">
+                Esquemático
+              </button>
+              <button
+                className={resultsShown ? 'active' : ''}
+                aria-pressed={resultsShown}
+                disabled={!sim}
+                onClick={toggleResultsView}
+                title={sim ? 'Resultados (Ctrl+2: sólo los resultados; Ctrl+0: los dos)' : 'Todavía no hay resultados: simulá primero'}
+              >
+                Resultados
+              </button>
+            </nav>
+            <div className="layout-btns" role="group" aria-label="Disposición de los resultados">
+              <button className={resultsSide ? 'active' : ''} aria-pressed={resultsSide} aria-label="Resultados al costado" title="Resultados al costado" onClick={() => setSide(true)}>
+                <Icon name="layoutSide" size={16} />
+              </button>
+              <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label="Resultados abajo" title="Resultados abajo" onClick={() => setSide(false)}>
+                <Icon name="layoutStack" size={16} />
+              </button>
+            </div>
+          </>,
+          slots.tabs,
+        )}
       <Toolbar
         label="Herramientas"
         groups={toolGroups}
         fixed={
           <>
-            {/* Simular partido: la acción principal simula y la flecha despliega los tipos de análisis */}
+            {/* Simular partido: la acción principal simula y la flecha despliega las simulaciones */}
             <div className="split" role="group" aria-label="Simulación">
               {running ? (
                 <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
                   <Icon name="stop" /> Abortar
                 </button>
               ) : (
-                <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" aria-keyshortcuts="Alt+R Control+Enter" title="Simular (Alt+R / Ctrl+Enter)">
+                <button
+                  className="primary"
+                  onClick={simulate}
+                  disabled={status.kind === 'loading'}
+                  aria-label="Simular"
+                  aria-keyshortcuts="Alt+R Control+Enter"
+                  title={canRun ? 'Simular (Alt+R / Ctrl+Enter)' : 'Elegir qué simular'}
+                >
                   <Icon name="run" /> Simular
                 </button>
               )}
-              <MenuButton items={simItems} label="Tipo de simulación" title="Tipo de simulación y parámetros (A)" className={running ? 'labeled' : 'primary'}>
+              <MenuButton items={simItems} label="Tipo de simulación" title="Simulaciones y tipos de análisis" className={running ? 'labeled' : 'primary'} openRef={simMenu}>
                 <Icon name="caret" size={14} />
               </MenuButton>
             </div>
-            {sim && (
-              <button className={tool.kind === 'probe' ? 'active' : ''} aria-label="Medir" title="Punta de prueba: click en un cable (tensión) o componente (corriente)" onClick={() => setTool({ kind: 'probe' })}>
-                <Icon name="probe" />
-              </button>
-            )}
-            {bias && (
-              <button className={showOp ? 'active' : ''} aria-label="Anotar OP" title="Anotar el punto de operación en el esquemático (sin modificarlo)" onClick={() => setShowOp((v) => !v)}>
-                <Icon name="op" />
-              </button>
-            )}
-            {sim && (
-              <button
-                className={`labeled${resultsShown ? ' active' : ''}`}
-                onClick={toggleResultsPanel}
-                aria-label="Panel de resultados"
-                aria-pressed={resultsShown}
-                title={resultsShown ? 'Ocultar el panel de resultados (no se pierden)' : 'Mostrar el panel de resultados'}
-              >
-                <Icon name="results" /> <span className="txt">Resultados</span>
-              </button>
-            )}
+            {/* siempre a la vista, separados de Simular; se habilitan cuando hay resultados (y punto de operación) */}
+            <span className="tb-sep" />
+            <button
+              className={tool.kind === 'probe' ? 'active' : ''}
+              aria-label="Medir"
+              title={sim ? 'Punta de prueba: click en un cable (tensión) o componente (corriente)' : 'Punta de prueba: simulá primero'}
+              disabled={!sim}
+              onClick={() => setTool({ kind: 'probe' })}
+            >
+              <Icon name="probe" />
+            </button>
+            <button
+              className={showOp && bias ? 'active' : ''}
+              aria-label="Anotar OP"
+              title={bias ? 'Anotar el punto de operación en el esquemático (sin modificarlo)' : sim ? 'Punto de operación: el circuito cambió desde la última simulación' : 'Punto de operación: simulá primero'}
+              disabled={!bias}
+              onClick={() => setShowOp((v) => !v)}
+            >
+              <Icon name="op" />
+            </button>
           </>
         }
-        after={<StatusText status={status} />}
+        after={
+          <SimBar
+            sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}
+            info={circuitInfo()}
+            state={running ? 'running' : status.kind === 'error' ? 'err' : sim ? 'ok' : 'idle'}
+            stateDetail={
+              status.kind === 'running'
+                ? status.percent ? `${status.percent.toFixed(0)} %` : undefined
+                : status.kind === 'error'
+                  ? status.message
+                  : status.kind === 'done' && sim
+                    ? `completada en ${status.ms.toFixed(0)} ms`
+                    : undefined
+            }
+            stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
+            running={running}
+            picker={picker}
+            onApply={(line) => commit(setAnalysisLine(doc, line))}
+            onRun={run}
+            onRename={renameActive}
+            onDelete={deleteActive}
+          />
+        }
       />
-      {curSim && (
-        <SimBar
-          name={simName(curSim)}
-          line={curSim.line}
-          info={circuitInfo()}
-          stale={!sim && !!curSim.view?.panes.some((p) => p.traces.length)}
-          running={running}
-          onApply={(line) => commit(setAnalysisLine(doc, line))}
-          onRun={run}
-          onEdit={() => openSimulation()}
-        />
-      )}
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div className="canvas-wrap">

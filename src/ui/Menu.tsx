@@ -14,18 +14,21 @@ export interface MenuDef {
 }
 
 /** Botón que despliega una lista de menú */
-export function MenuButton({ items, label, title, className, disabled, children }: {
+export function MenuButton({ items, label, title, className, disabled, openRef, children }: {
   items: MenuItem[];
   /** Nombre accesible del botón y de la lista */
   label: string;
   title?: string;
   className?: string;
   disabled?: boolean;
+  /** para desplegarlo desde otro botón */
+  openRef?: { current: (() => void) | null };
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
+  if (openRef) openRef.current = () => setOpen(true);
 
   useEffect(() => {
     if (!open) return;

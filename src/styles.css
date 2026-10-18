@@ -128,11 +128,18 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-hl: #51cf66;
 }
 
-.appbar { display: flex; align-items: center; gap: 16px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
-.appbar h1 { font-size: 16px; margin: 0; }
+.appbar { position: relative; display: flex; align-items: center; gap: 16px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
+.appbar h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
+.logo { color: var(--accent); flex: none; }
 .tabs { display: flex; gap: 2px; }
 .tabs button { border: 0; background: transparent; border-radius: 6px; padding: 4px 10px; color: var(--fg-muted); }
 .tabs button.active { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }
+.tabs button:disabled { opacity: 0.45; cursor: default; }
+/* disposición de los resultados (al costado o abajo), al lado de las vistas */
+.layout-btns { display: flex; gap: 2px; }
+.layout-btns button { display: inline-flex; padding: 3px; border-color: transparent; background: transparent; border-radius: 5px; color: var(--fg-muted); }
+.layout-btns button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.layout-btns button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .pad { padding: 16px; }
 
 .netlist-mode { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -456,7 +463,11 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .appbar-slot { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .appbar-slot:empty { display: none; }
 .appbar-right { margin-left: auto; }
-.appbar-right .filename { margin-left: 0; }
+/* el nombre del archivo, centrado en la barra; tema y compartir pegados al usuario */
+.appbar-right .filename { position: absolute; left: 50%; transform: translateX(-50%); margin-left: 0; }
+.appbar-right + .account { margin-left: -10px; }
+/* sin lugar para centrarlo: va junto al tema */
+@media (max-width: 1000px) { .appbar-right .filename { position: static; transform: none; } }
 .app-menu-btn { display: inline-flex; padding: 4px; border-color: transparent; background: transparent; border-radius: 6px; }
 .app-menu-btn:hover, .app-menu-btn.open { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 13px; }
@@ -473,6 +484,29 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .simbar .sb-hint.warn { color: var(--err); }
 .simbar .sb-line { font: 12px var(--mono); }
 .simbar .sb-run, .simbar .sb-edit { padding: 2px 10px; }
+/* en la fila de herramientas, a la derecha de Simular */
+.iconbar .bar-after { flex: 1 1 auto; min-width: 0; display: flex; overflow-x: auto; scrollbar-width: none; }
+.iconbar .simbar { position: relative; flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; margin-left: 6px; padding: 0 0 0 12px; border-bottom: 0; }
+.iconbar .simbar::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 22px; margin-top: -11px; background: var(--border); }
+.iconbar .simbar .sb-edit, .iconbar .simbar .sb-run { border-color: var(--border); font-size: 12px; white-space: nowrap; flex: none; }
+.iconbar .simbar .sb-row { gap: 4px 10px; }
+.iconbar .simbar .sb-field, .iconbar .simbar .sb-check, .iconbar .simbar .sb-hint { white-space: nowrap; }
+.iconbar .simbar .sb-rows { flex: 0 1 auto; min-width: 0; }
+.simbar button.sb-name { padding: 2px 6px; font: 600 12px system-ui, sans-serif; color: var(--fg); flex: none; }
+.simbar .sb-name-edit { font: 600 12px system-ui, sans-serif; padding: 1px 5px; flex: none; }
+.iconbar .simbar .sb-delete { padding: 2px; color: var(--fg-muted); flex: none; }
+.iconbar .simbar .sb-delete:hover { color: var(--err); }
+/* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
+   del grupo que el separador de la barra de la simulación) */
+.iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }
+/* estado de la simulación elegida: sin correr (naranja), corriendo (late), lista (verde) */
+.iconbar .simbar .sim-state { flex: none; width: 12px; height: 12px; margin: 0; border-radius: 2px; border: 1.5px solid var(--sch-sel); background: var(--sch-sel); }
+.iconbar .simbar .sim-state.running { border-color: var(--accent); background: var(--accent); animation: sim-pulse 0.9s ease-in-out infinite alternate; }
+.iconbar .simbar .sim-state.ok { border-color: var(--ok); background: var(--ok); }
+.iconbar .simbar .sim-state.err { border-color: var(--err); background: var(--err); }
+@keyframes sim-pulse { from { opacity: 1; } to { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) { .iconbar .simbar .sim-state.running { animation: none; opacity: 0.6; } }
+.simbar .sb-field .pick-btn { padding: 0 3px; line-height: 1; color: var(--fg-muted); }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }

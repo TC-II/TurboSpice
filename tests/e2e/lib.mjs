@@ -19,10 +19,17 @@ export async function menu(page, ...path) {
   await pick(page, path);
 }
 
-/** Elige un tipo de análisis en la flecha de Simular (abre el menú de simulación en ese tipo) */
+/** Elige un ítem de la flecha de Simular: una simulación guardada (por su nombre) o un tipo de
+ * análisis (crea una simulación nueva, con sus parámetros en la barra) */
 export async function simType(page, label) {
   await page.getByRole('button', { name: 'Tipo de simulación', exact: true }).click();
   await pick(page, [label]);
+}
+
+/** Abre el comando de simulación (el diálogo completo), opcionalmente en un tipo de análisis */
+export async function simCommand(page, label) {
+  await simType(page, 'Comando de simulación…');
+  if (label) await page.locator('.analysis-list button', { hasText: label }).first().click();
 }
 
 /** Abre un ejemplo y espera a que esté cargado (nombre en la barra, sin cambios) */

@@ -1325,7 +1325,6 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
           def={lib.symbol(doc.symbols[dialog.index].type)}
           windowDefaults={lib.windowDefaults}
           focusLabel={dialog.label}
-          others={selection.filter((r) => r.kind === 'symbol' && r.index !== dialog.index).length}
           onClose={() => setDialog(null)}
           onApply={(attrs, labels, toSelection) => {
             setDialog(null);

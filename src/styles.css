@@ -212,12 +212,8 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .modal input, .modal textarea { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%; }
 .attrs { display: flex; flex-direction: column; gap: 8px; }
 .attrs label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-muted); }
-.attrs fieldset.labels { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px 8px; margin: 4px 0 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--fg-muted); }
-.attrs .label-row { display: grid; grid-template-columns: 96px 1fr 52px auto; align-items: center; gap: 6px; }
-.attrs .label-row.focus .label-vis span { color: var(--accent); font-weight: 600; }
-.attrs .label-row label, .attrs .label-all { display: flex; gap: 6px; align-items: center; }
-.attrs .label-row input, .attrs .label-all input { width: auto; }
-.attrs .label-row select { min-width: 0; }
+.attrs label.attr-row { grid-template-columns: 96px 1fr 18px; }
+.attrs .attr-vis { width: auto; margin: 0; }
 .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .hint { color: var(--fg-muted); font-size: 12px; margin: 4px 0; }
 .textdlg { display: flex; flex-direction: column; gap: 8px; }

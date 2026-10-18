@@ -67,6 +67,37 @@ export function placementOrigin(def: SymbolDef | undefined, orient: Orient, at: 
   return { x: o.x + snap(ref.x) - ref.x + 0, y: o.y + snap(ref.y) - ref.y + 0 };
 }
 
+/**
+ * Punto fijo para rotar/espejar más cercano a `c`: sólo sirven los puntos de la grilla de `ref`
+ * y los centros de sus celdas (girar 90° alrededor de ellos deja la grilla sobre sí misma).
+ * Los empates se resuelven siempre igual: grilla antes que centro de celda, después menor y,
+ * después menor x.
+ */
+export function pivotNear(c: Point, ref: Point): Point {
+  const cands: { p: Point; d: number; k: number }[] = [];
+  for (const k of [0, GRID / 2]) {
+    const bx = ref.x + k;
+    const by = ref.y + k;
+    for (const x of [Math.floor((c.x - bx) / GRID), Math.ceil((c.x - bx) / GRID)].map((i) => bx + i * GRID))
+      for (const y of [Math.floor((c.y - by) / GRID), Math.ceil((c.y - by) / GRID)].map((i) => by + i * GRID))
+        cands.push({ p: { x: x + 0, y: y + 0 }, d: (x - c.x) ** 2 + (y - c.y) ** 2, k });
+  }
+  cands.sort((a, b) => a.d - b.d || a.k - b.k || a.p.y - b.p.y || a.p.x - b.p.x);
+  return cands[0].p;
+}
+
+/**
+ * Punto fijo de un símbolo para rotar/espejar, en coordenadas locales (no depende de la
+ * orientación, así que 4 rotaciones o 2 espejados lo devuelven exactamente al mismo lugar):
+ * el centro de la geometría (sin textos ni skin) llevado al punto más cercano que deja los
+ * pines sobre la grilla. Con una cantidad impar de tramos de grilla queda en uno de los puntos
+ * vecinos, elegido de forma determinista.
+ */
+export function symbolPivot(def: SymbolDef): Point {
+  const b = localBox(def);
+  return pivotNear({ x: (b.x1 + b.x2) / 2, y: (b.y1 + b.y2) / 2 }, def.pins[0] ?? { x: 0, y: 0 });
+}
+
 export function pinPoints(inst: SymbolInst, def: SymbolDef | undefined): Point[] {
   return def ? def.pins.map((p) => toWorld(inst, p.x, p.y)) : [];
 }

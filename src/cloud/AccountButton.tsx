@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import type { DriveFile } from './drive.ts';
 import { FOLDER_NAME } from './drive.ts';
-import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
+import { drive, initial, pickDriveFile, pickerEnabled, signIn, signOut, useGoogle, type Account } from './google.ts';
 
 function Avatar({ account }: { account: Account }) {
   const [broken, setBroken] = useState(false);
@@ -86,7 +86,7 @@ export function AccountButton() {
   );
 }
 
-export function DriveDialog({ onOpen, onClose }: { onOpen(f: DriveFile): void; onClose(): void }) {
+export function DriveDialog({ onOpen, onClose, onError }: { onOpen(f: DriveFile): void; onClose(): void; onError?(msg: string): void }) {
   const [files, setFiles] = useState<DriveFile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -113,6 +113,18 @@ export function DriveDialog({ onOpen, onClose }: { onOpen(f: DriveFile): void; o
         </ul>
       )}
       <div className="buttons">
+        {pickerEnabled && (
+          <button
+            type="button"
+            title="Elegir cualquier .asc de tu Drive (también los que no guardó TurboSpice)"
+            onClick={() => {
+              onClose();
+              pickDriveFile().then((f) => f && onOpen(f), (e: Error) => onError?.(e.message));
+            }}
+          >
+            Buscar en todo mi Drive…
+          </button>
+        )}
         <button type="button" onClick={onClose}>Cancelar</button>
       </div>
     </Modal>

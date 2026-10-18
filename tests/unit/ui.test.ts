@@ -53,6 +53,27 @@ describe('compartir con un link', () => {
   });
 });
 
+describe('colapsar los resultados (#36)', () => {
+  it('ocultar y mostrar alternan con el esquemático expandido, sin otra forma de cerrarlos', async () => {
+    const { toggleResults } = await import('../../src/ui/ResultsSplitter.tsx');
+    expect(toggleResults('')).toBe('schematic');
+    expect(toggleResults('results')).toBe('schematic');
+    expect(toggleResults('schematic')).toBe('');
+    expect(toggleResults(toggleResults(''))).toBe('');
+  });
+
+  it('se reajusta la vista cuando cambia el lienzo del esquemático', async () => {
+    const { refitsSchematic } = await import('../../src/ui/ResultsSplitter.tsx');
+    expect(refitsSchematic('', 'schematic')).toBe(true);
+    expect(refitsSchematic('schematic', '')).toBe(true);
+    expect(refitsSchematic('results', '')).toBe(true);
+    expect(refitsSchematic('results', 'schematic')).toBe(true);
+    // sin cambios, o con el esquemático oculto, no
+    expect(refitsSchematic('schematic', 'schematic')).toBe(false);
+    expect(refitsSchematic('', 'results')).toBe(false);
+  });
+});
+
 describe('valores amigables', () => {
   it('4k7 → 4.7k, aviso de M (mili) y de valores no numéricos', async () => {
     const { checkValue } = await import('../../src/schematic/dialogs.tsx');

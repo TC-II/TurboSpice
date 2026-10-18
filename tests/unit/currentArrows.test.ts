@@ -13,21 +13,19 @@ const arrowsOf = (body: string) => {
 };
 
 describe('flechas de sentido positivo de corriente', () => {
-  it('R: entra por el primer nodo y sale por el segundo', () => {
+  it('R: sólo la flecha que entra, por el primer nodo', () => {
     const a = arrowsOf('SYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k');
-    expect(a).toEqual([
-      { at: { x: 16, y: 16 }, inward: { x: 0, y: 1 }, enters: true },
-      { at: { x: 16, y: 96 }, inward: { x: 0, y: -1 }, enters: false },
-    ]);
+    expect(a).toEqual([{ at: { x: 16, y: 16 }, inward: { x: 0, y: 1 }, enters: true }]);
   });
 
   it('respeta rotación y espejado', () => {
     const r90 = arrowsOf('SYMBOL res 0 0 R90\nSYMATTR InstName R1\nSYMATTR Value 1k');
     // rotado: la pata del pin A queda horizontal, apuntando hacia el pin B
-    const [a, b] = r90;
+    const [a] = r90;
+    expect(r90.length).toBe(1);
     expect(a.enters).toBe(true);
-    expect(Math.sign(b.at.x - a.at.x)).toBe(a.inward.x);
     expect(a.inward.y).toBe(0);
+    expect(Math.abs(a.inward.x)).toBe(1);
     const m0 = arrowsOf('SYMBOL npn 0 0 M0\nSYMATTR InstName Q1');
     const base = m0.find((x) => x.at.y === 48 && x.inward.y === 0)!;
     // espejado: la base queda a la derecha y su pata va hacia la izquierda

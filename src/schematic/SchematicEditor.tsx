@@ -168,6 +168,8 @@ export function SchematicEditor(props: Props) {
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
+  // punta de prueba: sobre una red mide tensión (punta), sobre un componente corriente (pinza)
+  const [probeKind, setProbeKind] = useState<'' | 'v' | 'i'>('');
   const cursorRef = useRef(cursor);
   cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -504,7 +506,10 @@ export function SchematicEditor(props: Props) {
     const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
     const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
-    if (tool.kind === 'probe') setHoverNet(target?.net);
+    if (tool.kind === 'probe') {
+      setHoverNet(target?.net);
+      setProbeKind(target?.net ? 'v' : target?.symbol !== undefined ? 'i' : '');
+    }
     if (tool.kind === 'pick') {
       const t = probeTarget(p);
       const v = t && pickValue?.(t);
@@ -662,7 +667,10 @@ export function SchematicEditor(props: Props) {
   }, [selection, doc, lib]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
-  const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : hoverLabel !== undefined ? 'label' : '') : tool.kind;
+  const cursorClass =
+    tool.kind === 'select'
+      ? drag?.mode === 'pan' ? 'grabbing' : hoverLabel !== undefined ? 'label' : ''
+      : tool.kind === 'probe' && probeKind ? `probe tool-probe-${probeKind}` : tool.kind;
 
   return (
     <>

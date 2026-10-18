@@ -62,8 +62,9 @@ export function currentArrows(doc: AscDoc, lib: Library, elements: { sym: number
       const inward = pinInward(def, k);
       if (!inward) return;
       const d = transformOffset(inward.x, inward.y, s.orient);
-      // dos terminales: entra por el primer nodo, sale por el otro
-      out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters: !two || orders[k] === first });
+      // dos terminales: entra por el primer nodo, sale por el otro (sólo se dibuja la que entra)
+      const enters = !two || orders[k] === first;
+      if (enters) out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters });
     });
   }
   return out;

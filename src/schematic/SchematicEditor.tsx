@@ -369,9 +369,13 @@ export function SchematicEditor(props: Props) {
           setTool({ kind: 'wire', start: g });
           return;
         }
-        const corner = { x: g.x, y: tool.start.y };
-        let d = addWire(doc, tool.start, corner, lib);
-        d = addWire(d, corner, g, lib);
+        // con Ctrl, un solo tramo recto (puede ir en diagonal); si no, en L
+        let d: AscDoc;
+        if (e.ctrlKey || e.metaKey) d = addWire(doc, tool.start, g, lib);
+        else {
+          const corner = { x: g.x, y: tool.start.y };
+          d = addWire(addWire(doc, tool.start, corner, lib), corner, g, lib);
+        }
         const ends = connectsAt(doc, g, lib) && !(g.x === tool.start.x && g.y === tool.start.y);
         commit(d);
         setTool({ kind: 'wire', start: ends ? null : g });
@@ -435,7 +439,25 @@ export function SchematicEditor(props: Props) {
     };
   }, [dragging]);
 
+  // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta
+  const [ctrlHeld, setCtrlHeld] = useState(false);
+  const drawingWire = tool.kind === 'wire' && !!tool.start;
+  useEffect(() => {
+    if (!drawingWire) return setCtrlHeld(false);
+    const onKey = (e: KeyboardEvent) => setCtrlHeld(e.ctrlKey || e.metaKey);
+    const onBlur = () => setCtrlHeld(false);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [drawingWire]);
+
   const onPointerMove = (e: React.PointerEvent) => {
+    if (drawingWire && ctrlHeld !== (e.ctrlKey || e.metaKey)) setCtrlHeld(e.ctrlKey || e.metaKey);
     if (e.pointerType === 'touch' && touches.current.has(e.pointerId)) {
       const prev = touches.current.get(e.pointerId)!;
       if (Math.hypot(prev.x - e.clientX, prev.y - e.clientY) > 6) clearTimeout(longPress.current);
@@ -572,7 +594,7 @@ export function SchematicEditor(props: Props) {
     }
     if (tool.kind === 'wire' && tool.start) {
       return (
-        <path d={`M ${tool.start.x} ${tool.start.y} H ${g.x} V ${g.y}`} className="ghost-wire" />
+        <path d={`M ${tool.start.x} ${tool.start.y} ${ctrlHeld ? `L ${g.x} ${g.y}` : `H ${g.x} V ${g.y}`}`} className="ghost-wire" />
       );
     }
     if (tool.kind === 'flag') {
@@ -586,7 +608,7 @@ export function SchematicEditor(props: Props) {
       return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
     }
     return null;
-  }, [tool, g.x, g.y, lib]);
+  }, [tool, g.x, g.y, lib, ctrlHeld]);
 
   // codos arrastrables de los cables seleccionados
   const vertices = useMemo(() => {

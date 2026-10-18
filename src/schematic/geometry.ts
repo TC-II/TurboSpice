@@ -1,7 +1,7 @@
 // Geometría del esquemático: cajas de símbolos, detección bajo el cursor, grilla.
-import { GRID, WINDOW_ATTR, type AscDoc, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
+import { GRID, WINDOW_ATTR, type AscDoc, type Orient, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
-import { toWorld, transformAlign } from '../asc/transform.ts';
+import { toWorld, transformAlign, transformOffset } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
@@ -46,6 +46,21 @@ export function symbolBox(inst: SymbolInst, def: SymbolDef | undefined, lib: Lib
     toWorld(inst, b.x1, b.y2),
     toWorld(inst, b.x2, b.y2),
   ]);
+}
+
+/**
+ * Origen de inserción para que el cursor `at` quede en el centro de la geometría
+ * (líneas/formas/pines, sin textos ni skin) del símbolo orientado. Se corrige para
+ * que los pines sigan cayendo sobre la grilla.
+ */
+export function placementOrigin(def: SymbolDef | undefined, orient: Orient, at: Point): Point {
+  if (!def || (!def.shapes.length && !def.pins.length)) return at;
+  const b = localBox(def);
+  const c = transformOffset((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, orient);
+  const o = { x: at.x - c.x, y: at.y - c.y };
+  // referencia de grilla: el primer pin (o el origen si no tiene pines)
+  const ref = def.pins.length ? toWorld({ ...o, orient }, def.pins[0].x, def.pins[0].y) : o;
+  return { x: o.x + snap(ref.x) - ref.x + 0, y: o.y + snap(ref.y) - ref.y + 0 };
 }
 
 export function pinPoints(inst: SymbolInst, def: SymbolDef | undefined): Point[] {

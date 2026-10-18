@@ -13,6 +13,7 @@ import {
   hitTestAll,
   labelAt,
   pinPoints,
+  placementOrigin,
   snap,
   snapPoint,
   symbolBox,
@@ -330,7 +331,7 @@ export function SchematicEditor(props: Props) {
         return;
       }
       case 'place':
-        commit(placeSymbol(doc, tool.type, g, tool.orient, lib));
+        commit(placeSymbol(doc, tool.type, placementOrigin(lib.symbol(tool.type), tool.orient, g), tool.orient, lib));
         return;
       case 'flag':
         commit(addFlag(doc, g, tool.name));
@@ -450,8 +451,10 @@ export function SchematicEditor(props: Props) {
   const g = snapPoint(cursor);
   const ghost = useMemo(() => {
     if (tool.kind === 'place') {
-      const inst = { type: tool.type, x: g.x, y: g.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
-      return <SymbolView inst={inst} def={lib.symbol(tool.type)} lib={lib} />;
+      const def = lib.symbol(tool.type);
+      const o = placementOrigin(def, tool.orient, g);
+      const inst = { type: tool.type, x: o.x, y: o.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
+      return <SymbolView inst={inst} def={def} lib={lib} />;
     }
     if (tool.kind === 'wire' && tool.start) {
       return (
@@ -516,6 +519,13 @@ export function SchematicEditor(props: Props) {
           width={Math.abs(boxEnd.x - drag.start.x)}
           height={Math.abs(boxEnd.y - drag.start.y)}
         />
+      )}
+      {tool.kind === 'wire' && (
+        // cruz de pantalla completa en el punto de la grilla (reemplaza al cursor del mouse)
+        <g className="wire-crosshair">
+          <line x1={vb.x} y1={g.y} x2={vb.x + vb.w} y2={g.y} />
+          <line x1={g.x} y1={vb.y} x2={g.x} y2={vb.y + vb.h} />
+        </g>
       )}
       {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>

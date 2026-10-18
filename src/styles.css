@@ -353,12 +353,6 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .result-table { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
 .result-table .filter { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; width: 200px; }
 button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-muted); font: inherit; font-weight: 500; }
-.pz-view { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; overflow: auto; }
-.pz-plane { width: 260px; height: 260px; flex: none; background: var(--bg-alt); border-radius: 8px; }
-.pz-plane .axis { stroke: var(--fg-muted); stroke-width: 1; }
-.pz-plane text { fill: var(--fg-muted); font: 11px system-ui, sans-serif; }
-.pz-plane .pole { stroke: var(--err); stroke-width: 2; fill: none; }
-.pz-plane .zero { stroke: var(--accent); stroke-width: 2; fill: none; }
 .smith { display: flex; gap: 16px; align-items: flex-start; min-height: 0; flex: 1; }
 .smith svg { height: 100%; max-height: 420px; aspect-ratio: 1; flex: none; }
 .smith .grid circle, .smith .grid line, .smith .grid polyline { fill: none; stroke: var(--grid); stroke-width: 1; }
@@ -477,3 +471,23 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .workspace.side .canvas-wrap > .restore-tab { bottom: auto; top: 50%; left: auto; right: 8px; transform: translateY(-50%); }
 .results-panel { position: relative; }
 .results-panel > .restore-tab { position: static; align-self: center; margin: 4px 0; }
+
+/* ---------- Mapa de polos y ceros (#31) ---------- */
+.plot-only { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.bode-pz { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 34%); gap: 12px; min-height: 0; }
+.bode-pz > .plot-panel { min-width: 0; }
+.pz-view { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; overflow: auto; min-height: 0; }
+.pz-view.compact { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+.pz-main { display: flex; flex-direction: column; gap: 4px; }
+.pz-plane { width: 420px; height: 420px; max-width: 100%; flex: none; background: var(--bg-alt); border-radius: 8px; touch-action: none; cursor: grab; }
+.pz-view.compact .pz-plane { width: 100%; height: auto; aspect-ratio: 1; }
+.pz-plane .axis { stroke: var(--fg-muted); stroke-width: 1; }
+.pz-plane .rhp { fill: var(--err); opacity: 0.07; }
+.pz-plane .grid { stroke: var(--grid); stroke-width: 1; }
+.pz-plane .guides line, .pz-plane .guides circle { stroke: var(--fg-muted); stroke-width: 0.6; stroke-dasharray: 3 4; fill: none; opacity: 0.6; }
+.pz-plane .tick { fill: var(--fg-muted); font: 12px system-ui, sans-serif; }
+.pz-plane .root path, .pz-plane .root circle:not(.hit) { stroke: currentColor; stroke-width: 2; fill: none; }
+.pz-plane .root .hit { fill: transparent; stroke: none; }
+.pz-plane .root.hl path, .pz-plane .root.hl circle:not(.hit) { stroke-width: 3; }
+.pz-table tr.hl td, .pz-table tr.hl th { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.pz-view.compact .pz-table { font-size: 11px; }

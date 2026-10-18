@@ -26,3 +26,18 @@ describe('FFT y THD', () => {
     expect(r.harmonics[1]).toBeCloseTo(0.1, 2);
   });
 });
+
+describe('mapa de polos y ceros', () => {
+  it('f0, Q, ζ y τ de un par complejo y de un polo real', async () => {
+    const { rootInfo, niceStep } = await import('../../src/waveform/PzMap.tsx');
+    // RLC: σ = −5000, ω_d = 31222 → ω0 = 31623 (f0 = 5.033 kHz), Q = 3.162
+    const c = rootInfo({ re: -5000, im: 31222.6 });
+    expect(c.f0).toBeCloseTo(5032.9, 0);
+    expect(c.q).toBeCloseTo(3.162, 2);
+    expect(c.zeta).toBeCloseTo(0.1581, 3);
+    const r = rootInfo({ re: -1000, im: 0 });
+    expect(r.q).toBeNaN();
+    expect(r.tau).toBeCloseTo(1e-3, 9);
+    expect([niceStep(10), niceStep(73), niceStep(0.002)]).toEqual([2, 20, 0.0005]);
+  });
+});

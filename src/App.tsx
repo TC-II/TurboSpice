@@ -11,7 +11,8 @@ import { biasParams, elementBias, netBias } from './sim/bias.ts';
 import { symbolBox } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
 import { StatusText, type Status } from './NetlistMode.tsx';
-import { isPzPlot, PzPlane, ResultTable } from './waveform/ScalarViews.tsx';
+import { ResultTable } from './waveform/ScalarViews.tsx';
+import { isPzPlot, PzMap, pzPlots, pzRoots, rootInfo } from './waveform/PzMap.tsx';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
@@ -448,7 +449,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // sólo si no hay otra cosa
       const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
       const withScale = xy.length ? xy : realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
-      const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
+      // un .pz se muestra siempre al terminar (su mapa), aunque haya otros análisis (#31)
+      const shown = pzPlots(result.plots)[0] ?? withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
       // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
       // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
@@ -1035,6 +1037,14 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const runs = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
   const shownRuns = useMemo(() => (overlay ? runs : plot ? [plot] : []), [overlay, runs, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
+  const allPz = useMemo(() => (sim ? pzPlots(sim.result.plots) : []), [sim]);
+  // con .ac y .pz: el mapa al lado del Bode y las f₀ de los polos marcadas en el Bode (#31)
+  const [pzSide, setPzSide] = useState(true);
+  const bodeWithPz = !!plot && scaleOf(plot)?.name === 'frequency' && allPz.length > 0;
+  const poleMarks = useMemo(
+    () => (allPz[0] ? [...new Set(pzRoots(allPz[0]).filter((r) => r.kind === 'pole' && r.im >= 0).map((r) => +rootInfo(r).f0.toPrecision(6)))] : []),
+    [allPz],
+  );
   const isComplex = plot?.vectors.some((v) => v.imag);
 
   return (
@@ -1244,10 +1254,15 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                       <option value="smith">Carta de Smith</option>
                     </select>
                   )}
-                  {runs.length > 1 && (
+                  {bodeWithPz && (
+                    <label className="check inline">
+                      <input type="checkbox" checked={pzSide} onChange={(e) => setPzSide(e.target.checked)} /> Polos y ceros al lado
+                    </label>
+                  )}
+                  {(runs.length > 1 || (plot && isPzPlot(plot) && allPz.length > 1)) && (
                     <label className="check inline">
                       <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> Superponer las{' '}
-                      {runs.length} corridas
+                      {plot && isPzPlot(plot) ? allPz.length : runs.length} corridas
                     </label>
                   )}
                   {scale && (
@@ -1303,7 +1318,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             <div className="results-body">
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
               {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
+                <div className={bodeWithPz && pzSide ? 'bode-pz' : 'plot-only'}>
                 <PlotPanel
+                  markers={bodeWithPz ? poleMarks : undefined}
                   handle={plotPanel}
                   plot={plot}
                   runs={shownRuns}
@@ -1320,8 +1337,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                     setTraceNet(net ? conn.nets.find((n) => n.name.toLowerCase() === net.toLowerCase())?.name : undefined);
                   }}
                 />
+                {bodeWithPz && pzSide && <PzMap plots={overlay ? allPz : allPz.slice(0, 1)} labels={labels} compact />}
+                </div>
               )}
-              {panel === 'plot' && plot && !scale && (isPzPlot(plot) ? <PzPlane plot={plot} /> : <ResultTable plot={plot} />)}
+              {panel === 'plot' && plot && !scale && (isPzPlot(plot) ? <PzMap key={plot.name} plots={overlay ? allPz : [plot]} labels={labels} /> : <ResultTable plot={plot} />)}
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
               {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}

@@ -29,6 +29,8 @@ interface Props {
   setActive(i: number): void;
   /** traza bajo el mouse (para resaltar su red en el esquemático) */
   onHoverExpr?(expr: string | undefined): void;
+  /** marcas verticales en el eje X (p.ej. f₀ de los polos de un .pz sobre el Bode) */
+  markers?: number[];
   /** FFT de una traza del transitorio en el rango dado (crea un plot derivado) */
   onFft?(o: { expr: string; window: FftWindow; from?: number; to?: number }): void;
   handle?: Ref<PlotPanelHandle>;
@@ -50,7 +52,7 @@ const safeRange: uPlot.Range.Function = (_u, min, max) => {
 };
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, markers, handle }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   const [fftExpr, setFftExpr] = useState('');
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
@@ -216,6 +218,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
               setLastCursor(c.a !== undefined ? 'a' : 'b');
             }}
             onHoverExpr={onHoverExpr}
+            markers={markers}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
           />
         ))}
@@ -259,6 +262,7 @@ function PaneView(props: {
   cursors: Cursors;
   onCursor(c: Cursors): void;
   onHoverExpr?(e: string | undefined): void;
+  markers?: number[];
   register(u: uPlot | null): void;
 }) {
   const { index, pane, data, xRange, onZoom, cursorMode, cursors, onCursor } = props;
@@ -266,6 +270,8 @@ function PaneView(props: {
   const chart = useRef<uPlot | null>(null);
   const cursorsRef = useRef(cursors);
   cursorsRef.current = cursors;
+  const markersRef = useRef(props.markers);
+  markersRef.current = props.markers;
   const programmatic = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -341,6 +347,23 @@ function PaneView(props: {
           (u) => {
             const c = cursorsRef.current;
             const ctx = u.ctx;
+            // marcas (f₀ de polos): líneas finas punteadas con su valor
+            for (const m of markersRef.current ?? []) {
+              const px = u.valToPos(m, 'x', true);
+              if (px < u.bbox.left || px > u.bbox.left + u.bbox.width) continue;
+              ctx.save();
+              ctx.strokeStyle = 'rgba(224, 49, 49, 0.55)';
+              ctx.setLineDash([2, 4]);
+              ctx.lineWidth = devicePixelRatio;
+              ctx.beginPath();
+              ctx.moveTo(px, u.bbox.top);
+              ctx.lineTo(px, u.bbox.top + u.bbox.height);
+              ctx.stroke();
+              ctx.fillStyle = 'rgba(224, 49, 49, 0.9)';
+              ctx.font = `${11 * devicePixelRatio}px system-ui`;
+              ctx.fillText(`× ${fmt(m)}Hz`, px + 3 * devicePixelRatio, u.bbox.top + u.bbox.height - 4 * devicePixelRatio);
+              ctx.restore();
+            }
             for (const [name, v] of [
               ['A', c.a],
               ['B', c.b],

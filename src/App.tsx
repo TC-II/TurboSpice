@@ -2006,10 +2006,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         <ShareDialog
           url={dialog.url}
           onClose={() => setDialog(null)}
-          onDownload={() => {
-            setDialog(null);
-            doSave(true);
-          }}
         />
       )}
       {dialog?.kind === 'flag' && (

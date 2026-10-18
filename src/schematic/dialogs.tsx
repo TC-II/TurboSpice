@@ -336,7 +336,7 @@ export function FlagDialog({ initial, onApply, onClose }: {
 }
 
 /** Link para compartir el circuito: se copia al portapapeles al abrir */
-export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose(): void; onDownload(): void }) {
+export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) {
   const [copied, setCopied] = useState<boolean | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const copy = () =>
@@ -351,20 +351,21 @@ export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose
     input.current?.select();
     copy();
   }, []);
-  const kb = (url.length / 1024).toFixed(1);
+  // el circuito comprimido es el parámetro c= del hash (base64url: 4 caracteres por 3 bytes)
+  const packed = new URLSearchParams(url.slice(url.indexOf('#') + 1)).get('c') ?? '';
+  const bytes = Math.floor((packed.length * 3) / 4);
   return (
     <Modal title="Compartir circuito" onClose={onClose}>
       <div className="textdlg">
         <input ref={input} readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()} />
-        <p className="hint">
-          {copied ? 'Link copiado al portapapeles. ' : copied === false ? 'Copiá el link con Ctrl+C. ' : ''}
-          El circuito va dentro del link ({kb} KB): no se sube a ningún servidor.
-        </p>
-        {url.length > LONG_LINK && (
-          <p className="hint warn">Es un link largo: puede cortarse en algunos chats o mails. Si pasa, mandá el archivo .asc.</p>
-        )}
+        <p className="hint">El link contiene todo el circuito comprimido en {bytes.toLocaleString('es')} bytes.</p>
+        {copied ? (
+          <p className="hint ok"><span aria-hidden="true">✓</span> Link copiado en portapapeles</p>
+        ) : copied === false ? (
+          <p className="hint">Copiá el link con Ctrl+C.</p>
+        ) : null}
+        {url.length > LONG_LINK && <p className="hint warn">Es un link largo: puede cortarse en algunos chats o mails.</p>}
         <div className="buttons">
-          <button type="button" onClick={onDownload}>Descargar .asc</button>
           <button type="button" onClick={copy}>Copiar</button>
           <button type="button" className="primary" onClick={onClose}>Listo</button>
         </div>

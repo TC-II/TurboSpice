@@ -1,7 +1,7 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
-import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
+import { GRID, type AscDoc, type Orient, type Point, type Shape } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindow } from './edit.ts';
@@ -34,7 +34,16 @@ export type Tool =
   | { kind: 'delete' }
   | { kind: 'probe' }
   /** elegir una red o una fuente para un diálogo (Esc cancela) */
-  | { kind: 'pick'; what: PickWhat };
+  | { kind: 'pick'; what: PickWhat }
+  /**
+   * M / S de LTspice: click en un elemento (o recuadro) y sigue al cursor hasta el próximo
+   * click; `stretch` estira los cables conectados (S) o no (M)
+   */
+  | { kind: 'move'; stretch: boolean; refs: ItemRef[] | null; start: Point | null }
+  /** J / K: líneas y rectángulos decorativos (LINE / RECTANGLE del .asc) */
+  | { kind: 'shape'; shape: 'LINE' | 'RECTANGLE'; start: Point | null }
+  /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
+  | { kind: 'zoom'; prev: Tool };
 
 export interface EditorHandle {
   fit(): void;
@@ -45,6 +54,10 @@ export interface EditorHandle {
   contentBox(): Box | null;
   /** Centra la vista en una caja (p.ej. el componente de un problema) */
   centerOn(b: Box): void;
+  /** Shift+Z: vuelve a la vista anterior (zoom anterior) */
+  zoomPrev(): void;
+  /** ¿Se desplazó con Espacio+arrastrar desde que se apretó Espacio? (si no, Espacio = ajustar) */
+  spacePanned(): boolean;
 }
 
 interface Props {
@@ -73,6 +86,9 @@ interface Props {
   handle?: Ref<EditorHandle>;
   /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
   docKey?: number;
+  /** Ctrl+G: grilla; Ctrl+U: marcas de pines sueltos */
+  showGrid?: boolean;
+  showLoose?: boolean;
 }
 
 interface View {
@@ -86,6 +102,8 @@ type Drag =
   | { mode: 'pan'; sx: number; sy: number; view: View }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
+  /** recuadro de la herramienta zoom */
+  | { mode: 'zoom'; start: Point }
   /** arrastrar un rótulo (InstName/Value) de un símbolo */
   | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
 
@@ -131,11 +149,42 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
   });
 }
 
+/** Línea o rectángulo decorativo del esquemático cerca de p (el último dibujado primero) */
+function shapeAt(doc: AscDoc, p: Point, tol: number): number {
+  const seg = (x1: number, y1: number, x2: number, y2: number) => {
+    const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+    const t = l2 ? Math.max(0, Math.min(1, ((p.x - x1) * (x2 - x1) + (p.y - y1) * (y2 - y1)) / l2)) : 0;
+    return Math.hypot(p.x - (x1 + t * (x2 - x1)), p.y - (y1 + t * (y2 - y1)));
+  };
+  for (let i = doc.shapes.length - 1; i >= 0; i--) {
+    const [x1, y1, x2, y2] = doc.shapes[i].coords;
+    const kind = doc.shapes[i].kind;
+    if (kind === 'LINE' && seg(x1, y1, x2, y2) <= tol) return i;
+    if (kind === 'RECTANGLE' && Math.min(seg(x1, y1, x2, y1), seg(x2, y1, x2, y2), seg(x2, y2, x1, y2), seg(x1, y2, x1, y1)) <= tol) return i;
+  }
+  return -1;
+}
+
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, pickValue, onPicked } = props;
+  const { showGrid = true, showLoose = true } = props;
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
+  // vistas anteriores (Shift+Z); los giros seguidos de la rueda cuentan como un solo paso
+  const viewHistory = useRef<View[]>([]);
+  const lastWheel = useRef(0);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const pushView = () => {
+    viewHistory.current.push(viewRef.current);
+    if (viewHistory.current.length > 50) viewHistory.current.shift();
+  };
+  /** Cambio de vista que se deshace con Shift+Z */
+  const zoomTo = (v: View) => {
+    pushView();
+    setView(v);
+  };
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   const [drag, setDrag] = useState<Drag | null>(null);
   const [preview, setPreview] = useState<AscDoc | null>(null);
@@ -145,6 +194,7 @@ export function SchematicEditor(props: Props) {
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
+  const spaceUsed = useRef(false);
   const lastClick = useRef<{ p: Point; i: number; t: number } | null>(null);
   // táctil: punteros activos, pellizco (zoom + paneo con dos dedos) y toque largo (editar)
   const touches = useRef(new Map<number, { x: number; y: number }>());
@@ -158,13 +208,20 @@ export function SchematicEditor(props: Props) {
     return () => ro.disconnect();
   }, []);
 
+  /** Vista que muestra toda la caja, con un margen */
+  const viewOf = useCallback(
+    (b: Box, pad: number, max = 4): View => ({
+      cx: (b.x1 + b.x2) / 2,
+      cy: (b.y1 + b.y2) / 2,
+      scale: Math.min(max, Math.max(0.05, Math.min(size.w / (b.x2 - b.x1 + 2 * pad), size.h / (b.y2 - b.y1 + 2 * pad)))),
+    }),
+    [size],
+  );
   const fit = useCallback(() => {
     const b = docBox(doc, lib);
-    if (!b) return setView({ cx: 0, cy: 0, scale: 1 });
-    const pad = 48;
-    const scale = Math.min(4, Math.max(0.05, Math.min(size.w / (b.x2 - b.x1 + 2 * pad), size.h / (b.y2 - b.y1 + 2 * pad))));
-    setView({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale });
-  }, [doc, lib, size]);
+    viewHistory.current.push(viewRef.current);
+    setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
+  }, [doc, lib, viewOf]);
 
   useImperativeHandle(
     handle,
@@ -173,8 +230,15 @@ export function SchematicEditor(props: Props) {
       cursor: () => snapPoint(cursor),
       svg: () => svgRef.current,
       contentBox: () => docBox(doc, lib),
-      centerOn: (b: Box) =>
-        setView((v) => ({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale: Math.max(v.scale, Math.min(2, size.w / (b.x2 - b.x1 + 200))) })),
+      centerOn: (b: Box) => {
+        viewHistory.current.push(viewRef.current);
+        setView((v) => ({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale: Math.max(v.scale, Math.min(2, size.w / (b.x2 - b.x1 + 200))) }));
+      },
+      zoomPrev: () => {
+        const v = viewHistory.current.pop();
+        if (v) setView(v);
+      },
+      spacePanned: () => spaceUsed.current,
     }),
     [fit, cursor, doc, lib, size.w],
   );
@@ -191,7 +255,10 @@ export function SchematicEditor(props: Props) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) spaceDown.current = true;
+      if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        spaceDown.current = true;
+        spaceUsed.current = false;
+      }
     };
     const up = (e: KeyboardEvent) => e.code === 'Space' && (spaceDown.current = false);
     window.addEventListener('keydown', down);
@@ -219,6 +286,8 @@ export function SchematicEditor(props: Props) {
     const p = toDoc(e);
     const k = Math.exp(-e.deltaY * 0.0015);
     const scale = Math.min(8, Math.max(0.03, view.scale * k));
+    if (e.timeStamp - lastWheel.current > 500) pushView();
+    lastWheel.current = e.timeStamp;
     // mantener fijo el punto bajo el cursor
     setView({ scale, cx: p.x - (p.x - view.cx) * (view.scale / scale), cy: p.y - (p.y - view.cy) * (view.scale / scale) });
   };
@@ -268,12 +337,19 @@ export function SchematicEditor(props: Props) {
     const p = toDoc(e);
     const g = snapPoint(p);
     if (e.button === 1 || (e.button === 0 && spaceDown.current)) {
+      if (spaceDown.current) spaceUsed.current = true;
+      pushView();
       setDrag({ mode: 'pan', sx: e.clientX, sy: e.clientY, view });
       return;
     }
     if (e.button === 2) {
       // Botón derecho: terminar cable / volver a seleccionar (como Esc en LTspice)
       if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
+      else if (tool.kind === 'shape' && tool.start) setTool({ ...tool, start: null });
+      else if (tool.kind === 'move' && tool.refs) {
+        setPreview(null);
+        setTool({ ...tool, refs: null, start: null });
+      } else if (tool.kind === 'zoom') setTool(tool.prev);
       else if (tool.kind !== 'select') setTool({ kind: 'select' });
       else {
         const hit = hitTest(doc, p, lib, tol);
@@ -342,9 +418,44 @@ export function SchematicEditor(props: Props) {
         return;
       case 'delete': {
         const hit = hitTest(doc, p, lib, tol);
+        const shape = hit ? -1 : shapeAt(doc, p, tol);
         if (hit) commit(deleteItems(doc, [hit]));
+        else if (shape >= 0) commit({ ...doc, shapes: doc.shapes.filter((_, i) => i !== shape) });
         return;
       }
+      case 'move': {
+        if (tool.refs && tool.start) {
+          // segundo click: se suelta donde está
+          if (preview) commit(preview);
+          setPreview(null);
+          setTool({ ...tool, refs: null, start: null });
+          return;
+        }
+        const hit = hitTest(doc, p, lib, tol);
+        if (!hit) {
+          // un recuadro elige varios elementos
+          setDrag({ mode: 'box', start: p, additive: false });
+          setBoxEnd(p);
+          return;
+        }
+        const refs = selection.some((s) => s.kind === hit.kind && s.index === hit.index) ? selection : [hit];
+        setSelection(refs);
+        setTool({ ...tool, refs, start: g });
+        return;
+      }
+      case 'shape': {
+        if (!tool.start) return setTool({ ...tool, start: g });
+        if (g.x !== tool.start.x || g.y !== tool.start.y) {
+          const s: Shape = { kind: tool.shape, coords: [tool.start.x, tool.start.y, g.x, g.y] };
+          commit({ ...doc, shapes: [...doc.shapes, s] });
+        }
+        setTool({ ...tool, start: null });
+        return;
+      }
+      case 'zoom':
+        setDrag({ mode: 'zoom', start: p });
+        setBoxEnd(p);
+        return;
       case 'probe': {
         const target = probeTarget(p);
         if (target) onProbe?.(target);
@@ -393,6 +504,10 @@ export function SchematicEditor(props: Props) {
       const r = svgRef.current!.getBoundingClientRect();
       setTip({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height, info });
     } else if (tip) setTip(null);
+    if (tool.kind === 'move' && tool.refs && tool.start && !drag) {
+      const g = snapPoint(p);
+      setPreview(moveItems(doc, tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, lib));
+    }
     if (!drag) return;
     if (drag.mode === 'pan') {
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
@@ -432,7 +547,18 @@ export function SchematicEditor(props: Props) {
         y2: Math.max(drag.start.y, boxEnd.y),
       };
       const found = itemsIn(doc, b, lib);
-      setSelection(drag.additive ? [...selection, ...found] : found);
+      // con M / S el recuadro elige lo que se va a mover
+      if (tool.kind === 'move') {
+        setSelection(found);
+        if (found.length) setTool({ ...tool, refs: found, start: snapPoint(boxEnd) });
+      } else setSelection(drag.additive ? [...selection, ...found] : found);
+    }
+    if (drag.mode === 'zoom' && boxEnd) {
+      const b = { x1: Math.min(drag.start.x, boxEnd.x), y1: Math.min(drag.start.y, boxEnd.y), x2: Math.max(drag.start.x, boxEnd.x), y2: Math.max(drag.start.y, boxEnd.y) };
+      // un click sin arrastrar acerca al doble alrededor del punto
+      if ((b.x2 - b.x1) * view.scale < 6 && (b.y2 - b.y1) * view.scale < 6) zoomTo({ cx: drag.start.x, cy: drag.start.y, scale: Math.min(8, view.scale * 2) });
+      else zoomTo(viewOf(b, 0, 8));
+      if (tool.kind === 'zoom') setTool(tool.prev);
     }
     setDrag(null);
     setPreview(null);
@@ -468,11 +594,19 @@ export function SchematicEditor(props: Props) {
     if (tool.kind === 'text') {
       return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
     }
+    if (tool.kind === 'shape' && tool.start) {
+      const { x, y } = tool.start;
+      return tool.shape === 'LINE' ? (
+        <line x1={x} y1={y} x2={g.x} y2={g.y} />
+      ) : (
+        <rect x={Math.min(x, g.x)} y={Math.min(y, g.y)} width={Math.abs(g.x - x)} height={Math.abs(g.y - y)} fill="none" />
+      );
+    }
     return null;
   }, [tool, g.x, g.y, lib]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
-  const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
+  const cursorClass = drag?.mode === 'pan' ? 'grabbing' : tool.kind === 'select' ? '' : tool.kind;
 
   return (
     <>
@@ -495,20 +629,21 @@ export function SchematicEditor(props: Props) {
           <circle cx={0} cy={0} r={gridR} className="grid-dot" />
         </pattern>
       </defs>
-      {view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
+      {showGrid && view.scale * GRID >= 5 && <rect x={snap(vb.x) - GRID} y={snap(vb.y) - GRID} width={vb.w + 2 * GRID} height={vb.h + 2 * GRID} fill="url(#grid)" />}
       <SchematicCanvas
         doc={shown}
         lib={lib}
         conn={conn}
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
+        showLoose={showLoose}
       />
       <g className="ghost">{ghost}</g>
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
       )}
-      {drag?.mode === 'box' && boxEnd && (
+      {(drag?.mode === 'box' || drag?.mode === 'zoom') && boxEnd && (
         <rect
           className="selbox"
           x={Math.min(drag.start.x, boxEnd.x)}

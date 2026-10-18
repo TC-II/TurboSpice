@@ -166,9 +166,11 @@ export interface CanvasProps {
   selection: ItemRef[];
   /** red resaltada (probe o hover) */
   highlightNet?: string;
+  /** marcas de pines sueltos (Ctrl+U) */
+  showLoose?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, showLoose = true }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión: 3 o más extremos de cable en el mismo punto (spec §8.3)
@@ -213,7 +215,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
           <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} />
         ))}
       </g>
-      <g className="loose">{loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
+      <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((t, i) =>
           isStudyBlocksText(t) ? null : (

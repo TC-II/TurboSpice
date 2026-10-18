@@ -306,54 +306,135 @@ export function ShareDialog({ url, onClose, onDownload }: { url: string; onClose
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ['F2', 'Componente (buscador)'],
-  ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
-  ['G', 'Tierra'],
-  ['F3 · W', 'Cable (click derecho o Esc termina)'],
-  ['F4 · N', 'Etiqueta de red'],
-  ['S · T', 'Directiva SPICE · comentario'],
-  ['F5 · Supr', 'Borrar'],
-  ['F6', 'Duplicar la selección'],
-  ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
-  ['Ctrl+A', 'Seleccionar todo'],
-  ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
-  ['Ctrl+Z · Ctrl+Y', 'Deshacer · rehacer'],
-  ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
-  ['Click repetido', 'Alterna entre elementos superpuestos'],
-  ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
-  ['Rueda · botón medio · Espacio', 'Zoom · desplazar'],
-  ['Inicio', 'Ajustar a la vista'],
-  ['Alt+N', 'Mostrar los nombres de las redes'],
-  ['Alt+S · Alt+C', 'Comando de simulación · bloque .control'],
-  ['Ctrl+Enter', 'Simular'],
-  ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
-  ['?', 'Esta ayuda'],
+// Los de la configuración de LTspice que usamos (LTspice.ini): dependen de dónde está el mouse
+const SHORTCUTS: [string, [string, string][]][] = [
+  [
+    'Esquemático',
+    [
+      ['P · F2', 'Componente (buscador)'],
+      ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
+      ['G', 'Tierra'],
+      ['W · F3', 'Cable (click derecho o Esc termina)'],
+      ['N · F4', 'Etiqueta de red'],
+      ['. · T', 'Directiva SPICE · comentario'],
+      ['J · K', 'Línea · rectángulo (decorativos)'],
+      ['M', 'Mover: click en un elemento (o recuadro), sigue al cursor hasta el próximo click; los cables no se estiran'],
+      ['S', 'Arrastrar: igual que M, pero los cables se estiran'],
+      ['Backspace · F5', 'Borrar la selección (sin selección: modo borrar)'],
+      ['F6', 'Duplicar la selección'],
+      ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
+      ['Ctrl+A', 'Seleccionar todo'],
+      ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
+      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer (también Ctrl+Y)'],
+      ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
+      ['Click repetido', 'Alterna entre elementos superpuestos'],
+      ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
+      ['Rueda', 'Zoom'],
+      ['Botón medio · Espacio+arrastrar', 'Desplazar'],
+      ['Espacio · Inicio', 'Ajustar a la vista'],
+      ['Z · Shift+Z', 'Zoom a un recuadro · zoom anterior'],
+      ['Ctrl+G · Ctrl+U', 'Mostrar/ocultar la grilla · las marcas de pines sueltos'],
+      ['Alt+N', 'Mostrar los nombres de las redes'],
+      ['A · Alt+E · Alt+C', 'Comando de simulación · estudio · bloque .control'],
+      ['Alt+R · Ctrl+Enter', 'Simular'],
+      ['Alt+S', 'Abortar la simulación'],
+      ['Ctrl+L', 'Ver el log (o los problemas) de la simulación'],
+      ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
+      ['?', 'Esta ayuda'],
+    ],
+  ],
+  [
+    'Visor de resultados (con el mouse sobre los gráficos)',
+    [
+      ['Espacio', 'Ajustar (ver todo)'],
+      ['Z · Shift+Z', 'Zoom a un recuadro (X e Y) · zoom anterior'],
+      ['Ctrl+Y', 'Autoescala vertical'],
+      ['Ctrl+G', 'Mostrar/ocultar la grilla'],
+      ['A', 'Agregar traza (campo de expresión, con autocompletado)'],
+      ['P · B', 'Agregar panel · agregar panel debajo del activo'],
+      ['U · D', 'Mover el panel activo arriba · abajo'],
+      ['Backspace', 'Quitar trazas: click en el nombre (Esc termina)'],
+      ['C · Shift+C', 'Cursores · borrar los cursores'],
+      ['Shift+S', 'Elegir qué corridas de un .step mostrar'],
+      ['O · Ctrl+Espacio', 'Abrir una vista .plt · volver a aplicar la vista recordada'],
+      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer los cambios de la vista (trazas, paneles, colores)'],
+      ['Alt+R · Alt+S · Ctrl+L', 'Simular · abortar · log'],
+    ],
+  ],
+  [
+    'Modo Netlist',
+    [
+      ['Alt+R · Ctrl+Enter', 'Simular'],
+      ['Alt+S', 'Abortar'],
+      ['Ctrl+L', 'Ver el log'],
+      ['Ctrl+G', 'Ir a una línea'],
+    ],
+  ],
 ];
 
 export function HelpDialog({ onClose }: { onClose(): void }) {
   return (
     <Modal title="Atajos de teclado" onClose={onClose} wide>
-      <table className="shortcuts">
-        <tbody>
-          {SHORTCUTS.map(([k, d]) => (
-            <tr key={k}>
-              <th>
-                {k.split(' · ').map((x, i) => (
-                  <span key={i}>
-                    {i > 0 && ' · '}
-                    <kbd>{x}</kbd>
-                  </span>
-                ))}
-              </th>
-              <td>{d}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {SHORTCUTS.map(([section, rows]) => (
+        <section key={section}>
+          <h3>{section}</h3>
+          <table className="shortcuts">
+            <tbody>
+              {rows.map(([k, d]) => (
+                <tr key={k}>
+                  <th>
+                    {k.split(' · ').map((x, i) => (
+                      <span key={i}>
+                        {i > 0 && ' · '}
+                        <kbd>{x}</kbd>
+                      </span>
+                    ))}
+                  </th>
+                  <td>{d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ))}
       <p className="hint">En táctil: pellizcar para zoom, dos dedos para desplazar, mantener apretado para editar.</p>
       <div className="buttons">
         <button className="primary" onClick={onClose}>Cerrar</button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Shift+S en el visor: qué corridas de un .step se muestran */
+export function RunsDialog({ runs, hidden, onApply, onClose }: {
+  runs: { name: string; label: string }[];
+  hidden: Set<string>;
+  onApply(hidden: Set<string>): void;
+  onClose(): void;
+}) {
+  const [off, setOff] = useState(() => new Set(hidden));
+  const toggle = (name: string) => {
+    const next = new Set(off);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setOff(next);
+  };
+  return (
+    <Modal title="Corridas a mostrar" onClose={onClose}>
+      <div className="runs-list">
+        {runs.map((r) => (
+          <label key={r.name} className="check">
+            <input type="checkbox" checked={!off.has(r.name)} onChange={() => toggle(r.name)} /> {r.label}
+          </label>
+        ))}
+      </div>
+      <div className="buttons">
+        <button onClick={() => setOff(new Set())}>Todas</button>
+        <button onClick={() => setOff(new Set(runs.map((r) => r.name)))}>Ninguna</button>
+        <button onClick={onClose}>Cancelar</button>
+        <button className="primary" disabled={off.size === runs.length} onClick={() => onApply(off)}>
+          Aceptar
+        </button>
       </div>
     </Modal>
   );
@@ -373,8 +454,8 @@ export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
           ningún servidor. Abre y guarda <code>.asc</code> de LTspice, así que podés ir y volver entre los dos.
         </p>
         <ul>
-          <li>Dibujá con los mismos atajos de LTspice (<kbd>F2</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
-          <li>Configurá el análisis en <strong>Simulación…</strong> y apretá <strong>Simular</strong> (<kbd>Ctrl+Enter</kbd>).</li>
+          <li>Dibujá con los mismos atajos de LTspice (<kbd>P</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
+          <li>Configurá el análisis en <strong>Simulación…</strong> y apretá <strong>Simular</strong> (<kbd>Alt+R</kbd>).</li>
           <li>Medí con un click en un cable (tensión) o en un componente (corriente); pasá el mouse para ver el punto de operación.</li>
           <li>Compartí un circuito con un link; el trabajo se autoguarda en el navegador.</li>
         </ul>

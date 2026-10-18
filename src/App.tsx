@@ -14,7 +14,7 @@ import { StatusText, type Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, ResultTable } from './waveform/ScalarViews.tsx';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { MenuBar, type MenuDef } from './ui/Menu.tsx';
 import { Icon, type IconName } from './ui/icons.tsx';
@@ -35,7 +35,7 @@ import { SchematicEditor, type EditorHandle, type Tool } from './schematic/Schem
 import { useHistory } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
-import { PlotPanel, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
+import { PlotPanel, type PlotAction, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import type { ComplexMode } from './waveform/curves.ts';
@@ -66,6 +66,7 @@ type Dialog =
   | { kind: 'help' }
   | { kind: 'userfiles' }
   | { kind: 'study' }
+  | { kind: 'runs' }
   | { kind: 'welcome' };
 
 interface FileState {
@@ -223,7 +224,21 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 
   const setTool = useCallback((t: Tool) => {
     setToolState(t);
-    if (t.kind !== 'select') setSelection([]);
+    if (t.kind !== 'select' && t.kind !== 'move' && t.kind !== 'zoom') setSelection([]);
+  }, []);
+  // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
+  const [showGrid, setShowGrid] = useState(true);
+  const [showLoose, setShowLoose] = useState(true);
+  // corridas de un .step ocultas (Shift+S)
+  const [hiddenRuns, setHiddenRuns] = useState<Set<string>>(new Set());
+  // Los atajos dependen de dónde está el mouse, como en LTspice: esquemático o visor
+  const area = useRef<'schematic' | 'viewer'>('schematic');
+  useEffect(() => {
+    const h = (e: PointerEvent) => {
+      area.current = e.target instanceof Element && e.target.closest('.results-panel') ? 'viewer' : 'schematic';
+    };
+    window.addEventListener('pointermove', h);
+    return () => window.removeEventListener('pointermove', h);
   }, []);
   const commit = history.commit;
 
@@ -435,6 +450,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
       setSim({ built, result, doc, meas });
+      setHiddenRuns(new Set());
+      paneUndo.current = { past: [], future: [] };
       // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
       // sólo si no hay otra cosa
       const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
@@ -470,6 +487,26 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     engine.abort();
     engine.ready.then(() => setStatus({ kind: 'idle' }));
     setStatus({ kind: 'error', message: 'Simulación abortada' });
+  };
+  /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
+  const showLog = () => {
+    if (!sim) return setMessage('Todavía no hay simulación: simulá con Alt+R');
+    setPanel(sim.result.errors.length ? 'problems' : 'log');
+  };
+
+  // Deshacer / rehacer los cambios de la vista de resultados (trazas, paneles, colores)
+  const paneUndo = useRef<{ past: Pane[][]; future: Pane[][] }>({ past: [], future: [] });
+  const editPanes = (next: Pane[]) => {
+    paneUndo.current.past.push(panes);
+    paneUndo.current.future = [];
+    setPanes(next);
+  };
+  const undoPanes = (redo = false) => {
+    const u = paneUndo.current;
+    const p = (redo ? u.future : u.past).pop();
+    if (!p) return;
+    (redo ? u.past : u.future).push(panes);
+    setPanes(p);
   };
 
   const plot = sim?.result.plots.find((p) => p.name === plotName);
@@ -544,7 +581,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     if (!expr) return;
     setPanel('plot');
     if (panes.some((p) => p.traces.some((t) => sameExpr(t.expr, expr)))) {
-      setPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
+      editPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
       return;
     }
     const sc = scaleOf(plot);
@@ -555,7 +592,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       return setMessage(`No hay datos de ${expr} en ${plot.name}`);
     }
     const i = Math.min(activePane, panes.length - 1);
-    setPanes(panes.map((p, k) => (k === i ? { traces: [...p.traces, { expr }] } : p)));
+    editPanes(panes.map((p, k) => (k === i ? { traces: [...p.traces, { expr }] } : p)));
   };
 
   const rememberView = () => {
@@ -565,6 +602,12 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     setPlotView(next);
     saveView(file.name, next);
     setMessage(`Vista recordada para .${kind}: se aplica en cada simulación (y se guarda con el link y en el .plt)`);
+  };
+  /** Ctrl+Espacio: volver a aplicar la vista recordada */
+  const reapplyView = () => {
+    const v = plot && plotView[plotKind(plot.name)];
+    if (v) editPanes(v);
+    else setMessage('No hay una vista recordada para este análisis (botón "Recordar vista")');
   };
   const forgetView = () => {
     if (!plot) return;
@@ -779,37 +822,105 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       .filter(Boolean),
   });
 
-  // Atajos de teclado estilo LTspice
+  // Atajos de teclado: los de la configuración de LTspice que usamos (LTspice.ini,
+  // [SchKeyBoardShortCut] y [RawKeyBoardShortCut]); los del visor, con el mouse sobre los gráficos
+  const startMove = (stretch: boolean) =>
+    setTool(selection.length ? { kind: 'move', stretch, refs: selection, start: editor.current?.cursor() ?? null } : { kind: 'move', stretch, refs: null, start: null });
+  const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
+  const viewerKeys = () => area.current === 'viewer' && !!sim && panel === 'plot' && !!plotPanel.current;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (dialog || isTyping(e)) return;
       const ctrl = e.ctrlKey || e.metaKey;
       const k = e.key;
+      // letra sin importar Shift/Bloq Mayús (Shift se mira aparte)
+      const lk = k.length === 1 ? k.toLowerCase() : k;
       const handled = () => e.preventDefault();
-      if (ctrl && (k === 'z' || k === 'Z') && !e.shiftKey) return handled(), history.undo();
-      if (ctrl && (k === 'y' || ((k === 'z' || k === 'Z') && e.shiftKey))) return handled(), history.redo();
-      if (ctrl && (k === 's' || k === 'S')) return handled(), doSave(e.shiftKey);
-      if (ctrl && (k === 'o' || k === 'O')) return handled(), doOpen();
-      if (ctrl && (k === 'r' || k === 'R')) return handled(), rotateOrMirror('rotate');
-      if (ctrl && (k === 'e' || k === 'E')) return handled(), rotateOrMirror('mirror');
-      if (ctrl && (k === 'c' || k === 'C')) return handled(), copySelection();
-      if (ctrl && (k === 'x' || k === 'X')) return handled(), copySelection(true);
-      if (ctrl && (k === 'v' || k === 'V')) return handled(), paste();
-      if (ctrl && (k === 'a' || k === 'A')) return handled(), setTool({ kind: 'select' }), setSelection(allItems(doc));
+      // en los dos contextos
+      if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && run();
+      if (e.altKey && lk === 's') return handled(), running && abort();
+      if (ctrl && lk === 'l') return handled(), showLog();
       if (ctrl && k === 'Enter') return handled(), run();
-      if (e.altKey && (k === 's' || k === 'S')) return handled(), openSimulation();
-      if (e.altKey && (k === 'c' || k === 'C')) return handled(), openControl();
-      if (e.altKey && (k === 'n' || k === 'N')) return handled(), setShowNets((v) => !v);
-      if (e.altKey && (k === 'e' || k === 'E')) return handled(), openStudy();
+      if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
+      if (ctrl && lk === 'o') return handled(), doOpen();
+      if (k === ' ' && !e.altKey) {
+        // Espacio tocado = ajustar (al soltarlo); mantenido + arrastrar desplaza
+        handled();
+        if (ctrl && viewerKeys()) reapplyView();
+        return;
+      }
+      if (viewerKeys()) {
+        const act = (a: PlotAction) => (handled(), plotPanel.current?.action(a));
+        if (ctrl && lk === 'z') return handled(), undoPanes(e.shiftKey);
+        if (ctrl && lk === 'y') return act('autoY');
+        if (ctrl && lk === 'g') return act('grid');
+        if (!ctrl && !e.altKey) {
+          switch (lk) {
+            case 'z':
+              return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
+            case 'a':
+              return act('addTrace');
+            case 'p':
+              return act('addPane');
+            case 'b':
+              return act('addPaneBelow');
+            case 'u':
+              return act('paneUp');
+            case 'd':
+              return act('paneDown');
+            case 'Backspace':
+              return act('removeTraces');
+            case 'c':
+              return act(e.shiftKey ? 'clearCursors' : 'cursor');
+            case 's':
+              if (!e.shiftKey) return;
+              handled();
+              if (runs.length > 1) setDialog({ kind: 'runs' });
+              else setMessage('Este análisis no tiene varias corridas (.step)');
+              return;
+            case 'o':
+              return handled(), pltInput.current?.click();
+            case 'Escape':
+              plotPanel.current?.action('cancel');
+              return;
+          }
+          // el resto de las letras no van al esquemático
+          if (k.length === 1) return;
+        }
+      }
+      if (ctrl && lk === 'z') return handled(), e.shiftKey ? history.redo() : history.undo();
+      if (ctrl && lk === 'y') return handled(), history.redo();
+      if (ctrl && lk === 'r') return handled(), rotateOrMirror('rotate');
+      if (ctrl && lk === 'e') return handled(), rotateOrMirror('mirror');
+      if (ctrl && lk === 'c') return handled(), copySelection();
+      if (ctrl && lk === 'x') return handled(), copySelection(true);
+      if (ctrl && lk === 'v') return handled(), paste();
+      if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), setSelection(allItems(doc));
+      if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
+      if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
+      if (e.altKey && lk === 'c') return handled(), openControl();
+      if (e.altKey && lk === 'n') return handled(), setShowNets((v) => !v);
+      if (e.altKey && lk === 'e') return handled(), openStudy();
       if (e.altKey) return;
       if (ctrl) return;
+      if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
       switch (k) {
         case 'Escape':
+          plotPanel.current?.action('cancel');
           setTool({ kind: 'select' });
           setSelection([]);
           return;
+        case 'a':
+          return handled(), openSimulation();
         case 'F2':
+        case 'p':
           return handled(), setDialog({ kind: 'picker' });
+        case 'm':
+          return handled(), startMove(false);
+        case 'j':
+          return handled(), setTool({ kind: 'shape', shape: 'LINE', start: null });
+        case 'k':
+          return handled(), setTool({ kind: 'shape', shape: 'RECTANGLE', start: null });
         case 'F3':
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
@@ -840,15 +951,27 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         case 'g':
           return setTool({ kind: 'flag', name: '0' });
         case 's':
-          return setDialog({ kind: 'text', textKind: 'directive' });
+          return handled(), startMove(true);
+        case '.':
+          return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
-          return setDialog({ kind: 'text', textKind: 'comment' });
+          return handled(), setDialog({ kind: 'text', textKind: 'comment' });
         case 'Home':
           return handled(), editor.current?.fit();
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key !== ' ' || e.ctrlKey || e.metaKey || e.altKey || dialog || isTyping(e)) return;
+      e.preventDefault();
+      if (viewerKeys()) plotPanel.current?.action('fit');
+      else if (area.current === 'schematic' && !editor.current?.spacePanned()) editor.current?.fit();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   });
 
   // Arrastrar y soltar un .asc
@@ -920,24 +1043,27 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       label: 'Editar',
       items: [
         { label: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
-        { label: 'Rehacer', shortcut: 'Ctrl+Y', onClick: history.redo, disabled: !history.canRedo },
+        { label: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
         'sep',
         { label: 'Cortar', shortcut: 'Ctrl+X', onClick: () => copySelection(true), disabled: !selection.length },
         { label: 'Copiar', shortcut: 'Ctrl+C', onClick: () => copySelection(), disabled: !selection.length },
         { label: 'Pegar', shortcut: 'Ctrl+V', onClick: paste },
         { label: 'Duplicar', shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
-        { label: 'Borrar', shortcut: 'Supr', onClick: deleteSelection },
+        { label: 'Borrar', shortcut: 'Backspace', onClick: deleteSelection },
         { label: 'Seleccionar todo', shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), setSelection(allItems(doc))) },
         'sep',
         { label: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { label: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        'sep',
+        { label: 'Mover (sin estirar cables)', shortcut: 'M', onClick: () => startMove(false) },
+        { label: 'Arrastrar (estirando cables)', shortcut: 'S', onClick: () => startMove(true) },
       ],
     },
     {
       label: 'Dibujar',
       items: [
         { label: 'Cable', shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }) },
-        { label: 'Componente…', shortcut: 'F2', onClick: () => setDialog({ kind: 'picker' }) },
+        { label: 'Componente…', shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }) },
         { label: 'Resistencia', shortcut: 'R', onClick: placeTool('res') },
         { label: 'Capacitor', shortcut: 'C', onClick: placeTool('cap') },
         { label: 'Inductor', shortcut: 'L', onClick: placeTool('ind') },
@@ -946,17 +1072,20 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Tierra', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }) },
         { label: 'Etiqueta de red…', shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
-        { label: 'Directiva SPICE…', shortcut: 'S', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+        { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
         { label: 'Comentario…', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: 'Línea', shortcut: 'J', onClick: () => setTool({ kind: 'shape', shape: 'LINE', start: null }) },
+        { label: 'Rectángulo', shortcut: 'K', onClick: () => setTool({ kind: 'shape', shape: 'RECTANGLE', start: null }) },
       ],
     },
     {
       label: 'Simular',
       items: [
-        { label: 'Simular', shortcut: 'Ctrl+Enter', onClick: run, disabled: running || status.kind === 'loading' },
-        { label: 'Abortar', onClick: abort, disabled: !running },
+        { label: 'Simular', shortcut: 'Alt+R', onClick: run, disabled: running || status.kind === 'loading' },
+        { label: 'Abortar', shortcut: 'Alt+S', onClick: abort, disabled: !running },
+        { label: 'Ver el log', shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
         'sep',
-        { label: 'Comando de simulación…', shortcut: 'Alt+S', onClick: openSimulation },
+        { label: 'Comando de simulación…', shortcut: 'A', onClick: openSimulation },
         { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
         { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
         'sep',
@@ -968,7 +1097,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     {
       label: 'Ver',
       items: [
-        { label: 'Ajustar a la vista', shortcut: 'Inicio', onClick: () => editor.current?.fit() },
+        { label: 'Ajustar a la vista', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
+        { label: 'Zoom a un recuadro', shortcut: 'Z', onClick: zoomBox },
+        { label: 'Zoom anterior', shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
+        { label: 'Grilla', shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
+        { label: 'Marcas de pines sueltos', shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
         { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         {
           label: 'Resultados al costado',
@@ -1019,6 +1152,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const runs = sim && plot ? sameRuns(sim.result.plots, plot) : [];
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
+  const visibleRuns = runs.filter((r) => !hiddenRuns.has(r.name));
+  const shownRuns = plot ? (overlay && visibleRuns.length ? visibleRuns : [plot]) : [];
 
   return (
     <div className="schematic-mode">
@@ -1042,30 +1177,30 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         {iconBtn('share', 'Compartir', 'Copiar un link que abre este circuito', doShare)}
         <span className="sep" />
         {iconBtn('undo', 'Deshacer', 'Deshacer (Ctrl+Z)', history.undo, { disabled: !history.canUndo })}
-        {iconBtn('redo', 'Rehacer', 'Rehacer (Ctrl+Y)', history.redo, { disabled: !history.canRedo })}
+        {iconBtn('redo', 'Rehacer', 'Rehacer (Ctrl+Shift+Z)', history.redo, { disabled: !history.canRedo })}
         <span className="sep" />
         {iconBtn('select', 'Seleccionar', 'Seleccionar y mover (Esc)', () => setTool({ kind: 'select' }), { active: tool.kind === 'select' })}
-        {iconBtn('wire', 'Cable', 'Cable (F3 / W)', () => setTool({ kind: 'wire', start: null }), { active: tool.kind === 'wire' })}
-        {iconBtn('component', 'Componente', 'Componente (F2)', () => setDialog({ kind: 'picker' }), { active: tool.kind === 'place' })}
+        {iconBtn('wire', 'Cable', 'Cable (W)', () => setTool({ kind: 'wire', start: null }), { active: tool.kind === 'wire' })}
+        {iconBtn('component', 'Componente', 'Componente (P / F2)', () => setDialog({ kind: 'picker' }), { active: tool.kind === 'place' })}
         {iconBtn('ground', 'Tierra', 'Tierra (G)', () => setTool({ kind: 'flag', name: '0' }), { active: tool.kind === 'flag' && tool.name === '0' })}
         {iconBtn('label', 'Etiqueta', 'Etiqueta de red (F4 / N)', () => setDialog({ kind: 'flag' }))}
-        {iconBtn('directive', 'Directiva', 'Directiva SPICE libre (S)', () => setDialog({ kind: 'text', textKind: 'directive' }))}
-        {iconBtn('delete', 'Borrar', 'Borrar (F5 / Supr)', deleteSelection, { active: tool.kind === 'delete' })}
+        {iconBtn('directive', 'Directiva', 'Directiva SPICE libre (.)', () => setDialog({ kind: 'text', textKind: 'directive' }))}
+        {iconBtn('delete', 'Borrar', 'Borrar (Backspace)', deleteSelection, { active: tool.kind === 'delete' })}
         <span className="sep" />
         {iconBtn('rotate', 'Rotar', 'Rotar (Ctrl+R)', () => rotateOrMirror('rotate'))}
         {iconBtn('mirror', 'Espejar', 'Espejar (Ctrl+E)', () => rotateOrMirror('mirror'))}
-        {iconBtn('fit', 'Ajustar', 'Ajustar a la vista (Inicio)', () => editor.current?.fit())}
+        {iconBtn('fit', 'Ajustar', 'Ajustar a la vista (Espacio; Z: zoom a un recuadro, Shift+Z: zoom anterior)', () => editor.current?.fit())}
         {iconBtn('nets', 'Redes', 'Mostrar los nombres de todas las redes, sin modificar el esquemático (Alt+N)', () => setShowNets((v) => !v), { active: showNets })}
         <span className="sep" />
-        {iconBtn('sim', 'Simulación…', 'Tipo de simulación y parámetros (Alt+S)', openSimulation)}
+        {iconBtn('sim', 'Simulación…', 'Tipo de simulación y parámetros (A)', openSimulation)}
         {iconBtn('study', 'Estudio…', 'Estudio: barridos, tolerancias, mediciones (Alt+E)', openStudy)}
         {iconBtn('control', '.control…', 'Bloque .control: scripts de ngspice (Alt+C)', openControl)}
         {running ? (
-          <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación">
+          <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
             <Icon name="stop" /> Abortar
           </button>
         ) : (
-          <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" title="Simular (Ctrl+Enter)">
+          <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" title="Simular (Alt+R / Ctrl+Enter)">
             <Icon name="run" /> Simular
           </button>
         )}
@@ -1101,6 +1236,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             annotations={annotations}
             pickValue={pickValue}
             onPicked={endPick}
+            showGrid={showGrid}
+            showLoose={showLoose}
           />
           {picking && (
             <div className="pick-banner">
@@ -1166,7 +1303,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <button className={panel === 'problems' ? 'active' : ''} onClick={() => setPanel('problems')}>
                   Problemas{problems.length ? ` (${problems.length})` : ''}
                 </button>
-                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')}>
+                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')} title="Log de ngspice (Ctrl+L)">
                   Log
                 </button>
               </nav>
@@ -1196,6 +1333,11 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                       {runs.length} corridas
                     </label>
                   )}
+                  {runs.length > 1 && overlay && (
+                    <button onClick={() => setDialog({ kind: 'runs' })} title="Elegir qué corridas mostrar (Shift+S)">
+                      Corridas{hiddenRuns.size ? ` (${visibleRuns.length}/${runs.length})` : ''}…
+                    </button>
+                  )}
                   {scale && (
                     <>
                       {plot && plotView[plotKind(plot.name)] ? (
@@ -1203,7 +1345,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                           Vista recordada ✓
                         </button>
                       ) : (
-                        <button onClick={rememberView} title="Reaplicar estas trazas, paneles y colores en cada simulación">Recordar vista</button>
+                        <button onClick={rememberView} title="Reaplicar estas trazas, paneles y colores en cada simulación (Ctrl+Espacio la vuelve a aplicar)">Recordar vista</button>
                       )}
                       <select
                         aria-label="Exportar resultados"
@@ -1252,10 +1394,10 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <PlotPanel
                   handle={plotPanel}
                   plot={plot}
-                  runs={overlay ? runs : [plot]}
+                  runs={shownRuns}
                   labels={labels}
                   panes={panes}
-                  setPanes={setPanes}
+                  setPanes={editPanes}
                   resolver={resolver}
                   mode={mode}
                   active={activePane}
@@ -1366,6 +1508,18 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         />
       )}
       {dialog?.kind === 'help' && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'runs' && (
+        <RunsDialog
+          runs={runs.map((r) => ({ name: r.name, label: labels.get(r.name) ?? r.name }))}
+          hidden={hiddenRuns}
+          onClose={() => setDialog(null)}
+          onApply={(h) => {
+            setDialog(null);
+            setHiddenRuns(h);
+            setOverlay(true);
+          }}
+        />
+      )}
       {dialog?.kind === 'study' && (
         <StudyPanel
           initial={studyFromDoc(doc, lib)}
@@ -1437,7 +1591,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 function toolHint(t: Tool): string {
   switch (t.kind) {
     case 'select':
-      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar · rueda: zoom · botón medio o espacio: desplazar';
+      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar · rueda: zoom · botón medio o Espacio+arrastrar: desplazar · Espacio: ajustar';
     case 'wire':
       return t.start ? 'Click para fijar el tramo · click derecho o Esc para terminar' : 'Click para empezar el cable';
     case 'place':
@@ -1450,6 +1604,14 @@ function toolHint(t: Tool): string {
       return 'Click en un elemento para borrarlo · Esc para terminar';
     case 'probe':
       return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
+    case 'move':
+      return t.refs
+        ? `Click para soltar${t.stretch ? ' (los cables se estiran)' : ''} · click derecho o Esc cancela`
+        : `${t.stretch ? 'Arrastrar (los cables se estiran)' : 'Mover (sin estirar cables)'}: click en un elemento o recuadro para elegir · Esc para terminar`;
+    case 'shape':
+      return t.start ? 'Click para terminar · click derecho cancela' : `Click para empezar ${t.shape === 'LINE' ? 'la línea' : 'el rectángulo'} · Esc para terminar`;
+    case 'zoom':
+      return 'Arrastrá un recuadro para hacer zoom (click: acercar) · Shift+Z: zoom anterior';
     case 'pick':
       return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : t.what === 'source' ? 'Click en una fuente V o I para elegirla · Esc cancela' : 'Click en un componente para elegirlo · Esc cancela';
   }

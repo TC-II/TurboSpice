@@ -167,6 +167,8 @@ svg.editor.tool-grabbing { cursor: grabbing; }
 svg.editor.tool-wire, svg.editor.tool-place, svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
 svg.editor.tool-delete { cursor: not-allowed; }
 svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
+svg.editor.tool-zoom, svg.editor.tool-shape { cursor: crosshair; }
+svg.editor.tool-move { cursor: move; }
 .grid-dot { fill: var(--sch-grid); }
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
@@ -335,6 +337,8 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .trace-chip .val { color: var(--fg-muted); }
 .trace-chip .err { color: var(--err); font-family: system-ui, sans-serif; }
 .trace-chip .x { color: var(--fg-muted); }
+.pane.removing .trace-chip .name { cursor: not-allowed; text-decoration: line-through dotted; }
+.pane.zooming .pane-chart { cursor: crosshair; }
 .xval { color: var(--fg-muted); }
 .pane-x { margin-left: auto; font-size: 12px; padding: 0 8px; }
 .readout { font-size: 12px; }
@@ -391,6 +395,8 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }
 .shortcuts td { padding: 4px 0; color: var(--fg-muted); }
+.modal h3 { font-size: 13px; margin: 14px 0 4px; color: var(--fg-muted); font-weight: 600; }
+.runs-list { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow: auto; }
 kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-alt); }
 .welcome p, .welcome li { font-size: 14px; line-height: 1.5; }
 .welcome h3 { font-size: 14px; margin: 16px 0 8px; }

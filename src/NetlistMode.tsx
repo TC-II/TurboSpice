@@ -1,5 +1,5 @@
 // Modo netlist: escribir una netlist SPICE a mano → simular → ver resultados.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { EXAMPLES } from './examples.ts';
@@ -81,6 +81,45 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
 
   const running = status.kind === 'running';
 
+  // Atajos de LTspice ([NetKeyBoardShortCut]); valen también escribiendo en la netlist
+  const editor = useRef<HTMLTextAreaElement>(null);
+  const logRef = useRef<HTMLPreElement>(null);
+  const goToLine = () => {
+    const ta = editor.current;
+    if (!ta) return;
+    const n = Number(window.prompt('Ir a la línea:'));
+    if (!Number.isInteger(n) || n < 1) return;
+    const lines = netlist.split('\n');
+    const start = lines.slice(0, n - 1).reduce((s, l) => s + l.length + 1, 0);
+    const end = start + (lines[n - 1]?.length ?? 0);
+    ta.focus();
+    ta.setSelectionRange(Math.min(start, netlist.length), Math.min(end, netlist.length));
+    // llevar la línea a la vista
+    ta.scrollTop = Math.max(0, (Math.min(n, lines.length) - 3) * (parseFloat(getComputedStyle(ta).lineHeight) || 16));
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+      if (e.altKey && k === 'r') {
+        e.preventDefault();
+        if (!running && status.kind !== 'loading') simulate();
+      } else if (e.altKey && k === 's') {
+        e.preventDefault();
+        if (running) abort();
+      } else if (ctrl && k === 'l') {
+        e.preventDefault();
+        logRef.current?.scrollIntoView({ block: 'nearest' });
+        logRef.current?.focus();
+      } else if (ctrl && k === 'g') {
+        e.preventDefault();
+        goToLine();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   return (
     <div className="netlist-mode">
       <header className="toolbar-row">
@@ -94,9 +133,9 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
           ))}
         </select>
         {running ? (
-          <button onClick={abort}>Abortar</button>
+          <button onClick={abort} title="Abortar (Alt+S)">Abortar</button>
         ) : (
-          <button className="primary" onClick={simulate} disabled={status.kind === 'loading'}>
+          <button className="primary" onClick={simulate} disabled={status.kind === 'loading'} title="Simular (Alt+R / Ctrl+Enter)">
             Simular
           </button>
         )}
@@ -106,6 +145,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
       <main className="netlist-main">
         <section className="netlist-editor">
           <textarea
+            ref={editor}
             spellCheck={false}
             value={netlist}
             onChange={(e) => setNetlist(e.target.value)}
@@ -113,7 +153,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !running) simulate();
             }}
           />
-          <pre className="log">{log.join('\n')}</pre>
+          <pre className="log" ref={logRef} tabIndex={-1} title="Log de ngspice (Ctrl+L)">{log.join('\n')}</pre>
         </section>
 
         <section className="results">
@@ -149,7 +189,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
             </>
           )}
           {plot && !scale && <ScalarTable plot={plot} />}
-          {!result && <p className="empty">Escribí o elegí una netlist y presioná Simular (Ctrl+Enter).</p>}
+          {!result && <p className="empty">Escribí o elegí una netlist y presioná Simular (Alt+R o Ctrl+Enter). Ctrl+G: ir a una línea · Ctrl+L: log.</p>}
         </section>
       </main>
     </div>

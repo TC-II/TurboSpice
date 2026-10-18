@@ -10,7 +10,7 @@ import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
-import { symbolBox } from './schematic/geometry.ts';
+import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
@@ -324,6 +324,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // elemento bajo el mouse: la barra de estado muestra sus propiedades
   const [hover, setHover] = useState<{ ref: ItemRef | null; at: Point } | null>(null);
   const [showLoose, setShowLoose] = useState(true);
+  // Ver › Mostrar el comando de simulación (oculto por defecto: se configura en la barra de Simular)
+  const [showSimCommand, setShowSimCommand] = useState(() => lsGet('turbospice.showSimCommand') === '1');
+  const toggleSimCommand = () =>
+    setShowSimCommand((v) => {
+      lsSet('turbospice.showSimCommand', v ? '0' : '1');
+      return !v;
+    });
+  /** Ctrl+A: todo lo que se ve (no el comando de simulación oculto) */
+  const selectAll = () => setSelection(allItems(doc).filter((r) => r.kind !== 'text' || visibleText(doc.texts[r.index], showSimCommand)));
   // corridas de un .step ocultas (Shift+S)
   const [hiddenRuns, setHiddenRuns] = useState<Set<string>>(new Set());
   // Los atajos dependen de dónde está el mouse, como en LTspice: esquemático o visor
@@ -1185,7 +1194,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (ctrl && lk === 'c') return handled(), copySelection();
       if (ctrl && lk === 'x') return handled(), copySelection(true);
       if (ctrl && lk === 'v') return handled(), paste();
-      if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), setSelection(allItems(doc));
+      if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), selectAll();
       if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
       if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
       if (e.altKey && lk === 'c') return handled(), openControl();
@@ -1368,7 +1377,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Pegar', shortcut: 'Ctrl+V', onClick: paste },
         { label: 'Duplicar', shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
         { label: 'Borrar', shortcut: 'Backspace', onClick: deleteSelection },
-        { label: 'Seleccionar todo', shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), setSelection(allItems(doc))) },
+        { label: 'Seleccionar todo', shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), selectAll()) },
         'sep',
         { label: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { label: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
@@ -1417,6 +1426,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Zoom anterior', shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: 'Grilla', shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: 'Marcas de pines sueltos', shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
+        { label: 'Mostrar el comando de simulación', title: 'Dibujar .tran, .ac… sobre el esquemático, como LTspice', onClick: toggleSimCommand, checked: showSimCommand },
         { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: 'Resultados al costado', onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: 'Panel de resultados', shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
@@ -1681,6 +1691,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             onPicked={endPick}
             showGrid={showGrid}
             showLoose={showLoose}
+            showSimCommand={showSimCommand}
             onHover={setHover}
           />
           {picking && (

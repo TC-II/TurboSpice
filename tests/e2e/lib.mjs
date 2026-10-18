@@ -2,6 +2,8 @@
 
 /** Evita el diálogo de bienvenida de la primera visita */
 export const skipWelcome = (target) => target.addInitScript(() => localStorage.setItem('turbospice.welcomed', '1'));
+/** Ver › Mostrar el comando de simulación (#48): para los tests que leen el .tran dibujado */
+export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 
 /** Recorre un desplegable ya abierto: los submenús con hover, el último ítem con click */
 async function pick(page, path) {

@@ -2,7 +2,6 @@
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type Wire } from '../asc/model.ts';
-import { isDataText } from '../asc/dataText.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
@@ -22,6 +21,7 @@ import {
   snapPoint,
   symbolBox,
   textBox,
+  visibleText,
   wireVertexAt,
   sameRef,
   type Box,
@@ -101,6 +101,8 @@ interface Props {
   /** Ctrl+G: grilla; Ctrl+U: marcas de pines sueltos */
   showGrid?: boolean;
   showLoose?: boolean;
+  /** Ver › Mostrar el comando de simulación (.tran, .ac…): oculto, no se selecciona ni entra en Ajustar */
+  showSimCommand?: boolean;
   /** elemento bajo el mouse (con la herramienta de selección) y punto de la grilla más cercano; null al salir */
   onHover?(h: { ref: ItemRef | null; at: Point } | null): void;
 }
@@ -128,12 +130,15 @@ type Drag =
    */
   | { mode: 'label'; start: Point; sym: number; shift: boolean; items: { sym: number; win: number; w: TextWindow; at: Point }[]; moved: boolean };
 
-function docBox(doc: AscDoc, lib: Library): Box | null {
+function docBox(doc: AscDoc, lib: Library, showSim: boolean): Box | null {
   const boxes: Box[] = [];
   for (const w of doc.wires) boxes.push({ x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) });
   for (const s of doc.symbols) boxes.push(symbolBox(s, lib.symbol(s.type), lib));
   for (const f of doc.flags) boxes.push({ x1: f.x - 16, y1: f.y - 16, x2: f.x + 16, y2: f.y + 16 });
-  for (const t of doc.texts) if (!isDataText(t)) boxes.push(textBox(t));
+  for (const t of doc.texts) {
+    const v = visibleText(t, showSim);
+    if (v) boxes.push(textBox(v));
+  }
   if (!boxes.length) return null;
   return {
     x1: Math.min(...boxes.map((b) => b.x1)),
@@ -144,7 +149,7 @@ function docBox(doc: AscDoc, lib: Library): Box | null {
 }
 
 /** Elementos dentro de un recuadro de selección */
-function itemsIn(doc: AscDoc, b: Box, lib: Library): ItemRef[] {
+function itemsIn(doc: AscDoc, b: Box, lib: Library, showSim: boolean): ItemRef[] {
   const out: ItemRef[] = [];
   doc.symbols.forEach((s, i) => boxesIntersect(symbolBox(s, lib.symbol(s.type), lib), b) && out.push({ kind: 'symbol', index: i }));
   doc.wires.forEach((w, i) => {
@@ -152,7 +157,10 @@ function itemsIn(doc: AscDoc, b: Box, lib: Library): ItemRef[] {
     if (boxesIntersect(wb, b)) out.push({ kind: 'wire', index: i });
   });
   doc.flags.forEach((f, i) => f.x >= b.x1 && f.x <= b.x2 && f.y >= b.y1 && f.y <= b.y2 && out.push({ kind: 'flag', index: i }));
-  doc.texts.forEach((t, i) => !isDataText(t) && boxesIntersect(textBox(t), b) && out.push({ kind: 'text', index: i }));
+  doc.texts.forEach((t, i) => {
+    const v = visibleText(t, showSim);
+    if (v && boxesIntersect(textBox(v), b)) out.push({ kind: 'text', index: i });
+  });
   return out;
 }
 
@@ -201,7 +209,7 @@ function shapeAt(doc: AscDoc, p: Point, tol: number): number {
 
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
-  const { showGrid = true, showLoose = true, onHover } = props;
+  const { showGrid = true, showLoose = true, showSimCommand = false, onHover } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -269,7 +277,7 @@ export function SchematicEditor(props: Props) {
     [size],
   );
   const fit = useCallback(() => {
-    const b = docBox(doc, lib);
+    const b = docBox(doc, lib, showSimCommand);
     viewHistory.current.push(viewRef.current);
     setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
   }, [doc, lib, viewOf]);
@@ -280,7 +288,7 @@ export function SchematicEditor(props: Props) {
       fit,
       cursor: () => snapPoint(cursor),
       svg: () => svgRef.current,
-      contentBox: () => docBox(doc, lib),
+      contentBox: () => docBox(doc, lib, showSimCommand),
       centerOn: (b: Box) => {
         viewHistory.current.push(viewRef.current);
         setView((v) => ({ cx: (b.x1 + b.x2) / 2, cy: (b.y1 + b.y2) / 2, scale: Math.max(v.scale, Math.min(2, size.w / (b.x2 - b.x1 + 200))) }));
@@ -350,7 +358,7 @@ export function SchematicEditor(props: Props) {
   const probeTarget = (p: Point): { net?: string; symbol?: number } | null => {
     const g = snapPoint(p);
     const near = Math.hypot(p.x - g.x, p.y - g.y) <= tol * 1.5;
-    const hit = hitTest(doc, p, lib, tol);
+    const hit = hitTest(doc, p, lib, tol, showSimCommand);
     if (hit?.kind === 'wire') return { net: conn.netAt({ x: doc.wires[hit.index].x1, y: doc.wires[hit.index].y1 })?.name };
     if (near) {
       const net = conn.netAt(g)?.name;
@@ -377,7 +385,7 @@ export function SchematicEditor(props: Props) {
       }
       const at = toDoc(e);
       longPress.current = window.setTimeout(() => {
-        const hit = hitTest(doc, at, lib, tol * 2);
+        const hit = hitTest(doc, at, lib, tol * 2, showSimCommand);
         if (hit && touches.current.size === 1) {
           setDrag(null);
           setPreview(null);
@@ -406,7 +414,7 @@ export function SchematicEditor(props: Props) {
       else {
         const label = labelAt(doc, p, lib, tol);
         if (label && onEditLabel) return onEditLabel(label.sym, label.win);
-        const hit = hitTest(doc, p, lib, tol);
+        const hit = hitTest(doc, p, lib, tol, showSimCommand);
         if (hit) onEdit(hit);
       }
       return;
@@ -430,7 +438,7 @@ export function SchematicEditor(props: Props) {
           return;
         }
         // clicks repetidos en el mismo lugar alternan entre elementos superpuestos
-        const all = hitTestAll(doc, p, lib, tol);
+        const all = hitTestAll(doc, p, lib, tol, showSimCommand);
         // (un doble click, más rápido, edita y no alterna)
         const lc = lastClick.current;
         // (en un codo de cables no se alterna: se arrastra el codo)
@@ -509,7 +517,7 @@ export function SchematicEditor(props: Props) {
         return;
       case 'delete': {
         // lo que está bajo la cruz (en la grilla); si no hay nada, bajo el mouse
-        const hit = hitTest(doc, g, lib, tol) ?? hitTest(doc, p, lib, tol);
+        const hit = hitTest(doc, g, lib, tol, showSimCommand) ?? hitTest(doc, p, lib, tol, showSimCommand);
         const shape = hit ? -1 : shapeAt(doc, p, tol);
         if (hit) commit(deleteItems(doc, [hit], lib));
         else if (shape >= 0) commit({ ...doc, shapes: doc.shapes.filter((_, i) => i !== shape) });
@@ -523,7 +531,7 @@ export function SchematicEditor(props: Props) {
           setTool({ ...tool, refs: null, start: null });
           return;
         }
-        const hit = hitTest(doc, p, lib, tol);
+        const hit = hitTest(doc, p, lib, tol, showSimCommand);
         if (!hit) {
           // un recuadro elige varios elementos
           setDrag({ mode: 'box', start: p, additive: false });
@@ -638,7 +646,7 @@ export function SchematicEditor(props: Props) {
     const p = toDoc(e);
     setCursor(p);
     if (onHover && !drag) {
-      const ref = tool.kind === 'select' ? hitTest(doc, p, lib, tol) : null;
+      const ref = tool.kind === 'select' ? hitTest(doc, p, lib, tol, showSimCommand) : null;
       const at = snapPoint(p);
       const k = `${ref ? `${ref.kind}${ref.index}` : ''}@${at.x},${at.y}`;
       if (k !== lastHover.current) {
@@ -739,7 +747,7 @@ export function SchematicEditor(props: Props) {
         x2: Math.max(drag.start.x, boxEnd.x),
         y2: Math.max(drag.start.y, boxEnd.y),
       };
-      const found = itemsIn(doc, b, lib);
+      const found = itemsIn(doc, b, lib, showSimCommand);
       // con M / S el recuadro elige lo que se va a mover
       if (tool.kind === 'move') {
         setSelection(found);
@@ -764,7 +772,7 @@ export function SchematicEditor(props: Props) {
    * quita; en el medio de un tramo lo parte ahí y deja un codo para arrastrar.
    */
   function wireGesture(p: Point, t: number): boolean {
-    const hit = hitTest(doc, p, lib, t);
+    const hit = hitTest(doc, p, lib, t, showSimCommand);
     if (hit?.kind !== 'wire') return false;
     const v = wireVertexAt(doc, p, lib, t * 1.5);
     const at = gridPointOnWire(doc.wires[hit.index], p);
@@ -782,7 +790,7 @@ export function SchematicEditor(props: Props) {
     const label = labelAt(doc, p, lib, tol);
     if (label && onEditLabel) return onEditLabel(label.sym, label.win);
     if (wireGesture(p, tol)) return;
-    const hit = hitTest(doc, p, lib, tol);
+    const hit = hitTest(doc, p, lib, tol, showSimCommand);
     if (hit) onEdit(hit);
   };
 
@@ -874,6 +882,7 @@ export function SchematicEditor(props: Props) {
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverLabel}
         showLoose={showLoose}
+        showSimCommand={showSimCommand}
       />
       <g className="ghost">{ghost}</g>
       {tool.kind === 'select' && !drag && vertices.length > 0 && (

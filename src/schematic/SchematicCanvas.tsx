@@ -6,8 +6,7 @@ import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { isDataText } from '../asc/dataText.ts';
-import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, type ItemRef } from './geometry.ts';
+import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
@@ -172,9 +171,11 @@ export interface CanvasProps {
   hoverSymbol?: number;
   /** marcas de pines sueltos (Ctrl+U) */
   showLoose?: boolean;
+  /** Ver › Mostrar el comando de simulación */
+  showSimCommand?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, showLoose = true }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, showLoose = true, showSimCommand = true }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
@@ -217,11 +218,12 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       </g>
       <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
-        {doc.texts.map((t, i) =>
-          isDataText(t) ? null : (
+        {doc.texts.map((full, i) => {
+          const t = visibleText(full, showSimCommand);
+          return !t ? null : (
           <g
             key={i}
-            className={`${t.kind === 'comment' && isNgspiceComment(t.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}
+            className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}
           >
             {t.text.split('\\n').map((line, j) => (
               <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
@@ -229,8 +231,8 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
               </AlignedText>
             ))}
           </g>
-          ),
-        )}
+          );
+        })}
       </g>
       <g className="flags">
         {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} />)}

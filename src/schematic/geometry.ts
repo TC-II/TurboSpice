@@ -1,9 +1,26 @@
 // Geometría del esquemático: cajas de símbolos, detección bajo el cursor, grilla.
-import { GRID, WINDOW_ATTR, type AscDoc, type FlagDir, type Orient, type Point, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
+import { GRID, WINDOW_ATTR, type AscDoc, type FlagDir, type Orient, type Point, type SchText, type SymbolDef, type SymbolInst, type TextWindow, type Wire } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { toWorld, transformAlign, transformOffset } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { isDataText } from '../asc/dataText.ts';
+import { EXTRA_ANALYSES, isNgspiceComment } from '../netlist/directives.ts';
+import { ANALYSIS_LINE } from '../sim/analyses.ts';
+
+/**
+ * Lo que se dibuja de un texto, o null si no se dibuja nada. Los comentarios con datos nunca se
+ * ven; el comando de simulación (.tran, .ac… y los de ngspice guardados como comentario) se
+ * configura desde la barra de Simular, así que sólo se ve con `showSim` (Ver › Mostrar el
+ * comando de simulación). Si comparte el texto con otras directivas, se ocultan sólo sus líneas.
+ */
+export function visibleText<T extends SchText>(t: T, showSim: boolean): T | null {
+  if (isDataText(t)) return null;
+  if (showSim || !(t.kind === 'directive' || isNgspiceComment(t.text))) return t;
+  const lines = t.text.split('\\n');
+  const shown = lines.filter((l) => !ANALYSIS_LINE.test(l) && l !== EXTRA_ANALYSES);
+  if (shown.length === lines.length) return t;
+  return shown.some((l) => l.trim()) ? { ...t, text: shown.join('\\n') } : null;
+}
 
 export const snap = (v: number) => Math.round(v / GRID) * GRID;
 export const snapPoint = (p: Point): Point => ({ x: snap(p.x), y: snap(p.y) });
@@ -209,20 +226,20 @@ export function textBox(t: { x: number; y: number; size: number; text: string; a
  * Elemento bajo el cursor, en orden de prioridad: textos, etiquetas, cables, símbolos.
  * `tol` es la tolerancia en unidades del esquemático (depende del zoom).
  */
-export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef | null {
-  return hitTestAll(doc, p, lib, tol)[0] ?? null;
+export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number, showSim = true): ItemRef | null {
+  return hitTestAll(doc, p, lib, tol, showSim)[0] ?? null;
 }
 
 /**
  * Todos los elementos bajo el cursor, en el mismo orden de prioridad que hitTest (para
  * alternar entre elementos superpuestos con clicks repetidos). Los cables, del más cercano.
  */
-export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number): ItemRef[] {
+export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, showSim = true): ItemRef[] {
   const out: ItemRef[] = [];
   for (let i = doc.texts.length - 1; i >= 0; i--) {
-    // los comentarios con datos (";.study …", ";.plot …") no se dibujan ni se seleccionan
-    if (isDataText(doc.texts[i])) continue;
-    if (inBox(p, textBox(doc.texts[i]), tol / 2)) out.push({ kind: 'text', index: i });
+    // lo que no se dibuja (comentarios con datos, comando de simulación oculto) no se selecciona
+    const t = visibleText(doc.texts[i], showSim);
+    if (t && inBox(p, textBox(t), tol / 2)) out.push({ kind: 'text', index: i });
   }
   for (let i = doc.flags.length - 1; i >= 0; i--) if (inBox(p, flagBox(doc, doc.flags[i]), tol)) out.push({ kind: 'flag', index: i });
   doc.wires

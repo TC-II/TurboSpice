@@ -4,7 +4,7 @@
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, simCommand, simType, skipWelcome } from './lib.mjs';
+import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome } from './lib.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { takeSims } from '../../src/sim/simList.ts';
@@ -16,6 +16,8 @@ mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 await skipWelcome(page);
+// los checks comparan la barra de Simular con el comando dibujado en el esquemático
+await showSimCommand(page);
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));

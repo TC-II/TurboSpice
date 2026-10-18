@@ -730,8 +730,14 @@ await page.getByRole('button', { name: '+ Panel de AC (Bode)' }).click();
 await page.getByRole('button', { name: '+ Señal', exact: true }).click();
 await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+// #48: el comando de simulación no se dibuja (se configura en la barra de Simular)…
+check((await page.locator('svg.editor .texts text', { hasText: /^\.(tran|ac) / }).count()) === 0, 'el comando de simulación no se ve en el esquemático');
+// …salvo con Ver › Mostrar el comando de simulación
+await menu(page, 'Ver', 'Mostrar el comando de simulación');
 check((await page.locator('svg.editor .texts .directive', { hasText: '.tran 20m' }).count()) === 1, 'el .tran sigue siendo la directiva (la que corre LTspice)');
 check((await page.locator('svg.editor .texts .ngspice', { hasText: 'análisis adicionales' }).count()) === 1, 'el .ac queda como comentario que sólo corre TurboSpice');
+await menu(page, 'Ver', 'Mostrar el comando de simulación');
+check((await page.locator('svg.editor .texts text', { hasText: /^\.(tran|ac) / }).count()) === 0, 'y se vuelve a ocultar');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const studyPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();

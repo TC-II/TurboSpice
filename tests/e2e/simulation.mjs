@@ -3,7 +3,7 @@
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, skipWelcome } from './lib.mjs';
+import { menu, openExample, simType, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -55,7 +55,7 @@ check(wires.some((w) => w === '96,32,96,64' || w === '96,64,96,32'), `al arrastr
 await page.keyboard.press('Control+z');
 
 // --- Comando de simulación ---
-await page.getByRole('button', { name: 'Simulación…' }).click();
+await simType(page, 'Transitorio');
 check((await page.locator('.field', { hasText: 'Tiempo final' }).locator('input').inputValue()) === '20m', 'el menú lee la directiva existente (.tran 20m)');
 await page.getByRole('button', { name: 'AC (Bode)' }).click();
 check((await page.locator('.sim-preview code').textContent()) === '.ac dec 100 1 1meg', 'AC: vista previa de la directiva');

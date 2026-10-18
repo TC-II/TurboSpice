@@ -10,12 +10,14 @@ const P: Record<string, ReactNode> = {
   redo: <path d="M13 4.5 16.5 8 13 11.5M16.5 8H8a4.5 4.5 0 0 0 0 9h4" />,
   select: <path d="M4.5 3v13l3.5-3.5 2.5 5 2-1-2.5-5h5z" />,
   wire: <path d="M3 15.5h6v-11h8M3 15.5a1.2 1.2 0 1 0 0 .01M17 4.5a1.2 1.2 0 1 0 0 .01" />,
-  component: <path d="M2 10h3l1.5-4 3 8 3-8 3 8 1.5-4h1" />,
+  // resistencia europea (rectángulo)
+  component: <path d="M2 10h4M14 10h4M6 7h8v6H6z" />,
   ground: <path d="M10 3v7M4 10h12M6.5 13h7M9 16h2" />,
   label: <path d="M3 6.5h9l4.5 3.5-4.5 3.5H3zM6.5 10h.01" />,
   text: <path d="M4 5V3.5h12V5M10 3.5v13M7.5 16.5h5" />,
   directive: <path d="M7 4 3 10l4 6M13 4l4 6-4 6M11 3.5l-2 13" />,
-  delete: <path d="M4 6h12M8 6V4h4v2M5.5 6l1 11h7l1-11M8.5 9v5.5M11.5 9v5.5" />,
+  // cruz a 45°, chica como los trazos del esquemático
+  delete: <path d="M7 7l6 6M13 7l-6 6" />,
   rotate: <path d="M15.5 8.5A6 6 0 1 0 14 14M15.5 3.5v5h-5" />,
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,
@@ -35,6 +37,21 @@ const P: Record<string, ReactNode> = {
   paste: <path d="M6 4H4v13h12V4h-2M7 3h6v3H7z" />,
   cut: <path d="M6 14a2 2 0 1 0 0 .01M14 14a2 2 0 1 0 0 .01M7.5 12.5 15 3M12.5 12.5 5 3" />,
   close: <path d="M5 5l10 10M15 5 5 15" />,
+  // menú principal: un cuadrado con líneas
+  menu: (
+    <>
+      <rect x="3" y="3" width="14" height="14" rx="3" />
+      <path d="M6.5 7.5h7M6.5 10h7M6.5 12.5h7" />
+    </>
+  ),
+  more: (
+    <g fill="currentColor" stroke="none">
+      <circle cx="4.5" cy="10" r="1.4" />
+      <circle cx="10" cy="10" r="1.4" />
+      <circle cx="15.5" cy="10" r="1.4" />
+    </g>
+  ),
+  caret: <path d="M6 8.5 10 12.5 14 8.5" />,
 };
 
 export type IconName = keyof typeof P;

@@ -374,7 +374,7 @@ export function WelcomeDialog({ examples, onExample, onClose, onHelp }: {
         </p>
         <ul>
           <li>Dibujá con los mismos atajos de LTspice (<kbd>F2</kbd> componente, <kbd>W</kbd> cable, <kbd>G</kbd> tierra…).</li>
-          <li>Configurá el análisis en <strong>Simulación…</strong> y apretá <strong>Simular</strong> (<kbd>Ctrl+Enter</kbd>).</li>
+          <li>Elegí el tipo de análisis en la flecha de <strong>Simular</strong> y apretá <strong>Simular</strong> (<kbd>Ctrl+Enter</kbd>).</li>
           <li>Medí con un click en un cable (tensión) o en un componente (corriente); pasá el mouse para ver el punto de operación.</li>
           <li>Compartí un circuito con un link; el trabajo se autoguarda en el navegador.</li>
         </ul>

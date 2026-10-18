@@ -393,7 +393,8 @@ export function SchematicEditor(props: Props) {
         setTool({ kind: 'select' });
         return;
       case 'delete': {
-        const hit = hitTest(doc, p, lib, tol);
+        // lo que está bajo la cruz (en la grilla); si no hay nada, bajo el mouse
+        const hit = hitTest(doc, g, lib, tol) ?? hitTest(doc, p, lib, tol);
         if (hit) commit(deleteItems(doc, [hit], lib));
         return;
       }
@@ -681,7 +682,11 @@ export function SchematicEditor(props: Props) {
           <line x1={g.x} y1={vb.y} x2={g.x} y2={vb.y + vb.h} />
         </g>
       )}
-      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind === 'delete' && (
+        // cursor de borrar: una cruz chica a 45° en el punto de la grilla
+        <path className="delete-cursor" d={`M ${g.x - 5 / view.scale} ${g.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${g.x + 5 / view.scale} ${g.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
+      )}
+      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

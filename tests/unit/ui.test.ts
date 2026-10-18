@@ -66,3 +66,22 @@ describe('valores amigables', () => {
     expect(checkValue('V', 'SINE(0 1 1k)')).toEqual({ value: 'SINE(0 1 1k)' });
   });
 });
+
+describe('barra de herramientas (#38)', () => {
+  it('los grupos que no entran pasan al desplegable, de derecha a izquierda', async () => {
+    const { groupsThatFit } = await import('../../src/ui/Toolbar.tsx');
+    const w = [100, 70, 230, 100, 70];
+    expect(groupsThatFit(w, 600)).toBe(5);
+    expect(groupsThatFit(w, 570)).toBe(5);
+    // si no entran todos, se reserva lugar para el botón "Más herramientas"
+    expect(groupsThatFit(w, 569, 40)).toBe(4);
+    expect(groupsThatFit(w, 500, 40)).toBe(3);
+    expect(groupsThatFit(w, 200, 40)).toBe(1);
+    expect(groupsThatFit(w, 100, 40)).toBe(0);
+  });
+
+  it('menús: cada tipo de análisis tiene su ítem en la flecha de Simular', async () => {
+    const { ANALYSES } = await import('../../src/sim/analyses.ts');
+    expect(new Set(ANALYSES.map((a) => a.label)).size).toBe(ANALYSES.length);
+  });
+});

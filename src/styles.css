@@ -166,7 +166,7 @@ svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg
 svg.editor.tool-grabbing { cursor: grabbing; }
 svg.editor.tool-wire, svg.editor.tool-place { cursor: none; }
 svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
-svg.editor.tool-delete { cursor: not-allowed; }
+svg.editor.tool-delete { cursor: none; }
 svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
 .grid-dot { fill: var(--sch-grid); }
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
@@ -198,6 +198,8 @@ svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
 .ghost text { fill: var(--sch-ghost); stroke: none; }
 .ghost-wire { stroke: var(--sch-wire); stroke-dasharray: 6 4; fill: none; vector-effect: non-scaling-stroke; }
 .snap-cursor { fill: var(--sch-sel); }
+.delete-cursor { stroke: var(--sch-sel); stroke-width: 1.6; stroke-linecap: round; fill: none; vector-effect: non-scaling-stroke; pointer-events: none; }
+svg.editor:not(:hover) .delete-cursor { display: none; }
 .wire-crosshair { pointer-events: none; }
 .wire-crosshair line { stroke: var(--sch-sym); stroke-opacity: 0.28; stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
 svg.editor:not(:hover) .wire-crosshair { display: none; }
@@ -400,11 +402,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .smith-legend { list-style: none; margin: 0; padding: 0; font: 13px var(--mono); }
 
 /* ---------- Menús, barra de íconos, ayuda ---------- */
-.menurow { display: flex; align-items: center; gap: 8px; padding: 2px 12px; border-bottom: 1px solid var(--border); }
-.menubar { display: flex; gap: 2px; }
-.menu-top { position: relative; }
-.menu-top > button { border: 0; background: transparent; padding: 4px 10px; font-size: 13px; }
-.menu-top > button.open, .menu-top > button:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.menu-top { position: relative; display: flex; }
 .menu-list { position: absolute; top: 100%; left: 0; z-index: 20; min-width: 230px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 22%); display: flex; flex-direction: column; }
 .menu-item { position: relative; }
 .menu-item > button { width: 100%; display: flex; justify-content: space-between; gap: 24px; border: 0; background: transparent; padding: 5px 10px; font-size: 13px; text-align: left; border-radius: 5px; }
@@ -412,16 +410,38 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .menu-item .sc { color: var(--fg-muted); font-size: 12px; }
 .menu-item .check-mark { display: inline-block; width: 16px; }
 .menu-item.has-sub > .menu-list { top: -5px; left: 100%; }
+.menu-item.has-sub > .menu-list.flip { left: auto; right: 100%; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
-.iconbar { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 4px 12px; border-bottom: 1px solid var(--border); }
-.iconbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 6px; }
+.iconbar { display: flex; align-items: center; flex-wrap: nowrap; padding: 4px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
+/* grupos separados por una línea; el ancho de cada uno incluye su separador (se mide para colapsar) */
+.iconbar .group { display: flex; align-items: center; gap: 2px; flex: none; position: relative; padding: 0 6px 0 7px; }
+.iconbar .group::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 22px; margin-top: -11px; background: var(--border); }
+.iconbar .group:first-child { padding-left: 0; }
+.iconbar .group:first-child::before { display: none; }
+.iconbar .group.more { padding-left: 0; }
+.iconbar .group.more::before { display: none; }
 .iconbar button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-color: transparent; background: transparent; border-radius: 6px; }
-.iconbar button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.iconbar button:hover:not(:disabled), .iconbar button.open { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .iconbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.iconbar button.primary { background: var(--accent); color: #fff; padding: 4px 12px; }
+.iconbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 4px 12px; }
+.iconbar button.primary:hover:not(:disabled), .iconbar button.primary.open { background: color-mix(in srgb, var(--accent) 85%, #000); }
 .iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
-.iconbar .status { margin-left: 8px; font-size: 13px; }
-.iconbar .spacer { flex: 1; }
+.iconbar .status { flex: 1 1 auto; min-width: 0; margin-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Simular partido: acción principal + flecha con los tipos de análisis */
+.split { display: inline-flex; align-items: stretch; }
+.split > button { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split .menu-top > button { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 4px 5px; height: 100%; }
+.split .menu-top > button.primary { border-left: 1px solid color-mix(in srgb, #fff 40%, var(--accent)); }
+.split .menu-top > button.labeled { border-left-width: 0; }
+/* barra superior: menú junto al nombre; archivo, tema, compartir (y usuario) a la derecha */
+.appbar-slot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.appbar-slot:empty { display: none; }
+.appbar-right { margin-left: auto; }
+.appbar-right .filename { margin-left: 0; }
+.app-menu-btn { display: inline-flex; padding: 4px; border-color: transparent; background: transparent; border-radius: 6px; }
+.app-menu-btn:hover, .app-menu-btn.open { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; font-size: 13px; }
+.share-btn:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }
@@ -442,7 +462,17 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
 @media (max-width: 720px) { .workspace.side { flex-direction: column; } }
 .theme-btn { position: relative; border: 0; background: transparent; padding: 4px 6px; }
 .theme-btn .auto { position: absolute; right: 0; bottom: 0; font: 600 9px system-ui, sans-serif; }
-.menurow .filename { margin-left: auto; }
+.theme-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+@media (max-width: 720px) {
+  .appbar { gap: 8px; padding: 6px 8px; }
+  .appbar .tabs button { padding: 4px 6px; }
+  .share-btn { padding: 4px 6px; }
+  .iconbar { padding: 4px 8px; }
+  .iconbar .txt, .share-btn .txt { display: none; }
+  /* menús en pantallas angostas: los submenús se abren debajo de su ítem y la lista se desplaza */
+  .menu-list { max-height: calc(100vh - 96px); overflow-y: auto; }
+  .menu-item.has-sub > .menu-list, .menu-item.has-sub > .menu-list.flip { position: static; box-shadow: none; border: 0; border-left: 2px solid var(--border); border-radius: 0; margin: 2px 0 2px 12px; padding: 0 0 0 4px; min-width: 0; max-height: none; }
+}
 .attrs label small { grid-column: 2; margin: -4px 0 0; }
 .userfiles-section h3 { font-size: 13px; margin: 14px 0 6px; color: var(--fg-muted); font-weight: 500; }
 .userfiles-section ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

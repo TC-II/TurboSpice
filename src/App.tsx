@@ -698,7 +698,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // sin permiso: queda la copia interna
     }
     if (cut) {
-      commit(deleteItems(doc, selection));
+      commit(deleteItems(doc, selection, lib));
       setSelection([]);
     }
   };
@@ -727,7 +727,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   };
   const deleteSelection = () => {
     if (selection.length) {
-      commit(deleteItems(doc, selection));
+      commit(deleteItems(doc, selection, lib));
       setSelection([]);
     } else setTool({ kind: 'delete' });
   };
@@ -1437,7 +1437,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 function toolHint(t: Tool): string {
   switch (t.kind) {
     case 'select':
-      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar · rueda: zoom · botón medio o espacio: desplazar';
+      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o espacio: desplazar';
     case 'wire':
       return t.start ? 'Click para fijar el tramo · click derecho o Esc para terminar' : 'Click para empezar el cable';
     case 'place':

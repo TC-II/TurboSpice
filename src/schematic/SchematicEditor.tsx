@@ -1,14 +1,15 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
-import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
+import { GRID, type AscDoc, type Orient, type Point, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindow } from './edit.ts';
+import { addFlag, addText, addWire, deleteItems, dragSegment, moveItems, moveVertex, placeSymbol, removeVertex, sameConnections, setWindow, splitWire, wiresOn } from './edit.ts';
 import { inverseOffset } from '../asc/transform.ts';
 import type { TextWindow } from '../asc/model.ts';
 import {
   boxesIntersect,
+  distToSegment,
   hitTest,
   hitTestAll,
   labelAt,
@@ -17,6 +18,7 @@ import {
   snapPoint,
   symbolBox,
   textBox,
+  wireVertexAt,
   type Box,
   type ItemRef,
 } from './geometry.ts';
@@ -86,6 +88,10 @@ type Drag =
   | { mode: 'pan'; sx: number; sy: number; view: View }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
+  /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
+  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
+  /** desplazar un tramo de cable en forma perpendicular */
+  | { mode: 'segment'; start: Point; index: number }
   /** arrastrar un rótulo (InstName/Value) de un símbolo */
   | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
 
@@ -129,6 +135,19 @@ function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
     const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
     return cross === 0 && p.x >= minx && p.x <= maxx && p.y >= miny && p.y <= maxy;
   });
+}
+
+/** Punto de la grilla sobre un cable horizontal o vertical, el más cercano a p */
+function gridPointOnWire(w: Wire, p: Point): Point | null {
+  if (w.y1 === w.y2 && w.x1 !== w.x2) return { x: Math.min(Math.max(snap(p.x), Math.min(w.x1, w.x2)), Math.max(w.x1, w.x2)), y: w.y1 };
+  if (w.x1 === w.x2 && w.y1 !== w.y2) return { x: w.x1, y: Math.min(Math.max(snap(p.y), Math.min(w.y1, w.y2)), Math.max(w.y1, w.y2)) };
+  return null;
+}
+
+/** ¿El codo en p es un extremo suelto? (arrastrarlo puede conectarlo a otra cosa) */
+function freeEnd(doc: AscDoc, p: Point): boolean {
+  const at = doc.wires.filter((w) => (w.x1 === p.x && w.y1 === p.y) || (w.x2 === p.x && w.y2 === p.y));
+  return at.length === 1 && !doc.wires.some((w) => w !== at[0] && distToSegment(p, w) === 0);
 }
 
 export function SchematicEditor(props: Props) {
@@ -261,7 +280,8 @@ export function SchematicEditor(props: Props) {
         if (hit && touches.current.size === 1) {
           setDrag(null);
           setPreview(null);
-          onEdit(hit);
+          // sobre un cable: agrega un codo (o quita el que hay ahí), como el doble click
+          if (!wireGesture(at, tol * 2)) onEdit(hit);
         }
       }, 550);
     }
@@ -311,6 +331,23 @@ export function SchematicEditor(props: Props) {
           return;
         }
         const already = selection.some((s) => s.kind === hit.kind && s.index === hit.index);
+        // un cable solo: se arrastra un codo o un tramo (Alt+click agrega un codo ahí);
+        // con Ctrl se mueve suelto, y si es parte de una selección se mueve todo junto
+        if (hit.kind === 'wire' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !(already && selection.length > 1)) {
+          const v = wireVertexAt(doc, p, lib, tol * 1.5);
+          const at = gridPointOnWire(doc.wires[hit.index], p);
+          if (e.altKey && at && !v) {
+            const base = splitWire(doc, hit.index, at);
+            setSelection([]);
+            setDrag({ mode: 'vertex', base, at, free: false, commitBase: base !== doc });
+            return;
+          }
+          if (v || at) {
+            setSelection([hit]);
+            setDrag(v ? { mode: 'vertex', base: doc, at: v, free: freeEnd(doc, v), commitBase: false } : { mode: 'segment', start: g, index: hit.index });
+            return;
+          }
+        }
         const sel = e.shiftKey ? (already ? selection.filter((s) => !(s.kind === hit.kind && s.index === hit.index)) : [...selection, hit]) : already ? selection : [hit];
         setSelection(sel);
         setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false });
@@ -322,8 +359,8 @@ export function SchematicEditor(props: Props) {
           return;
         }
         const corner = { x: g.x, y: tool.start.y };
-        let d = addWire(doc, tool.start, corner);
-        d = addWire(d, corner, g);
+        let d = addWire(doc, tool.start, corner, lib);
+        d = addWire(d, corner, g, lib);
         const ends = connectsAt(doc, g, lib) && !(g.x === tool.start.x && g.y === tool.start.y);
         commit(d);
         setTool({ kind: 'wire', start: ends ? null : g });
@@ -342,7 +379,7 @@ export function SchematicEditor(props: Props) {
         return;
       case 'delete': {
         const hit = hitTest(doc, p, lib, tol);
-        if (hit) commit(deleteItems(doc, [hit]));
+        if (hit) commit(deleteItems(doc, [hit], lib));
         return;
       }
       case 'probe': {
@@ -408,6 +445,14 @@ export function SchematicEditor(props: Props) {
       const dy = g.y - drag.start.y;
       if (dx || dy) setDrag({ ...drag, moved: true });
       setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
+    } else if (drag.mode === 'vertex' || drag.mode === 'segment') {
+      // cambia el recorrido pero no la conectividad: si el nuevo lugar crearía o rompería
+      // una unión, el cable se queda en la última posición válida
+      const g = snapPoint(p);
+      const from = drag.mode === 'vertex' ? drag.base : doc;
+      const nd = drag.mode === 'vertex' ? moveVertex(drag.base, drag.at, g, lib) : dragSegment(doc, drag.index, g.x - drag.start.x, g.y - drag.start.y, lib);
+      if (nd === from) setPreview(null);
+      else if ((drag.mode === 'vertex' && drag.free) || sameConnections(doc, nd, lib)) setPreview(nd);
     } else {
       setBoxEnd(p);
     }
@@ -423,7 +468,25 @@ export function SchematicEditor(props: Props) {
       }
     }
     if (!drag) return;
-    if ((drag.mode === 'move' || drag.mode === 'label') && preview && drag.moved) commit(preview);
+    if (drag.mode === 'label' && preview && drag.moved) commit(preview);
+    if (drag.mode === 'move' && preview && drag.moved) {
+      commit(preview);
+      // al mover se limpian los cables (pueden cambiar de índice): reubicar la selección
+      const g = snapPoint(toDoc(e));
+      const [dx, dy] = [g.x - drag.start.x, g.y - drag.start.y];
+      const moved = drag.refs.flatMap((r) => {
+        const w = r.kind === 'wire' ? doc.wires[r.index] : undefined;
+        return w ? [{ x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }] : [];
+      });
+      if (moved.length) setSelection([...drag.refs.filter((r) => r.kind !== 'wire'), ...wiresOn(preview, moved).map((index) => ({ kind: 'wire' as const, index }))]);
+    }
+    if (drag.mode === 'vertex' || drag.mode === 'segment') {
+      const next = preview ?? (drag.mode === 'vertex' && drag.commitBase ? drag.base : null);
+      if (next) {
+        commit(next);
+        setSelection([]);
+      }
+    }
     if (drag.mode === 'box' && boxEnd) {
       const b = {
         x1: Math.min(drag.start.x, boxEnd.x),
@@ -440,9 +503,28 @@ export function SchematicEditor(props: Props) {
     svgRef.current!.releasePointerCapture(e.pointerId);
   };
 
+  /**
+   * Doble click (o toque largo) sobre un cable: en un codo que une dos tramos alineados lo
+   * quita; en el medio de un tramo lo parte ahí y deja un codo para arrastrar.
+   */
+  function wireGesture(p: Point, t: number): boolean {
+    const hit = hitTest(doc, p, lib, t);
+    if (hit?.kind !== 'wire') return false;
+    const v = wireVertexAt(doc, p, lib, t * 1.5);
+    const at = gridPointOnWire(doc.wires[hit.index], p);
+    const nd = v ? removeVertex(doc, v, lib) : at ? splitWire(doc, hit.index, at) : doc;
+    if (nd !== doc) {
+      commit(nd);
+      setSelection([]);
+    }
+    return true;
+  }
+
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool.kind !== 'select') return;
-    const hit = hitTest(doc, toDoc(e), lib, tol);
+    const p = toDoc(e);
+    if (wireGesture(p, tol)) return;
+    const hit = hitTest(doc, p, lib, tol);
     if (hit) onEdit(hit);
   };
 
@@ -470,6 +552,17 @@ export function SchematicEditor(props: Props) {
     }
     return null;
   }, [tool, g.x, g.y, lib]);
+
+  // codos arrastrables de los cables seleccionados
+  const vertices = useMemo(() => {
+    const out = new Map<string, Point>();
+    for (const r of selection) {
+      const w = r.kind === 'wire' ? doc.wires[r.index] : undefined;
+      if (!w) continue;
+      for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) if (wireVertexAt(doc, e, lib, 0)) out.set(`${e.x},${e.y}`, e);
+    }
+    return [...out.values()];
+  }, [selection, doc, lib]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
   const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
@@ -504,6 +597,13 @@ export function SchematicEditor(props: Props) {
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
       />
       <g className="ghost">{ghost}</g>
+      {tool.kind === 'select' && !drag && vertices.length > 0 && (
+        <g className="wire-vertices">
+          {vertices.map((v) => (
+            <rect key={`${v.x},${v.y}`} x={v.x - 3 / view.scale} y={v.y - 3 / view.scale} width={6 / view.scale} height={6 / view.scale} />
+          ))}
+        </g>
+      )}
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />

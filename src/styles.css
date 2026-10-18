@@ -173,6 +173,7 @@ svg.editor.tool-probe, svg.editor.tool-pick { cursor: crosshair; }
 .wires line { stroke: var(--sch-wire); stroke-width: 1.6; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
 .junctions circle { fill: var(--sch-wire); stroke: none; }
+.wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
 .sym { color: var(--sch-sym); stroke: currentColor; }
 .sym .body { stroke-width: 1.4; }
 .sym .body text { fill: currentColor; stroke: none; }

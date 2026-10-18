@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TurboSpice — Política de privacidad</title>
+<link rel="icon" href="favicon.svg">
+<style>
+  :root { color-scheme: light dark; --fg: #1d1f23; --muted: #5b616b; --bg: #ffffff; --accent: #3b6fd4; }
+  @media (prefers-color-scheme: dark) { :root { --fg: #e6e8eb; --muted: #9aa1ab; --bg: #16181c; --accent: #7aa2f7; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 32px 0 8px; }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  code { font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Política de privacidad de TurboSpice</h1>
+  <p class="muted">Última actualización: 18 de octubre de 2026</p>
+
+  <p>TurboSpice es un simulador de circuitos que corre entero en tu navegador. Los circuitos se
+  simulan en tu computadora: no se suben a ningún servidor de TurboSpice.</p>
+
+  <h2>Inicio de sesión con Google y Google Drive</h2>
+  <p>El inicio de sesión con Google es opcional. Si lo usás, TurboSpice pide únicamente el permiso
+  <code>drive.file</code>, que le da acceso <strong>sólo a los archivos que la propia app crea o que
+  vos abrís con ella</strong>, dentro de una carpeta "TurboSpice" de tu Google Drive. TurboSpice no
+  puede ver ni modificar el resto de tu Drive.</p>
+  <ul>
+    <li>Se usan tu nombre, tu correo y tu foto de perfil de Google sólo para mostrarte con qué cuenta
+    iniciaste sesión.</li>
+    <li>Los archivos <code>.asc</code> se leen y se guardan directamente entre tu navegador y Google
+    Drive. No pasan por servidores de TurboSpice.</li>
+    <li>El permiso de acceso se guarda sólo en tu navegador y se borra al cerrar sesión. Podés
+    revocarlo cuando quieras en <a href="https://myaccount.google.com/permissions">la configuración de
+    tu cuenta de Google</a>.</li>
+  </ul>
+  <p>El uso que hace TurboSpice de la información recibida de las APIs de Google cumple con la
+  <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de datos de
+  usuario de los servicios de API de Google</a>, incluidos los requisitos de uso limitado.</p>
+
+  <h2>Datos guardados en tu navegador</h2>
+  <p>TurboSpice guarda en el almacenamiento local de tu navegador el autoguardado del circuito, los
+  archivos recientes y tus preferencias. Esos datos no salen de tu computadora y los podés borrar
+  borrando los datos del sitio.</p>
+
+  <h2>Lo que TurboSpice no hace</h2>
+  <ul>
+    <li>No vende, comparte ni transfiere datos a terceros.</li>
+    <li>No usa los datos para publicidad ni para entrenar modelos.</li>
+    <li>No usa cookies de seguimiento ni analítica.</li>
+  </ul>
+
+  <h2>Contacto</h2>
+  <p>Ante cualquier consulta, abrí un issue en
+  <a href="https://github.com/TC-II/TurboSpice/issues">github.com/TC-II/TurboSpice</a>.</p>
+
+  <p class="muted"><a href="./">Volver a TurboSpice</a></p>
+</main>
+</body>
+</html>

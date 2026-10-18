@@ -196,6 +196,41 @@ const vsR = await page.locator('.readout tbody tr').first().locator('td').allTex
 check(vsR[0] === 'tsubida' && /^1\.09\d*m @ 500$/.test(vsR[1]) && /^4\.39\d*m @ 2k$/.test(vsR[2]), `medición en función del parámetro barrido (${vsR.slice(0, 3).join(', ')})`);
 await page.getByRole('button', { name: 'Medidas' }).click();
 
+// --- #24: expandir esquemático o resultados ---
+const splitter = page.locator('.splitter');
+const splitOpacity = () => page.locator('.split-buttons').evaluate((e) => getComputedStyle(e).opacity);
+await page.mouse.move(5, 5);
+check((await splitOpacity()) === '0', 'los botones del divisor están ocultos');
+await splitter.hover();
+await page.waitForTimeout(200);
+check((await splitOpacity()) === '1', 'aparecen al pasar el mouse por el divisor');
+const panelH = (await page.locator('.results-panel').boundingBox()).height;
+await page.getByRole('button', { name: 'Expandir resultados' }).click();
+check(!(await page.locator('.canvas-wrap').isVisible()) && (await page.locator('.results-panel').boundingBox()).height > panelH * 1.5, 'expandir resultados oculta el esquemático');
+await page.getByRole('button', { name: /Mostrar esquemático/ }).click();
+check(Math.abs((await page.locator('.results-panel').boundingBox()).height - panelH) < 2, 'restaurar vuelve al mismo tamaño');
+await splitter.hover();
+await page.getByRole('button', { name: 'Expandir esquemático' }).click();
+check(!(await page.locator('.results-panel').isVisible()), 'expandir esquemático oculta los resultados');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.results-panel').waitFor({ timeout: 30000 });
+check(await page.locator('.results-panel').isVisible(), 'al simular con el esquemático expandido vuelven los resultados');
+await page.keyboard.press('Control+Shift+Digit2');
+check(!(await page.locator('.canvas-wrap').isVisible()), 'Ctrl+Shift+2: sólo resultados');
+await page.keyboard.press('Control+Shift+Digit0');
+check(await page.locator('.canvas-wrap').isVisible(), 'Ctrl+Shift+0: los dos');
+const wsH = (await page.locator('.workspace').boundingBox()).height;
+const sb2 = await splitter.boundingBox();
+await page.mouse.dblclick(sb2.x + 20, sb2.y + sb2.height / 2);
+const h2 = (await page.locator('.results-panel').boundingBox()).height;
+check(Math.abs(h2 - wsH / 2) < 8, `doble click en el divisor: mitad y mitad (${h2.toFixed(0)} de ${wsH.toFixed(0)})`);
+await page.mouse.dblclick(sb2.x + 20, (await splitter.boundingBox()).y + 3);
+check(Math.abs((await page.locator('.results-panel').boundingBox()).height - panelH) < 8, 'otro doble click vuelve a la división anterior');
+// volver al tamaño por defecto (proporcional) para las secciones siguientes
+await page.evaluate(() => localStorage.removeItem('turbospice.resultsH'));
+await page.reload();
+await page.getByText('Listo').waitFor({ timeout: 30000 });
+
 // --- #3, #14, #12: visor de resultados, vista recordada y exportaciones ---
 const downloaded = async (action) => {
   const [d] = await Promise.all([page.waitForEvent('download'), action()]);

@@ -459,3 +459,21 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .cursor-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
 .cursor-tools button { font-size: 12px; padding: 1px 8px; }
+
+/* ---------- Expandir esquemático / resultados (#24) ---------- */
+.splitter { position: relative; }
+.split-buttons { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; gap: 6px; opacity: 0; pointer-events: none; transition: opacity 0.12s; z-index: 5; }
+.splitter:hover .split-buttons, .splitter.touched .split-buttons, .split-buttons:focus-within { opacity: 1; pointer-events: auto; }
+.split-buttons button { font-size: 12px; padding: 2px 10px; border-radius: 999px; background: var(--bg); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); white-space: nowrap; }
+.workspace.side .split-buttons { flex-direction: column; }
+/* zona de hover más alta que la línea del divisor */
+.splitter::before { content: ''; position: absolute; inset: -6px 0; }
+.workspace.side .splitter::before { inset: 0 -6px; }
+.workspace.expand-schematic .results-panel, .workspace.expand-schematic .splitter { display: none; }
+.workspace.expand-results .canvas-wrap, .workspace.expand-results .splitter { display: none; }
+.workspace.expand-results .results-panel { flex: 1 1 auto; border-top: 0; border-left: 0; }
+.restore-tab { position: absolute; z-index: 4; font-size: 12px; padding: 2px 12px; border-radius: 999px; background: var(--bg); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); }
+.canvas-wrap > .restore-tab { bottom: 28px; left: 50%; transform: translateX(-50%); }
+.workspace.side .canvas-wrap > .restore-tab { bottom: auto; top: 50%; left: auto; right: 8px; transform: translateY(-50%); }
+.results-panel { position: relative; }
+.results-panel > .restore-tab { position: static; align-self: center; margin: 4px 0; }

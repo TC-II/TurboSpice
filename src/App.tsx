@@ -198,6 +198,13 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const [resultsH, setResultsH] = useState<number>(() => Number(lsGet(sizeKey)) || 0);
   useEffect(() => setResultsH(Number(lsGet(sizeKey)) || 0), [sizeKey]);
   const [theme, setTheme] = useTheme();
+  // ver sólo el esquemático o sólo los resultados a toda la ventana (#24)
+  const [expand, setExpandState] = useState<'none' | 'schematic' | 'results'>(() => (lsGet('turbospice.expand') as 'schematic' | 'results') || 'none');
+  const setExpand = (v: 'none' | 'schematic' | 'results') => {
+    setExpandState(v);
+    lsSet('turbospice.expand', v === 'none' ? '' : v);
+  };
+  const splitBefore = useRef(0);
   const [panel, setPanel] = useState<'plot' | 'netlist' | 'log' | 'problems' | 'meas'>('plot');
   const [overlay, setOverlay] = useState(true);
   const editor = useRef<EditorHandle>(null);
@@ -435,6 +442,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
       if (!sim) setTimeout(() => editor.current?.fit(), 50);
       setSim({ built, result, doc, meas });
+      // con el esquemático expandido los resultados quedarían ocultos
+      if (expand === 'schematic') setExpand('none');
       // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
       // sólo si no hay otra cosa
       const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
@@ -792,6 +801,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       if (ctrl && (k === 'o' || k === 'O')) return handled(), doOpen();
       if (ctrl && (k === 'r' || k === 'R')) return handled(), rotateOrMirror('rotate');
       if (ctrl && (k === 'e' || k === 'E')) return handled(), rotateOrMirror('mirror');
+      if (ctrl && e.shiftKey && e.code === 'Digit1') return handled(), setExpand('schematic');
+      if (ctrl && e.shiftKey && e.code === 'Digit2') return handled(), sim && setExpand('results');
+      if (ctrl && e.shiftKey && e.code === 'Digit0') return handled(), setExpand('none');
       if (ctrl && (k === 'c' || k === 'C')) return handled(), copySelection();
       if (ctrl && (k === 'x' || k === 'X')) return handled(), copySelection(true);
       if (ctrl && (k === 'v' || k === 'V')) return handled(), paste();
@@ -970,6 +982,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       items: [
         { label: 'Ajustar a la vista', shortcut: 'Inicio', onClick: () => editor.current?.fit() },
         { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
+        { label: 'Sólo el esquemático', shortcut: 'Ctrl+Shift+1', onClick: () => setExpand('schematic'), checked: expand === 'schematic', disabled: !sim },
+        { label: 'Sólo los resultados', shortcut: 'Ctrl+Shift+2', onClick: () => setExpand('results'), checked: expand === 'results', disabled: !sim },
+        { label: 'Esquemático y resultados', shortcut: 'Ctrl+Shift+0', onClick: () => setExpand('none'), checked: expand === 'none', disabled: !sim },
         {
           label: 'Resultados al costado',
           onClick: () => {
@@ -1081,8 +1096,13 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         <StatusText status={status} />
       </div>
 
-      <div className={`workspace${resultsSide ? ' side' : ''}`}>
+      <div className={`workspace${resultsSide ? ' side' : ''}${sim && expand !== 'none' ? ` expand-${expand}` : ''}`}>
         <div className="canvas-wrap">
+          {sim && expand === 'schematic' && (
+            <button className="restore-tab" onClick={() => setExpand('none')} title="Volver a mostrar los resultados (Ctrl+Shift+0)">
+              {resultsSide ? '◂' : '▴'} Mostrar resultados
+            </button>
+          )}
           <SchematicEditor
             handle={editor}
             docKey={docKey}
@@ -1123,8 +1143,25 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
             className="splitter"
             role="separator"
             aria-orientation={resultsSide ? 'vertical' : 'horizontal'}
-            title="Arrastrar para cambiar el tamaño de los resultados"
+            title="Arrastrar para cambiar el tamaño de los resultados · doble click: mitad y mitad"
+            onDoubleClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return;
+              const wrap = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
+              const half = Math.round((resultsSide ? wrap.width : wrap.height) / 2);
+              // tamaño actual real (con el tamaño por defecto resultsH vale 0)
+              const panel = (e.currentTarget.nextElementSibling as HTMLElement | null)?.getBoundingClientRect();
+              const cur = Math.round(panel ? (resultsSide ? panel.width : panel.height) : 0);
+              // alterna entre la división guardada y 50 %
+              setResultsH(() => {
+                const next = Math.abs(cur - half) < 4 && splitBefore.current ? splitBefore.current : half;
+                if (next === half) splitBefore.current = cur;
+                lsSet(sizeKey, String(next));
+                return next;
+              });
+            }}
             onPointerDown={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return;
+              e.currentTarget.classList.add('touched');
               const wrap = (e.currentTarget.parentElement as HTMLElement).getBoundingClientRect();
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
               const move = (ev: PointerEvent) =>
@@ -1141,10 +1178,25 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
               window.addEventListener('pointermove', move);
               window.addEventListener('pointerup', up);
             }}
-          />
+            onPointerLeave={(e) => e.currentTarget.classList.remove('touched')}
+          >
+            <div className="split-buttons">
+              <button onClick={() => setExpand('schematic')} title="Sólo el esquemático, a toda la ventana (Ctrl+Shift+1)" aria-label="Expandir esquemático">
+                {resultsSide ? '▸' : '▾'} Esquemático
+              </button>
+              <button onClick={() => setExpand('results')} title="Sólo los resultados, a toda la ventana (Ctrl+Shift+2)" aria-label="Expandir resultados">
+                {resultsSide ? '◂' : '▴'} Resultados
+              </button>
+            </div>
+          </div>
         )}
         {sim && (
-          <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>
+          <section className="results-panel" style={resultsH && expand !== 'results' ? { flexBasis: resultsH } : undefined}>
+            {expand === 'results' && (
+              <button className="restore-tab" onClick={() => setExpand('none')} title="Volver a mostrar el esquemático (Ctrl+Shift+0)">
+                {resultsSide ? '▸' : '▾'} Mostrar esquemático
+              </button>
+            )}
             <input
               ref={pltInput}
               type="file"

@@ -1,7 +1,10 @@
 // Parser de .asc (esquemático) y .asy (símbolo) de LTspice.
 import {
   emptyDoc,
+  FLAG_DIRS,
+  FLAGDIR_TEXT,
   ORIENTS,
+  type FlagDir,
   type AscDoc,
   type Orient,
   type PinDef,
@@ -136,7 +139,20 @@ export function parseAsc(text: string): AscDoc {
         else doc.unknown.push(line);
     }
   }
+  readFlagDirs(doc);
   return doc;
+}
+
+/** Lados de etiquetas elegidos a mano (comentario ";.flagdir", extensión de TurboSpice) */
+function readFlagDirs(doc: AscDoc) {
+  const i = doc.texts.findIndex((t) => t.kind === 'comment' && t.text.startsWith(FLAGDIR_TEXT));
+  if (i < 0) return;
+  for (const item of doc.texts[i].text.slice(FLAGDIR_TEXT.length).trim().split(/\s+/)) {
+    const [x, y, dir] = item.split(',');
+    const flag = doc.flags.find((f) => f.x === Number(x) && f.y === Number(y));
+    if (flag && FLAG_DIRS.includes(dir as FlagDir)) flag.dir = dir as FlagDir;
+  }
+  doc.texts.splice(i, 1);
 }
 
 export function parseAsy(text: string, name: string): SymbolDef {

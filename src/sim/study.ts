@@ -5,13 +5,18 @@
 //  - un texto "!" con las directivas de las tarjetas activas, y otro ";" con las desactivadas
 //    (comentar una directiva es la forma habitual de apagarla en LTspice);
 //  - los valores de los componentes barridos ({R1}) o con tolerancia ({mc(1k,0.05)});
-//  - el bloque .control (comentario) si hay un paso personalizado.
+//  - el bloque .control (comentario) si hay un paso personalizado;
+//  - los análisis: el primero activo como directiva (el que corre LTspice) y los demás en un
+//    comentario que sólo ejecuta TurboSpice (ver EXTRA_ANALYSES);
+//  - la vista de ploteo (";.plot …", la misma que "Recordar vista" del visor).
 // Al abrir un archivo se reconstruyen las tarjetas a partir de eso, aunque venga de LTspice.
-import { belowTexts, dataText, DATA_TAGS, isDataTextOf, readData } from '../asc/dataText.ts';
+import { belowTexts, dataText, DATA_TAGS, isDataText, isDataTextOf, readData } from '../asc/dataText.ts';
 import type { AscDoc, SchText } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
-import { controlHooks, HOOK_MARKS, isControlBlock } from '../netlist/directives.ts';
+import { controlHooks, EXTRA_ANALYSES, HOOK_MARKS, isControlBlock, isNgspiceComment, NGSPICE_ONLY } from '../netlist/directives.ts';
 import { parseStep } from '../netlist/step.ts';
+import { viewFromDoc, withView, type PlotView } from '../waveform/view.ts';
+import { ANALYSIS_LINE } from './analyses.ts';
 import { parseMeas, type MeasAnalysis, type MeasDef } from './meas.ts';
 
 export type SweepTarget =
@@ -110,7 +115,17 @@ export function customBody(c: StudyCustom): string[] {
   return [...sec(HOOK_MARKS.before, c.before), ...sec(HOOK_MARKS.after, c.after), ...sec(HOOK_MARKS.final, c.final)];
 }
 
+/** Un análisis (.tran, .ac…), como línea SPICE (se edita con los formularios de analyses.ts) */
+export interface StudyAnalysis {
+  enabled: boolean;
+  line: string;
+}
+
 export interface Study {
+  /** análisis a correr; undefined = no tocar los del esquemático */
+  analyses?: StudyAnalysis[];
+  /** qué graficar, por análisis; undefined = no tocar la vista guardada */
+  plot?: PlotView;
   sweeps: StudySweep[];
   tolerance: StudyTolerance | null;
   measures: StudyMeasure[];
@@ -230,6 +245,58 @@ export function studyLines(st: Study): { on: string[]; off: string[] } {
   return { on, off };
 }
 
+// --- análisis ------------------------------------------------------------------------------
+
+/** Primera línea del comentario con análisis desactivados que, si no, se ejecutarían (;.pz) */
+export const OFF_ANALYSES = '* análisis desactivados';
+const isAnalysisMark = (l: string) => l.trim() === EXTRA_ANALYSES || l.trim() === OFF_ANALYSES;
+
+/**
+ * Análisis del esquemático: los de directivas y comentarios de ngspice (activos) y los
+ * comentados con ";" (desactivados, como se apagan en LTspice).
+ */
+export function analysesFromDoc(doc: AscDoc): StudyAnalysis[] {
+  const out: StudyAnalysis[] = [];
+  for (const t of doc.texts) {
+    if (isDataText(t) || isControlBlock(t.text)) continue;
+    const enabled = t.kind === 'directive' || isNgspiceComment(t.text);
+    for (const l of t.text.split('\\n')) if (ANALYSIS_LINE.test(l)) out.push({ enabled, line: l.trim() });
+  }
+  return out;
+}
+
+/** Análisis que corren, en orden: el primero es el principal (el que corre LTspice) */
+export const activeAnalyses = (list: StudyAnalysis[]) => list.filter((a) => a.enabled && a.line.trim());
+
+/**
+ * Reemplaza los análisis del esquemático: el principal donde estaba el anterior (directiva, o
+ * comentario si LTspice no lo tiene), los adicionales en un comentario que sólo ejecuta
+ * TurboSpice y los desactivados comentados.
+ */
+export function applyAnalyses(doc: AscDoc, list: StudyAnalysis[]): AscDoc {
+  let anchor: { x: number; y: number } | null = null;
+  const texts: SchText[] = [];
+  for (const t of doc.texts) {
+    const lines = t.text.split('\\n');
+    const keep = isDataText(t) || isControlBlock(t.text) ? lines : lines.filter((l) => !ANALYSIS_LINE.test(l) && !isAnalysisMark(l));
+    if (keep.length === lines.length) {
+      texts.push(t);
+      continue;
+    }
+    const left = keep.filter((l) => l.trim());
+    anchor ??= { x: t.x, y: t.y + (left.length ? left.length * 24 + 16 : 0) };
+    if (left.length) texts.push({ ...t, text: keep.join('\\n') });
+  }
+  const text = (at: { x: number; y: number }, kind: SchText['kind'], lines: string[]): SchText => ({ x: at.x, y: at.y, align: 'Left', size: 2, kind, text: lines.join('\\n') });
+  const [main, ...extra] = activeAnalyses(list).map((a) => a.line.trim());
+  if (main) texts.push(text(anchor ?? belowTexts(doc), NGSPICE_ONLY.test(main) ? 'comment' : 'directive', [main]));
+  if (extra.length) texts.push(text(belowTexts({ ...doc, texts }), 'comment', [EXTRA_ANALYSES, ...extra]));
+  const off = list.filter((a) => !a.enabled && a.line.trim()).map((a) => a.line.trim());
+  // un ";.pz" solo se ejecutaría: la marca de la primera línea lo apaga
+  if (off.length) texts.push(text(belowTexts({ ...doc, texts }), 'comment', NGSPICE_ONLY.test(off[0]) ? [OFF_ANALYSES, ...off] : off));
+  return { ...doc, texts };
+}
+
 // --- directivas → tarjetas ----------------------------------------------------------------
 
 const STUDY_LINE = /^\s*\.(step|meas(ure)?)\b/i;
@@ -320,7 +387,9 @@ function measureFromDefs(defs: { def: MeasDef; enabled: boolean }[]): StudyMeasu
 
 /** Reconstruye el estudio de un documento (también uno hecho en LTspice) */
 export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
-  const st = emptyStudy();
+  const st: Study = { ...emptyStudy(), analyses: analysesFromDoc(doc) };
+  const plot = viewFromDoc(doc);
+  if (plot) st.plot = plot;
   const lines = directiveLines(doc);
   const params = new Map<string, string>();
   for (const l of lines) {
@@ -486,6 +555,8 @@ export function applyStudyCode(doc: AscDoc, lib: SymbolSource, code: string): As
 export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
   const prev = studyFromDoc(doc, lib);
   let out = doc;
+  // análisis: sólo si cambiaron (así no se mueven los textos del esquemático)
+  if (st.analyses && JSON.stringify(st.analyses) !== JSON.stringify(prev.analyses)) out = applyAnalyses(out, st.analyses);
   // valores originales de lo que deja de estar barrido o con tolerancia
   for (const s of prev.sweeps) {
     if (s.target.kind === 'component' && s.original !== undefined && !st.sweeps.some((n) => n.target.kind === 'component' && n.target.name === (s.target as { name: string }).name)) {
@@ -523,5 +594,6 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
   }
   // programa de bloques: texto chico (tamaño 0) debajo de todo; TurboSpice no lo dibuja
   if (st.blocks) texts.push(dataText('study', st.blocks, { x: at.x, y: y + 32 }));
-  return { ...out, texts };
+  // qué graficar: la vista guardada (";.plot …")
+  return st.plot ? withView({ ...out, texts }, st.plot) : { ...out, texts };
 }

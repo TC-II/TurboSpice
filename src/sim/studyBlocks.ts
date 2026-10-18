@@ -4,6 +4,7 @@
 // Trabaja sobre el JSON de Blockly, sin depender de Blockly (se puede testear en Node).
 import { formatSpiceNumber } from '../netlist/spicenum.ts';
 import { parseStep } from '../netlist/step.ts';
+import { PALETTE, type PlotView } from '../waveform/view.ts';
 import type { MeasAnalysis } from './meas.ts';
 import { measureLines, MEASURE_KINDS, stepLine, type MeasureKind, type Study, type StudyMeasure, type StudySweep, type SweepTarget } from './study.ts';
 
@@ -56,6 +57,12 @@ export const BLOCK_MEASURES: [MeasureKind, string, MeasAnalysis | null][] = [
   ['f3db', 'la frecuencia de corte (−3 dB)', 'ac'],
   ['f0db', 'la frecuencia de cruce por 0 dB', 'ac'],
   ['phaseMargin', 'el margen de fase', 'ac'],
+];
+
+/** Colores del bloque "Graficar señal" (la paleta del visor) */
+export const PLOT_COLORS: [string, string][] = [
+  ['automático', 'auto'],
+  ...(['verde', 'azul', 'rojo', 'turquesa', 'violeta', 'gris', 'naranja', 'oliva', 'fucsia', 'azul oscuro'] as const).map((n, i): [string, string] => [n, PALETTE[i]]),
 ];
 
 /** Definiciones JSON de los bloques propios; los desplegables de componentes los completa la UI */
@@ -148,6 +155,28 @@ export function blockDefinitions(): object[] {
       tooltip: 'Agrega un punto (x, y) cada vez que se ejecuta; al terminar aparece el gráfico',
       ...stmt,
     },
+    {
+      type: 'ts_plot_signal',
+      message0: 'Graficar la señal %1 en el panel %2 con color %3 en %4',
+      args0: [
+        { type: 'field_input', name: 'SIGNAL', text: 'V(out)' },
+        { type: 'field_number', name: 'PANE', value: 1, min: 1, precision: 1 },
+        { type: 'field_dropdown', name: 'COLOR', options: PLOT_COLORS },
+        {
+          type: 'field_dropdown',
+          name: 'ANALYSIS',
+          options: [
+            ['transitorio', 'tran'],
+            ['AC (Bode)', 'ac'],
+            ['barrido DC', 'dc'],
+            ['ruido', 'noise'],
+          ],
+        },
+      ],
+      colour: COLORS.show,
+      tooltip: 'Qué mostrar en los resultados de ese análisis (lo mismo que "Recordar vista"); no se ejecuta en cada corrida',
+      ...stmt,
+    },
   ];
 }
 
@@ -166,7 +195,7 @@ export function toolbox(): object {
       cat('Calcular', '%{BKY_MATH_HUE}', [b('math_number'), b('math_arithmetic', { inputs: { A: num(1), B: num(1) } }), b('math_single', { inputs: { NUM: num(9) } })]),
       cat('Lógica', '%{BKY_LOGIC_HUE}', [b('controls_if'), b('logic_compare'), b('logic_operation'), b('logic_negate'), b('logic_boolean')]),
       cat('Variables', '%{BKY_VARIABLES_HUE}', [], { custom: 'VARIABLE' }),
-      cat('Mostrar', COLORS.show, [b('ts_plot_xy'), b('ts_print'), b('ts_message'), b('text')]),
+      cat('Mostrar', COLORS.show, [b('ts_plot_signal'), b('ts_plot_xy'), b('ts_print'), b('ts_message'), b('text')]),
     ],
   };
 }
@@ -322,6 +351,8 @@ class Compiler {
     switch (b.type) {
       case 'ts_simulate':
         return ['run'];
+      case 'ts_plot_signal':
+        return []; // es la vista de resultados, no un paso
       case 'ts_for_list':
       case 'ts_for_range': {
         const vals = this.values(b);
@@ -435,19 +466,43 @@ function asCards(top: BlockJson[], analysis: MeasAnalysis, varName: (b: BlockJso
   }
   if (core[0]?.type !== 'ts_simulate') return null;
   const rest = core.slice(1);
-  if (!rest.every((b) => b.type === 'ts_measure' || b.type === 'ts_plot_xy')) return null;
+  if (!rest.every((b) => b.type === 'ts_measure' || b.type === 'ts_plot_xy' || b.type === 'ts_plot_signal')) return null;
   const measures = rest.filter((b) => b.type === 'ts_measure').map((b) => blockMeasure(b, varName(b, 'VAR'), analysis));
   // componentes barridos: el valor original lo completa quien aplica (applyBlocksStudy)
   return { sweeps, measures };
+}
+
+/** Todos los bloques del programa (también los anidados) */
+function allBlocks(list: BlockJson[]): BlockJson[] {
+  return list.flatMap((b) => chain(b).flatMap((x) => [x, ...allBlocks(Object.values(x.inputs ?? {}).flatMap((i) => (i.block ? [i.block] : [])))]));
+}
+
+/** Vista de resultados de los bloques "Graficar señal" (undefined si no hay ninguno) */
+function plotFromBlocks(blocks: BlockJson[]): PlotView | undefined {
+  const sig = blocks.filter((b) => b.type === 'ts_plot_signal' && field(b, 'SIGNAL').trim());
+  if (!sig.length) return undefined;
+  const view: PlotView = {};
+  for (const b of sig) {
+    const kind = field(b, 'ANALYSIS') || 'tran';
+    const pane = Math.max(1, Math.round(Number(b.fields?.PANE) || 1)) - 1;
+    const panes = (view[kind] ??= []);
+    while (panes.length <= pane) panes.push({ traces: [] });
+    const color = field(b, 'COLOR');
+    panes[pane].traces.push({ expr: field(b, 'SIGNAL').trim(), ...(color && color !== 'auto' ? { color } : {}) });
+  }
+  for (const k of Object.keys(view)) view[k] = view[k].filter((p) => p.traces.length);
+  return view;
 }
 
 /** Compila el programa de bloques al estudio (tarjetas o paso personalizado) */
 export function compileBlocks(ws: WorkspaceJson, analysis: MeasAnalysis): CompiledBlocks {
   const c = new Compiler(ws, analysis);
   const tops = [...(ws.blocks?.blocks ?? [])].sort((a, b) => (a.y ?? 0) - (b.y ?? 0) || (a.x ?? 0) - (b.x ?? 0));
-  const top = tops.flatMap((b) => chain(b));
+  // "Graficar señal" es la vista de resultados: no cuenta para la forma del programa
+  const top = tops.flatMap((b) => chain(b)).filter((b) => b.type !== 'ts_plot_signal');
   const cards = asCards(top, analysis, (b, f) => c.varName(b, f));
-  const empty = { sweeps: [], measures: [], tolerance: null, custom: null, blocks: ws } as Study;
+  const plot = plotFromBlocks(allBlocks(tops));
+  const empty = { sweeps: [], measures: [], tolerance: null, custom: null, blocks: ws, ...(plot ? { plot } : {}) } as Study;
   if (cards) return { study: { ...empty, ...cards }, ltspice: true, errors: [] };
   const lines = c.stmts(top, []);
   const plots = c.plots.map((p) => `* grafico ${p.id} ${p.x} ${p.y}`);
@@ -490,6 +545,14 @@ export function studyToBlocks(st: Study): WorkspaceJson {
     loop.inputs = { DO: { block: link(core) } };
     core = [loop];
   });
+  // la vista de resultados, como bloques "Graficar señal" al final
+  for (const [kind, panes] of Object.entries(st.plot ?? {})) {
+    panes.forEach((p, pi) =>
+      p.traces.forEach((t) =>
+        core.push({ type: 'ts_plot_signal', fields: { SIGNAL: t.expr, PANE: pi + 1, COLOR: t.color && PLOT_COLORS.some(([, c]) => c === t.color) ? t.color : 'auto', ANALYSIS: kind } }),
+      ),
+    );
+  }
   const top = link(core)!;
   top.x = 20;
   top.y = 20;

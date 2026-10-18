@@ -440,10 +440,19 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .study-triple .field { grid-template-columns: 1fr; }
 .study-card input, .study-card select, .study-card textarea { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; width: 100%; }
 .study-card select { font-family: inherit; }
+.study-card input[type=checkbox] { width: auto; }
 .study-line { display: block; white-space: pre-wrap; font: 12px var(--mono); color: var(--fg-muted); background: var(--bg-alt); border-radius: 6px; padding: 4px 8px; }
 .study-add { display: flex; flex-wrap: wrap; gap: 6px; }
 .tol-quick { display: flex; flex-wrap: wrap; gap: 6px; }
 .tol-quick button { font-size: 12px; padding: 2px 8px; }
+.study-analysis { display: flex; flex-direction: column; gap: 6px; }
+.study-analysis fieldset, .study-pane { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 6px; }
+.study-pane legend { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.study-pane legend .x, .study-trace .x { border: 0; background: transparent; color: var(--fg-muted); }
+.study-trace { display: flex; align-items: center; gap: 6px; }
+.study-trace .with-pick { flex: 1; display: flex; gap: 4px; }
+.study-trace .with-pick input { flex: 1; min-width: 0; }
+.study-card input.color { width: 32px; height: 26px; padding: 1px 2px; flex: none; }
 .tol-table { border-collapse: collapse; font-size: 13px; }
 .tol-table th { text-align: left; font-weight: 500; color: var(--fg-muted); padding: 2px 10px 2px 0; }
 .tol-table td { padding: 2px 10px 2px 0; }

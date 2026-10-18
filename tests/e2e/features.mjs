@@ -456,7 +456,8 @@ const studyRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(studyRows.length === 3 && /R1=1k.*2\.19\d*m/.test(studyRows[1]), `simula el estudio (${studyRows.join(' | ')})`);
 // reabrir: las tarjetas se reconstruyen desde las directivas; agregar tolerancias Monte Carlo
 await page.keyboard.press('Alt+e');
-check((await page.locator('.study-card').count()) === 2 && (await page.getByLabel('Valores').inputValue()) === '500 1k 2k', 'al reabrir, las tarjetas se reconstruyen');
+// (la tarjeta de simulación del .tran, el barrido y la medición)
+check((await page.locator('.study-card').count()) === 3 && (await page.getByLabel('Valores').inputValue()) === '500 1k 2k', 'al reabrir, las tarjetas se reconstruyen');
 await page.getByLabel('Activar Barrido de R1').uncheck();
 await page.getByRole('button', { name: '+ Tolerancias' }).click();
 await page.getByRole('button', { name: 'Todos los capacitores 10 %' }).click();
@@ -482,6 +483,47 @@ await page.getByLabel('Código del estudio').fill(code2);
 await page.getByRole('button', { name: 'Aplicar código' }).click();
 await page.keyboard.press('Alt+e');
 check((await page.getByLabel('Valores').inputValue()) === '1k 3k' && (await page.getByLabel('Activar Barrido de R1').isChecked()), 'el código editado a mano vuelve a ser tarjetas');
+await page.keyboard.press('Escape');
+
+// --- #25: simulaciones y gráfico desde el Estudio (.tran y .ac, barrer R1, f −3 dB, dos paneles) ---
+await openExample(page, 'Filtro RC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+await page.keyboard.press('Alt+e');
+await page.getByRole('button', { name: '+ Simulación' }).click();
+check((await page.locator('.study-line', { hasText: '.ac dec 100 1 1meg' }).count()) === 1, 'agregar un .ac junto al .tran');
+check(await page.getByText('cada una corre .tran, .ac').isVisible(), 'el resumen muestra qué análisis corren');
+await page.getByRole('button', { name: '+ Barrido' }).click();
+await page.locator('.study-card').last().getByLabel('Componente', { exact: true }).fill('R1');
+await page.locator('.study-card').last().getByLabel('Valores').fill('1k 2k');
+await page.getByRole('button', { name: '+ Medición' }).click();
+await page.locator('.study-card').last().getByLabel('Análisis de la medición').selectOption('ac');
+await page.locator('.study-card').last().getByLabel('Qué medir').selectOption('f3db');
+await page.locator('.study-card').last().getByLabel('Señal', { exact: true }).fill('V(out)');
+await page.getByRole('button', { name: '+ Gráfico' }).click();
+await page.getByRole('button', { name: '+ Panel de Transitorio' }).click();
+await page.getByRole('button', { name: '+ Señal', exact: true }).click();
+await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
+await page.getByLabel('Análisis del gráfico').selectOption('ac');
+await page.getByRole('button', { name: '+ Panel de AC (Bode)' }).click();
+await page.getByRole('button', { name: '+ Señal', exact: true }).click();
+await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+check((await page.locator('svg.editor .texts .directive', { hasText: '.tran 20m' }).count()) === 1, 'el .tran sigue siendo la directiva (la que corre LTspice)');
+check((await page.locator('svg.editor .texts .ngspice', { hasText: 'análisis adicionales' }).count()) === 1, 'el .ac queda como comentario que sólo corre TurboSpice');
+await page.getByRole('button', { name: 'Simular' }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+const studyPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
+check(studyPlots.some((p) => /^tran/.test(p)) && studyPlots.some((p) => /^ac/.test(p)), `corren el .tran y el .ac con el barrido (${studyPlots.join(', ')})`);
+for (const p of [studyPlots.find((x) => /^tran/.test(x)), studyPlots.find((x) => /^ac/.test(x))]) {
+  await page.getByRole('combobox', { name: 'Plot' }).selectOption(p);
+  check((await paneChips(0)).join() === 'V(out)' && (await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible()), `${p}: aparece el gráfico definido en el Estudio`);
+}
+await page.getByRole('button', { name: /^Mediciones/ }).click();
+const fcRows = await page.locator('.meas-table tbody tr').allTextContents();
+check(fcRows.length === 2, `la medición de f −3 dB, una por corrida (${fcRows.join(' | ')})`);
+// al reabrir se reconstruyen las tarjetas de simulación y de gráfico
+await page.keyboard.press('Alt+e');
+check((await page.locator('.study-card', { hasText: 'Simulación 2: AC (Bode)' }).count()) === 1 && (await page.locator('.study-card', { hasText: 'Gráfico' }).count()) === 1, 'al reabrir, vuelven las tarjetas de simulación y de gráfico');
 await page.keyboard.press('Escape');
 
 // --- #23: Estudio con bloques ---

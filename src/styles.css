@@ -635,3 +635,14 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .drive-list button { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border: 0; background: transparent; padding: 6px 8px; border-radius: 5px; text-align: left; font-size: 13px; }
 .drive-list button:hover, .drive-list button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
 .drive-list .hint { margin: 0; white-space: nowrap; }
+/* Mis simulaciones: buscador y acciones por archivo */
+.drive-browser { display: flex; flex-direction: column; gap: 8px; min-width: min(560px, 80vw); }
+.drive-browser > .hint { margin: 0; }
+.drive-search { width: 100%; }
+.drive-list li { display: flex; align-items: center; gap: 2px; border-radius: 5px; }
+.drive-list li.current { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.drive-list li.current .drive-open > span:first-child { font-weight: 600; }
+.drive-list .drive-open { flex: 1; min-width: 0; }
+.drive-list .drive-open > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-list .drive-act { width: 30px; flex: none; justify-content: center; padding: 6px 0; opacity: 0.55; }
+.drive-list li:hover .drive-act, .drive-list .drive-act:focus-visible { opacity: 1; }

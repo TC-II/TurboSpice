@@ -91,6 +91,32 @@ export class DriveClient {
     return new Uint8Array(await r.arrayBuffer());
   }
 
+  private patchMeta(id: string, meta: object): Promise<DriveFile> {
+    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=id,name,modifiedTime`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(meta),
+    });
+  }
+
+  rename(id: string, name: string): Promise<DriveFile> {
+    return this.patchMeta(id, { name });
+  }
+
+  /** Copia en la misma carpeta, con otro nombre */
+  async copy(id: string, name: string): Promise<DriveFile> {
+    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}/copy?fields=id,name,modifiedTime`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, parents: [await this.folderId()] }),
+    });
+  }
+
+  /** A la papelera de Drive (se puede recuperar desde ahí) */
+  async trash(id: string): Promise<void> {
+    await this.patchMeta(id, { trashed: true });
+  }
+
   /** Crea el archivo en la carpeta (sin `id`) o reemplaza su contenido (con `id`) */
   async save(name: string, bytes: Uint8Array, id?: string): Promise<DriveFile> {
     const meta: Record<string, unknown> = { name };
@@ -101,6 +127,15 @@ export class DriveClient {
       : `${UPLOAD}/files?uploadType=multipart&fields=id,name,modifiedTime`;
     return this.json<DriveFile>(url, { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': contentType }, body: body as BlobPart });
   }
+}
+
+/** Nombre .asc que no choca con los de la carpeta: «x.asc», «x (2).asc», «x (3).asc»… */
+export function uniqueName(name: string, taken: string[]): string {
+  const base = name.replace(/\.asc$/i, '');
+  const used = new Set(taken.map((t) => t.toLowerCase()));
+  let n = `${base}.asc`;
+  for (let i = 2; used.has(n.toLowerCase()); i++) n = `${base} (${i}).asc`;
+  return n;
 }
 
 /** Cuerpo multipart/related (metadatos JSON + contenido) para las subidas de Drive */

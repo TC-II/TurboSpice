@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DriveClient, multipart, qString } from '../../src/cloud/drive.ts';
+import { DriveClient, multipart, qString, uniqueName } from '../../src/cloud/drive.ts';
 
 type Call = { url: string; method: string; auth: string | null; body?: unknown; contentType: string | null };
 
@@ -84,5 +84,28 @@ describe('Google Drive', () => {
   it('los errores de la API llegan con su mensaje', async () => {
     const { fn } = fakeFetch([() => json({ error: { message: 'Quota exceeded' } }, 403)]);
     await expect(new DriveClient(async () => 'tok', fn).download('X')).rejects.toThrow('Google Drive: Quota exceeded');
+  });
+
+  it('renombra, duplica en la carpeta y manda a la papelera', async () => {
+    const { fn, calls } = fakeFetch([
+      (c) => (c.method === 'GET' && q(c).includes("name = 'TurboSpice'") ? json({ files: [{ id: 'F1' }] }) : undefined),
+      (c) => (c.method === 'PATCH' ? json({ id: 'A1', name: 'b.asc' }) : undefined),
+      (c) => (c.method === 'POST' && c.url.includes('/copy') ? json({ id: 'A2', name: 'a (copia).asc' }) : undefined),
+    ]);
+    const d = new DriveClient(async () => 'tok', fn);
+    expect(await d.rename('A1', 'b.asc')).toEqual({ id: 'A1', name: 'b.asc' });
+    expect(JSON.parse(calls.at(-1)!.body as string)).toEqual({ name: 'b.asc' });
+    expect((await d.copy('A1', 'a (copia).asc')).id).toBe('A2');
+    expect(calls.at(-1)!.url).toContain('/files/A1/copy');
+    expect(JSON.parse(calls.at(-1)!.body as string)).toEqual({ name: 'a (copia).asc', parents: ['F1'] });
+    await d.trash('A1');
+    expect(calls.at(-1)!.method).toBe('PATCH');
+    expect(JSON.parse(calls.at(-1)!.body as string)).toEqual({ trashed: true });
+  });
+
+  it('nombres que no pisan los de la carpeta', () => {
+    expect(uniqueName('a.asc', [])).toBe('a.asc');
+    expect(uniqueName('a', ['A.asc'])).toBe('a (2).asc');
+    expect(uniqueName('a.asc', ['a.asc', 'a (2).asc'])).toBe('a (3).asc');
   });
 });

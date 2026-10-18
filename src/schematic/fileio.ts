@@ -35,6 +35,22 @@ export function readAsc(bytes: Uint8Array, name: string): Omit<OpenedFile, 'hand
   return { doc: parseAsc(text), name, encoding };
 }
 
+/** Elegir uno o más .asc del equipo y leer sus bytes tal cual (para importarlos a Drive) */
+export function pickAscFiles(): Promise<{ name: string; bytes: Uint8Array }[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.asc';
+    input.multiple = true;
+    input.onchange = async () => {
+      const files = [...(input.files ?? [])].filter((f) => /\.asc$/i.test(f.name));
+      resolve(await Promise.all(files.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }))));
+    };
+    input.oncancel = () => resolve([]);
+    input.click();
+  });
+}
+
 export async function openFile(): Promise<OpenedFile | null> {
   if (window.showOpenFilePicker) {
     try {

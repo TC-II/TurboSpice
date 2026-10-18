@@ -52,7 +52,7 @@ import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
-import { ascBytes, openFile, readAsc, saveFile } from './schematic/fileio.ts';
+import { ascBytes, openFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
 import { useHistory } from './schematic/useHistory.ts';
@@ -75,7 +75,7 @@ import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download, exportSchematic } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
-import { AccountButton, DriveDialog } from './cloud/AccountButton.tsx';
+import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import type { DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
@@ -490,7 +490,25 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const confirmDiscard = () => !dirty || window.confirm('Hay cambios sin guardar. ¿Descartarlos?');
 
-  const doOpen = async () => {
+  // Con la sesión de Google iniciada, Abrir muestra "Mis simulaciones" (la carpeta del Drive);
+  // los archivos del equipo entran con Importar. Sin sesión, abre un .asc del equipo.
+  const doOpen = () => (google.account ? setDialog({ kind: 'drive' }) : doOpenLocal());
+
+  /** Importar .asc del equipo a la carpeta del Drive; uno solo se abre */
+  const doImport = async (picked?: { name: string; bytes: Uint8Array }[]) => {
+    const files = picked ?? (await pickAscFiles());
+    if (!files.length) return;
+    try {
+      setMessage(files.length > 1 ? `Importando ${files.length} archivos a Google Drive…` : `Importando ${files[0].name} a Google Drive…`);
+      const saved = await importToDrive(files);
+      if (saved.length === 1) await openDriveFile(saved[0]);
+      else setMessage(`Importados ${saved.length} archivos a «Mis simulaciones»`);
+    } catch (e) {
+      setMessage(`No se pudo importar: ${(e as Error).message}`);
+    }
+  };
+
+  const doOpenLocal = async () => {
     if (!confirmDiscard()) return;
     try {
       const f = await openFile();
@@ -1241,7 +1259,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // símbolos y modelos propios (un .asc suelto se abre; junto con otros archivos, es un bloque)
       const own = all.filter((x) => userFileKind(x.name) && (!/\.asc$/i.test(x.name) || all.length > 1));
       if (own.length && !(all.length === 1 && /\.asc$/i.test(f.name))) return addUserFiles(own);
-      if (!f || !f.name.toLowerCase().endsWith('.asc') || !confirmDiscard()) return;
+      if (!f || !f.name.toLowerCase().endsWith('.asc')) return;
+      // con la sesión de Google, soltar un .asc lo importa a "Mis simulaciones" y lo abre
+      if (google.account) return doImport([{ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }]);
+      if (!confirmDiscard()) return;
       const r = readAsc(new Uint8Array(await f.arrayBuffer()), f.name);
       loadDoc(r.doc, { name: r.name, encoding: r.encoding });
       remember(r.doc, { name: r.name, encoding: r.encoding });
@@ -1294,11 +1315,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: 'Archivo',
       items: [
         { label: 'Nuevo', onClick: doNew },
-        { label: 'Abrir…', shortcut: 'Ctrl+O', onClick: doOpen },
-        ...(google.account ? [{ label: 'Abrir de Google Drive…', onClick: () => setDialog({ kind: 'drive' }) }] : []),
-        { label: google.account ? 'Guardar en Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { label: google.account ? 'Guardar en Drive como…' : 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
-        ...(google.account ? [{ label: 'Guardar en el equipo…', onClick: () => doSaveLocal(true) }] : []),
+        { label: google.account ? 'Abrir (Mis simulaciones)…' : 'Abrir…', shortcut: 'Ctrl+O', onClick: doOpen },
+        ...(google.account ? [{ label: 'Importar desde la PC…', onClick: () => doImport() }] : []),
+        { label: 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: 'Exportar a la PC…', onClick: () => doSaveLocal(true) }] : []),
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
@@ -1447,7 +1468,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'new', label: 'Nuevo', title: 'Nuevo esquemático', onClick: doNew },
         { icon: 'save', label: 'Guardar', title: google.account ? 'Guardar en Google Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { icon: 'open', label: 'Abrir', title: 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
+        { icon: 'open', label: 'Abrir', title: google.account ? 'Mis simulaciones (Google Drive)' : 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },
     {
@@ -1972,7 +1993,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           }}
         />
       )}
-      {dialog?.kind === 'drive' && <DriveDialog onOpen={openDriveFile} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'drive' && (
+        <DriveDialog
+          currentId={file.driveId}
+          onOpen={openDriveFile}
+          onRenamed={(f) => f.id === file.driveId && setFile({ ...file, name: f.name })}
+          onTrashed={(id) => id === file.driveId && setFile({ ...file, driveId: undefined })}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'share' && (
         <ShareDialog
           url={dialog.url}

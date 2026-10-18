@@ -454,3 +454,5 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .study-code textarea { width: 100%; font: 13px/1.5 var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 240px; }
 .plot-info { margin: 0; } .fft-tools { padding: 4px 0; }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.cursor-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.cursor-tools button { font-size: 12px; padding: 1px 8px; }

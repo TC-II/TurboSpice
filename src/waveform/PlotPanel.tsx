@@ -67,11 +67,34 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     [panes, plot, runs, labels, resolver, mode],
   );
 
-  // Otro plot: volver al rango completo y sin cursores
+  // Otro eje X (otro tipo de análisis): rango completo y sin cursores. Al volver a simular
+  // el mismo análisis se conservan (#30)
+  const axisKey = `${data[0]?.xName ?? ''}`;
   useEffect(() => {
     setXRange(null);
     setCursors({});
-  }, [plot]);
+  }, [axisKey]);
+  // último cursor tocado: lo mueven las flechas
+  const [lastCursor, setLastCursor] = useState<'a' | 'b'>('a');
+  useEffect(() => {
+    if (!cursorMode) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const x = data[0]?.x;
+      const v = cursors[lastCursor];
+      if (!x || v === undefined) return;
+      e.preventDefault();
+      // un punto simulado (con Shift, diez)
+      let k = 0;
+      while (k < x.length - 1 && x[k] < v) k++;
+      if (x[k] > v && k > 0 && e.key === 'ArrowRight') k--;
+      const step = (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? 10 : 1);
+      setCursors((c) => ({ ...c, [lastCursor]: x[Math.min(x.length - 1, Math.max(0, k + step))] }));
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [cursorMode, cursors, lastCursor, data]);
   useEffect(() => {
     if (active >= panes.length) setActive(Math.max(0, panes.length - 1));
   }, [panes.length, active, setActive]);
@@ -188,7 +211,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onZoom={setXRange}
             cursorMode={cursorMode}
             cursors={cursors}
-            onCursor={(c) => setCursors((old) => ({ ...old, ...c }))}
+            onCursor={(c) => {
+              setCursors((old) => ({ ...old, ...c }));
+              setLastCursor(c.a !== undefined ? 'a' : 'b');
+            }}
             onHoverExpr={onHoverExpr}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
           />
@@ -196,8 +222,20 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       </div>
       {(cursorMode || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
-          {cursorMode && (cursors.a !== undefined || cursors.b !== undefined) && <CursorTable data={data} cursors={cursors} />}
-          {cursorMode && cursors.a === undefined && <p className="hint pad-x">Click en el gráfico para ubicar el cursor A; Shift+click o click derecho para el B.</p>}
+          {cursorMode && (cursors.a !== undefined || cursors.b !== undefined) && (
+            <>
+              <div className="cursor-tools">
+                <button onClick={() => setCursors((c) => ({ ...c, a: undefined }))} disabled={cursors.a === undefined}>Borrar A</button>
+                <button onClick={() => setCursors((c) => ({ ...c, b: undefined }))} disabled={cursors.b === undefined}>Borrar B</button>
+                <button onClick={() => setCursors((c) => ({ a: c.b, b: c.a }))}>Intercambiar A y B</button>
+                <span className="hint">Arrastrá las líneas para moverlos; ←/→ mueven el último un punto (Shift: diez).</span>
+              </div>
+              <CursorTable data={data} cursors={cursors} />
+            </>
+          )}
+          {cursorMode && cursors.a === undefined && cursors.b === undefined && (
+            <p className="hint pad-x">Click en el gráfico para ubicar el cursor A; Shift+click o click derecho para el B.</p>
+          )}
           {showStats && allVisible.length > 0 && <StatsTable data={data} range={range} />}
         </div>
       )}
@@ -320,7 +358,19 @@ function PaneView(props: {
               ctx.stroke();
               ctx.fillStyle = fg;
               ctx.font = `${12 * devicePixelRatio}px system-ui`;
-              ctx.fillText(name, px + 4 * devicePixelRatio, u.bbox.top + 14 * devicePixelRatio);
+              ctx.fillText(`${name} ${fmt(v)}`, px + 4 * devicePixelRatio, u.bbox.top + 14 * devicePixelRatio);
+              // un punto sobre cada curva visible, en el valor que lee la tabla
+              ctx.setLineDash([]);
+              data.curves.forEach((cv, i) => {
+                if (cv.hidden) return;
+                const y = valueAt(data.x, cv.y, v);
+                if (!Number.isFinite(y)) return;
+                const py = u.valToPos(y, u.series[i + 1].scale ?? 'y', true);
+                ctx.fillStyle = cv.color;
+                ctx.beginPath();
+                ctx.arc(px, py, 3.5 * devicePixelRatio, 0, 2 * Math.PI);
+                ctx.fill();
+              });
               ctx.restore();
             }
           },
@@ -333,16 +383,39 @@ function PaneView(props: {
     chart.current = u;
     props.register(u);
     const over = u.over;
-    const place = (e: MouseEvent, which: 'a' | 'b') => {
-      const x = u.posToVal(e.offsetX, 'x');
-      onCursor({ [which]: x });
+    // Cursores: se colocan al apretar (no con "click", que se pierde si el gráfico se redibuja
+    // entre que se aprieta y se suelta) y se arrastran tomando su línea.
+    const lineAt = (offsetX: number): 'a' | 'b' | null => {
+      const c = cursorsRef.current;
+      let best: 'a' | 'b' | null = null;
+      let d = 6;
+      for (const k of ['a', 'b'] as const) {
+        const v = c[k];
+        if (v === undefined) continue;
+        const dist = Math.abs(u.valToPos(v, 'x') - offsetX);
+        if (dist <= d) [best, d] = [k, dist];
+      }
+      return best;
     };
-    const click = (e: MouseEvent) => cursorMode && place(e, e.shiftKey ? 'b' : 'a');
-    const context = (e: MouseEvent) => {
-      if (!cursorMode) return;
+    let dragging: 'a' | 'b' | null = null;
+    const down = (e: PointerEvent) => {
+      if (!cursorMode || (e.button !== 0 && e.button !== 2)) return;
       e.preventDefault();
-      place(e, 'b');
+      dragging = lineAt(e.offsetX) ?? (e.button === 2 || e.shiftKey ? 'b' : 'a');
+      over.setPointerCapture(e.pointerId);
+      onCursor({ [dragging]: u.posToVal(e.offsetX, 'x') });
     };
+    const move = (e: PointerEvent) => {
+      if (!cursorMode) return;
+      if (dragging) onCursor({ [dragging]: u.posToVal(e.offsetX, 'x') });
+      else over.style.cursor = lineAt(e.offsetX) ? 'ew-resize' : '';
+    };
+    const up = (e: PointerEvent) => {
+      if (!dragging) return;
+      dragging = null;
+      if (over.hasPointerCapture(e.pointerId)) over.releasePointerCapture(e.pointerId);
+    };
+    const context = (e: MouseEvent) => cursorMode && e.preventDefault();
     // rueda: zoom en X alrededor del cursor
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -358,7 +431,10 @@ function PaneView(props: {
       const x1 = data.x[data.x.length - 1];
       onZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     };
-    over.addEventListener('click', click);
+    over.addEventListener('pointerdown', down);
+    over.addEventListener('pointermove', move);
+    over.addEventListener('pointerup', up);
+    over.addEventListener('pointercancel', up);
     over.addEventListener('contextmenu', context);
     over.addEventListener('wheel', wheel, { passive: false });
     const ro = new ResizeObserver(() => u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) }));
@@ -366,7 +442,10 @@ function PaneView(props: {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      over.removeEventListener('click', click);
+      over.removeEventListener('pointerdown', down);
+      over.removeEventListener('pointermove', move);
+      over.removeEventListener('pointerup', up);
+      over.removeEventListener('pointercancel', up);
       over.removeEventListener('contextmenu', context);
       over.removeEventListener('wheel', wheel);
       props.register(null);

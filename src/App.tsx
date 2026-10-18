@@ -1016,7 +1016,9 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     editor.current?.centerOn(symbolBox(s, lib.symbol(s.type), lib));
   };
   const scale = plot ? scaleOf(plot) : null;
-  const runs = sim && plot ? sameRuns(sim.result.plots, plot) : [];
+  // memoizadas: un arreglo nuevo en cada render recrearía los gráficos (y perdería clicks, #30)
+  const runs = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
+  const shownRuns = useMemo(() => (overlay ? runs : plot ? [plot] : []), [overlay, runs, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
 
@@ -1252,7 +1254,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
                 <PlotPanel
                   handle={plotPanel}
                   plot={plot}
-                  runs={overlay ? runs : [plot]}
+                  runs={shownRuns}
                   labels={labels}
                   panes={panes}
                   setPanes={setPanes}

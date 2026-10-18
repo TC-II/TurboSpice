@@ -242,6 +242,28 @@ await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2, { button
 await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
 check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);
+// #30: muchos clicks seguidos colocan siempre el cursor A, y las líneas se arrastran
+const headA = async () => (await page.locator('.readout thead th').nth(1).textContent()) ?? '';
+let placed = 0;
+for (let k = 0; k < 12; k++) {
+  const box = await page.locator('.pane-chart').first().boundingBox();
+  const before = await headA();
+  // (lejos de la línea de B, en el 70 %: un click sobre una línea la toma para arrastrarla)
+  await page.mouse.click(box.x + box.width * (0.15 + 0.04 * k), box.y + box.height / 2);
+  await page.waitForTimeout(450); // que no cuente como doble click
+  if ((await headA()) !== before) placed++;
+}
+check(placed === 12, `12 clicks seguidos colocan el cursor A (${placed}/12)`);
+const aBefore = await headA();
+// la línea de A quedó en el 59 % del ancho: arrastrarla al 30 %
+const cb4 = await page.locator('.pane-chart').first().boundingBox();
+await page.mouse.move(cb4.x + cb4.width * 0.59, cb4.y + cb4.height / 2);
+await page.mouse.down();
+await page.mouse.move(cb4.x + cb4.width * 0.3, cb4.y + cb4.height / 2, { steps: 8 });
+await page.mouse.up();
+check((await headA()) !== aBefore && (await page.locator('.readout tbody tr').count()) > 0, `arrastrar la línea mueve el cursor (${aBefore} → ${await headA()})`);
+await page.getByRole('button', { name: 'Intercambiar A y B' }).click();
+check(/B \(/.test(await page.locator('.readout thead').textContent()), 'intercambiar A y B');
 await page.screenshot({ path: `${OUT}/plot-panel.png` });
 await page.getByRole('button', { name: 'Cursores' }).click();
 

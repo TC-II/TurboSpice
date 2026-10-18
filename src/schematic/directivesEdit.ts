@@ -1,6 +1,7 @@
 // Ubicar y reemplazar en el esquemático el comando de análisis y el bloque .control.
 import type { AscDoc, SchText } from '../asc/model.ts';
 import { isControlBlock, isNgspiceComment } from '../netlist/directives.ts';
+import { isDataText } from '../asc/dataText.ts';
 import { ANALYSIS_LINE } from '../sim/analyses.ts';
 
 export interface FoundLine {
@@ -51,4 +52,19 @@ export function replaceAnalysis(doc: AscDoc, found: FoundLine, line: string, ngs
     texts.push({ ...t, y: t.y + 32 * (ls.length + 1), text: line, kind });
   }
   return { ...doc, texts };
+}
+
+/**
+ * Pone `line` como comando de análisis del esquemático: reemplaza el que haya o, si no hay
+ * ninguno, agrega un texto debajo de los demás. Los análisis de ngspice van como comentario.
+ */
+export function setAnalysisLine(doc: AscDoc, line: string): AscDoc {
+  const found = findAnalysis(doc);
+  if (found?.value === line) return doc;
+  const ngspiceOnly = isNgspiceComment(line);
+  if (found) return replaceAnalysis(doc, found, line, ngspiceOnly);
+  const shown = doc.texts.filter((t) => !isDataText(t));
+  const y = shown.length ? Math.max(...shown.map((t) => t.y + lines(t).length * 24)) + 16 : 0;
+  const text: SchText = { x: shown[0]?.x ?? 0, y, align: 'Left', size: 2, kind: ngspiceOnly ? 'comment' : 'directive', text: line };
+  return { ...doc, texts: [...doc.texts, text] };
 }

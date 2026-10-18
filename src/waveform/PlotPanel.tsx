@@ -8,7 +8,7 @@ import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curve
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { displayName, scaleOf, si } from './series.ts';
-import { sameExpr, traceColor, type Pane, type Trace } from './view.ts';
+import { sameExpr, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
@@ -52,6 +52,10 @@ interface Props {
   handle?: Ref<PlotPanelHandle>;
   /** frecuencias de polos y ceros (.pz) para marcar en el eje de frecuencia */
   marks?: PzMark[];
+  /** zoom y cursores con los que arranca (los de la simulación elegida, #39) */
+  initial?: PlotState;
+  /** avisa cada cambio de zoom o cursores (para guardarlos con la simulación) */
+  onState?(s: PlotState): void;
 }
 
 export interface PzMark {
@@ -60,16 +64,6 @@ export interface PzMark {
 }
 
 type Range = [number, number];
-type CursorKey = 'a' | 'b';
-interface Cursors {
-  a?: number;
-  b?: number;
-  /** traza (etiqueta de la curva) que sigue cada cursor */
-  ta?: string;
-  tb?: string;
-  /** último cursor movido: el que mueven las flechas */
-  sel?: CursorKey;
-}
 /** distancia (px) a la línea de un cursor para tomarlo y arrastrarlo */
 const GRAB = 6;
 
@@ -86,20 +80,22 @@ const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName ===
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks, initial, onState }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   const [fftExpr, setFftExpr] = useState('');
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
-  const [xRange, setXRange] = useState<Range | null>(null);
-  const [cursorMode, setCursorMode] = useState(false);
-  const [cursors, setCursors] = useState<Cursors>({});
+  // el estado inicial vale sólo si es del mismo eje X
+  const init = initial && initial.scale === scaleOf(plot)?.name ? initial : undefined;
+  const [xRange, setXRange] = useState<Range | null>(init?.xRange ?? null);
+  const [cursorMode, setCursorMode] = useState(init?.cursorMode ?? false);
+  const [cursors, setCursors] = useState<Cursors>(init?.cursors ?? {});
   const [showStats, setShowStats] = useState(false);
   const [expr, setExpr] = useState('');
   const [exprError, setExprError] = useState<string>();
   const charts = useRef(new Map<number, uPlot>());
   const exprInput = useRef<HTMLInputElement>(null);
   // eje Y fijado por un zoom a recuadro (por panel; sin entrada = autoescala)
-  const [yRanges, setYRanges] = useState<Record<number, Range>>({});
+  const [yRanges, setYRanges] = useState<Record<number, Range>>(init?.yRanges ?? {});
   const [zoomMode, setZoomMode] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
@@ -115,12 +111,18 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   // a simular el mismo análisis se mantienen el zoom y los cursores.
   const scale = scaleOf(plot);
   const scaleName = scale?.name;
+  const lastScale = useRef(scaleName);
   useEffect(() => {
+    if (lastScale.current === scaleName) return;
+    lastScale.current = scaleName;
     setXRange(null);
     setYRanges({});
     zoomHistory.current = [];
     setCursors({});
   }, [scaleName]);
+  useEffect(() => {
+    onState?.({ scale: scaleName, xRange, yRanges, cursors, cursorMode });
+  }, [scaleName, xRange, yRanges, cursors, cursorMode, onState]);
   useEffect(() => {
     const xs = scale?.real;
     if (!xs?.length) return;

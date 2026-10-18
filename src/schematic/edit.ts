@@ -352,6 +352,51 @@ export function dragSegment(doc: AscDoc, index: number, dx: number, dy: number, 
   return mergeCollinear({ ...doc, wires }, lib);
 }
 
+/**
+ * Como moveVertex pero sin codos (Ctrl+arrastre): cada cable que termina en `p` va en línea
+ * recta desde su otro extremo hasta `to`, aunque quede en diagonal.
+ */
+export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Library): AscDoc {
+  if (samePt(p, to)) return doc;
+  let touched = false;
+  const wires = doc.wires.map((w) => {
+    if (isZero(w)) return w;
+    const [a, b] = ends(w);
+    if (samePt(a, p)) return (touched = true), seg(to, b);
+    if (samePt(b, p)) return (touched = true), seg(a, to);
+    return w;
+  });
+  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+}
+
+/**
+ * Como dragSegment pero en cualquier dirección y sin codos (Ctrl+arrastre): el tramo se
+ * desplaza y los cables que terminan en sus extremos van en línea recta hasta la nueva
+ * posición; si en el extremo hay otra cosa (pin, etiqueta, unión en T) se agrega un cable
+ * recto que la sigue uniendo.
+ */
+export function dragSegmentStraight(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library): AscDoc {
+  const w = doc.wires[index];
+  if (!w || (!dx && !dy)) return doc;
+  const fixed = fixedPoints(doc, lib);
+  const mvp = (p: Point) => ({ x: p.x + dx, y: p.y + dy });
+  const wires = [...doc.wires];
+  const stubs: Wire[] = [];
+  const others = doc.wires.flatMap((o, j) => (j !== index && !isZero(o) ? [j] : []));
+  for (const e of ends(w)) {
+    const endHere = others.filter((j) => ends(doc.wires[j]).some((q) => samePt(q, e)));
+    const passHere = others.some((j) => inInterior(e, doc.wires[j]));
+    if (fixed.has(ptKey(e)) || passHere) stubs.push(seg(e, mvp(e)));
+    else
+      for (const j of endHere) {
+        const n = wires[j];
+        wires[j] = samePt({ x: n.x1, y: n.y1 }, e) ? { ...n, x1: e.x + dx, y1: e.y + dy } : { ...n, x2: e.x + dx, y2: e.y + dy };
+      }
+  }
+  wires.splice(index, 1, { x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }, ...stubs);
+  return mergeCollinear({ ...doc, wires }, lib);
+}
+
 /** Índices de los cables de `doc` que caen sobre alguno de los tramos `segs` (para la selección) */
 export function wiresOn(doc: AscDoc, segs: Wire[]): number[] {
   return doc.wires.flatMap((w, i) => (!isZero(w) && segs.some((s) => ends(w).every((e) => onSegment(e, s))) ? [i] : []));

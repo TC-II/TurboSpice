@@ -1450,7 +1450,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
 function toolHint(t: Tool): string {
   switch (t.kind) {
     case 'select':
-      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o espacio: desplazar';
+      return 'Click para seleccionar · arrastrar para mover (Ctrl: sin arrastrar cables; en un cable o codo: en línea recta) · doble click para editar (en un cable: agrega o quita un codo) · rueda: zoom · botón medio o espacio: desplazar';
     case 'wire':
       return t.start ? 'Click para fijar el tramo · click derecho o Esc para terminar' : 'Click para empezar el cable';
     case 'place':

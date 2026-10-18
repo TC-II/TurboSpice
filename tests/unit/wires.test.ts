@@ -11,9 +11,11 @@ import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import {
   addWire,
   dragSegment,
+  dragSegmentStraight,
   mergeCollinear,
   moveItems,
   moveVertex,
+  moveVertexStraight,
   removeVertex,
   sameConnections,
   splitWire,
@@ -151,6 +153,34 @@ describe('codos y tramos', () => {
         }
       });
     }
+  });
+});
+
+describe('Ctrl+arrastre: en línea recta', () => {
+  it('mover un codo lleva los dos cables en recta hasta el nuevo punto, sin codos', () => {
+    const d = moveVertexStraight(U, { x: 16, y: 160 }, { x: 64, y: 208 }, lib);
+    expect(ws(d)).toEqual([
+      [16, 96, 64, 208],
+      [64, 208, 176, 160],
+      [176, 160, 176, 96],
+    ]);
+    expect(net(d)).toBe(net(U));
+  });
+
+  it('arrastrar un tramo en diagonal estira los vecinos en recta', () => {
+    const d = dragSegmentStraight(U, 1, 48, 64, lib);
+    expect(ws(d)).toEqual([
+      [16, 96, 64, 224],
+      [64, 224, 224, 224],
+      [224, 224, 176, 96],
+    ]);
+    expect(net(d)).toBe(net(U));
+  });
+
+  it('arrastrar un tramo que sale de un pin agrega un cable recto al pin', () => {
+    const d = dragSegmentStraight(U, 0, 32, 16, lib);
+    expect(d.wires).toContainEqual({ x1: 16, y1: 96, x2: 48, y2: 112 });
+    expect(net(d)).toBe(net(U));
   });
 });
 

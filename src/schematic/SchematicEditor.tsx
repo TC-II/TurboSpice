@@ -4,7 +4,7 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { GRID, type AscDoc, type Orient, type Point, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, dragSegment, moveItems, moveVertex, placeSymbol, removeVertex, sameConnections, setWindow, splitWire, wiresOn } from './edit.ts';
+import { addFlag, addText, addWire, deleteItems, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindow, splitWire, wiresOn } from './edit.ts';
 import { inverseOffset } from '../asc/transform.ts';
 import type { TextWindow } from '../asc/model.ts';
 import {
@@ -90,9 +90,9 @@ type Drag =
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
-  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
+  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean; straight?: boolean }
   /** desplazar un tramo de cable en forma perpendicular */
-  | { mode: 'segment'; start: Point; index: number }
+  | { mode: 'segment'; start: Point; index: number; straight?: boolean }
   /** arrastrar un rótulo (InstName/Value) de un símbolo */
   | { mode: 'label'; start: Point; sym: number; win: number; w: TextWindow; moved: boolean };
 
@@ -316,7 +316,9 @@ export function SchematicEditor(props: Props) {
         const all = hitTestAll(doc, p, lib, tol);
         // (un doble click, más rápido, edita y no alterna)
         const lc = lastClick.current;
-        const again = !!lc && Math.hypot(lc.p.x - p.x, lc.p.y - p.y) < tol && all.length > 1 && e.timeStamp - lc.t > 350;
+        // (en un codo de cables no se alterna: se arrastra el codo)
+        const onVertex = all[0]?.kind === 'wire' && !e.shiftKey && !!wireVertexAt(doc, p, lib, tol * 1.5);
+        const again = !onVertex && !!lc && Math.hypot(lc.p.x - p.x, lc.p.y - p.y) < tol && all.length > 1 && e.timeStamp - lc.t > 350;
         const pickIdx = again ? (lc!.i + 1) % all.length : 0;
         lastClick.current = { p, i: pickIdx, t: e.timeStamp };
         const hit = all[pickIdx] ?? null;
@@ -333,19 +335,25 @@ export function SchematicEditor(props: Props) {
         }
         const already = selection.some((s) => s.kind === hit.kind && s.index === hit.index);
         // un cable solo: se arrastra un codo o un tramo (Alt+click agrega un codo ahí);
-        // con Ctrl se mueve suelto, y si es parte de una selección se mueve todo junto
-        if (hit.kind === 'wire' && !e.shiftKey && !e.ctrlKey && !e.metaKey && !(already && selection.length > 1)) {
+        // con Ctrl, en línea recta (sin codos, puede quedar en diagonal); si es parte de una
+        // selección se mueve todo junto
+        if (hit.kind === 'wire' && !e.shiftKey && !(already && selection.length > 1)) {
+          const straight = e.ctrlKey || e.metaKey;
           const v = wireVertexAt(doc, p, lib, tol * 1.5);
           const at = gridPointOnWire(doc.wires[hit.index], p);
           if (e.altKey && at && !v) {
             const base = splitWire(doc, hit.index, at);
             setSelection([]);
-            setDrag({ mode: 'vertex', base, at, free: false, commitBase: base !== doc });
+            setDrag({ mode: 'vertex', base, at, free: false, commitBase: base !== doc, straight });
             return;
           }
-          if (v || at) {
+          if (v || at || straight) {
             setSelection([hit]);
-            setDrag(v ? { mode: 'vertex', base: doc, at: v, free: freeEnd(doc, v), commitBase: false } : { mode: 'segment', start: g, index: hit.index });
+            setDrag(
+              v
+                ? { mode: 'vertex', base: doc, at: v, free: freeEnd(doc, v), commitBase: false, straight }
+                : { mode: 'segment', start: g, index: hit.index, straight },
+            );
             return;
           }
         }
@@ -451,7 +459,11 @@ export function SchematicEditor(props: Props) {
       // una unión, el cable se queda en la última posición válida
       const g = snapPoint(p);
       const from = drag.mode === 'vertex' ? drag.base : doc;
-      const nd = drag.mode === 'vertex' ? moveVertex(drag.base, drag.at, g, lib) : dragSegment(doc, drag.index, g.x - drag.start.x, g.y - drag.start.y, lib);
+      const [dx, dy] = drag.mode === 'segment' ? [g.x - drag.start.x, g.y - drag.start.y] : [0, 0];
+      const nd =
+        drag.mode === 'vertex'
+          ? (drag.straight ? moveVertexStraight : moveVertex)(drag.base, drag.at, g, lib)
+          : (drag.straight ? dragSegmentStraight : dragSegment)(doc, drag.index, dx, dy, lib);
       if (nd === from) setPreview(null);
       else if ((drag.mode === 'vertex' && drag.free) || sameConnections(doc, nd, lib)) setPreview(nd);
     } else {

@@ -1,5 +1,6 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc } from './asc/model.ts';
 import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
@@ -18,8 +19,9 @@ import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, WelcomeDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
-import { MenuBar, type MenuDef } from './ui/Menu.tsx';
-import { Icon, type IconName } from './ui/icons.tsx';
+import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
+import { Icon } from './ui/icons.tsx';
+import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
@@ -27,7 +29,7 @@ import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, replaceAnalysis, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
-import { ANALYSIS_LINE } from './sim/analyses.ts';
+import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
@@ -67,7 +69,7 @@ type Dialog =
   | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point }
-  | { kind: 'sim'; found: FoundLine | null }
+  | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
   | { kind: 'share'; url: string }
   | { kind: 'help' }
@@ -168,25 +170,36 @@ export function App() {
     return () => engine.abort();
   }, [engine]);
 
+  // lugares de la barra superior que llena el modo esquemático: el menú (junto al nombre) y,
+  // arriba a la derecha, archivo, tema y compartir (#38)
+  const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null);
+  const [rightSlot, setRightSlot] = useState<HTMLElement | null>(null);
+
   return (
     <div className="app">
       <header className="appbar">
+        <div className="appbar-slot" ref={setMenuSlot} />
         <h1>TurboSpice</h1>
         <nav className="tabs">
           <button className={mode === 'schematic' ? 'active' : ''} onClick={() => setMode('schematic')}>Esquemático</button>
           <button className={mode === 'netlist' ? 'active' : ''} onClick={() => setMode('netlist')}>Netlist</button>
         </nav>
-        <div id="appbar-slot" />
+        <div className="appbar-slot appbar-right" ref={setRightSlot} />
+        {/* el usuario / login (#35), al final, después de Compartir */}
         <AccountButton />
       </header>
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
-        (lib ? <SchematicMode engine={engine} lib={lib} /> : <p className="empty pad">{libError ?? 'Cargando librería…'}</p>)}
+        (lib ? (
+          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, right: rightSlot }} />
+        ) : (
+          <p className="empty pad">{libError ?? 'Cargando librería…'}</p>
+        ))}
     </div>
   );
 }
 
-function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) {
+function SchematicMode({ engine, lib, slots }: { engine: EngineClient; lib: Library; slots: { menu: HTMLElement | null; right: HTMLElement | null } }) {
   const history = useHistory<AscDoc>(emptyDoc());
   const doc = history.value;
   const [file, setFile] = useState<FileState>({ name: 'Sin título.asc' });
@@ -900,7 +913,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
     };
   };
 
-  const openSimulation = () => setDialog({ kind: 'sim', found: findAnalysis(doc) });
+  /** Menú de simulación; con un tipo de análisis, abre en ese tipo */
+  const openSimulation = (analysis?: AnalysisKind) => setDialog({ kind: 'sim', found: findAnalysis(doc), analysis });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
@@ -1091,16 +1105,25 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   });
 
   const running = status.kind === 'running';
-  const iconBtn = (icon: IconName, label: string, title: string, onClick: () => void, o: { active?: boolean; disabled?: boolean } = {}) => (
-    <button className={o.active ? 'active' : ''} aria-label={label} title={title} onClick={onClick} disabled={o.disabled}>
-      <Icon name={icon} />
-    </button>
-  );
   // Colapsar o mostrar el panel de resultados (#36): el resultado, las trazas, los cursores y la
   // vista se conservan; sólo se reemplazan al volver a simular o al abrir otro circuito
   const resultsShown = !!sim && expanded !== 'schematic';
   const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
+  // Tipos de análisis: el elegido abre el menú de simulación en ese tipo. Marcado, el de la
+  // directiva actual
+  const currentAnalysis = useMemo(() => {
+    const found = findAnalysis(doc);
+    return found ? parseAnalysis(found.value)?.kind : undefined;
+  }, [doc]);
+  const analysisItems: MenuItem[] = ANALYSES.map((x) => ({
+    label: x.label,
+    title: x.help,
+    onClick: () => openSimulation(x.kind),
+    checked: x.kind === currentAnalysis,
+  }));
+  // Desplegable de la flecha de Simular: por ahora, los tipos de análisis (#38)
+  const simItems: MenuItem[] = [...analysisItems, 'sep', { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() }];
   const menus: MenuDef[] = [
     {
       label: 'Archivo',
@@ -1177,7 +1200,8 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
         { label: 'Abortar', shortcut: 'Alt+S', onClick: abort, disabled: !running },
         { label: 'Ver el log', shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
         'sep',
-        { label: 'Comando de simulación…', shortcut: 'A', onClick: openSimulation },
+        { label: 'Tipo de simulación', items: analysisItems },
+        { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() },
         { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
         { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
         'sep',
@@ -1257,70 +1281,134 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
   const marks = useMemo(() => pzMarks(pzRoots(pzAll)), [pzAll]);
   const withPz = !!pzAll.length && scale?.name.toLowerCase() === 'frequency';
 
+  // Barra de herramientas (#38): archivo, historial, dibujo, edición, vista y análisis; si falta
+  // lugar, los grupos de la derecha pasan al desplegable "Más herramientas"
+  const toolGroups: ToolGroup[] = [
+    {
+      id: 'file',
+      label: 'Archivo',
+      tools: [
+        { icon: 'new', label: 'Nuevo', title: 'Nuevo esquemático', onClick: doNew },
+        { icon: 'save', label: 'Guardar', title: google.account ? 'Guardar en Google Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { icon: 'open', label: 'Abrir', title: 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
+      ],
+    },
+    {
+      id: 'history',
+      label: 'Historial',
+      tools: [
+        { icon: 'undo', label: 'Deshacer', title: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
+        { icon: 'redo', label: 'Rehacer', title: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
+      ],
+    },
+    {
+      id: 'draw',
+      label: 'Dibujo',
+      tools: [
+        { icon: 'select', label: 'Seleccionar', title: 'Seleccionar y mover', shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
+        { icon: 'wire', label: 'Cable', title: 'Cable', shortcut: 'F3 / W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
+        { icon: 'component', label: 'Componente', title: 'Componente', shortcut: 'P / F2', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
+        { icon: 'ground', label: 'Tierra', title: 'Tierra (GND)', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
+        { icon: 'label', label: 'Etiqueta', title: 'Etiqueta de red', shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
+        { icon: 'text', label: 'Texto', title: 'Texto (comentario)', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'directive', label: 'Directiva', title: 'Directiva SPICE libre', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+      ],
+    },
+    {
+      id: 'edit',
+      label: 'Edición',
+      tools: [
+        { icon: 'rotate', label: 'Rotar', title: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
+        { icon: 'mirror', label: 'Espejar', title: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        { icon: 'delete', label: 'Borrar', title: 'Borrar', shortcut: 'F5 / Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
+      ],
+    },
+    {
+      id: 'view',
+      label: 'Vista',
+      tools: [
+        { icon: 'fit', label: 'Ajustar', title: 'Ajustar a la vista (Z: zoom a un recuadro, Shift+Z: zoom anterior)', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
+        { icon: 'nets', label: 'Redes', title: 'Mostrar los nombres de todas las redes, sin modificar el esquemático', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
+      ],
+    },
+    {
+      id: 'analysis',
+      label: 'Análisis',
+      tools: [
+        { icon: 'study', label: 'Estudio…', title: 'Estudio: barridos, tolerancias, mediciones', shortcut: 'Alt+E', onClick: openStudy },
+        { icon: 'control', label: '.control…', title: 'Bloque .control: scripts de ngspice', shortcut: 'Alt+C', onClick: openControl },
+      ],
+    },
+  ];
+
   return (
     <div className="schematic-mode">
-      <div className="menurow">
-        <MenuBar menus={menus} />
-        <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
-        <button
-          className="theme-btn"
-          aria-label="Cambiar tema"
-          title={`Tema: ${theme === 'auto' ? 'automático (del sistema)' : theme === 'light' ? 'claro' : 'oscuro'}`}
-          onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
-        >
-          <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
-          {theme === 'auto' && <span className="auto">A</span>}
-        </button>
-      </div>
-      <div className="iconbar" role="toolbar" aria-label="Herramientas">
-        {iconBtn('new', 'Nuevo', 'Nuevo esquemático', doNew)}
-        {iconBtn('open', 'Abrir', 'Abrir .asc (Ctrl+O)', doOpen)}
-        {iconBtn('save', 'Guardar', google.account ? 'Guardar en Google Drive (Ctrl+S)' : 'Guardar (Ctrl+S)', () => doSave(false))}
-        {iconBtn('share', 'Compartir', 'Copiar un link que abre este circuito', doShare)}
-        <span className="sep" />
-        {iconBtn('undo', 'Deshacer', 'Deshacer (Ctrl+Z)', history.undo, { disabled: !history.canUndo })}
-        {iconBtn('redo', 'Rehacer', 'Rehacer (Ctrl+Shift+Z)', history.redo, { disabled: !history.canRedo })}
-        <span className="sep" />
-        {iconBtn('select', 'Seleccionar', 'Seleccionar y mover (Esc)', () => setTool({ kind: 'select' }), { active: tool.kind === 'select' })}
-        {iconBtn('wire', 'Cable', 'Cable (W)', () => setTool({ kind: 'wire', start: null }), { active: tool.kind === 'wire' })}
-        {iconBtn('component', 'Componente', 'Componente (P / F2)', () => setDialog({ kind: 'picker' }), { active: tool.kind === 'place' })}
-        {iconBtn('ground', 'Tierra', 'Tierra (G)', () => setTool({ kind: 'flag', name: '0' }), { active: tool.kind === 'flag' && tool.name === '0' })}
-        {iconBtn('label', 'Etiqueta', 'Etiqueta de red (F4 / N)', () => setDialog({ kind: 'flag' }))}
-        {iconBtn('directive', 'Directiva', 'Directiva SPICE libre (.)', () => setDialog({ kind: 'text', textKind: 'directive' }))}
-        {iconBtn('delete', 'Borrar', 'Borrar (Backspace)', deleteSelection, { active: tool.kind === 'delete' })}
-        <span className="sep" />
-        {iconBtn('rotate', 'Rotar', 'Rotar (Ctrl+R)', () => rotateOrMirror('rotate'))}
-        {iconBtn('mirror', 'Espejar', 'Espejar (Ctrl+E)', () => rotateOrMirror('mirror'))}
-        {iconBtn('fit', 'Ajustar', 'Ajustar a la vista (Espacio; Z: zoom a un recuadro, Shift+Z: zoom anterior)', () => editor.current?.fit())}
-        {iconBtn('nets', 'Redes', 'Mostrar los nombres de todas las redes, sin modificar el esquemático (Alt+N)', () => setShowNets((v) => !v), { active: showNets })}
-        <span className="sep" />
-        {iconBtn('sim', 'Simulación…', 'Tipo de simulación y parámetros (A)', openSimulation)}
-        {iconBtn('study', 'Estudio…', 'Estudio: barridos, tolerancias, mediciones (Alt+E)', openStudy)}
-        {iconBtn('control', '.control…', 'Bloque .control: scripts de ngspice (Alt+C)', openControl)}
-        {running ? (
-          <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
-            <Icon name="stop" /> Abortar
-          </button>
-        ) : (
-          <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" title="Simular (Alt+R / Ctrl+Enter)">
-            <Icon name="run" /> Simular
-          </button>
+      {slots.menu && createPortal(<AppMenu menus={menus} />, slots.menu)}
+      {slots.right &&
+        createPortal(
+          <>
+            <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
+            <button
+              className="theme-btn"
+              aria-label="Cambiar tema"
+              title={`Tema: ${theme === 'auto' ? 'automático (del sistema)' : theme === 'light' ? 'claro' : 'oscuro'}`}
+              onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
+            >
+              <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
+              {theme === 'auto' && <span className="auto">A</span>}
+            </button>
+            <button className="share-btn" aria-label="Compartir" title="Copiar un link que abre este circuito" onClick={doShare}>
+              <Icon name="share" />
+              <span className="txt">Compartir</span>
+            </button>
+          </>,
+          slots.right,
         )}
-        {sim && iconBtn('probe', 'Medir', 'Punta de prueba: click en un cable (tensión) o componente (corriente)', () => setTool({ kind: 'probe' }), { active: tool.kind === 'probe' })}
-        {bias && iconBtn('op', 'Anotar OP', 'Anotar el punto de operación en el esquemático (sin modificarlo)', () => setShowOp((v) => !v), { active: showOp })}
-        {sim && (
-          <button
-            className={`labeled${resultsShown ? ' active' : ''}`}
-            onClick={toggleResultsPanel}
-            aria-label="Panel de resultados"
-            aria-pressed={resultsShown}
-            title={resultsShown ? 'Ocultar el panel de resultados (no se pierden)' : 'Mostrar el panel de resultados'}
-          >
-            <Icon name="results" /> Resultados
-          </button>
-        )}
-        <StatusText status={status} />
-      </div>
+      <Toolbar
+        label="Herramientas"
+        groups={toolGroups}
+        fixed={
+          <>
+            {/* Simular partido: la acción principal simula y la flecha despliega los tipos de análisis */}
+            <div className="split" role="group" aria-label="Simulación">
+              {running ? (
+                <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
+                  <Icon name="stop" /> Abortar
+                </button>
+              ) : (
+                <button className="primary" onClick={run} disabled={status.kind === 'loading'} aria-label="Simular" aria-keyshortcuts="Alt+R Control+Enter" title="Simular (Alt+R / Ctrl+Enter)">
+                  <Icon name="run" /> Simular
+                </button>
+              )}
+              <MenuButton items={simItems} label="Tipo de simulación" title="Tipo de simulación y parámetros (A)" className={running ? 'labeled' : 'primary'}>
+                <Icon name="caret" size={14} />
+              </MenuButton>
+            </div>
+            {sim && (
+              <button className={tool.kind === 'probe' ? 'active' : ''} aria-label="Medir" title="Punta de prueba: click en un cable (tensión) o componente (corriente)" onClick={() => setTool({ kind: 'probe' })}>
+                <Icon name="probe" />
+              </button>
+            )}
+            {bias && (
+              <button className={showOp ? 'active' : ''} aria-label="Anotar OP" title="Anotar el punto de operación en el esquemático (sin modificarlo)" onClick={() => setShowOp((v) => !v)}>
+                <Icon name="op" />
+              </button>
+            )}
+            {sim && (
+              <button
+                className={`labeled${resultsShown ? ' active' : ''}`}
+                onClick={toggleResultsPanel}
+                aria-label="Panel de resultados"
+                aria-pressed={resultsShown}
+                title={resultsShown ? 'Ocultar el panel de resultados (no se pierden)' : 'Mostrar el panel de resultados'}
+              >
+                <Icon name="results" /> <span className="txt">Resultados</span>
+              </button>
+            )}
+          </>
+        }
+        after={<StatusText status={status} />}
+      />
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div className="canvas-wrap">
@@ -1585,6 +1673,7 @@ function SchematicMode({ engine, lib }: { engine: EngineClient; lib: Library }) 
       {dialog?.kind === 'sim' && (
         <SimulationDialog
           initial={dialog.found?.value ?? null}
+          analysis={dialog.analysis}
           info={circuitInfo()}
           picker={picker}
           hidden={!!picking}

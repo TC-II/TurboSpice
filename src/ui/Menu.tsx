@@ -1,5 +1,7 @@
-// Barra de menús (Archivo, Editar, …) con submenús, atajos visibles y manejo de teclado.
-import { useEffect, useRef, useState } from 'react';
+// Menús desplegables (el menú principal colapsado, la flecha de Simular, …) con submenús,
+// atajos visibles y manejo de teclado.
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { Icon } from './icons.tsx';
 
 export type MenuItem =
   | { label: string; shortcut?: string; onClick(): void; disabled?: boolean; checked?: boolean; title?: string }
@@ -11,17 +13,29 @@ export interface MenuDef {
   items: MenuItem[];
 }
 
-export function MenuBar({ menus }: { menus: MenuDef[] }) {
-  const [open, setOpen] = useState<number | null>(null);
-  const bar = useRef<HTMLDivElement>(null);
+/** Botón que despliega una lista de menú */
+export function MenuButton({ items, label, title, className, disabled, children }: {
+  items: MenuItem[];
+  /** Nombre accesible del botón y de la lista */
+  label: string;
+  title?: string;
+  className?: string;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (open === null) return;
-    const down = (e: PointerEvent) => !bar.current?.contains(e.target as Node) && setOpen(null);
+    if (!open) return;
+    const down = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
     const key = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        // que no llegue a los atajos del editor (Esc también deselecciona)
         e.stopPropagation();
-        setOpen(null);
+        setOpen(false);
+        btn.current?.focus();
       }
     };
     window.addEventListener('pointerdown', down);
@@ -33,38 +47,82 @@ export function MenuBar({ menus }: { menus: MenuDef[] }) {
   }, [open]);
 
   return (
-    <div className="menubar" ref={bar} role="menubar">
-      {menus.map((m, i) => (
-        <div key={m.label} className="menu-top">
-          <button
-            role="menuitem"
-            aria-haspopup="menu"
-            aria-expanded={open === i}
-            className={open === i ? 'open' : ''}
-            onClick={() => setOpen(open === i ? null : i)}
-            onPointerEnter={() => open !== null && setOpen(i)}
-          >
-            {m.label}
-          </button>
-          {open === i && <MenuList items={m.items} close={() => setOpen(null)} label={m.label} autoFocus />}
-        </div>
-      ))}
+    <div className="menu-top" ref={root}>
+      <button
+        ref={btn}
+        className={`${className ?? ''}${open ? ' open' : ''}`}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={title}
+        disabled={disabled}
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown' && !open) {
+            e.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {children}
+      </button>
+      {open && <MenuList items={items} close={() => setOpen(false)} label={label} autoFocus />}
     </div>
   );
 }
 
-function MenuList({ items, close, label, autoFocus }: { items: MenuItem[]; close(): void; label: string; autoFocus?: boolean }) {
+/** Menú principal colapsado: un botón junto al nombre de la app con todos los menús como submenús */
+export function AppMenu({ menus }: { menus: MenuDef[] }) {
+  return (
+    <MenuButton
+      items={menus.map((m) => ({ label: m.label, items: m.items }))}
+      label="Menú"
+      title={`Menú: ${menus.map((m) => m.label).join(', ')}`}
+      className="app-menu-btn"
+    >
+      <Icon name="menu" />
+    </MenuButton>
+  );
+}
+
+function MenuList({ items, close, label, autoFocus, onBack }: {
+  items: MenuItem[];
+  close(): void;
+  label: string;
+  autoFocus?: boolean;
+  /** En un submenú: volver al ítem que lo abrió (flecha izquierda) */
+  onBack?(): void;
+}) {
   const list = useRef<HTMLDivElement>(null);
-  const [sub, setSub] = useState<number | null>(null);
+  const [sub, setSub] = useState<{ i: number; focus: boolean } | null>(null);
   useEffect(() => {
     if (autoFocus) list.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
   }, [autoFocus]);
-  const move = (e: React.KeyboardEvent, d: number) => {
-    const btns = [...(list.current?.querySelectorAll<HTMLButtonElement>(':scope > .menu-item > button:not(:disabled)') ?? [])];
+  // que no se salga de la ventana: la lista principal se corre a la izquierda y los submenús
+  // se abren del otro lado (en pantallas angostas van debajo de su ítem, ver el CSS)
+  const isSub = !!onBack;
+  useLayoutEffect(() => {
+    const el = list.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    // el ancho del documento, no innerWidth: en el celular la lista desbordada agranda la ventana
+    const over = r.right - (document.documentElement.clientWidth - 8);
+    if (over <= 0 || getComputedStyle(el).position !== 'absolute') return;
+    if (isSub) el.classList.add('flip');
+    else el.style.left = `${-Math.min(over, Math.max(0, r.left - 8))}px`;
+  }, [isSub]);
+  // si algún ítem se marca, todos dejan lugar para la marca (quedan alineados)
+  const checks = items.some((it) => it !== 'sep' && !('items' in it) && it.checked !== undefined);
+  const buttons = () => [...(list.current?.querySelectorAll<HTMLButtonElement>(':scope > .menu-item > button:not(:disabled)') ?? [])];
+  const move = (d: number) => {
+    const btns = buttons();
     const i = btns.indexOf(document.activeElement as HTMLButtonElement);
     btns[(i + d + btns.length) % btns.length]?.focus();
-    e.preventDefault();
   };
+  const focusItem = (i: number) => list.current?.querySelector<HTMLButtonElement>(`:scope > .menu-item[data-i="${i}"] > button`)?.focus();
+  // sólo con mouse: en pantallas táctiles el submenú se abre y se cierra tocando el ítem
+  const mouse = (e: React.PointerEvent) => e.pointerType === 'mouse';
+  const lastPointer = useRef('mouse');
   return (
     <div
       className="menu-list"
@@ -72,23 +130,62 @@ function MenuList({ items, close, label, autoFocus }: { items: MenuItem[]; close
       aria-label={label}
       ref={list}
       onKeyDown={(e) => {
-        if (e.key === 'ArrowDown') move(e, 1);
-        else if (e.key === 'ArrowUp') move(e, -1);
+        // las teclas de un submenú no deben mover el foco del menú que lo contiene
+        const handled = () => (e.preventDefault(), e.stopPropagation());
+        if (e.key === 'ArrowDown') handled(), move(1);
+        else if (e.key === 'ArrowUp') handled(), move(-1);
+        else if (e.key === 'ArrowLeft' && onBack) handled(), onBack();
       }}
     >
       {items.map((it, i) =>
         it === 'sep' ? (
           <div key={i} className="menu-sep" role="separator" />
         ) : 'items' in it ? (
-          <div key={i} className="menu-item has-sub" onPointerEnter={() => setSub(i)} onPointerLeave={() => setSub(null)}>
-            <button role="menuitem" aria-haspopup="menu" aria-label={it.label} disabled={it.disabled || !it.items.length} onClick={() => setSub(sub === i ? null : i)}>
-              <span>{it.label}</span>
+          <div
+            key={i}
+            data-i={i}
+            className="menu-item has-sub"
+            onPointerEnter={(e) => mouse(e) && setSub({ i, focus: false })}
+            onPointerLeave={(e) => mouse(e) && setSub(null)}
+          >
+            <button
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={sub?.i === i}
+              aria-label={it.label}
+              disabled={it.disabled || !it.items.length}
+              onPointerDown={(e) => (lastPointer.current = e.pointerType)}
+              // con mouse ya se abrió al pasar por encima: el click no lo cierra
+              onClick={() => setSub(sub?.i === i && lastPointer.current !== 'mouse' ? null : { i, focus: false })}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight' || e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setSub({ i, focus: true });
+                }
+              }}
+            >
+              <span>
+                {checks && <span className="check-mark" />}
+                {it.label}
+              </span>
               <span className="sc">▸</span>
             </button>
-            {sub === i && <MenuList items={it.items} close={close} label={it.label} />}
+            {sub?.i === i && (
+              <MenuList
+                items={it.items}
+                close={close}
+                label={it.label}
+                autoFocus={sub.focus}
+                onBack={() => {
+                  setSub(null);
+                  focusItem(i);
+                }}
+              />
+            )}
           </div>
         ) : (
-          <div key={i} className="menu-item">
+          <div key={i} data-i={i} className="menu-item">
             <button
               role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
               aria-checked={it.checked}
@@ -102,7 +199,7 @@ function MenuList({ items, close, label, autoFocus }: { items: MenuItem[]; close
               }}
             >
               <span>
-                {it.checked !== undefined && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
+                {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
                 {it.label}
               </span>
               {it.shortcut && <span className="sc">{it.shortcut}</span>}

@@ -5,7 +5,7 @@
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, skipWelcome } from './lib.mjs';
+import { menu, openExample, simType, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -33,6 +33,35 @@ const check = (ok, msg) => {
 await page.goto(URL);
 await page.getByText('Listo').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
+
+// --- #38: barra de herramientas y menú colapsado ---
+check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
+await page.getByRole('button', { name: 'Menú', exact: true }).click();
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Ayuda▸', 'el botón junto al nombre despliega todos los menús');
+await page.keyboard.press('ArrowRight');
+check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
+await page.keyboard.press('Escape');
+check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
+const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+check(
+  toolbarNames.slice(0, 13).join() === 'Nuevo,Guardar,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Directiva,Rotar' && toolbarNames.includes('Borrar'),
+  `orden de la barra (${toolbarNames.join(', ')})`,
+);
+await page.getByRole('button', { name: 'Texto', exact: true }).click();
+check(await page.locator('.modal .seg input[type=radio]').nth(1).isChecked(), 'Texto abre el diálogo de comentario');
+await page.keyboard.press('Escape');
+// en ancho de celular la barra no desborda: los grupos que no entran van a "Más herramientas"
+await page.setViewportSize({ width: 375, height: 760 });
+await page.waitForTimeout(300);
+const overflow = await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector('.iconbar').scrollWidth, document.querySelector('.appbar').scrollWidth]);
+check(overflow.every((w) => w <= 375), `en 375 px no hay desborde (${overflow.join(', ')})`);
+await page.getByRole('button', { name: 'Más herramientas' }).click();
+await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exact: true }).click();
+check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');
+await page.keyboard.press('Escape');
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.waitForTimeout(300);
+await page.keyboard.press('Home');
 
 // --- #15: nombres de redes temporales ---
 const names = () => page.locator('.net-name text').allTextContents();
@@ -89,7 +118,8 @@ check((await flags()) === before + 1, 'al recargar se recupera el trabajo sin gu
 check((await page.locator('.filename').textContent()) === 'Bode RLC.asc •', 'con su nombre y marcado como modificado');
 await page.keyboard.press('Control+z');
 check((await flags()) === before, 'y se puede deshacer lo anterior a la recarga');
-await page.getByRole('menubar').getByRole('menuitem', { name: 'Archivo', exact: true }).click();
+await page.getByRole('button', { name: 'Menú', exact: true }).click();
+await page.getByRole('menu').getByRole('menuitem', { name: 'Archivo', exact: true }).hover();
 await page.getByRole('menu').getByRole('menuitem', { name: 'Recientes' }).hover();
 const recents = await page.getByRole('menu', { name: 'Recientes' }).getByRole('menuitem').allTextContents();
 await page.keyboard.press('Escape');
@@ -139,8 +169,8 @@ check((await page.locator('.bias-tip').count()) === 0 && (await page.locator('.o
 
 // --- #13: elegir nodos y fuentes en el esquemático desde el menú de simulación ---
 await page.keyboard.press('Control+z'); // sacar la tierra agregada
-await page.getByRole('button', { name: 'Simulación…' }).click();
-await page.getByRole('button', { name: 'Ruido' }).click();
+await simType(page, 'Ruido');
+check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'la flecha de Simular abre el menú en el tipo elegido');
 await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
 check(await page.locator('.pick-banner').isVisible(), 'el diálogo se oculta y pide elegir una red');
 const outPick = await at(280, 160);
@@ -346,8 +376,7 @@ check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
 await page.getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // .pz en el plano s
-await page.getByRole('button', { name: 'Simulación…' }).click();
-await page.getByRole('button', { name: /Polos y ceros/ }).click();
+await simType(page, 'Polos y ceros');
 const pzField = (label) => page.locator('.field', { hasText: label }).locator('input');
 await pzField('Entrada +').fill('N001');
 await pzField('Entrada −').fill('0');

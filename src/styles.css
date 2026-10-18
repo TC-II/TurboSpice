@@ -354,12 +354,34 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .result-table { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
 .result-table .filter { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; width: 200px; }
 button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-muted); font: inherit; font-weight: 500; }
-.pz-view { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; overflow: auto; }
-.pz-plane { width: 260px; height: 260px; flex: none; background: var(--bg-alt); border-radius: 8px; }
+.pz-view { flex: 1; display: flex; gap: 16px; align-items: stretch; min-height: 0; overflow: hidden; }
+.pz-view.compact { flex: none; flex-direction: column; width: 300px; gap: 6px; }
+.pz-side { display: flex; flex-direction: column; gap: 4px; flex: none; min-height: 0; max-width: 100%; }
+.pz-map { position: relative; flex: 1 1 0; min-height: 140px; max-height: 360px; max-width: 100%; }
+.pz-view.compact .pz-side { flex: 1 1 0; }
+.pz-plane { display: block; width: 100%; aspect-ratio: 1; border-radius: 8px; touch-action: none; cursor: crosshair; user-select: none; }
+.pz-plane.panning { cursor: grabbing; }
+.pz-plane .bg { fill: var(--bg-alt); }
+.pz-plane .rhp { fill: var(--err); opacity: 0.07; }
+.pz-plane .grid { stroke: var(--grid); stroke-width: 1; fill: none; }
+.pz-plane .guide { stroke: var(--fg-muted); stroke-width: 0.75; stroke-dasharray: 3 3; fill: none; opacity: 0.6; }
 .pz-plane .axis { stroke: var(--fg-muted); stroke-width: 1; }
-.pz-plane text { fill: var(--fg-muted); font: 11px system-ui, sans-serif; }
+.pz-plane text { fill: var(--fg-muted); font: 10px system-ui, sans-serif; }
+.pz-plane .guide-label { font-size: 9px; }
+.pz-plane .unit { font-weight: 600; }
 .pz-plane .pole { stroke: var(--err); stroke-width: 2; fill: none; }
 .pz-plane .zero { stroke: var(--accent); stroke-width: 2; fill: none; }
+.pz-plane .hl { stroke-width: 3; }
+.pz-plane .zoom-box { fill: var(--accent); fill-opacity: 0.1; stroke: var(--accent); stroke-dasharray: 4 3; }
+.pz-tip { position: absolute; transform: translate(12px, 12px); pointer-events: none; display: flex; flex-direction: column; gap: 1px; padding: 4px 8px; font: 12px var(--mono); white-space: nowrap; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 2px 8px rgb(0 0 0 / 0.15); z-index: 2; }
+.pz-help { margin: 0; font-size: 11px; }
+.pz-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; max-width: 360px; }
+.pz-table { flex: 0 1 auto; min-height: 0; overflow: auto; }
+.pz-view.compact .pz-table { flex: 0 1 auto; min-height: 48px; font-size: 12px; }
+.pz-table tr.hl > * { background: var(--bg-alt); }
+.pz-table tr.unstable th { color: var(--err); }
+.results-body:has(> .pz-view.compact) { flex-direction: row; gap: 12px; }
+.results-body:has(> .pz-view.compact) > .plot-panel { min-width: 0; }
 .smith { display: flex; gap: 16px; align-items: flex-start; min-height: 0; flex: 1; }
 .smith svg { height: 100%; max-height: 420px; aspect-ratio: 1; flex: none; }
 .smith .grid circle, .smith .grid line, .smith .grid polyline { fill: none; stroke: var(--grid); stroke-width: 1; }

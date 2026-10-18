@@ -337,6 +337,63 @@ await page.locator('.pz-plane').waitFor({ timeout: 30000 });
 const pzRows = await page.locator('.pz-view tbody tr').allTextContents();
 check(pzRows.length === 2 && pzRows.every((r) => /polo/.test(r) && /5\.03\d*kHz/.test(r) && /3\.16/.test(r)), `.pz: dos polos con f0 = 5.03 kHz y Q = 3.16 (${pzRows.join(' | ')})`);
 await page.screenshot({ path: `${OUT}/pz.png` });
+
+// #31: con .ac y ;.pz el mapa de polos y ceros se abre solo; con .step se superponen las corridas
+const rlcAsc = (extra, r = '10') =>
+  [
+    'Version 4', 'SHEET 1 880 680', 'WIRE 0 16 0 -32', 'WIRE 0 -32 16 -32', 'WIRE 96 -32 112 -32', 'WIRE 192 -32 256 -32',
+    'FLAG 256 -32 out', 'FLAG 0 96 0', 'FLAG 192 32 0',
+    'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value AC 1',
+    'SYMBOL res 112 -48 R90', 'SYMATTR InstName R1', `SYMATTR Value ${r}`,
+    'SYMBOL ind 208 -48 R90', 'SYMATTR InstName L1', 'SYMATTR Value 1m',
+    'SYMBOL cap 176 -32 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1u',
+    'TEXT 0 160 Left 2 !.ac dec 100 100 100k', 'TEXT 0 192 Left 2 ;.pz N001 0 out 0 vol pz',
+    ...extra.map((t, i) => `TEXT 0 ${224 + 32 * i} Left 2 ${t}`),
+  ].join('\n') + '\n';
+const pzp = await context.newPage();
+watch(pzp);
+await pzp.goto(URL);
+await pzp.getByText('Listo').waitFor({ timeout: 30000 });
+const dropAsc = (name, text) =>
+  pzp.evaluate(([n, t]) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([t], n));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  }, [name, text]);
+await dropAsc('RLC pz.asc', rlcAsc([]));
+await pzp.waitForFunction(() => document.querySelector('.filename')?.textContent === 'RLC pz.asc');
+await pzp.getByRole('button', { name: 'Simular' }).click();
+await pzp.locator('.pz-plane').waitFor({ timeout: 30000 });
+check((await pzp.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'pz1', 'con .ac y .pz se abre el mapa de polos y ceros');
+const pole = await pzp.locator('.pz-plane path.pole').first().boundingBox();
+await pzp.mouse.move(pole.x + pole.width / 2, pole.y + pole.height / 2);
+const pzTip = await pzp.locator('.pz-tip').textContent().catch(() => '');
+check(/5\.03\d*kHz/.test(pzTip) && /Q = 3\.16/.test(pzTip) && /ζ = 0\.158/.test(pzTip) && /τ = /.test(pzTip), `hover sobre un polo: f₀, Q, ζ, τ (${pzTip})`);
+check((await pzp.locator('.pz-table tr.hl').count()) === 1, 'el polo bajo el mouse se resalta en la tabla');
+const span0 = await pzp.locator('.pz-plane text').allTextContents();
+await pzp.mouse.wheel(0, -400);
+await pzp.waitForTimeout(100);
+check((await pzp.locator('.pz-plane text').allTextContents()).join() !== span0.join(), 'zoom con la rueda (cambia la escala)');
+await pzp.locator('.pz-view').getByRole('button', { name: 'Ajustar' }).click();
+const [pzDl] = await Promise.all([pzp.waitForEvent('download'), pzp.getByRole('combobox', { name: 'Exportar polos y ceros' }).selectOption('csv')]);
+const pzCsv = { name: pzDl.suggestedFilename(), text: readFileSync(await pzDl.path(), 'utf8') };
+check(pzCsv.name === 'RLC pz.csv' && pzCsv.text.split('\n').filter(Boolean).length === 3 && pzCsv.text.startsWith('corrida,tipo'), `tabla de polos y ceros a CSV (${pzCsv.name})`);
+await pzp.getByRole('combobox', { name: 'Plot' }).selectOption('ac1');
+await pzp.locator('.pz-view.compact .pz-plane').waitFor();
+await pzp.getByRole('textbox', { name: 'Expresión' }).fill('V(out)');
+await pzp.getByRole('button', { name: 'Agregar', exact: true }).click();
+await pzp.locator('.pane-chart').first().waitFor();
+check((await pzp.getByRole('checkbox', { name: 'Polos y ceros' }).isChecked()) && (await pzp.locator('.pz-view.compact path.pole').count()) === 2, 'en el Bode, el mapa de polos y ceros al lado');
+await pzp.screenshot({ path: `${OUT}/pz-bode.png` });
+await dropAsc('RLC pz step.asc', rlcAsc(['!.step param R list 10 20 40'], '{R}'));
+await pzp.waitForFunction(() => document.querySelector('.filename')?.textContent === 'RLC pz step.asc');
+await pzp.getByRole('button', { name: 'Simular' }).click();
+await pzp.locator('.pz-legend li').first().waitFor({ timeout: 30000 });
+const legend = await pzp.locator('.pz-legend li').allTextContents();
+check(legend.length === 3 && /R=20/.test(legend[1]), `.pz con .step: corridas superpuestas con leyenda (${legend.join(', ')})`);
+check((await pzp.locator('.pz-table tbody tr').count()) === 6, 'dos polos por corrida');
+await pzp.screenshot({ path: `${OUT}/pz-step.png` });
+await pzp.close();
 await page.keyboard.press('Control+z');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.pane-chart').first().waitFor({ timeout: 30000 });

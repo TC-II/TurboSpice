@@ -32,6 +32,13 @@ interface Props {
   /** FFT de una traza del transitorio en el rango dado (crea un plot derivado) */
   onFft?(o: { expr: string; window: FftWindow; from?: number; to?: number }): void;
   handle?: Ref<PlotPanelHandle>;
+  /** frecuencias de polos y ceros (.pz) para marcar en el eje de frecuencia */
+  marks?: PzMark[];
+}
+
+export interface PzMark {
+  f: number;
+  kind: 'pole' | 'zero';
 }
 
 type Range = [number, number];
@@ -61,7 +68,7 @@ const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName ===
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   const [fftExpr, setFftExpr] = useState('');
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
@@ -213,6 +220,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             cursors={cursors}
             onCursor={(c) => setCursors((old) => ({ ...old, ...c }))}
             onHoverExpr={onHoverExpr}
+            marks={marks}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
           />
         ))}
@@ -246,6 +254,7 @@ function PaneView(props: {
   cursors: Cursors;
   onCursor(c: Cursors): void;
   onHoverExpr?(e: string | undefined): void;
+  marks?: PzMark[];
   register(u: uPlot | null): void;
 }) {
   const { index, pane, data, xRange, cursorMode, cursors, onCursor } = props;
@@ -256,6 +265,8 @@ function PaneView(props: {
   // lo último de las props para los manejadores del gráfico, que vive mientras no cambien los datos
   const live = useRef(props);
   live.current = props;
+  const marksRef = useRef(props.marks);
+  marksRef.current = props.marks;
   const programmatic = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -268,6 +279,7 @@ function PaneView(props: {
     const grid = css.getPropertyValue('--grid').trim();
     const fg = css.getPropertyValue('--fg').trim();
     const bg = css.getPropertyValue('--bg').trim() || '#fff';
+    const markColor = { pole: css.getPropertyValue('--err').trim(), zero: css.getPropertyValue('--accent').trim() };
     const ticks = (_u: uPlot, t: number[]) => t.map((x) => si(x, 3));
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
@@ -339,9 +351,28 @@ function PaneView(props: {
         ],
         draw: [
           (u) => {
-            if (!live.current.cursorMode) return;
             const c = cursorsRef.current;
             const ctx = u.ctx;
+            // f₀ de polos (×) y ceros (○): líneas verticales punteadas
+            if (data.xName === 'frequency')
+              for (const m of marksRef.current ?? []) {
+                const px = u.valToPos(m.f, 'x', true);
+                if (!(px >= u.bbox.left && px <= u.bbox.left + u.bbox.width)) continue;
+                ctx.save();
+                ctx.strokeStyle = ctx.fillStyle = markColor[m.kind];
+                ctx.globalAlpha = 0.7;
+                ctx.setLineDash([2, 3].map((d) => d * devicePixelRatio));
+                ctx.lineWidth = devicePixelRatio;
+                ctx.beginPath();
+                ctx.moveTo(px, u.bbox.top);
+                ctx.lineTo(px, u.bbox.top + u.bbox.height);
+                ctx.stroke();
+                ctx.font = `${11 * devicePixelRatio}px system-ui`;
+                ctx.textAlign = 'center';
+                ctx.fillText(m.kind === 'pole' ? '×' : '○', px, u.bbox.top + u.bbox.height - 4 * devicePixelRatio);
+                ctx.restore();
+              }
+            if (!live.current.cursorMode) return;
             const dpr = devicePixelRatio;
             const { left, top, width, height } = u.bbox;
             for (const [name, v, tr] of [
@@ -516,7 +547,7 @@ function PaneView(props: {
 
   useEffect(() => {
     chart.current?.redraw(false);
-  }, [cursors]);
+  }, [cursors, props.marks]);
 
   // corridas (pasos de .step, barridos .dc anidados) con el color de la primera traza
   const runLegend = data.curves.filter((c) => c.trace === data.curves[0]?.trace && c.axis === data.curves[0]?.axis && c.runLabel);

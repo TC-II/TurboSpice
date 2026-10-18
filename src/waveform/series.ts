@@ -125,7 +125,8 @@ export function stepSweepPlots(plots: SimPlot[], steps?: StepRuns): SimPlot[] {
   const byKind = new Map<string, SimPlot[]>();
   for (const p of plots) {
     const k = /^([a-z]+)\d+$/i.exec(p.name)?.[1];
-    if (k && !scaleOf(p)) (byKind.get(k) ?? byKind.set(k, []).get(k)!).push(p);
+    // los .pz (polos complejos, cantidad variable) se superponen en el plano s, no acá
+    if (k && !scaleOf(p) && !p.vectors.some((v) => /^(pole|zero)\(\d+\)$/i.test(v.name))) (byKind.get(k) ?? byKind.set(k, []).get(k)!).push(p);
   }
   const out: SimPlot[] = [];
   for (const [kind, ps] of byKind) {

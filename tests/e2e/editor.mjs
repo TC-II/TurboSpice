@@ -82,14 +82,14 @@ check((await page.locator('svg.editor .symbols > g').count()) === 3, 'tres compo
 const setValue = async (x, y, v) => {
   const p = await at(x, y);
   await page.mouse.dblclick(p.x, p.y);
-  await page.locator('.modal input').nth(1).fill(v);
+  await page.locator('.modal input:not([type=checkbox])').nth(1).fill(v);
   await page.keyboard.press('Enter');
 };
 await setValue(56, -32, '1k');
 await setValue(96, 0, '1µ');
 const p = await at(0, 56);
 await page.mouse.dblclick(p.x, p.y);
-await page.locator('.modal input').nth(1).fill('PULSE(0 1 0 1u 1u 2m 4m)');
+await page.locator('.modal input:not([type=checkbox])').nth(1).fill('PULSE(0 1 0 1u 1u 2m 4m)');
 await page.keyboard.press('Enter');
 await page.screenshot({ path: `${OUT}/editor-1.png` });
 

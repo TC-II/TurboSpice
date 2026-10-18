@@ -241,6 +241,14 @@ export function SchematicEditor(props: Props) {
   const pinch = useRef<{ d: number; cx: number; cy: number; view: View } | null>(null);
   const longPress = useRef<number | undefined>(undefined);
 
+  // la selección no puede apuntar a elementos que ya no existen (deshacer, borrar, abrir otro)
+  useEffect(() => {
+    const n = { symbol: doc.symbols.length, wire: doc.wires.length, flag: doc.flags.length, text: doc.texts.length };
+    const valid = selection.filter((r) => r.index < n[r.kind]);
+    if (valid.length !== selection.length) setSelection(valid);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc]);
+
   useEffect(() => {
     const el = svgRef.current!;
     const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
@@ -408,7 +416,7 @@ export function SchematicEditor(props: Props) {
         // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
         const label = labelAt(doc, p, lib, tol);
         if (label) {
-          const selSyms = selection.filter((r) => r.kind === 'symbol').map((r) => r.index);
+          const selSyms = selection.filter((r) => r.kind === 'symbol' && doc.symbols[r.index]).map((r) => r.index);
           const syms = selSyms.includes(label.sym) ? selSyms : [label.sym];
           const items = syms.flatMap((si) => {
             const inst = doc.symbols[si];

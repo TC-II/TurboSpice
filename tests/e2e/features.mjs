@@ -548,7 +548,7 @@ await page.keyboard.press('Control+z');
 
 // valores amigables: 4k7
 await page.mouse.dblclick(r1.x, r1.y);
-await page.locator('.modal input').nth(1).fill('4k7');
+await page.locator('.modal input:not([type=checkbox])').nth(1).fill('4k7');
 check((await page.locator('.modal .attrs small').textContent()) === '= 4.7kΩ', 'el diálogo interpreta 4k7');
 await page.keyboard.press('Enter');
 check((await page.locator('svg.editor .sym text.win', { hasText: '4.7k' }).count()) === 1, 'y lo guarda como 4.7k (compatible con LTspice)');
@@ -799,18 +799,19 @@ check(again.some((t) => /R1 demasiado grande/.test(t)), 'al reabrir, el programa
 await page.screenshot({ path: `${OUT}/blocks.png` });
 await page.keyboard.press('Escape');
 
-// bienvenida en la primera visita
+// primera visita: sin pantalla de bienvenida; "Acerca de" sólo desde Ayuda
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const fp = await fresh.newPage();
 await fp.goto(URL);
-check(await fp.getByRole('dialog', { name: 'Bienvenido a TurboSpice' }).waitFor({ timeout: 15000 }).then(() => true, () => false), 'bienvenida en la primera visita');
-await fp.getByRole('dialog').getByRole('button', { name: 'Emisor común' }).click();
+await fp.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+check((await fp.getByRole('dialog').count()) === 0, 'la primera visita no abre ningún diálogo');
+await menu(fp, 'Ayuda', 'Acerca de TurboSpice');
+check(await fp.getByRole('dialog', { name: 'Acerca de TurboSpice' }).waitFor({ timeout: 5000 }).then(() => true, () => false), 'Ayuda › Acerca de abre el diálogo');
+await fp.keyboard.press('Escape');
+await menu(fp, 'Archivo', 'Ejemplos', 'Emisor común');
 await fp.locator('svg.editor .sym').first().waitFor();
 await fp.waitForTimeout(500);
-check((await fp.locator('.filename').textContent()) === 'Emisor común.asc', `abre el ejemplo elegido (${await fp.locator('.filename').textContent()})`);
-await fp.reload();
-await fp.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
-check((await fp.getByRole('dialog').count()) === 0, 'y no vuelve a aparecer');
+check((await fp.locator('.filename').textContent()) === 'Emisor común.asc', `abre el ejemplo desde el menú (${await fp.locator('.filename').textContent()})`);
 await fresh.close();
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);

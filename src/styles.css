@@ -382,6 +382,10 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-table tr.unstable th { color: var(--err); }
 .results-body:has(> .pz-view.compact) { flex-direction: row; gap: 12px; }
 .results-body:has(> .pz-view.compact) > .plot-panel { min-width: 0; }
+/* resultados al costado (angostos): el mapa va debajo del Bode, no al lado */
+.workspace.side .results-body:has(> .pz-view.compact) { flex-direction: column; }
+.workspace.side .pz-view.compact { width: auto; flex: 0 0 50%; }
+.workspace.side .results-body:has(> .pz-view.compact) > .plot-panel { min-height: 0; }
 .smith { display: flex; gap: 16px; align-items: flex-start; min-height: 0; flex: 1; }
 .smith svg { height: 100%; max-height: 420px; aspect-ratio: 1; flex: none; }
 .smith .grid circle, .smith .grid line, .smith .grid polyline { fill: none; stroke: var(--grid); stroke-width: 1; }

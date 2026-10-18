@@ -187,6 +187,15 @@ describe('vista de ploteo dentro del .asc (;.plot)', () => {
     expect(asPlotView({ tran: [{ traces: [{ expr: 'V(a)', x: 1 }, { nada: 1 }] }], ac: 'x' })).toEqual({ tran: [{ traces: [{ expr: 'V(a)' }] }] });
     expect(asPlotView(null)).toBeNull();
   });
+
+  it('queda debajo de todo el dibujo (en LTspice se ve como comentario)', async () => {
+    const { withView } = await import('../../src/waveform/view.ts');
+    const doc = withView(DOC, { tran: [{ traces: [{ expr: 'V(out)' }] }] });
+    const t = doc.texts.find((x) => x.text.startsWith('.plot '))!;
+    const ys = [...DOC.wires.flatMap((w) => [w.y1, w.y2]), ...DOC.symbols.map((s) => s.y + 128), ...DOC.texts.map((x) => x.y)];
+    expect(t.y).toBeGreaterThan(Math.max(...ys) + 100);
+    expect(t.x).toBeLessThanOrEqual(Math.min(...DOC.wires.flatMap((w) => [w.x1, w.x2])));
+  });
 });
 
 describe('Estudio: análisis y gráfico', () => {

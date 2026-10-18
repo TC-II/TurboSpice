@@ -10,7 +10,7 @@
 //    comentario que sólo ejecuta TurboSpice (ver EXTRA_ANALYSES);
 //  - la vista de ploteo (";.plot …", la misma que "Recordar vista" del visor).
 // Al abrir un archivo se reconstruyen las tarjetas a partir de eso, aunque venga de LTspice.
-import { belowTexts, dataText, DATA_TAGS, isDataText, isDataTextOf, readData } from '../asc/dataText.ts';
+import { belowTexts, dataText, DATA_TAGS, isDataText, isDataTextOf, placeDataTexts, readData } from '../asc/dataText.ts';
 import type { AscDoc, SchText } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { controlHooks, EXTRA_ANALYSES, HOOK_MARKS, isControlBlock, isNgspiceComment, NGSPICE_ONLY } from '../netlist/directives.ts';
@@ -595,5 +595,5 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
   // programa de bloques: texto chico (tamaño 0) debajo de todo; TurboSpice no lo dibuja
   if (st.blocks) texts.push(dataText('study', st.blocks, { x: at.x, y: y + 32 }));
   // qué graficar: la vista guardada (";.plot …")
-  return st.plot ? withView({ ...out, texts }, st.plot) : { ...out, texts };
+  return st.plot ? withView({ ...out, texts }, st.plot) : placeDataTexts({ ...out, texts });
 }

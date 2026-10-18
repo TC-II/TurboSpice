@@ -60,10 +60,38 @@ export function writeData(doc: AscDoc, tag: DataTag, value: unknown): AscDoc {
   if (i >= 0) {
     const texts = [...doc.texts];
     texts[i] = dataText(tag, value, texts[i]);
-    return { ...doc, texts };
+    return placeDataTexts({ ...doc, texts });
   }
-  const at = belowTexts(doc);
-  return { ...doc, texts: [...doc.texts, dataText(tag, value, { x: at.x, y: at.y + 48 })] };
+  return placeDataTexts({ ...doc, texts: [...doc.texts, dataText(tag, value, { x: 0, y: 0 })] });
+}
+
+/**
+ * Lleva los comentarios con datos debajo de todo el dibujo, con margen, para que en LTspice (que
+ * los muestra como un comentario más) no queden encima del circuito. Uno debajo del otro.
+ */
+export function placeDataTexts(doc: AscDoc): AscDoc {
+  if (!doc.texts.some(isDataText)) return doc;
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const pt = (x: number, y: number) => (xs.push(x), ys.push(y));
+  for (const w of doc.wires) pt(w.x1, w.y1), pt(w.x2, w.y2);
+  for (const f of doc.flags) pt(f.x, f.y + 32);
+  // el cuerpo de un símbolo se extiende desde su origen (hasta ~128 unidades según la orientación)
+  for (const s of doc.symbols) pt(s.x - 64, s.y + 144);
+  for (const sh of doc.shapes) for (let i = 0; i + 1 < sh.coords.length; i += 2) pt(sh.coords[i], sh.coords[i + 1]);
+  for (const t of doc.texts) if (!isDataText(t)) pt(t.x, t.y + t.text.split('\\n').length * 24 * Math.max(1, t.size / 2));
+  const x = xs.length ? Math.min(...xs) : 0;
+  let y = ys.length ? Math.max(...ys) + 160 : 0;
+  let changed = false;
+  const texts = doc.texts.map((t) => {
+    if (!isDataText(t)) return t;
+    const at = { x, y };
+    y += 32;
+    if (t.x === at.x && t.y === at.y) return t;
+    changed = true;
+    return { ...t, ...at };
+  });
+  return changed ? { ...doc, texts } : doc;
 }
 
 /** ¿Mismo circuito salvo los comentarios con datos? (cambiar la vista no invalida la simulación) */

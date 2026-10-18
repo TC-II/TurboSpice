@@ -2,9 +2,9 @@
 import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
 import { defaultWindows, effectiveWindows } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
-import { localAlign, mirrorX, rotateCW } from '../asc/transform.ts';
+import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
-import { pinPoints, snap, type ItemRef } from './geometry.ts';
+import { localBox, pinPoints, pivotNear, snap, symbolPivot, type ItemRef } from './geometry.ts';
 
 const samePt = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const ends = (w: Wire): [Point, Point] => [
@@ -439,26 +439,57 @@ function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolI
   return { ...sym, orient, windows };
 }
 
-/** Rota (90° horario) o espeja la selección alrededor de su centro, sobre la grilla */
-export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
-  if (!refs.length) return doc;
+/** Último punto fijo usado por documento resultante: rotar/espejar otra vez lo reutiliza */
+const lastPivot = new WeakMap<AscDoc, { key: string; c: Point }>();
+const refsKey = (refs: ItemRef[]) => refs.map((r) => `${r.kind}${r.index}`).sort().join(' ');
+
+/**
+ * Punto fijo para rotar/espejar la selección. Un símbolo solo gira alrededor de su
+ * symbolPivot; varios elementos, alrededor del centro de su geometría llevado a la grilla
+ * (pivotNear). Si se rota otra vez el resultado de la rotación anterior se usa el mismo punto,
+ * así 4 rotaciones o 2 espejados siempre vuelven exactamente al lugar de partida.
+ */
+export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Point {
+  const last = lastPivot.get(doc);
+  if (last && last.key === refsKey(refs)) return last.c;
+  const one = refs.length === 1 && refs[0].kind === 'symbol' ? doc.symbols[refs[0].index] : undefined;
+  const oneDef = one && lib.symbol(one.type);
+  if (one && oneDef) {
+    const p = symbolPivot(oneDef);
+    return toWorld(one, p.x, p.y);
+  }
   const pts: Point[] = [];
   for (const r of refs) {
-    if (r.kind === 'symbol') pts.push(...pinPoints(doc.symbols[r.index], lib.symbol(doc.symbols[r.index].type)), doc.symbols[r.index]);
+    if (r.kind === 'symbol') {
+      const sym = doc.symbols[r.index];
+      const def = lib.symbol(sym.type);
+      if (!def) pts.push(sym);
+      else {
+        const b = localBox(def);
+        pts.push(...pinPoints(sym, def), ...[[b.x1, b.y1], [b.x2, b.y2]].map(([x, y]) => toWorld(sym, x, y)));
+      }
+    }
     if (r.kind === 'wire') pts.push(...ends(doc.wires[r.index]));
     if (r.kind === 'flag') pts.push(doc.flags[r.index]);
     if (r.kind === 'text') pts.push(doc.texts[r.index]);
   }
   const c = {
-    x: snap((Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2),
-    y: snap((Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2),
+    x: (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2,
+    y: (Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2,
   };
+  return pivotNear(c, { x: 0, y: 0 });
+}
+
+/** Rota (90° horario) o espeja la selección alrededor de un punto fijo (transformPivot) */
+export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
+  if (!refs.length) return doc;
+  const c = transformPivot(doc, refs, lib);
   const tp = (p: Point): Point =>
-    op === 'rotate' ? { x: c.x - (p.y - c.y), y: c.y + (p.x - c.x) } : { x: 2 * c.x - p.x, y: p.y };
+    op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y };
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
-  return mergeCollinear({
+  const out = mergeCollinear({
     ...doc,
     symbols: doc.symbols.map((sym, i) => {
       if (!s.has(i)) return sym;
@@ -474,6 +505,8 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
   }, lib);
+  lastPivot.set(out, { key: refsKey(refs), c });
+  return out;
 }
 
 export function setSymbolAttrs(doc: AscDoc, index: number, attrs: Record<string, string | null>): AscDoc {

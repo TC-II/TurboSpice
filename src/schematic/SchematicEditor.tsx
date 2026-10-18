@@ -459,6 +459,14 @@ export function SchematicEditor(props: Props) {
     };
   }, [dragging]);
 
+  // Rotar/espejar (Ctrl+R / Ctrl+E) mientras se mueve: App cambia el documento y el fantasma
+  // se recalcula en el acto con la posición actual del cursor, sin esperar a mover el mouse
+  useEffect(() => {
+    if (drag?.mode !== 'move') return;
+    const g = snapPoint(cursorRef.current);
+    setPreview(moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib));
+  }, [doc]);
+
   // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta
   const [ctrlHeld, setCtrlHeld] = useState(false);
   const drawingWire = tool.kind === 'wire' && !!tool.start;

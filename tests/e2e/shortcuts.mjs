@@ -112,9 +112,9 @@ const wires = () => svg.locator('.wires line').count();
 const before = await symPos();
 const nWires = await wires();
 await page.keyboard.press('m');
-const r2 = await at(336, 56);
+const r2 = await at(320, 8); // la R nueva queda centrada en el click: origen (304,-48)
 await page.mouse.click(r2.x, r2.y);
-const dst = await at(400, 56);
+const dst = await at(384, 8);
 await page.mouse.move(dst.x, dst.y, { steps: 4 });
 await page.mouse.click(dst.x, dst.y);
 await page.keyboard.press('Escape');
@@ -124,9 +124,9 @@ check((await symPos()) === before, 'Ctrl+Z deshace el movimiento');
 // S sobre el capacitor (conectado a cables): los cables se estiran
 const capWires = await page.evaluate(() => [...document.querySelectorAll('svg.editor .wires line')].map((l) => l.getAttribute('x2')).join());
 await page.keyboard.press('s');
-const cap = await at(96, 0);
+const cap = await at(240, 48);
 await page.mouse.click(cap.x, cap.y);
-const capDst = await at(128, 0);
+const capDst = await at(272, 48);
 await page.mouse.move(capDst.x, capDst.y, { steps: 4 });
 await page.mouse.click(capDst.x, capDst.y);
 await page.keyboard.press('Escape');

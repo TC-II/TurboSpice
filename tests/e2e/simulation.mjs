@@ -46,16 +46,16 @@ check((await page.locator('.picker-preview svg.big .sym').count()) === 1, 'y una
 await page.keyboard.press('Escape');
 
 // --- Tierra: se selecciona haciendo click sobre su dibujo y se arrastra ---
-const gnd = await at(96, 44); // barras inferiores de la tierra de C1 (conectada en 96,32)
+const gnd = await at(240, 124); // barras inferiores de la tierra de C1 (conectada en 240,112)
 await page.mouse.click(gnd.x, gnd.y);
 check((await page.locator('.flags .flag.sel').count()) === 1, 'click sobre el dibujo de la tierra la selecciona');
-const to = await at(96, 76);
+const to = await at(240, 156);
 await page.mouse.move(gnd.x, gnd.y);
 await page.mouse.down();
 await page.mouse.move(to.x, to.y, { steps: 5 });
 await page.mouse.up();
 const wires = await page.locator('.wires line').evaluateAll((ls) => ls.map((l) => [l.getAttribute('x1'), l.getAttribute('y1'), l.getAttribute('x2'), l.getAttribute('y2')].join(',')));
-check(wires.some((w) => w === '96,32,96,64' || w === '96,64,96,32'), `al arrastrarla queda conectada con un cable (${wires.join(' ')})`);
+check(wires.some((w) => /^240,(80|112),240,144$|^240,144,240,(80|112)$/.test(w)), `al arrastrarla queda conectada con un cable (${wires.join(' ')})`);
 await page.keyboard.press('Control+z');
 
 // --- Comando de simulación ---
@@ -83,7 +83,7 @@ await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const plots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(plots.join() === 'tran1,tran2,tran3', `el barrido genera tres corridas (${plots.join(', ')})`);
 await page.waitForTimeout(300);
-const out = await at(128, -32);
+const out = await at(272, -32);
 await page.mouse.click(out.x, out.y);
 await page.waitForTimeout(300);
 await page.getByRole('button', { name: 'Medidas' }).click();
@@ -113,7 +113,7 @@ check((await page.locator('.simbar .sb-name').textContent()) === 'Barrido DC V1 
 check((await page.locator('.simbar .sim-state.idle').count()) === 1, 'el cuadrado de estado arranca sin correr');
 await simulate();
 check((await page.locator('.simbar .sim-state.ok').count()) === 1, 'y al simular queda listo');
-await probe(128, -32); // red out
+await probe(272, -32); // red out
 check((await chipNames()).join() === 'V(out)', `primera DC: V(out) (${(await chipNames()).join()})`);
 // otra del mismo tipo con otros parámetros, desde la barra
 await menu(page, 'Simular', 'Barrido DC');

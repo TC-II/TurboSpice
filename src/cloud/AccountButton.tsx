@@ -6,6 +6,8 @@ import type { DriveFile } from './drive.ts';
 import { FOLDER_NAME, uniqueName } from './drive.ts';
 import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
 
+const BASE = import.meta.env.BASE_URL;
+
 function Avatar({ account }: { account: Account }) {
   const [broken, setBroken] = useState(false);
   return account.photoLink && !broken ? (
@@ -46,7 +48,7 @@ export function AccountButton() {
   return (
     <div className="account" ref={box}>
       <button
-        className={`account-btn${a ? ' signed-in' : ''}`}
+        className={`account-btn${a ? ' signed-in' : ' google'}`}
         aria-label={a ? `Cuenta de Google: ${a.displayName}` : 'Iniciar sesión con Google'}
         title={a ? `${a.displayName}${a.emailAddress ? ` (${a.emailAddress})` : ''}` : 'Iniciar sesión con Google'}
         aria-haspopup="menu"
@@ -56,9 +58,11 @@ export function AccountButton() {
         {a ? (
           <Avatar account={a} />
         ) : (
-          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <path d="M10 10a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4M4 17c.8-3 3.2-4.6 6-4.6s5.2 1.6 6 4.6" />
-          </svg>
+          // botón oficial de Google sin cambios (ver public/google/README.md), según el tema
+          <>
+            <img className="g-light" src={`${BASE}google/signin-light.svg`} alt="" />
+            <img className="g-dark" src={`${BASE}google/signin-dark.svg`} alt="" />
+          </>
         )}
       </button>
       {open && (
@@ -74,7 +78,10 @@ export function AccountButton() {
             </>
           ) : (
             <>
-              <p className="hint">Iniciá sesión para guardar y abrir tus esquemáticos en Google Drive (carpeta «{FOLDER_NAME}»). TurboSpice sólo ve los archivos que crea él mismo.</p>
+              <ul className="account-ticks">
+                <li>Se creará la carpeta <strong>{FOLDER_NAME}</strong> en tu Google Drive.</li>
+                <li>TurboSpice <strong>sólo puede ver los archivos que crea él mismo</strong>.</li>
+              </ul>
               <button role="menuitem" className="primary" onClick={login} disabled={g.busy}>
                 {g.busy ? 'Conectando…' : 'Iniciar sesión con Google'}
               </button>

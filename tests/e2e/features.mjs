@@ -334,6 +334,25 @@ check((await page.locator('svg.editor').evaluate((e) => getComputedStyle(e).curs
 await page.keyboard.press('Escape');
 check((await page.locator('.wire-cross').count()) === 0, 'sólo con la herramienta Cable');
 
+// --- #34: al colocar, el fantasma queda centrado en el cursor (también rotado) ---
+for (const rotate of [false, true]) {
+  await page.keyboard.press('r');
+  if (rotate) await page.keyboard.press('Control+r');
+  const sb = await page.locator('svg.editor').boundingBox();
+  const target = { x: sb.x + sb.width * 0.6, y: sb.y + sb.height * 0.5 };
+  await page.mouse.move(target.x - 5, target.y - 5);
+  await page.mouse.move(target.x, target.y);
+  const gb = await page.locator('svg.editor .ghost .sym .body').boundingBox();
+  const dx = Math.abs(gb.x + gb.width / 2 - target.x);
+  const dy = Math.abs(gb.y + gb.height / 2 - target.y);
+  const half = (await at(8, 0)).x - (await at(0, 0)).x; // media grilla en píxeles
+  // el origen cae en la grilla (para que los pines también): el centro puede quedar corrido hasta
+  // media grilla por eje, más la diferencia entre el dibujo del skin y la geometría del .asy
+  const tol = half + (await at(3, 0)).x - (await at(0, 0)).x;
+  check(dx <= tol && dy <= tol, `resistencia${rotate ? ' rotada' : ''}: el cursor queda en el centro del dibujo (desvío ${dx.toFixed(1)}, ${dy.toFixed(1)} px; media grilla ${half.toFixed(1)} px; caja ${gb.width.toFixed(0)}x${gb.height.toFixed(0)})`);
+  await page.keyboard.press('Escape');
+}
+
 // --- #4: interfaz ---
 await page.setViewportSize({ width: 1280, height: 800 });
 await page.getByRole('button', { name: 'Cerrar resultados' }).click();

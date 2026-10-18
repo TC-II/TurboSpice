@@ -9,6 +9,8 @@ import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
+import { localBox } from '../../src/schematic/geometry.ts';
+import { transformOffset } from '../../src/asc/transform.ts';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -48,16 +50,25 @@ const click = async (x, y) => {
   await page.mouse.click(p.x, p.y);
 };
 
+// Al colocar, el cursor queda en el centro del dibujo del símbolo (#34): para que el origen
+// caiga en (x, y) hay que hacer click en el origen más el centro (orientado)
+const symLib = new Library(buildBundle());
+const place = async (type, orient, x, y) => {
+  const b = localBox(symLib.symbol(type));
+  const c = transformOffset((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, orient);
+  await click(x + c.x, y + c.y);
+};
+
 // Fuente, resistencia horizontal (Ctrl+R), capacitor
 await page.keyboard.press('v');
-await click(0, 0);
+await place('voltage', 'R0', 0, 0);
 await page.keyboard.press('Escape');
 await page.keyboard.press('r');
 await page.keyboard.press('Control+r');
-await click(112, -48);
+await place('res', 'R90', 112, -48);
 await page.keyboard.press('Escape');
 await page.keyboard.press('c');
-await click(80, -32);
+await place('cap', 'R0', 80, -32);
 await page.keyboard.press('Escape');
 // Cable de V1+ al pin izquierdo de R1 (termina solo al llegar a un pin)
 await page.keyboard.press('w');

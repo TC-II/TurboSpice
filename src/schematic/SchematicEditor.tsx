@@ -5,9 +5,10 @@ import { GRID, type AscDoc, type Orient, type Point } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, moveItems, placeSymbol, setWindow } from './edit.ts';
-import { inverseOffset } from '../asc/transform.ts';
+import { inverseOffset, transformOffset } from '../asc/transform.ts';
 import type { TextWindow } from '../asc/model.ts';
 import {
+  localBox,
   boxesIntersect,
   hitTest,
   hitTestAll,
@@ -225,6 +226,21 @@ export function SchematicEditor(props: Props) {
   };
 
   /**
+   * Origen del símbolo a colocar para que el cursor quede en el centro de su dibujo (caja de
+   * gráficos y pines, sin los textos), con la orientación elegida. El origen cae en la grilla,
+   * así los pines también.
+   */
+  const placeOrigin = (p: Point): Point => {
+    if (tool.kind !== 'place') return snapPoint(p);
+    const def = lib.symbol(tool.type);
+    if (!def) return snapPoint(p);
+    // geometría del .asy (formas y pines); el viewBox del skin puede tener márgenes vacíos
+    const b = def.shapes.length || def.pins.length ? localBox(def) : localBox(def, lib.skin(tool.type)?.viewBox);
+    const c = transformOffset((b.x1 + b.x2) / 2, (b.y1 + b.y2) / 2, tool.orient);
+    return snapPoint({ x: p.x - c.x, y: p.y - c.y });
+  };
+
+  /**
    * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
    * de su red; el cuerpo de un componente, su corriente.
    */
@@ -331,7 +347,7 @@ export function SchematicEditor(props: Props) {
         return;
       }
       case 'place':
-        commit(placeSymbol(doc, tool.type, g, tool.orient, lib));
+        commit(placeSymbol(doc, tool.type, placeOrigin(p), tool.orient, lib));
         return;
       case 'flag':
         commit(addFlag(doc, g, tool.name));
@@ -452,7 +468,8 @@ export function SchematicEditor(props: Props) {
   const g = snapPoint(cursor);
   const ghost = useMemo(() => {
     if (tool.kind === 'place') {
-      const inst = { type: tool.type, x: g.x, y: g.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
+      const o = placeOrigin(cursor);
+      const inst = { type: tool.type, x: o.x, y: o.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
       return <SymbolView inst={inst} def={lib.symbol(tool.type)} lib={lib} />;
     }
     if (tool.kind === 'wire' && tool.start) {
@@ -471,7 +488,8 @@ export function SchematicEditor(props: Props) {
       return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
     }
     return null;
-  }, [tool, g.x, g.y, lib]);
+  // (al colocar, el fantasma depende de la posición cruda del cursor: centro del dibujo)
+  }, [tool, g.x, g.y, lib, tool.kind === 'place' ? cursor.x : 0, tool.kind === 'place' ? cursor.y : 0]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
   const cursorClass = tool.kind === 'select' ? (drag?.mode === 'pan' ? 'grabbing' : '') : tool.kind;
@@ -530,7 +548,7 @@ export function SchematicEditor(props: Props) {
           <line x1={g.x} y1={vb.y} x2={g.x} y2={vb.y + vb.h} />
         </g>
       )}
-      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'place' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

@@ -557,12 +557,20 @@ check((await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'a
 await viewBtn('Resultados').click();
 await page.locator('.results-panel').waitFor();
 check((await resultsState()) === shownBefore, `al mostrarlos de nuevo, los resultados siguen intactos (${shownBefore})`);
-// apagar el esquemático deja los resultados a toda la ventana; el último prendido no se apaga
-await viewBtn('Esquemático').click();
-check((await page.locator('.workspace.expand-results').count()) === 1 && (await viewBtn('Esquemático').getAttribute('aria-pressed')) === 'false', 'apagar Esquemático deja sólo los resultados');
+// #55: un click siempre suma. Con las dos vistas, click en una la deja a pantalla completa…
 await viewBtn('Resultados').click();
-check((await page.locator('.workspace.expand-results').count()) === 1, 'el último prendido no se apaga');
+check((await page.locator('.workspace.expand-results').count()) === 1 && (await viewBtn('Esquemático').getAttribute('aria-pressed')) === 'false', 'con las dos, click en Resultados la deja a pantalla completa');
+await viewBtn('Resultados').click();
+check((await page.locator('.workspace.expand-results').count()) === 1, 'otro click en la que está sola no cambia nada');
+// …y click en la que no se ve la agrega en pantalla partida
 await viewBtn('Esquemático').click();
+check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'click en Esquemático (oculto) vuelve a pantalla partida');
+await viewBtn('Esquemático').click();
+check((await page.locator('.workspace.expand-schematic').count()) === 1 && (await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'click en Esquemático lo deja a pantalla completa');
+const blue = await viewBtn('Esquemático').evaluate((b) => getComputedStyle(b).backgroundColor);
+const dark = await viewBtn('Resultados').evaluate((b) => getComputedStyle(b).backgroundColor);
+check(blue !== dark, `la vista que se muestra se distingue por color (${blue} / ${dark})`);
+await viewBtn('Resultados').click();
 check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'con los dos prendidos, pantalla partida');
 await page.getByRole('button', { name: 'Resultados al costado' }).click();
 check((await page.locator('.workspace.side').count()) === 1 && (await page.getByRole('button', { name: 'Resultados al costado' }).getAttribute('aria-pressed')) === 'true', 'el botón de disposición pone los resultados al costado');

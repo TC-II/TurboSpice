@@ -901,6 +901,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Caja de trazas de la barra de resultados
   const traceBox = useRef<TraceBoxHandle>(null);
+  const [viewerTools, setViewerTools] = useState<HTMLElement | null>(null);
   const traceNames = useMemo(() => {
     const sc = plot && scaleOf(plot);
     return plot ? [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))] : [];
@@ -1783,13 +1784,15 @@ ${ltNetlistText(sim.built.lt)}
             <div className="toolbar small results-bar">
               {/* como Simular: el botón vuelve al gráfico; la flecha, a exportar y al resto de las vistas */}
               <div className="split" role="group" aria-label="Vista de resultados">
-                <button className={panel === 'plot' ? 'active' : ''} onClick={() => setPanel('plot')} aria-label="Resultados" title="Gráfico de resultados">
-                  {panel === 'plot' ? 'Resultados' : `Resultados · ${PANEL_NAMES[panel]}`}
+                <button className="active" onClick={() => setPanel('plot')} title="Volver al gráfico de resultados">
+                  Resultados
                 </button>
-                <MenuButton items={resultsItems} label="Más vistas de resultados" title="Exportar, netlist, log y problemas" className={panel === 'plot' ? 'active' : ''}>
+                <MenuButton items={resultsItems} label="Más vistas de resultados" title="Exportar, netlist, log y problemas" className="active">
                   <Icon name="caret" size={14} />
                 </MenuButton>
               </div>
+              {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
+              {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
               {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} onAdd={addExpr} />}
               {panel === 'plot' && (
                 <>
@@ -1814,6 +1817,8 @@ ${ltNetlistText(sim.built.lt)}
                       <option value="smith">Carta de Smith</option>
                     </select>
                   )}
+                  {/* Cursores, FFT, Medidas y Ajustar (los pone el visor) */}
+                  <span className="viewer-tools" ref={setViewerTools} />
                   {withPz && (
                     <label className="check inline" title="Mapa de polos y ceros (.pz) al lado del gráfico; sus f₀ se marcan en el eje">
                       <input type="checkbox" checked={pzSide} onChange={(e) => setPzSide(e.target.checked)} /> Polos y ceros
@@ -1856,6 +1861,7 @@ ${ltNetlistText(sim.built.lt)}
                   onFft={doFft}
                   onFocusTrace={() => traceBox.current?.focus()}
                   side={resultsSide}
+                  toolsHost={viewerTools}
                   marks={withPz && pzSide ? marks : undefined}
                   onHoverExpr={(e) => {
                     const net = e && /^\s*V\(([^,()]+)\)\s*$/i.exec(e)?.[1];

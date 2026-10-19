@@ -26,8 +26,8 @@ export async function resultsMenu(page, ...path) {
   await page.getByRole('button', { name: 'Más vistas de resultados', exact: true }).click();
   await pick(page, path);
 }
-/** Vista elegida en el panel de resultados (el botón Resultados dice cuál, si no es el gráfico) */
-export const resultsView = (page) => page.locator('.results-bar .split > button').first().textContent();
+/** Vista elegida en el panel de resultados ('' = el gráfico; si no, el nombre junto al botón) */
+export const resultsView = async (page) => ((await page.locator('.results-bar .results-view').count()) ? page.locator('.results-bar .results-view').textContent() : '');
 
 /** Elige un ítem de la flecha de Simular: una simulación guardada (por su nombre) o un tipo de
  * análisis (crea una simulación nueva, con sus parámetros en la barra) */

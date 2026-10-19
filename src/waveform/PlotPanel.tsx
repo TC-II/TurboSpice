@@ -1,6 +1,7 @@
 // Visor de resultados: paneles apilados con eje X compartido, trazas como expresiones,
 // Bode (magnitud y fase), cursores, medidas rápidas y exportación a CSV/PNG.
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { createPortal } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
@@ -50,6 +51,8 @@ interface Props {
   /** FFT de una traza del transitorio en el rango dado (crea un plot derivado) */
   onFft?(o: { expr: string; window: FftWindow; from?: number; to?: number }): void;
   handle?: Ref<PlotPanelHandle>;
+  /** lugar de la barra de resultados donde van Cursores, FFT, Medidas y Ajustar */
+  toolsHost?: HTMLElement | null;
   /** A: ir a la caja de expresiones (está en la barra de resultados) */
   onFocusTrace?(): void;
   /** resultados al costado del esquemático: cursores y medidas van debajo de los paneles (si
@@ -85,7 +88,7 @@ const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName ===
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks, initial, onState, onFocusTrace, side }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks, initial, onState, onFocusTrace, side, toolsHost }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   const [fftExpr, setFftExpr] = useState('');
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
@@ -95,6 +98,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [cursorMode, setCursorMode] = useState(init?.cursorMode ?? false);
   const [cursors, setCursors] = useState<Cursors>(init?.cursors ?? {});
   const [showStats, setShowStats] = useState(false);
+  // cursores activos y todavía sin ubicar: el A sigue al mouse (línea y tabla preliminares)
+  const [hoverX, setHoverX] = useState<number>();
   const charts = useRef(new Map<number, uPlot>());
   // eje Y fijado por un zoom a recuadro (por panel; sin entrada = autoescala)
   const [yRanges, setYRanges] = useState<Record<number, Range>>(init?.yRanges ?? {});
@@ -223,30 +228,39 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   }));
 
   const range: Range | null = xRange;
+  const unplaced = cursorMode && cursors.a === undefined && cursors.b === undefined;
+  const previewX = unplaced ? hoverX : undefined;
+  // en este orden, en la barra de resultados (toolsHost) o arriba de los paneles
+  const tools = (
+    <>
+      <button
+        className={cursorMode ? 'active' : ''}
+        onClick={() => setCursorMode((v) => !v)}
+        title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto; C; Shift+C los borra)"
+      >
+        Cursores
+      </button>
+      {onFft && data[0]?.xName === 'time' && (
+        <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title="Espectro (FFT) y distorsión armónica de una traza">
+          FFT…
+        </button>
+      )}
+      <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title="Máximo, mínimo, pico a pico, promedio, eficaz y frecuencia en el rango visible">
+        Medidas
+      </button>
+      <button onClick={() => zoomTo(null, {})} title="Ver todo (Espacio o doble click en el gráfico; Z: zoom a un recuadro, Shift+Z: zoom anterior)">
+        Ajustar
+      </button>
+    </>
+  );
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
 
   return (
     <div className="plot-panel">
-      <div className="plot-tools">
-        <button
-          className={cursorMode ? 'active' : ''}
-          onClick={() => setCursorMode((v) => !v)}
-          title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto; C; Shift+C los borra)"
-        >
-          Cursores
-        </button>
-        <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title="Máximo, mínimo, pico a pico, promedio, eficaz y frecuencia en el rango visible">
-          Medidas
-        </button>
-        <button onClick={() => zoomTo(null, {})} title="Ver todo (Espacio o doble click en el gráfico; Z: zoom a un recuadro, Shift+Z: zoom anterior)">Ajustar</button>
-        {onFft && data[0]?.xName === 'time' && (
-          <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title="Espectro (FFT) y distorsión armónica de una traza">
-            FFT…
-          </button>
-        )}
-        {zoomMode && <span className="hint">Arrastrá un recuadro para hacer zoom · Esc cancela</span>}
-        {removing && <span className="hint">Click en el nombre de una traza para quitarla · Esc termina</span>}
-      </div>
+      {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
+      {(zoomMode || removing) && (
+        <p className="hint plot-info">{zoomMode ? 'Arrastrá un recuadro para hacer zoom · Esc cancela' : 'Click en el nombre de una traza para quitarla · Esc termina'}</p>
+      )}
       {fftOpen && onFft && (
         <div className="plot-tools fft-tools">
           <select value={fftExpr} aria-label="Traza para la FFT" onChange={(e) => setFftExpr(e.target.value)}>
@@ -307,6 +321,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             cursorMode={cursorMode}
             cursors={cursors}
             onCursor={(c) => setCursors((old) => ({ ...old, ...c }))}
+            previewX={previewX}
+            onHoverX={unplaced ? setHoverX : undefined}
             onHoverExpr={onHoverExpr}
             marks={marks}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
@@ -323,11 +339,19 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       </div>
       {(cursorMode || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
-          {cursorMode && (cursors.a !== undefined || cursors.b !== undefined) && <CursorTable data={data} cursors={cursors} setCursors={setCursors} />}
-          {cursorMode && cursors.a === undefined && cursors.b === undefined && (
-            <p className="hint pad-x">Click en el gráfico para ubicar el cursor A; Shift+click o click derecho para el B. Arrastrá las líneas para moverlas.</p>
+          {cursorMode && (
+            <section className="readout-card" aria-label="Cursores">
+              <h4>Cursores</h4>
+              <CursorTable data={data} cursors={previewX !== undefined ? { ...cursors, a: previewX } : cursors} preview={unplaced} setCursors={setCursors} />
+              {unplaced && <p className="hint">Click en el gráfico para fijar el cursor A; Shift+click o click derecho para el B. Arrastrá las líneas para moverlas.</p>}
+            </section>
           )}
-          {showStats && allVisible.length > 0 && <StatsTable data={data} range={range} />}
+          {showStats && allVisible.length > 0 && (
+            <section className="readout-card" aria-label="Medidas">
+              <h4>Medidas</h4>
+              <StatsTable data={data} range={range} />
+            </section>
+          )}
         </div>
       )}
       </div>
@@ -362,6 +386,10 @@ function PaneView(props: {
   register(u: uPlot | null): void;
   /** sólo en el último panel: "+" en su borde inferior para agregar uno debajo */
   onAddBelow?(): void;
+  /** cursor A preliminar (todavía sin ubicar): sigue al mouse */
+  previewX?: number;
+  /** posición del mouse en X (mientras haya cursores sin ubicar) */
+  onHoverX?(x: number | undefined): void;
 }) {
   const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
@@ -456,7 +484,11 @@ function PaneView(props: {
         setCursor: [
           (u) => {
             cancelAnimationFrame(raf);
-            raf = requestAnimationFrame(() => setHover(u.cursor.idx ?? null));
+            raf = requestAnimationFrame(() => {
+              setHover(u.cursor.idx ?? null);
+              const l = u.cursor.left;
+              live.current.onHoverX?.(l != null && l >= 0 ? u.posToVal(l, 'x') : undefined);
+            });
           },
         ],
         setScale: [
@@ -495,8 +527,9 @@ function PaneView(props: {
             if (!live.current.cursorMode) return;
             const dpr = devicePixelRatio;
             const { left, top, width, height } = u.bbox;
+            const pa = c.a === undefined && c.b === undefined ? live.current.previewX : c.a;
             for (const [name, v, tr] of [
-              ['A', c.a, c.ta],
+              ['A', pa, c.ta],
               ['B', c.b, c.tb],
             ] as const) {
               if (v === undefined) continue;
@@ -622,6 +655,15 @@ function PaneView(props: {
       const x1 = data.x[data.x.length - 1];
       live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     };
+    // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece
+    // (uPlot deja el recuadro vacío al terminar: la sombra va sólo durante el arrastre)
+    const selStart = (e: PointerEvent) => {
+      if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode)) el.classList.add('selecting');
+    };
+    const selEnd = () => el.classList.remove('selecting');
+    root.addEventListener('pointerdown', selStart);
+    window.addEventListener('pointerup', selEnd);
+    window.addEventListener('pointercancel', selEnd);
     root.addEventListener('pointerdown', down);
     root.addEventListener('pointermove', move);
     root.addEventListener('pointerup', up);
@@ -634,6 +676,9 @@ function PaneView(props: {
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
+      root.removeEventListener('pointerdown', selStart);
+      window.removeEventListener('pointerup', selEnd);
+      window.removeEventListener('pointercancel', selEnd);
       root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move);
       root.removeEventListener('pointerup', up);
@@ -670,7 +715,7 @@ function PaneView(props: {
 
   useEffect(() => {
     chart.current?.redraw(false);
-  }, [cursors, props.marks]);
+  }, [cursors, props.marks, props.previewX]);
 
   // corridas (pasos de .step, barridos .dc anidados) con el color de la primera traza
   const runLegend = data.curves.filter((c) => c.trace === data.curves[0]?.trace && c.axis === data.curves[0]?.axis && c.runLabel);
@@ -785,7 +830,7 @@ function PaneView(props: {
   );
 }
 
-function CursorTable({ data, cursors, setCursors }: { data: PaneData[]; cursors: Cursors; setCursors(f: (c: Cursors) => Cursors): void }) {
+function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[]; cursors: Cursors; preview?: boolean; setCursors(f: (c: Cursors) => Cursors): void }) {
   const { a, b } = cursors;
   const dx = a !== undefined && b !== undefined ? b - a : NaN;
   const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
@@ -806,7 +851,7 @@ function CursorTable({ data, cursors, setCursors }: { data: PaneData[]; cursors:
       <div className="cursor-tools">
         {traceSelect('ta', 'A')}
         {traceSelect('tb', 'B')}
-        <button disabled={a === undefined} onClick={() => setCursors((c) => ({ ...c, a: undefined, sel: 'b' }))}>
+        <button disabled={a === undefined || preview} onClick={() => setCursors((c) => ({ ...c, a: undefined, sel: 'b' }))}>
           Borrar A
         </button>
         <button disabled={b === undefined} onClick={() => setCursors((c) => ({ ...c, b: undefined, sel: 'a' }))}>
@@ -820,7 +865,7 @@ function CursorTable({ data, cursors, setCursors }: { data: PaneData[]; cursors:
         <thead>
           <tr>
             <th>Traza</th>
-            <th>A {a !== undefined && `(${fmt(a, xu)})`}</th>
+            <th className={preview ? 'preview' : undefined} title={preview ? 'Sigue al mouse: click para fijarlo' : undefined}>A {a !== undefined && `(${fmt(a, xu)})`}</th>
             <th>B {b !== undefined && `(${fmt(b, xu)})`}</th>
             <th>B − A</th>
             <th>pendiente</th>

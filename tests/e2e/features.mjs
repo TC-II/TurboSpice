@@ -218,7 +218,7 @@ await openExample(page, 'Barrido RC (.step).asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-check((await resultsView(page)) === 'Resultados · Mediciones', 'con .meas y nada graficado, abre en Mediciones');
+check((await resultsView(page)) === 'Mediciones', 'con .meas y nada graficado, abre en Mediciones');
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k),meas vs R', `una corrida por paso (${stepPlots.join(', ')})`);
@@ -317,6 +317,17 @@ const cb = await page.locator('.pane-chart').first().boundingBox();
   const panesBox = await page.locator('.plot-main > .panes').boundingBox();
   const ro = page.locator('.plot-main.beside > .readouts');
   check((await ro.count()) === 1 && (await ro.boundingBox()).x >= panesBox.x + panesBox.width - 1, 'cursores a la derecha de los paneles');
+}
+{
+  // #51: antes de fijarlo, el cursor A sigue al mouse (línea y tabla preliminares)
+  const cp = await page.locator('.pane-chart').first().boundingBox();
+  await page.mouse.move(cp.x + cp.width * 0.3, cp.y + cp.height / 2, { steps: 3 });
+  await page.waitForTimeout(150);
+  const h1 = await page.locator('.readout th.preview').textContent();
+  await page.mouse.move(cp.x + cp.width * 0.6, cp.y + cp.height / 2, { steps: 3 });
+  await page.waitForTimeout(150);
+  const h2 = await page.locator('.readout th.preview').textContent();
+  check(/^A \(/.test(h1) && h1 !== h2, `cursor A preliminar sigue al mouse (${h1} → ${h2})`);
 }
 await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
 await page.waitForTimeout(400); // que no cuente como doble click

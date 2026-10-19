@@ -215,7 +215,6 @@ svg.editor.tool-move { cursor: move; }
 .net-hl circle { fill: var(--sch-hl); stroke: none; }
 .ghost { opacity: 0.55; color: var(--sch-ghost); stroke: var(--sch-ghost); fill: none; }
 .ghost text { fill: var(--sch-ghost); stroke: none; }
-.ghost-wire { stroke: var(--sch-wire); stroke-dasharray: 6 4; fill: none; vector-effect: non-scaling-stroke; }
 .snap-cursor { fill: var(--sch-sel); }
 .delete-cursor { stroke: var(--sch-sel); stroke-width: 1.6; stroke-linecap: round; fill: none; vector-effect: non-scaling-stroke; pointer-events: none; }
 svg.editor:not(:hover) .delete-cursor { display: none; }

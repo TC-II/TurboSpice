@@ -1,6 +1,19 @@
 // Íconos de la barra de herramientas (SVG en línea, 20×20, trazo con currentColor).
 import type { ReactNode } from 'react';
 
+/** Cápsula con texto (NET, OP): más ancha que los demás íconos */
+function capsule(text: string): ReactNode {
+  return (
+    <>
+      <rect x="1" y="3" width="28" height="14" rx="7" />
+      <text x="15" y="13.8" textAnchor="middle" fontSize="10" fontWeight="700" fill="currentColor" stroke="none" fontFamily="system-ui, sans-serif" letterSpacing="0.3">
+        {text}
+      </text>
+    </>
+  );
+}
+const WIDE = new Set(['nets', 'op']);
+
 const P: Record<string, ReactNode> = {
   new: <path d="M5 2.5h7l3 3v12H5zM12 2.5v3h3" />,
   pdf: <path d="M5 2.5h7l3 3v12H5zM12 2.5v3h3M10 8v5M7.8 11l2.2 2.2 2.2-2.2" />,
@@ -22,14 +35,14 @@ const P: Record<string, ReactNode> = {
   rotate: <path d="M15.5 8.5A6 6 0 1 0 14 14M15.5 3.5v5h-5" />,
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,
-  nets: <path d="M2.5 13.5h4M13.5 13.5h4M6.5 11h7v5h-7zM8.5 13.5h3M10 11V5M7 5h6" />,
+  nets: capsule('NET'),
   study: <path d="M4 3.5h12v13H4zM7 7h6M7 10h6M7 13h3.5M13.5 12.5l1.5 1.5 2.5-3" />,
   sim: <path d="M3 4.5h14M3 10h14M3 15.5h14M7 2.5v4M13 8v4M9 13.5v4" />,
   control: <path d="M6 4H4.5v12H6M14 4h1.5v12H14M7.5 8l2 2-2 2M10.5 12.5h2" />,
   run: <path d="M6 4l10 6-10 6z" />,
   stop: <path d="M5 5h10v10H5z" />,
   probe: <path d="M15 3l2 2-7.5 7.5-3-.5-.5-3zM6.5 12.5 3 17" />,
-  op: <path d="M3 15l3.5-4 3 2.5L14 7l3 3M3 4h5M3 7h3" />,
+  op: capsule('OP'),
   help: <path d="M7.5 7.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7M10 14.5v.01M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16" />,
   sun: <path d="M10 6.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" />,
   moon: <path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8" />,
@@ -62,7 +75,7 @@ export type IconName = keyof typeof P;
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   return (
-    <svg className="icon" width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+    <svg className="icon" width={WIDE.has(name) ? size * 1.5 : size} height={size} viewBox={WIDE.has(name) ? '0 0 30 20' : '0 0 20 20'} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
       {P[name]}
     </svg>
   );

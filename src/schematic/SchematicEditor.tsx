@@ -516,8 +516,8 @@ export function SchematicEditor(props: Props) {
         setTool({ kind: 'select' });
         return;
       case 'delete': {
-        // lo que está bajo la cruz (en la grilla); si no hay nada, bajo el mouse
-        const hit = hitTest(doc, g, lib, tol, showSimCommand) ?? hitTest(doc, p, lib, tol, showSimCommand);
+        // lo que está bajo la cruz (que sigue al mouse, sin grilla)
+        const hit = hitTest(doc, p, lib, tol, showSimCommand);
         const shape = hit ? -1 : shapeAt(doc, p, tol);
         if (hit) commit(deleteItems(doc, [hit], lib));
         else if (shape >= 0) commit({ ...doc, shapes: doc.shapes.filter((_, i) => i !== shape) });
@@ -803,11 +803,6 @@ export function SchematicEditor(props: Props) {
       const inst = { type: tool.type, x: o.x, y: o.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
       return <SymbolView inst={inst} def={def} lib={lib} />;
     }
-    if (tool.kind === 'wire' && tool.start) {
-      return (
-        <path d={`M ${tool.start.x} ${tool.start.y} ${ctrlHeld ? `L ${g.x} ${g.y}` : `H ${g.x} V ${g.y}`}`} className="ghost-wire" />
-      );
-    }
     if (tool.kind === 'flag') {
       return tool.name === '0' ? (
         <path d={`M ${g.x - 16} ${g.y} H ${g.x + 16} M ${g.x - 9} ${g.y + 6} H ${g.x + 9} M ${g.x - 3} ${g.y + 12} H ${g.x + 3}`} />
@@ -885,6 +880,19 @@ export function SchematicEditor(props: Props) {
         showSimCommand={showSimCommand}
       />
       <g className="ghost">{ghost}</g>
+      {tool.kind === 'wire' && tool.start && (
+        // el cable que se está trazando, igual a como va a quedar (en L, o recto con Ctrl)
+        <g className="wires drawing">
+          {ctrlHeld ? (
+            <line x1={tool.start.x} y1={tool.start.y} x2={g.x} y2={g.y} />
+          ) : (
+            <>
+              <line x1={tool.start.x} y1={tool.start.y} x2={g.x} y2={tool.start.y} />
+              <line x1={g.x} y1={tool.start.y} x2={g.x} y2={g.y} />
+            </>
+          )}
+        </g>
+      )}
       {tool.kind === 'select' && !drag && vertices.length > 0 && (
         <g className="wire-vertices">
           {vertices.map((v) => (
@@ -914,8 +922,8 @@ export function SchematicEditor(props: Props) {
         </g>
       )}
       {tool.kind === 'delete' && (
-        // cursor de borrar: una cruz chica a 45° en el punto de la grilla
-        <path className="delete-cursor" d={`M ${g.x - 5 / view.scale} ${g.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${g.x + 5 / view.scale} ${g.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
+        // cursor de borrar: una cruz chica a 45° que sigue al mouse (sin grilla)
+        <path className="delete-cursor" d={`M ${cursor.x - 5 / view.scale} ${cursor.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${cursor.x + 5 / view.scale} ${cursor.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
       )}
       {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
     </svg>

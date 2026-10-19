@@ -1326,9 +1326,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const schematicShown = !sim || expanded !== 'results';
   const resultsShown = !!sim && expanded !== 'schematic';
   const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
-  // apagar uno deja el otro a toda la ventana; el último prendido no se apaga
-  const toggleSchematicView = () => sim && (schematicShown ? resultsShown && setExpanded('results') : setExpanded(''));
-  const toggleResultsView = () => sim && (resultsShown ? schematicShown && setExpanded('schematic') : setExpanded(''));
+  // Botones de vista (#55): un click siempre suma. Si la vista no está, se agrega en pantalla
+  // partida; si ya está junto con la otra, queda a pantalla completa
+  const showSchematicView = () => sim && setExpanded(!schematicShown ? '' : resultsShown ? 'schematic' : expanded);
+  const showResultsView = () => sim && setExpanded(!resultsShown ? '' : schematicShown ? 'results' : expanded);
   const setSide = (side: boolean) => {
     lsSet('turbospice.resultsSide', side ? '1' : '0');
     setResultsSide(side);
@@ -1618,16 +1619,16 @@ ${ltNetlistText(sim.built.lt)}
         createPortal(
           <>
             {/* vistas: con las dos prendidas, pantalla partida */}
-            <nav className="tabs" aria-label="Vistas">
-              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={toggleSchematicView} title="Esquemático (Ctrl+1: sólo el esquemático)">
+            <nav className="tabs view-tabs" aria-label="Vistas">
+              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? 'Esquemático' : schematicShown && resultsShown ? 'Esquemático a pantalla completa (Ctrl+1)' : schematicShown ? 'Esquemático' : 'Agregar el esquemático en pantalla partida (Ctrl+0)'}>
                 Esquemático
               </button>
               <button
                 className={resultsShown ? 'active' : ''}
                 aria-pressed={resultsShown}
                 disabled={!sim}
-                onClick={toggleResultsView}
-                title={sim ? 'Resultados (Ctrl+2: sólo los resultados; Ctrl+0: los dos)' : 'Todavía no hay resultados: simulá primero'}
+                onClick={showResultsView}
+                title={!sim ? 'Todavía no hay resultados: simulá primero' : schematicShown && resultsShown ? 'Resultados a pantalla completa (Ctrl+2)' : resultsShown ? 'Resultados' : 'Agregar los resultados en pantalla partida (Ctrl+0)'}
               >
                 Resultados
               </button>

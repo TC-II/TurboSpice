@@ -135,6 +135,10 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .tabs button { border: 0; background: transparent; border-radius: 6px; padding: 4px 10px; color: var(--fg-muted); }
 .tabs button.active { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }
 .tabs button:disabled { opacity: 0.45; cursor: default; }
+/* vistas (#55): la que se muestra va en azul; las demás, oscuras (un click las agrega) */
+.view-tabs button { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }
+.view-tabs button.active { background: var(--accent); color: #fff; box-shadow: none; }
+.view-tabs button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 /* disposición de los resultados (al costado o abajo), al lado de las vistas */
 .layout-btns { display: flex; gap: 2px; }
 .layout-btns button { display: inline-flex; padding: 3px; border-color: transparent; background: transparent; border-radius: 5px; color: var(--fg-muted); }

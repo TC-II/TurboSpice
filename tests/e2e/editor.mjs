@@ -88,9 +88,15 @@ const setValue = async (x, y, v) => {
 await setValue(56, -32, '1k');
 await setValue(96, 0, '1µ');
 const p = await at(0, 56);
-// doble click en la fuente: ventana de configuración (#47), forma de onda Pulso
+// doble click en la fuente: ventana de configuración (#47). Una fuente nueva arranca en
+// Valor DC = 1: con Enter ya queda con ese valor
 await page.mouse.dblclick(p.x, p.y);
 const src = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
+check((await src.getByRole('tab', { selected: true }).textContent()) === 'Valor DC' && (await src.getByLabel('Valor DC', { exact: true }).inputValue()) === '1', 'una fuente nueva abre en Valor DC = 1');
+await page.keyboard.press('Enter');
+check((await page.locator('svg.editor .sym text', { hasText: /^1$/ }).count()) === 1, 'Enter deja la fuente en 1');
+// …y al pasarla a Pulso el DC no queda como DC para .op
+await page.mouse.dblclick(p.x, p.y);
 await src.getByRole('tab', { name: 'Pulso' }).click();
 for (const [k, v] of [['Ton', '2m'], ['Período', '4m'], ['Trise', '1u'], ['Tfall', '1u']]) await src.getByLabel(k, { exact: true }).fill(v);
 await page.keyboard.press('Enter');

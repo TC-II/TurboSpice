@@ -100,8 +100,10 @@ const fullLine = (s: SourceSpec) => {
 };
 
 /** Campo de texto que no pisa lo que se está escribiendo cuando cambia el valor calculado */
-function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, label }: {
+function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, label, autoFocus }: {
   value: string;
+  /** al abrir la ventana (o cambiar de pestaña) el foco va acá, con el texto seleccionado */
+  autoFocus?: boolean;
   onChange(v: string): void;
   onFocus?(): void;
   onBlur?(): void;
@@ -115,8 +117,9 @@ function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, l
       aria-label={label}
       className={className}
       placeholder={placeholder}
+      autoFocus={autoFocus}
       value={own ?? value}
-      onFocus={() => (setOwn(value), onFocus?.())}
+      onFocus={(e) => (setOwn(value), autoFocus && e.target.select(), onFocus?.())}
       onBlur={() => (setOwn(null), onBlur?.())}
       onChange={(e) => (setOwn(e.target.value), onChange(e.target.value))}
     />
@@ -141,10 +144,15 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
     SpiceLine: inst.attrs.get('SpiceLine'),
   };
   const parsed = useMemo(() => parseSource(original), []);
-  const [spec, setSpec] = useState<SourceSpec>(() => parsed ?? emptySource());
+  // una fuente sin valor arranca con un DC de 1: abrir y apretar Enter ya deja una fuente válida
+  const blankDc = !parsed || (parsed.kind === 'dc' && !parsed.dc.trim());
+  const [spec, setSpec] = useState<SourceSpec>(() => (parsed && !blankDc ? parsed : { ...(parsed ?? emptySource()), kind: 'dc', dc: '1' }));
+  // valores que la ventana completó sola (DC al abrir, AC o Valor DC al entrar a esas pestañas):
+  // si no se tocaron, se sacan al ir a otra pestaña (mirar AC no debe dejar un "AC 1" puesto)
+  const autoFilled = useRef<{ acMag?: string; dc?: string }>(blankDc ? { dc: '1' } : {});
   // los parámetros de cada forma de onda se recuerdan al cambiar de pestaña
   const [argsBy, setArgsBy] = useState<Partial<Record<SourceKind, string[]>>>(() => ({ ...DEFAULT_ARGS, ...(parsed ? { [parsed.kind]: parsed.args } : {}) }));
-  const [text, setText] = useState<string | null>(() => (parsed ? null : [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ')));
+  const [text, setText] = useState<string | null>(() => (parsed || !original.Value.trim() ? null : [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ')));
   const [focus, setFocus] = useState('');
   // pulso: los dos últimos escritos entre Ton, período (o frecuencia) y DC quedan fijos
   const [fixed, setFixed] = useState<[PulseLinked, PulseLinked]>(['ton', 'per']);
@@ -227,18 +235,23 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
     setSpec({ ...spec, params: has ? spec.params.map(([p, x]) => (p.toLowerCase() === k.toLowerCase() ? [p, v] : [p, x])) : [...spec.params, [k, v]] });
   };
 
-  // valores que la ventana completó sola al entrar a AC o a Valor DC: si no se tocaron, se
-  // sacan al ir a otra pestaña (mirar AC no debe dejar un "AC 1" puesto)
-  const autoFilled = useRef<{ acMag?: string; dc?: string }>({});
+  // el valor de la pestaña Valor DC se guarda aparte: al pasar a una forma de onda no se
+  // convierte en el "DC para .op" (que es opcional), y vuelve si se regresa a Valor DC
+  const dcStash = useRef('');
   const choose = (k: SourceKind) => {
     setFocus('');
+    if (k === kind) return;
     const next = { ...spec, kind: k };
     const auto = autoFilled.current;
     if (auto.acMag !== undefined && spec.acMag === auto.acMag) next.acMag = '';
-    if (auto.dc !== undefined && spec.dc === auto.dc) next.dc = '';
+    if (kind === 'dc') (dcStash.current = auto.dc !== undefined && spec.dc === auto.dc ? '' : spec.dc), (next.dc = '');
     autoFilled.current = {};
     if (k === 'ac' && !next.acMag) (next.acMag = '1'), (autoFilled.current.acMag = '1');
-    if (k === 'dc' && !next.dc) (next.dc = '1'), (autoFilled.current.dc = '1');
+    if (k === 'dc') {
+      // si la forma de onda tenía un DC para .op, ése es el valor DC
+      next.dc = spec.dc || dcStash.current || '1';
+      if (!spec.dc && !dcStash.current) autoFilled.current.dc = '1';
+    }
     if (k === 'pwl' && !next.points.length) next.points = [['0', '0'], ['1m', '1'], ['2m', '1'], ['3m', '0']];
     setSpec(next);
   };
@@ -301,7 +314,16 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
       <form className="srcdlg" onSubmit={(e) => (e.preventDefault(), submit())}>
         <div className="src-tabs" role="tablist" aria-orientation="vertical" aria-label="Forma de onda">
           {KINDS.map((k) => (
-            <button key={k.kind} type="button" role="tab" aria-selected={kind === k.kind} className={kind === k.kind ? 'on' : ''} onClick={() => choose(k.kind)}>
+            <button
+              key={k.kind}
+              type="button"
+              role="tab"
+              aria-selected={kind === k.kind}
+              className={kind === k.kind ? 'on' : ''}
+              onClick={() => choose(k.kind)}
+              // Enter con el foco en una pestaña acepta, como en los campos
+              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
+            >
               <svg viewBox="0 0 46 20" aria-hidden="true">
                 <g fill="none" stroke="currentColor" strokeWidth="1.5">{k.icon}</g>
               </svg>
@@ -316,13 +338,14 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
             <>
               <WaveDrawing spec={full} focus={focus} />
               {LAYOUT[kind].map((row, i) => (
-                <div className="src-row" key={i}>
-                  {row.map((fd) => (
+                <div className="src-row" key={`${kind}-${i}`}>
+                  {row.map((fd, j) => (
                     <label key={String(fd.key)} title={fd.key === 'duty' ? 'Ciclo útil (duty cycle): (Trise/2 + Ton + Tfall/2) / Período' : isDerived(fd.key) ? 'Calculado a partir de los otros' : undefined}>
                       {fd.label}
                       {unitOf(fd.unit) ? ` [${unitOf(fd.unit)}]` : ''}
                       <LiveInput
                         label={fd.label}
+                        autoFocus={i === 0 && j === 0}
                         value={valueOf(fd.key)}
                         className={isDerived(fd.key) ? 'derived' : undefined}
                         placeholder={fd.optional ? '0' : undefined}

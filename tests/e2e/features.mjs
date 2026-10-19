@@ -867,6 +867,52 @@ check(again.some((t) => /R1 demasiado grande/.test(t)), 'al reabrir, el programa
 await page.screenshot({ path: `${OUT}/blocks.png` });
 await page.keyboard.press('Escape');
 
+// --- #47: ventana de configuración de fuentes ---
+await openExample(page, 'Filtro RC.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+{
+  // cuerpo de V1 (se recalcula: al simular se abre el panel de resultados y cambia la vista)
+  // (Esc: después de simular queda la herramienta de medir y el doble click sólo edita al seleccionar)
+  const openV1 = async () => {
+    await page.keyboard.press('Escape');
+    const p = await at(0, 56);
+    await page.mouse.dblclick(p.x, p.y);
+  };
+  await openV1();
+  const sd = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
+  check(await sd.waitFor({ timeout: 5000 }).then(() => true, () => false), 'doble click en una fuente abre su ventana');
+  const field = (n) => sd.getByLabel(n, { exact: true });
+  check((await sd.getByRole('tab', { selected: true }).textContent()) === 'Pulso', 'reconoce el PULSE del ejemplo');
+  const pulseVals = [await field('Ton').inputValue(), await field('Período').inputValue(), await field('Frecuencia').inputValue(), await field('DC').inputValue()];
+  check(pulseVals.join() === '5m,10m,100,50', `cada parámetro en su campo; frecuencia y DC calculados (${pulseVals})`);
+  await field('DC').fill('25');
+  check((await field('Ton').inputValue()) === '2.5m', `con período y DC fijos, el DC recalcula Ton (${await field('Ton').inputValue()})`);
+  await sd.getByRole('tab', { name: 'Seno' }).click();
+  await field('Amplitud').fill('2');
+  await field('Frecuencia').fill('2k');
+  check((await field('Período').inputValue()) === '500u', `el período sigue a la frecuencia (${await field('Período').inputValue()})`);
+  await sd.getByText(/^Avanzado/).click();
+  await field('Amplitud AC').fill('1');
+  const line = await sd.locator('.src-line').textContent();
+  check(line === 'SINE(0 2 2k) AC 1', `la línea resultante con la sintaxis de LTspice (${line})`);
+  await sd.getByRole('button', { name: 'Aceptar' }).click();
+  check((await page.locator('svg.editor .sym text', { hasText: 'SINE(0 2 2k)' }).count()) === 1, 'Aceptar escribe la forma de onda en el componente');
+  await page.getByRole('button', { name: 'Simular', exact: true }).click();
+  await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+  check((await page.locator('.status.ok').count()) === 1, 'y simula');
+  // un valor que el formulario no sabe editar se edita como texto, sin perderlo
+  await openV1();
+  await sd.getByText(/^Avanzado/).click();
+  await sd.getByRole('button', { name: 'Editar como texto' }).click();
+  await sd.getByLabel('Valor de la fuente').fill('wavefile="x.wav" chan=0');
+  await sd.getByRole('button', { name: 'Aceptar' }).click();
+  await openV1();
+  check((await sd.getByLabel('Valor de la fuente').inputValue()) === 'wavefile="x.wav" chan=0' && (await sd.getByText('el formulario no sabe editar').count()) === 1, 'lo que no reconoce abre como texto');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+}
+
 // primera visita: sin pantalla de bienvenida; "Acerca de" sólo desde Ayuda
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 const fp = await fresh.newPage();

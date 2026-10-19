@@ -68,6 +68,15 @@ function splitParams(value: string): { main: string; params: Map<string, string>
   return { main: main.join(' '), params, order };
 }
 
+/**
+ * Sintaxis de fuentes de LTspice que ngspice escribe distinto: el PWL repetido
+ * ("PWL REPEAT FOREVER (t v …) ENDREPEAT") es "PWL(t v …) r=0" en ngspice.
+ */
+export function sourceSyntax(letter: string, value: string): string {
+  if (letter !== 'V' && letter !== 'I') return value;
+  return value.replace(/\bPWL\s+REPEAT\s+FOREVER\s*\(([^)]*)\)\s*ENDREPEAT\b/i, 'PWL($1) r=0');
+}
+
 function ngspiceName(e: Element, used: Set<string>): string {
   let n = e.name.replace(/§/g, '_');
   while (used.has(n.toLowerCase())) n += '_';
@@ -194,7 +203,7 @@ function convertElements(
         for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
       }
     }
-    out.push(...expandElement(name, letter, e.nodes, translateRandom(e.value), warnings));
+    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateRandom(e.value)), warnings));
   }
 
   return out;

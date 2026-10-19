@@ -18,6 +18,7 @@ import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { SourceDialog } from './schematic/SourceDialog.tsx';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
@@ -91,6 +92,7 @@ const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rec
 type Dialog =
   | { kind: 'picker' }
   | { kind: 'attrs'; index: number; label?: number }
+  | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point }
   | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
@@ -943,7 +945,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   const editItem = (ref: ItemRef) => {
-    if (ref.kind === 'symbol') setDialog({ kind: 'attrs', index: ref.index });
+    if (ref.kind === 'symbol') {
+      // las fuentes independientes (V, I) tienen su ventana de configuración
+      const s = doc.symbols[ref.index];
+      const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
+      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : { kind: 'attrs', index: ref.index });
+    }
     else if (ref.kind === 'text') {
       const t = doc.texts[ref.index];
       const ls = t.text.split('\\n');
@@ -1908,6 +1915,20 @@ ${ltNetlistText(sim.built.lt)}
             setDialog(null);
             // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
             setTool({ kind: 'place', type: type.startsWith(`${USER_DIR}/`) ? type.slice(USER_DIR.length + 1) : type, orient: 'R0' });
+          }}
+        />
+      )}
+      {dialog?.kind === 'source' && doc.symbols[dialog.index] && (
+        <SourceDialog
+          inst={doc.symbols[dialog.index]}
+          def={lib.symbol(doc.symbols[dialog.index].type)}
+          onClose={() => setDialog(null)}
+          onAttributes={() => setDialog({ kind: 'attrs', index: dialog.index })}
+          onApply={(attrs) => {
+            setDialog(null);
+            const s = doc.symbols[dialog.index];
+            const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => v !== (s.attrs.get(k) ?? null)));
+            if (Object.keys(changed).length) commit(setSymbolAttrs(doc, dialog.index, changed));
           }}
         />
       )}

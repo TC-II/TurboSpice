@@ -119,9 +119,16 @@ await probe(272, -32); // red out
 check((await chipNames()).join() === 'V(out)', `primera DC: V(out) (${(await chipNames()).join()})`);
 // otra del mismo tipo con otros parámetros, desde la barra
 await menu(page, 'Simular', 'Barrido DC');
+// aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
+// render después y no debe pisar lo que se está escribiendo (fallaba en CI)
+const directiveIs = (t) =>
+  page.waitForFunction((t) => document.querySelector('.texts .directive')?.textContent === t, t, { timeout: 5000 }).catch(() => {});
 await page.getByLabel('Fin 1').fill('2');
+await page.getByLabel('Fin 1').press('Enter');
+await directiveIs('.dc V1 0 2 0.1');
 await page.getByLabel('Incremento 1').fill('0.01');
 await page.getByLabel('Incremento 1').press('Enter');
+await directiveIs('.dc V1 0 2 0.01');
 check((await directive()) === '.dc V1 0 2 0.01', `los parámetros de la barra van al esquemático (${await directive()})`);
 check((await page.locator('.results-panel').count()) === 0, 'la nueva simulación arranca sin resultados');
 await simulate();

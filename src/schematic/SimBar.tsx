@@ -3,7 +3,7 @@
 // fuente; las redes y fuentes se pueden elegir en el esquemático), un cuadrado con su estado
 // (sin correr, corriendo, lista) y una × para borrarla. Los cambios se aplican al salir del
 // campo o con Enter y reemplazan el comando del esquemático.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
@@ -140,12 +140,21 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     if (ok && sim && naming !== null && naming.trim() !== (sim.custom ? sim.name : '')) onRename(naming);
     setNaming(null);
   };
-  useEffect(() => setDraft(parseAnalysis(line)), [line]);
+  // la línea que la barra acaba de aplicar: vuelve un render después (la lista sigue al
+  // esquemático en un efecto) y no debe pisar lo que ya se está escribiendo en otro campo
+  const applied = useRef<string | null>(null);
+  useEffect(() => {
+    if (line !== applied.current) setDraft(parseAnalysis(line));
+    applied.current = null;
+  }, [line]);
   const errors = draft ? validateAnalysis(draft) : [];
   const apply = (a: Analysis | null = draft) => {
     if (!a) return;
     const next = formatAnalysis(a);
-    if (next !== line && !validateAnalysis(a).length) onApply(next);
+    if (next !== line && !validateAnalysis(a).length) {
+      applied.current = next;
+      onApply(next);
+    }
   };
   const change = (a: Analysis) => (setDraft(a), apply(a));
   const rows = sim && draft ? barRows(draft) : [];

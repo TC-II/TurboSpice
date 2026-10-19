@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { siFixed } from '../../src/waveform/series.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
 import { addTraceTo, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
 
@@ -94,5 +95,25 @@ describe('colores de las trazas (#51)', () => {
     const v = { tran: [{ traces: [{ expr: 'V(a)', color: PALETTE[2] }, { expr: 'V(b)', color: PALETTE[0] }] }] };
     const back = parsePlt(serializePlt(v)).tran[0].traces;
     expect(back.map((t) => t.color)).toEqual(['#ff0000', '#00a000']);
+  });
+});
+
+describe('valores de ancho fijo (#54)', () => {
+  it('siempre el mismo largo: signo, 4 cifras y prefijo', () => {
+    const cases: [number, string][] = [
+      [0.9107, ' 910.7m'],
+      [-1.554, '-1.554 '],
+      [1, ' 1.000 '],
+      [14, ' 14.00 '],
+      [60.06e-3, ' 60.06m'],
+      [-51.33, '-51.33 '],
+      [2.023e-3, ' 2.023m'],
+      [428.7, ' 428.7 '],
+      [999.96, ' 1.000k'],
+      [0, ' 0.000 '],
+      [1e-20, ' 0.000f'],
+    ];
+    for (const [x, s] of cases) expect(siFixed(x), String(x)).toBe(s);
+    expect(new Set([...cases.map(([x]) => siFixed(x)), siFixed(NaN)].map((s) => s.length))).toEqual(new Set([7]));
   });
 });

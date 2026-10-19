@@ -680,10 +680,13 @@ export function SchematicEditor(props: Props) {
     }
     const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
-    const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p, tool.kind === 'probe') : null;
+    // la punta de prueba mide la corriente por pin en los transistores; la información del punto
+    // de operación (describe) sigue saliendo sobre el cuerpo
+    const probe = tool.kind === 'probe' && !drag ? probeTarget(p, true) : null;
+    const target = describe && !drag ? probeTarget(p) : null;
     if (tool.kind === 'probe') {
-      setHoverNet(target?.net);
-      setProbeKind(target?.net ? 'v' : target?.symbol !== undefined ? 'i' : '');
+      setHoverNet(probe?.net);
+      setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined ? 'i' : '');
     }
     if (tool.kind === 'pick') {
       const t = probeTarget(p);

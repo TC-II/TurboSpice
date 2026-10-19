@@ -73,6 +73,24 @@ export function si(x: number, digits = 4): string {
   return `${parseFloat((x / 10 ** (3 * e)).toPrecision(digits))}${SI[e + 5]}`;
 }
 
+/**
+ * Como si(), pero siempre del mismo largo (para lecturas que cambian con el mouse y no deben
+ * cambiar de ancho): signo o espacio, `digits` cifras significativas con ceros a la derecha y
+ * el prefijo SI o un espacio. 0.9107 → " 910.7m", -1.554 → "-1.554 ", 1 → " 1.000 ".
+ * Sin valor (NaN): una raya centrada del mismo largo.
+ */
+export function siFixed(x: number, digits = 4): string {
+  const width = digits + 3;
+  if (!Number.isFinite(x)) return '—'.padStart(Math.ceil(width / 2)).padEnd(width);
+  const a = Math.abs(x);
+  let e = a === 0 ? 0 : Math.min(4, Math.max(-5, Math.floor(Math.log10(a) / 3)));
+  let m = (a / 10 ** (3 * e)).toPrecision(digits);
+  // el redondeo puede llegar a 1000 (999.96 → "1000"): pasa al prefijo siguiente
+  if (parseFloat(m) >= 1000 && e < 4) m = (a / 10 ** (3 * ++e)).toPrecision(digits);
+  if (m.includes('e')) m = parseFloat(m).toString();
+  return `${x < 0 ? '-' : ' '}${m.slice(0, digits + 1).padEnd(digits + 1)}${SI[e + 5] || ' '}`;
+}
+
 /** Interpola linealmente (xs, ys) en los puntos xd (xs creciente). Fuera de rango: NaN */
 export function resample(xs: Float64Array, ys: Float64Array, xd: Float64Array): Float64Array {
   const out = new Float64Array(xd.length);

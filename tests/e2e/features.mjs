@@ -162,6 +162,23 @@ const q1 = await at(236, 208);
 await page.mouse.move(q1.x, q1.y);
 const tip = await page.locator('.bias-tip').textContent().catch(() => '');
 check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.test(tip), `hover sobre Q1: ${tip}`);
+{
+  // #53: en un transistor la punta de prueba mide la corriente de cada pin; el cuerpo no mide
+  const names = () => page.locator('.trace-chip .name').allTextContents();
+  const n0 = (await names()).length;
+  await page.mouse.click(q1.x, q1.y);
+  await page.waitForTimeout(200);
+  check((await names()).length === n0, 'click en el cuerpo de Q1 no mide');
+  for (const [x, y] of [[256, 164], [196, 208], [256, 252]]) {
+    const pin = await at(x, y);
+    await page.mouse.click(pin.x, pin.y);
+    await page.waitForTimeout(200);
+  }
+  const got = (await names()).slice(n0);
+  check(got.join() === 'Ic(Q1),Ib(Q1),Ie(Q1)', `colector, base y emisor miden Ic, Ib e Ie (${got})`);
+  check((await page.locator('.trace-chip.bad').count()) === 0, 'y las tres tienen datos');
+  for (let k = 0; k < got.length; k++) await page.locator('.trace-chip .x').last().click();
+}
 const outW = await at(320, 128);
 await page.mouse.move(outW.x, outW.y);
 const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
@@ -346,8 +363,14 @@ await page.locator('.pane-chart').first().hover();
 await page.locator('.pane').first().click({ position: { x: 5, y: 5 } });
 check((await canvas.evaluate((c) => c.dataset.e2e).catch(() => undefined)) === 'mismo', 'el gráfico no se recrea al pasar por una traza ni al activar el panel');
 // clicks seguidos y rápidos (sin esperar el doble click) colocan siempre el cursor A
-const headA = async () => /A \(([^)]+)\)/.exec(await page.locator('.readout thead').textContent())?.[1];
-const headB = async () => /B \(([^)]+)\)/.exec(await page.locator('.readout thead').textContent())?.[1];
+// (el lugar del valor queda reservado: sin cursor dice "—")
+const cursorHead = async (k) => {
+  const re = k === 'A' ? /A \(([^)]+)\)/ : /B \(([^)]+)\)/;
+  const v = re.exec(await page.locator('.readout thead').textContent())?.[1]?.trim();
+  return v && v !== '—' ? v : undefined;
+};
+const headA = () => cursorHead('A');
+const headB = () => cursorHead('B');
 const bBefore = await headB();
 let placed = 0;
 let lastA = await headA();

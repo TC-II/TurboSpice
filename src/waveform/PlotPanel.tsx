@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { scaleOf, si } from './series.ts';
+import { scaleOf, si, siFixed } from './series.ts';
 import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 
@@ -84,6 +84,8 @@ const safeRange: uPlot.Range.Function = (_u, min, max) => {
   return uPlot.rangeNum(min, max, 0.1, true);
 };
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
+/** Lecturas que cambian con el mouse (cursores, leyenda): siempre del mismo ancho, sin parpadeo */
+const fix = (v: number, unit = '') => `${siFixed(v)}${Number.isFinite(v) ? unit : ' '.repeat(unit.length)}`;
 const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName === 'frequency' ? 'Hz' : '');
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
@@ -776,14 +778,19 @@ function PaneView(props: {
               >
                 {t.expr}
               </button>
-              {err ? <span className="err">{err}</span> : hover !== null && <span className="val">{fmt(v, unitOf(c))}</span>}
+              {/* el lugar del valor queda reservado aunque el mouse no esté sobre el gráfico */}
+          {err ? <span className="err">{err}</span> : <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>}
               <button className="x" aria-label={`Quitar ${t.expr}`} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
                 ✕
               </button>
             </span>
           );
         })}
-        {hover !== null && data.x[hover] !== undefined && <span className="xval">{data.xName} = {fmt(data.x[hover])}</span>}
+        {data.x.length > 0 && (
+          <span className={`xval${hover === null || data.x[hover] === undefined ? ' idle' : ''}`}>
+            {data.xName} = {fix(hover !== null ? (data.x[hover] ?? NaN) : NaN, xUnit(data.xName))}
+          </span>
+        )}
         {runLegend.length > 1 && (
           <span className="run-legend">
             {runLegend.map((c) => (
@@ -865,8 +872,8 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
         <thead>
           <tr>
             <th>Traza</th>
-            <th className={preview ? 'preview' : undefined} title={preview ? 'Sigue al mouse: click para fijarlo' : undefined}>A {a !== undefined && `(${fmt(a, xu)})`}</th>
-            <th>B {b !== undefined && `(${fmt(b, xu)})`}</th>
+            <th className={preview ? 'preview' : undefined} title={preview ? 'Sigue al mouse: click para fijarlo' : undefined}>A ({fix(a ?? NaN, xu)})</th>
+            <th>B ({fix(b ?? NaN, xu)})</th>
             <th>B − A</th>
             <th>pendiente</th>
           </tr>
@@ -879,18 +886,18 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
             return (
               <tr key={i} className={followed ? 'followed' : undefined}>
                 <td style={{ color: c.color }}>{c.label}</td>
-                <td>{fmt(ya)}</td>
-                <td>{fmt(yb)}</td>
-                <td>{fmt(yb - ya)}</td>
-                <td>{fmt((yb - ya) / dx)}</td>
+                <td>{fix(ya)}</td>
+                <td>{fix(yb)}</td>
+                <td>{fix(yb - ya)}</td>
+                <td>{fix((yb - ya) / dx)}</td>
               </tr>
             );
           })}
           <tr className="dx">
             <td>{data[0]?.xName}</td>
             <td colSpan={2} />
-            <td>Δx = {fmt(dx, xu)}</td>
-            <td>1/Δx = {fmt(1 / dx, xu === 's' ? 'Hz' : '')}</td>
+            <td>Δx = {fix(dx, xu)}</td>
+            <td>1/Δx = {fix(1 / dx, xu === 's' ? 'Hz' : '')}</td>
           </tr>
         </tbody>
       </table>

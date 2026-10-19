@@ -3,7 +3,7 @@
 // Uso: node tests/e2e/shortcuts.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, skipWelcome } from './lib.mjs';
+import { menu, resultsView, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -158,7 +158,7 @@ await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await page.locator('.results-panel').count()) === 1, 'Alt+R simula');
 await onSchematic();
 await page.keyboard.press('Control+l');
-check((await page.getByRole('button', { name: 'Log', exact: true }).getAttribute('class')) === 'active', 'Ctrl+L abre el log');
+check((await resultsView(page)) === 'Resultados · Log', 'Ctrl+L abre el log');
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 
 // --- visor (con el mouse sobre los gráficos) ---

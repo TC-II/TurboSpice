@@ -351,7 +351,15 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .plot-tools button { padding: 2px 10px; font-size: 13px; }
 .plot-tools button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .expr-form { display: flex; gap: 4px; flex: 1 1 320px; max-width: 520px; }
-.expr-form input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+.expr-form input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 30px 3px 8px; }
+/* el "+" va dentro de la caja, al final */
+.expr-form { align-items: center; }
+.expr-box { position: relative; flex: 1; display: flex; min-width: 0; }
+.expr-add { position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--accent); font-size: 18px; line-height: 22px; }
+.expr-add:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.expr-add:disabled { color: var(--fg-muted); opacity: 0.5; cursor: default; }
+.results-bar .split .menu-top > button.active { border-left: 1px solid color-mix(in srgb, #fff 40%, var(--accent)); }
+.results-bar .expr-form .hint { white-space: nowrap; }
 .panes { flex: 1; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
 .pane { flex: 1 1 0; display: flex; flex-direction: column; min-height: 110px; border: 1px solid transparent; border-radius: 8px; padding: 2px 4px; }
 .pane.active { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
@@ -386,6 +394,17 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .panes { min-height: 150px; overflow-y: auto; }
 .pane { min-height: 150px; }
 .readouts { flex: none; max-height: 38%; overflow: auto; border-top: 1px solid var(--border); padding-top: 4px; }
+/* paneles + cursores/medidas: debajo (resultados al costado) o a la derecha (resultados abajo) */
+.plot-main { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+.plot-main > .panes { flex: 1; min-width: 0; }
+.plot-main.beside { flex-direction: row; }
+.plot-main.beside > .readouts { max-height: none; max-width: 55%; border-top: 0; border-left: 1px solid var(--border); padding: 0 0 0 8px; display: flex; gap: 12px; align-items: flex-start; }
+.plot-main.beside > .readouts > * { flex: none; }
+/* "+" para agregar un panel: aparece al acercarse al borde inferior del último */
+.pane { position: relative; }
+.pane-add { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; display: flex; justify-content: center; align-items: flex-end; z-index: 2; }
+.pane-add button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; line-height: 22px; opacity: 0; transition: opacity 0.12s; }
+.pane-add:hover button, .pane-add button:focus-visible { opacity: 1; }
 .results-body { overflow: hidden; }
 /* el contenedor no scrollea (por el visor): netlist, log y problemas llevan su propio scroll */
 .results-body > .code { flex: 1 1 auto; min-height: 0; overflow: auto; }

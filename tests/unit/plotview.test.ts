@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
-import { controlPlots, parsePlt, serializePlt } from '../../src/waveform/view.ts';
+import { addTraceTo, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
   it('seno: pico a pico, eficaz, frecuencia', () => {
@@ -61,5 +61,38 @@ describe('vista de ploteo', () => {
     ]);
     expect(v.ac).toEqual([{ traces: [{ expr: 'V(out)/V(in)' }] }]);
     expect(parsePlt(serializePlt(v))).toEqual(v);
+  });
+});
+
+describe('colores de las trazas (#51)', () => {
+  const exprs = (p: Pane[]) => p.map((x) => x.traces.map((t) => `${t.expr}:${t.color}`).join(' '));
+
+  it('una traza nueva toma el primer color libre y lo conserva al quitar otras', () => {
+    let p: Pane[] = [{ traces: [] }];
+    for (const e of ['V(a)', 'V(b)', 'V(c)']) p = addTraceTo(p, 0, e);
+    expect(exprs(p)).toEqual([`V(a):${PALETTE[0]} V(b):${PALETTE[1]} V(c):${PALETTE[2]}`]);
+    // se quita V(a): las demás no cambian; la siguiente usa el color liberado
+    p = [{ traces: p[0].traces.slice(1) }];
+    p = addTraceTo(p, 0, 'V(d)');
+    expect(exprs(p)).toEqual([`V(b):${PALETTE[1]} V(c):${PALETTE[2]} V(d):${PALETTE[0]}`]);
+  });
+
+  it('agregar una traza que ya está en el panel no hace nada; en otro panel, mismo color', () => {
+    let p: Pane[] = addTraceTo([{ traces: [] }, { traces: [] }], 0, 'V(out)');
+    expect(addTraceTo(p, 0, 'v( out )')).toBe(p);
+    p = addTraceTo(p, 1, 'V(out)');
+    expect(exprs(p)).toEqual([`V(out):${PALETTE[0]}`, `V(out):${PALETTE[0]}`]);
+  });
+
+  it('colorize fija el color que cada traza mostraba por su posición', () => {
+    const p = colorize([{ traces: [{ expr: 'V(a)' }, { expr: 'V(b)', color: '#123456' }, { expr: 'V(c)' }] }]);
+    expect(exprs(p)).toEqual([`V(a):${PALETTE[0]} V(b):#123456 V(c):${PALETTE[2]}`]);
+    expect(colorize(p)).toBe(p);
+  });
+
+  it('el .plt conserva los colores de la paleta propia', () => {
+    const v = { tran: [{ traces: [{ expr: 'V(a)', color: PALETTE[2] }, { expr: 'V(b)', color: PALETTE[0] }] }] };
+    const back = parsePlt(serializePlt(v)).tran[0].traces;
+    expect(back.map((t) => t.color)).toEqual(['#ff0000', '#00a000']);
   });
 });

@@ -7,8 +7,8 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { displayName, scaleOf, si } from './series.ts';
-import { sameExpr, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
+import { scaleOf, si } from './series.ts';
+import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
@@ -50,6 +50,11 @@ interface Props {
   /** FFT de una traza del transitorio en el rango dado (crea un plot derivado) */
   onFft?(o: { expr: string; window: FftWindow; from?: number; to?: number }): void;
   handle?: Ref<PlotPanelHandle>;
+  /** A: ir a la caja de expresiones (está en la barra de resultados) */
+  onFocusTrace?(): void;
+  /** resultados al costado del esquemático: cursores y medidas van debajo de los paneles (si
+   * no, a la derecha) */
+  side?: boolean;
   /** frecuencias de polos y ceros (.pz) para marcar en el eje de frecuencia */
   marks?: PzMark[];
   /** zoom y cursores con los que arranca (los de la simulación elegida, #39) */
@@ -80,7 +85,7 @@ const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName ===
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks, initial, onState }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, onFft, handle, marks, initial, onState, onFocusTrace, side }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   const [fftExpr, setFftExpr] = useState('');
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
@@ -90,10 +95,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [cursorMode, setCursorMode] = useState(init?.cursorMode ?? false);
   const [cursors, setCursors] = useState<Cursors>(init?.cursors ?? {});
   const [showStats, setShowStats] = useState(false);
-  const [expr, setExpr] = useState('');
-  const [exprError, setExprError] = useState<string>();
   const charts = useRef(new Map<number, uPlot>());
-  const exprInput = useRef<HTMLInputElement>(null);
   // eje Y fijado por un zoom a recuadro (por panel; sin entrada = autoescala)
   const [yRanges, setYRanges] = useState<Record<number, Range>>(init?.yRanges ?? {});
   const [zoomMode, setZoomMode] = useState(false);
@@ -148,17 +150,6 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   }, [panes.length, active, setActive]);
 
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? f(p) : p)));
-  const addTrace = () => {
-    const e = expr.trim();
-    if (!e) return;
-    const target = panes[active] ?? panes[0];
-    if (target.traces.some((t) => sameExpr(t.expr, e))) return setExpr('');
-    const test = paneCurves({ traces: [{ expr: e }] }, { plot, runs: [plot], labels, resolver, mode });
-    if (test.errors.size) return setExprError(test.errors.get(0));
-    setExprError(undefined);
-    update(Math.min(active, panes.length - 1), (p) => ({ traces: [...p.traces, { expr: e }] }));
-    setExpr('');
-  };
   const moveTrace = (from: number, ti: number, to: number) => {
     if (from === to) return;
     const t = panes[from].traces[ti];
@@ -195,7 +186,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         case 'grid':
           return setShowGrid((v) => !v);
         case 'addTrace':
-          return exprInput.current?.focus();
+          return onFocusTrace?.();
         case 'addPane':
           setPanes([...panes, { traces: [] }]);
           return setActive(panes.length);
@@ -231,45 +222,12 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     },
   }));
 
-  // nombres para autocompletar el campo de expresión
-  const names = useMemo(() => {
-    const sc = scaleOf(plot);
-    return [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))];
-  }, [plot]);
-
   const range: Range | null = xRange;
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
 
   return (
     <div className="plot-panel">
       <div className="plot-tools">
-        <form
-          className="expr-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            addTrace();
-          }}
-        >
-          <input
-            ref={exprInput}
-            list="trace-names"
-            value={expr}
-            spellCheck={false}
-            placeholder="Agregar traza: V(out)/V(in), I(R1)*V(n1), d(V(c))…"
-            aria-label="Expresión"
-            onChange={(e) => {
-              setExpr(e.target.value);
-              setExprError(undefined);
-            }}
-          />
-          <datalist id="trace-names">
-            {names.map((n) => (
-              <option key={n} value={n} />
-            ))}
-          </datalist>
-          <button type="submit" title="Agregar la traza (A: ir al campo)">Agregar</button>
-        </form>
-        <button onClick={() => setPanes([...panes, { traces: [] }])} title="Agregar un panel; las trazas nuevas van al panel activo (P; B: debajo del activo)">+ Panel</button>
         <button
           className={cursorMode ? 'active' : ''}
           onClick={() => setCursorMode((v) => !v)}
@@ -286,7 +244,6 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             FFT…
           </button>
         )}
-        {exprError && <span className="hint warn">{exprError}</span>}
         {zoomMode && <span className="hint">Arrastrá un recuadro para hacer zoom · Esc cancela</span>}
         {removing && <span className="hint">Click en el nombre de una traza para quitarla · Esc termina</span>}
       </div>
@@ -317,6 +274,9 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         </div>
       )}
       {plot.info && <p className="hint plot-info">{plot.info}</p>}
+      {/* cursores y medidas: a la derecha de los paneles con los resultados abajo (son anchos y
+          bajos); debajo con los resultados al costado */}
+      <div className={`plot-main${side ? '' : ' beside'}`}>
       <div className="panes">
         {panes.map((p, i) => (
           <PaneView
@@ -350,6 +310,14 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onHoverExpr={onHoverExpr}
             marks={marks}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
+            onAddBelow={
+              i === panes.length - 1
+                ? () => {
+                    setPanes([...panes, { traces: [] }]);
+                    setActive(panes.length);
+                  }
+                : undefined
+            }
           />
         ))}
       </div>
@@ -362,6 +330,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           {showStats && allVisible.length > 0 && <StatsTable data={data} range={range} />}
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -391,6 +360,8 @@ function PaneView(props: {
   onHoverExpr?(e: string | undefined): void;
   marks?: PzMark[];
   register(u: uPlot | null): void;
+  /** sólo en el último panel: "+" en su borde inferior para agregar uno debajo */
+  onAddBelow?(): void;
 }) {
   const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
@@ -802,6 +773,13 @@ function PaneView(props: {
         <p className="empty pane-empty">
           {pane.traces.length ? 'Ninguna traza se puede graficar en este análisis.' : 'Panel vacío: medí con la punta de prueba, escribí una expresión o arrastrá una traza acá.'}
         </p>
+      )}
+      {props.onAddBelow && (
+        <div className="pane-add">
+          <button aria-label="Agregar panel" title="Agregar un panel debajo (P)" onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>
+            +
+          </button>
+        </div>
       )}
     </div>
   );

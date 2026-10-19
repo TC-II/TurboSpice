@@ -21,6 +21,14 @@ export async function menu(page, ...path) {
   await pick(page, path);
 }
 
+/** Elige un ítem de la flecha de Resultados: resultsMenu(page, 'Exportar', 'Trazas a CSV'), resultsMenu(page, 'Log') */
+export async function resultsMenu(page, ...path) {
+  await page.getByRole('button', { name: 'Más vistas de resultados', exact: true }).click();
+  await pick(page, path);
+}
+/** Vista elegida en el panel de resultados (el botón Resultados dice cuál, si no es el gráfico) */
+export const resultsView = (page) => page.locator('.results-bar .split > button').first().textContent();
+
 /** Elige un ítem de la flecha de Simular: una simulación guardada (por su nombre) o un tipo de
  * análisis (crea una simulación nueva, con sus parámetros en la barra) */
 export async function simType(page, label) {

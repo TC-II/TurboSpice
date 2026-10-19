@@ -46,6 +46,36 @@ export const PALETTE = ['#2f9e44', '#1c7ed6', '#e03131', '#0c8599', '#ae3ec9', '
 
 export const traceColor = (t: Trace, i: number) => t.color ?? PALETTE[i % PALETTE.length];
 
+/**
+ * Paneles con el color de cada traza fijo (las que no tienen toman el que muestran por su
+ * posición): así, al quitar una, las demás no cambian de color.
+ */
+export function colorize(panes: Pane[]): Pane[] {
+  if (panes.every((p) => p.traces.every((t) => t.color))) return panes;
+  return panes.map((p) => (p.traces.every((t) => t.color) ? p : { traces: p.traces.map((t, i) => (t.color ? t : { ...t, color: traceColor(t, i) })) }));
+}
+
+/** Color para una traza nueva: el de la misma expresión en otro panel, o el primero libre */
+export function colorFor(panes: Pane[], expr: string): string {
+  const all = panes.flatMap((p) => p.traces.map((t, i) => ({ expr: t.expr, color: traceColor(t, i).toLowerCase() })));
+  const same = all.find((t) => sameExpr(t.expr, expr));
+  if (same) return same.color;
+  const used = new Set(all.map((t) => t.color));
+  return PALETTE.find((c) => !used.has(c)) ?? PALETTE[all.length % PALETTE.length];
+}
+
+/**
+ * Agrega una traza al panel `i`. Si ya está en ese panel no hace nada (no se quita: eso es a
+ * mano); si está en otro, queda en los dos con el mismo color.
+ */
+export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
+  const k = Math.max(0, Math.min(i, panes.length - 1));
+  const base = panes.length ? panes : emptyPanes();
+  if (base[k].traces.some((t) => sameExpr(t.expr, expr))) return panes;
+  const color = colorFor(base, expr);
+  return base.map((p, j) => (j === k ? { traces: [...p.traces, { expr, color }] } : p));
+}
+
 /** Tipo de análisis de un plot de ngspice ("tran3" → "tran", "op vs R" → "op") */
 export const plotKind = (name: string) => /^([a-z]+)/i.exec(name)?.[1].toLowerCase() ?? name;
 
@@ -170,7 +200,9 @@ export function serializePlt(view: PlotView): string {
     panes.forEach((p, pi) => {
       const traces = p.traces
         .map((t, i) => {
-          const color = t.color ? Math.max(0, LT_COLORS.indexOf(t.color)) : i;
+          // (la paleta propia sigue el orden de la de LTspice)
+          const c = t.color?.toLowerCase();
+          const color = c ? [LT_COLORS.indexOf(c), PALETTE.indexOf(c)].find((k) => k >= 0) ?? i : i;
           const axis = kind === 'ac' ? 0 : isCurrent(t.expr) ? 0x2100000 : 0x80000;
           return `{${axis + 2 + color},0,"${t.expr}"}`;
         })

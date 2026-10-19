@@ -5,7 +5,7 @@
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, simCommand, simType, skipWelcome } from './lib.mjs';
+import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -218,7 +218,7 @@ await openExample(page, 'Barrido RC (.step).asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-check(await page.getByRole('button', { name: /^Mediciones/ }).evaluate((b) => b.classList.contains('active')), 'con .meas y nada graficado, abre en Mediciones');
+check((await resultsView(page)) === 'Resultados · Mediciones', 'con .meas y nada graficado, abre en Mediciones');
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k),meas vs R', `una corrida por paso (${stepPlots.join(', ')})`);
@@ -232,7 +232,7 @@ check(series.join() === 'V(out) · R=500,V(out) · R=1k,V(out) · R=2k', `cada p
 await page.getByRole('button', { name: 'Medidas' }).click();
 await page.screenshot({ path: `${OUT}/step.png` });
 // .meas por corrida (#20): tiempo de subida 10-90 % = 2.2·RC
-await page.getByRole('button', { name: /^Mediciones/ }).click();
+await resultsMenu(page, /^Mediciones/);
 const measRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(
   measRows.length === 3 && /R=500.*1\.09\d*m/.test(measRows[0]) && /R=1k.*2\.19\d*m/.test(measRows[1]) && /R=2k.*4\.39\d*m/.test(measRows[2]),
@@ -269,23 +269,55 @@ const peak = await page.locator('.readout tbody tr').first().locator('td').nth(2
 check(/@ 4\.9\d*k|@ 4\.89\d*k/.test(peak), `pico de resonancia cerca de 4.9 kHz (${peak})`);
 await page.getByRole('button', { name: 'Medidas' }).click();
 
-await page.getByRole('button', { name: '+ Panel' }).click();
-await page.locator('.pane').nth(1).click();
+// #51: el "+" del borde inferior del último panel agrega uno debajo (y queda activo)
+await page.locator('.pane').last().hover({ position: { x: 200, y: 5 } });
+await page.getByRole('button', { name: 'Agregar panel' }).click();
+check((await page.locator('.pane').count()) === 2, 'el + del borde agrega un panel debajo');
 await page.getByLabel('Expresión').fill('V(out)/V(n001)');
 await page.keyboard.press('Enter');
 const paneChips = (i) => page.locator('.pane').nth(i).locator('.trace-chip .name').allTextContents();
 check((await paneChips(1)).join() === 'V(out)/V(n001)', `expresión en el panel nuevo (${await paneChips(1)})`);
 await page.getByLabel('Expresión').fill('V(nada)');
 await page.keyboard.press('Enter');
-check(/no existe/.test(await page.locator('.plot-tools .hint.warn').textContent()), 'una expresión inválida avisa y no se agrega');
+check(/no existe/.test(await page.locator('.expr-form .hint.warn').textContent()), 'una expresión inválida avisa y no se agrega');
 await page.getByLabel('Expresión').fill('');
 await page.locator('.pane').nth(1).locator('.trace-chip').dragTo(page.locator('.pane').nth(0).locator('.pane-chart'));
 check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `arrastrar una traza la pasa a otro panel (${await paneChips(0)})`);
 await page.getByRole('button', { name: 'Quitar panel' }).nth(1).click();
 check((await page.locator('.pane').count()) === 1, 'se puede quitar un panel');
+{
+  // #51: la punta de prueba no des-plotea; los colores no cambian al quitar una traza
+  const swatches = () => page.locator('.pane').first().locator('.trace-chip .swatch').evaluateAll((l) => l.map((e) => getComputedStyle(e).backgroundColor));
+  const [cOut, cDiv] = await swatches();
+  await page.mouse.click(outAc.x, outAc.y);
+  await page.waitForTimeout(200);
+  check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `volver a medir un nodo ya graficado no lo quita (${await paneChips(0)})`);
+  await page.locator('.trace-chip .x').first().click();
+  check((await swatches()).join() === cDiv, `al quitar V(out) la otra conserva su color (${await swatches()} vs ${cDiv})`);
+  await page.mouse.click(outAc.x, outAc.y);
+  await page.waitForTimeout(200);
+  check((await swatches()).join() === `${cDiv},${cOut}`, 'V(out) vuelve con su color (el que quedó libre)');
+  const rb = await page.locator('.results-panel').boundingBox();
+  await page.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', 'Ctrl+Z vuelve a como estaba');
+  // con el foco en la caja de trazas, la punta de prueba escribe en ella
+  await page.getByLabel('Expresión').click();
+  await page.mouse.click(outAc.x, outAc.y);
+  check((await page.getByLabel('Expresión').inputValue()) === 'V(out)' && (await paneChips(0)).length === 2, 'con el foco en la caja, click en un nodo escribe su nombre');
+  await page.getByLabel('Expresión').fill('');
+  await page.getByLabel('Expresión').blur();
+}
 
 await page.getByRole('button', { name: 'Cursores' }).click();
 const cb = await page.locator('.pane-chart').first().boundingBox();
+{
+  // #51: con los resultados abajo, cursores y medidas van a la derecha de los paneles
+  const panesBox = await page.locator('.plot-main > .panes').boundingBox();
+  const ro = page.locator('.plot-main.beside > .readouts');
+  check((await ro.count()) === 1 && (await ro.boundingBox()).x >= panesBox.x + panesBox.width - 1, 'cursores a la derecha de los paneles');
+}
 await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
 await page.waitForTimeout(400); // que no cuente como doble click
 // al aparecer la tabla de cursores el gráfico se achica: volver a medirlo
@@ -341,23 +373,17 @@ await page.getByRole('button', { name: 'Borrar B' }).click();
 check((await headB()) === undefined && (await headA()) === b2, 'borrar el cursor B');
 await page.getByRole('button', { name: 'Cursores' }).click();
 
-const csv = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('csv'));
+const csv = await downloaded(() => resultsMenu(page, 'Exportar', 'Trazas a CSV'));
 check(csv.text.startsWith('frequency,V(out),V(out) (fase),V(out)/V(n001),V(out)/V(n001) (fase)\n'), `CSV (${csv.name}): ${csv.text.split('\n')[0]}`);
-const png = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('png'));
+const png = await downloaded(() => resultsMenu(page, 'Exportar', 'Gráfico a PNG'));
 check(png.name === 'Bode RLC.png' && png.text.length > 1000, 'gráfico a PNG');
 
-await page.getByRole('button', { name: 'Recordar vista' }).click();
-check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'recordar la vista');
-await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
-check(await page.getByRole('button', { name: 'Recordar vista' }).isVisible(), 'deshacer revierte "Recordar vista" (la vista va dentro del .asc)');
-await page.getByRole('button', { name: 'Rehacer', exact: true }).click();
-check(await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible(), 'rehacer la vista recordada');
-for (let k = 0; k < 2; k++) await page.locator('.trace-chip .x').first().click();
-check((await page.locator('.trace-chip').count()) === 0, 'quitar las trazas');
+// #51: ya no hay "Recordar vista" (la vista se guarda siempre con la simulación)
+check((await page.getByRole('button', { name: /Recordar vista|Vista recordada/ }).count()) === 0, 'sin botón Recordar vista');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.waitForTimeout(500);
-check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `al volver a simular se reaplica la vista recordada (${await paneChips(0)})`);
-const plt = await downloaded(() => page.getByRole('combobox', { name: 'Exportar resultados' }).selectOption('plt'));
+check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `al volver a simular se conserva la vista (${await paneChips(0)})`);
+const plt = await downloaded(() => resultsMenu(page, 'Exportar', 'Vista a .plt (LTspice)'));
 check(plt.name === 'Bode RLC.plt' && plt.text.includes('[AC Analysis]') && plt.text.includes('"V(out)/V(n001)"'), `vista a .plt de LTspice (${plt.name})`);
 await page.locator('input[type=file][accept=".plt"]').setInputFiles({
   name: 'x.plt',
@@ -391,8 +417,8 @@ const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar esquemáti
 check(svgOut.name === 'Bode RLC.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
 const net = await downloaded(() => menu(page, 'Archivo', 'Exportar netlist de LTspice (.net)'));
 check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `netlist de LTspice (.net): ${net.text.split('\n')[1]}`);
-await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
-const cir = await downloaded(() => page.getByRole('button', { name: 'Descargar .cir (ngspice)' }).click());
+await resultsMenu(page, 'Netlist');
+const cir = await downloaded(() => resultsMenu(page, 'Exportar', 'Netlist .cir (ngspice)'));
 check(cir.text.includes('.ac dec 100 100 100k'), 'netlist de ngspice (.cir)');
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 
@@ -453,7 +479,7 @@ check(pzCsv.name === 'RLC pz.csv' && pzCsv.text.split('\n').filter(Boolean).leng
 await pzp.getByRole('combobox', { name: 'Plot' }).selectOption('ac1');
 await pzp.locator('.pz-view.compact .pz-plane').waitFor();
 await pzp.getByLabel('Expresión', { exact: true }).fill('V(out)');
-await pzp.getByRole('button', { name: 'Agregar', exact: true }).click();
+await pzp.getByRole('button', { name: 'Agregar traza', exact: true }).click();
 await pzp.locator('.pane-chart').first().waitFor();
 check((await pzp.getByRole('checkbox', { name: 'Polos y ceros' }).isChecked()) && (await pzp.locator('.pz-view.compact path.pole').count()) === 2, 'en el Bode, el mapa de polos y ceros al lado');
 await pzp.screenshot({ path: `${OUT}/pz-bode.png` });
@@ -479,7 +505,8 @@ await page.setViewportSize({ width: 1600, height: 800 });
 // #36: los resultados no se cierran, se colapsan y se vuelven a mostrar intactos
 const resultsState = async () =>
   JSON.stringify({
-    plot: await page.getByRole('combobox', { name: 'Plot' }).inputValue(),
+    // (con un solo plot no hay desplegable)
+    plots: await page.locator('select[aria-label="Plot"]').count(),
     vista: await page.getByRole('combobox', { name: 'Vista' }).inputValue(),
     trazas: await page.locator('.trace-chip .name').allTextContents(),
     paneles: await page.locator('.pane').count(),
@@ -570,7 +597,7 @@ await page.mouse.click(free2.x, free2.y);
 await page.keyboard.press('Escape');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await page.getByRole('button', { name: /^Problemas/ }).click();
+await resultsMenu(page, /^Problemas/);
 const prob = page.locator('.problems li', { hasText: 'R2 no tiene valor asignado' });
 check((await prob.count()) === 1, 'Problemas lista el componente sin valor');
 await prob.getByRole('button', { name: 'ver en el esquemático' }).click();
@@ -642,7 +669,7 @@ await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const opRows = await page.locator('.result-table tbody tr').allTextContents();
 check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
-await page.getByRole('button', { name: 'Netlist', exact: true }).last().click();
+await resultsMenu(page, 'Netlist');
 check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
 await page.getByRole('button', { name: 'Ocultar resultados' }).click();
 
@@ -673,7 +700,7 @@ await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check((await page.locator('svg.editor .sym text.win', { hasText: '{R1}' }).count()) === 1, 'R1 pasa a valer {R1}');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await page.getByRole('button', { name: /^Mediciones/ }).click();
+await resultsMenu(page, /^Mediciones/);
 const studyRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(studyRows.length === 3 && /R1=1k.*2\.19\d*m/.test(studyRows[1]), `simula el estudio (${studyRows.join(' | ')})`);
 // reabrir: las tarjetas se reconstruyen desde las directivas; agregar tolerancias Monte Carlo
@@ -690,7 +717,7 @@ check((await page.locator('svg.editor .sym text.win', { hasText: '{mc(1u,0.1)}' 
 check((await page.locator('svg.editor .texts .comment', { hasText: '.step param R1 list 500 1k 2k' }).count()) === 1, 'el barrido desactivado queda como comentario');
 await page.getByRole('button', { name: 'Simular' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await page.getByRole('button', { name: /^Mediciones/ }).click();
+await resultsMenu(page, /^Mediciones/);
 const mcRows = await page.locator('.meas-table tbody tr').allTextContents();
 const tvals = (await page.locator('.meas-table tbody tr td:nth-child(2)').allTextContents()).map((t) => parseFloat(t));
 const spread = Math.max(...tvals) - Math.min(...tvals);
@@ -744,9 +771,9 @@ const studyPlots = await page.locator('select[aria-label="Plot"] option').allTex
 check(studyPlots.some((p) => /^tran/.test(p)) && studyPlots.some((p) => /^ac/.test(p)), `corren el .tran y el .ac con el barrido (${studyPlots.join(', ')})`);
 for (const p of [studyPlots.find((x) => /^tran/.test(x)), studyPlots.find((x) => /^ac/.test(x))]) {
   await page.getByRole('combobox', { name: 'Plot' }).selectOption(p);
-  check((await paneChips(0)).join() === 'V(out)' && (await page.getByRole('button', { name: 'Vista recordada ✓' }).isVisible()), `${p}: aparece el gráfico definido en el Estudio`);
+  check((await paneChips(0)).join() === 'V(out)', `${p}: aparece el gráfico definido en el Estudio`);
 }
-await page.getByRole('button', { name: /^Mediciones/ }).click();
+await resultsMenu(page, /^Mediciones/);
 const fcRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(fcRows.length === 2, `la medición de f −3 dB, una por corrida (${fcRows.join(' | ')})`);
 // al reabrir se reconstruyen las tarjetas de simulación y de gráfico
@@ -804,7 +831,7 @@ await page.getByRole('button', { name: 'Medidas' }).click();
 const xyRow = await page.locator('.readout tbody tr').first().locator('td').allTextContents();
 check(xyRow[0] === 'trise' && /^1\.09\d*m @ 500$/.test(xyRow[1]) && /^4\.39\d*m @ 2k$/.test(xyRow[2]), `trise en función de R (${xyRow.slice(0, 3).join(', ')})`);
 await page.getByRole('button', { name: 'Medidas' }).click();
-await page.getByRole('button', { name: 'Log' }).click();
+await resultsMenu(page, 'Log');
 const logText = await page.locator('.results-body pre').textContent();
 check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición se evalúa en cada corrida (un solo mensaje)');
 // #49: un log más alto que el panel se puede scrollear hasta el final (no queda recortado)

@@ -60,10 +60,11 @@ import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import { PlotPanel, type PlotAction, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
-import { sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
-import type { ComplexMode } from './waveform/curves.ts';
+import { displayName, sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
+import { paneCurves, type ComplexMode } from './waveform/curves.ts';
+import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace } from './waveform/expr.ts';
-import { asPlotView, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
@@ -183,6 +184,9 @@ const userFileKind = (name: string): UserFile['kind'] | null =>
 /** Copia interna por si el navegador no deja leer el portapapeles */
 let clipboardFallback = '';
 
+/** Nombre de cada vista del panel de resultados (en el botón Resultados) */
+const PANEL_NAMES = { plot: 'Gráfico', netlist: 'Netlist', log: 'Log', problems: 'Problemas', meas: 'Mediciones' } as const;
+
 export function App() {
   const engine = useMemo(() => new EngineClient(), []);
   const [mode, setMode] = useState<'schematic' | 'netlist'>('schematic');
@@ -266,7 +270,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // último punto de operación calculado: sigue valiendo al elegir otra simulación de la lista
   // (aunque todavía no tenga resultados) mientras el circuito no cambie
   const [opPoint, setOpPoint] = useState<{ doc: AscDoc; built: BuiltSimulation; bias: Bias } | null>(null);
-  const [panes, setPanes] = useState<Pane[]>(emptyPanes);
+  const [panes, setPanesRaw] = useState<Pane[]>(emptyPanes);
+  // cada traza con su color fijo: al quitar una, las demás no se recolorean
+  const setPanes = useCallback((p: Pane[]) => setPanesRaw(colorize(p)), []);
   const [activePane, setActivePane] = useState(0);
   // vista recordada (paneles por tipo de análisis): va dentro del .asc (";.plot …"), así que
   // cambiarla es editar el documento (entra al historial de deshacer)
@@ -870,18 +876,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p), [sim]);
 
-  // Punta de prueba: agrega la traza al panel activo (o la quita si ya estaba)
+  // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
+  // mano); si está en otro panel, queda en los dos con el mismo color
   const onProbe = (target: { net?: string; symbol?: number }) => {
     if (!sim || !plot) return;
     const expr = probeExpr(sim.built, target);
     if (!expr) return;
+    // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
+    if (traceBox.current?.focused()) return traceBox.current.insert(expr);
     setPanel('plot');
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
-    if (panes.some((p) => p.traces.some((t) => sameExpr(t.expr, expr)))) {
-      editPanes(panes.map((p) => ({ traces: p.traces.filter((t) => !sameExpr(t.expr, expr)) })));
-      return;
-    }
+    const i = Math.min(activePane, panes.length - 1);
+    if (panes[i]?.traces.some((t) => sameExpr(t.expr, expr))) return;
     const sc = scaleOf(plot);
     if (!sc) return setMessage(`${plot.name} no tiene eje X: elegí otro análisis para graficar`);
     try {
@@ -889,26 +896,29 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     } catch {
       return setMessage(`No hay datos de ${expr} en ${plot.name}`);
     }
-    const i = Math.min(activePane, panes.length - 1);
-    editPanes(panes.map((p, k) => (k === i ? { traces: [...p.traces, { expr }] } : p)));
+    editPanes(addTraceTo(panes, i, expr));
   };
 
-  const rememberView = () => {
+  // Caja de trazas de la barra de resultados
+  const traceBox = useRef<TraceBoxHandle>(null);
+  const traceNames = useMemo(() => {
+    const sc = plot && scaleOf(plot);
+    return plot ? [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))] : [];
+  }, [plot]);
+  /** agrega la expresión al panel activo; devuelve el error si no se puede graficar */
+  const addExpr = (expr: string): string | undefined => {
     if (!plot) return;
-    const kind = plotKind(plot.name);
-    setPlotView({ ...plotView, [kind]: panes });
-    setMessage(`Vista recordada para .${kind}: se aplica en cada simulación y se guarda dentro del .asc`);
+    const test = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver, mode });
+    if (test.errors.size) return test.errors.get(0);
+    const next = addTraceTo(panes, activePane, expr);
+    if (next !== panes) editPanes(next);
   };
-  /** Ctrl+Espacio: volver a aplicar la vista recordada */
+
+  /** Ctrl+Espacio: volver a aplicar la vista guardada para el análisis (";.plot" o un .plt importado) */
   const reapplyView = () => {
     const v = plot && plotView[plotKind(plot.name)];
     if (v) editPanes(v);
-    else setMessage('No hay una vista recordada para este análisis (botón "Recordar vista")');
-  };
-  const forgetView = () => {
-    if (!plot) return;
-    const { [plotKind(plot.name)]: _, ...rest } = plotView;
-    setPlotView(rest);
+    else setMessage('No hay una vista guardada para este análisis (se importa con un .plt)');
   };
   const acceptOfferedView = () => {
     if (offerView) setPlotView({ ...offerView, ...plotView });
@@ -1539,6 +1549,40 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     },
   ];
 
+  // Flecha de Resultados: exportar y las otras vistas (netlist, log, problemas, mediciones)
+  const exportBase = () => file.name.replace(/\.asc$/i, '');
+  const canExportPlot = panel === 'plot' && !!plot && !!scaleOf(plot);
+  const resultsItems: MenuItem[] = !sim
+    ? []
+    : [
+        {
+          label: 'Exportar',
+          items: [
+            { label: 'Trazas a CSV', disabled: !canExportPlot, onClick: () => download(`${exportBase()}.csv`, new Blob([plotPanel.current?.csv() ?? ''], { type: 'text/csv' })) },
+            {
+              label: 'Gráfico a PNG',
+              disabled: !canExportPlot,
+              onClick: async () => {
+                const b = await plotPanel.current?.png();
+                if (b) download(`${exportBase()}.png`, b);
+              },
+            },
+            { label: 'Vista a .plt (LTspice)', onClick: () => exportPlt() },
+            { label: 'Importar vista .plt…', shortcut: 'O', onClick: () => pltInput.current?.click() },
+            'sep',
+            { label: 'Netlist .cir (ngspice)', onClick: () => download(`${exportBase()}.cir`, new Blob([sim.built.netlist], { type: 'text/plain' })) },
+            { label: 'Netlist .net (LTspice)', onClick: () => download(`${exportBase()}.net`, new Blob([`* ${file.name}
+${ltNetlistText(sim.built.lt)}
+`], { type: 'text/plain' })) },
+          ],
+        },
+        'sep',
+        { label: 'Netlist', checked: panel === 'netlist', onClick: () => setPanel('netlist') },
+        ...(sim.meas ? [{ label: `Mediciones (${sim.meas.names.length})`, checked: panel === 'meas', onClick: () => setPanel('meas') }] : []),
+        { label: `Problemas${problems.length ? ` (${problems.length})` : ''}`, checked: panel === 'problems', onClick: () => setPanel('problems') },
+        { label: 'Log', shortcut: 'Ctrl+L', checked: panel === 'log', onClick: () => setPanel('log') },
+      ];
+
   return (
     <div className="schematic-mode">
       {slots.menu && createPortal(<AppMenu menus={menus} />, slots.menu)}
@@ -1666,7 +1710,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       />
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
-        <div className="canvas-wrap">
+        <div
+          className="canvas-wrap"
+          // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
+          // de prueba escribe ahí el nodo o componente
+          onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
+        >
           <SchematicEditor
             handle={editor}
             docKey={docKey}
@@ -1731,32 +1780,30 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
                 e.target.value = '';
               }}
             />
-            <div className="toolbar small">
-              <nav className="tabs">
-                <button className={panel === 'plot' ? 'active' : ''} onClick={() => setPanel('plot')}>Resultados</button>
-                <button className={panel === 'netlist' ? 'active' : ''} onClick={() => setPanel('netlist')}>Netlist</button>
-                {sim.meas && (
-                  <button className={panel === 'meas' ? 'active' : ''} onClick={() => setPanel('meas')}>
-                    Mediciones ({sim.meas.names.length})
-                  </button>
-                )}
-                <button className={panel === 'problems' ? 'active' : ''} onClick={() => setPanel('problems')}>
-                  Problemas{problems.length ? ` (${problems.length})` : ''}
+            <div className="toolbar small results-bar">
+              {/* como Simular: el botón vuelve al gráfico; la flecha, a exportar y al resto de las vistas */}
+              <div className="split" role="group" aria-label="Vista de resultados">
+                <button className={panel === 'plot' ? 'active' : ''} onClick={() => setPanel('plot')} aria-label="Resultados" title="Gráfico de resultados">
+                  {panel === 'plot' ? 'Resultados' : `Resultados · ${PANEL_NAMES[panel]}`}
                 </button>
-                <button className={panel === 'log' ? 'active' : ''} onClick={() => setPanel('log')} title="Log de ngspice (Ctrl+L)">
-                  Log
-                </button>
-              </nav>
+                <MenuButton items={resultsItems} label="Más vistas de resultados" title="Exportar, netlist, log y problemas" className={panel === 'plot' ? 'active' : ''}>
+                  <Icon name="caret" size={14} />
+                </MenuButton>
+              </div>
+              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} onAdd={addExpr} />}
               {panel === 'plot' && (
                 <>
-                  <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label="Plot">
-                    {sim.result.plots.map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.name}
-                        {labels.has(p.name) ? ` (${labels.get(p.name)})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}
+                  {sim.result.plots.length > 1 && (
+                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label="Plot" title="Resultado a ver (la simulación devolvió varios)">
+                      {sim.result.plots.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name}
+                          {labels.has(p.name) ? ` (${labels.get(p.name)})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   {isComplex && scale && (
                     <select value={mode} onChange={(e) => setMode(e.target.value as ComplexMode)} aria-label="Vista">
                       <option value="bode">Bode (dB y fase)</option>
@@ -1783,52 +1830,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
                       Corridas{hiddenRuns.size ? ` (${visibleRuns.length}/${allRuns.length})` : ''}…
                     </button>
                   )}
-                  {scale && (
-                    <>
-                      {plot && plotView[plotKind(plot.name)] ? (
-                        <button className="active" onClick={forgetView} title="Esta vista se reaplica en cada simulación. Click para olvidarla">
-                          Vista recordada ✓
-                        </button>
-                      ) : (
-                        <button onClick={rememberView} title="Reaplicar estas trazas, paneles y colores en cada simulación (Ctrl+Espacio la vuelve a aplicar)">Recordar vista</button>
-                      )}
-                      <select
-                        aria-label="Exportar resultados"
-                        value=""
-                        onChange={async (e) => {
-                          const v = e.target.value;
-                          const base = file.name.replace(/\.asc$/i, '');
-                          if (v === 'csv') download(`${base}.csv`, new Blob([plotPanel.current?.csv() ?? ''], { type: 'text/csv' }));
-                          if (v === 'png') {
-                            const b = await plotPanel.current?.png();
-                            if (b) download(`${base}.png`, b);
-                          }
-                          if (v === 'plt') exportPlt();
-                          if (v === 'plt-in') pltInput.current?.click();
-                        }}
-                      >
-                        <option value="">Exportar…</option>
-                        <option value="csv">Trazas a CSV</option>
-                        <option value="png">Gráfico a PNG</option>
-                        <option value="plt">Vista a .plt (LTspice)</option>
-                        <option value="plt-in">Importar vista .plt…</option>
-                      </select>
-                    </>
-                  )}
-                </>
-              )}
-              {panel === 'netlist' && (
-                <>
-                  <button onClick={() => download(file.name.replace(/\.asc$/i, '') + '.cir', new Blob([sim.built.netlist], { type: 'text/plain' }))}>
-                    Descargar .cir (ngspice)
-                  </button>
-                  <button
-                    onClick={() =>
-                      download(file.name.replace(/\.asc$/i, '') + '.net', new Blob([`* ${file.name}\n${ltNetlistText(sim.built.lt)}\n`], { type: 'text/plain' }))
-                    }
-                  >
-                    Descargar .net (LTspice)
-                  </button>
                 </>
               )}
               <button className="close" onClick={() => setExpanded('schematic')} aria-label="Ocultar resultados" title="Ocultar resultados (Ctrl+1)">
@@ -1853,6 +1854,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
                   active={activePane}
                   setActive={setActivePane}
                   onFft={doFft}
+                  onFocusTrace={() => traceBox.current?.focus()}
+                  side={resultsSide}
                   marks={withPz && pzSide ? marks : undefined}
                   onHoverExpr={(e) => {
                     const net = e && /^\s*V\(([^,()]+)\)\s*$/i.exec(e)?.[1];

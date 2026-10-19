@@ -12,13 +12,17 @@ import {
   addWire,
   dragSegment,
   dragSegmentStraight,
+  duplicateItems,
   mergeCollinear,
   moveItems,
   moveVertex,
   moveVertexStraight,
+  pasteItems,
+  placeSymbol,
   removeVertex,
   sameConnections,
   splitWire,
+  transformItems,
 } from '../../src/schematic/edit.ts';
 import { junctionPoints, pinPoints } from '../../src/schematic/geometry.ts';
 
@@ -317,6 +321,54 @@ describe('un cable no atraviesa componentes (#45)', () => {
   it('mover un cable sobre un componente también lo parte', () => {
     const d = asc('WIRE 112 -64 112 176\nSYMBOL res 0 0 R0\n');
     expect(ws(moveItems(d, [{ kind: 'wire', index: 0 }], -96, 0, false, lib))).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+  });
+
+  // #50: colocar, pegar, duplicar o rotar un componente sobre un cable tampoco lo deja en corto
+  const wire2 = asc('WIRE 16 -64 16 176\nFLAG 16 -64 a\nFLAG 16 176 b\nWIRE 200 0 300 0\n');
+  const cutWires = [[16, -64, 16, 16], [16, 96, 16, 176], [200, 0, 300, 0]];
+
+  it('colocar un componente sobre un cable lo parte en sus pines', () => {
+    const d = placeSymbol(wire2, 'res', { x: 0, y: 0 }, 'R0', lib);
+    expect(ws(d)).toEqual(cutWires);
+    expect(net(d)).toMatch(/^R1 a b /m);
+    // sobre un cable que sólo toca un pin (T) no se corta nada
+    const t = placeSymbol(asc('WIRE -64 96 96 96\n'), 'res', { x: 0, y: 0 }, 'R0', lib);
+    expect(ws(t)).toEqual([[-64, 96, 96, 96]]);
+  });
+
+  it('pegar un componente sobre un cable lo parte; las referencias siguen a los cables pegados', () => {
+    const frag = asc('SYMBOL res 0 0 R0\nSYMATTR InstName R1\nWIRE 400 0 400 64\n');
+    const r = pasteItems(wire2, frag, { x: 0, y: 0 }, lib);
+    expect(ws(r.doc)).toEqual([...cutWires, [400, 0, 400, 64]]);
+    expect(r.refs).toEqual([{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 3 }]);
+    expect(net(r.doc)).toMatch(/^R1 a b /m);
+  });
+
+  it('pegar un cable que atraviesa un componente lo parte en tramos seleccionados', () => {
+    const d = asc('SYMBOL res 0 0 R0\n');
+    const r = pasteItems(d, asc('WIRE 16 -64 16 176\n'), { x: 16, y: -64 }, lib);
+    expect(ws(r.doc)).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+    expect(r.refs).toEqual([{ kind: 'wire', index: 0 }, { kind: 'wire', index: 1 }]);
+  });
+
+  it('duplicar un componente que cae sobre un cable lo parte', () => {
+    const d = { ...wire2, symbols: asc('SYMBOL res -32 -32 R0\nSYMATTR InstName R1\n').symbols };
+    const r = duplicateItems(d, [{ kind: 'symbol', index: 0 }], 32, 32, lib);
+    expect(ws(r.doc)).toEqual(cutWires);
+    expect(net(r.doc)).toMatch(/^R2 a b /m);
+  });
+
+  it('rotar un componente sobre un cable lo parte', () => {
+    const one = [{ kind: 'symbol' as const, index: 0 }];
+    const [p, q] = pinPoints(transformItems(asc('SYMBOL res 0 0 R0\n'), one, 'rotate', lib).symbols[0], lib.symbol('res'));
+    const [l, r] = p.x < q.x ? [p, q] : [q, p];
+    expect(l.y).toBe(r.y);
+    const d = asc(
+      `SYMBOL res 0 0 R0\nSYMATTR InstName R1\nWIRE ${l.x - 64} ${l.y} ${r.x + 64} ${r.y}\nFLAG ${l.x - 64} ${l.y} a\nFLAG ${r.x + 64} ${r.y} b\n`,
+    );
+    const m = transformItems(d, one, 'rotate', lib);
+    expect(ws(m)).toEqual([[l.x - 64, l.y, l.x, l.y], [r.x, r.y, r.x + 64, r.y]]);
+    expect(net(m)).toMatch(/^R1 (a b|b a) /m);
   });
 });
 

@@ -159,6 +159,24 @@ await drag([336, 56], [416, 56]);
   check(d.wires.includes('416 -64 416 16') && d.wires.includes('416 96 416 176'), `mover R3 sobre un cable lo parte: ${d.wires.join(' | ')}`);
   check(a && b && a !== b, `y R3 queda en serie (${a} ${b})`);
 }
+// #50: colocar un componente nuevo sobre un cable existente también lo parte
+await page.keyboard.press('w');
+await click(496, -64);
+await click(496, 176);
+await page.keyboard.press('Escape');
+{
+  const wired = await saved();
+  await page.keyboard.press('r');
+  await click(496, 48); // R4: pines en (496,16) y (496,96)
+  await page.keyboard.press('Escape');
+  const d = await saved();
+  const [a, b] = rNodes(d.net, 'R4');
+  check(d.wires.includes('496 -64 496 16') && d.wires.includes('496 96 496 176') && !d.wires.includes('496 -64 496 176'), `colocar R4 sobre un cable lo parte: ${d.wires.join(' | ')}`);
+  check(a && b && a !== b, `y R4 queda en serie (${a} ${b})`);
+  await page.keyboard.press('Control+z');
+  const u = await saved();
+  check(u.wires.join() === wired.wires.join() && !/^R4 /m.test(u.net), 'Ctrl+Z deshace la colocación y el corte en un paso');
+}
 
 await page.screenshot({ path: `${OUT}/wires.png` });
 check(errors.length === 0, `sin errores en la página${errors.length ? `: ${errors.join(' | ')}` : ''}`);

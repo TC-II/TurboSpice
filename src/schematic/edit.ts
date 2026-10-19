@@ -61,10 +61,15 @@ export function addWire(doc: AscDoc, a: Point, b: Point, lib?: Library): AscDoc 
  * los dos pines no llega nada más (otro pin, una etiqueta o el extremo de otro cable).
  */
 function cutThroughBodies(doc: AscDoc, wires: Wire[], lib: Library, applies: (sym: number, w: Wire) => boolean): Wire[] {
+  return cutPieces(doc, wires, lib, applies).flat();
+}
+
+/** Como cutThroughBodies, pero devuelve los tramos que quedan de cada cable (en su lugar) */
+function cutPieces(doc: AscDoc, wires: Wire[], lib: Library, applies: (sym: number, w: Wire) => boolean): Wire[][] {
   const pins = doc.symbols.flatMap((s, sym) => pinPoints(s, lib.symbol(s.type)).map((p) => ({ p, sym })));
-  if (!pins.length) return wires;
+  if (!pins.length) return wires.map((w) => [w]);
   const marks: Point[] = [...pins.map((q) => q.p), ...doc.flags, ...wires.flatMap(ends)];
-  return wires.flatMap((w) => {
+  return wires.map((w) => {
     if (isZero(w) || !doc.symbols.some((_, i) => applies(i, w))) return [w];
     // posición a lo largo del cable (las coordenadas son enteras: comparaciones exactas)
     const along = (p: Point) => (w.x1 !== w.x2 ? (p.x - w.x1) / (w.x2 - w.x1) : (p.y - w.y1) / (w.y2 - w.y1));
@@ -89,6 +94,24 @@ function cutThroughBodies(doc: AscDoc, wires: Wire[], lib: Library, applies: (sy
   });
 }
 
+/**
+ * Corta los cables que atraviesan los componentes recién colocados (`refs`, pegados, duplicados
+ * o rotados) y los cables nuevos que atraviesan cualquier componente. Cada cable cortado queda
+ * en su lugar del archivo; las referencias a cables se reasignan a sus tramos.
+ */
+function cutNew(doc: AscDoc, refs: ItemRef[], lib: Library): { doc: AscDoc; refs: ItemRef[] } {
+  const syms = new Set(refs.filter((r) => r.kind === 'symbol').map((r) => r.index));
+  const news = new Set(refs.filter((r) => r.kind === 'wire').map((r) => doc.wires[r.index]));
+  const pieces = cutPieces(doc, doc.wires, lib, (sym, w) => syms.has(sym) || news.has(w));
+  if (pieces.every((p, i) => p.length === 1 && p[0] === doc.wires[i])) return { doc, refs };
+  const at: number[] = [];
+  pieces.reduce((n, p, i) => ((at[i] = n), n + p.length), 0);
+  return {
+    doc: { ...doc, wires: pieces.flat() },
+    refs: refs.flatMap((r): ItemRef[] => (r.kind === 'wire' ? pieces[r.index].map((_, j) => ({ kind: 'wire', index: at[r.index] + j })) : [r])),
+  };
+}
+
 /** Letra de InstName que usa LTspice para un prefijo (X → U, QN → Q, MN → M…) */
 export function instLetter(prefix: string): string {
   const p = prefix.toUpperCase();
@@ -108,7 +131,8 @@ export function placeSymbol(doc: AscDoc, type: string, at: Point, orient: Orient
   const attrs = new Map<string, string>();
   if (!def?.attrs.has('InstName')) attrs.set('InstName', nextInstName(doc, instLetter(def?.attrs.get('Prefix') ?? 'X'), lib));
   const sym: SymbolInst = { type, x: at.x, y: at.y, orient, windows: new Map(), attrs };
-  return { ...doc, symbols: [...doc.symbols, sym] };
+  // colocado sobre un cable: el cable se parte en sus pines, no queda en corto
+  return cutNew({ ...doc, symbols: [...doc.symbols, sym] }, [{ kind: 'symbol', index: doc.symbols.length }], lib).doc;
 }
 
 export function addFlag(doc: AscDoc, at: Point, name: string): AscDoc {
@@ -540,7 +564,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
-  const out = mergeCollinear({
+  const turned: AscDoc = {
     ...doc,
     symbols: doc.symbols.map((sym, i) => {
       if (!s.has(i)) return sym;
@@ -555,7 +579,9 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     }),
     flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
-  }, lib);
+  };
+  // rotado sobre un cable: se parte en sus pines igual que al moverlo
+  const out = mergeCollinear(cutNew(turned, refs, lib).doc, lib);
   lastPivot.set(out, { key: refsKey(refs), c });
   return out;
 }
@@ -610,7 +636,7 @@ export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: num
       newRefs.push({ kind: 'text', index: out.texts.length - 1 });
     }
   }
-  return { doc: out, refs: newRefs };
+  return cutNew(out, newRefs, lib);
 }
 
 /** Todos los elementos del documento (Ctrl+A) */
@@ -669,7 +695,7 @@ export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): 
     ...frag.flags.map((_, i) => ({ kind: 'flag' as const, index: doc.flags.length + i })),
     ...frag.texts.map((_, i) => ({ kind: 'text' as const, index: doc.texts.length + i })),
   ];
-  return { doc: out, refs };
+  return cutNew(out, refs, lib);
 }
 
 /** Mueve el rótulo `win` (0 = InstName, 3 = Value…) de un símbolo: queda como WINDOW explícito */

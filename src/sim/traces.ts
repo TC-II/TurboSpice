@@ -42,18 +42,35 @@ export function traceResolver(sim: BuiltSimulation | null, plot: SimPlot): Resol
       const vec = el && sim ? elementVector(sim, el.name) : null;
       return wave((vec ? findVector(plot, vec) : undefined) ?? findVector(plot, `${ng}#branch`) ?? findVector(plot, `@${ng}[i]`));
     }
-    const term = TERMINAL[f.slice(1)];
+    const term = TERMINAL[f];
     return term ? wave(findVector(plot, `@${ng}[${term}]`)) : null;
   };
 }
 
-/** Expresión que mide la punta de prueba: V(red) o I(elemento) */
-export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?: number }): string | null {
+/** Terminales de los componentes de varios pines, en el orden de SpiceOrder (D G S B, C B E) */
+const PIN_TERMINALS: [RegExp, string[]][] = [
+  [/^M/, ['d', 'g', 's', 'b']],
+  [/^Q/, ['c', 'b', 'e']],
+  [/^J/, ['d', 'g', 's']],
+];
+
+/** ¿Componente de varios pines? (la corriente se mide en cada pin, no en el cuerpo) */
+export const multiPinPrefix = (prefix: string) => PIN_TERMINALS.some(([re]) => re.test(prefix.toUpperCase()));
+
+/**
+ * Expresión que mide la punta de prueba: V(red), I(elemento), o la corriente del pin de un
+ * transistor (`pin` = SpiceOrder: Id/Ig/Is/Ib del MOS, Ic/Ib/Ie del BJT)
+ */
+export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?: number; pin?: number }): string | null {
   if (target.net && target.net !== '0') return `V(${target.net})`;
   if (target.symbol === undefined) return null;
   const el = sim.lt.elements.find((e) => e.sym === target.symbol);
   if (!el) return null;
   const p = el.prefix.toUpperCase();
+  if (target.pin !== undefined) {
+    const term = PIN_TERMINALS.find(([re]) => re.test(p))?.[1][target.pin - 1];
+    return term ? `I${term}(${el.name})` : null;
+  }
   // transistores: la corriente del terminal principal, como LTspice
   if (p === 'QN' || p === 'QP') return `Ic(${el.name})`;
   if (p === 'MN' || p === 'MP' || p === 'JN' || p === 'JP' || p === 'D') return `Id(${el.name})`;

@@ -880,7 +880,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
-  const onProbe = (target: { net?: string; symbol?: number }) => {
+  const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot) return;
     const expr = probeExpr(sim.built, target);
     if (!expr) return;

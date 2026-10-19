@@ -32,6 +32,7 @@ import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type Net
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
+import { multiPinPrefix } from '../sim/traces.ts';
 
 export type Tool =
   | { kind: 'select' }
@@ -80,7 +81,7 @@ interface Props {
   onEdit(ref: ItemRef): void;
   /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
   onEditLabel?(sym: number, win: number): void;
-  onProbe?(ref: { net?: string; symbol?: number }): void;
+  onProbe?(ref: { net?: string; symbol?: number; pin?: number }): void;
   highlightNet?: string;
   /** etiquetas temporales con los nombres de las redes */
   netNames?: NetName[];
@@ -355,7 +356,24 @@ export function SchematicEditor(props: Props) {
    * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
    * de su red; el cuerpo de un componente, su corriente.
    */
-  const probeTarget = (p: Point): { net?: string; symbol?: number } | null => {
+  /**
+   * Qué mide la punta de prueba en p: la tensión de una red o la corriente de un componente. En
+   * los de varios pines (MOS, BJT, JFET) la corriente es la de un pin (`pins`: sólo con la punta
+   * de prueba): se mide sobre el pin, no sobre el cuerpo.
+   */
+  const probeTarget = (p: Point, pins = false): { net?: string; symbol?: number; pin?: number } | null => {
+    if (pins) {
+      let best: { symbol: number; pin: number; d: number } | null = null;
+      doc.symbols.forEach((s, i) => {
+        const def = lib.symbol(s.type);
+        if (!def || def.pins.length < 3 || !multiPinPrefix(s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return;
+        pinPoints(s, def).forEach((q, k) => {
+          const d = Math.hypot(p.x - q.x, p.y - q.y);
+          if (d <= tol * 2 && (!best || d < best.d)) best = { symbol: i, pin: Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1), d };
+        });
+      });
+      if (best) return { symbol: (best as { symbol: number }).symbol, pin: (best as { pin: number }).pin };
+    }
     const g = snapPoint(p);
     const near = Math.hypot(p.x - g.x, p.y - g.y) <= tol * 1.5;
     const hit = hitTest(doc, p, lib, tol, showSimCommand);
@@ -364,7 +382,13 @@ export function SchematicEditor(props: Props) {
       const net = conn.netAt(g)?.name;
       if (net) return { net };
     }
-    if (hit?.kind === 'symbol') return { symbol: hit.index };
+    if (hit?.kind === 'symbol') {
+      // el cuerpo de un transistor no mide: la corriente va por pin
+      const s = doc.symbols[hit.index];
+      const def = lib.symbol(s.type);
+      if (pins && def && def.pins.length >= 3 && multiPinPrefix(s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return null;
+      return { symbol: hit.index };
+    }
     if (hit?.kind === 'flag') return { net: conn.netAt(doc.flags[hit.index])?.name };
     return null;
   };
@@ -557,7 +581,7 @@ export function SchematicEditor(props: Props) {
         setBoxEnd(p);
         return;
       case 'probe': {
-        const target = probeTarget(p);
+        const target = probeTarget(p, true);
         if (target) onProbe?.(target);
         return;
       }
@@ -656,7 +680,7 @@ export function SchematicEditor(props: Props) {
     }
     const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
-    const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p) : null;
+    const target = (tool.kind === 'probe' || describe) && !drag ? probeTarget(p, tool.kind === 'probe') : null;
     if (tool.kind === 'probe') {
       setHoverNet(target?.net);
       setProbeKind(target?.net ? 'v' : target?.symbol !== undefined ? 'i' : '');

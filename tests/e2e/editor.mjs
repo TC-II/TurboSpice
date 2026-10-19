@@ -88,8 +88,11 @@ const setValue = async (x, y, v) => {
 await setValue(56, -32, '1k');
 await setValue(96, 0, '1µ');
 const p = await at(0, 56);
+// doble click en la fuente: ventana de configuración (#47), forma de onda Pulso
 await page.mouse.dblclick(p.x, p.y);
-await page.locator('.modal input:not([type=checkbox])').nth(1).fill('PULSE(0 1 0 1u 1u 2m 4m)');
+const src = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
+await src.getByRole('tab', { name: 'Pulso' }).click();
+for (const [k, v] of [['Ton', '2m'], ['Período', '4m'], ['Trise', '1u'], ['Tfall', '1u']]) await src.getByLabel(k, { exact: true }).fill(v);
 await page.keyboard.press('Enter');
 await page.screenshot({ path: `${OUT}/editor-1.png` });
 

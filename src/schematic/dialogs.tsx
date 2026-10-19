@@ -1,6 +1,8 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
+import { PartTable, type PartGroup } from './PartTable.tsx';
+import { cmpApply, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
 import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
@@ -176,10 +178,12 @@ export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: W
 }
 
 /** Atributos de un componente y, a la derecha de cada uno, si su rótulo se ve en el esquemático */
-export function AttributeDialog({ inst, def, windowDefaults, focusLabel, onApply, onClose }: {
+export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, onApply, onClose }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   windowDefaults: WindowDefaults;
+  /** listas de library/cmp de las que se elige el valor (transistores, diodos, capacitores…) */
+  parts?: PartGroup[];
   /** rótulo desde el que se abrió (botón derecho o doble click sobre el texto) */
   focusLabel?: number;
   onApply(attrs: Record<string, string>, labels: Map<number, LabelPatch>, toSelection: boolean): void;
@@ -204,14 +208,25 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, onApply
     setPatches(new Map(patches).set(win, { ...patches.get(win), visible }));
     setRows(rows.map((r) => (r.win === win ? { ...r, visible, moved: true } : r)));
   };
-  const submit = () => {
+  // pieza elegida de la tabla: su nombre (semiconductores) o la que se eligió en esta ventana
+  const [picked, setPicked] = useState<string | undefined>(() => parts?.flatMap((g) => g.parts).find((p) => p.name.toLowerCase() === (eff.get('Value') ?? '').toLowerCase())?.name);
+  const pick = (p: CmpPart) => {
+    const a = cmpApply(p);
+    setPicked(p.name);
+    const next = { ...vals, Value: a.Value, ...(a.SpiceLine !== null || p.kind !== 'res' ? { SpiceLine: a.SpiceLine ?? '' } : {}) };
+    setVals(next);
+    return next;
+  };
+  const submit = (from = vals) => {
+    const vals = from;
+    const check = checkValue(prefix, vals.Value ?? '');
     const out = { ...vals, ...(vals.Value !== undefined ? { Value: check.value } : {}) };
     // Sólo se guardan los que cambiaron respecto al valor efectivo
     const changed = Object.fromEntries(Object.entries(out).filter(([k, v]) => v !== (eff.get(k) ?? '')));
     onApply(changed, patches, false);
   };
   return (
-    <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose}>
+    <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose} wide={!!parts?.length}>
       <form
         className="attrs"
         onSubmit={(e) => {
@@ -219,6 +234,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, onApply
           submit();
         }}
       >
+        {!!parts?.length && <PartTable groups={parts} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />}
         {keys.map((k) => {
           const row = rows.find((r) => r.attr === k);
           return (
@@ -228,7 +244,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, onApply
                 ref={k === focusAttr ? first : undefined}
                 value={vals[k]}
                 spellCheck={false}
-                onChange={(e) => setVals({ ...vals, [k]: e.target.value })}
+                onChange={(e) => (setVals({ ...vals, [k]: e.target.value }), k === 'Value' && setPicked(undefined))}
               />
               {row ? (
                 <input

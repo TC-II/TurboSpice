@@ -1,0 +1,10 @@
+* TurboSpice: ferrites (beads) (en LTspice, lib/cmp/standard.bead es un binario; acá es texto)
+* Una línea por ferrite:  nombre  Z100M=  Idc=  Rdc=  L=  Rpar=  Cpar=  mfg=
+* Se modela como un inductor: L va al valor y Rdc (como Rser)/Rpar/Cpar a los parásitos;
+* Z100M (impedancia a 100 MHz), Idc (corriente nominal) y mfg son informativos.
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
+* reales van debajo.
+
+TS_FB_0603_600  Z100M=600 Idc=500m Rdc=150m L=1.2u Rpar=700 Cpar=1.2p mfg=TurboSpice_ejemplo
+TS_FB_0805_120  Z100M=120 Idc=2    Rdc=30m  L=250n Rpar=150 Cpar=0.8p mfg=TurboSpice_ejemplo

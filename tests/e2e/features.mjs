@@ -627,7 +627,7 @@ await page.keyboard.press('Control+z');
 
 // valores amigables: 4k7
 await page.mouse.dblclick(r1.x, r1.y);
-await page.locator('.modal input:not([type=checkbox])').nth(1).fill('4k7');
+await page.locator('.modal label.attr-row input:not([type=checkbox])').nth(1).fill('4k7');
 check((await page.locator('.modal .attrs small').textContent()) === '= 4.7kΩ', 'el diálogo interpreta 4k7');
 await page.keyboard.press('Enter');
 check((await page.locator('svg.editor .sym text.win', { hasText: '4.7k' }).count()) === 1, 'y lo guarda como 4.7k (compatible con LTspice)');
@@ -941,6 +941,36 @@ await page.locator('svg.editor .sym').first().waitFor();
   check((await sd.getByLabel('Valor de la fuente').inputValue()) === 'wavefile="x.wav" chan=0' && (await sd.getByText('el formulario no sabe editar').count()) === 1, 'lo que no reconoce abre como texto');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+}
+
+// --- library/cmp: el valor de un transistor, resistor… se elige de una tabla ---
+await openExample(page, 'Emisor común.asc');
+await page.locator('svg.editor .sym').first().waitFor();
+{
+  const open = async (x, y) => {
+    await page.keyboard.press('Escape');
+    const p = await at(x, y);
+    await page.mouse.dblclick(p.x, p.y);
+  };
+  await open(236, 208); // Q1
+  const dlg = page.getByRole('dialog');
+  const table = dlg.locator('.parts-table');
+  check(await table.waitFor({ timeout: 5000 }).then(() => true, () => false), 'doble click en un transistor muestra la tabla de la librería');
+  const heads = await table.locator('th').allTextContents();
+  check(heads[0] === 'Nombre' && heads.some((h) => h.startsWith('Vceo')) && heads.some((h) => h.startsWith('Fabricante')), `con los parámetros relevantes en columnas (${heads.join(', ')})`);
+  const rowNames = () => table.locator('tbody tr:not(.empty) td:first-child').allTextContents();
+  check((await rowNames()).join() === 'TS_NPN_GP', `sólo los NPN para un npn (${await rowNames()})`);
+  await dlg.getByLabel('Buscar en la librería').fill('zzz');
+  check((await table.locator('tr.empty').count()) === 1, 'la búsqueda filtra');
+  await dlg.getByLabel('Buscar en la librería').fill('npn');
+  await table.locator('tbody tr', { hasText: 'TS_NPN_GP' }).click();
+  check((await dlg.locator('label', { hasText: /^Value/ }).locator('input').first().inputValue()) === 'TS_NPN_GP', 'click en una fila pone el valor');
+  await dlg.getByRole('button', { name: 'Cancelar' }).click();
+  // un resistor: doble click en la fila elige y acepta
+  await open(256, 48); // RC
+  await page.getByRole('dialog').locator('.parts-table tbody tr', { hasText: 'TS_R_4k7_5%' }).dblclick();
+  check((await page.getByRole('dialog').count()) === 0 && (await page.locator('svg.editor .sym text', { hasText: /^4\.7k$/ }).count()) >= 1, 'doble click en una fila elige y acepta (RC = 4.7k)');
   await page.keyboard.press('Control+z');
 }
 

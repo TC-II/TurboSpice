@@ -1,7 +1,7 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { baseName, emptyDoc, type AscDoc } from './asc/model.ts';
+import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
@@ -19,6 +19,8 @@ import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
+import type { PartGroup } from './schematic/PartTable.tsx';
+import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
@@ -943,6 +945,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
     else if (selection.length) commit(transformItems(doc, selection, op, lib));
   };
+
+  /** Listas de library/cmp de las que se elige el valor de un componente (vacío si no tiene) */
+  const partGroups = (s: SymbolInst): PartGroup[] =>
+    cmpChoicesFor(effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '', s.type).map((c) => ({ kind: c.kind, label: c.label, parts: lib.parts(c.kind).filter(c.accept) }));
 
   const editItem = (ref: ItemRef) => {
     if (ref.kind === 'symbol') {
@@ -1937,6 +1943,7 @@ ${ltNetlistText(sim.built.lt)}
         <AttributeDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}
+          parts={partGroups(doc.symbols[dialog.index])}
           windowDefaults={lib.windowDefaults}
           focusLabel={dialog.label}
           onClose={() => setDialog(null)}

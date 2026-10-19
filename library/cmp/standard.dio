@@ -1,0 +1,11 @@
+* TurboSpice: diodos (como lib/cmp/standard.dio de LTspice)
+* Una línea .model por diodo. Informativos de LTspice que muestra la tabla y ngspice no usa:
+* Iave (corriente media), Vpk (tensión inversa de pico), mfg (fabricante) y type
+* (silicon, schottky, zener, led&).
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders). Los modelos
+* levantados de fuentes que permitan redistribuirlos van debajo, con su origen en
+* library/LICENSES.md.
+
+.model TS_D_SENAL D(Is=2.5n Rs=0.6 N=1.8 Cjo=4p M=0.4 Vj=0.7 tt=10n BV=100 IBV=5u Iave=150m Vpk=100 mfg=TurboSpice_ejemplo type=silicon)
+.model TS_D_SCHOTTKY D(Is=30u Rs=50m N=1.05 Cjo=150p M=0.5 Vj=0.35 Eg=0.69 Xti=2 BV=40 IBV=500u Iave=1 Vpk=40 mfg=TurboSpice_ejemplo type=schottky)

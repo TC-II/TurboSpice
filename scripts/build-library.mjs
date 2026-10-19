@@ -71,8 +71,16 @@ export function buildBundle() {
   for (const p of walk(join(LIB, 'sub'))) {
     if (/\.(lib|sub|mod|cir|txt)$/i.test(p)) subs[rel(join(LIB, 'sub'), p)] = scanModels(readText(p));
   }
+  // library/cmp: las listas de componentes; los .model (semiconductores) se incluyen al simular
+  // como cualquier archivo de modelos, en la carpeta cmp/
+  const cmp = {};
+  for (const p of walk(join(LIB, 'cmp'))) {
+    const name = rel(join(LIB, 'cmp'), p);
+    cmp[name] = readText(p);
+    if (/\.(bjt|dio|jft|mos)$/i.test(name)) subs[`cmp/${name}`] = scanModels(cmp[name]);
+  }
   const windowDefaults = JSON.parse(readFileSync(join(LIB, 'window-defaults.json'), 'utf8'));
-  return { symbols, skins, windowDefaults, subs };
+  return { symbols, skins, windowDefaults, subs, cmp };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -84,6 +92,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const subOut = join(dirname(out), 'sub');
   rmSync(subOut, { recursive: true, force: true });
   cpSync(join(LIB, 'sub'), subOut, { recursive: true });
+  cpSync(join(LIB, 'cmp'), join(subOut, 'cmp'), { recursive: true });
   console.log(
     `librería: ${Object.keys(bundle.symbols).length} símbolos, ${Object.keys(bundle.skins).length} skins, ` +
       `${Object.keys(bundle.subs).length} archivos de modelos → ${relative(ROOT, out)}`,

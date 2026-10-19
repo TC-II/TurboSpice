@@ -1,0 +1,9 @@
+* TurboSpice: JFET (como lib/cmp/standard.jft de LTspice)
+* Una línea .model por JFET; mfg (fabricante) es informativo.
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders). Los modelos
+* levantados de fuentes que permitan redistribuirlos van debajo, con su origen en
+* library/LICENSES.md.
+
+.model TS_NJF_GP NJF(Beta=1.2m Vto=-2.5 Lambda=4m Rd=5 Rs=5 Is=30f Cgd=2p Cgs=3p Pb=0.8 Fc=0.5 mfg=TurboSpice_ejemplo)
+.model TS_PJF_GP PJF(Beta=0.8m Vto=-3 Lambda=5m Rd=8 Rs=8 Is=40f Cgd=3p Cgs=4p Pb=0.8 Fc=0.5 mfg=TurboSpice_ejemplo)

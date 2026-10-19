@@ -1,0 +1,11 @@
+* TurboSpice: MOSFET de potencia (como lib/cmp/standard.mos de LTspice, modelo VDMOS)
+* Una línea .model por transistor; el canal P se marca con pchan. Informativos de LTspice
+* que muestra la tabla: Vds (tensión máxima D-S), Ron (resistencia en conducción), Qg (carga
+* de compuerta) y mfg (fabricante).
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders). Los modelos
+* levantados de fuentes que permitan redistribuirlos van debajo, con su origen en
+* library/LICENSES.md.
+
+.model TS_NMOS_60V VDMOS(Kp=20 Vto=2.5 Lambda=5m Rd=20m Rs=10m Rg=2 Cgdmax=800p Cgdmin=40p Cgs=1.2n Cjo=600p Is=10p Rb=15m Vds=60 Ron=35m Qg=25n mfg=TurboSpice_ejemplo)
+.model TS_PMOS_60V VDMOS(pchan Kp=12 Vto=-2.5 Lambda=5m Rd=40m Rs=15m Rg=3 Cgdmax=900p Cgdmin=50p Cgs=1.4n Cjo=700p Is=10p Rb=20m Vds=60 Ron=70m Qg=30n mfg=TurboSpice_ejemplo)

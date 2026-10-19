@@ -38,6 +38,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   const ng = toNgspice(lt, title, {
     resolve: (p) => lib.resolveModelFile(p),
     defines: (m) => lib.definesModel(m),
+    cmpFile: (m) => lib.cmpFileDefining(m),
   });
   const texts = Object.fromEntries(
     await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),

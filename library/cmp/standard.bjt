@@ -1,0 +1,11 @@
+* TurboSpice: transistores bipolares (como lib/cmp/standard.bjt de LTspice)
+* Una línea .model por transistor. Además de los parámetros de SPICE, la tabla de la app
+* muestra los informativos de LTspice: Vceo (tensión máxima C-E), Icrating (corriente de
+* colector nominal) y mfg (fabricante); ngspice no los usa.
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders). Los modelos
+* levantados de fuentes que permitan redistribuirlos van debajo, con su origen en
+* library/LICENSES.md.
+
+.model TS_NPN_GP NPN(IS=15f BF=250 NF=1 VAF=80 IKF=150m ISE=20f NE=1.5 BR=5 RB=10 RE=0.5 RC=1 CJE=12p VJE=0.7 MJE=0.35 CJC=4p VJC=0.6 MJC=0.4 TF=400p TR=50n Vceo=45 Icrating=100m mfg=TurboSpice_ejemplo)
+.model TS_PNP_GP PNP(IS=20f BF=220 NF=1 VAF=60 IKF=120m ISE=25f NE=1.5 BR=4 RB=10 RE=0.6 RC=1.2 CJE=14p VJE=0.7 MJE=0.35 CJC=6p VJC=0.6 MJC=0.4 TF=500p TR=60n Vceo=45 Icrating=100m mfg=TurboSpice_ejemplo)

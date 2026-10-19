@@ -1,0 +1,10 @@
+* TurboSpice: inductores reales (en LTspice, lib/cmp/standard.ind es un binario; acá es texto)
+* Una línea por inductor:  nombre  L=  Ipk=  Rser=  Rpar=  Cpar=  mfg=
+* Al elegirlo, L va al valor y Rser/Rpar/Cpar a los parásitos (SpiceLine); Ipk (corriente de
+* saturación) y mfg son informativos.
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
+* reales van debajo.
+
+TS_L_10u_2A   L=10u  Ipk=2   Rser=40m  Rpar=2k  Cpar=3p mfg=TurboSpice_ejemplo
+TS_L_100u_05A L=100u Ipk=500m Rser=350m Rpar=20k Cpar=5p mfg=TurboSpice_ejemplo

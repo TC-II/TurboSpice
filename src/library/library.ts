@@ -3,6 +3,7 @@
 import { parseAsc, parseAsy } from '../asc/parse.ts';
 import { baseName, symbolPath, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import type { SymbolSource, WindowDefaults } from '../asc/resolve.ts';
+import { parseCmp, type CmpKind, type CmpPart } from './cmp.ts';
 
 export interface LibraryBundle {
   /** ruta relativa a library/sym sin extensión (p.ej. "TCLib/OA_param2") → texto .asy */
@@ -12,7 +13,12 @@ export interface LibraryBundle {
   windowDefaults: WindowDefaults;
   /** ruta relativa a library/sub (p.ej. "TCLib/Black_Box.lib") → definiciones */
   subs: Record<string, { subckts: string[]; models: string[] }>;
+  /** library/cmp: archivo (standard.bjt…) → texto; las listas de las que se elige un valor */
+  cmp?: Record<string, string>;
 }
+
+/** Carpeta, dentro de los archivos de modelos, de los .model de library/cmp */
+export const CMP_DIR = 'cmp/';
 
 /** Prefijo de las rutas de archivos de modelos del usuario en el FS del motor */
 export const USER_PREFIX = 'user/';
@@ -35,6 +41,7 @@ export class Library implements SymbolSource {
   private byPath = new Map<string, string>();
   private byName = new Map<string, string>();
   private cache = new Map<string, SymbolDef>();
+  private cmpCache = new Map<CmpKind, CmpPart[]>();
   /** Símbolos agregados por el usuario o importados de su LTspice (ganan a los del bundle) */
   private extra = new Map<string, string>();
   /** Archivos de modelos del usuario: nombre de archivo (minúsculas) → texto */
@@ -158,6 +165,22 @@ export class Library implements SymbolSource {
     return [...Object.values(this.bundle.subs), ...this.userModels.values()].some(
       (s) => s.subckts.some((x) => x.toLowerCase() === n) || s.models.some((x) => x.toLowerCase() === n),
     );
+  }
+
+  /** Componentes de library/cmp de un tipo (la lista de la que se elige el valor) */
+  parts(kind: CmpKind): CmpPart[] {
+    let p = this.cmpCache.get(kind);
+    if (!p) {
+      p = Object.entries(this.bundle.cmp ?? {}).flatMap(([file, text]) => parseCmp(file, text)).filter((x) => x.kind === kind);
+      this.cmpCache.set(kind, p);
+    }
+    return p;
+  }
+
+  /** Archivo de library/cmp que define este .model (como la standard.bjt que incluye LTspice) */
+  cmpFileDefining(name: string): string | undefined {
+    const n = name.toLowerCase();
+    return Object.entries(this.bundle.subs).find(([f, s]) => f.startsWith(CMP_DIR) && s.models.some((m) => m.toLowerCase() === n))?.[0];
   }
 
   /** Todas las rutas de símbolos, para el buscador (F2) */

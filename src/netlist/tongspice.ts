@@ -9,6 +9,7 @@
 import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
 import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
+import { stripLtspiceInfo } from '../library/cmp.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
 import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
@@ -21,6 +22,8 @@ export interface ModelResolver {
   resolve(path: string): string | undefined;
   /** ¿Algún archivo resuelto o directiva define este modelo/subcircuito? */
   defines?(name: string): boolean;
+  /** Archivo de library/cmp que define este .model (se incluye solo, como la standard.bjt de LTspice) */
+  cmpFile?(name: string): string | undefined;
 }
 
 export interface NgspiceNetlist {
@@ -319,6 +322,16 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       .filter((t) => t.kind === 'directive')
       .flatMap((t) => [...t.text.matchAll(/(?:^|\\n)\s*\.(?:model|subckt)\s+(\S+)/gi)].map((m) => m[1].toLowerCase())),
   );
+  // Los de library/cmp (la lista de la que se eligen) se incluyen solos, salvo que el
+  // esquemático los defina: como LTspice con su standard.bjt, .dio, .jft y .mos
+  if (models.cmpFile) {
+    for (const e of [...lt.elements, ...lt.blocks.flatMap((b) => b.lt.elements)]) {
+      if (!/^[DQMJ]/i.test(e.prefix)) continue;
+      const model = e.value.split(/\s/)[0];
+      const rel = model && !local.has(model.toLowerCase()) ? models.cmpFile(model) : undefined;
+      if (rel && !includes.includes(rel)) out.push(include(rel)!);
+    }
+  }
   if (models.defines) {
     for (const e of lt.elements) {
       if (!/^[DQMJXZ]/i.test(e.prefix)) continue;
@@ -446,7 +459,8 @@ export interface PreparedSimulation {
 export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) => string): PreparedSimulation {
   const warnings = [...net.warnings];
   const files: Record<string, string> = {};
-  for (const rel of net.includes) files[rel] = patchModelFile(readFile(rel), net.subcktParams);
+  // (los informativos de LTspice en los .model, como Iave o Vpk, hacen fallar a ngspice)
+  for (const rel of net.includes) files[rel] = stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams));
   // ako: se resuelve con los modelos de todos los archivos y de la netlist
   const models = collectModels(net.text);
   for (const t of Object.values(files)) collectModels(t, models);
@@ -458,7 +472,7 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
     warnings.push(...a.warnings, ...r.warnings);
     for (const [k, v] of r.found) external.set(k, v);
   }
-  const ako = replaceAko(net.text, models);
+  const ako = replaceAko(stripLtspiceInfo(net.text), models);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
   return { netlist: main.text, files, warnings };

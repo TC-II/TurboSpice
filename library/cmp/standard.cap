@@ -1,0 +1,10 @@
+* TurboSpice: capacitores reales (en LTspice, lib/cmp/standard.cap es un binario; acá es texto)
+* Una línea por capacitor:  nombre  C=  V=  Irms=  Rser=  Lser=  Rpar=  Cpar=  type=  mfg=
+* Al elegirlo, C va al valor y Rser/Lser/Rpar/Cpar a los parásitos (SpiceLine); V, Irms,
+* type y mfg son informativos.
+*
+* Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
+* reales van debajo.
+
+TS_C_100n_X7R  C=100n V=50 Irms=1 Rser=20m Lser=0.6n type=X7R mfg=TurboSpice_ejemplo
+TS_C_100u_ELEC C=100u V=25 Irms=350m Rser=150m Lser=5n Rpar=1Meg type=Electrolítico mfg=TurboSpice_ejemplo

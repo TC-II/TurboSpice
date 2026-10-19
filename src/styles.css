@@ -387,6 +387,9 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .pane { min-height: 150px; }
 .readouts { flex: none; max-height: 38%; overflow: auto; border-top: 1px solid var(--border); padding-top: 4px; }
 .results-body { overflow: hidden; }
+/* el contenedor no scrollea (por el visor): netlist, log y problemas llevan su propio scroll */
+.results-body > .code { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.results-body > .problems { flex: 0 1 auto; min-height: 0; overflow: auto; }
 .result-table { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
 .result-table .filter { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; width: 200px; }
 button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-muted); font: inherit; font-weight: 500; }

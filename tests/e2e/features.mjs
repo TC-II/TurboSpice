@@ -807,6 +807,20 @@ await page.getByRole('button', { name: 'Medidas' }).click();
 await page.getByRole('button', { name: 'Log' }).click();
 const logText = await page.locator('.results-body pre').textContent();
 check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición se evalúa en cada corrida (un solo mensaje)');
+// #49: un log más alto que el panel se puede scrollear hasta el final (no queda recortado)
+{
+  const log = page.locator('.results-body pre');
+  const p = await log.boundingBox();
+  await page.mouse.move(p.x + 40, p.y + 20);
+  await page.mouse.wheel(0, 100000);
+  await page.waitForTimeout(300);
+  const s = await log.evaluate((el) => {
+    const body = el.parentElement.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return { tall: el.scrollHeight > el.clientHeight, end: el.scrollTop + el.clientHeight >= el.scrollHeight - 1, inside: r.bottom <= body.bottom + 1 };
+  });
+  check(s.tall && s.end && s.inside, `el log se scrollea con la rueda hasta el final (${JSON.stringify(s)})`);
+}
 // los bloques quedan guardados en el .asc y se recuperan
 await page.keyboard.press('Alt+e');
 await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });

@@ -125,6 +125,16 @@ SYMATTR SpiceLine K = 1
     expect(r.subcktParams.get('gain_block')?.get('k')).toBe('1');
   });
 
+  it('fuentes B: sin espacio entre la función y el paréntesis ("LIMIT (")', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bi 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value I=LIMIT ( -V(a) , 1 , -1 ) * U (V(a))
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * U(V(a))');
+  });
+
   it('reemplaza diodos ideales de LTspice por fuentes B', () => {
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');

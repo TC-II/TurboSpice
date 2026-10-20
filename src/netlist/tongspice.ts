@@ -277,7 +277,9 @@ function convertElements(
         for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
       }
     }
-    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(e.value))), warnings));
+    // LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis; ngspice no
+    const value = letter === 'B' ? e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1(') : e.value;
+    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 
   return out;

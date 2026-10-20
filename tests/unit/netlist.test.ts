@@ -146,6 +146,16 @@ SYMATTR Value V=u(time*1200-round(time*1200))+buf(V(a))
     expect(t).toContain('V=u(time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5)))+((V(a)) > 0.5 ? 1 : 0)');
   });
 
+  it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B3
+SYMATTR Value V=120+250*log10(1+V(p)/0.0035)+sqrt(V(q))
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('V=120+250*log10(max(1+V(p)/0.0035,1e-100))+sqrt(max(V(q),0))');
+  });
+
   it('.tran 0 {expresión}: el paso también es expresión', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

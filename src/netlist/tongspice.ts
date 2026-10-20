@@ -193,11 +193,20 @@ const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
 };
 const LT_FUNCTION_RE = new RegExp(`\\b(${Object.keys(LT_FUNCTIONS).join('|')})\\s*\\(`, 'gi');
 
-// Las fuentes B de ngspice ya tienen u() y uramp(); éstas no
-const B_FUNCTION_RE = /\b(buf|inv|round|hypot)\s*\(/gi;
+// Las fuentes B de ngspice ya tienen u() y uramp(); éstas no. Además el logaritmo o la raíz de
+// un negativo abortan la simulación en ngspice; LTspice los acota (log → muy negativo, sqrt → 0)
+// y eso pasa en las iteraciones de Newton aunque el resultado final sea válido.
+const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
+  ...LT_FUNCTIONS,
+  log: ([x, ...r]) => (r.length ? null : `log(max(${x},1e-100))`),
+  ln: ([x, ...r]) => (r.length ? null : `ln(max(${x},1e-100))`),
+  log10: ([x, ...r]) => (r.length ? null : `log10(max(${x},1e-100))`),
+  sqrt: ([x, ...r]) => (r.length ? null : `sqrt(max(${x},0))`),
+};
+const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt)\s*\(/gi;
 
 /** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
-function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE): string {
+function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE, fns = LT_FUNCTIONS): string {
   let out = '';
   let i = 0;
   const re = new RegExp(fnRe.source, 'gi');
@@ -211,8 +220,8 @@ function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE): strin
     }
     if (depth) break;
     // los argumentos pueden tener a su vez llamadas a traducir
-    const args = splitArgs(translateExpression(text.slice(start, k - 1), fnRe));
-    const rep = LT_FUNCTIONS[m[1].toLowerCase()](args);
+    const args = splitArgs(translateExpression(text.slice(start, k - 1), fnRe, fns));
+    const rep = fns[m[1].toLowerCase()](args);
     if (rep === null) continue;
     out += text.slice(i, m.index) + rep;
     i = k;
@@ -302,7 +311,7 @@ function convertElements(
     }
     // Fuentes B: LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis y funciones
     // que la fuente B de ngspice no conoce (round, buf…) también fuera de llaves; ngspice no
-    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE) : e.value;
+    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : e.value;
     out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 

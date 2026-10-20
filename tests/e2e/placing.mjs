@@ -70,8 +70,12 @@ const after = await vb();
 check(after !== before && before.split(' ')[2] === after.split(' ')[2], 'botón derecho + arrastrar desplaza la vista (sin zoom)');
 check((await page.locator('[role=dialog]').count()) === 0, 'arrastrar con el derecho no abre ningún diálogo');
 const body = await page.locator('svg.editor .symbols .sym .body').first().boundingBox();
+// registra cada menú contextual: dónde llegó y si se canceló el del navegador
+await page.evaluate(() => window.addEventListener('contextmenu', (e) => (window.__ctx ??= []).push([e.target.tagName, e.defaultPrevented])));
 await page.mouse.click(body.x + body.width / 2, body.y + body.height / 2, { button: 'right' });
 check((await page.locator('[role=dialog]').count()) === 1, 'click derecho (sin arrastrar) sobre un componente lo edita');
+const ctx = await page.evaluate(() => (window.__ctx ?? []).map((c) => c.join(':')));
+check(ctx.length > 0 && ctx.every((c) => c.endsWith(':true')), `sin el menú del navegador al soltar el botón derecho (${ctx.join(', ')})`);
 await page.keyboard.press('Escape');
 
 // --- #63: la caja del buscador queda en el mismo lugar ---
@@ -94,7 +98,9 @@ check(['Línea', 'Rectángulo', 'Círculo', 'Arco', 'Estilo de línea'].every((l
 await page.getByRole('menuitem', { name: /Círculo/ }).click();
 check((await svg.getAttribute('class')).includes('tool-shape'), 'elegir Círculo empieza a dibujarlo');
 
-check(!errors.length, `sin errores en la página${errors.length ? `: ${errors.join(' | ')}` : ''}`);
+// (la simulación automática del ejemplo se aborta al editar: no es un error)
+const real = errors.filter((e) => !/Simulación abortada/.test(e));
+check(!real.length, `sin errores en la página${real.length ? `: ${real.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\ntodo ok');
 process.exit(failed ? 1 : 0);

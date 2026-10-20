@@ -423,6 +423,10 @@ export function SchematicEditor(props: Props) {
     }
   };
 
+  // inicio y fin del arco (3.er y 4.º click): en LTspice tienen resolución de 1 punto, sin grilla
+  const arcEnd = (t: Tool, p: Point): Point | null =>
+    t.kind === 'shape' && t.shape === 'ARC' && t.pts.length >= 2 ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
+
   const onPointerDown = (e: React.PointerEvent) => {
     svgRef.current!.setPointerCapture(e.pointerId);
     if (e.pointerType === 'touch') {
@@ -584,9 +588,10 @@ export function SchematicEditor(props: Props) {
         return;
       }
       case 'shape': {
-        const s = shapeFromClicks(tool.shape, [...tool.pts, g], tool.style);
+        const at = arcEnd(tool, p) ?? g;
+        const s = shapeFromClicks(tool.shape, [...tool.pts, at], tool.style);
         if (s === 'invalid') return;
-        if (s === 'more') return setTool({ ...tool, pts: [...tool.pts, g] });
+        if (s === 'more') return setTool({ ...tool, pts: [...tool.pts, at] });
         commit({ ...doc, shapes: [...doc.shapes, s] });
         setTool({ ...tool, pts: [] });
         return;
@@ -762,7 +767,14 @@ export function SchematicEditor(props: Props) {
       }
     }
     if (!drag) return;
-    if (drag.mode === 'pan' && drag.right && !drag.moved) rightClick(toDoc(e));
+    if (drag.mode === 'pan' && drag.right && !drag.moved) {
+      // en Windows el menú contextual llega después de soltar, cuando ya puede haber un diálogo
+      // bajo el cursor (fuera del svg): ese menú del navegador no se muestra
+      const block = (ev: Event) => ev.preventDefault();
+      window.addEventListener('contextmenu', block, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('contextmenu', block, { capture: true }), 300);
+      rightClick(toDoc(e));
+    }
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
     if (drag.mode === 'label' && !drag.moved) {
       // click sobre un rótulo sin moverlo: selecciona su componente (Shift: agrega/quita)
@@ -868,7 +880,7 @@ export function SchematicEditor(props: Props) {
       );
     }
     if (tool.kind === 'shape' && tool.pts.length) {
-      const pts = [...tool.pts, g];
+      const pts = [...tool.pts, arcEnd(tool, cursor) ?? g];
       const [a, b] = pts;
       if (tool.shape !== 'ARC' || pts.length === 2) {
         // el arco, mientras se elige la caja, se ve como la elipse entera
@@ -876,23 +888,24 @@ export function SchematicEditor(props: Props) {
         return <g className="shapes"><ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: tool.style }} /></g>;
       }
       const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const end = pts[pts.length - 1];
       // (la caja y el radio son guías, en gris)
       const box = <g className="ghost"><ShapeView s={{ kind: 'CIRCLE', coords: [a.x, a.y, b.x, b.y], style: '2' }} /></g>;
       // 3 clicks: falta el inicio (se ve el radio); 4: el arco desde el inicio hasta el cursor
       return pts.length === 3 ? (
         <>
           {box}
-          <line className="ghost" x1={c.x} y1={c.y} x2={g.x} y2={g.y} strokeDasharray="2 5" />
+          <line className="ghost" x1={c.x} y1={c.y} x2={end.x} y2={end.y} strokeDasharray="2 5" />
         </>
       ) : (
         <>
           {box}
-          <g className="shapes"><ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, g.x, g.y, pts[2].x, pts[2].y], style: tool.style }} /></g>
+          <g className="shapes"><ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, end.x, end.y, pts[2].x, pts[2].y], style: tool.style }} /></g>
         </>
       );
     }
     return null;
-  }, [tool, g.x, g.y, lib, ctrlHeld, doc]);
+  }, [tool, g.x, g.y, lib, ctrlHeld, doc, ...(arcEnd(tool, cursor) ? [cursor.x, cursor.y] : [0, 0])]);
 
   // codos arrastrables de los cables seleccionados
   const vertices = useMemo(() => {
@@ -995,7 +1008,7 @@ export function SchematicEditor(props: Props) {
         // cursor de borrar: una cruz chica a 45° que sigue al mouse (sin grilla)
         <path className="delete-cursor" d={`M ${cursor.x - 5 / view.scale} ${cursor.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${cursor.x + 5 / view.scale} ${cursor.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
       )}
-      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && <circle cx={g.x} cy={g.y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

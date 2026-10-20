@@ -174,6 +174,21 @@ TEXT 0 0 Left 2 !.meas ac pm find V(a)\\n+ when mag(V(a))=1\\n.ac dec 10 1 1k
     expect(r.measures).toContain('.meas ac pm find V(a) when mag(V(a))=1');
   });
 
+  it('K con inductores cuyo InstName no empieza con L (L§N2)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL ind 0 0 R0
+SYMATTR InstName N2
+SYMATTR Value 1m
+SYMBOL ind 100 0 R0
+SYMATTR InstName L1
+SYMATTR Value 1m
+TEXT 0 200 Left 2 !K1 N2 L1 1
+`);
+    const t = toNgspice(n, 't', resolver);
+    expect(t.text).toContain(`K1 ${t.names.get('L§N2')} ${t.names.get('L1')} 1`);
+  });
+
   it('directivas con comentario ";" a mitad de línea', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

@@ -417,6 +417,15 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         out.push(r ?? `* ${line}`);
         continue;
       }
+      // Acoplamiento "K1 N2 N1 1": LTspice busca cada inductor por nombre o por InstName sin
+      // prefijo (L§N2); se usan los nombres de ngspice
+      const k = /^(K\S*)\s+(.*)$/i.exec(line);
+      if (k) {
+        const ng = (t: string) => names.get(t) ?? names.get(`L§${t}`) ?? [...names].find(([a]) => a.toLowerCase() === t.toLowerCase() || a.toLowerCase() === `l§${t.toLowerCase()}`)?.[1] ?? t;
+        const toks = k[2].split(/\s+/);
+        out.push([k[1], ...toks.map((t, i) => (i < toks.length - 1 ? ng(t) : t))].join(' '));
+        continue;
+      }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
       out.push(fixParam(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3')));
     }

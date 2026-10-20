@@ -110,7 +110,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     <g className={cls}>
       <g transform={matrix(inst.orient, inst.x, inst.y)} className="body">
         {skin ? (
-          <g dangerouslySetInnerHTML={{ __html: skin.body }} />
+          <g className="skin" dangerouslySetInnerHTML={{ __html: skin.body }} />
         ) : (
           <>
             {def.shapes.map((s, i) => <ShapeView key={i} s={s} />)}
@@ -140,7 +140,7 @@ export function FlagView({ flag, doc, lib, selected }: { flag: Flag; doc: AscDoc
     const gnd = lib.skin('GND');
     return (
       <g className={cls} transform={matrix(GND_ROT[dir], flag.x, flag.y)}>
-        {gnd ? <g dangerouslySetInnerHTML={{ __html: gnd.body }} /> : <path d="M -16 0 H 16 M -9 6 H 9 M -3 12 H 3" />}
+        {gnd ? <g className="skin" dangerouslySetInnerHTML={{ __html: gnd.body }} /> : <path d="M -16 0 H 16 M -9 6 H 9 M -3 12 H 3" />}
       </g>
     );
   }

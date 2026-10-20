@@ -54,6 +54,17 @@ export function replaceAnalysis(doc: AscDoc, found: FoundLine, line: string, ngs
   return { ...doc, texts };
 }
 
+/** Reemplaza una línea de directiva (comparada sin espacios a los costados) en el primer texto que la tenga */
+export function replaceLine(doc: AscDoc, from: string, to: string): AscDoc {
+  const i = doc.texts.findIndex((t) => lines(t).some((l) => l.trim() === from.trim()));
+  if (i < 0) return doc;
+  const t = doc.texts[i];
+  const text = lines(t)
+    .map((l) => (l.trim() === from.trim() ? to : l))
+    .join('\\n');
+  return { ...doc, texts: doc.texts.map((x, k) => (k === i ? { ...t, text } : x)) };
+}
+
 /** Saca el comando de análisis (y su texto, si no tenía otras líneas) */
 export function removeAnalysis(doc: AscDoc): AscDoc {
   const found = findAnalysis(doc);

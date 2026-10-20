@@ -1,5 +1,5 @@
 // API del motor para la UI: promesas sobre el Worker de ngspice.
-import type { SimResult, SimulateOptions } from './ngspice.ts';
+import { OUT_OF_MEMORY, OUT_OF_MEMORY_RE, type SimResult, type SimulateOptions } from './ngspice.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
 
 export interface SimOutcome {
@@ -10,9 +10,14 @@ export interface SimOutcome {
 interface Pending {
   resolve: (v: SimOutcome | void) => void;
   reject: (e: Error) => void;
+  /** es una simulación (si falla, el Worker se reemplaza) */
+  sim: boolean;
 }
 
 type Req = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, 'id'> : never) : never;
+
+/** "can't allocate…" (ngspice) o "Cannot enlarge memory" (Emscripten) → un mensaje claro */
+const friendly = (msg: string) => (OUT_OF_MEMORY_RE.test(msg) ? OUT_OF_MEMORY : msg);
 
 export class EngineClient {
   onOutput?: (line: string) => void;
@@ -36,14 +41,22 @@ export class EngineClient {
       const p = this.pending.get(msg.id);
       if (!p) return;
       this.pending.delete(msg.id);
-      if (msg.type === 'error') p.reject(new Error(msg.message));
-      else if (msg.type === 'result') p.resolve({ result: msg.result, ms: msg.ms });
-      else p.resolve();
+      if (msg.type === 'error') {
+        p.reject(new Error(friendly(msg.message)));
+        if (p.sim) this.restart();
+      } else if (msg.type === 'result') {
+        p.resolve({ result: msg.result, ms: msg.ms });
+        // ngspice "cannot recover": se descarta el Worker entero (y su memoria) para la próxima
+        if (msg.result.aborted) this.restart();
+      } else p.resolve();
     };
     this.worker.onerror = (ev) => {
-      const err = new Error(ev.message || 'Error en el Worker del motor');
+      const err = new Error(friendly(ev.message || 'Error en el Worker del motor'));
+      const sim = [...this.pending.values()].some((p) => p.sim);
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
+      // (el Worker se cae, p. ej., si el navegador le niega memoria): uno nuevo para la próxima
+      if (sim) this.restart();
     };
     this.ready = this.request({ type: 'init' }) as Promise<void>;
   }
@@ -51,7 +64,7 @@ export class EngineClient {
   private request(req: Req): Promise<SimOutcome | void> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { resolve, reject, sim: req.type === 'simulate' });
       this.worker.postMessage({ ...req, id } as WorkerRequest);
     });
   }
@@ -66,6 +79,12 @@ export class EngineClient {
     this.worker.terminate();
     for (const p of this.pending.values()) p.reject(new Error('Simulación abortada'));
     this.pending.clear();
+    this.spawn();
+  }
+
+  /** Worker nuevo (tras un error fatal de ngspice o una caída del Worker) */
+  private restart(): void {
+    this.worker.terminate();
     this.spawn();
   }
 }

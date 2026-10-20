@@ -5,8 +5,10 @@ import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import { ltNetlist, type LtNetlist } from '../netlist/ltnetlist.ts';
 import { prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
-import { isControlBlock } from '../netlist/directives.ts';
+import { isControlBlock, isNgspiceComment } from '../netlist/directives.ts';
 import { controlPlots, type Pane } from '../waveform/view.ts';
+import { ANALYSIS_LINE } from './analyses.ts';
+import { checkSimSize, type SizeProblem } from './estimate.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -31,6 +33,8 @@ export interface BuiltSimulation {
   ng: NgspiceNetlist;
   /** paneles pedidos con "plot" en el bloque .control */
   controlPanes: Pane[];
+  /** análisis que no entran en memoria: no se simula (#58) */
+  tooBig: SizeProblem[];
 }
 
 export async function buildSimulation(doc: AscDoc, lib: Library, title: string): Promise<BuiltSimulation> {
@@ -48,7 +52,15 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   const netlist = prep.netlist.replace(/\n\.end\s*$/i, '\n.options savecurrents\n.end');
   const control = lt.texts.find((t) => isControlBlock(t.text));
   const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
-  return { netlist, files: prep.files, warnings: prep.warnings, lt, ng, controlPanes };
+  // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
+  const analyses = lt.texts
+    .filter((t) => (t.kind === 'directive' || isNgspiceComment(t.text)) && !isControlBlock(t.text))
+    .flatMap((t) => t.text.split('\\n'))
+    .map((l) => l.trim())
+    .filter((l) => ANALYSIS_LINE.test(l));
+  const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
+  const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
+  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors };
 }
 
 /** Vector de ngspice con la tensión de una red */

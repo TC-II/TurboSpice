@@ -166,6 +166,17 @@ TEXT 0 0 Left 2 !.tran 1m ; corto
     expect(r.text).not.toContain('corto');
   });
 
+  it('.param con espacios dentro de la expresión → entre llaves', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.param Kb=1 + 2 c=0.5\\n.param Kc = c / 2\\n.param a=1 b=2 d={x * 2}
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('.param Kb={1 + 2} c=0.5');
+    expect(t).toContain('.param Kc={c / 2}');
+    expect(t).toContain('.param a=1 b=2 d={x * 2}');
+  });
+
   it('reemplaza diodos ideales de LTspice por fuentes B', () => {
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');
@@ -272,6 +283,6 @@ describe('funciones de LTspice que numparam no conoce (#56)', () => {
     );
     const ng = toNgspice(lt, 't', { resolve: () => undefined });
     expect(ng.text).toContain('AC {((P) > 0 ? 1 : 0)*unif(1,0.1)}');
-    expect(ng.text).toContain('.param P=max((-1), 0)');
+    expect(ng.text).toContain('.param P={max((-1), 0)}');
   });
 });

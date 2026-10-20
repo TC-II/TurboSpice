@@ -237,6 +237,22 @@ export function translateFunctions(text: string): string {
   return text.replace(/\{[^{}]*\}/g, (e) => translateExpression(e));
 }
 
+/**
+ * ".param K=(a) / (b) c=1": LTspice acepta espacios dentro de la expresión; numparam la corta en
+ * el primer espacio (y en silencio da otro valor, p.ej. "K=1 + 2" → 1). Cada valor con espacios
+ * va entre llaves.
+ */
+function fixParam(line: string): string {
+  const m = /^(\.param\s+)(.*)$/i.exec(line);
+  if (!m || !m[2].includes('=')) return line;
+  const parts = m[2].split(/\s+(?=[A-Za-z_]\w*\s*=(?!=))/).map((p) => {
+    const a = /^([A-Za-z_]\w*)\s*=\s*(.*?)\s*$/.exec(p);
+    if (!a || !/\s/.test(a[2]) || /^\{.*\}$/.test(a[2])) return p;
+    return `${a[1]}={${a[2]}}`;
+  });
+  return m[1] + parts.join(' ');
+}
+
 /** ".tran tstop" o ".tran 0 tstop ..." → ".tran paso tstop ..." (ngspice exige paso > 0) */
 function fixTran(line: string, warnings: string[]): string {
   const m = /^\.tran\s+(.*)$/i.exec(line.trim());
@@ -386,7 +402,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         continue;
       }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
-      out.push(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
+      out.push(fixParam(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3')));
     }
   }
 

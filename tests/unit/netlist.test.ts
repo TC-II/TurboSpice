@@ -114,6 +114,17 @@ SYMATTR InstName D1
     expect(out).toContain('.ends OA');
   });
 
+  it('parámetros de instancia con espacios alrededor del = ("K = 1")', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL TCLib\\\\Gain_Block 0 0 R0
+SYMATTR InstName U1
+SYMATTR SpiceLine K = 1
+`);
+    const r = toNgspice(n, 't', resolver);
+    expect(r.subcktParams.get('gain_block')?.get('k')).toBe('1');
+  });
+
   it('reemplaza diodos ideales de LTspice por fuentes B', () => {
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');

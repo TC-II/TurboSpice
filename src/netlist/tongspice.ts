@@ -60,7 +60,8 @@ function splitParams(value: string): { main: string; params: Map<string, string>
   const order: string[] = [];
   const main: string[] = [];
   // tokens respetando paréntesis y llaves: "SINE(0 1 1k)" o "{a*2}" son un solo token
-  const tokens = value.match(/(?:[^\s({]+|\([^)]*\)|\{[^}]*\})+/g) ?? [];
+  // LTspice acepta espacios alrededor del "=" ("K = 1"); no toca ==, >=, <=, !=
+  const tokens = value.replace(/([A-Za-z_]\w*)\s*=\s*(?=[^=\s])/g, '$1=').match(/(?:[^\s({]+|\([^)]*\)|\{[^}]*\})+/g) ?? [];
   for (const t of tokens) {
     const m = /^([A-Za-z_]\w*)=(.+)$/.exec(t);
     if (m) {

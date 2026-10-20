@@ -99,6 +99,10 @@ function ngspiceName(e: Element, used: Set<string>): string {
 
 /** Expande parásitos de L, C y V. Devuelve las líneas que reemplazan al elemento. */
 function expandElement(name: string, letter: string, nodes: string[], value: string, warnings: string[]): string[] {
+  // Resistencia de comportamiento "R= expr" (con espacios y V()): ngspice la acepta como r={expr},
+  // sigue siendo una R y su corriente se mide igual (@r[i])
+  const behavioral = letter === 'R' ? /^\s*r\s*=\s*(.+?)\s*$/i.exec(value) : null;
+  if (behavioral) return [[name, ...nodes, `r={${behavioral[1].replace(/^\{(.*)\}$/, '$1').replace(/^'(.*)'$/, '$1')}}`].join(' ')];
   const kinds = PARASITICS[letter];
   const dropped = DB_PARAMS[letter];
   if (!kinds && !dropped) return [[name, ...nodes, value].filter(Boolean).join(' ')];

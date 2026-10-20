@@ -103,6 +103,17 @@ SYMATTR SpiceLine Ipk=1 tol=5
     expect(r.text).toContain('R__C1 C1__s');
   });
 
+  it('resistencia de comportamiento "R= expr" → r={expr} (sigue siendo R)', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R5
+SYMATTR Value R= -1000*(V(Vx))**3 + 3400*(V(Vx))**2+200
+`);
+    expect(r.text).toMatch(/^R5 \S+ \S+ r=\{-1000\*\(V\(Vx\)\)\*\*3 \+ 3400\*\(V\(Vx\)\)\*\*2\+200\}$/m);
+    expect(r.names.get('R5')).toBe('R5');
+  });
+
   it('.tran de un argumento y .step como bucle en .control', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

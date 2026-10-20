@@ -96,6 +96,20 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
   let ncCounter = 0;
   const nc = (kind: 'NC' | 'MP') => `${kind}_${String(++ncCounter).padStart(2, '0')}`;
 
+  // Etiquetas que no dan nombre a su red (otra etiqueta ganó): LTspice reescribe V(etiqueta) en
+  // los valores de los elementos con el nombre de la red (no en las directivas)
+  const aliases = new Map<string, string>();
+  for (const n of conn.nets) for (const l of n.labels) if (l !== n.name) aliases.set(l.toLowerCase(), n.name);
+  const renameV = (v: string) =>
+    aliases.size
+      ? v.replace(/\bV\(\s*([^,()\s]+)\s*(?:,\s*([^,()\s]+)\s*)?\)/gi, (m, a: string, b?: string) => {
+          const na = aliases.get(a.toLowerCase());
+          const nb = b && aliases.get(b.toLowerCase());
+          if (!na && !nb) return m;
+          return `V(${na ?? a}${b ? `,${nb ?? b}` : ''})`;
+        })
+      : v;
+
   const elements: Element[] = [];
   const families = new Set<string>();
   const modelFiles: string[] = [];
@@ -149,6 +163,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       .join(' ')
       // LTspice escribe el prefijo micro como "u" en la netlist
       .replace(/[µμ]/g, 'u');
+    value = renameV(value);
     // Bloque jerárquico: el subcircuito es el .asc con el nombre del símbolo
     if (def.symbolType.toUpperCase() === 'BLOCK') {
       const name = baseName(s.type);

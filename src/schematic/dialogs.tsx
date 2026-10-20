@@ -36,7 +36,7 @@ export function checkValue(prefix: string, value: string): { value: string; info
 }
 import { SymbolView } from './SchematicCanvas.tsx';
 
-export function Modal({ title, children, onClose, wide, large, hidden }: {
+export function Modal({ title, children, onClose, wide, large, hidden, top }: {
   title: string;
   children: ReactNode;
   onClose(): void;
@@ -45,6 +45,8 @@ export function Modal({ title, children, onClose, wide, large, hidden }: {
   large?: boolean;
   /** oculto mientras se elige algo en el esquemático (conserva su estado) */
   hidden?: boolean;
+  /** arriba, a una altura fija (no se recentra si cambia de alto) */
+  top?: boolean;
 }) {
   useEffect(() => {
     if (hidden) return;
@@ -53,7 +55,7 @@ export function Modal({ title, children, onClose, wide, large, hidden }: {
     return () => window.removeEventListener('keydown', k);
   }, [onClose, hidden]);
   return (
-    <div className={`modal-backdrop${hidden ? ' picking' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className={`modal-backdrop${hidden ? ' picking' : ''}${top ? ' top' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
@@ -97,7 +99,8 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   }, [q, lib]);
   const current = items[Math.min(sel, items.length - 1)];
   return (
-    <Modal title="Componente" onClose={onClose} wide>
+    // arriba y con la lista de alto fijo: la caja de búsqueda no se mueve mientras se escribe
+    <Modal title="Componente" onClose={onClose} wide top>
       <div className="picker">
         <div className="picker-list">
           <input
@@ -437,12 +440,12 @@ const SHORTCUTS: [string, [string, string][]][] = [
     'Esquemático',
     [
       ['P · F2', 'Componente (buscador)'],
-      ['R · C · L · D · V', 'Resistencia, capacitor, inductor, diodo, fuente de tensión'],
+      ['R · C · L · D · V · I', 'Resistencia, capacitor, inductor, diodo, fuente de tensión, fuente de corriente'],
       ['G', 'Tierra'],
       ['W · F3', 'Cable (click derecho o Esc termina)'],
       ['N · F4', 'Etiqueta de red'],
       ['. · T', 'Directiva SPICE · comentario'],
-      ['J · K', 'Línea · rectángulo (decorativos)'],
+      ['J · K · O · U', 'Línea · rectángulo · círculo · arco (decorativos)'],
       ['M', 'Mover: click en un elemento (o recuadro), sigue al cursor hasta el próximo click; los cables no se estiran'],
       ['S', 'Arrastrar: igual que M, pero los cables se estiran'],
       ['Backspace · F5', 'Borrar la selección (sin selección: modo borrar)'],
@@ -455,7 +458,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['Click repetido', 'Alterna entre elementos superpuestos'],
       ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
       ['Rueda', 'Zoom'],
-      ['Botón medio · Espacio+arrastrar', 'Desplazar'],
+      ['Botón medio · derecho · Espacio+arrastrar', 'Desplazar'],
       ['Espacio · Inicio', 'Ajustar a la vista'],
       ['Z · Shift+Z', 'Zoom a un recuadro · zoom anterior'],
       ['Ctrl+G · Ctrl+U', 'Mostrar/ocultar la grilla · las marcas de pines sueltos'],

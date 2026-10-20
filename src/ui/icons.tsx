@@ -28,6 +28,8 @@ const P: Record<string, ReactNode> = {
   component: <path d="M2 10h4M14 10h4M6 7h8v6H6z" />,
   ground: <path d="M10 3v7M4 10h12M6.5 13h7M9 16h2" />,
   label: <path d="M3 6.5h9l4.5 3.5-4.5 3.5H3zM6.5 10h.01" />,
+  // figuras: línea, rectángulo y círculo
+  shapes: <path d="M2.5 17.5l6-6M11 3.5h6v6h-6zM6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6M13.5 14a3 3 0 1 0 .01 0" />,
   text: <path d="M4 5V3.5h12V5M10 3.5v13M7.5 16.5h5" />,
   directive: <path d="M7 4 3 10l4 6M13 4l4 6-4 6M11 3.5l-2 13" />,
   // cruz a 45°, chica como los trazos del esquemático

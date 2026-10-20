@@ -12,7 +12,10 @@ export interface ToolDef {
   /** Tooltip, sin el atajo */
   title: string;
   shortcut?: string;
-  onClick(): void;
+  /** sin `items`: lo que hace el botón */
+  onClick?(): void;
+  /** el botón despliega este mini menú (p.ej. las figuras) */
+  items?: MenuItem[];
   /** Sólo en las herramientas con estado: si está activa */
   active?: boolean;
   disabled?: boolean;
@@ -27,6 +30,12 @@ export interface ToolGroup {
 export const toolTitle = (t: { title: string; shortcut?: string }) => (t.shortcut ? `${t.title} (${t.shortcut})` : t.title);
 
 export function ToolButton({ tool }: { tool: ToolDef }) {
+  if (tool.items)
+    return (
+      <MenuButton items={tool.items} label={tool.label} title={toolTitle(tool)} className={tool.active ? 'active' : ''} disabled={tool.disabled}>
+        <Icon name={tool.icon} />
+      </MenuButton>
+    );
   return (
     <button className={tool.active ? 'active' : ''} aria-label={tool.label} aria-keyshortcuts={tool.shortcut} title={toolTitle(tool)} onClick={tool.onClick} disabled={tool.disabled}>
       <Icon name={tool.icon} />
@@ -77,7 +86,11 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
   const hidden = groups.slice(shown);
   const moreItems: MenuItem[] = hidden.flatMap((g, i) => [
     ...(i ? ['sep' as const] : []),
-    ...g.tools.map((t) => ({ label: t.label, shortcut: t.shortcut, title: t.title, onClick: t.onClick, disabled: t.disabled, checked: t.active })),
+    ...g.tools.map((t): MenuItem =>
+      t.items
+        ? { label: t.label, items: t.items, disabled: t.disabled }
+        : { label: t.label, shortcut: t.shortcut, title: t.title, onClick: t.onClick ?? (() => {}), disabled: t.disabled, checked: t.active },
+    ),
   ]);
 
   return (

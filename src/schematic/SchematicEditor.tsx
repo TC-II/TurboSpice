@@ -4,7 +4,7 @@ import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState,
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type ShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
+import { addFlag, addText, addWire, deleteItems, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
 import { inverseOffset, toWorld } from '../asc/transform.ts';
 import { effectiveWindows } from '../asc/resolve.ts';
 import type { TextWindow } from '../asc/model.ts';
@@ -31,7 +31,7 @@ import type { PickWhat } from './simDialogs.tsx';
 import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
-import { AlignedText, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
+import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
 import { shapeBox, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
 
@@ -121,7 +121,8 @@ interface View {
 }
 
 type Drag =
-  | { mode: 'pan'; sx: number; sy: number; view: View }
+  /** `right`: con el botón derecho; si no se movió, al soltar es un click derecho */
+  | { mode: 'pan'; sx: number; sy: number; view: View; right?: boolean; moved?: boolean }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
   | { mode: 'box'; start: Point; additive: boolean }
   /** recuadro de la herramienta zoom */
@@ -405,6 +406,23 @@ export function SchematicEditor(props: Props) {
     return null;
   };
 
+  // Botón derecho sin arrastrar: terminar cable / volver a seleccionar (como Esc en LTspice)
+  const rightClick = (p: Point) => {
+    if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
+    else if (tool.kind === 'shape' && tool.pts.length) setTool({ ...tool, pts: [] });
+    else if (tool.kind === 'move' && tool.refs) {
+      setPreview(null);
+      setTool({ ...tool, refs: null, start: null });
+    } else if (tool.kind === 'zoom') setTool(tool.prev);
+    else if (tool.kind !== 'select') setTool({ kind: 'select' });
+    else {
+      const label = labelAt(doc, p, lib, tol);
+      if (label && onEditLabel) return onEditLabel(label.sym, label.win);
+      const hit = hitTest(doc, p, lib, tol, showSimCommand);
+      if (hit) onEdit(hit);
+    }
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     svgRef.current!.setPointerCapture(e.pointerId);
     if (e.pointerType === 'touch') {
@@ -439,20 +457,8 @@ export function SchematicEditor(props: Props) {
       return;
     }
     if (e.button === 2) {
-      // Botón derecho: terminar cable / volver a seleccionar (como Esc en LTspice)
-      if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
-      else if (tool.kind === 'shape' && tool.pts.length) setTool({ ...tool, pts: [] });
-      else if (tool.kind === 'move' && tool.refs) {
-        setPreview(null);
-        setTool({ ...tool, refs: null, start: null });
-      } else if (tool.kind === 'zoom') setTool(tool.prev);
-      else if (tool.kind !== 'select') setTool({ kind: 'select' });
-      else {
-        const label = labelAt(doc, p, lib, tol);
-        if (label && onEditLabel) return onEditLabel(label.sym, label.win);
-        const hit = hitTest(doc, p, lib, tol, showSimCommand);
-        if (hit) onEdit(hit);
-      }
+      // botón derecho: arrastrando mueve la vista; un click (sin arrastrar) se resuelve al soltar
+      setDrag({ mode: 'pan', sx: e.clientX, sy: e.clientY, view, right: true });
       return;
     }
     if (e.button !== 0) return;
@@ -714,6 +720,11 @@ export function SchematicEditor(props: Props) {
     }
     if (!drag) return;
     if (drag.mode === 'pan') {
+      if (drag.right && !drag.moved) {
+        if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
+        pushView();
+        setDrag({ ...drag, moved: true });
+      }
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
     } else if (drag.mode === 'label') {
       // snap del ancla a la grilla de 8; Shift: libre
@@ -751,6 +762,7 @@ export function SchematicEditor(props: Props) {
       }
     }
     if (!drag) return;
+    if (drag.mode === 'pan' && drag.right && !drag.moved) rightClick(toDoc(e));
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
     if (drag.mode === 'label' && !drag.moved) {
       // click sobre un rótulo sin moverlo: selecciona su componente (Shift: agrega/quita)
@@ -832,22 +844,28 @@ export function SchematicEditor(props: Props) {
 
   const shown = preview ?? doc;
   const g = snapPoint(cursor);
+  // lo que se está por colocar, dibujado igual a como va a quedar (colores, InstName, tierra)
   const ghost = useMemo(() => {
     if (tool.kind === 'place') {
       const def = lib.symbol(tool.type);
       const o = placementOrigin(def, tool.orient, g);
-      const inst = { type: tool.type, x: o.x, y: o.y, orient: tool.orient, windows: new Map(), attrs: new Map() };
+      const attrs = new Map<string, string>();
+      if (def && !def.attrs.has('InstName')) attrs.set('InstName', nextInstName(doc, instLetter(def.attrs.get('Prefix') ?? 'X'), lib));
+      const inst = { type: tool.type, x: o.x, y: o.y, orient: tool.orient, windows: new Map(), attrs };
       return <SymbolView inst={inst} def={def} lib={lib} />;
     }
     if (tool.kind === 'flag') {
-      return tool.name === '0' ? (
-        <path d={`M ${g.x - 16} ${g.y} H ${g.x + 16} M ${g.x - 9} ${g.y + 6} H ${g.x + 9} M ${g.x - 3} ${g.y + 12} H ${g.x + 3}`} />
-      ) : (
-        <AlignedText x={g.x} y={g.y + 8} align="Top" size={2}>{tool.name}</AlignedText>
-      );
+      const flag = { x: g.x, y: g.y, name: tool.name };
+      return <FlagView flag={flag} doc={{ ...doc, flags: [...doc.flags, flag] }} lib={lib} />;
     }
     if (tool.kind === 'text') {
-      return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
+      return (
+        <g className="texts">
+          <g className={tool.textKind}>
+            <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>
+          </g>
+        </g>
+      );
     }
     if (tool.kind === 'shape' && tool.pts.length) {
       const pts = [...tool.pts, g];
@@ -855,25 +873,26 @@ export function SchematicEditor(props: Props) {
       if (tool.shape !== 'ARC' || pts.length === 2) {
         // el arco, mientras se elige la caja, se ve como la elipse entera
         const kind = tool.shape === 'ARC' ? 'CIRCLE' : tool.shape;
-        return <ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: tool.style }} />;
+        return <g className="shapes"><ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: tool.style }} /></g>;
       }
       const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      const box = <ShapeView s={{ kind: 'CIRCLE', coords: [a.x, a.y, b.x, b.y], style: '2' }} />;
+      // (la caja y el radio son guías, en gris)
+      const box = <g className="ghost"><ShapeView s={{ kind: 'CIRCLE', coords: [a.x, a.y, b.x, b.y], style: '2' }} /></g>;
       // 3 clicks: falta el inicio (se ve el radio); 4: el arco desde el inicio hasta el cursor
       return pts.length === 3 ? (
         <>
           {box}
-          <line x1={c.x} y1={c.y} x2={g.x} y2={g.y} strokeDasharray="2 5" />
+          <line className="ghost" x1={c.x} y1={c.y} x2={g.x} y2={g.y} strokeDasharray="2 5" />
         </>
       ) : (
         <>
           {box}
-          <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, g.x, g.y, pts[2].x, pts[2].y], style: tool.style }} />
+          <g className="shapes"><ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, g.x, g.y, pts[2].x, pts[2].y], style: tool.style }} /></g>
         </>
       );
     }
     return null;
-  }, [tool, g.x, g.y, lib, ctrlHeld]);
+  }, [tool, g.x, g.y, lib, ctrlHeld, doc]);
 
   // codos arrastrables de los cables seleccionados
   const vertices = useMemo(() => {
@@ -888,7 +907,7 @@ export function SchematicEditor(props: Props) {
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
   const cursorClass =
-    drag?.mode === 'pan'
+    drag?.mode === 'pan' && (!drag.right || drag.moved)
       ? 'grabbing'
       : tool.kind === 'select'
         ? hoverLabel !== undefined ? 'label' : ''
@@ -930,7 +949,7 @@ export function SchematicEditor(props: Props) {
         showLoose={showLoose}
         showSimCommand={showSimCommand}
       />
-      <g className="ghost">{ghost}</g>
+      <g className="schematic placing">{ghost}</g>
       {tool.kind === 'wire' && tool.start && (
         // el cable que se está trazando, igual a como va a quedar (en L, o recto con Ctrl)
         <g className="wires drawing">

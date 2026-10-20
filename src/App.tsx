@@ -1255,6 +1255,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           return handled(), shapeTool('LINE')();
         case 'k':
           return handled(), shapeTool('RECTANGLE')();
+        case 'o':
+          return handled(), shapeTool('CIRCLE')();
+        case 'u':
+          return handled(), shapeTool('ARC')();
         case 'F3':
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
@@ -1282,6 +1286,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           return setTool({ kind: 'place', type: 'diode', orient: 'R0' });
         case 'v':
           return setTool({ kind: 'place', type: 'voltage', orient: 'R0' });
+        case 'i':
+          return setTool({ kind: 'place', type: 'current', orient: 'R0' });
         case 'g':
           return setTool({ kind: 'flag', name: '0' });
         case 's':
@@ -1352,6 +1358,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setResultsSide(side);
   };
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
+  // Figuras: en el menú Dibujar y en el botón de la barra (#64)
+  const shapeItems: MenuItem[] = [
+    { label: 'Línea', shortcut: 'J', onClick: shapeTool('LINE') },
+    { label: 'Rectángulo', shortcut: 'K', onClick: shapeTool('RECTANGLE') },
+    { label: 'Círculo', shortcut: 'O', onClick: shapeTool('CIRCLE') },
+    { label: 'Arco', shortcut: 'U', onClick: shapeTool('ARC') },
+    'sep',
+    { label: 'Estilo de línea…', onClick: () => openLineStyle() },
+  ];
   // Desplegable de Simular: las simulaciones guardadas (se elige cuál ver, #39); los tipos de
   // análisis, que crean una simulación nueva con sus parámetros en la barra; los comandos a mano
   // y los análisis programados
@@ -1432,17 +1447,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Inductor', shortcut: 'L', onClick: placeTool('ind') },
         { label: 'Diodo', shortcut: 'D', onClick: placeTool('diode') },
         { label: 'Fuente de tensión', shortcut: 'V', onClick: placeTool('voltage') },
+        { label: 'Fuente de corriente', shortcut: 'I', onClick: placeTool('current') },
         { label: 'Tierra', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }) },
         { label: 'Etiqueta de red…', shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
         { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
         { label: 'Comentario…', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
         'sep',
-        { label: 'Línea', shortcut: 'J', onClick: shapeTool('LINE') },
-        { label: 'Rectángulo', shortcut: 'K', onClick: shapeTool('RECTANGLE') },
-        { label: 'Círculo', onClick: shapeTool('CIRCLE') },
-        { label: 'Arco', onClick: shapeTool('ARC') },
-        { label: 'Estilo de línea…', onClick: () => openLineStyle() },
+        ...shapeItems,
       ],
     },
     {
@@ -1557,6 +1569,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'ground', label: 'Tierra', title: 'Tierra (GND)', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
         { icon: 'label', label: 'Etiqueta', title: 'Etiqueta de red', shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
         { icon: 'text', label: 'Texto', title: 'Texto (comentario)', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'shapes', label: 'Figuras', title: 'Figuras: línea, rectángulo, círculo, arco', items: shapeItems, active: tool.kind === 'shape' },
         { icon: 'directive', label: 'Directiva', title: 'Directiva SPICE libre', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
     },

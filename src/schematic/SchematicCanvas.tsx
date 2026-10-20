@@ -131,7 +131,7 @@ const FLAG_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
   right: { align: 'Right', dx: -8, dy: 0 },
 };
 
-function FlagView({ flag, doc, lib, selected }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean }) {
+export function FlagView({ flag, doc, lib, selected }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean }) {
   const dir = flagDirection(doc, flag);
   const cls = `flag${selected ? ' sel' : ''}`;
   if (flag.name === '0') {

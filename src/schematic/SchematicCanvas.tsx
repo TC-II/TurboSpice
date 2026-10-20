@@ -7,6 +7,7 @@ import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
+import { arcAngles, lineDash } from './shapes.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
@@ -40,36 +41,28 @@ export function AlignedText({ x, y, align, size, children, className }: {
   );
 }
 
-const STYLE_DASH: Record<string, string> = { '1': '10 5', '2': '2 5', '3': '10 5 2 5', '4': '10 5 2 5 2 5' };
-
 /** Arco de LTspice: caja de la elipse, (xs,ys) es el FINAL y (xe,ye) el INICIO, antihorario */
 function arcPath(c: number[]): string {
-  const [x1, y1, x2, y2, xEnd, yEnd, xStart, yStart] = c;
-  const cx = (x1 + x2) / 2;
-  const cy = (y1 + y2) / 2;
-  const rx = Math.abs(x2 - x1) / 2;
-  const ry = Math.abs(y2 - y1) / 2;
-  const a0 = Math.atan2(yStart - cy, xStart - cx);
-  const a1 = Math.atan2(yEnd - cy, xEnd - cx);
+  const { cx, cy, rx, ry, a0, span } = arcAngles(c);
+  if (span >= 2 * Math.PI) return `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy}`;
+  const a1 = a0 - span;
   const p0 = { x: cx + rx * Math.cos(a0), y: cy + ry * Math.sin(a0) };
   const p1 = { x: cx + rx * Math.cos(a1), y: cy + ry * Math.sin(a1) };
-  const span = (((a0 - a1) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  if (span < 1e-9) return `M ${x1} ${cy} A ${rx} ${ry} 0 1 0 ${x2} ${cy} A ${rx} ${ry} 0 1 0 ${x1} ${cy}`;
   return `M ${p0.x} ${p0.y} A ${rx} ${ry} 0 ${span > Math.PI ? 1 : 0} 0 ${p1.x} ${p1.y}`;
 }
 
-export function ShapeView({ s }: { s: Shape }) {
+export function ShapeView({ s, className }: { s: Shape; className?: string }) {
   const c = s.coords;
-  const dash = s.style ? STYLE_DASH[s.style] : undefined;
+  const dash = lineDash(s.style);
   switch (s.kind) {
     case 'LINE':
-      return <line x1={c[0]} y1={c[1]} x2={c[2]} y2={c[3]} strokeDasharray={dash} />;
+      return <line className={className} x1={c[0]} y1={c[1]} x2={c[2]} y2={c[3]} strokeDasharray={dash} />;
     case 'RECTANGLE':
-      return <rect x={Math.min(c[0], c[2])} y={Math.min(c[1], c[3])} width={Math.abs(c[2] - c[0])} height={Math.abs(c[3] - c[1])} strokeDasharray={dash} />;
+      return <rect className={className} x={Math.min(c[0], c[2])} y={Math.min(c[1], c[3])} width={Math.abs(c[2] - c[0])} height={Math.abs(c[3] - c[1])} strokeDasharray={dash} />;
     case 'CIRCLE':
-      return <ellipse cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} />;
+      return <ellipse className={className} cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} />;
     case 'ARC':
-      return <path d={arcPath(c)} strokeDasharray={dash} />;
+      return <path className={className} d={arcPath(c)} strokeDasharray={dash} />;
   }
 }
 
@@ -195,7 +188,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
 
   return (
     <g className="schematic">
-      <g className="shapes">{doc.shapes.map((s, i) => <ShapeView key={i} s={s} />)}</g>
+      <g className="shapes">{doc.shapes.map((s, i) => <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
         {doc.wires.map((w, i) => (
           <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} className={isSel({ kind: 'wire', index: i }) ? 'sel' : undefined} />

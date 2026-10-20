@@ -9,6 +9,7 @@ import { transformAlign } from '../asc/transform.ts';
 import type { LabelPatch } from './edit.ts';
 import type { Library } from '../library/library.ts';
 import { localBox } from './geometry.ts';
+import { LINE_STYLES } from './shapes.ts';
 import { LONG_LINK } from './share.ts';
 import { fromRkm, parseSpiceNumber } from '../netlist/spicenum.ts';
 import { si } from '../waveform/series.ts';
@@ -343,6 +344,45 @@ export function FlagDialog({ initial, onApply, onClose }: {
           <span>Nombre</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
+        <div className="buttons">
+          <button type="button" onClick={onClose}>Cancelar</button>
+          <button type="submit" className="primary">Aceptar</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Estilo de línea de las figuras (Dibujar › Estilo de línea, doble click en una figura) */
+export function LineStyleDialog({ initial, count, onApply, onClose }: {
+  initial: string;
+  /** figuras seleccionadas a las que se aplica (0: sólo las que se dibujen después) */
+  count: number;
+  onApply(style: string): void;
+  onClose(): void;
+}) {
+  const [style, setStyle] = useState(initial);
+  return (
+    <Modal title="Estilo de línea" onClose={onClose}>
+      <form
+        className="attrs line-styles"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onApply(style);
+        }}
+      >
+        <p className="hint">
+          {count ? `Se aplica a ${count === 1 ? 'la figura seleccionada' : `las ${count} figuras seleccionadas`} y a las que se dibujen después.` : 'Se aplica a las figuras que se dibujen.'}
+        </p>
+        {LINE_STYLES.map((ls) => (
+          <label key={ls.value} className="line-style">
+            <input type="radio" name="line-style" checked={style === ls.value} onChange={() => setStyle(ls.value)} autoFocus={style === ls.value} />
+            <svg width="96" height="12" aria-hidden="true">
+              <line x1="4" y1="6" x2="92" y2="6" stroke="currentColor" strokeWidth="1.6" strokeDasharray={ls.dash} />
+            </svg>
+            <span>{ls.label}</span>
+          </label>
+        ))}
         <div className="buttons">
           <button type="button" onClick={onClose}>Cancelar</button>
           <button type="submit" className="primary">Aceptar</button>

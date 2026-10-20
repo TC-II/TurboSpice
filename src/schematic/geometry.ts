@@ -6,6 +6,7 @@ import type { Library } from '../library/library.ts';
 import { isDataText } from '../asc/dataText.ts';
 import { EXTRA_ANALYSES, isNgspiceComment } from '../netlist/directives.ts';
 import { ANALYSIS_LINE } from '../sim/analyses.ts';
+import { shapeDist } from './shapes.ts';
 
 /**
  * Lo que se dibuja de un texto, o null si no se dibuja nada. Los comentarios con datos nunca se
@@ -204,7 +205,9 @@ export type ItemRef =
   | { kind: 'symbol'; index: number }
   | { kind: 'wire'; index: number }
   | { kind: 'flag'; index: number }
-  | { kind: 'text'; index: number };
+  | { kind: 'text'; index: number }
+  /** LINE, RECTANGLE, CIRCLE o ARC decorativo del esquemático */
+  | { kind: 'shape'; index: number };
 
 export const sameRef = (a: ItemRef, b: ItemRef) => a.kind === b.kind && a.index === b.index;
 
@@ -223,7 +226,7 @@ export function textBox(t: { x: number; y: number; size: number; text: string; a
 }
 
 /**
- * Elemento bajo el cursor, en orden de prioridad: textos, etiquetas, cables, símbolos.
+ * Elemento bajo el cursor, en orden de prioridad: textos, etiquetas, cables, símbolos, figuras.
  * `tol` es la tolerancia en unidades del esquemático (depende del zoom).
  */
 export function hitTest(doc: AscDoc, p: Point, lib: Library, tol: number, showSim = true): ItemRef | null {
@@ -251,6 +254,8 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, sho
     const s = doc.symbols[i];
     if (inBox(p, symbolBox(s, lib.symbol(s.type), lib), tol / 2)) out.push({ kind: 'symbol', index: i });
   }
+  // las figuras, al final: sólo por su trazo, la última dibujada primero
+  for (let i = doc.shapes.length - 1; i >= 0; i--) if (shapeDist(doc.shapes[i], p) <= tol) out.push({ kind: 'shape', index: i });
   return out;
 }
 

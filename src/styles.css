@@ -194,6 +194,8 @@ svg.editor.tool-move { cursor: move; }
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
 .wires line { stroke: var(--sch-wire); stroke-width: 1.6; }
+.shapes > * { stroke: var(--sch-sym); stroke-width: 1.4; }
+.shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
 .junctions circle { fill: var(--sch-wire); stroke: none; }
 .wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
@@ -237,6 +239,8 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .attrs label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-muted); }
 .attrs label.attr-row { grid-template-columns: 96px 1fr 18px; }
 .attrs .attr-vis { width: auto; margin: 0; }
+.attrs label.line-style { grid-template-columns: 18px 104px 1fr; color: var(--fg); cursor: pointer; }
+.attrs label.line-style input { width: auto; margin: 0; }
 .buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .hint { color: var(--fg-muted); font-size: 12px; margin: 4px 0; }
 .textdlg { display: flex; flex-direction: column; gap: 8px; }

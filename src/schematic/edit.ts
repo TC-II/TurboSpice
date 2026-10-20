@@ -1,10 +1,11 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
-import type { AscDoc, Flag, Orient, Point, SchText, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
+import type { AscDoc, Flag, Orient, Point, SchText, Shape, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
 import { defaultWindows, effectiveWindows } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { localBox, pinPoints, pivotNear, snap, symbolPivot, type ItemRef } from './geometry.ts';
+import { mapShape, shapePoints, shiftShape } from './shapes.ts';
 
 const samePt = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 const ends = (w: Wire): [Point, Point] => [
@@ -146,13 +147,14 @@ export function addText(doc: AscDoc, t: SchText): AscDoc {
 
 export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc {
   const del = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
-  const [s, w, f, t] = [del('symbol'), del('wire'), del('flag'), del('text')];
+  const [s, w, f, t, sh] = [del('symbol'), del('wire'), del('flag'), del('text'), del('shape')];
   const out = {
     ...doc,
     symbols: doc.symbols.filter((_, i) => !s.has(i)),
     wires: doc.wires.filter((_, i) => !w.has(i)),
     flags: doc.flags.filter((_, i) => !f.has(i)),
     texts: doc.texts.filter((_, i) => !t.has(i)),
+    shapes: doc.shapes.filter((_, i) => !sh.has(i)),
   };
   // sin el cable de una T, los dos tramos que quedan alineados vuelven a ser uno
   return w.size ? mergeCollinear(out, lib) : out;
@@ -167,7 +169,7 @@ export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc
 export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, drag: boolean, lib: Library): AscDoc {
   if (!dx && !dy) return doc;
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
-  const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
+  const [s, w, f, t, sh] = [sel('symbol'), sel('wire'), sel('flag'), sel('text'), sel('shape')];
   const key = (p: Point) => `${p.x},${p.y}`;
   const mv = (p: Point) => ({ x: p.x + dx, y: p.y + dy });
   const shift = (wr: Wire): Wire => ({ x1: wr.x1 + dx, y1: wr.y1 + dy, x2: wr.x2 + dx, y2: wr.y2 + dy });
@@ -176,6 +178,8 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     symbols: doc.symbols.map((sym, i) => (s.has(i) ? { ...sym, x: sym.x + dx, y: sym.y + dy } : sym)),
     flags: doc.flags.map((fl, i): Flag => (f.has(i) ? { ...fl, ...mv(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...mv(tx) } : tx)),
+    // las figuras no conectan nada: se trasladan igual al mover y al arrastrar
+    shapes: sh.size ? doc.shapes.map((x, i) => (sh.has(i) ? shiftShape(x, dx, dy) : x)) : doc.shapes,
   };
   // un componente movido sobre un cable (o un cable movido sobre un componente) no queda en corto
   const moved = new Set<Wire>();
@@ -547,6 +551,7 @@ export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Poin
     if (r.kind === 'wire') pts.push(...ends(doc.wires[r.index]));
     if (r.kind === 'flag') pts.push(doc.flags[r.index]);
     if (r.kind === 'text') pts.push(doc.texts[r.index]);
+    if (r.kind === 'shape') pts.push(...shapePoints(doc.shapes[r.index]).slice(0, 2));
   }
   const c = {
     x: (Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2,
@@ -563,7 +568,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y };
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
-  const [s, w, f, t] = [sel('symbol'), sel('wire'), sel('flag'), sel('text')];
+  const [s, w, f, t, sh] = [sel('symbol'), sel('wire'), sel('flag'), sel('text'), sel('shape')];
   const turned: AscDoc = {
     ...doc,
     symbols: doc.symbols.map((sym, i) => {
@@ -579,6 +584,7 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     }),
     flags: doc.flags.map((fl, i) => (f.has(i) ? { ...fl, ...tp(fl) } : fl)),
     texts: doc.texts.map((tx, i) => (t.has(i) ? { ...tx, ...tp(tx) } : tx)),
+    shapes: doc.shapes.map((x, i) => (sh.has(i) ? mapShape(x, tp, op === 'mirror') : x)),
   };
   // rotado sobre un cable: se parte en sus pines igual que al moverlo
   const out = mergeCollinear(cutNew(turned, refs, lib).doc, lib);
@@ -609,6 +615,19 @@ export function setFlagName(doc: AscDoc, index: number, name: string): AscDoc {
   return { ...doc, flags: doc.flags.map((f, i) => (i === index ? { ...f, name } : f)) };
 }
 
+/** Estilo de línea de las figuras indicadas ('' = sólida, sin campo en el archivo) */
+export function setShapeStyle(doc: AscDoc, indices: number[], style: string): AscDoc {
+  const set = new Set(indices);
+  return {
+    ...doc,
+    shapes: doc.shapes.map((x, i): Shape => {
+      if (!set.has(i)) return x;
+      const { style: _, ...rest } = x;
+      return style ? { ...rest, style } : rest;
+    }),
+  };
+}
+
 
 /** Copia de los elementos seleccionados desplazada (F6 duplicar / pegar) */
 export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
@@ -630,6 +649,9 @@ export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: num
       const f = doc.flags[r.index];
       out = { ...out, flags: [...out.flags, { ...f, x: f.x + dx, y: f.y + dy }] };
       newRefs.push({ kind: 'flag', index: out.flags.length - 1 });
+    } else if (r.kind === 'shape') {
+      out = { ...out, shapes: [...out.shapes, shiftShape(doc.shapes[r.index], dx, dy)] };
+      newRefs.push({ kind: 'shape', index: out.shapes.length - 1 });
     } else {
       const t = doc.texts[r.index];
       out = { ...out, texts: [...out.texts, { ...t, x: t.x + dx, y: t.y + dy }] };
@@ -646,6 +668,7 @@ export function allItems(doc: AscDoc): ItemRef[] {
     ...doc.wires.map((_, index) => ({ kind: 'wire' as const, index })),
     ...doc.flags.map((_, index) => ({ kind: 'flag' as const, index })),
     ...doc.texts.map((_, index) => ({ kind: 'text' as const, index })),
+    ...doc.shapes.map((_, index) => ({ kind: 'shape' as const, index })),
   ];
 }
 
@@ -658,7 +681,7 @@ export function extractItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
     wires: doc.wires.filter((_, i) => has('wire', i)),
     flags: doc.flags.filter((_, i) => has('flag', i)),
     texts: doc.texts.filter((_, i) => has('text', i)),
-    shapes: [],
+    shapes: doc.shapes.filter((_, i) => has('shape', i)),
     dataFlags: [],
   };
 }
@@ -668,7 +691,7 @@ export function extractItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
  * componentes cuyo nombre ya existe en el documento reciben uno nuevo, como al duplicar.
  */
 export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
-  const pts: Point[] = [...frag.symbols, ...frag.flags, ...frag.texts, ...frag.wires.flatMap(ends)];
+  const pts: Point[] = [...frag.symbols, ...frag.flags, ...frag.texts, ...frag.wires.flatMap(ends), ...frag.shapes.flatMap((x) => shapePoints(x).slice(0, 2))];
   if (!pts.length) return { doc, refs: [] };
   const dx = snap(at.x - Math.min(...pts.map((p) => p.x)));
   const dy = snap(at.y - Math.min(...pts.map((p) => p.y)));
@@ -688,12 +711,14 @@ export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): 
     wires: [...doc.wires, ...frag.wires.map((w) => ({ x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }))],
     flags: [...doc.flags, ...frag.flags.map((f) => ({ ...f, x: f.x + dx, y: f.y + dy }))],
     texts: [...doc.texts, ...frag.texts.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy }))],
+    shapes: [...doc.shapes, ...frag.shapes.map((x) => shiftShape(x, dx, dy))],
   };
   const refs: ItemRef[] = [
     ...frag.symbols.map((_, i) => ({ kind: 'symbol' as const, index: doc.symbols.length + i })),
     ...frag.wires.map((_, i) => ({ kind: 'wire' as const, index: doc.wires.length + i })),
     ...frag.flags.map((_, i) => ({ kind: 'flag' as const, index: doc.flags.length + i })),
     ...frag.texts.map((_, i) => ({ kind: 'text' as const, index: doc.texts.length + i })),
+    ...frag.shapes.map((_, i) => ({ kind: 'shape' as const, index: doc.shapes.length + i })),
   ];
   return cutNew(out, refs, lib);
 }

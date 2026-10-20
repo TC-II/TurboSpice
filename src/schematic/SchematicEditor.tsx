@@ -1,7 +1,7 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
-import { GRID, type AscDoc, type Orient, type Point, type Shape, type Wire } from '../asc/model.ts';
+import { GRID, type AscDoc, type Orient, type Point, type Shape, type ShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
@@ -31,7 +31,8 @@ import type { PickWhat } from './simDialogs.tsx';
 import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
-import { AlignedText, SchematicCanvas, SymbolView } from './SchematicCanvas.tsx';
+import { AlignedText, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
+import { shapeBox, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
 
 export type Tool =
@@ -49,8 +50,12 @@ export type Tool =
    * click; `stretch` estira los cables conectados (S) o no (M)
    */
   | { kind: 'move'; stretch: boolean; refs: ItemRef[] | null; start: Point | null }
-  /** J / K: líneas y rectángulos decorativos (LINE / RECTANGLE del .asc) */
-  | { kind: 'shape'; shape: 'LINE' | 'RECTANGLE'; start: Point | null }
+  /**
+   * Figuras decorativas (LINE / RECTANGLE / CIRCLE / ARC del .asc), con `style` de línea.
+   * `pts`: los clicks hechos. Línea, rectángulo y círculo (su caja) llevan 2; el arco, 4: la
+   * caja de la elipse, el punto de inicio y el de fin (va en sentido antihorario).
+   */
+  | { kind: 'shape'; shape: ShapeKind; pts: Point[]; style?: string }
   /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
   | { kind: 'zoom'; prev: Tool };
 
@@ -140,6 +145,7 @@ function docBox(doc: AscDoc, lib: Library, showSim: boolean): Box | null {
     const v = visibleText(t, showSim);
     if (v) boxes.push(textBox(v));
   }
+  for (const s of doc.shapes) boxes.push(shapeBox(s));
   if (!boxes.length) return null;
   return {
     x1: Math.min(...boxes.map((b) => b.x1)),
@@ -162,6 +168,7 @@ function itemsIn(doc: AscDoc, b: Box, lib: Library, showSim: boolean): ItemRef[]
     const v = visibleText(t, showSim);
     if (v && boxesIntersect(textBox(v), b)) out.push({ kind: 'text', index: i });
   });
+  doc.shapes.forEach((s, i) => shapeInBox(s, b) && out.push({ kind: 'shape', index: i }));
   return out;
 }
 
@@ -192,20 +199,25 @@ function freeEnd(doc: AscDoc, p: Point): boolean {
   return at.length === 1 && !doc.wires.some((w) => w !== at[0] && distToSegment(p, w) === 0);
 }
 
-/** Línea o rectángulo decorativo del esquemático cerca de p (el último dibujado primero) */
-function shapeAt(doc: AscDoc, p: Point, tol: number): number {
-  const seg = (x1: number, y1: number, x2: number, y2: number) => {
-    const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
-    const t = l2 ? Math.max(0, Math.min(1, ((p.x - x1) * (x2 - x1) + (p.y - y1) * (y2 - y1)) / l2)) : 0;
-    return Math.hypot(p.x - (x1 + t * (x2 - x1)), p.y - (y1 + t * (y2 - y1)));
-  };
-  for (let i = doc.shapes.length - 1; i >= 0; i--) {
-    const [x1, y1, x2, y2] = doc.shapes[i].coords;
-    const kind = doc.shapes[i].kind;
-    if (kind === 'LINE' && seg(x1, y1, x2, y2) <= tol) return i;
-    if (kind === 'RECTANGLE' && Math.min(seg(x1, y1, x2, y1), seg(x2, y1, x2, y2), seg(x2, y2, x1, y2), seg(x1, y2, x1, y1)) <= tol) return i;
-  }
-  return -1;
+/**
+ * Figura a partir de los clicks de la herramienta: 'more' si faltan clicks, 'invalid' si el
+ * último no sirve (un punto repetido, una caja sin ancho o alto).
+ */
+export function shapeFromClicks(kind: ShapeKind, pts: Point[], style?: string): Shape | 'more' | 'invalid' {
+  const [a, b, start, end] = pts;
+  if (!b) return 'more';
+  if (b.x === a.x && b.y === a.y) return 'invalid';
+  const withStyle = (s: Shape): Shape => (style ? { ...s, style } : s);
+  if (kind === 'LINE' || kind === 'RECTANGLE') return withStyle({ kind, coords: [a.x, a.y, b.x, b.y] });
+  if (b.x === a.x || b.y === a.y) return 'invalid';
+  if (kind === 'CIRCLE') return withStyle({ kind, coords: [a.x, a.y, b.x, b.y] });
+  // el arco necesita además inicio y fin, distintos del centro
+  const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const last = pts[pts.length - 1];
+  if (pts.length > 2 && last.x === center.x && last.y === center.y) return 'invalid';
+  if (!end) return 'more';
+  // en el archivo va primero el FINAL y después el INICIO
+  return withStyle({ kind, coords: [a.x, a.y, b.x, b.y, end.x, end.y, start.x, start.y] });
 }
 
 export function SchematicEditor(props: Props) {
@@ -255,7 +267,7 @@ export function SchematicEditor(props: Props) {
 
   // la selección no puede apuntar a elementos que ya no existen (deshacer, borrar, abrir otro)
   useEffect(() => {
-    const n = { symbol: doc.symbols.length, wire: doc.wires.length, flag: doc.flags.length, text: doc.texts.length };
+    const n = { symbol: doc.symbols.length, wire: doc.wires.length, flag: doc.flags.length, text: doc.texts.length, shape: doc.shapes.length };
     const valid = selection.filter((r) => r.index < n[r.kind]);
     if (valid.length !== selection.length) setSelection(valid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -429,7 +441,7 @@ export function SchematicEditor(props: Props) {
     if (e.button === 2) {
       // Botón derecho: terminar cable / volver a seleccionar (como Esc en LTspice)
       if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
-      else if (tool.kind === 'shape' && tool.start) setTool({ ...tool, start: null });
+      else if (tool.kind === 'shape' && tool.pts.length) setTool({ ...tool, pts: [] });
       else if (tool.kind === 'move' && tool.refs) {
         setPreview(null);
         setTool({ ...tool, refs: null, start: null });
@@ -542,9 +554,7 @@ export function SchematicEditor(props: Props) {
       case 'delete': {
         // lo que está bajo la cruz (que sigue al mouse, sin grilla)
         const hit = hitTest(doc, p, lib, tol, showSimCommand);
-        const shape = hit ? -1 : shapeAt(doc, p, tol);
         if (hit) commit(deleteItems(doc, [hit], lib));
-        else if (shape >= 0) commit({ ...doc, shapes: doc.shapes.filter((_, i) => i !== shape) });
         return;
       }
       case 'move': {
@@ -568,12 +578,11 @@ export function SchematicEditor(props: Props) {
         return;
       }
       case 'shape': {
-        if (!tool.start) return setTool({ ...tool, start: g });
-        if (g.x !== tool.start.x || g.y !== tool.start.y) {
-          const s: Shape = { kind: tool.shape, coords: [tool.start.x, tool.start.y, g.x, g.y] };
-          commit({ ...doc, shapes: [...doc.shapes, s] });
-        }
-        setTool({ ...tool, start: null });
+        const s = shapeFromClicks(tool.shape, [...tool.pts, g], tool.style);
+        if (s === 'invalid') return;
+        if (s === 'more') return setTool({ ...tool, pts: [...tool.pts, g] });
+        commit({ ...doc, shapes: [...doc.shapes, s] });
+        setTool({ ...tool, pts: [] });
         return;
       }
       case 'zoom':
@@ -840,12 +849,27 @@ export function SchematicEditor(props: Props) {
     if (tool.kind === 'text') {
       return <AlignedText x={g.x} y={g.y} align="Left" size={2}>{tool.text.split('\\n')[0]}</AlignedText>;
     }
-    if (tool.kind === 'shape' && tool.start) {
-      const { x, y } = tool.start;
-      return tool.shape === 'LINE' ? (
-        <line x1={x} y1={y} x2={g.x} y2={g.y} />
+    if (tool.kind === 'shape' && tool.pts.length) {
+      const pts = [...tool.pts, g];
+      const [a, b] = pts;
+      if (tool.shape !== 'ARC' || pts.length === 2) {
+        // el arco, mientras se elige la caja, se ve como la elipse entera
+        const kind = tool.shape === 'ARC' ? 'CIRCLE' : tool.shape;
+        return <ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: tool.style }} />;
+      }
+      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const box = <ShapeView s={{ kind: 'CIRCLE', coords: [a.x, a.y, b.x, b.y], style: '2' }} />;
+      // 3 clicks: falta el inicio (se ve el radio); 4: el arco desde el inicio hasta el cursor
+      return pts.length === 3 ? (
+        <>
+          {box}
+          <line x1={c.x} y1={c.y} x2={g.x} y2={g.y} strokeDasharray="2 5" />
+        </>
       ) : (
-        <rect x={Math.min(x, g.x)} y={Math.min(y, g.y)} width={Math.abs(g.x - x)} height={Math.abs(g.y - y)} fill="none" />
+        <>
+          {box}
+          <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, g.x, g.y, pts[2].x, pts[2].y], style: tool.style }} />
+        </>
       );
     }
     return null;

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
-import { CMP_FILES, cmpApply, cmpCell, cmpChoicesFor, parseCmp, stripLtspiceInfo, type CmpKind } from '../../src/library/cmp.ts';
+import { CMP_FILES, cmpApply, cmpCell, cmpChoicesFor, compareCells, parseCmp, stripLtspiceInfo, type CmpKind } from '../../src/library/cmp.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
 import { prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
@@ -93,5 +93,20 @@ describe('al simular', () => {
   it('stripLtspiceInfo sólo toca las líneas .model', () => {
     expect(stripLtspiceInfo('.model D1 D(Is=1n Iave=1 Vpk=50 mfg=X type=silicon)\nR1 a b 1k ; type=x\n+ Vpk=3')).toBe('.model D1 D(Is=1n)\nR1 a b 1k ; type=x\n+ Vpk=3');
     expect(stripLtspiceInfo('.model Q1 NPN(BF=100\n+ Vceo=40 Icrating=1)')).toBe('.model Q1 NPN(BF=100\n+)');
+  });
+});
+
+describe('compareCells (orden de la tabla, #69)', () => {
+  const sorted = (xs: string[], dir: 1 | -1) => [...xs].sort((a, b) => compareCells(a, b, dir));
+  it('números con sufijo SPICE, por valor', () => {
+    expect(sorted(['4.7k', '100', '1meg', '220n', '1k'], 1)).toEqual(['220n', '100', '1k', '4.7k', '1meg']);
+    expect(sorted(['4.7k', '100', '1meg'], -1)).toEqual(['1meg', '4.7k', '100']);
+  });
+  it('texto con números adentro en orden natural', () => {
+    expect(sorted(['BC5470', 'bc547', '2N3904', 'BC337'], 1)).toEqual(['2N3904', 'BC337', 'bc547', 'BC5470']);
+  });
+  it('las vacías al final en los dos sentidos', () => {
+    expect(sorted(['', '2', '1'], 1)).toEqual(['1', '2', '']);
+    expect(sorted(['', '2', '1'], -1)).toEqual(['2', '1', '']);
   });
 });

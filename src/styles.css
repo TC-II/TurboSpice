@@ -777,6 +777,9 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .parts-table table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .parts-table th { position: sticky; top: 0; z-index: 1; background: var(--bg-alt); color: var(--fg-muted); font-weight: 500; text-align: left; padding: 4px 8px; white-space: nowrap; }
 .parts-table th .unit { font-size: 10px; }
+.parts-table th.sortable { cursor: pointer; user-select: none; }
+.parts-table th.sortable:hover { color: var(--fg); }
+.parts-table th[aria-sort] { color: var(--fg); }
 .parts-table td { padding: 3px 8px; white-space: nowrap; font-family: var(--mono); }
 .parts-table td:first-child { font-weight: 600; }
 .parts-table tbody tr { cursor: pointer; }

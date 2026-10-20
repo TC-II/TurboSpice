@@ -1,8 +1,9 @@
 // Tabla de componentes de library/cmp dentro del diálogo de atributos: se busca por nombre (o
 // fabricante, tipo) y muestra los parámetros relevantes de cada uno en columnas. Click elige
-// el valor; doble click elige y acepta.
+// el valor; doble click elige y acepta. Click en un encabezado ordena por esa columna
+// (ascendente, y alternando con cada click).
 import { useMemo, useState } from 'react';
-import { CMP_COLUMNS, cmpCell, type CmpKind, type CmpPart } from '../library/cmp.ts';
+import { CMP_COLUMNS, cmpCell, compareCells, type CmpKind, type CmpPart } from '../library/cmp.ts';
 
 export interface PartGroup {
   kind: CmpKind;
@@ -19,15 +20,22 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
 }) {
   const [g, setG] = useState(() => Math.max(0, groups.findIndex((x) => x.parts.some((p) => p.name === selected))));
   const [q, setQ] = useState('');
+  // columna por la que se ordena ('' = el nombre) y sentido; sin orden, el de la librería
+  const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
+  const sortBy = (key: string) => setSort((s) => ({ key, dir: s?.key === key ? (-s.dir as 1 | -1) : 1 }));
+  const ariaSort = (key: string) => (sort?.key === key ? (sort.dir === 1 ? 'ascending' : 'descending') : undefined);
   const group = groups[g] ?? groups[0];
   const cols = CMP_COLUMNS[group.kind];
   const rows = useMemo(() => {
     const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return group.parts.filter((p) => {
+    const found = group.parts.filter((p) => {
       const hay = [p.name, cmpCell(p, 'mfg'), cmpCell(p, 'type'), p.type].join(' ').toLowerCase();
       return words.every((w) => hay.includes(w));
     });
-  }, [group, q]);
+    if (!sort) return found;
+    const cell = (p: CmpPart) => (sort.key ? cmpCell(p, sort.key) : p.name);
+    return [...found].sort((a, b) => compareCells(cell(a), cell(b), sort.dir));
+  }, [group, q, sort]);
   return (
     <div className="parts">
       <div className="parts-head">
@@ -59,9 +67,9 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
         <table>
           <thead>
             <tr>
-              <th>Nombre</th>
+              <th className="sortable" aria-sort={ariaSort('')} onClick={() => sortBy('')}>Nombre</th>
               {cols.map((c) => (
-                <th key={c.key}>
+                <th key={c.key} className="sortable" aria-sort={ariaSort(c.key)} onClick={() => sortBy(c.key)}>
                   {c.label}
                   {c.unit && <span className="unit"> [{c.unit}]</span>}
                 </th>

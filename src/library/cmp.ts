@@ -4,6 +4,8 @@
 //                                     LTspice: mfg=, Vceo=, Iave=…)
 //   standard.cap, .ind, .res, .bead  "nombre clave=valor …" (en LTspice son binarios)
 
+import { parseSpiceNumber } from '../netlist/spicenum.ts';
+
 export type CmpKind = 'bjt' | 'dio' | 'jft' | 'mos' | 'cap' | 'ind' | 'res' | 'bead';
 
 export interface CmpPart {
@@ -153,6 +155,18 @@ export const CMP_COLUMNS: Record<CmpKind, CmpColumn[]> = {
 };
 
 /** Valor de una columna para mostrar */
+/**
+ * Orden de dos celdas de la tabla: por número si las dos lo son (con sufijos SPICE: 4.7k, 100n),
+ * si no por texto (con los números de adentro en orden: BC547 < BC5470). Las vacías van al final
+ * en cualquier sentido (`dir` 1 ascendente, -1 descendente).
+ */
+export function compareCells(a: string, b: string, dir: 1 | -1): number {
+  if (!a || !b) return a ? -1 : b ? 1 : 0;
+  const [x, y] = [parseSpiceNumber(a), parseSpiceNumber(b)];
+  const c = !Number.isNaN(x) && !Number.isNaN(y) ? x - y : a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+  return c * dir;
+}
+
 export function cmpCell(p: CmpPart, key: string): string {
   if (key === '@type') return p.type;
   if (key === '@channel') return p.flags.has('pchan') ? 'P' : 'N';

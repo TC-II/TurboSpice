@@ -11,7 +11,7 @@ import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import { stripLtspiceInfo } from '../library/cmp.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
-import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
+import { formatSpiceNumber, fromRkm, parseSpiceNumber } from './spicenum.ts';
 import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
 
 /** Resistencia serie que LTspice agrega a todo inductor sin Rser */
@@ -247,17 +247,41 @@ export function translateFunctions(text: string): string {
 }
 
 /**
+ * "2*{a}" o "Freq=1/{2*pi*f}": LTspice acepta llaves en parte del valor; numparam no. Cada token
+ * con llaves que no lo envuelven entero (y paréntesis balanceados, para no romper "PULSE(…)")
+ * va entero entre llaves.
+ */
+function fixBraces(value: string): string {
+  if (!value.includes('{')) return value;
+  const count = (t: string, c: string) => t.split(c).length - 1;
+  return value.replace(/\S+/g, (tok) => {
+    const kv = /^([A-Za-z_]\w*=)(.*)$/.exec(tok);
+    const [k, v] = kv ? [kv[1], kv[2]] : ['', tok];
+    if (!v.includes('{') || /^\{[^{}]*\}$/.test(v) || count(v, '{') !== count(v, '}') || count(v, '(') !== count(v, ')')) return tok;
+    return `${k}{${v.replace(/[{}]/g, '')}}`;
+  });
+}
+
+/**
  * ".param K=(a) / (b) c=1": LTspice acepta espacios dentro de la expresión; numparam la corta en
  * el primer espacio (y en silencio da otro valor, p.ej. "K=1 + 2" → 1). Cada valor con espacios
- * va entre llaves.
+ * va entre llaves; también los que tienen llaves sueltas adentro, y la notación RKM (1k94) pasa
+ * a 1.94k.
  */
 function fixParam(line: string): string {
   const m = /^(\.param\s+)(.*)$/i.exec(line);
   if (!m || !m[2].includes('=')) return line;
   const parts = m[2].split(/\s+(?=[A-Za-z_]\w*\s*=(?!=))/).map((p) => {
     const a = /^([A-Za-z_]\w*)\s*=\s*(.*?)\s*$/.exec(p);
-    if (!a || !/\s/.test(a[2]) || /^\{.*\}$/.test(a[2])) return p;
-    return `${a[1]}={${a[2]}}`;
+    if (!a) return p;
+    // "R=1K94": la notación RKM numparam no la entiende
+    const rkm = fromRkm(a[2]);
+    if (rkm) return `${a[1]}=${rkm}`;
+    // "ton=(1/(2*{f}))": llaves sueltas dentro de la expresión
+    let v = a[2];
+    if (!/^\{[^{}]*\}$/.test(v) && /[{}]/.test(v)) v = `{${v.replace(/[{}]/g, '')}}`;
+    if (v === a[2] && (!/\s/.test(v) || /^\{.*\}$/.test(v))) return p;
+    return /^\{.*\}$/.test(v) ? `${a[1]}=${v}` : `${a[1]}={${v}}`;
   });
   return m[1] + parts.join(' ');
 }
@@ -284,6 +308,28 @@ function fixTran(line: string, warnings: string[]): string {
 const DROP_DIRECTIVES = /^\.(backanno|wave|save\s+none|loadbias|savebias)\b/i;
 
 /** Líneas de ngspice de los elementos de una netlist (con los parásitos expandidos) */
+/**
+ * "C1 b 0 1u IC=1": LTspice usa la condición inicial del capacitor aunque el .tran no tenga uic
+ * (es una restricción del punto de operación); ngspice sólo con uic. Con un terminal a tierra
+ * equivale a ".ic V(b)=1". Con los dos terminales flotantes no hay equivalente directo en .ic.
+ */
+function capacitorIcs(lt: LtNetlist): string[] {
+  const out: string[] = [];
+  const done = new Set<string>();
+  for (const e of lt.elements) {
+    if (e.prefix.toUpperCase() !== 'C' || e.nodes.length !== 2) continue;
+    const ic = splitParams(e.value).params.get('ic');
+    if (ic === undefined) continue;
+    const [a, b] = e.nodes;
+    const v = ic.replace(/^\{(.*)\}$/, '$1');
+    const [node, val] = b === '0' ? [a, ic] : a === '0' ? [b, `{-(${v})}`] : [];
+    if (!node || node === '0' || done.has(node)) continue;
+    done.add(node);
+    out.push(`.ic V(${node})=${val}`);
+  }
+  return out;
+}
+
 function convertElements(
   lt: LtNetlist,
   used: Set<string>,
@@ -311,7 +357,7 @@ function convertElements(
     }
     // Fuentes B: LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis y funciones
     // que la fuente B de ngspice no conoce (round, buf…) también fuera de llaves; ngspice no
-    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : e.value;
+    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : fixBraces(e.value);
     out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 
@@ -341,6 +387,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   };
 
   out.push(...convertElements(lt, used, names, warnings, subcktParams));
+  out.push(...capacitorIcs(lt));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
   out.push(...implicit);

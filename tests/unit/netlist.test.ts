@@ -212,6 +212,51 @@ TEXT 0 0 Left 2 !.param Kb=1 + 2 c=0.5\\n.param Kc = c / 2\\n.param a=1 b=2 d={x
     expect(t).toContain('.param a=1 b=2 d={x * 2}');
   });
 
+  it('IC= de un capacitor a tierra → .ic (LTspice lo usa sin uic)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 16 80 0
+FLAG 16 16 b
+FLAG 116 16 0
+FLAG 116 80 c
+SYMBOL cap 0 16 R0
+SYMATTR InstName C1
+SYMATTR Value 1u IC=1
+SYMBOL cap 100 16 R0
+SYMATTR InstName C2
+SYMATTR Value 1u ic={x/2}
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('.ic V(b)=1');
+    expect(t).toContain('.ic V(c)={-(x/2)}');
+  });
+
+  it('valores con llaves en parte del token: "2*{a}" y "Freq=1/{2*pi*f}"', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R1
+SYMATTR Value 2*{a}
+SYMBOL voltage 100 0 R0
+SYMATTR InstName V1
+SYMATTR Value PULSE(0 {V} 1n 1n 1n {ton} {tp})
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toMatch(/^R1 \S+ \S+ \{2\*a\}$/m);
+    expect(t).toContain('PULSE(0 {V} 1n 1n 1n {ton} {tp})');
+  });
+
+  it('.param con notación RKM (1K94) y llaves sueltas en la expresión', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.param R_CROSSOVER=1K94\\n.param ton=(1/(2*{f}))\\n.param tp= 2*{ton}
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('.param R_CROSSOVER=1.94K');
+    expect(t).toContain('.param ton={(1/(2*f))}');
+    expect(t).toContain('.param tp={2*ton}');
+  });
+
   it('reemplaza diodos ideales de LTspice por fuentes B', () => {
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');

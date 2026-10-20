@@ -87,8 +87,9 @@ describe('ida y vuelta .asc', () => {
       'SYMATTR Value R',
       'SYMATTR Prefix R',
       'SYMBOL res 128 144 R90',
-      'WINDOW 0 0 56 VBottom 2',
-      'WINDOW 3 32 56 VTop 2',
+      // posiciones óptimas de ASC-Parser (#74), no las de LTspice (0 56 / 32 56)
+      'WINDOW 0 2 56 VBottom 2',
+      'WINDOW 3 29 56 VTop 2',
       'SYMATTR InstName R2',
       'SYMATTR Value R',
       'SYMATTR Prefix R',

@@ -54,7 +54,9 @@ export class Library implements SymbolSource {
 
   constructor(bundle: LibraryBundle) {
     this.bundle = bundle;
-    this.windowDefaults = bundle.windowDefaults;
+    // (un bundle viejo, de antes de #74, traía sólo la tabla de LTspice)
+    const wd = bundle.windowDefaults as WindowDefaults | WindowDefaults['ltspice'];
+    this.windowDefaults = 'ltspice' in wd && 'preferred' in wd ? (wd as WindowDefaults) : { ltspice: wd as WindowDefaults['ltspice'], preferred: {} };
     for (const path of Object.keys(bundle.symbols)) {
       this.byPath.set(path.toLowerCase(), path);
       const name = baseName(path).toLowerCase();

@@ -1,6 +1,6 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
 import type { AscDoc, Flag, Orient, Point, SchText, Shape, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
-import { defaultWindows, effectiveWindows } from '../asc/resolve.ts';
+import { defaultWindows, effectiveWindows, ltspiceDefaultAs, ltspiceWindows } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
@@ -507,8 +507,11 @@ function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolI
   if (!def) return { ...sym, orient };
   const before = defaultWindows(def, sym.orient, lib.windowDefaults);
   const after = defaultWindows(def, orient, lib.windowDefaults);
+  // la de LTspice (un .asc guardado por LTspice) también cuenta como «sin mover» (#74)
+  const ltBefore = ltspiceWindows(def, sym.orient, lib.windowDefaults);
   const windows = new Map<number, TextWindow>();
-  for (const [i, w] of sym.windows) {
+  for (const [i, raw] of sym.windows) {
+    const w = ltspiceDefaultAs(raw, ltBefore.get(i), before.get(i)) ?? raw;
     const d = before.get(i);
     const n = after.get(i);
     if (d && sameWindow(w, d)) continue;

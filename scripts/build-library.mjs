@@ -79,7 +79,11 @@ export function buildBundle() {
     cmp[name] = readText(p);
     if (/\.(bjt|dio|jft|mos)$/i.test(name)) subs[`cmp/${name}`] = scanModels(cmp[name]);
   }
-  const windowDefaults = JSON.parse(readFileSync(join(LIB, 'window-defaults.json'), 'utf8'));
+  // posiciones de los rótulos: las de LTspice al rotar y las óptimas de ASC-Parser (#74)
+  const windowDefaults = {
+    ltspice: JSON.parse(readFileSync(join(LIB, 'window-defaults.json'), 'utf8')),
+    preferred: JSON.parse(readFileSync(join(LIB, 'window-positions.json'), 'utf8')),
+  };
   return { symbols, skins, windowDefaults, subs, cmp };
 }
 

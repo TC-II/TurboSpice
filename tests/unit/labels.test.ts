@@ -59,17 +59,28 @@ describe('rótulos de componentes', () => {
     const rotated = transformItems(base, [{ kind: 'symbol', index: 0 }], 'rotate', lib);
     expect(rotated.symbols[0].orient).toBe('R90');
     expect(rotated.symbols[0].windows.size).toBe(0);
-    expect(save(rotated)).toContain('WINDOW 0 0 56 VBottom 2');
+    // (posición óptima de ASC-Parser para res en R90, #74)
+    expect(save(rotated)).toContain('WINDOW 0 2 56 VBottom 2');
 
     const moved = setWindow(base, 0, 3, { x: 40, y: 24, align: 'Left', size: 2 });
     const hidden = patchLabels(moved, [0], new Map([[0, { visible: false }]]), lib);
     const r = transformItems(hidden, [{ kind: 'symbol', index: 0 }], 'rotate', lib).symbols[0];
     expect(r.windows.get(3)).toEqual({ x: 40, y: 24, align: 'Left', size: 2 });
-    expect(r.windows.get(0)).toEqual({ x: 0, y: 56, align: 'Invisible', size: 2 });
+    expect(r.windows.get(0)).toEqual({ x: 2, y: 56, align: 'Invisible', size: 2 });
 
     const m = transformItems(moved, [{ kind: 'symbol', index: 0 }], 'mirror', lib).symbols[0];
     expect(m.orient).toBe('M0');
     expect(m.windows.get(3)).toEqual({ x: 40, y: 24, align: 'Left', size: 2 });
   });
-});
 
+  it('un .asc de LTspice con sus WINDOW por defecto se ve en las posiciones óptimas (#74)', () => {
+    const asc = (...w: string[]) => parseAsc(['Version 4', 'SHEET 1 880 680', 'SYMBOL ind 0 0 R0', ...w, 'SYMATTR InstName L1', ''].join('\n'));
+    const at = (doc: ReturnType<typeof parseAsc>) => effectiveWindows(doc.symbols[0], lib.symbol('ind'), lib.windowDefaults).get(3);
+    // inductor en R0 como lo guarda LTspice: el valor centrado sobre la bobina (se pisaba)
+    expect(at(asc('WINDOW 0 -2 40 Right 2', 'WINDOW 3 -2 72 Center 2'))).toEqual({ x: -2, y: 72, align: 'Right', size: 2 });
+    // movido a mano: se respeta
+    expect(at(asc('WINDOW 3 -40 90 Center 2'))).toEqual({ x: -40, y: 90, align: 'Center', size: 2 });
+    // oculto en su lugar de siempre: sigue oculto
+    expect(at(asc('WINDOW 3 -2 72 Invisible 2'))?.align).toBe('Invisible');
+  });
+});

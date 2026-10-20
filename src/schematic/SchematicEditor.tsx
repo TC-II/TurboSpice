@@ -732,13 +732,15 @@ export function SchematicEditor(props: Props) {
       }
       setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
     } else if (drag.mode === 'label') {
-      // snap del ancla a la grilla de 8; Shift: libre
+      // de a 8 (desde donde estaba); Shift: libre
       const dx = p.x - drag.start.x;
       const dy = p.y - drag.start.y;
       const free = e.shiftKey;
       const edits = drag.items.map((it) => {
         const inst = doc.symbols[it.sym];
-        const to = free ? { x: Math.round(it.at.x + dx), y: Math.round(it.at.y + dy) } : { x: snapLabel(it.at.x + dx), y: snapLabel(it.at.y + dy) };
+        // se mueve de a 8 desde donde estaba (las posiciones óptimas no caen en la grilla de 8:
+        // ajustar la posición absoluta lo haría saltar al empezar a arrastrar)
+        const to = free ? { x: Math.round(it.at.x + dx), y: Math.round(it.at.y + dy) } : { x: it.at.x + snapLabel(dx), y: it.at.y + snapLabel(dy) };
         const d = inverseOffset(to.x - inst.x, to.y - inst.y, inst.orient);
         return { sym: it.sym, win: it.win, w: { ...it.w, x: d.x, y: d.y } };
       });

@@ -2,8 +2,19 @@
 // conversión de un documento a "todo explícito" para guardarlo.
 import { baseName, type AscDoc, type Orient, type SymbolDef, type SymbolInst, type TextWindow } from './model.ts';
 
-/** { símbolo en minúsculas: { R90|R180|R270: { idx: [x, y, align, size] } } } */
-export type WindowDefaults = Record<string, Record<string, Record<string, [number, number, string, number]>>>;
+/** { símbolo en minúsculas: { orientación: { idx: [x, y, align, size] } } } (coordenadas del símbolo) */
+export type WindowTable = Record<string, Record<string, Record<string, [number, number, string, number]>>>;
+
+/** Posiciones por defecto de los rótulos */
+export interface WindowDefaults {
+  /** las que pone LTspice al rotar (R90/R180/R270, derivadas de su corpus) */
+  ltspice: WindowTable;
+  /**
+   * las óptimas de ASC-Parser (engine/component_defaults.js, #74), en R0…R270: ganan a las de
+   * LTspice en los símbolos que tienen (M* usa la fila de su R*, y el espejo hace el resto)
+   */
+  preferred: WindowTable;
+}
 
 export interface SymbolSource {
   symbol(type: string): SymbolDef | undefined;
@@ -32,12 +43,12 @@ const win = ([x, y, align, size]: [number, number, string, number]): TextWindow 
  * .asc). En R0/M0 son las del .asy; al rotar, LTspice usa posiciones propias por símbolo
  * (tabla derivada del corpus). Para R180 sin dato, LTspice intercambia las ventanas 0 y 3.
  */
-export function defaultWindows(def: SymbolDef, orient: Orient, table: WindowDefaults): Map<number, TextWindow> {
+export function ltspiceWindows(def: SymbolDef, orient: Orient, table: WindowDefaults): Map<number, TextWindow> {
   const out = new Map<number, TextWindow>();
   for (const [i, w] of def.windows) out.set(i, { ...w });
   if (orient === 'R0' || orient === 'M0') return out;
 
-  const t = table[def.name.toLowerCase()]?.[`R${orient.slice(1)}`];
+  const t = table.ltspice[def.name.toLowerCase()]?.[`R${orient.slice(1)}`];
   if (!t) return out;
   for (const [i, w] of Object.entries(t)) out.set(Number(i), win(w));
 
@@ -50,10 +61,42 @@ export function defaultWindows(def: SymbolDef, orient: Orient, table: WindowDefa
   return out;
 }
 
+/** Fila de posiciones óptimas (ASC-Parser) de un símbolo para una orientación, si tiene */
+function preferredRow(def: SymbolDef, orient: Orient, table: WindowDefaults) {
+  const t = table.preferred[def.name.toLowerCase()];
+  return t && (t[orient] ?? t[`R${orient.slice(1)}`] ?? t.R0);
+}
+
+/**
+ * Posiciones por defecto de los rótulos en TurboSpice: las óptimas de ASC-Parser para los
+ * símbolos que las tienen (#74); las de LTspice para el resto (y para los índices que la tabla
+ * no nombra).
+ */
+export function defaultWindows(def: SymbolDef, orient: Orient, table: WindowDefaults): Map<number, TextWindow> {
+  const out = ltspiceWindows(def, orient, table);
+  const row = preferredRow(def, orient, table);
+  if (row) for (const [i, w] of Object.entries(row)) out.set(Number(i), win(w));
+  return out;
+}
+
+/**
+ * Una WINDOW del .asc que es la que LTspice pone sola (archivo guardado por LTspice, sin mover
+ * el rótulo): no cuenta como movida a mano, así que va la posición óptima. Devuelve la ventana
+ * que corresponde, o null si la WINDOW es propia (movida, otro tamaño…) y se respeta.
+ */
+export function ltspiceDefaultAs(w: TextWindow, lt: TextWindow | undefined, pref: TextWindow | undefined): TextWindow | null {
+  if (!lt || !pref || w.x !== lt.x || w.y !== lt.y || w.size !== lt.size) return null;
+  if (w.align === lt.align) return { ...pref };
+  // oculto en su lugar de siempre: sigue oculto
+  if (w.align === 'Invisible') return { ...pref, align: 'Invisible' };
+  return null;
+}
+
 /** Ventanas efectivas: las del .asc ganan; el resto, las por defecto para la orientación */
 export function effectiveWindows(inst: SymbolInst, def: SymbolDef | undefined, table: WindowDefaults) {
   const out = def ? defaultWindows(def, inst.orient, table) : new Map<number, TextWindow>();
-  for (const [i, w] of inst.windows) out.set(i, { ...w });
+  const lt = def && preferredRow(def, inst.orient, table) ? ltspiceWindows(def, inst.orient, table) : undefined;
+  for (const [i, w] of inst.windows) out.set(i, (lt && ltspiceDefaultAs(w, lt.get(i), out.get(i))) || { ...w });
   return out;
 }
 

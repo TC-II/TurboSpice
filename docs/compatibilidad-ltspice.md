@@ -36,6 +36,15 @@ cualquier otra orientación escribe posiciones propias por símbolo (p.ej. `res`
 `WINDOW 0 0 56 VBottom 2` / `WINDOW 3 32 56 VTop 2`). La tabla está en `library/window-defaults.json`,
 derivada del corpus (Mxx usa la misma que Rxx; para R180 sin dato se intercambian las ventanas 0 y 3).
 
+**Posiciones óptimas** (#74): las de LTspice tienen problemas (el valor del inductor queda centrado
+sobre la bobina), así que TurboSpice usa por defecto las de ASC-Parser (`library/window-positions.json`,
+importadas de su `engine/component_defaults.js` con `npm run windows:import`), en las cuatro rotaciones
+de los 58 símbolos que tiene; el resto sigue con las de LTspice. Valen al colocar, al rotar/espejar y al
+volver un rótulo a su lugar. En un `.asc` de LTspice, un `WINDOW` igual al que LTspice pone solo cuenta
+como «no movido» y se muestra en la posición óptima; uno distinto (movido a mano) se respeta. Al guardar
+se escriben las posiciones óptimas, así que LTspice abre el archivo igual a como se ve en TurboSpice.
+Arrastrar un rótulo lo mueve de a 8 desde donde estaba (las posiciones óptimas no caen en la grilla de 8).
+
 **Rótulos movidos a mano** (#28): se guardan como `WINDOW` explícito (posición local del símbolo,
 alineación y tamaño); ocultar un rótulo es `WINDOW n x y Invisible size`. Al rotar o espejar,
 los rótulos que estaban en la posición por defecto pasan a la de la nueva orientación; los movidos

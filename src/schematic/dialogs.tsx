@@ -1,5 +1,5 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
 import { cmpApply, type CmpPart } from '../library/cmp.ts';
@@ -36,7 +36,15 @@ export function checkValue(prefix: string, value: string): { value: string; info
 }
 import { SymbolView } from './SchematicCanvas.tsx';
 
-export function Modal({ title, children, onClose, wide, large, hidden, top }: {
+/** margen mínimo de los diálogos contra los bordes de la ventana */
+const MODAL_MARGIN = 16;
+
+/**
+ * Diálogo modal. Todos se abren centrados en la ventana y después no se mueven: si cambian de
+ * alto (otra pestaña, más o menos resultados) crecen o se achican hacia abajo, y sólo suben lo
+ * necesario si dejarían de entrar (#67).
+ */
+export function Modal({ title, children, onClose, wide, large, hidden }: {
   title: string;
   children: ReactNode;
   onClose(): void;
@@ -45,9 +53,30 @@ export function Modal({ title, children, onClose, wide, large, hidden, top }: {
   large?: boolean;
   /** oculto mientras se elige algo en el esquemático (conserva su estado) */
   hidden?: boolean;
-  /** arriba, a una altura fija (no se recentra si cambia de alto) */
-  top?: boolean;
 }) {
+  const box = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || hidden) return;
+    let t: number | null = null;
+    const place = (center: boolean) => {
+      const vh = window.innerHeight;
+      const h = el.offsetHeight;
+      if (center || t === null) t = Math.max(MODAL_MARGIN, (vh - h) / 2);
+      else if (t + h > vh - MODAL_MARGIN) t = Math.max(MODAL_MARGIN, vh - MODAL_MARGIN - h);
+      setTop(t);
+    };
+    place(true);
+    const ro = new ResizeObserver(() => place(false));
+    ro.observe(el);
+    const onResize = () => place(true);
+    window.addEventListener('resize', onResize);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', onResize);
+    };
+  }, [hidden]);
   useEffect(() => {
     if (hidden) return;
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -55,8 +84,12 @@ export function Modal({ title, children, onClose, wide, large, hidden, top }: {
     return () => window.removeEventListener('keydown', k);
   }, [onClose, hidden]);
   return (
-    <div className={`modal-backdrop${hidden ? ' picking' : ''}${top ? ' top' : ''}`} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
+    <div
+      className={`modal-backdrop${hidden ? ' picking' : ''}`}
+      style={top !== null ? { paddingTop: top } : undefined}
+      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>
@@ -99,8 +132,8 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   }, [q, lib]);
   const current = items[Math.min(sel, items.length - 1)];
   return (
-    // arriba y con la lista de alto fijo: la caja de búsqueda no se mueve mientras se escribe
-    <Modal title="Componente" onClose={onClose} wide top>
+    // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
+    <Modal title="Componente" onClose={onClose} wide>
       <div className="picker">
         <div className="picker-list">
           <input

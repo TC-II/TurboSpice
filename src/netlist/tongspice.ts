@@ -382,7 +382,14 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     if (blocksCtl && t === blocksCtl) continue;
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
     const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
-    for (const raw of t.text.split('\\n')) {
+    // "+ …" continúa la línea anterior (p.ej. un .meas en dos renglones): se une antes de
+    // procesarla, si no la continuación queda suelta cuando la directiva se comenta
+    const joined: string[] = [];
+    for (const l of t.text.split('\\n')) {
+      if (/^\s*\+/.test(l) && joined.length) joined[joined.length - 1] += ` ${l.trim().slice(1).trim()}`;
+      else joined.push(l);
+    }
+    for (const raw of joined) {
       if (comment) {
         out.push(`* ${raw}`);
         continue;

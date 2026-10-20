@@ -164,6 +164,16 @@ TEXT 0 0 Left 2 !.tran 0 {6/fz}
     expect(toNgspice(n, 't', resolver).text).toContain('.tran {(6/fz)/1000} {6/fz}');
   });
 
+  it('.meas en dos renglones con "+": la continuación no queda suelta', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.meas ac pm find V(a)\\n+ when mag(V(a))=1\\n.ac dec 10 1 1k
+`);
+    const r = toNgspice(n, 't', resolver);
+    expect(r.text).not.toMatch(/^\+/m);
+    expect(r.measures).toContain('.meas ac pm find V(a) when mag(V(a))=1');
+  });
+
   it('directivas con comentario ";" a mitad de línea', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

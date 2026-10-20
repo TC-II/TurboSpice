@@ -82,6 +82,27 @@ SYMATTR SpiceLine Rser=2 Cpar=1p
     expect(r.text).toContain('C__C1_par NC_03 NC_04 1p');
   });
 
+  it('quita los parámetros de la base de datos de LTspice que ngspice no conoce (tol, pwr, V, Irms…)', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R1
+SYMATTR Value 10k
+SYMATTR SpiceLine tol=1 pwr=0.1 tc1=0.001
+SYMBOL cap 100 0 R0
+SYMATTR InstName C1
+SYMATTR Value 1u
+SYMATTR SpiceLine V=10 Irms=1 mfg="x" Rser=2
+SYMBOL ind 200 0 R0
+SYMATTR InstName L1
+SYMATTR Value 1m
+SYMATTR SpiceLine Ipk=1 tol=5
+`);
+    expect(r.text).toMatch(/^R1 \S+ \S+ 10k tc1=0.001$/m);
+    expect(r.text).not.toMatch(/tol=|pwr=|Irms|Ipk|V=10|mfg/i);
+    expect(r.text).toContain('R__C1 C1__s');
+  });
+
   it('.tran de un argumento y .step como bucle en .control', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

@@ -54,6 +54,15 @@ const PARASITICS: Record<string, string[]> = {
   V: ['rser', 'cpar'],
 };
 
+// Parámetros de la base de datos de componentes de LTspice (tolerancia, potencia, corriente
+// máxima, fabricante…): informativos, ngspice no los conoce ("unknown parameter") y no cambian
+// el resultado, así que se quitan. Los que ngspice entiende (temp, tc1, tc2, m, ic…) se dejan.
+const DB_PARAMS: Record<string, string[]> = {
+  R: ['tol', 'pwr', 'mfg', 'pn', 'type'],
+  C: ['tol', 'v', 'irms', 'iripple', 'mfg', 'pn', 'type', 'rlshunt'],
+  L: ['tol', 'ipk', 'irms', 'isat', 'mfg', 'pn', 'type', 'rlshunt'],
+};
+
 /** Separa "10m Rser=2 Cpar=1p" en valor principal y parámetros key=value */
 function splitParams(value: string): { main: string; params: Map<string, string>; order: string[] } {
   const params = new Map<string, string>();
@@ -91,14 +100,19 @@ function ngspiceName(e: Element, used: Set<string>): string {
 /** Expande parásitos de L, C y V. Devuelve las líneas que reemplazan al elemento. */
 function expandElement(name: string, letter: string, nodes: string[], value: string, warnings: string[]): string[] {
   const kinds = PARASITICS[letter];
-  if (!kinds) return [[name, ...nodes, value].filter(Boolean).join(' ')];
+  const dropped = DB_PARAMS[letter];
+  if (!kinds && !dropped) return [[name, ...nodes, value].filter(Boolean).join(' ')];
   const { main, params, order } = splitParams(value);
+  if (!kinds) {
+    const keep = order.filter((k) => !dropped.includes(k.toLowerCase())).map((k) => `${k}=${params.get(k.toLowerCase())}`);
+    return [[name, ...nodes, main, ...keep].filter(Boolean).join(' ')];
+  }
   if (letter === 'L' && !params.has('rser')) params.set('rser', LTSPICE_INDUCTOR_RSER);
   const p = (k: string) => {
     const v = params.get(k);
     return v !== undefined && parseSpiceNumber(v) !== 0 ? v : undefined;
   };
-  const rest = order.filter((k) => !kinds.includes(k.toLowerCase())).map((k) => `${k}=${params.get(k.toLowerCase())}`);
+  const rest = order.filter((k) => !kinds.includes(k.toLowerCase()) && !dropped?.includes(k.toLowerCase())).map((k) => `${k}=${params.get(k.toLowerCase())}`);
 
   const [a, b] = nodes;
   const lines: string[] = [];

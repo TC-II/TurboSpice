@@ -124,7 +124,8 @@ type Drag =
   /** `right`: con el botón derecho; si no se movió, al soltar es un click derecho */
   | { mode: 'pan'; sx: number; sy: number; view: View; right?: boolean; moved?: boolean }
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
-  | { mode: 'box'; start: Point; additive: boolean }
+  /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
+  | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
   | { mode: 'zoom'; start: Point }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
@@ -561,12 +562,11 @@ export function SchematicEditor(props: Props) {
         commit(addText(doc, { x: g.x, y: g.y, align: 'Left', size: 2, kind: tool.textKind, text: tool.text }));
         setTool({ kind: 'select' });
         return;
-      case 'delete': {
-        // lo que está bajo la cruz (que sigue al mouse, sin grilla)
-        const hit = hitTest(doc, p, lib, tol, showSimCommand);
-        if (hit) commit(deleteItems(doc, [hit], lib));
+      case 'delete':
+        // un click borra lo que está bajo la cruz; arrastrando, todo lo del recuadro (al soltar)
+        setDrag({ mode: 'box', start: p, additive: false, erase: true });
+        setBoxEnd(p);
         return;
-      }
       case 'move': {
         if (tool.refs && tool.start) {
           // segundo click: se suelta donde está
@@ -808,11 +808,18 @@ export function SchematicEditor(props: Props) {
         y2: Math.max(drag.start.y, boxEnd.y),
       };
       const found = itemsIn(doc, b, lib, showSimCommand);
+      if (drag.erase) {
+        // sin arrastrar (menos de unos píxeles): es un click sobre un elemento
+        const click = (b.x2 - b.x1) * view.scale < 4 && (b.y2 - b.y1) * view.scale < 4;
+        const hit = click ? hitTest(doc, drag.start, lib, tol, showSimCommand) : null;
+        const refs = click ? (hit ? [hit] : []) : found;
+        if (refs.length) commit(deleteItems(doc, refs, lib));
+      }
       // con M / S el recuadro elige lo que se va a mover
       if (tool.kind === 'move') {
         setSelection(found);
         if (found.length) setTool({ ...tool, refs: found, start: snapPoint(boxEnd) });
-      } else setSelection(drag.additive ? [...selection, ...found] : found);
+      } else if (!drag.erase) setSelection(drag.additive ? [...selection, ...found] : found);
     }
     if (drag.mode === 'zoom' && boxEnd) {
       const b = { x1: Math.min(drag.start.x, boxEnd.x), y1: Math.min(drag.start.y, boxEnd.y), x2: Math.max(drag.start.x, boxEnd.x), y2: Math.max(drag.start.y, boxEnd.y) };

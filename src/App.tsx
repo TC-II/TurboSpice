@@ -2132,7 +2132,7 @@ function toolHint(t: Tool): string {
     case 'text':
       return 'Click para ubicar el texto';
     case 'delete':
-      return 'Click en un elemento para borrarlo · Esc para terminar';
+      return 'Click en un elemento para borrarlo · arrastrar un recuadro borra todo lo que queda adentro · Esc para terminar';
     case 'probe':
       return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
     case 'move':

@@ -98,6 +98,29 @@ check(['Línea', 'Rectángulo', 'Círculo', 'Arco', 'Estilo de línea'].every((l
 await page.getByRole('menuitem', { name: /Círculo/ }).click();
 check((await svg.getAttribute('class')).includes('tool-shape'), 'elegir Círculo empieza a dibujarlo');
 
+// --- #68: modo borrar: un click borra uno; arrastrar borra todo el recuadro al soltar ---
+await page.keyboard.press('Escape');
+const count = () => page.evaluate(() => document.querySelectorAll('svg.editor .symbols .sym').length + document.querySelectorAll('svg.editor .wires line').length);
+const n0 = await count();
+await page.keyboard.press('F5');
+check((await svg.getAttribute('class')).includes('tool-delete'), 'F5 sin selección: modo borrar');
+const sb = await page.locator('svg.editor .symbols .sym .body').first().boundingBox();
+await page.mouse.click(sb.x + sb.width / 2, sb.y + sb.height / 2);
+const n1 = await count();
+check(n1 < n0, `un click borra el elemento (${n0} → ${n1})`);
+const all = await svg.boundingBox();
+await page.mouse.move(all.x + 5, all.y + 5);
+await page.mouse.down();
+await page.mouse.move(all.x + all.width / 2, all.y + all.height / 2, { steps: 4 });
+await page.mouse.move(all.x + all.width - 5, all.y + all.height - 5, { steps: 4 });
+check((await page.locator('svg.editor .selbox').count()) === 1, 'arrastrando se ve el recuadro');
+check((await count()) === n1, 'no borra nada antes de soltar');
+await page.mouse.up();
+check((await count()) === 0, `al soltar borra todo lo del recuadro (${await count()} quedan)`);
+await page.keyboard.press('Control+z');
+check((await count()) === n1, 'Ctrl+Z lo recupera en un paso');
+await page.keyboard.press('Escape');
+
 // (la simulación automática del ejemplo se aborta al editar: no es un error)
 const real = errors.filter((e) => !/Simulación abortada/.test(e));
 check(!real.length, `sin errores en la página${real.length ? `: ${real.join(' | ')}` : ''}`);

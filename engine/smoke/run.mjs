@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { Ngspice } from '../../src/engine/ngspice.ts';
 import { CASES } from './cases.mjs';
@@ -13,7 +13,7 @@ import { CASES } from './cases.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(HERE, '..', 'dist-engine');
 
-const { default: factory } = await import(join(DIST, 'ngspice.mjs'));
+const { default: factory } = await import(pathToFileURL(join(DIST, 'ngspice.mjs')).href);
 const codemodels = {};
 for (const f of readdirSync(DIST).filter((f) => f.endsWith('.cm'))) {
   codemodels[f] = new Uint8Array(readFileSync(join(DIST, f)));

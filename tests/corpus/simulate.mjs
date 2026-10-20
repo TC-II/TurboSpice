@@ -3,7 +3,7 @@
 // Uso: node tests/corpus/simulate.mjs [--show N] <dir|archivo>...
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -36,7 +36,7 @@ function* walk(p) {
 }
 
 const lib = new Library(buildBundle());
-const { default: factory } = await import(join(DIST, 'ngspice.mjs'));
+const { default: factory } = await import(pathToFileURL(join(DIST, 'ngspice.mjs')).href);
 const codemodels = Object.fromEntries(
   readdirSync(DIST)
     .filter((f) => f.endsWith('.cm'))
@@ -58,6 +58,7 @@ for (const root of args) {
     const net = toNgspice(ltNetlist(doc, lib), basename(file), {
       resolve: (p) => lib.resolveModelFile(p),
       defines: (m) => lib.definesModel(m),
+      cmpFile: (m) => lib.cmpFileDefining(m),
     });
     const prep = prepareSimulation(net, (rel) => readFileSync(join(ROOT, 'library', 'sub', rel), 'latin1'));
     ng.writeFiles(prep.files);

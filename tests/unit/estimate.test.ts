@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAnalysis } from '../../src/sim/analyses.ts';
-import { analysisPoints, checkSimSize, countVectors, MAX_SIM_BYTES, sweepPoints } from '../../src/sim/estimate.ts';
+import { analysisPoints, checkSimSize, countVectors, MAX_POINTS, MAX_SIM_BYTES, sweepPoints } from '../../src/sim/estimate.ts';
 
 const points = (line: string) => analysisPoints(parseAnalysis(line)!);
 
@@ -56,6 +56,20 @@ describe('chequeo de tamaño (#58)', () => {
     expect(r.errors[0].fix).toEqual({ from: '.ac dec 1000000 10 100meg', to: '.ac dec 1000 10 100meg' });
     // y avisa que tantos puntos por década no sirven
     expect(r.warnings[0].text).toMatch(/puntos por década/);
+  });
+
+  it('el ejemplo Bode RLC con dec 1000000 de 100 Hz a 100 MHz (≈1 GB) tampoco se simula', () => {
+    const rlc = '* t\nV1 in 0 AC 1\nR1 in a 10\nL1 a b 1m\nR__L1 b out 1m\nC1 out 0 1u\n.options savecurrents\n.end';
+    const r = checkSimSize(['.ac dec 1000000 100 100meg'], rlc, {});
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].fix?.to).toBe('.ac dec 1000 100 100meg');
+  });
+
+  it('demasiados puntos aunque entren en memoria', () => {
+    const r = checkSimSize(['.tran 0 1 0 100n'], '* t\nR1 a 0 1\n.end', {});
+    expect(r.errors).toHaveLength(1);
+    expect(r.errors[0].text).toMatch(/demasiados puntos/);
+    expect(points(r.errors[0].fix!.to)).toBeLessThanOrEqual(MAX_POINTS);
   });
 
   it('lo razonable pasa sin avisos', () => {

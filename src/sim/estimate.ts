@@ -5,12 +5,18 @@
 import { formatSpiceNumber, parseSpiceNumber } from '../netlist/spicenum.ts';
 import { parseAnalysis, type Analysis, type Sweep } from './analyses.ts';
 
-/** Por encima de esto no se simula */
-export const MAX_SIM_BYTES = 1024 ** 3;
+/**
+ * Por encima de esto no se simula. ngspice agranda los vectores con realloc (el viejo y el
+ * nuevo conviven) y después se copian a la página: el pico es varias veces esto.
+ */
+export const MAX_SIM_BYTES = 512 * 1024 ** 2;
+/** Puntos por corrida: más tardan minutos en simular y no se pueden graficar con fluidez */
+export const MAX_POINTS = 2_000_000;
 /** Más puntos por década casi nunca aportan resolución */
 const MAX_PER_DECADE = 10000;
 /** Lo que se propone al bajar los puntos */
 const TARGET_BYTES = 100 * 1024 ** 2;
+const TARGET_POINTS = 200_000;
 
 /** Puntos de un barrido dec/oct/lin, o NaN si no se puede saber (parámetros, etc.) */
 export function sweepPoints(s: Sweep): number {
@@ -209,13 +215,16 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     vectors ??= countVectors(netlist, files);
     const complex = a.kind === 'ac' || a.kind === 'sp' || a.kind === 'disto' || (a.kind === 'sens' && a.ac);
     const bytes = points * vectors * (complex ? 16 : 8) * runs;
-    if (bytes <= MAX_SIM_BYTES) continue;
-    const to = fewerPoints(line, a, TARGET_BYTES / bytes);
+    if (bytes <= MAX_SIM_BYTES && points <= MAX_POINTS) continue;
+    const to = fewerPoints(line, a, Math.min(TARGET_BYTES / bytes, TARGET_POINTS / points));
     const per = runs > 1 ? ` × ${runs} corridas` : '';
+    const why =
+      bytes > MAX_SIM_BYTES
+        ? `≈ ${fmtBytes(bytes)}: más de lo que el navegador puede guardar y graficar`
+        : `≈ ${fmtBytes(bytes)}: demasiados puntos para simular y graficar en un tiempo razonable`;
     out.errors.push({
       text:
-        `${line} genera ${fmtCount(points)} puntos × ${vectors} vectores${per} ≈ ${fmtBytes(bytes)}; ` +
-        `el navegador admite como mucho ~2–4 GB, así que no se simula.` +
+        `${line} genera ${fmtCount(points)} puntos × ${vectors} vectores${per} ${why}, así que no se simula.` +
         (to ? ` Probá con «${to}».` : ' Reducí la cantidad de puntos.'),
       fix: to ? { from: line, to } : undefined,
     });

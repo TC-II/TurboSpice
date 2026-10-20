@@ -157,7 +157,11 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     }
     if (FAMILIES[P]) families.add(P);
 
-    let value = ['SpiceModel', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2']
+    // Subcircuito sin ModelFile: el SpiceModel es el archivo (.lib) y el nombre es Value2 o, si
+    // no hay, Value (p.ej. CD4046B, o los amp. op. de LTspice con SpiceModel LTC.lib)
+    const libModel = P === 'X' && !attrs.get('ModelFile') ? attrs.get('SpiceModel') : undefined;
+    const keys = libModel ? [attrs.get('Value2') ? 'Value2' : 'Value', 'SpiceLine', 'SpiceLine2'] : ['SpiceModel', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2'];
+    let value = keys
       .map((k) => attrs.get(k) ?? '')
       .filter((v) => v !== '')
       .join(' ')
@@ -171,7 +175,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       addBlock(name, def);
     }
 
-    const modelFile = attrs.get('ModelFile');
+    const modelFile = attrs.get('ModelFile') || libModel;
     if (modelFile && !modelFiles.includes(modelFile)) modelFiles.push(modelFile);
 
     elements.push({ sym: si, name: elementName(prefix, instName), prefix, nodes, pinNames, value, attrs });

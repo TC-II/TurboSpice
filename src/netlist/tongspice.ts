@@ -348,12 +348,29 @@ function capacitorIcs(lt: LtNetlist): string[] {
   return out;
 }
 
+/**
+ * ".ic I(L1)=0 V(a)=1": LTspice acepta corrientes de inductor; el .ic de ngspice sólo tensiones
+ * de nodo (".ic syntax error"). Las I(Lx) pasan a IC= del inductor (ngspice sólo lo usa con uic)
+ * y en el .ic quedan las V(…). Devuelve las corrientes por nombre (minúsculas) y el .ic restante.
+ */
+function splitIc(line: string, currents: Map<string, string>): string | null {
+  if (!/^\.ic\b/i.test(line)) return line;
+  const rest: string[] = [];
+  for (const t of line.slice(3).trim().match(/(?:[^\s=]+\s*=\s*)?\S+/g) ?? []) {
+    const m = /^I\(([^)]+)\)\s*=\s*(\S+)$/i.exec(t);
+    if (m) currents.set(m[1].toLowerCase(), m[2]);
+    else rest.push(t);
+  }
+  return rest.length ? `.ic ${rest.join(' ')}` : null;
+}
+
 function convertElements(
   lt: LtNetlist,
   used: Set<string>,
   names: Map<string, string>,
   warnings: string[],
   subcktParams: Map<string, Map<string, string>>,
+  inductorIcs = new Map<string, string>(),
 ): string[] {
   const out: string[] = [];
   for (const e of lt.elements) {
@@ -375,7 +392,10 @@ function convertElements(
     }
     // Fuentes B: LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis y funciones
     // que la fuente B de ngspice no conoce (round, buf…) también fuera de llaves; ngspice no
-    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : fixBraces(e.value);
+    let value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : fixBraces(e.value);
+    // corriente inicial de .ic I(L1)=… (se busca por nombre o por InstName sin el prefijo L§)
+    const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
+    if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
     out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 
@@ -404,7 +424,13 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     return section ? `.lib ${rel} ${section}` : `.include ${rel}`;
   };
 
-  out.push(...convertElements(lt, used, names, warnings, subcktParams));
+  // corrientes de inductor de los .ic (ver splitIc); el texto restante se vuelve a procesar abajo
+  const inductorIcs = new Map<string, string>();
+  for (const t of lt.texts) {
+    if (t.kind === 'directive') for (const l of t.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
+  }
+  for (const [l, v] of inductorIcs) if (parseSpiceNumber(v) !== 0) warnings.push(`.ic I(${l})=${v}: ngspice usa la corriente inicial del inductor sólo con .tran uic`);
+  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs));
   out.push(...capacitorIcs(lt));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
@@ -460,8 +486,16 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         continue;
       }
       // en LTspice ";" empieza un comentario también a mitad de línea
-      const line = raw.replace(/\s*;.*$/, '').trim();
+      let line = raw.replace(/\s*;.*$/, '').trim();
       if (!line) continue;
+      if (!comment) {
+        const ic = splitIc(line, new Map());
+        if (ic === null) {
+          out.push(`* ${line}`);
+          continue;
+        }
+        line = ic;
+      }
       if (DROP_DIRECTIVES.test(line)) continue;
       if (/^\.meas(ure)?\b/i.test(line)) {
         measures.push(line);

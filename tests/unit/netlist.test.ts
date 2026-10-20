@@ -114,6 +114,25 @@ SYMATTR Value R= -1000*(V(Vx))**3 + 3400*(V(Vx))**2+200
     expect(r.names.get('R5')).toBe('R5');
   });
 
+  it('.ic con corrientes de inductor: I(L1)=x pasa a IC= del inductor y V() queda en .ic', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL ind 0 0 R0
+SYMATTR InstName L§N2
+SYMATTR Value 1m
+SYMBOL ind 100 0 R0
+SYMATTR InstName L2
+SYMATTR Value 1m
+SYMATTR SpiceLine Rser=2
+TEXT 0 200 Left 2 !.ic I(N2)=0 V(a)=1 I(L2)=0.5
+TEXT 0 240 Left 2 !.ic I(L9)=3
+`);
+    expect(r.text).toMatch(/^L_N2 \S+ \S+ 1m ic=0$/m);
+    expect(r.text).toMatch(/^L2 \S+ \S+ 1m ic=0.5$/m);
+    expect(r.text).toContain('.ic V(a)=1');
+    expect(r.text).not.toMatch(/^\.ic.*I\(/m);
+  });
+
   it('.tran de un argumento y .step como bucle en .control', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

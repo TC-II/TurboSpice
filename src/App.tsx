@@ -884,7 +884,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return currentArrows(doc, lib, sim.built.lt.elements);
   }, [sim, doc, lib, showOp, tool.kind]);
 
-  const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p), [sim]);
+  const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color

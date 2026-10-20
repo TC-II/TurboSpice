@@ -1,5 +1,6 @@
 // Expresiones de trazas al estilo LTspice: V(out), V(a,b), I(R1), Ic(Q1), V(out)/V(in),
 // db(V(out)), d(V(c)), 2*I(L1)… Se evalúan punto a punto sobre vectores reales o complejos.
+// Con .step, V(out)@2 es el vector de la segunda corrida (como en LTspice).
 
 export interface Wave {
   re: Float64Array;
@@ -7,13 +8,16 @@ export interface Wave {
   im?: Float64Array;
 }
 
-/** Busca el vector de una referencia: V(a), V(a,b) ya resuelto como resta, I(x), Ic(x)… */
-export type Resolver = (fn: string, args: string[]) => Wave | null;
+/**
+ * Busca el vector de una referencia: V(a), V(a,b) ya resuelto como resta, I(x), Ic(x)…
+ * `run`: número de corrida de .step (1, 2…) pedido con "@"; sin él, la que se grafica.
+ */
+export type Resolver = (fn: string, args: string[], run?: number) => Wave | null;
 
 type Node =
   | { t: 'num'; v: number }
-  | { t: 'ref'; fn: string; args: string[] }
-  | { t: 'var'; name: string }
+  | { t: 'ref'; fn: string; args: string[]; run?: number }
+  | { t: 'var'; name: string; run?: number }
   | { t: 'call'; fn: string; args: Node[] }
   | { t: 'un'; op: string; a: Node }
   | { t: 'bin'; op: string; a: Node; b: Node };
@@ -65,7 +69,11 @@ export function parseExpr(src: string): Node {
     const name = id[0];
     i += name.length;
     ws();
-    if (peek() !== '(') return { t: 'var', name };
+    if (peek() !== '(') {
+      // "out@2": el nodo out en la corrida 2
+      const at = /^(.+)@(\d+)$/.exec(name);
+      return at ? { t: 'var', name: at[1], run: Number(at[2]) } : { t: 'var', name };
+    }
     i++;
     if (isRefFn(name)) {
       const close = src.indexOf(')', i);
@@ -76,7 +84,10 @@ export function parseExpr(src: string): Node {
         .map((a) => a.trim());
       i = close + 1;
       if (!args[0]) throw new ExprError(`${name}() necesita un argumento`);
-      return { t: 'ref', fn: name, args };
+      // "V(out)@2": en la corrida 2
+      const at = /^\s*@(\d+)/.exec(src.slice(i));
+      if (at) i += at[0].length;
+      return at ? { t: 'ref', fn: name, args, run: Number(at[1]) } : { t: 'ref', fn: name, args };
     }
     const args: Node[] = [];
     ws();
@@ -240,13 +251,13 @@ function ev(n: Node, ctx: EvalContext): C {
       if (v === 'e') return { re: fill(1, Math.E), im: null };
       if (v === 'j') return { re: fill(1, 0), im: fill(1, 1) };
       // un nombre suelto es un nodo, como en LTspice ("out" = V(out))
-      const w = ctx.resolve('V', [n.name]);
-      if (!w) throw new ExprError(`no existe ${n.name}`);
+      const w = ctx.resolve('V', [n.name], n.run);
+      if (!w) throw new ExprError(`no existe ${n.name}${n.run ? `@${n.run}` : ''}`);
       return { re: w.re, im: w.im ?? null };
     }
     case 'ref': {
-      const w = ctx.resolve(n.fn, n.args);
-      if (!w) throw new ExprError(`no existe ${n.fn}(${n.args.join(',')})`);
+      const w = ctx.resolve(n.fn, n.args, n.run);
+      if (!w) throw new ExprError(`no existe ${n.fn}(${n.args.join(',')})${n.run ? `@${n.run}` : ''}`);
       return { re: w.re, im: w.im ?? null };
     }
     case 'un': {

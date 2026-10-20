@@ -1,0 +1,110 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "turbospice",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5173"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "turbospice-51",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "C:/_DATA/ITBA/Repositorios GitHub/TurboSpice/.claude/worktrees/issue-resultados-vista",
+        "--port",
+        "5174",
+        "--strictPort"
+      ],
+      "port": 5174
+    },
+    {
+      "name": "turbospice-preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--port",
+        "4173",
+        "--strictPort"
+      ],
+      "port": 4173
+    },
+    {
+      "name": "asc-parser",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8123",
+        "--directory",
+        "C:/_DATA/ITBA/Repositorios GitHub/ASC-Parser"
+      ],
+      "port": 8123
+    },
+    {
+      "name": "turbospice-5175",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "--port",
+        "5175",
+        "--strictPort"
+      ],
+      "port": 5175
+    },
+    {
+      "name": "turbospice-56",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "C:/_DATA/ITBA/Repositorios GitHub/TurboSpice/.claude/worktrees/issue-56-prueba",
+        "--port",
+        "5176",
+        "--strictPort"
+      ],
+      "port": 5176
+    },
+    {
+      "name": "turbospice-58",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "C:/_DATA/ITBA/Repositorios GitHub/TurboSpice/.claude/worktrees/issue-58-prueba",
+        "--port",
+        "5177",
+        "--strictPort"
+      ],
+      "port": 5177
+    },
+    {
+      "name": "turbospice-57",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "C:/_DATA/ITBA/Repositorios GitHub/TurboSpice/.claude/worktrees/issue-57-prueba",
+        "--port",
+        "5178",
+        "--strictPort"
+      ],
+      "port": 5178
+    },
+    {
+      "name": "turbospice-ux",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "C:/_DATA/ITBA/Repositorios GitHub/TurboSpice/.claude/worktrees/issue-ux-colocar",
+        "--port",
+        "5181",
+        "--strictPort"
+      ],
+      "port": 5181
+    }
+  ]
+}

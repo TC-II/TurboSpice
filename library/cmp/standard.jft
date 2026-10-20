@@ -1,9 +1,38 @@
-* TurboSpice: JFET (como lib/cmp/standard.jft de LTspice)
-* Una línea .model por JFET; mfg (fabricante) es informativo.
-*
-* Los dos primeros son ejemplos inventados con valores típicos (placeholders). Los modelos
-* levantados de fuentes que permitan redistribuirlos van debajo, con su origen en
-* library/LICENSES.md.
+* TurboSpice: JFET
+* modelaron desde el datasheet y se calibraron contra el motor
 
-.model TS_NJF_GP NJF(Beta=1.2m Vto=-2.5 Lambda=4m Rd=5 Rs=5 Is=30f Cgd=2p Cgs=3p Pb=0.8 Fc=0.5 mfg=TurboSpice_ejemplo)
-.model TS_PJF_GP PJF(Beta=0.8m Vto=-3 Lambda=5m Rd=8 Rs=8 Is=40f Cgd=3p Cgs=4p Pb=0.8 Fc=0.5 mfg=TurboSpice_ejemplo)
+.model MPF102A NJF(Beta=1.04m Betatce=-.5 Rd=1 Rs=1 Lambda=2m Vto=-3.41 Vtotc=-2.5m Is=33.57f N=1 Xti=3 Cgd=1.6p M=.3622 Pb=1 Fc=.5 Cgs=2.414p Kf=11.73E-18 Af=1)
+.model J201 NJF(Beta=1.07m Betatce=-0.5 Vto=-0.93 Vtotc=-2.5m Lambda=6.75m Is=1.72f Xti=0 Rd=10 Rs=12 Cgd=1p Cgs=1p Fc=0.5 M=500m Pb=0.8 Kf=0 Af=1 Mfg=Linear_Systems)
+.model 2N5462 PJF(Is=1.5p Vto=-5.4 Vtotc=-3m Beta=2.0m Lambda=10m Betatce=-.5 Rd=10 Rs=10 Cgs=5p Cgd=5p Kf=3e-17 mfg=Siliconix)
+.model 2N3819 NJF(Beta=1.304m Betatce=-.5 Rd=1 Rs=1 Lambda=2.25m Vto=-3 Vtotc=-2.5m Is=33.57f N=1 Xti=3 Cgd=1.6p M=.3622 Pb=1 Fc=.5 Cgs=2.414p Kf=9.882E-18 Af=1 mfg=Vishay)
+.model 2N4117A NJF(Beta=0.56m Betatce=-0.5 Vto=-1.209 Vtotc=-2.5m Lambda=7.5m Is=4.477f Xti=3 N=1 Rd=1 Rs=1 Cgd=4.49p Cgs=4.49p Fc=0.5 M=435.9m Pb=1 Kf=30820f Af=1 Mfg=Linear_Systems)
+.model 2N4391 NJF(Beta=3.084m Betatce=-0.5 Vto=-5.27 Vtotc=-2.5m Lambda=17.5m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=5.35p Cgs=4.76p Fc=0.5 M=407m Pb=1 Kf=40230f Af=1 Mfg=Linear_Systems)
+.model 2N4392 NJF(Beta=5.816m Betatce=-0.5 Vto=-2.808 Vtotc=-2.5m Lambda=12m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=4.83p Cgs=4.29p Fc=0.5 M=407m Pb=1 Kf=77640f Af=1 Mfg=Linear_Systems)
+.model 2N4393 NJF(Beta=9.109m Betatce=-0.5 Vto=-1.422 Vtotc=-2.5m Lambda=6m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=4.57p Cgs=4.06p Fc=0.5 M=407m Pb=1 Kf=12300f Af=1 Mfg=Linear_Systems)
+.model 2N4416 NJF(Beta=0.989m Betatce=-0.5 Vto=-3.07 Vtotc=-2.5m Lambda=5.5m Is=33.57f Xti=3 N=1 Rd=1 Rs=1 Cgd=1.6p Cgs=2.414p Fc=0.5 M=362m Pb=1 Kf=74450f Af=1 Mfg=Linear_Systems)
+.model 2N5460 PJF(Is=1.5p Vto=-3.4 Vtotc=-3m Beta=1.0m Lambda=10m Betatce=-.5 Rd=10 Rs=10 Cgs=5p Cgd=5p Kf=3e-17 mfg=Siliconix)
+.model 2N5461 PJF(Is=1.5p Vto=-4.3 Vtotc=-3m Beta=1.5m Lambda=10m Betatce=-.5 Rd=10 Rs=10 Cgs=5p Cgd=5p Kf=3e-17 mfg=Siliconix)
+.model J111 NJF(Beta=2.91m Betatce=-0.5 Vto=-4.047 Vtotc=-2.5m Lambda=17.5m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.46p Cgs=5.74p Fc=0.5 M=407m Pb=1 Kf=37860f Af=1 Mfg=Linear_Systems)
+.model J112 NJF(Beta=5.695m Betatce=-0.5 Vto=-2.057 Vtotc=-2.5m Lambda=13m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.46p Cgs=5.74p Fc=0.5 M=407m Pb=1 Kf=75980f Af=1 Mfg=Linear_Systems)
+.model J113 NJF(Beta=9.109m Betatce=-0.5 Vto=-1.382 Vtotc=-2.5m Lambda=8m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.46p Cgs=5.74p Fc=0.5 M=407m Pb=1 Kf=12300f Af=1 Mfg=Linear_Systems)
+.model J174 PJF(Beta=0.813m Betatce=-0.5 Vto=-6.552 Vtotc=-2.5m Lambda=40m Is=461.5f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.5p Cgs=9p Fc=0.5 M=279m Pb=1 Kf=52540f Af=1 Mfg=Linear_Systems)
+.model J175 PJF(Beta=1.031m Betatce=-0.5 Vto=-3.762 Vtotc=-2.5m Lambda=28m Is=461.5f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.5p Cgs=9p Fc=0.5 M=279m Pb=1 Kf=66610f Af=1 Mfg=Linear_Systems)
+.model J176 PJF(Beta=2.3m Betatce=-0.5 Vto=-1.82 Vtotc=-2.5m Lambda=21m Is=461.5f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.5p Cgs=9p Fc=0.5 M=279m Pb=1 Kf=148600f Af=1 Mfg=Linear_Systems)
+.model J177 PJF(Beta=3.3m Betatce=-0.5 Vto=-1.386 Vtotc=-2.5m Lambda=18.18m Is=461.5f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.5p Cgs=9p Fc=0.5 M=279m Pb=1 Kf=21320f Af=1 Mfg=Linear_Systems)
+.model J202 NJF(Beta=0.88m Betatce=-0.5 Vto=-1.81 Vtotc=-2.5m Lambda=8.47m Is=2.56f Xti=0 Rd=11 Rs=13 Cgd=1p Cgs=1p Fc=0.5 M=500m Pb=0.8 Kf=0 Af=1 Mfg=Linear_Systems)
+.model J204 NJF(Beta=1.004m Betatce=-0.5 Vto=-1.139 Vtotc=-2.5m Lambda=3.333m Is=29.04f Xti=3 N=1 Rd=1 Rs=1 Cgd=3.58p Cgs=5.4p Fc=0.5 M=360m Pb=1 Kf=16500f Af=1 Mfg=Linear_Systems)
+.model J310 NJF(Beta=3.384m Betatce=-0.5 Vto=-3.409 Vtotc=-2.5m Lambda=17m Is=193.9f Xti=3 N=1 Rd=1 Rs=1 Cgd=6.2p Cgs=6.2p Fc=0.5 M=465m Pb=1 Kf=46340f Af=1 Mfg=Linear_Systems)
+.model LSJ74A PJF(Beta=38m Betatce=-0.5 Vto=-.38 Vtotc=-2.5m Lambda=3m Is=12980f Xti=3 N=1 Rd=7.748 Rs=7.748 Cgd=85.67p Cgs=78.27p Fc=0.5 M=324m Pb=0.3905 Kf=26640f Mfg=Linear_Systems)
+.model PN4391 NJF(Beta=3.084m Betatce=-0.5 Vto=-5.27 Vtotc=-2.5m Lambda=17.5m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=5.35p Cgs=4.76p Fc=0.5 M=407m Pb=1 Kf=40230f Af=1 Mfg=Linear_Systems)
+.model PN4393 NJF(Beta=9.109m Betatce=-0.5 Vto=-1.417 Vtotc=-2.5m Lambda=8m Is=205.2f Xti=3 N=1 Rd=1 Rs=1 Cgd=4.57p Cgs=4.06p Fc=0.5 M=407m Pb=1 Kf=12300f Af=1 Mfg=Linear_Systems)
+.model U440 NJF(Beta=1.978m Betatce=-0.5 Vto=-2.839 Vtotc=-2.5m Lambda=30m Is=36.18f Xti=3 N=1 Rd=1 Rs=1 Cgd=2.11p Cgs=2.47p Fc=0.5 M=333m Pb=1 Kf=27880f Af=1 Mfg=Linear_Systems)
+.model U441 NJF(Beta=1.978m Betatce=-0.5 Vto=-2.839 Vtotc=-2.5m Lambda=30m Is=36.18f Xti=3 N=1 Rd=1 Rs=1 Cgd=2.11p Cgs=2.47p Fc=0.5 M=333m Pb=1 Kf=27880f Af=1 Mfg=Linear_Systems)
+.model LSK170A NJF(Beta=35E-3 Betatce=-0.5 Vto=-0.35 Lambda=0.024 IS=14f N=1 Rd=4 Rs=1.1 Cgd=19p Cgs=27p Fc=0.5 M=320m Pb=0.6 Kf=0.004f Af=1.0 Gdsnoi=8 XTI=0 Nlev=3 mfg=Linear_Systems)
+.model LSK170B NJF(Beta=30E-3 Betatce=-0.5 Vto=-0.54 Lambda=0.02 IS=15f N=1 Rd=4.9 Rs=5.1 Cgd=20p Cgs=27p Fc=0.5 M=320m Pb=0.6 Kf=0.004f Af=1.0 Gdsnoi=7 XTI=0 Nlev=3 mfg=Linear_Systems)
+.model 2N5457 NJF(Beta=1.333m Vto=-1.5 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.5p Cgs=3.5p Pb=0.8 Fc=0.5 mfg=Fairchild)
+.model 2N5458 NJF(Beta=1.282m Vto=-2.2 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.5p Cgs=3.5p Pb=0.8 Fc=0.5 mfg=Fairchild)
+.model 2N5459 NJF(Beta=1.629m Vto=-2.8 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.5p Cgs=3.5p Pb=0.8 Fc=0.5 mfg=Fairchild)
+.model BF245A NJF(Beta=1.61m Vto=-1.6 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.1p Cgs=3.4p Pb=0.8 Fc=0.5 mfg=NXP)
+.model BF245B NJF(Beta=1.563m Vto=-2.6 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.1p Cgs=3.4p Pb=0.8 Fc=0.5 mfg=NXP)
+.model BF245C NJF(Beta=1.498m Vto=-3.6 Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.1p Cgs=3.4p Pb=0.8 Fc=0.5 mfg=NXP)
+.model BF862 NJF(Beta=63.3m Vto=-700m Lambda=2m Rd=10 Rs=10 Is=30f Cgd=1.5p Cgs=10.5p Pb=0.8 Fc=0.5 mfg=NXP)

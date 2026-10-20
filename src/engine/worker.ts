@@ -62,6 +62,8 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     );
     post({ id: req.id, type: 'result', result, ms }, transfer);
   } catch (e) {
+    // (p. ej. un abort de Emscripten sin memoria): el módulo quedó inutilizable
+    ng = null;
     post({ id: req.id, type: 'error', message: e instanceof Error ? e.message : String(e) });
   }
 };

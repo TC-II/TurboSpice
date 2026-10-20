@@ -163,6 +163,76 @@ export function translateRandom(text: string): string {
   return out + text.slice(i);
 }
 
+/** Argumentos de una llamada: separados por las comas de primer nivel */
+function splitArgs(args: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let k = 0; k < args.length; k++) {
+    if (args[k] === '(') depth++;
+    else if (args[k] === ')') depth--;
+    else if (args[k] === ',' && !depth) {
+      out.push(args.slice(start, k).trim());
+      start = k + 1;
+    }
+  }
+  out.push(args.slice(start).trim());
+  return out;
+}
+
+// Funciones de LTspice que el numparam de ngspice no conoce (en las fuentes B sí andan)
+const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
+  u: ([x, ...r]) => (r.length ? null : `((${x}) > 0 ? 1 : 0)`),
+  uramp: ([x, ...r]) => (r.length ? null : `max((${x}), 0)`),
+  buf: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 1 : 0)`),
+  inv: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 0 : 1)`),
+  // al entero más cercano, las mitades lejos del cero (nint de ngspice redondea al par)
+  round: ([x, ...r]) => (r.length ? null : `(sgn(${x})*floor(abs(${x})+0.5))`),
+  hypot: ([x, y, ...r]) => (y === undefined || r.length ? null : `sqrt(pow(${x},2)+pow(${y},2))`),
+};
+const LT_FUNCTION_RE = new RegExp(`\\b(${Object.keys(LT_FUNCTIONS).join('|')})\\s*\\(`, 'gi');
+
+/** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
+function translateExpression(text: string): string {
+  let out = '';
+  let i = 0;
+  const re = new RegExp(LT_FUNCTION_RE.source, 'gi');
+  for (let m = re.exec(text); m; m = re.exec(text)) {
+    let depth = 1;
+    let k = m.index + m[0].length;
+    const start = k;
+    for (; k < text.length && depth; k++) {
+      if (text[k] === '(') depth++;
+      else if (text[k] === ')') depth--;
+    }
+    if (depth) break;
+    // los argumentos pueden tener a su vez llamadas a traducir
+    const args = splitArgs(translateExpression(text.slice(start, k - 1)));
+    const rep = LT_FUNCTIONS[m[1].toLowerCase()](args);
+    if (rep === null) continue;
+    out += text.slice(i, m.index) + rep;
+    i = k;
+    re.lastIndex = k;
+  }
+  return out + text.slice(i);
+}
+
+/**
+ * Funciones deterministas de LTspice que el numparam de ngspice no conoce: u(x) → ((x) > 0 ? 1 : 0),
+ * uramp(x) → max((x), 0), buf, inv, round y hypot. Sólo se traducen en las expresiones que evalúa
+ * numparam: las líneas .param/.func enteras y, en el resto, lo que está entre llaves (en una fuente
+ * B, "V=u(x)" sin llaves lo evalúa la fuente, que sí conoce u()).
+ */
+export function translateFunctions(text: string): string {
+  if (!new RegExp(LT_FUNCTION_RE.source, 'i').test(text)) return text;
+  if (/^\s*\.(param|func)\b/i.test(text)) {
+    // ".func u(x)=…" define la función: el nombre no se toca
+    const head = /^\s*\.func\s+\w+\s*\([^)]*\)/i.exec(text)?.[0] ?? '';
+    return head + translateExpression(text.slice(head.length));
+  }
+  return text.replace(/\{[^{}]*\}/g, (e) => translateExpression(e));
+}
+
 /** ".tran tstop" o ".tran 0 tstop ..." → ".tran paso tstop ..." (ngspice exige paso > 0) */
 function fixTran(line: string, warnings: string[]): string {
   const m = /^\.tran\s+(.*)$/i.exec(line.trim());
@@ -206,7 +276,7 @@ function convertElements(
         for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
       }
     }
-    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateRandom(e.value)), warnings));
+    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(e.value))), warnings));
   }
 
   return out;
@@ -304,7 +374,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         continue;
       }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
-      out.push(translateRandom(fixTran(line, warnings)).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
+      out.push(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3'));
     }
   }
 
@@ -353,7 +423,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         const line = raw.trim();
         if (/^\.(model|param|func|subckt|ends|include|inc|lib)\b/i.test(line) || /^[+]/.test(line)) {
           const lib = /^\.(lib|include|inc)\s+("?)([^"]+)\2(?:\s+(\S+))?\s*$/i.exec(line);
-          out.push(lib ? (include(lib[3].trim(), lib[1].toLowerCase() === 'lib' ? lib[4] : undefined) ?? `* ${line}`) : line);
+          out.push(lib ? (include(lib[3].trim(), lib[1].toLowerCase() === 'lib' ? lib[4] : undefined) ?? `* ${line}`) : translateFunctions(line));
         } else if (/^\./.test(line)) out.push(`* ${line} (dentro del bloque ${b.name}: se ignora)`);
       }
     }

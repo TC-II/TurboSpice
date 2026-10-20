@@ -66,3 +66,29 @@ describe('expresiones de trazas', () => {
     ]);
   });
 });
+
+describe('corridas de .step con @n (como LTspice)', () => {
+  // corrida 1: out = 1; corrida 2: out = 10; sin @, la que se grafica (out = 100)
+  const runs: Record<string, number> = { '': 100, '1': 1, '2': 10 };
+  const rctx = {
+    scale: x,
+    scaleName: 'frequency',
+    resolve: (fn: string, args: string[], run?: number) => {
+      const v = runs[run === undefined ? '' : String(run)];
+      return v !== undefined && fn.toUpperCase() === 'V' && args[0] === 'out' ? { re: new Float64Array(4).fill(v) } : null;
+    },
+  };
+  const rev = (s: string) => evalTrace(s, rctx).re[0];
+
+  it('V(x)@n y nodo@n eligen la corrida', () => {
+    expect(rev('V(out)@2')).toBe(10);
+    expect(rev('V(out) @1 + out@2')).toBe(11);
+    expect(rev('V(out)')).toBe(100);
+    // la fórmula de Middlebrook del ejemplo de ganancia de lazo se puede leer
+    expect(() => parseExpr('1/(1-1/(2*(I(Vp)@1*V(x2)@2-V(x2)@1*I(Vp)@2)+V(x2)@1+I(Vp)@2))')).not.toThrow();
+  });
+
+  it('una corrida que no existe avisa', () => {
+    expect(() => rev('V(out)@3')).toThrow(/no existe V\(out\)@3/);
+  });
+});

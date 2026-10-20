@@ -183,3 +183,43 @@ describe('funciones aleatorias (Monte Carlo)', () => {
     expect(translateRandom('{gauss(1k, 0.1, 3)}')).toBe('{gauss(1k, 0.1, 3)}');
   });
 });
+
+describe('funciones de LTspice que numparam no conoce (#56)', () => {
+  it('u, uramp, buf, inv, round y hypot entre llaves', async () => {
+    const { translateFunctions } = await import('../../src/netlist/tongspice.ts');
+    expect(translateFunctions('AC {u(P)}')).toBe('AC {((P) > 0 ? 1 : 0)}');
+    expect(translateFunctions('AC {U (-P)}')).toBe('AC {((-P) > 0 ? 1 : 0)}');
+    expect(translateFunctions('{u(-(P-1))}')).toBe('{((-(P-1)) > 0 ? 1 : 0)}');
+    expect(translateFunctions('{2*u(P)+uramp(x)}')).toBe('{2*((P) > 0 ? 1 : 0)+max((x), 0)}');
+    expect(translateFunctions('{u(uramp(x)-1)}')).toBe('{((max((x), 0)-1) > 0 ? 1 : 0)}');
+    expect(translateFunctions('{buf(a)+inv(b)}')).toBe('{((a) > 0.5 ? 1 : 0)+((b) > 0.5 ? 0 : 1)}');
+    expect(translateFunctions('{round(x)}')).toBe('{(sgn(x)*floor(abs(x)+0.5))}');
+    expect(translateFunctions('{hypot(a, b)}')).toBe('{sqrt(pow(a,2)+pow(b,2))}');
+  });
+
+  it('no toca identificadores que contienen u ni las fuentes B sin llaves', async () => {
+    const { translateFunctions } = await import('../../src/netlist/tongspice.ts');
+    expect(translateFunctions('{mu(x)*Vout}')).toBe('{mu(x)*Vout}');
+    expect(translateFunctions('{my_u(x)}')).toBe('{my_u(x)}');
+    expect(translateFunctions('V=u(time-1)*{u(P)}')).toBe('V=u(time-1)*{((P) > 0 ? 1 : 0)}');
+    expect(translateFunctions('{u(1, 2)}')).toBe('{u(1, 2)}');
+  });
+
+  it('.param y .func se traducen enteras (sin llaves)', async () => {
+    const { translateFunctions } = await import('../../src/netlist/tongspice.ts');
+    expect(translateFunctions('.param a=u(P) b={uramp(P)}')).toBe('.param a=((P) > 0 ? 1 : 0) b={max((P), 0)}');
+    expect(translateFunctions('.func u(x)=uramp(x)')).toBe('.func u(x)=max((x), 0)');
+  });
+
+  it('en la netlist: valores de elementos y .param, con mc() también', async () => {
+    const lt = ltNetlist(
+      parseAsc(
+        `Version 4\nSHEET 1 880 680\nFLAG 0 0 a\nFLAG 0 96 0\nSYMBOL current 0 0 R0\nSYMATTR InstName I1\nSYMATTR Value 0\nSYMATTR Value2 AC {u(P)*mc(1,0.1)}\nTEXT 0 200 Left 2 !.param P=uramp(-1)\nTEXT 0 240 Left 2 !.ac dec 1 1 10\n`,
+      ),
+      lib,
+    );
+    const ng = toNgspice(lt, 't', { resolve: () => undefined });
+    expect(ng.text).toContain('AC {((P) > 0 ? 1 : 0)*unif(1,0.1)}');
+    expect(ng.text).toContain('.param P=max((-1), 0)');
+  });
+});

@@ -13,8 +13,17 @@ function findVector(plot: SimPlot, name: string): SimVector | undefined {
 
 const wave = (v: SimVector | undefined): Wave | null => (v ? { re: v.real, ...(v.imag ? { im: v.imag } : {}) } : null);
 
-/** Resolver de referencias V()/I() de una expresión sobre un plot */
-export function traceResolver(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
+/**
+ * Resolver de referencias V()/I() de una expresión sobre un plot. `runs`: las corridas de .step
+ * del mismo análisis, para "V(out)@2".
+ */
+export function traceResolver(sim: BuiltSimulation | null, plot: SimPlot, runs: SimPlot[] = [plot]): Resolver {
+  const here = resolverOn(sim, plot);
+  const byRun = runs.map((p) => (p === plot ? here : resolverOn(sim, p)));
+  return (fn, args, run) => (run === undefined ? here(fn, args) : (byRun[run - 1]?.(fn, args) ?? null));
+}
+
+function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
   const node = (name: string): Wave | null => {
     if (name === '0') {
       const len = plot.vectors[0]?.real.length ?? 0;

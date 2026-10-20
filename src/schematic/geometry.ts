@@ -7,6 +7,8 @@ import { isDataText } from '../asc/dataText.ts';
 import { EXTRA_ANALYSES, isNgspiceComment } from '../netlist/directives.ts';
 import { ANALYSIS_LINE } from '../sim/analyses.ts';
 import { shapeDist } from './shapes.ts';
+import { fromRkm, parseSpiceNumber } from '../netlist/spicenum.ts';
+import { si } from '../waveform/series.ts';
 
 /**
  * Lo que se dibuja de un texto, o null si no se dibuja nada. Los comentarios con datos nunca se
@@ -348,6 +350,20 @@ export function alignedBox(x: number, y: number, align: string, size: number, le
 
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
 
+const VALUE_UNIT: Record<string, string> = { R: 'Ω', C: 'F', L: 'H' };
+
+/**
+ * Cómo se ve el valor de un R, C o L en el esquemático: con prefijo SI y unidad (10Meg → 10MΩ,
+ * 4k7 → 4.7kΩ, 1u → 1µF). Sólo si es un número solo; expresiones y demás, tal cual (#73).
+ */
+export function displayValue(prefix: string, value: string): string {
+  const unit = VALUE_UNIT[prefix.toUpperCase()];
+  const v = value.trim();
+  if (!unit || !v || /\s/.test(v)) return value;
+  const x = parseSpiceNumber(fromRkm(v) ?? v);
+  return Number.isFinite(x) ? `${si(x, 6)}${unit}` : value;
+}
+
 /** Rótulo visible (InstName, Value…) de un símbolo bajo el cursor: índice de WINDOW y su ventana local */
 export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number): { sym: number; win: number; w: TextWindow } | null {
   for (let i = doc.symbols.length - 1; i >= 0; i--) {
@@ -357,8 +373,9 @@ export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number): { sym
     const attrs = effectiveAttrs(inst, def);
     for (const [idx, w] of effectiveWindows(inst, def, lib.windowDefaults)) {
       const key = WINDOW_ATTR[idx];
-      const text = key && attrs.get(key);
-      if (!text || w.align === 'Invisible') continue;
+      const raw = key && attrs.get(key);
+      if (!raw || w.align === 'Invisible') continue;
+      const text = idx === 3 ? displayValue(attrs.get('Prefix') ?? '', raw) : raw;
       if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(attrs.get('Prefix') ?? '')) continue;
       const at = toWorld(inst, w.x, w.y);
       if (inBox(p, alignedBox(at.x, at.y, transformAlign(w.align, inst.orient), w.size, text.length), tol / 2)) return { sym: i, win: idx, w };

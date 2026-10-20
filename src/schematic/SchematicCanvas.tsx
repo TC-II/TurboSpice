@@ -6,11 +6,12 @@ import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
+import { displayValue, flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
+
 
 /** <text> con la semántica de alineación de LTspice (Left…VBottom, spec §7) */
 export function AlignedText({ x, y, align, size, children, className }: {
@@ -95,8 +96,9 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     const key = WINDOW_ATTR[idx];
     if (!key) continue;
     if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(prefix)) continue;
-    const text = attrs.get(key);
-    if (!text) continue;
+    const raw = attrs.get(key);
+    if (!raw) continue;
+    const text = idx === 3 ? displayValue(prefix, raw) : raw;
     const p = toWorld(inst, w.x, w.y);
     labels.push(
       <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} className="win">

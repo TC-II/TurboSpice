@@ -322,7 +322,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
             {partsOpen && table}
           </details>
         )}
-        {rows.length > 0 && <p className="hint">☑ = visible en el esquemático. Los rótulos se arrastran con el mouse (Shift: libre).</p>}
+        {rows.length > 0 && <p className="hint">Los rótulos se arrastran con el mouse (Shift: libre).</p>}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
         <div className="buttons">
           <button type="button" onClick={onClose}>Cancelar</button>

@@ -3,7 +3,8 @@
 // Lo avanzado (AC, DC para .op, parásitos, sintaxis) va plegado.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
-import { effectiveAttrs } from '../asc/resolve.ts';
+import { effectiveAttrs, type WindowDefaults } from '../asc/resolve.ts';
+import type { LabelPatch } from './edit.ts';
 import {
   emptySource,
   engNumber,
@@ -17,7 +18,7 @@ import {
   type SourceKind,
   type SourceSpec,
 } from '../sim/sources.ts';
-import { Modal } from './dialogs.tsx';
+import { labelRows, Modal } from './dialogs.tsx';
 
 const KINDS: { kind: SourceKind; label: string; icon: ReactNode }[] = [
   { kind: 'sine', label: 'Seno', icon: <path d="M3 10C9 -2 15 -2 21 10S33 22 39 10" /> },
@@ -126,11 +127,12 @@ function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, l
   );
 }
 
-export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
+export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAttributes }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
-  /** atributos a escribir (null = se borra) */
-  onApply(attrs: Record<string, string | null>): void;
+  windowDefaults: WindowDefaults;
+  /** atributos a escribir (null = se borra) y rótulos que se muestran u ocultan */
+  onApply(attrs: Record<string, string | null>, labels: Map<number, LabelPatch>): void;
   onClose(): void;
   /** abrir el diálogo genérico de atributos (InstName, rótulos…) */
   onAttributes(): void;
@@ -264,13 +266,29 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
     .filter(Boolean)
     .join(' ');
 
+  // rótulos del nombre y del valor: si se ven en el esquemático (#71)
+  const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
+  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, r.visible])));
+  const labels = () => new Map(shown.filter((r) => visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
+  const showToggles = shown.length > 0 && (
+    <span className="src-show" role="group" aria-label="Mostrar en el esquemático">
+      Mostrar:
+      {shown.map((r) => (
+        <label key={r.win} title={`${r.attr === 'InstName' ? 'El nombre' : 'El valor'} se ve en el esquemático`}>
+          <input type="checkbox" checked={!!visible.get(r.win)} onChange={(e) => setVisible(new Map(visible).set(r.win, e.target.checked))} />
+          {r.attr === 'InstName' ? 'Nombre' : 'Valor'}
+        </label>
+      ))}
+    </span>
+  );
+
   const submit = () => {
     if (text !== null) {
       const p = parseSource({ Value: text });
-      if (p) return onApply(writeSource(p));
-      return onApply({ Value: text.trim(), Value2: null, SpiceLine: null });
+      if (p) return onApply(writeSource(p), labels());
+      return onApply({ Value: text.trim(), Value2: null, SpiceLine: null }, labels());
     }
-    onApply(writeSource(full));
+    onApply(writeSource(full), labels());
   };
 
   const name = eff.get('InstName') ?? baseName(inst.type);
@@ -286,6 +304,7 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
           <input aria-label="Valor de la fuente" value={text} onChange={(e) => setText(e.target.value)} autoFocus />
           <p className="hint">Sintaxis de LTspice, por ejemplo: SINE(0 1 1k) AC 1 Rser=1</p>
           <div className="buttons">
+            {showToggles}
             <button
               type="button"
               disabled={!parseSource({ Value: text })}
@@ -403,6 +422,8 @@ export function SourceDialog({ inst, def, onApply, onClose, onAttributes }: {
           </details>
           {warn && <p className="hint warn">{warn}</p>}
           <div className="buttons">
+            {showToggles}
+            <span className="spacer" />
             <button type="button" onClick={onClose}>Cancelar</button>
             <button type="submit" className="primary">Aceptar</button>
           </div>

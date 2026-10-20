@@ -1975,11 +1975,14 @@ ${ltNetlistText(sim.built.lt)}
           def={lib.symbol(doc.symbols[dialog.index].type)}
           onClose={() => setDialog(null)}
           onAttributes={() => setDialog({ kind: 'attrs', index: dialog.index })}
-          onApply={(attrs) => {
+          windowDefaults={lib.windowDefaults}
+          onApply={(attrs, labels) => {
             setDialog(null);
             const s = doc.symbols[dialog.index];
             const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => v !== (s.attrs.get(k) ?? null)));
-            if (Object.keys(changed).length) commit(setSymbolAttrs(doc, dialog.index, changed));
+            let d = Object.keys(changed).length ? setSymbolAttrs(doc, dialog.index, changed) : doc;
+            if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
+            if (d !== doc) commit(d);
           }}
         />
       )}

@@ -214,6 +214,8 @@ export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: W
   return rows;
 }
 
+const PASSIVE_KINDS = new Set(['res', 'cap', 'ind', 'bead']);
+
 /** Atributos de un componente y, a la derecha de cada uno, si su rótulo se ve en el esquemático */
 export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, onApply, onClose }: {
   inst: SymbolInst;
@@ -254,6 +256,21 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     setVals(next);
     return next;
   };
+  // R, L, C: la tabla de modelos de fabricante va escondida en «Avanzado» (#70), abierta si ya
+  // se usa uno; en semiconductores queda a la vista
+  const passive = !!parts?.length && parts.every((g) => PASSIVE_KINDS.has(g.kind));
+  // (un R de la tabla sólo pone el valor: un «1k» escrito a mano es lo mismo; un C o un L deja
+  // además sus parásitos en SpiceLine, y eso sí lo reconoce)
+  const [partsOpen, setPartsOpen] = useState(() => {
+    if (!passive) return true;
+    if (picked) return true;
+    const line = eff.get('SpiceLine') ?? '';
+    return !!line && !!parts?.some((g) => g.parts.some((p) => {
+      const a = cmpApply(p);
+      return a.SpiceLine === line && a.Value.toLowerCase() === (eff.get('Value') ?? '').toLowerCase();
+    }));
+  });
+  const table = !!parts?.length && <PartTable groups={parts} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />;
   const submit = (from = vals) => {
     const vals = from;
     const check = checkValue(prefix, vals.Value ?? '');
@@ -263,7 +280,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     onApply(changed, patches, false);
   };
   return (
-    <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose} wide={!!parts?.length}>
+    <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose} wide={!!parts?.length && partsOpen}>
       <form
         className="attrs"
         onSubmit={(e) => {
@@ -271,7 +288,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
           submit();
         }}
       >
-        {!!parts?.length && <PartTable groups={parts} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />}
+        {!passive && table}
         {keys.map((k) => {
           const row = rows.find((r) => r.attr === k);
           return (
@@ -299,6 +316,12 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
             </label>
           );
         })}
+        {passive && (
+          <details className="src-adv" open={partsOpen} onToggle={(e) => setPartsOpen(e.currentTarget.open)}>
+            <summary>Avanzado: modelo de fabricante</summary>
+            {partsOpen && table}
+          </details>
+        )}
         {rows.length > 0 && <p className="hint">☑ = visible en el esquemático. Los rótulos se arrastran con el mouse (Shift: libre).</p>}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
         <div className="buttons">

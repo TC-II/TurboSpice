@@ -135,6 +135,37 @@ SYMATTR Value I=LIMIT ( -V(a) , 1 , -1 ) * U (V(a))
     expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * U(V(a))');
   });
 
+  it('fuentes B: round, buf, inv e hypot fuera de llaves (ngspice no las tiene)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B2
+SYMATTR Value V=u(time*1200-round(time*1200))+buf(V(a))
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('V=u(time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5)))+((V(a)) > 0.5 ? 1 : 0)');
+  });
+
+  it('.tran 0 {expresión}: el paso también es expresión', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.tran 0 {6/fz}
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('.tran {(6/fz)/1000} {6/fz}');
+  });
+
+  it('directivas con comentario ";" a mitad de línea', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.step param prb list -1 1 ; set prb=0 to turn off probe
+TEXT 0 0 Left 2 !.tran 1m ; corto
+`);
+    const r = toNgspice(n, 't', resolver);
+    expect(r.warnings.join()).not.toMatch(/inválidos/);
+    expect(r.text).toContain('.tran 0.000001 1m');
+    expect(r.text).not.toContain('corto');
+  });
+
   it('reemplaza diodos ideales de LTspice por fuentes B', () => {
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');

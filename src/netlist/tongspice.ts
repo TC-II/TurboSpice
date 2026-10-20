@@ -193,11 +193,14 @@ const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
 };
 const LT_FUNCTION_RE = new RegExp(`\\b(${Object.keys(LT_FUNCTIONS).join('|')})\\s*\\(`, 'gi');
 
+// Las fuentes B de ngspice ya tienen u() y uramp(); éstas no
+const B_FUNCTION_RE = /\b(buf|inv|round|hypot)\s*\(/gi;
+
 /** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
-function translateExpression(text: string): string {
+function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE): string {
   let out = '';
   let i = 0;
-  const re = new RegExp(LT_FUNCTION_RE.source, 'gi');
+  const re = new RegExp(fnRe.source, 'gi');
   for (let m = re.exec(text); m; m = re.exec(text)) {
     let depth = 1;
     let k = m.index + m[0].length;
@@ -208,7 +211,7 @@ function translateExpression(text: string): string {
     }
     if (depth) break;
     // los argumentos pueden tener a su vez llamadas a traducir
-    const args = splitArgs(translateExpression(text.slice(start, k - 1)));
+    const args = splitArgs(translateExpression(text.slice(start, k - 1), fnRe));
     const rep = LT_FUNCTIONS[m[1].toLowerCase()](args);
     if (rep === null) continue;
     out += text.slice(i, m.index) + rep;
@@ -245,7 +248,11 @@ function fixTran(line: string, warnings: string[]): string {
   if (unsupported.length) warnings.push(`.tran: opciones de LTspice ignoradas (${unsupported.join(', ')})`);
   if (nums.length === 1) nums.unshift('0');
   const tstop = parseSpiceNumber(nums[1]);
-  if (parseSpiceNumber(nums[0]) === 0 && Number.isFinite(tstop)) nums[0] = formatSpiceNumber(tstop / 1000);
+  if (parseSpiceNumber(nums[0]) === 0) {
+    if (Number.isFinite(tstop)) nums[0] = formatSpiceNumber(tstop / 1000);
+    // ".tran 0 {6/fz}": el paso también como expresión
+    else if (/^\{.*\}$/.test(nums[1] ?? '')) nums[0] = `{(${nums[1].slice(1, -1)})/1000}`;
+  }
   return ['.tran', ...nums, ...flags.filter((f) => /^uic$/i.test(f))].join(' ');
 }
 
@@ -277,8 +284,9 @@ function convertElements(
         for (const k of order) if (!known.has(k.toLowerCase())) known.set(k.toLowerCase(), params.get(k.toLowerCase())!);
       }
     }
-    // LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis; ngspice no
-    const value = letter === 'B' ? e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1(') : e.value;
+    // Fuentes B: LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis y funciones
+    // que la fuente B de ngspice no conoce (round, buf…) también fuera de llaves; ngspice no
+    const value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE) : e.value;
     out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 
@@ -354,7 +362,8 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         out.push(`* ${raw}`);
         continue;
       }
-      const line = raw.trim();
+      // en LTspice ";" empieza un comentario también a mitad de línea
+      const line = raw.replace(/\s*;.*$/, '').trim();
       if (!line) continue;
       if (DROP_DIRECTIVES.test(line)) continue;
       if (/^\.meas(ure)?\b/i.test(line)) {

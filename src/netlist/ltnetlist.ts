@@ -109,8 +109,8 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     }
     const attrs = effectiveAttrs(s, def);
     const prefix = attrs.get('Prefix') ?? '';
-    // Símbolos sin prefijo (decorativos, flechas) no generan línea
-    if (!prefix) return;
+    // Símbolos sin prefijo o sin pines (decorativos, flechas, puntos) no generan línea
+    if (!prefix || !def.pins.length) return;
     const instName = attrs.get('InstName') ?? '';
 
     // Nodos por SpiceOrder; órdenes faltantes → MP_xx

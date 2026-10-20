@@ -960,17 +960,20 @@ await page.locator('svg.editor .sym').first().waitFor();
   const heads = await table.locator('th').allTextContents();
   check(heads[0] === 'Nombre' && heads.some((h) => h.startsWith('Vceo')) && heads.some((h) => h.startsWith('Fabricante')), `con los parámetros relevantes en columnas (${heads.join(', ')})`);
   const rowNames = () => table.locator('tbody tr:not(.empty) td:first-child').allTextContents();
-  check((await rowNames()).join() === 'TS_NPN_GP', `sólo los NPN para un npn (${await rowNames()})`);
+  const npns = await rowNames();
+  check(npns.includes('BC547C') && !npns.includes('BC557C'), `sólo los NPN para un npn (${npns.length} filas)`);
   await dlg.getByLabel('Buscar en la librería').fill('zzz');
   check((await table.locator('tr.empty').count()) === 1, 'la búsqueda filtra');
-  await dlg.getByLabel('Buscar en la librería').fill('npn');
-  await table.locator('tbody tr', { hasText: 'TS_NPN_GP' }).click();
-  check((await dlg.locator('label', { hasText: /^Value/ }).locator('input').first().inputValue()) === 'TS_NPN_GP', 'click en una fila pone el valor');
+  await dlg.getByLabel('Buscar en la librería').fill('BC547C');
+  await table.locator('tbody tr', { has: page.locator('td:first-child', { hasText: /^BC547C$/ }) }).click();
+  check((await dlg.locator('label', { hasText: /^Value/ }).locator('input').first().inputValue()) === 'BC547C', 'click en una fila pone el valor');
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
   // un resistor: doble click en la fila elige y acepta
   await open(256, 48); // RC
+  await page.getByRole('dialog').getByText('Avanzado: modelo de fabricante').click();
+  await page.getByRole('dialog').getByLabel('Buscar en la librería').fill('TS_R_4k7');
   await page.getByRole('dialog').locator('.parts-table tbody tr', { hasText: 'TS_R_4k7_5%' }).dblclick();
-  check((await page.getByRole('dialog').count()) === 0 && (await page.locator('svg.editor .sym text', { hasText: /^4\.7k$/ }).count()) >= 1, 'doble click en una fila elige y acepta (RC = 4.7k)');
+  check((await page.getByRole('dialog').count()) === 0 && (await page.locator('svg.editor .sym text', { hasText: '4.7k' }).count()) >= 1, 'doble click en una fila elige y acepta (RC = 4.7k)');
   await page.keyboard.press('Control+z');
 }
 

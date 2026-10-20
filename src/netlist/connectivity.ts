@@ -136,7 +136,15 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
   };
   for (const [k, p] of points) netOf(k).points.push(p);
   for (const p of pins) netOf(key(p.at.x, p.at.y)).pins.push(p);
-  for (const f of doc.flags) netOf(key(f.x, f.y)).labels.push(f.name);
+  // Con varias etiquetas, LTspice nombra la red con la de mayor y, después mayor x y, en el
+  // mismo punto, la última del archivo (verificado contra LTspice -netlist)
+  const chosen = new Map<Net, { x: number; y: number; name: string }>();
+  for (const f of doc.flags) {
+    const n = netOf(key(f.x, f.y));
+    n.labels.push(f.name);
+    const c = chosen.get(n);
+    if (!c || f.y > c.y || (f.y === c.y && f.x >= c.x)) chosen.set(n, f);
+  }
   doc.wires.forEach((w, i) => netOf(key(w.x1, w.y1)).wires.push(i));
 
   // Redes que llegan a la netlist: las que tienen pines o etiquetas
@@ -146,7 +154,7 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
   const unnamed: Net[] = [];
   for (const n of nets) {
     if (n.labels.includes('0')) n.name = '0';
-    else if (n.labels.length) n.name = [...n.labels].sort()[0];
+    else if (n.labels.length) n.name = chosen.get(n)!.name;
     else if (n.pins.length === 1 && !n.wires.length) n.name = ''; // pin suelto → NC_xx
     else unnamed.push(n);
   }

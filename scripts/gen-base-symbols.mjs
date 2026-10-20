@@ -6,7 +6,7 @@
 // (library/skins/default); estos gráficos son el respaldo cuando no hay SVG.
 //
 // Uso: node scripts/gen-base-symbols.mjs
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -124,6 +124,13 @@ const SYMBOLS = {
     'Fuente de tensión comportamental', null],
   bi: ['B', 'I=F(...)', P2V(0, 80, '+', '-', 0), { 0: [24, 0, 'Left'], 3: [24, 80, 'Left'] },
     'Fuente de corriente comportamental', null],
+  // misma fuente que bi pero con + abajo y - arriba (lib/sym/bi2)
+  bi2: ['B', 'I=F(...)', [[0, 80, '+', 1], [0, 0, '-', 2]], { 0: [24, 0, 'Left'], 3: [24, 81, 'Left'] },
+    'Fuente de corriente comportamental (polaridad invertida)',
+    [stub(0, 0, 8), stub(0, 72, 80), circle(0, 40, 32), stub(0, 24, 56), 'LINE Normal -4 36 0 24', 'LINE Normal 4 36 0 24']],
+  // resistencia estilo europeo (Misc\EuropeanResistor): carpeta Misc, como en LTspice
+  'Misc/EuropeanResistor': ['R', 'R', P2V(16, 96), { 0: [31, 40, 'Left'], 3: [31, 76, 'Left'] },
+    'Resistencia (gráfico europeo)', [stub(16, 16, 24), stub(16, 88, 96), box(5, 24, 27, 88)]],
   sw: ['S', 'SW', [[0, 16, 'A', 1], [0, 96, 'B', 2], [-48, 80, 'NC+', 3], [-48, 32, 'NC-', 4]],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] }, 'Llave controlada por tensión',
     [stub(0, 16, 40), stub(0, 72, 96), 'LINE Normal 0 72 16 44', box(-24, 24, 8, 88)]],
@@ -162,6 +169,7 @@ for (const [name, [prefix, value, pins, windows, desc, graphics]] of Object.entr
       `PINATTR SpiceOrder ${order}`,
     ]),
   ];
+  mkdirSync(dirname(join(OUT, `${name}.asy`)), { recursive: true });
   writeFileSync(join(OUT, `${name}.asy`), lines.join('\r\n') + '\r\n', 'latin1');
 }
 console.log(`${Object.keys(SYMBOLS).length} símbolos base escritos en library/sym/`);

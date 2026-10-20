@@ -16,6 +16,11 @@ acá van los agregados y las reglas de la netlist.
   (`TCLib\\Special\\74HCU04\ Not`).
 - **`TEXT`**: `!` = directiva SPICE, `;` = comentario; los saltos de línea se guardan como `\n` literal.
 - **`SYMATTR X ""`**: vacío explícito, gana al valor del `.asy`.
+- **Figuras** (`LINE`, `RECTANGLE`, `CIRCLE`, `ARC` `Normal … [estilo]`): estilo 1 guiones, 2 puntos,
+  3 raya y punto, 4 raya y dos puntos; sin estilo = sólida. `CIRCLE` y `ARC` llevan la caja de la
+  elipse; en `ARC` siguen el punto **final** y después el de **inicio**, en sentido antihorario.
+  Se eligen, mueven, copian, rotan y espejan como el resto (al espejar un arco se intercambian
+  inicio y fin para que siga antihorario).
 - Verificado: parse → serialize reproduce **4712/4712** archivos del corpus línea por línea.
 
 ## Guardado "todo explícito"

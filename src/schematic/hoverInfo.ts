@@ -4,6 +4,7 @@ import { effectiveAttrs } from '../asc/resolve.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import type { Library } from '../library/library.ts';
 import type { ItemRef } from './geometry.ts';
+import { LINE_STYLES } from './shapes.ts';
 
 const netLabel = (name: string | undefined) => (name ? name : 'sin nombre');
 const short = (s: string, n = 60) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
@@ -43,6 +44,14 @@ export function hoverInfo(doc: AscDoc, lib: Library, conn: Connectivity, ref: It
       const t = doc.texts[ref.index];
       if (!t) return [];
       return [t.kind === 'directive' ? 'Directiva SPICE' : 'Comentario', short(t.text.split('\\n').join(' ⏎ ')), `tamaño ${t.size}`, `en (${t.x}, ${t.y})`];
+    }
+    case 'shape': {
+      const sh = doc.shapes[ref.index];
+      if (!sh) return [];
+      const name = { LINE: 'Línea', RECTANGLE: 'Rectángulo', CIRCLE: 'Círculo', ARC: 'Arco' }[sh.kind];
+      const [x1, y1, x2, y2] = sh.coords;
+      const style = LINE_STYLES.find((ls) => ls.value === (sh.style ?? ''))?.label ?? `estilo ${sh.style}`;
+      return [name, `(${x1}, ${y1}) → (${x2}, ${y2})`, `línea ${style.toLowerCase()}`];
     }
   }
 }

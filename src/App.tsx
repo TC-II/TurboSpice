@@ -11,13 +11,13 @@ import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
-import type { Point } from './asc/model.ts';
+import type { Point, ShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
@@ -54,7 +54,7 @@ import {
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -105,7 +105,9 @@ type Dialog =
   | { kind: 'study' }
   | { kind: 'runs' }
   | { kind: 'about' }
-  | { kind: 'drive' };
+  | { kind: 'drive' }
+  /** estilo de línea para las figuras indicadas y las que se dibujen después */
+  | { kind: 'lineStyle'; shapes: number[] };
 
 /** Resultados de una simulación */
 interface SimRun {
@@ -329,6 +331,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setToolState(t);
     if (t.kind !== 'select' && t.kind !== 'move' && t.kind !== 'zoom') setSelection([]);
   }, []);
+  // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
+  const [shapeStyle, setShapeStyleState] = useState('');
+  const shapeTool = (shape: ShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
   // elemento bajo el mouse: la barra de estado muestra sus propiedades
@@ -965,6 +971,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       else if (ls.length === 1 && ANALYSIS_LINE.test(ls[0])) setDialog({ kind: 'sim', found: { text: ref.index, line: 0, value: ls[0].trim() } });
       else setDialog({ kind: 'text', index: ref.index, textKind: t.kind });
     } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
+    else if (ref.kind === 'shape') {
+      // doble click en una figura de la selección: el estilo va a todas las seleccionadas
+      const sel = selection.filter((r) => r.kind === 'shape').map((r) => r.index);
+      openLineStyle(sel.includes(ref.index) ? sel : [ref.index]);
+    }
   };
 
   const picker: Picker = (what) =>
@@ -1241,9 +1252,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case 'm':
           return handled(), startMove(false);
         case 'j':
-          return handled(), setTool({ kind: 'shape', shape: 'LINE', start: null });
+          return handled(), shapeTool('LINE')();
         case 'k':
-          return handled(), setTool({ kind: 'shape', shape: 'RECTANGLE', start: null });
+          return handled(), shapeTool('RECTANGLE')();
         case 'F3':
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
@@ -1426,8 +1437,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         'sep',
         { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
         { label: 'Comentario…', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
-        { label: 'Línea', shortcut: 'J', onClick: () => setTool({ kind: 'shape', shape: 'LINE', start: null }) },
-        { label: 'Rectángulo', shortcut: 'K', onClick: () => setTool({ kind: 'shape', shape: 'RECTANGLE', start: null }) },
+        'sep',
+        { label: 'Línea', shortcut: 'J', onClick: shapeTool('LINE') },
+        { label: 'Rectángulo', shortcut: 'K', onClick: shapeTool('RECTANGLE') },
+        { label: 'Círculo', onClick: shapeTool('CIRCLE') },
+        { label: 'Arco', onClick: shapeTool('ARC') },
+        { label: 'Estilo de línea…', onClick: () => openLineStyle() },
       ],
     },
     {
@@ -2062,6 +2077,19 @@ ${ltNetlistText(sim.built.lt)}
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog?.kind === 'lineStyle' && (
+        <LineStyleDialog
+          initial={dialog.shapes.length ? (doc.shapes[dialog.shapes[0]]?.style ?? '') : shapeStyle}
+          count={dialog.shapes.length}
+          onClose={() => setDialog(null)}
+          onApply={(style) => {
+            setDialog(null);
+            setShapeStyleState(style);
+            if (tool.kind === 'shape') setToolState({ ...tool, style: style || undefined });
+            if (dialog.shapes.length) commit(setShapeStyle(doc, dialog.shapes, style));
+          }}
+        />
+      )}
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
@@ -2098,8 +2126,13 @@ function toolHint(t: Tool): string {
       return t.refs
         ? `Click para soltar${t.stretch ? ' (los cables se estiran)' : ''} · click derecho o Esc cancela`
         : `${t.stretch ? 'Arrastrar (los cables se estiran)' : 'Mover (sin estirar cables)'}: click en un elemento o recuadro para elegir · Esc para terminar`;
-    case 'shape':
-      return t.start ? 'Click para terminar · click derecho cancela' : `Click para empezar ${t.shape === 'LINE' ? 'la línea' : 'el rectángulo'} · Esc para terminar`;
+    case 'shape': {
+      const n = t.pts.length;
+      if (t.shape === 'ARC' && n >= 2) return `${n === 2 ? 'Click en el punto de inicio del arco' : 'Click en el punto final (sentido antihorario)'} · click derecho cancela`;
+      if (n) return `Click para terminar${t.shape === 'ARC' ? ' la caja del arco' : ''} · click derecho cancela`;
+      const what = { LINE: 'la línea', RECTANGLE: 'el rectángulo', CIRCLE: 'el círculo (su caja)', ARC: 'el arco (la caja de su elipse)' }[t.shape];
+      return `Click para empezar ${what} · Dibujar › Estilo de línea · Esc para terminar`;
+    }
     case 'zoom':
       return 'Arrastrá un recuadro para hacer zoom (click: acercar) · Shift+Z: zoom anterior';
     case 'pick':

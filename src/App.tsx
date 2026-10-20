@@ -30,7 +30,7 @@ import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSess
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
+import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import {
@@ -658,7 +658,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const id = sims.active;
     try {
       const built = await buildSimulation(doc, lib, file.name);
-      const { result, ms } = await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
+      // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
+      const tooBig = built.tooBig.map((p) => p.text);
+      const { result, ms } = tooBig.length
+        ? { result: { plots: [], log: tooBig, errors: tooBig, aborted: false }, ms: 0 }
+        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
@@ -1484,7 +1488,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
-        return { ...p, sym: el?.sym };
+        const fix = sim.built.tooBig?.find((f) => f.text === p.text)?.fix;
+        return { ...p, sym: el?.sym, fix };
       })
     : [];
   const goTo = (sym: number) => {
@@ -1901,6 +1906,17 @@ ${ltNetlistText(sim.built.lt)}
                         {p.sym !== undefined && (
                           <button className="link" onClick={() => goTo(p.sym!)}>
                             ver en el esquemático
+                          </button>
+                        )}
+                        {p.fix && (
+                          <button
+                            className="link"
+                            onClick={() => {
+                              commit(replaceLine(doc, p.fix!.from, p.fix!.to));
+                              setMessage(`Cambiado a «${p.fix!.to}»: simulá de nuevo con Alt+R`);
+                            }}
+                          >
+                            usar «{p.fix.to}»
                           </button>
                         )}
                       </li>

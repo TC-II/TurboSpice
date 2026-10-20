@@ -72,6 +72,11 @@ interface EmModule {
 
 export type NgspiceFactory = (opts: Record<string, unknown>) => Promise<unknown>;
 
+export const OUT_OF_MEMORY =
+  'Memoria insuficiente: la simulación genera más datos de los que admite el navegador. Bajá la cantidad de puntos (menos puntos por década en .ac, un paso máximo mayor en .tran).';
+/** Mensajes de ngspice o de Emscripten cuando se queda sin memoria */
+export const OUT_OF_MEMORY_RE = /can't allocate|not enough memory|out of memory|cannot enlarge memory|\bOOM\b/i;
+
 const SPINIT_PATH = '/usr/local/share/ngspice/scripts/spinit';
 const CM_DIR = '/usr/local/lib/ngspice';
 const WORK_DIR = '/work';
@@ -132,6 +137,9 @@ export class Ngspice {
       // ngspice antepone "stdout " / "stderr "; por stderr también llegan avisos
       // ("Note: ...", "Warning: ..."), así que los errores se reconocen por el texto.
       const line = raw.replace(/^std(out|err) /, '');
+      // el progreso de cada punto de AC ("Reference value : 5.2e+03"): ya llega por sendStat
+      if (/^\s*Reference value\s*:/.test(line)) return 0;
+      if (OUT_OF_MEMORY_RE.test(line) && !this.errors.includes(OUT_OF_MEMORY)) this.errors.unshift(OUT_OF_MEMORY);
       this.log.push(line);
       if (/\berror\b|\bfatal\b/i.test(line)) this.errors.push(line);
       this.opts.onOutput?.(line);

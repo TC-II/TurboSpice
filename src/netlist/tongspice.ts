@@ -553,6 +553,13 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       const rel = model && !local.has(model.toLowerCase()) ? models.cmpFile(model) : undefined;
       if (rel && !includes.includes(rel)) out.push(include(rel)!);
     }
+    // ".model Dz ako: 1N750 (bv=4.3)": el modelo base también puede estar en library/cmp
+    for (const t of lt.texts) {
+      for (const m of t.text.split('\\n').join('\n').matchAll(/^\s*\.model\s+\S+\s+ako:\s*([^\s(]+)/gim)) {
+        const rel = !local.has(m[1].toLowerCase()) ? models.cmpFile(m[1]) : undefined;
+        if (rel && !includes.includes(rel)) out.push(include(rel)!);
+      }
+    }
   }
   if (models.defines) {
     for (const e of lt.elements) {

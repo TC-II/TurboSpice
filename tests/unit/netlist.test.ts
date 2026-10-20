@@ -263,6 +263,18 @@ TEXT 0 0 Left 2 !.param Kb=1 + 2 c=0.5\\n.param Kc = c / 2\\n.param a=1 b=2 d={x
     expect(t).toContain('.param a=1 b=2 d={x * 2}');
   });
 
+  it('.model ako: con el modelo base en library/cmp incluye su archivo', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL zener 0 0 R0
+SYMATTR InstName D1
+SYMATTR Value Dz
+TEXT 0 200 Left 2 !.model Dz ako: 1N750 (bv=4.3)
+`);
+    const t = toNgspice(n, 't', { ...resolver, cmpFile: (m: string) => lib.cmpFileDefining(m) });
+    expect(t.includes).toContain(lib.cmpFileDefining('1N750'));
+  });
+
   it('IC= de un capacitor a tierra → .ic (LTspice lo usa sin uic)', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

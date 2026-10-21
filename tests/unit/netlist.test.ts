@@ -8,6 +8,7 @@ import { Library } from '../../src/library/library.ts';
 import { replaceIdealDiodes } from '../../src/netlist/idealdiode.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
+import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
 import { patchModelFile, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
@@ -517,5 +518,72 @@ describe('funciones de LTspice que numparam no conoce (#56)', () => {
     const ng = toNgspice(lt, 't', { resolve: () => undefined });
     expect(ng.text).toContain('AC {((P) > 0 ? 1 : 0)*unif(1,0.1)}');
     expect(ng.text).toContain('.param P={max((-1), 0)}');
+  });
+});
+
+describe('Laplace en E/G/B → s_xfer', () => {
+  const sym = (type: string, name: string, value: string) => `Version 4
+SHEET 1 880 680
+SYMBOL ${type} 0 0 R0
+SYMATTR InstName ${name}
+SYMATTR Value ${value}
+`;
+  const ng = (type: string, name: string, value: string) => toNgspice(netFromAsc(sym(type, name, value)), 't', resolver);
+
+  it('E con transferencia propia y parámetros: coeficientes como expresiones de numparam', () => {
+    const t = ng('e', 'E1', 'Laplace=(s/ {w0})/(s/{w0}+1)').text;
+    expect(t).toMatch(/^E__E1_in E1__in 0 \S+ \S+ 1$/m);
+    expect(t).toContain('A__E1 E1__in E1__r E1__lap');
+    expect(t).toContain('.model E1__lap s_xfer(num_coeff=[{1/(w0)} 0] den_coeff=[{1/(w0)} 1])');
+    expect(t).toMatch(/^E1 \S+ \S+ E1__r 0 1$/m);
+  });
+
+  it('productos de factores, potencias s**2 y s^2, y polos en el origen', () => {
+    expect(ng('e', 'E1', 'Laplace=1/((s+0.01)^2)').text).toContain('s_xfer(num_coeff=[1] den_coeff=[1 0.02 0.0001])');
+    expect(ng('e', 'E1', 'laplace = 1/(1+1*s+s**2)').text).toContain('den_coeff=[1 1 1]');
+    expect(ng('g', 'G1', 'Laplace=2/s*1/(1+s/4)').text).toContain('s_xfer(num_coeff=[2] den_coeff=[0.25 1 0])');
+  });
+
+  it('fuente B con entrada explícita y la forma Laplace(…) sin "="', () => {
+    const t = ng('bv', 'B1', 'V=V(a)-V(b) Laplace(1/(1+s*2))').text;
+    expect(t).toContain('B__B1_in B1__in 0 V=V(a)-V(b)');
+    expect(t).toContain('den_coeff=[2 1]');
+    expect(t).toMatch(/^B1 \S+ \S+ V=V\(B1__r\)$/m);
+  });
+
+  it('numerador de mayor grado: la parte polinomial va con derivadores', () => {
+    const t = ng('e', 'E1', 'Laplace=(1+3*s)*(1+2*s)/(1+s)').text;
+    // (6s²+5s+1)/(s+1) = 6s - 1 + 2/(s+1)
+    expect(t).toContain('s_xfer(num_coeff=[2] den_coeff=[1 1])');
+    expect(t).toContain('C__E1_d1 E1__in E1__d1c 1');
+    expect(t).toContain('B__E1_y E1__y 0 V=V(E1__r)+(-1)*V(E1__in)+6*V(E1__d1)');
+  });
+
+  it('llaves en parte de la expresión, cache= y ganancia antes de Laplace', () => {
+    expect(ng('e', 'E1', 'Laplace={w0/Q}*s /(s*s  + {w0/Q}*s + {w0*w0}) cache=2').text).toContain(
+      's_xfer(num_coeff=[{(w0)*(1/(Q))} 0] den_coeff=[1 {(w0)*(1/(Q))} {(w0)*(w0)}])',
+    );
+    expect(ng('e', 'E1', '2 Laplace=1/(1+s)').text).toContain('s_xfer(num_coeff=[2] den_coeff=[1 1])');
+  });
+
+  it('en archivos de modelos (TCLib/fdnr.lib: G1 1 2 1 2 Laplace=(s^2)*{D})', () => {
+    const t = replaceLaplaceLines('.subckt FDNR 1 2 D=1\nG1 1 2 1 2 Laplace=(s^2)*{D}\n.ends', []);
+    expect(t).toContain('E__G1_in G1__in 0 1 2 1');
+    expect(t).toContain('B__G1_y G1__y 0 V={D}*V(G1__d2)');
+    expect(t).toContain('G1 1 2 G1__y 0 1');
+  });
+
+  it('coeficientes de órdenes muy distintos: s escalada con denormalized_freq', () => {
+    expect(ng('e', 'E1', 'Laplace=1/(1+s/1e6)**2').text).toContain('s_xfer(num_coeff=[0.5] den_coeff=[0.5 1 0.5] denormalized_freq=1000000)');
+  });
+
+  it('sin s: ganancia constante', () => {
+    expect(ng('e', 'E1', 'Laplace=DIAM*DIAM*5e6').text).toContain(' {((DIAM)*(DIAM))*5000000}');
+  });
+
+  it('lo que no es racional en s se avisa', () => {
+    const r = ng('e', 'E1', 'Laplace=exp(-.001*s)/(1+.001*s)**2');
+    expect(r.warnings.join('\n')).toMatch(/E1: la transferencia .* no es un cociente de polinomios en s \(exp\(\) de s\)/);
+    expect(ng('e', 'E1', 'Laplace=1e-6*s**{alpha}').warnings.join('\n')).toMatch(/no es un cociente/);
   });
 });

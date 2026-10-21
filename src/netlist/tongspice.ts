@@ -11,6 +11,7 @@ import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import { stripLtspiceInfo } from '../library/cmp.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
+import { replaceLaplaceLines, translateLaplace } from './laplace.ts';
 import { formatSpiceNumber, fromRkm, parseSpiceNumber } from './spicenum.ts';
 import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
 
@@ -434,7 +435,10 @@ function convertElements(
     const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
     if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
     if (startup && (letter === 'V' || letter === 'I')) value = startupRamp(value);
-    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
+    const fixed = sourceSyntax(letter, translateFunctions(translateRandom(value)));
+    // Laplace=… de E, G y B (ver laplace.ts); en E y G sin fixBraces, que corta la expresión
+    const lap = translateLaplace(name, letter, e.nodes, letter === 'B' ? fixed : translateFunctions(translateRandom(e.value)), warnings);
+    out.push(...(lap ?? expandElement(name, letter, e.nodes, fixed, warnings)));
   }
 
   return out;
@@ -727,7 +731,8 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   const warnings = [...net.warnings];
   const files: Record<string, string> = {};
   // (los informativos de LTspice en los .model, como Iave o Vpk, hacen fallar a ngspice)
-  for (const rel of net.includes) files[rel] = stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams));
+  // Laplace= en E/G/B de los archivos y de los .subckt escritos como directiva (ver laplace.ts)
+  for (const rel of net.includes) files[rel] = replaceLaplaceLines(stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams)), warnings);
   // ako: se resuelve con los modelos de todos los archivos y de la netlist
   const models = collectModels(net.text);
   for (const t of Object.values(files)) collectModels(t, models);
@@ -739,7 +744,9 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
     warnings.push(...a.warnings, ...r.warnings);
     for (const [k, v] of r.found) external.set(k, v);
   }
-  const ako = replaceAko(stripLtspiceInfo(net.text), models);
+  const lapWarnings: string[] = [];
+  const ako = replaceAko(replaceLaplaceLines(stripLtspiceInfo(net.text), lapWarnings), models);
+  for (const w of lapWarnings) if (!warnings.includes(w)) warnings.push(w);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
   return { netlist: main.text, files, warnings };

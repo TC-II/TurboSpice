@@ -318,6 +318,53 @@ TEXT 0 200 Left 2 !.model Dz ako: 1N750 (bv=4.3)
     expect(t.includes).toContain(lib.cmpFileDefining('1N750'));
   });
 
+  it('.tran startup: rampa de 20 µs sólo en las fuentes V/I de DC puro', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 0 a
+FLAG 0 100 0
+FLAG 200 0 s
+FLAG 200 100 0
+FLAG 400 0 i
+FLAG 400 100 0
+FLAG 600 0 d
+FLAG 600 100 0
+SYMBOL voltage 0 0 R0
+SYMATTR InstName V1
+SYMATTR Value 5 Rser=1
+SYMBOL voltage 200 0 R0
+SYMATTR InstName V2
+SYMATTR Value SINE(1 2 10k)
+SYMBOL current 400 0 R0
+SYMATTR InstName I1
+SYMATTR Value {2*x}
+SYMBOL voltage 600 0 R0
+SYMATTR InstName V3
+SYMATTR Value DC 4 AC 1
+TEXT 0 200 Left 2 !.tran 0 100u 0 0.1u startup
+`);
+    const r = toNgspice(n, 't', resolver);
+    expect(r.text).toMatch(/^V1 \S+ \S+ DC 5 PWL\(0 0 20u 5\)$/m);
+    expect(r.text).toMatch(/^V2 \S+ \S+ SINE\(1 2 10k\)$/m);
+    expect(r.text).toMatch(/^I1 \S+ \S+ DC \{2\*x\} PWL\(0 0 20u \{2\*x\}\)$/m);
+    expect(r.text).toMatch(/^V3 \S+ \S+ DC 4 AC 1 PWL\(0 0 20u 4\)$/m);
+    expect(r.text).toMatch(/^\.tran 1e-7 100u 0 0\.1u$/m);
+    expect(r.warnings.join()).not.toContain('startup');
+  });
+
+  it('.tran sin startup: las fuentes DC no cambian', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 0 a
+FLAG 0 100 0
+SYMBOL voltage 0 0 R0
+SYMATTR InstName V1
+SYMATTR Value 5
+TEXT 0 200 Left 2 !.tran 100u
+`);
+    expect(toNgspice(n, 't', resolver).text).toMatch(/^V1 \S+ \S+ 5$/m);
+  });
+
   it('IC= de un capacitor a tierra → .ic (LTspice lo usa sin uic)', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

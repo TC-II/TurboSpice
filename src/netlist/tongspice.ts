@@ -59,7 +59,7 @@ const PARASITICS: Record<string, string[]> = {
 // el resultado, así que se quitan. Los que ngspice entiende (temp, tc1, tc2, m, ic…) se dejan.
 const DB_PARAMS: Record<string, string[]> = {
   R: ['tol', 'pwr', 'mfg', 'pn', 'type'],
-  C: ['tol', 'v', 'irms', 'iripple', 'mfg', 'pn', 'type', 'rlshunt'],
+  C: ['tol', 'v', 'irms', 'iripple', 'mfg', 'pn', 'type', 'rlshunt', 'mtbf', 'pppkg'],
   L: ['tol', 'ipk', 'irms', 'isat', 'mfg', 'pn', 'type', 'rlshunt'],
 };
 
@@ -103,6 +103,20 @@ function expandElement(name: string, letter: string, nodes: string[], value: str
   // sigue siendo una R y su corriente se mide igual (@r[i])
   const behavioral = letter === 'R' ? /^\s*r\s*=\s*(.+?)\s*$/i.exec(value) : null;
   if (behavioral) return [[name, ...nodes, `r={${behavioral[1].replace(/^\{(.*)\}$/, '$1').replace(/^'(.*)'$/, '$1')}}`].join(' ')];
+  // Fuente B: tripdv/tripdt (control de paso de LTspice) no existen en ngspice y se quitan;
+  // Rpar/Cpar van como elementos en paralelo. La expresión tiene espacios, así que no se usa
+  // splitParams: estos parámetros van siempre después de la expresión.
+  if (letter === 'B') {
+    const extra: string[] = [];
+    const rest = value.replace(/\s+(tripdv|tripdt|rpar|cpar)\s*=\s*(\{[^}]*\}|\S+)/gi, (_, k: string, v: string) => {
+      const kind = k.toLowerCase();
+      if (kind === 'rpar' || kind === 'cpar') extra.push(`${kind[0].toUpperCase()}__${name}_par ${nodes[0]} ${nodes[1]} ${v}`);
+      return '';
+    });
+    return [[name, ...nodes, rest].join(' '), ...extra];
+  }
+  // "electrolytic" del tipo de capacitor de la base de datos de LTspice (a veces con una comilla)
+  if (letter === 'C') value = value.replace(/(^|\s)electrolytic"?(?=\s|$)/i, '$1');
   const kinds = PARASITICS[letter];
   const dropped = DB_PARAMS[letter];
   if (!kinds && !dropped) return [[name, ...nodes, value].filter(Boolean).join(' ')];
@@ -220,8 +234,11 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   ln: ([x, ...r]) => (r.length ? null : `ln(max(${x},1e-100))`),
   log10: ([x, ...r]) => (r.length ? null : `log10(max(${x},1e-100))`),
   sqrt: ([x, ...r]) => (r.length ? null : `sqrt(max(${x},0))`),
+  // table(x, x1,y1, x2,y2…) de LTspice es la pwl(x, …) de la fuente B de ngspice (interpola
+  // lineal y fuera del rango mantiene el extremo)
+  table: (a) => (a.length < 3 || a.length % 2 === 0 ? null : `pwl(${a.join(',')})`),
 };
-const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt)\s*\(/gi;
+const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table)\s*\(/gi;
 
 /** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
 function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE, fns = LT_FUNCTIONS): string {

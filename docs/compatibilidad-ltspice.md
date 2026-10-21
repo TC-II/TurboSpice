@@ -134,6 +134,9 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | `.step` con un `.control` propio en el esquemático | Se simula el primer valor (el bloque decide qué correr) y se avisa |
 | `.param x 20` en una directiva | `.param x=20` |
 | `.model X ako:BASE [tipo] (params)` (a-kind-of, también encadenados) | `.model X tipo(params de BASE + los nuevos)`; si BASE no está, se comenta y se avisa |
+| Capacitor de la base de datos: `electrolytic` suelto (a veces con comilla), `MTBF=`, `ppPkg=` (66 casos del corpus fallaban; #111) | Se quitan (informativos) |
+| Fuente B con `tripdv=`/`tripdt=` (35 casos con `Rpar`/`Cpar`; #112) | Se quitan; `Rpar`/`Cpar` como R/C en paralelo |
+| `table(x, x1,y1, …)` en fuentes B (16 casos; #113) | `pwl(x, x1,y1, …)` de la fuente B |
 | Integración por defecto `modified trap` | ngspice usa `trap` (diferencia conocida) |
 
 Con varios `.step`, el primero es el que varía más rápido (bucle interno). **Pendiente de verificar

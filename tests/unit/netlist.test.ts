@@ -103,6 +103,31 @@ SYMATTR SpiceLine Ipk=1 tol=5
     expect(r.text).toContain('R__C1 C1__s');
   });
 
+  it('capacitor: quita "electrolytic" (con o sin comilla), MTBF y ppPkg', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL cap 0 0 R0
+SYMATTR InstName C1
+SYMATTR Value 470u
+SYMATTR SpiceLine electrolytic" MTBF=2000 ppPkg=1 Rser=0.1
+`);
+    expect(r.text).toMatch(/^C1 \S+ C1__s 470u$/m);
+    expect(r.text).not.toMatch(/electrolytic|mtbf|pppkg/i);
+  });
+
+  it('fuente B: quita tripdv/tripdt, Rpar/Cpar en paralelo y table() → pwl()', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value V=table(V(a), 0,0, 1,2) * 2 tripdv=1u tripdt=1p Rpar={1/g} Cpar=1p
+`);
+    expect(r.text).toMatch(/^B1 (\S+) (\S+) V=pwl\(V\(a\),0,0,1,2\) \* 2$/m);
+    expect(r.text).toMatch(/^R__B1_par \S+ \S+ \{1\/g\}$/m);
+    expect(r.text).toMatch(/^C__B1_par \S+ \S+ 1p$/m);
+    expect(r.text).not.toMatch(/tripd/i);
+  });
+
   it('resistencia de comportamiento "R= expr" → r={expr} (sigue siendo R)', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

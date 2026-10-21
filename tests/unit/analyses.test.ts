@@ -15,6 +15,8 @@ describe('comandos de análisis', () => {
     '.tran 10m',
     '.tran 0 10m 1m 1u',
     '.tran 1u 10m 0 0 uic',
+    '.tran 0 10m 0 1u startup',
+    '.tran 10m uic startup',
     '.ac dec 100 1 1meg',
     '.ac lin 50 1k 2k',
     '.dc V1 0 5 0.1',
@@ -35,7 +37,7 @@ describe('comandos de análisis', () => {
   });
 
   it('las opciones que el formulario no maneja no se interpretan', () => {
-    expect(parseAnalysis('.tran 10m startup')).toBeNull();
+    expect(parseAnalysis('.tran 10m steady')).toBeNull();
     expect(parseAnalysis('.ac dec 10 1')).toBeNull();
   });
 

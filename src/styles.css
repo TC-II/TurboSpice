@@ -536,6 +536,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .simbar .sb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .simbar .sb-field { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
 .simbar .sb-field input, .simbar .sb-field select { font: 12px var(--mono); padding: 1px 4px; color: var(--fg); }
+.simbar .sb-checks { display: inline-flex; flex-direction: column; line-height: 1.15; }
 .simbar .sb-check { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
 .simbar .sb-hint { color: var(--fg-muted); }
 .simbar .sb-hint.warn { color: var(--err); }

@@ -38,7 +38,7 @@ describe('nombre automático de una simulación', () => {
     expect(analysisLabel('.tran {T}')).toBe('Transitorio 0–{T}');
   });
   it('un comando que no se entiende queda como está', () => {
-    expect(analysisLabel('.tran 1m startup')).toBe('.tran 1m startup');
+    expect(analysisLabel('.tran 1m steady')).toBe('.tran 1m steady');
   });
   it('el nombre propio tiene prioridad', () => {
     const r = simsFromLine('.op');

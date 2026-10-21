@@ -190,7 +190,7 @@ function fewerPoints(line: string, a: Analysis, factor: number): string | undefi
     const p = analysisPoints(a);
     const dur = parseSpiceNumber(a.tstop) - (a.tstart.trim() ? parseSpiceNumber(a.tstart) : 0);
     const step = formatSpiceNumber(Number((dur / Math.max(1, p * factor)).toPrecision(1)));
-    return `.tran 0 ${a.tstop} ${a.tstart.trim() || '0'} ${step}${a.uic ? ' uic' : ''}`;
+    return `.tran 0 ${a.tstop} ${a.tstart.trim() || '0'} ${step}${a.uic ? ' uic' : ''}${a.startup ? ' startup' : ''}`;
   }
   return undefined;
 }

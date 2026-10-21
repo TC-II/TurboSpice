@@ -135,6 +135,7 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | `.end nombre` cerrando un subcircuito, `.param x 20` | `.ends`, `.param x=20` |
 | `pi` predefinido en `.param` | `.param pi=…` |
 | `.tran tstop` / `.tran 0 tstop` | `.tran tstop/1000 tstop` |
+| `.tran … startup` (medido con `LTspice -b`): el `.op` se hace con las fuentes V e I de valor **DC puro** del nivel superior en 0 y se llevan a su valor con una **rampa lineal de 20 µs** (fija, aunque el `.tran` sea más corto). SINE, PULSE, PWL… y las fuentes de adentro de subcircuitos (p.ej. `supply.lib`) no cambian; no es `uic` (el `.op` sí se hace). En 321 casos del corpus con `startup`: igual/parecido pasa de 8 a 31 (1 oscilador Colpitts empeora por el arranque); #100 | `V1 a 0 5` → `V1 a 0 DC 5 PWL(0 0 20u 5)` |
 | `.step param/fuente/temp/modelo` (lin, dec, oct, list; anidados) | Bucles `foreach` en un `.control` generado: `alterparam` + `reset`, `alter fuente dc=`, `altermod`, `option temp=`; una corrida (`tran1`, `tran2`…) por paso, etiquetada `R=2k` |
 | `.step` con un `.control` propio en el esquemático | Se simula el primer valor (el bloque decide qué correr) y se avisa |
 | `.param x 20` en una directiva | `.param x=20` |

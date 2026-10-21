@@ -328,7 +328,8 @@ function fixTran(line: string, warnings: string[]): string {
   const args = m[1].split(/\s+/);
   const flags = args.filter((a) => /^[a-z]/i.test(a) && !/^\{/.test(a));
   const nums = args.filter((a) => !flags.includes(a));
-  const unsupported = flags.filter((f) => !/^uic$/i.test(f));
+  // startup se emula en las fuentes (ver startupRamp)
+  const unsupported = flags.filter((f) => !/^(uic|startup)$/i.test(f));
   if (unsupported.length) warnings.push(`.tran: opciones de LTspice ignoradas (${unsupported.join(', ')})`);
   if (nums.length === 1) nums.unshift('0');
   const tstop = parseSpiceNumber(nums[1]);
@@ -381,6 +382,24 @@ function splitIc(line: string, currents: Map<string, string>): string | null {
   return rest.length ? `.ic ${rest.join(' ')}` : null;
 }
 
+/**
+ * ".tran … startup": LTspice hace el punto de operación con las fuentes V e I de valor DC puro
+ * en 0 y las lleva a su valor con una rampa lineal de 20 µs (fija, aunque el .tran sea más
+ * corto). Las fuentes con forma (SINE, PULSE, PWL…) y las de adentro de subcircuitos no cambian.
+ * En ngspice: "V1 a 0 5" → "V1 a 0 DC 5 PWL(0 0 20u 5)" (el .op de .tran usa el PWL en t=0).
+ */
+export function startupRamp(value: string): string {
+  const { main, params, order } = splitParams(value);
+  const m = /^(?:DC\s+)?([^\s(){}]+|\{[^{}]*\})((?:\s+AC\b.*)?)$/i.exec(main.trim());
+  if (!m || !/^[-+.\d{]/.test(m[1])) return value;
+  const rest = order.map((k) => `${k}=${params.get(k.toLowerCase())}`);
+  return [`DC ${m[1]}${m[2]} PWL(0 0 20u ${m[1]})`, ...rest].join(' ');
+}
+
+function hasStartup(lt: LtNetlist): boolean {
+  return lt.texts.some((t) => t.kind === 'directive' && t.text.split('\n').some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
+}
+
 function convertElements(
   lt: LtNetlist,
   used: Set<string>,
@@ -388,6 +407,7 @@ function convertElements(
   warnings: string[],
   subcktParams: Map<string, Map<string, string>>,
   inductorIcs = new Map<string, string>(),
+  startup = false,
 ): string[] {
   const out: string[] = [];
   for (const e of lt.elements) {
@@ -413,6 +433,7 @@ function convertElements(
     // corriente inicial de .ic I(L1)=… (se busca por nombre o por InstName sin el prefijo L§)
     const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
     if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
+    if (startup && (letter === 'V' || letter === 'I')) value = startupRamp(value);
     out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
   }
 
@@ -447,7 +468,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
     if (t.kind === 'directive') for (const l of t.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
   }
   for (const [l, v] of inductorIcs) if (parseSpiceNumber(v) !== 0) warnings.push(`.ic I(${l})=${v}: ngspice usa la corriente inicial del inductor sólo con .tran uic`);
-  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs));
+  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt)));
   out.push(...capacitorIcs(lt));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);

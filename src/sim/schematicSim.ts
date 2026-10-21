@@ -4,7 +4,7 @@ import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import { ltNetlist, type LtNetlist } from '../netlist/ltnetlist.ts';
-import { prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
+import { ngNodeName, prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
 import { isControlBlock, isNgspiceComment } from '../netlist/directives.ts';
 import { controlPlots, type Pane } from '../waveform/view.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
@@ -69,7 +69,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
 }
 
 /** Vector de ngspice con la tensión de una red */
-export const netVector = (net: string) => net.toLowerCase();
+export const netVector = (net: string) => ngNodeName(net).toLowerCase();
 
 /** Vector de ngspice con la corriente de un elemento (nombre LTspice), o null si no hay */
 export function elementVector(sim: BuiltSimulation, ltName: string): string | null {

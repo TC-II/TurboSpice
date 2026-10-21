@@ -10,7 +10,7 @@ import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
-import { patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
+import { ngNodeName, patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
@@ -368,6 +368,23 @@ TEXT 0 0 Left 2 !Bvco a 0 V=1/64*TABLE(V(c), 0, 700, 1, 855)\\nBr b 0 V=Round(V(
     expect(t).toContain('Br b 0 V=(sgn(V(c))*floor(abs(V(c))+0.5))*2');
     const m = patchModelFile('.subckt s p n\nB1 p n I=TABLE(V(p,n), 0,0, 1,2,\n+ 2,5)\n.ends s', new Map());
     expect(m).toContain('B1 p n I=pwl(V(p,n),0,0,1,2,2,5)');
+  });
+
+  it('un nodo llamado Temp/temper se renombra (temp y temper son variables de las fuentes B de ngspice) (#104)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 16 Temp
+FLAG 0 96 0
+SYMBOL bv 0 0 R0
+SYMATTR InstName B3
+SYMATTR Value V= 800k * V(Temp) + 200
+TEXT 0 200 Left 2 !.ic V(temp)=1
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toMatch(/^B3 \S+ \S+ V= 800k \* V\(Temp_\) \+ 200$/m);
+    expect(t).toContain('.ic V(temp_)=1');
+    expect(ngNodeName('Temper')).toBe('Temper_');
+    expect(ngNodeName('temperature')).toBe('temperature');
   });
 
   it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {

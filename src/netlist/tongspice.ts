@@ -638,7 +638,29 @@ function convertElements(
   return [...out, ...extra];
 }
 
-export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): NgspiceNetlist {
+/**
+ * En las fuentes B de ngspice temp y temper son variables: un nodo con ese nombre rompe V(temp)
+ * ("no such function 'v'" o malloc enorme). LTspice lo acepta; en ngspice el nodo se llama temp_.
+ */
+export const ngNodeName = (net: string): string => (/^(temp|temper)$/i.test(net) ? `${net}_` : net);
+
+function renameReservedNodes(lt: LtNetlist): LtNetlist {
+  const used = lt.elements.some((e) => e.nodes.some((n) => ngNodeName(n) !== n));
+  if (!used) return lt;
+  const expr = (t: string) =>
+    t.replace(/\b([vV])\(\s*([^()]*?)\s*\)/g, (m, f: string, a: string) => {
+      const args = a.split(',').map((x) => ngNodeName(x.trim()));
+      return args.join(',') === a.replace(/\s+/g, '') ? m : `${f}(${args.join(',')})`;
+    });
+  return {
+    ...lt,
+    elements: lt.elements.map((e) => ({ ...e, nodes: e.nodes.map(ngNodeName), value: expr(e.value) })),
+    texts: lt.texts.map((t) => ({ ...t, text: expr(t.text) })),
+  };
+}
+
+export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolver): NgspiceNetlist {
+  const lt = renameReservedNodes(ltOrig);
   const warnings = [...lt.warnings];
   const names = new Map<string, string>();
   const used = new Set<string>();

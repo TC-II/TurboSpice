@@ -48,17 +48,44 @@ function toAsy(g) {
   }
 }
 
+// Formato del skin Default de ASC-Parser (clase .st0 como en sus exportaciones de Illustrator),
+// limitado a lo que dibuja su exportación a PDF: sin arcos en los path (van como Bézier) ni
+// stroke-dasharray (las líneas punteadas van como segmentos sueltos)
+const ST0 = '.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }';
+
+// arco como curvas de Bézier cúbicas de hasta 90° cada una
+function arcPath(g) {
+  const span = ((g.a1 - g.a0) % 360 + 360) % 360 || 360;
+  const n = Math.ceil(span / 90), step = span / n, k = (4 / 3) * Math.tan(((step / 4) * Math.PI) / 180);
+  const d = (a) => [-g.r * Math.sin((a * Math.PI) / 180), -g.r * Math.cos((a * Math.PI) / 180)];
+  const [x0, y0] = pt(g.cx, g.cy, g.r, g.a0);
+  let out = `M${x0},${y0}`;
+  for (let i = 0; i < n; i++) {
+    const a = g.a0 + i * step, b = a + step;
+    const [ax, ay] = pt(g.cx, g.cy, g.r, a), [bx, by] = pt(g.cx, g.cy, g.r, b);
+    const [dax, day] = d(a), [dbx, dby] = d(b);
+    out += ` C${r1(ax + k * dax)},${r1(ay + k * day)} ${r1(bx - k * dbx)},${r1(by - k * dby)} ${bx},${by}`;
+  }
+  return out;
+}
+
 function toSvg(g) {
   switch (g.k) {
-    case 'L': return `<line x1="${r1(g.x1)}" y1="${r1(g.y1)}" x2="${r1(g.x2)}" y2="${r1(g.y2)}"${g.dash ? ' stroke-dasharray="4 4"' : ''}/>`;
-    case 'C': return `<circle cx="${g.cx}" cy="${g.cy}" r="${g.r}"/>`;
-    case 'R': return `<rect x="${Math.min(g.x1, g.x2)}" y="${Math.min(g.y1, g.y2)}" width="${Math.abs(g.x2 - g.x1)}" height="${Math.abs(g.y2 - g.y1)}"/>`;
-    case 'A': {
-      const [x0, y0] = pt(g.cx, g.cy, g.r, g.a0), [x1, y1] = pt(g.cx, g.cy, g.r, g.a1);
-      const large = ((g.a1 - g.a0 + 360) % 360) > 180 ? 1 : 0;
-      return `<path d="M${x0},${y0} A${g.r},${g.r} 0 ${large} 0 ${x1},${y1}"/>`;
+    case 'L': {
+      if (!g.dash) return [`<line class="st0" x1="${r1(g.x1)}" y1="${r1(g.y1)}" x2="${r1(g.x2)}" y2="${r1(g.y2)}"/>`];
+      // punteada: segmentos de 4 con huecos de 4
+      const len = Math.hypot(g.x2 - g.x1, g.y2 - g.y1), ux = (g.x2 - g.x1) / len, uy = (g.y2 - g.y1) / len, out = [];
+      for (let t = 0; t < len; t += 8) {
+        const e = Math.min(t + 4, len);
+        out.push(`<line class="st0" x1="${r1(g.x1 + ux * t)}" y1="${r1(g.y1 + uy * t)}" x2="${r1(g.x1 + ux * e)}" y2="${r1(g.y1 + uy * e)}"/>`);
+      }
+      return out;
     }
-    case 'F': return `<polygon points="${g.pts.map((p) => p.map(r1).join(',')).join(' ')}" fill="#000" stroke="none"/>`;
+    case 'C': return [`<circle class="st0" cx="${g.cx}" cy="${g.cy}" r="${g.r}"/>`];
+    case 'R': return [`<rect class="st0" x="${Math.min(g.x1, g.x2)}" y="${Math.min(g.y1, g.y2)}" width="${Math.abs(g.x2 - g.x1)}" height="${Math.abs(g.y2 - g.y1)}"/>`];
+    case 'A': return [`<path class="st0" d="${arcPath(g)}"/>`];
+    // relleno negro por omisión, como las puntas de flecha de los skins de ASC-Parser
+    case 'F': return [`<polygon points="${g.pts.map((p) => p.map(r1).join(',')).join(' ')}"/>`];
   }
 }
 
@@ -74,10 +101,12 @@ function svgDoc(gs, pins) {
   const x0 = Math.floor(Math.min(...xs)), y0 = Math.floor(Math.min(...ys));
   const w = Math.ceil(Math.max(...xs)) - x0, h = Math.ceil(Math.max(...ys)) - y0;
   return [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${w} ${h}">`,
-    '  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">',
-    ...gs.map((g) => `    ${toSvg(g)}`),
-    '  </g>',
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="${x0} ${y0} ${w} ${h}">`,
+    '  <defs>',
+    `    <style>${ST0}</style>`,
+    '  </defs>',
+    ...gs.flatMap(toSvg).map((e) => `  ${e}`),
     '</svg>',
     '',
   ].join('\n');

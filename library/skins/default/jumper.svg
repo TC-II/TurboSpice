@@ -1,7 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-36 44 72 72">
-  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">
-    <path d="M32.2,64 A36,36 0 0 0 -32.2,64"/>
-    <circle cx="-32" cy="64" r="2"/>
-    <circle cx="32" cy="64" r="2"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-36 44 72 72">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <path class="st0" d="M32.2,64 C26.1,51.8 13.7,44 0,44 C-13.7,44 -26.1,51.8 -32.2,64"/>
+  <circle class="st0" cx="-32" cy="64" r="2"/>
+  <circle class="st0" cx="32" cy="64" r="2"/>
 </svg>

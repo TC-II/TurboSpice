@@ -1,17 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -64 100 128">
-  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">
-    <circle cx="0" cy="0" r="50"/>
-    <line x1="0" y1="-64" x2="0" y2="-30"/>
-    <line x1="-16" y1="-30" x2="16" y2="-30"/>
-    <line x1="-20" y1="-16" x2="20" y2="-16" stroke-dasharray="4 4"/>
-    <line x1="-48" y1="-16" x2="-20" y2="-16"/>
-    <line x1="-20" y1="0" x2="20" y2="0" stroke-dasharray="4 4"/>
-    <line x1="20" y1="0" x2="48" y2="0"/>
-    <line x1="-20" y1="16" x2="20" y2="16" stroke-dasharray="4 4"/>
-    <line x1="-48" y1="16" x2="-20" y2="16"/>
-    <line x1="-16" y1="32" x2="16" y2="32"/>
-    <line x1="16" y1="32" x2="16" y2="26"/>
-    <line x1="-16" y1="32" x2="-16" y2="42"/>
-    <line x1="-16" y1="42" x2="-32" y2="64"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-50 -64 100 128">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <circle class="st0" cx="0" cy="0" r="50"/>
+  <line class="st0" x1="0" y1="-64" x2="0" y2="-30"/>
+  <line class="st0" x1="-16" y1="-30" x2="16" y2="-30"/>
+  <line class="st0" x1="-20" y1="-16" x2="-16" y2="-16"/>
+  <line class="st0" x1="-12" y1="-16" x2="-8" y2="-16"/>
+  <line class="st0" x1="-4" y1="-16" x2="0" y2="-16"/>
+  <line class="st0" x1="4" y1="-16" x2="8" y2="-16"/>
+  <line class="st0" x1="12" y1="-16" x2="16" y2="-16"/>
+  <line class="st0" x1="-48" y1="-16" x2="-20" y2="-16"/>
+  <line class="st0" x1="-20" y1="0" x2="-16" y2="0"/>
+  <line class="st0" x1="-12" y1="0" x2="-8" y2="0"/>
+  <line class="st0" x1="-4" y1="0" x2="0" y2="0"/>
+  <line class="st0" x1="4" y1="0" x2="8" y2="0"/>
+  <line class="st0" x1="12" y1="0" x2="16" y2="0"/>
+  <line class="st0" x1="20" y1="0" x2="48" y2="0"/>
+  <line class="st0" x1="-20" y1="16" x2="-16" y2="16"/>
+  <line class="st0" x1="-12" y1="16" x2="-8" y2="16"/>
+  <line class="st0" x1="-4" y1="16" x2="0" y2="16"/>
+  <line class="st0" x1="4" y1="16" x2="8" y2="16"/>
+  <line class="st0" x1="12" y1="16" x2="16" y2="16"/>
+  <line class="st0" x1="-48" y1="16" x2="-20" y2="16"/>
+  <line class="st0" x1="-16" y1="32" x2="16" y2="32"/>
+  <line class="st0" x1="16" y1="32" x2="16" y2="26"/>
+  <line class="st0" x1="-16" y1="32" x2="-16" y2="42"/>
+  <line class="st0" x1="-16" y1="42" x2="-32" y2="64"/>
 </svg>

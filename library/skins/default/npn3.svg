@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 96">
-  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">
-    <line x1="0" y1="48" x2="36" y2="48"/>
-    <line x1="36" y1="21" x2="36" y2="74"/>
-    <line x1="36" y1="31" x2="64" y2="10"/>
-    <line x1="64" y1="10" x2="64" y2="0"/>
-    <line x1="36" y1="65" x2="64" y2="86"/>
-    <line x1="64" y1="86" x2="64" y2="96"/>
-    <polygon points="61,83.8 50.6,81.1 55.3,74.6" fill="#000" stroke="none"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 64 96">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <line class="st0" x1="0" y1="48" x2="36" y2="48"/>
+  <line class="st0" x1="36" y1="21" x2="36" y2="74"/>
+  <line class="st0" x1="36" y1="31" x2="64" y2="10"/>
+  <line class="st0" x1="64" y1="10" x2="64" y2="0"/>
+  <line class="st0" x1="36" y1="65" x2="64" y2="86"/>
+  <line class="st0" x1="64" y1="86" x2="64" y2="96"/>
+  <polygon points="61,83.8 50.6,81.1 55.3,74.6"/>
 </svg>

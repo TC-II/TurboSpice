@@ -1,16 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-4 0 40 64">
-  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">
-    <line x1="16" y1="0" x2="16" y2="8"/>
-    <line x1="0" y1="8" x2="32" y2="8"/>
-    <line x1="0" y1="8" x2="16" y2="32"/>
-    <line x1="32" y1="8" x2="16" y2="32"/>
-    <line x1="0" y1="32" x2="32" y2="32"/>
-    <line x1="0" y1="56" x2="32" y2="56"/>
-    <line x1="0" y1="56" x2="16" y2="32"/>
-    <line x1="32" y1="56" x2="16" y2="32"/>
-    <line x1="0" y1="32" x2="32" y2="32"/>
-    <line x1="16" y1="56" x2="16" y2="64"/>
-    <line x1="0" y1="32" x2="-4" y2="28"/>
-    <line x1="32" y1="32" x2="36" y2="36"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-4 0 40 64">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <line class="st0" x1="16" y1="0" x2="16" y2="8"/>
+  <line class="st0" x1="0" y1="8" x2="32" y2="8"/>
+  <line class="st0" x1="0" y1="8" x2="16" y2="32"/>
+  <line class="st0" x1="32" y1="8" x2="16" y2="32"/>
+  <line class="st0" x1="0" y1="32" x2="32" y2="32"/>
+  <line class="st0" x1="0" y1="56" x2="32" y2="56"/>
+  <line class="st0" x1="0" y1="56" x2="16" y2="32"/>
+  <line class="st0" x1="32" y1="56" x2="16" y2="32"/>
+  <line class="st0" x1="0" y1="32" x2="32" y2="32"/>
+  <line class="st0" x1="16" y1="56" x2="16" y2="64"/>
+  <line class="st0" x1="0" y1="32" x2="-4" y2="28"/>
+  <line class="st0" x1="32" y1="32" x2="36" y2="36"/>
 </svg>

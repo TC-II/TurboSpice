@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 64">
-  <g style="fill: none; stroke: #000; stroke-width: 1.5px; stroke-linecap: round; stroke-linejoin: round;">
-    <line x1="16" y1="0" x2="16" y2="28"/>
-    <line x1="16" y1="36" x2="16" y2="64"/>
-    <line x1="0" y1="28" x2="32" y2="28"/>
-    <polygon points="0,36 32,36 32,41 0,41" fill="#000" stroke="none"/>
-    <line x1="1" y1="16" x2="7" y2="16"/>
-    <line x1="4" y1="13" x2="4" y2="19"/>
-  </g>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 32 64">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <line class="st0" x1="16" y1="0" x2="16" y2="28"/>
+  <line class="st0" x1="16" y1="36" x2="16" y2="64"/>
+  <line class="st0" x1="0" y1="28" x2="32" y2="28"/>
+  <polygon points="0,36 32,36 32,41 0,41"/>
+  <line class="st0" x1="1" y1="16" x2="7" y2="16"/>
+  <line class="st0" x1="4" y1="13" x2="4" y2="19"/>
 </svg>

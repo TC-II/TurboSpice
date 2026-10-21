@@ -314,6 +314,57 @@ SYMATTR Value V=if(sin(2*pi*time)+.5,2,-2)
     expect(toNgspice(n, 't', resolver).text).toContain('V=((sin(2*pi*time)+.5) >= 0.5 ? (2) : (-2))');
   });
 
+  it('table/tbl fuera de las fuentes B: cadena de ternarios con interpolación lineal (#130)', async () => {
+    const { translateFunctions } = await import('../../src/netlist/tongspice.ts');
+    const f = translateFunctions('.FUNC RT(x) table(x, 1,1, 2,3, 4,4)').replace(/^\.func RT\(x\) /i, '');
+    // numparam tiene ?: como JavaScript: se evalúa igual
+    const rt = new Function('x', `return ${f}`) as (x: number) => number;
+    expect([0, 1, 1.5, 2, 3, 4, 9].map(rt)).toEqual([1, 1, 2, 3, 3.5, 4, 4]);
+    expect(translateFunctions('{TBL(T, 0,34k, 25,10k, 50,3.55k)}')).toMatch(/^\{\(\(T\) <= \(0\) \? \(34k\)/);
+    expect(translateFunctions('{table(x, 1,2,3)}')).toBe('{table(x, 1,2,3)}');
+  });
+
+  it('fuentes B: tbl() como table(); con puntos que no son literales, ternarios (pwl sólo admite literales)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bi 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value I=tbl(V(s),-1,-2,0,0,1,2)
+SYMBOL bi 100 0 R0
+SYMATTR InstName B2
+SYMATTR Value I=tbl(V(s),-vc,-Fc,0,0,vc,Fc)
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('I=pwl(V(s),-1,-2,0,0,1,2)');
+    expect(t).toMatch(/I=\(\(V\(s\)\) <= \(-vc\) \? \(-Fc\)/);
+  });
+
+  it('I1 a b TBL(v1 i1 …): corriente tabulada de su propia tensión → fuente B (#130)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 0 s
+FLAG 0 96 0
+SYMBOL current 0 0 R0
+SYMATTR InstName Ifric
+SYMATTR Value TBL(-1 -2 0 0 {vc} 3)
+`);
+    const t = toNgspice(n, 't', resolver);
+    expect(t.text).toMatch(/^B_Ifric \S+ \S+ I=\(\(V\(\S+,\S+\)\) <= \(-1\) \? \(-2\)/m);
+    expect(t.names.get('Ifric')).toBe('B_Ifric');
+  });
+
+  it('fuentes B escritas como directiva o en un archivo de modelos, también con "+" (#130)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !Bvco a 0 V=1/64*TABLE(V(c), 0, 700, 1, 855)\\nBr b 0 V=Round(V(c))*2
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('Bvco a 0 V=1/64*pwl(V(c),0,700,1,855)');
+    expect(t).toContain('Br b 0 V=(sgn(V(c))*floor(abs(V(c))+0.5))*2');
+    const m = patchModelFile('.subckt s p n\nB1 p n I=TABLE(V(p,n), 0,0, 1,2,\n+ 2,5)\n.ends s', new Map());
+    expect(m).toContain('B1 p n I=pwl(V(p,n),0,0,1,2,2,5)');
+  });
+
   it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

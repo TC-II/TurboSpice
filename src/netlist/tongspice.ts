@@ -217,12 +217,30 @@ function splitArgs(args: string): string[] {
   return out;
 }
 
+/**
+ * table(x, x1,y1, x2,y2…) de LTspice como cadena de ternarios: interpola lineal entre puntos y
+ * mantiene el extremo fuera del rango. Para numparam (.func, .param, llaves), que no tiene table.
+ */
+function tableTernary([x, ...pts]: string[]): string | null {
+  if (pts.length < 2 || pts.length % 2) return null;
+  const xs = pts.filter((_, i) => i % 2 === 0);
+  const ys = pts.filter((_, i) => i % 2 === 1);
+  let out = `(${ys[ys.length - 1]})`;
+  for (let i = xs.length - 2; i >= 0; i--) {
+    const seg = `((${ys[i]})+((${ys[i + 1]})-(${ys[i]}))*((${x})-(${xs[i]}))/((${xs[i + 1]})-(${xs[i]})))`;
+    out = `((${x}) <= (${xs[i + 1]}) ? ${seg} : ${out})`;
+  }
+  return `((${x}) <= (${xs[0]}) ? (${ys[0]}) : ${out})`;
+}
+
 // Funciones de LTspice que el numparam de ngspice no conoce (en las fuentes B sí andan)
 const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   u: ([x, ...r]) => (r.length ? null : `((${x}) > 0 ? 1 : 0)`),
   // if(x,y,z): y si x >= 0,5 (medido: 0,5 da y; 0,4999 da z); la de ngspice no la evalúa así
   if: ([c, a, b, ...r]) => (b === undefined || r.length ? null : `((${c}) >= 0.5 ? (${a}) : (${b}))`),
   uramp: ([x, ...r]) => (r.length ? null : `max((${x}), 0)`),
+  table: tableTernary,
+  tbl: tableTernary,
   buf: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 1 : 0)`),
   inv: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 0 : 1)`),
   // al entero más cercano, las mitades lejos del cero (nint de ngspice redondea al par)
@@ -230,6 +248,12 @@ const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   hypot: ([x, y, ...r]) => (y === undefined || r.length ? null : `sqrt(pow(${x},2)+pow(${y},2))`),
 };
 const LT_FUNCTION_RE = new RegExp(`\\b(${Object.keys(LT_FUNCTIONS).join('|')})\\s*\\(`, 'gi');
+
+// pwl de la fuente B sólo admite puntos literales; con parámetros o expresiones, los ternarios
+function bTable(a: string[]): string | null {
+  if (a.length < 3 || a.length % 2 === 0) return null;
+  return a.slice(1).every((p) => /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(p)) ? `pwl(${a.join(',')})` : tableTernary(a);
+}
 
 // Las fuentes B de ngspice ya tienen u() y uramp(); éstas no. Además el logaritmo o la raíz de
 // un negativo abortan la simulación en ngspice; LTspice los acota (log → muy negativo, sqrt → 0)
@@ -242,7 +266,8 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   sqrt: ([x, ...r]) => (r.length ? null : `sqrt(max(${x},0))`),
   // table(x, x1,y1, x2,y2…) de LTspice es la pwl(x, …) de la fuente B de ngspice (interpola
   // lineal y fuera del rango mantiene el extremo)
-  table: (a) => (a.length < 3 || a.length % 2 === 0 ? null : `pwl(${a.join(',')})`),
+  table: bTable,
+  tbl: bTable,
   // rand(x): escalonada en [0,1), cambia en cada entero de x; random(x) pasa por los mismos
   // valores en los enteros e interpola suave; white(x) es random(x)-0.5. ngspice no tiene nada
   // parecido en la fuente B: hash pseudoaleatorio de floor(x) (otra semilla que LTspice)
@@ -250,7 +275,7 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   random: ([x, ...r]) => (r.length ? null : smoothRand(x)),
   white: ([x, ...r]) => (r.length ? null : `(${smoothRand(x)}-0.5)`),
 };
-const B_FUNCTION_RE = /\b(u|if|buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
+const B_FUNCTION_RE = /\b(u|if|buf|inv|round|hypot|log|ln|log10|sqrt|table|tbl|rand|random|white)\s*\(/gi;
 
 function hashRand(n: string): string {
   const s = `(sin((${n})*12.9898+78.233)*43758.5453)`;
@@ -319,6 +344,19 @@ export function expandStateFunctions(name: string, expr: string, lines: string[]
     re.lastIndex = k;
   }
   return out + expr.slice(i);
+}
+
+/**
+ * Fuente B escrita como línea de netlist (directiva del esquemático o archivo de modelos): las
+ * funciones de LTspice que ngspice no tiene (round, table, idt, rand…); los elementos auxiliares
+ * de idt/delay van justo después. undefined si la línea no es una B o no hay nada que traducir.
+ */
+function translateBLine(line: string, warnings: string[]): string | undefined {
+  const b = /^(\s*(B\S*)\s+\S+\s+\S+\s+)(\S.*)$/i.exec(line);
+  if (!b || !(/\b(idt|sdt|idtmod|delay)\s*\(/i.test(b[3]) || new RegExp(B_FUNCTION_RE.source, 'i').test(b[3]))) return undefined;
+  const aux: string[] = [];
+  const value = translateExpression(expandStateFunctions(b[2], b[3].replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), aux, warnings), B_FUNCTION_RE, B_FUNCTIONS);
+  return [b[1] + value, ...aux].join('\n');
 }
 
 /** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
@@ -540,6 +578,18 @@ function convertElements(
   for (const e of lt.elements) {
     const name = ngspiceName(e, used);
     names.set(e.name, name);
+    // "I1 a b TBL(v1 i1 v2 i2 …)": la corriente es la tabla de la tensión de la propia fuente
+    // (medido con LTspice: I = f(V(a,b))); en ngspice una fuente B
+    const tbl = /^I/i.test(name) && e.nodes.length === 2 ? /^\s*tbl\s*\((.*)\)\s*$/i.exec(e.value) : null;
+    const pts = tbl?.[1].match(/\{[^{}]*\}|[^\s,{}]+/g)?.map((p) => p.replace(/[{}]/g, ''));
+    if (pts) {
+      const f = bTable([`V(${e.nodes[0]},${e.nodes[1]})`, ...pts]);
+      if (f) {
+        names.set(e.name, `B_${name}`);
+        out.push(`B_${name} ${e.nodes[0]} ${e.nodes[1]} I=${f}`);
+        continue;
+      }
+    }
     const letter = name[0].toUpperCase();
     // Valor por defecto del símbolo sin cambiar ("R", "C", "L"…): falta asignarlo.
     // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
@@ -710,6 +760,12 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         out.push([k[1], ...toks.map((t, i) => (i < toks.length - 1 ? ng(t) : t))].join(' '));
         continue;
       }
+      // fuente B escrita a mano (p.ej. "Bvco a 0 V=TABLE(…)")
+      const bline = translateBLine(line, warnings);
+      if (bline) {
+        out.push(bline);
+        continue;
+      }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
       out.push(fixParam(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3')));
     }
@@ -837,16 +893,21 @@ function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out:
  */
 export function patchModelFile(text: string, subcktParams: Map<string, Map<string, string>>): string {
   let depth = 0;
-  const all = text.split(/\r\n|\r|\n/);
-  const lines = all.map((line, k) => {
-    // fuentes B de una sola línea: funciones de LTspice que ngspice no tiene (idt, rand…); los
-    // elementos auxiliares van justo después, en el mismo .subckt
-    const b = /^(\s*(B\S*)\s+\S+\s+\S+\s+)(\S.*)$/i.exec(line);
-    if (b && /\b(idt|sdt|idtmod|delay|rand|random|white)\s*\(/i.test(b[3]) && !/^\s*\+/.test(all[k + 1] ?? '')) {
-      const aux: string[] = [];
-      const value = translateExpression(expandStateFunctions(b[2], b[3].replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), aux, []), B_FUNCTION_RE, B_FUNCTIONS);
-      return [b[1] + value, ...aux].join('\n');
+  // las fuentes B con líneas "+" de continuación se unen en una sola
+  const all: string[] = [];
+  let inB = false;
+  for (const l of text.split(/\r\n|\r|\n/)) {
+    if (inB && /^\s*\+/.test(l)) all[all.length - 1] += ` ${l.trim().slice(1).trim()}`;
+    else {
+      all.push(l);
+      inB = /^\s*B\S*\s/i.test(l);
     }
+  }
+  const lines = all.map((line) => {
+    // fuentes B: funciones de LTspice que ngspice no tiene (idt, rand, table…); los elementos
+    // auxiliares van justo después, en el mismo .subckt
+    const bline = translateBLine(line, []);
+    if (bline) return bline;
     if (/^\s*\.subckt\b/i.test(line)) depth++;
     else if (/^\s*\.ends\b/i.test(line)) depth = Math.max(0, depth - 1);
     else if (depth > 0 && /^\s*\.end\b/i.test(line)) {

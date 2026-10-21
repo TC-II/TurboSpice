@@ -1,0 +1,16 @@
+Version 4
+SymbolType CELL
+LINE Normal 16 0 16 12
+LINE Normal 16 52 16 64
+RECTANGLE Normal 5 12 27 52
+WINDOW 0 36 16 Left 2
+WINDOW 3 36 56 Left 2
+SYMATTR Value R
+SYMATTR Prefix R
+SYMATTR Description Resistencia (corta)
+PIN 16 0 NONE 0
+PINATTR PinName A
+PINATTR SpiceOrder 1
+PIN 16 64 NONE 0
+PINATTR PinName B
+PINATTR SpiceOrder 2

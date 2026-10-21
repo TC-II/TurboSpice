@@ -46,6 +46,24 @@ SYMATTR Value 1k
     expect(n.elements[0].nodes).toEqual(['0', 'NC_01']);
   });
 
+  it('Misc\\jumper une las redes de sus dos pines y no genera línea', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG -32 64 out
+FLAG -32 144 0
+FLAG 32 144 0
+SYMBOL Misc\\\\jumper 0 0 R0
+SYMATTR InstName J1
+SYMBOL res -48 48 R0
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL res 16 48 R0
+SYMATTR InstName R2
+SYMATTR Value 2k
+`);
+    expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['R1 out 0', 'R2 out 0']);
+  });
+
   it('nombres §, sustrato del BJT y bulk del MOSFET', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

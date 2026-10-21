@@ -1,0 +1,26 @@
+Version 4
+SymbolType CELL
+LINE Normal 0 48 36 48
+LINE Normal 36 21 36 74
+LINE Normal 36 31 64 10
+LINE Normal 64 10 64 0
+LINE Normal 36 65 64 86
+LINE Normal 64 86 64 96
+LINE Normal 42 70 52 73
+LINE Normal 52 73 48 79
+LINE Normal 48 79 42 70
+CIRCLE Normal 8 14 76 82
+WINDOW 0 84 32 Left 2
+WINDOW 3 84 68 Left 2
+SYMATTR Value PNP
+SYMATTR Prefix QP
+SYMATTR Description Transistor bipolar PNP (con cápsula)
+PIN 64 0 NONE 0
+PINATTR PinName C
+PINATTR SpiceOrder 1
+PIN 0 48 NONE 0
+PINATTR PinName B
+PINATTR SpiceOrder 2
+PIN 64 96 NONE 0
+PINATTR PinName E
+PINATTR SpiceOrder 3

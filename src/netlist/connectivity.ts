@@ -6,6 +6,7 @@
 // - nombre de red: tierra > etiqueta (la primera en orden alfabético) > N001, N002…
 //   numeradas según el primer cable de cada red en el archivo.
 import { toWorld } from '../asc/transform.ts';
+import { baseName } from '../asc/model.ts';
 import type { AscDoc, Point, SymbolDef } from '../asc/model.ts';
 
 export interface PinRef {
@@ -115,6 +116,13 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
   for (const [k, p] of points) {
     for (const i of wiresThrough(p)) uf.union(k, key(doc.wires[i].x1, doc.wires[i].y1));
   }
+
+  // Misc\jumper: LTspice une las redes de sus dos pines y no genera línea en la netlist
+  doc.symbols.forEach((s, si) => {
+    if (baseName(s.type).toLowerCase() !== 'jumper') return;
+    const [a, ...rest] = pins.filter((p) => p.sym === si);
+    for (const b of rest) uf.union(key(a.at.x, a.at.y), key(b.at.x, b.at.y));
+  });
 
   // Etiquetas con el mismo nombre son la misma red. LTspice distingue mayúsculas acá
   // ("-v" y "-V" quedan como redes distintas en la netlist; recién el simulador las une)

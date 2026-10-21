@@ -1,0 +1,21 @@
+Version 4
+SymbolType CELL
+LINE Normal 16 0 16 8
+LINE Normal 16 56 16 64
+RECTANGLE Normal 10 8 22 56
+LINE Normal 2 12 2 52
+LINE Normal -16 32 2 32
+WINDOW 0 36 16 Left 2
+WINDOW 3 36 56 Left 2
+SYMATTR Value URC
+SYMATTR Prefix U
+SYMATTR Description Línea RC distribuida (URC)
+PIN 16 0 NONE 0
+PINATTR PinName A
+PINATTR SpiceOrder 1
+PIN 16 64 NONE 0
+PINATTR PinName B
+PINATTR SpiceOrder 2
+PIN -16 32 NONE 0
+PINATTR PinName C
+PINATTR SpiceOrder 3

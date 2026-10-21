@@ -1,0 +1,21 @@
+Version 4
+SymbolType CELL
+LINE Normal 32 0 32 20
+LINE Normal 32 44 32 64
+LINE Normal 8 20 56 20
+LINE Normal 8 44 56 44
+LINE Normal 8 20 20 44
+LINE Normal 32 20 20 44
+LINE Normal 32 44 44 20
+LINE Normal 56 44 44 20
+WINDOW 0 48 0 Left 2
+WINDOW 3 48 72 Left 2
+SYMATTR Value DIAC
+SYMATTR Prefix X
+SYMATTR Description DIAC: el modelo lo provee el usuario
+PIN 32 0 NONE 0
+PINATTR PinName +
+PINATTR SpiceOrder 1
+PIN 32 64 NONE 0
+PINATTR PinName -
+PINATTR SpiceOrder 2

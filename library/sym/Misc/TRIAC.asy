@@ -1,0 +1,26 @@
+Version 4
+SymbolType CELL
+LINE Normal 32 0 32 20
+LINE Normal 32 44 32 64
+LINE Normal 8 20 56 20
+LINE Normal 8 44 56 44
+LINE Normal 8 20 20 44
+LINE Normal 32 20 20 44
+LINE Normal 32 44 44 20
+LINE Normal 56 44 44 20
+LINE Normal 16 44 0 64
+LINE Normal 0 64 -16 64
+WINDOW 0 48 0 Left 2
+WINDOW 3 48 72 Left 2
+SYMATTR Value TRIAC
+SYMATTR Prefix X
+SYMATTR Description TRIAC: el modelo lo provee el usuario
+PIN 32 0 NONE 0
+PINATTR PinName MT2
+PINATTR SpiceOrder 1
+PIN -16 64 NONE 0
+PINATTR PinName G
+PINATTR SpiceOrder 2
+PIN 32 64 NONE 0
+PINATTR PinName MT1
+PINATTR SpiceOrder 3

@@ -6,6 +6,7 @@
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
+import { fixFloatingNodes } from './floating.ts';
 import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
 import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
@@ -805,5 +806,6 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   for (const w of lapWarnings) if (!warnings.includes(w)) warnings.push(w);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
-  return { netlist: main.text, files, warnings };
+  // nodos sin camino de continua a tierra: como LTspice (ver floating.ts)
+  return { netlist: fixFloatingNodes(main.text, files).text, files, warnings };
 }

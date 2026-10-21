@@ -9,6 +9,7 @@ import { replaceIdealDiodes } from '../../src/netlist/idealdiode.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
+import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
 import { patchModelFile, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
@@ -622,5 +623,38 @@ SYMATTR Value ${value}
     const r = ng('e', 'E1', 'Laplace=exp(-.001*s)/(1+.001*s)**2');
     expect(r.warnings.join('\n')).toMatch(/E1: la transferencia .* no es un cociente de polinomios en s \(exp\(\) de s\)/);
     expect(ng('e', 'E1', 'Laplace=1e-6*s**{alpha}').warnings.join('\n')).toMatch(/no es un cociente/);
+  });
+});
+
+describe('nodos flotantes (como LTspice: gmin en el último nodo creado de cada grupo)', () => {
+  it('entrada de E abierta, capacitores en serie y fuente entre capacitores', () => {
+    const net = [
+      'V1 1 0 1', 'E1 out 0 in 0 10', 'R1 out 0 1k',
+      'C1 1 2 1u', 'C2 2 0 3u',
+      'C3 1 3 1u', 'R3 3 4 1k', 'C4 4 0 1u',
+      'C5 1 a 1u', 'V3 a b 5', 'C6 b 0 1u',
+      'L1 1 5 1m', 'I1 0 5 1m', 'D1 5 0 dmod', '.model dmod D',
+      '.op', '.end',
+    ].join('\n');
+    // los mismos nodos que nombra LTspice en "WARNING: Node … is floating"
+    expect(floatingNodes(net, {})).toEqual(['in', '2', '4', 'b']);
+    const fixed = fixFloatingNodes(net, {}).text.split('\n');
+    expect(fixed).toContain('R__float1 in 0 1e12');
+    expect(fixed.at(-1)).toBe('.end');
+  });
+
+  it('nodos internos de subcircuitos (de la netlist o de un archivo incluido), con nombre aplanado', () => {
+    const lib = ['.subckt Gyr V1+ V1- V2+ V2- PARAMS: R=1', 'Rin V1+ I1in 1m', 'VI1 I1in I1out 0', 'HV1 I1out V1- VI2 {-R}',
+      'Rout V2+ I2in 1m', 'VI2 I2in I2out 0', 'HV2 I2out V2- VI1 {R}', '.ends Gyr'].join('\n');
+    const net = ['X_U1 N014 N016 N010 N005 gyr R=1', 'X_U2 N010 N005 N011 N006 gyr R=1', 'V1 N016 0 1', 'R1 N011 0 1',
+      '.subckt div a', 'C1 a m 1u', 'C2 m 0 1u', '.ends', 'XD N016 div', '.include gyr.lib', '.op', '.end'].join('\n');
+    expect(floatingNodes(net, { 'gyr.lib': lib })).toEqual(['x_u2.i1out', 'xd.m']);
+  });
+
+  it('no toca circuitos con camino a tierra (transistores, MOSFET de 3 y 4 terminales, subcircuitos desconocidos)', () => {
+    const net = ['V1 1 0 5', 'Q1 1 2 3 npn', 'R1 3 0 1k', 'C1 2 0 1n', 'M1 1 4 5 5 nm', 'M2 1 4 6 nm', 'R2 6 0 1', 'R4 4 0 1',
+      'C5 5 0 1n', 'X1 7 8 nada', 'C7 1 7 1n', '.model npn NPN', '.model nm VDMOS', '.end'].join('\n');
+    expect(floatingNodes(net, {})).toEqual([]);
+    expect(fixFloatingNodes(net, {}).text).toBe(net);
   });
 });

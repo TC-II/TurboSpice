@@ -10,7 +10,7 @@ import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
-import { patchModelFile, toNgspice } from '../../src/netlist/tongspice.ts';
+import { ngNodeName, patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
@@ -64,6 +64,34 @@ SYMATTR InstName R2
 SYMATTR Value 2k
 `);
     expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['R1 out 0', 'R2 out 0']);
+  });
+
+  it('redes sin cables (pines que se tocan): P001, P002… con contador aparte, en el orden de los símbolos (#109)', () => {
+    // medido con LTspice -netlist: dos pilas de resistencias sin cable y un par unido con cable
+    const text = ltNetlistText(
+      netFromAsc(`Version 4
+SHEET 1 880 680
+WIRE 16 96 116 96
+SYMBOL res 400 400 R0
+SYMATTR InstName R1
+SYMBOL res 400 480 R0
+SYMATTR InstName R2
+SYMBOL res 0 0 R0
+SYMATTR InstName R3
+SYMBOL res 100 0 R0
+SYMATTR InstName R4
+SYMBOL res 0 200 R0
+SYMATTR InstName R5
+SYMBOL res 0 280 R0
+SYMATTR InstName R6
+`),
+    );
+    expect(text).toMatch(/^R1 NC_01 P001 R$/m);
+    expect(text).toMatch(/^R2 P001 NC_02 R$/m);
+    expect(text).toMatch(/^R3 NC_03 N001 R$/m);
+    expect(text).toMatch(/^R4 NC_04 N001 R$/m);
+    expect(text).toMatch(/^R5 NC_05 P002 R$/m);
+    expect(text).toMatch(/^R6 P002 NC_06 R$/m);
   });
 
   it('nombres §, sustrato del BJT y bulk del MOSFET', () => {
@@ -183,7 +211,12 @@ SYMATTR InstName B1
 SYMATTR Value V=delay(V(in),V(td))
 `);
     expect(v.text).toMatch(/^A__B1__delay0 B1__delay0_in B1__delay0 B1__delay0_t B1__delay0_m$/m);
-    expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{1\} has_delay_cnt=true\)$/m);
+    // delmax = min(tmax, tstop): ngspice lo recorta al final de la simulación (#131)
+    expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{min\(1e30,dly_tstop\)\} has_delay_cnt=true\)$/m);
+    expect(v.text).toContain('V=(V(td))/(min(1e30,dly_tstop))');
+    const prep = prepareSimulation({ ...v, text: `${v.text.replace(/\.end\s*$/, '')}.tran 1u 20m
+.end` }, () => '');
+    expect(prep.netlist).toMatch(/^\.param dly_tstop=20m$/m);
     expect(v.warnings.some((w) => /delay\(\) con retardo variable/.test(w))).toBe(true);
   });
 
@@ -298,7 +331,7 @@ SYMBOL bi 0 0 R0
 SYMATTR InstName B1
 SYMATTR Value I=LIMIT ( -V(a) , 1 , -1 ) * U (V(a))
 `);
-    expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * U(V(a))');
+    expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * ((V(a)) > 0 ? 1 : 0)');
   });
 
   it('fuentes B: round, buf, inv e hypot fuera de llaves (ngspice no las tiene)', () => {
@@ -309,7 +342,95 @@ SYMATTR InstName B2
 SYMATTR Value V=u(time*1200-round(time*1200))+buf(V(a))
 `);
     const t = toNgspice(n, 't', resolver).text;
-    expect(t).toContain('V=u(time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5)))+((V(a)) > 0.5 ? 1 : 0)');
+    expect(t).toContain('V=((time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5))) > 0 ? 1 : 0)+((V(a)) > 0.5 ? 1 : 0)');
+  });
+
+  it('fuentes B: u(x) es 0 en x = 0 (la u() de ngspice vale 0,5) (#128)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B6
+SYMATTR Value V=u(ddt(u(V(a))))
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('V=((ddt(((V(a)) > 0 ? 1 : 0))) > 0 ? 1 : 0)');
+  });
+
+  it('fuentes B: if(x,y,z) es y si x >= 0,5 y si no z (#129)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value V=if(sin(2*pi*time)+.5,2,-2)
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('V=((sin(2*pi*time)+.5) >= 0.5 ? (2) : (-2))');
+  });
+
+  it('table/tbl fuera de las fuentes B: cadena de ternarios con interpolación lineal (#130)', async () => {
+    const { translateFunctions } = await import('../../src/netlist/tongspice.ts');
+    const f = translateFunctions('.FUNC RT(x) table(x, 1,1, 2,3, 4,4)').replace(/^\.func RT\(x\) /i, '');
+    // numparam tiene ?: como JavaScript: se evalúa igual
+    const rt = new Function('x', `return ${f}`) as (x: number) => number;
+    expect([0, 1, 1.5, 2, 3, 4, 9].map(rt)).toEqual([1, 1, 2, 3, 3.5, 4, 4]);
+    expect(translateFunctions('{TBL(T, 0,34k, 25,10k, 50,3.55k)}')).toMatch(/^\{\(\(T\) <= \(0\) \? \(34k\)/);
+    expect(translateFunctions('{table(x, 1,2,3)}')).toBe('{table(x, 1,2,3)}');
+  });
+
+  it('fuentes B: tbl() como table(); con puntos que no son literales, ternarios (pwl sólo admite literales)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bi 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value I=tbl(V(s),-1,-2,0,0,1,2)
+SYMBOL bi 100 0 R0
+SYMATTR InstName B2
+SYMATTR Value I=tbl(V(s),-vc,-Fc,0,0,vc,Fc)
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('I=pwl(V(s),-1,-2,0,0,1,2)');
+    expect(t).toMatch(/I=\(\(V\(s\)\) <= \(-vc\) \? \(-Fc\)/);
+  });
+
+  it('I1 a b TBL(v1 i1 …): corriente tabulada de su propia tensión → fuente B (#130)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 0 s
+FLAG 0 96 0
+SYMBOL current 0 0 R0
+SYMATTR InstName Ifric
+SYMATTR Value TBL(-1 -2 0 0 {vc} 3)
+`);
+    const t = toNgspice(n, 't', resolver);
+    expect(t.text).toMatch(/^B_Ifric \S+ \S+ I=\(\(V\(\S+,\S+\)\) <= \(-1\) \? \(-2\)/m);
+    expect(t.names.get('Ifric')).toBe('B_Ifric');
+  });
+
+  it('fuentes B escritas como directiva o en un archivo de modelos, también con "+" (#130)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !Bvco a 0 V=1/64*TABLE(V(c), 0, 700, 1, 855)\\nBr b 0 V=Round(V(c))*2
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toContain('Bvco a 0 V=1/64*pwl(V(c),0,700,1,855)');
+    expect(t).toContain('Br b 0 V=(sgn(V(c))*floor(abs(V(c))+0.5))*2');
+    const m = patchModelFile('.subckt s p n\nB1 p n I=TABLE(V(p,n), 0,0, 1,2,\n+ 2,5)\n.ends s', new Map());
+    expect(m).toContain('B1 p n I=pwl(V(p,n),0,0,1,2,2,5)');
+  });
+
+  it('un nodo llamado Temp/temper se renombra (temp y temper son variables de las fuentes B de ngspice) (#104)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 16 Temp
+FLAG 0 96 0
+SYMBOL bv 0 0 R0
+SYMATTR InstName B3
+SYMATTR Value V= 800k * V(Temp) + 200
+TEXT 0 200 Left 2 !.ic V(temp)=1
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).toMatch(/^B3 \S+ \S+ V= 800k \* V\(Temp_\) \+ 200$/m);
+    expect(t).toContain('.ic V(temp_)=1');
+    expect(ngNodeName('Temper')).toBe('Temper_');
+    expect(ngNodeName('temperature')).toBe('temperature');
   });
 
   it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {
@@ -615,6 +736,7 @@ describe('funciones de LTspice que numparam no conoce (#56)', () => {
     expect(translateFunctions('{u(uramp(x)-1)}')).toBe('{((max((x), 0)-1) > 0 ? 1 : 0)}');
     expect(translateFunctions('{buf(a)+inv(b)}')).toBe('{((a) > 0.5 ? 1 : 0)+((b) > 0.5 ? 0 : 1)}');
     expect(translateFunctions('{round(x)}')).toBe('{(sgn(x)*floor(abs(x)+0.5))}');
+    expect(translateFunctions('.param p=if(x,2,3)')).toBe('.param p=((x) >= 0.5 ? (2) : (3))');
     expect(translateFunctions('{hypot(a, b)}')).toBe('{sqrt(pow(a,2)+pow(b,2))}');
   });
 

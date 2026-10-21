@@ -166,16 +166,21 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
     else if (n.pins.length === 1 && !n.wires.length) n.name = ''; // pin suelto → NC_xx
     else unnamed.push(n);
   }
-  // LTspice numera según el primer cable de cada red en el orden del archivo (verificado
-  // contra LTspice -netlist); las redes sin cables (pines que se tocan) van al final, de
-  // arriba hacia abajo y de izquierda a derecha.
-  const topLeft = (n: Net) =>
-    n.points.reduce((a, b) => (b.y < a.y || (b.y === a.y && b.x < a.x) ? b : a));
+  // LTspice numera según el primer cable de cada red en el orden del archivo (N001, N002…;
+  // verificado contra LTspice -netlist). Las redes sin cables (pines que se tocan) se llaman
+  // P001, P002… con un contador aparte, en el orden de sus símbolos y pines en el archivo.
   const firstWire = (n: Net) => (n.wires.length ? Math.min(...n.wires) : Infinity);
-  unnamed
+  const [bare, wired] = [unnamed.filter((n) => !n.wires.length), unnamed.filter((n) => n.wires.length)];
+  const topLeft = (n: Net) => n.points.reduce((a, b) => (b.y < a.y || (b.y === a.y && b.x < a.x) ? b : a));
+  wired
     .map((n) => [n, firstWire(n), topLeft(n)] as const)
     .sort(([, wa, a], [, wb, b]) => wa - wb || a.y - b.y || a.x - b.x)
     .forEach(([n], i) => (n.name = `N${String(i + 1).padStart(3, '0')}`));
+  const pinKey = (n: Net) => n.pins.reduce((m, p) => (p.sym < m.sym || (p.sym === m.sym && p.order < m.order) ? p : m));
+  bare
+    .map((n) => [n, pinKey(n)] as const)
+    .sort(([, a], [, b]) => a.sym - b.sym || a.order - b.order)
+    .forEach(([n], i) => (n.name = `P${String(i + 1).padStart(3, '0')}`));
 
   const pinNet = new Map<string, Net>();
   for (const n of nets) for (const p of n.pins) pinNet.set(`${p.sym}:${p.pin}`, n);

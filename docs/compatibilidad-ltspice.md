@@ -73,7 +73,7 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   Las redes sin nombre se numeran según **el primer cable de cada red en el orden del archivo**
   (el `WIRE` de menor índice), no por posición: con esa regla las netlists de los 23 fixtures son
   idénticas a las de LTspice incluidos los nombres (antes, con "de arriba hacia abajo", 130/130
-  equivalentes y 84 idénticas). Las redes sin cables (pines que se tocan) van al final.
+  equivalentes y 84 idénticas). Las redes sin cables (pines que se tocan) se llaman **`P001`, `P002`…** con un **contador aparte** (medido con `LTspice -netlist`; el issue #109 suponía un contador común) y se numeran en el orden de sus símbolos y pines en el archivo, no por posición. De los 262 casos del corpus con redes `P###` en la netlist de LTspice, 119 pasan a tener todas esas líneas iguales (antes ninguna), 20 a netlist idéntica y 5 a equivalente; el resto difiere por otras causas (símbolos faltantes, jerarquía, huecos en la numeración `N###`).
 - Pines sueltos: `NC_xx`; `SpiceOrder` faltantes en subcircuitos: `MP_xx` (mismo contador, en orden de
   elementos).
 - Nombre del elemento: si `InstName` no empieza con la letra del prefijo → `P§InstName` (`R§5`, `X§U1`).

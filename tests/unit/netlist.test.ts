@@ -66,6 +66,34 @@ SYMATTR Value 2k
     expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['R1 out 0', 'R2 out 0']);
   });
 
+  it('redes sin cables (pines que se tocan): P001, P002… con contador aparte, en el orden de los símbolos (#109)', () => {
+    // medido con LTspice -netlist: dos pilas de resistencias sin cable y un par unido con cable
+    const text = ltNetlistText(
+      netFromAsc(`Version 4
+SHEET 1 880 680
+WIRE 16 96 116 96
+SYMBOL res 400 400 R0
+SYMATTR InstName R1
+SYMBOL res 400 480 R0
+SYMATTR InstName R2
+SYMBOL res 0 0 R0
+SYMATTR InstName R3
+SYMBOL res 100 0 R0
+SYMATTR InstName R4
+SYMBOL res 0 200 R0
+SYMATTR InstName R5
+SYMBOL res 0 280 R0
+SYMATTR InstName R6
+`),
+    );
+    expect(text).toMatch(/^R1 NC_01 P001 R$/m);
+    expect(text).toMatch(/^R2 P001 NC_02 R$/m);
+    expect(text).toMatch(/^R3 NC_03 N001 R$/m);
+    expect(text).toMatch(/^R4 NC_04 N001 R$/m);
+    expect(text).toMatch(/^R5 NC_05 P002 R$/m);
+    expect(text).toMatch(/^R6 P002 NC_06 R$/m);
+  });
+
   it('nombres §, sustrato del BJT y bulk del MOSFET', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

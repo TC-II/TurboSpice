@@ -148,6 +148,58 @@ SYMATTR Value V=table(V(a), 0,0, 1,2) * 2 tripdv=1u tripdt=1p Rpar={1/g} Cpar=1p
     expect(r.text).not.toMatch(/tripd/i);
   });
 
+  const bsrc = (value: string) =>
+    ng(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value ${value}
+`).text;
+
+  it('fuente B: idt/sdt con ic y reset → C de 1 F cargado por una fuente B de corriente', () => {
+    const t = bsrc('V=2*idt(V(a),1,V(r))+sdt(1)');
+    expect(t).toMatch(/^B1 \S+ \S+ V=2\*V\(B1__idt0\)\+V\(B1__sdt2\)$/m);
+    expect(t).toMatch(/^C__B1__idt0 B1__idt0 0 1$/m);
+    expect(t).toMatch(/^B__B1__idt0 0 B1__idt0 I=\(\(time > 0\) && !\(\(V\(r\)\) > 0\.5\)\) \? \(V\(a\)\) : 1e6\*\(\(1\)-V\(B1__idt0\)\)$/m);
+    expect(t).toMatch(/^B__B1__sdt2 0 B1__sdt2 I=\(time > 0\) \? \(1\) : 1e6\*\(\(0\)-V\(B1__sdt2\)\)$/m);
+  });
+
+  it('fuente B: idtmod → integral con módulo y offset a la salida; idt anidada', () => {
+    expect(bsrc('V=idtmod(V(f),0,1,-0.5)')).toMatch(/V=\(\(-0\.5\)\+V\(B1__idtmod0\)-\(1\)\*floor\(V\(B1__idtmod0\)\/\(1\)\)\)$/m);
+    const t = bsrc('V=idt(idt(1))');
+    expect(t).toMatch(/^B__B1__idt2 0 B1__idt2 I=\(time > 0\) \? \(V\(B1__idt0\)\) : /m);
+  });
+
+  it('fuente B: delay constante → línea ideal; variable → code model delay con aviso', () => {
+    const t = bsrc('I=delay(V(x),{Trep})');
+    expect(t).toMatch(/^B1 \S+ \S+ I=V\(B1__delay0\)$/m);
+    expect(t).toMatch(/^B__B1__delay0 B1__delay0_in 0 V=V\(x\)$/m);
+    expect(t).toMatch(/^T__B1__delay0 B1__delay0_in 0 B1__delay0 0 Z0=1 TD=\{Trep\}$/m);
+    expect(t).toMatch(/^R__B1__delay0 B1__delay0 0 1$/m);
+    const v = ng(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value V=delay(V(in),V(td))
+`);
+    expect(v.text).toMatch(/^A__B1__delay0 B1__delay0_in B1__delay0 B1__delay0_t B1__delay0_m$/m);
+    expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{1\} has_delay_cnt=true\)$/m);
+    expect(v.warnings.some((w) => /delay\(\) con retardo variable/.test(w))).toBe(true);
+  });
+
+  it('archivo de modelos: idt/rand de las fuentes B con los auxiliares adentro del .subckt', () => {
+    const t = patchModelFile('.subckt a in out\nB_s out 0 V=idt(V(in))/{T}\nB2 x 0 V=rand(time)\n.ends a', new Map());
+    expect(t).toMatch(/^B_s out 0 V=V\(B_s__idt0\)\/\{T\}\nC__B_s__idt0 B_s__idt0 0 1\nB__B_s__idt0 0 B_s__idt0 I=/m);
+    expect(t).not.toMatch(/rand\(/);
+    expect(t).toMatch(/\.ends a$/);
+  });
+
+  it('fuente B: rand/random/white → hash pseudoaleatorio de floor(x)', () => {
+    const t = bsrc('V=rand(time*10)>.5+white(time)');
+    expect(t).not.toMatch(/\b(rand|white|random)\(/);
+    expect(t).toMatch(/sin\(\(floor\(time\*10\)\)\*12\.9898/);
+  });
+
   it('resistencia de comportamiento "R= expr" → r={expr} (sigue siendo R)', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

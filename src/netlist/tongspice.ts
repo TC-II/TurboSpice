@@ -241,8 +241,83 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   // table(x, x1,y1, x2,y2…) de LTspice es la pwl(x, …) de la fuente B de ngspice (interpola
   // lineal y fuera del rango mantiene el extremo)
   table: (a) => (a.length < 3 || a.length % 2 === 0 ? null : `pwl(${a.join(',')})`),
+  // rand(x): escalonada en [0,1), cambia en cada entero de x; random(x) pasa por los mismos
+  // valores en los enteros e interpola suave; white(x) es random(x)-0.5. ngspice no tiene nada
+  // parecido en la fuente B: hash pseudoaleatorio de floor(x) (otra semilla que LTspice)
+  rand: ([x, ...r]) => (r.length ? null : hashRand(`floor(${x})`)),
+  random: ([x, ...r]) => (r.length ? null : smoothRand(x)),
+  white: ([x, ...r]) => (r.length ? null : `(${smoothRand(x)}-0.5)`),
 };
-const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table)\s*\(/gi;
+const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
+
+function hashRand(n: string): string {
+  const s = `(sin((${n})*12.9898+78.233)*43758.5453)`;
+  return `(${s}-floor(${s}))`;
+}
+function smoothRand(x: string): string {
+  const f = `((${x})-floor(${x}))`;
+  return `(${hashRand(`floor(${x})`)}+(${hashRand(`floor(${x})+1`)}-${hashRand(`floor(${x})`)})*${f}*${f}*(3-2*${f}))`;
+}
+
+/**
+ * Funciones con estado de las fuentes B de LTspice, que necesitan elementos auxiliares:
+ *  - idt(x[,ic[,reset]]) / sdt: C de 1 F cargado con corriente x; en el punto de operación y
+ *    mientras reset > 0.5 la corriente lleva el nodo a ic;
+ *  - idtmod(x[,ic[,m[,o]]]): la misma integral, a la salida o + mod(·, m);
+ *  - delay(x,t[,tmax]): con t constante una línea de transmisión ideal adaptada (exacta); con t
+ *    variable el code model XSPICE delay (cuantiza al paso del .tran).
+ * Devuelve la expresión con cada llamada cambiada por V(nodo auxiliar).
+ */
+export function expandStateFunctions(name: string, expr: string, lines: string[], warnings: string[]): string {
+  const re = /\b(idt|sdt|idtmod|delay)\s*\(/gi;
+  if (!new RegExp(re.source, 'i').test(expr)) return expr;
+  let out = '';
+  let i = 0;
+  for (let m = re.exec(expr); m; m = re.exec(expr)) {
+    let depth = 1;
+    let k = m.index + m[0].length;
+    const start = k;
+    for (; k < expr.length && depth; k++) {
+      if (expr[k] === '(') depth++;
+      else if (expr[k] === ')') depth--;
+    }
+    if (depth) break;
+    const args = splitArgs(expandStateFunctions(name, expr.slice(start, k - 1), lines, warnings));
+    const fn = m[1].toLowerCase();
+    const n = `${name}__${fn}${lines.length}`;
+    let rep: string | null = null;
+    if (fn !== 'delay' && args[0] && args.length <= (fn === 'idtmod' ? 4 : 3)) {
+      const [x, ic = '0', third] = args;
+      const hold = fn !== 'idtmod' && third ? `(time > 0) && !((${third}) > 0.5)` : 'time > 0';
+      lines.push(`C__${n} ${n} 0 1`, `B__${n} 0 ${n} I=(${hold}) ? (${x}) : 1e6*((${ic})-V(${n}))`);
+      if (fn === 'idtmod') {
+        const [, , mod = '1', off = '0'] = args;
+        rep = `((${off})+V(${n})-(${mod})*floor(V(${n})/(${mod})))`;
+      } else rep = `V(${n})`;
+    } else if (fn === 'delay' && (args.length === 2 || args.length === 3)) {
+      const [x, t, tmax] = args;
+      lines.push(`B__${n} ${n}_in 0 V=${x}`);
+      if (!/\b[vi]\s*\(|\btime\b/i.test(t)) {
+        lines.push(`T__${n} ${n}_in 0 ${n} 0 Z0=1 TD={${t.replace(/[{}]/g, '')}}`, `R__${n} ${n} 0 1`);
+      } else {
+        // el control del code model es la fracción de delmax (delmin = 0)
+        const dmax = tmax ? tmax.replace(/[{}]/g, '') : '1';
+        lines.push(
+          `B__${n}_t ${n}_t 0 V=(${t})/(${dmax})`,
+          `A__${n} ${n}_in ${n} ${n}_t ${n}_m`,
+          `.model ${n}_m delay(delmin=0 delmax={${dmax}} has_delay_cnt=true)`,
+        );
+        warnings.push(`${name}: delay() con retardo variable se resuelve al paso del .tran${tmax ? '' : ' (hasta 1 s)'}`);
+      }
+      rep = `V(${n})`;
+    }
+    if (rep === null) continue;
+    out += expr.slice(i, m.index) + rep;
+    i = k;
+    re.lastIndex = k;
+  }
+  return out + expr.slice(i);
+}
 
 /** Reescribe en una expresión las llamadas a funciones de LTspice que ngspice no tiene */
 function translateExpression(text: string, fnRe: RegExp = LT_FUNCTION_RE, fns = LT_FUNCTIONS): string {
@@ -479,7 +554,14 @@ function convertElements(
     }
     // Fuentes B: LTspice acepta "LIMIT (x, …)" con espacio antes del paréntesis y funciones
     // que la fuente B de ngspice no conoce (round, buf…) también fuera de llaves; ngspice no
-    let value = letter === 'B' ? translateExpression(e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), B_FUNCTION_RE, B_FUNCTIONS) : fixBraces(e.value);
+    // (idt, delay… con elementos auxiliares: ver expandStateFunctions)
+    let value = fixBraces(e.value);
+    if (letter === 'B') {
+      const aux: string[] = [];
+      value = expandStateFunctions(name, e.value.replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), aux, warnings);
+      value = translateExpression(value, B_FUNCTION_RE, B_FUNCTIONS);
+      extra.push(...aux);
+    }
     // corriente inicial de .ic I(L1)=… (se busca por nombre o por InstName sin el prefijo L§)
     const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
     if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
@@ -753,7 +835,16 @@ function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out:
  */
 export function patchModelFile(text: string, subcktParams: Map<string, Map<string, string>>): string {
   let depth = 0;
-  const lines = text.split(/\r\n|\r|\n/).map((line) => {
+  const all = text.split(/\r\n|\r|\n/);
+  const lines = all.map((line, k) => {
+    // fuentes B de una sola línea: funciones de LTspice que ngspice no tiene (idt, rand…); los
+    // elementos auxiliares van justo después, en el mismo .subckt
+    const b = /^(\s*(B\S*)\s+\S+\s+\S+\s+)(\S.*)$/i.exec(line);
+    if (b && /\b(idt|sdt|idtmod|delay|rand|random|white)\s*\(/i.test(b[3]) && !/^\s*\+/.test(all[k + 1] ?? '')) {
+      const aux: string[] = [];
+      const value = translateExpression(expandStateFunctions(b[2], b[3].replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), aux, []), B_FUNCTION_RE, B_FUNCTIONS);
+      return [b[1] + value, ...aux].join('\n');
+    }
     if (/^\s*\.subckt\b/i.test(line)) depth++;
     else if (/^\s*\.ends\b/i.test(line)) depth = Math.max(0, depth - 1);
     else if (depth > 0 && /^\s*\.end\b/i.test(line)) {

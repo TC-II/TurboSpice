@@ -126,13 +126,13 @@ const opamp = (top, invUp, supplies) => {
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
 const SYMBOLS = {
   npn2: ['QN', 'NPN', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3]], { 0: [56, 32, 'Left'], 3: [56, 68, 'Left'] },
-    'Transistor bipolar NPN (con cápsula)', [...bjt(false), C(42, 48, 34)]],
+    'Transistor bipolar NPN (con cápsula)', [...bjt(false), C(53, 48, 43)]],
   npn3: ['QN', 'NPN', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3]], { 0: [56, 32, 'Left'], 3: [56, 68, 'Left'] },
     'Transistor bipolar NPN (variante)', bjt(false)],
   npn4: ['QN', 'NPN', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3], [64, 48, 'S', 4]], { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
     'Transistor bipolar NPN con sustrato', [...bjt(false), ...substrate]],
   pnp2: ['QP', 'PNP', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3]], { 0: [84, 32, 'Left'], 3: [84, 68, 'Left'] },
-    'Transistor bipolar PNP (con cápsula)', [...bjt(true), C(42, 48, 34)]],
+    'Transistor bipolar PNP (con cápsula)', [...bjt(true), C(53, 48, 43)]],
   pnp4: ['QP', 'PNP', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3], [64, 48, 'S', 4]], { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
     'Transistor bipolar PNP con sustrato', [...bjt(true), ...substrate]],
   lpnp: ['QP', 'LPNP', [[64, 0, 'C', 1], [0, 48, 'B', 2], [64, 96, 'E', 3], [64, 48, 'S', 4]], { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
@@ -215,6 +215,10 @@ const SYMBOLS = {
     'Capacitor polarizado (gráfico europeo)', [L(16, 0, 16, 28), L(16, 36, 16, 64), L(0, 28, 32, 28), F([0, 36], [32, 36], [32, 41], [0, 41]), ...plus(4, 16, 3)]],
 };
 
+// Skins que no se generan: son los npn.svg y pnp.svg (BJT con cápsula) del skin Default de
+// ASC-Parser, copiados tal cual (ver library/LICENSES.md)
+const ASC_PARSER_SKINS = new Set(['npn2', 'pnp2']);
+
 for (const [path, [prefix, value, pins, windows, desc, graphics, extra = []]] of Object.entries(SYMBOLS)) {
   const lines = [
     'Version 4',
@@ -232,6 +236,7 @@ for (const [path, [prefix, value, pins, windows, desc, graphics, extra = []]] of
   writeFileSync(asy, lines.join('\r\n') + '\r\n', 'latin1');
   // en minúsculas: la librería busca el skin por el nombre exacto y después en minúsculas, y los
   // .asc escriben el mismo símbolo con distintas mayúsculas (UniversalOpamp2, universalopamp2)
+  if (ASC_PARSER_SKINS.has(path)) continue;
   writeFileSync(join(LIB, 'skins', 'default', `${path.split('/').pop().toLowerCase()}.svg`), svgDoc(graphics, pins));
 }
 console.log(`${Object.keys(SYMBOLS).length} símbolos escritos en library/sym/ (con su skin)`);

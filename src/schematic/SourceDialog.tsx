@@ -14,6 +14,7 @@ import {
   solvePulse,
   spiceNumber,
   writeSource,
+  pulseFixedAfter,
   type PulseLinked,
   type SourceKind,
   type SourceSpec,
@@ -173,20 +174,18 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   // --- pulso: campos vinculados ---
   const pulse = kind === 'pulse';
   const duty = pulse && !fixed.includes('duty') ? pulseDutyText(args) : dutyText;
-  function pulseDutyText(a: string[]) {
+  // el DC calculado se muestra con 3 cifras; al fijarlo se parte del valor exacto para que Ton no se corra
+  function pulseDutyText(a: string[], digits = 3) {
     const d = pulseDuty(n(a[5]) || 0, n(a[6]), n(a[3]) || 0, n(a[4]) || 0);
-    return isFinite(d) ? String(Number((d * 100).toPrecision(3))) : '';
+    return isFinite(d) ? String(Number((d * 100).toPrecision(digits))) : '';
   }
+  // Ton y período recalculados con todas las cifras: la frecuencia y el DC quedan donde se pidieron
   const relink = (a: string[], fx: [PulseLinked, PulseLinked], dText: string) => {
     const v = { ton: n(a[5]) || 0, per: n(a[6]), duty: n(dText) / 100, tr: n(a[3]) || 0, tf: n(a[4]) || 0 };
     const out = [...a];
-    if (fx.includes('duty') && fx.includes('per') && isFinite(v.per) && isFinite(v.duty)) out[5] = engNumber(solvePulse(fx, v).ton);
-    else if (fx.includes('duty') && fx.includes('ton') && isFinite(v.duty) && v.duty > 0) out[6] = engNumber(solvePulse(fx, v).per);
+    if (fx.includes('duty') && fx.includes('per') && dText.trim() && isFinite(v.per) && isFinite(v.duty)) out[5] = engNumber(solvePulse(fx, v).ton, 12);
+    else if (fx.includes('duty') && fx.includes('ton') && isFinite(v.duty) && v.duty > 0) out[6] = engNumber(solvePulse(fx, v).per, 12);
     return out;
-  };
-  const touch = (k: PulseLinked): [PulseLinked, PulseLinked] => {
-    if (fixed[1] === k) return fixed;
-    return [fixed[1] === k ? fixed[0] : fixed[1], k];
   };
   const isDerived = (key: FieldKey) => {
     if (!pulse) return false;
@@ -217,11 +216,11 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
     if (pulse) {
       let a = [...args];
       let fx = fixed;
-      let d = dutyText;
-      if (key === 5) (a[5] = v), (fx = touch('ton'));
-      else if (key === 'per') (a[6] = v), (fx = touch('per'));
-      else if (key === 'frq') (a[6] = isFinite(n(v)) && n(v) ? engNumber(1 / n(v)) : a[6]), (fx = touch('per'));
-      else if (key === 'duty') (d = v), (fx = touch('duty'));
+      let d = fixed.includes('duty') ? dutyText : pulseDutyText(args, 12);
+      if (key === 5) (a[5] = v), (fx = pulseFixedAfter('ton'));
+      else if (key === 'per') (a[6] = v), (fx = pulseFixedAfter('per'));
+      else if (key === 'frq') (a[6] = isFinite(n(v)) && n(v) ? engNumber(1 / n(v), 12) : a[6]), (fx = pulseFixedAfter('frq'));
+      else if (key === 'duty') (d = v), (fx = pulseFixedAfter('duty'));
       else if (typeof key === 'number') a[key] = v;
       a = relink(a, fx, d);
       setFixed(fx);

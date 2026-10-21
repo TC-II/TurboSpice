@@ -181,14 +181,14 @@ export function spiceNumber(s: string): number {
   return parseSpiceNumber(fromRkm(t) ?? t);
 }
 
-/** 0.0047 → "4.7m"; 3 cifras significativas */
-export function engNumber(x: number): string {
+/** 0.0047 → "4.7m"; 3 cifras significativas (o `digits`, si hace falta más precisión) */
+export function engNumber(x: number, digits = 3): string {
   if (!isFinite(x)) return '';
   if (Math.abs(x) < 1e-18) return '0';
   const steps: [number, string][] = [[1e-15, 'f'], [1e-12, 'p'], [1e-9, 'n'], [1e-6, 'u'], [1e-3, 'm'], [1, ''], [1e3, 'k'], [1e6, 'Meg'], [1e9, 'G']];
   let s = steps[0];
   for (const q of steps) if (Math.abs(x) >= q[0] * 0.9995) s = q;
-  return `${Number((x / s[0]).toPrecision(3))}${s[1]}`;
+  return `${Number((x / s[0]).toPrecision(digits))}${s[1]}`;
 }
 
 /** "1M" en una fuente es casi siempre un error: en SPICE es mili, no mega */
@@ -200,6 +200,12 @@ export const looksLikeMegaTypo = (s: string) => /^\s*[\d.]+M\s*$/.test(s);
 // fijos y el tercero se calcula.
 
 export type PulseLinked = 'ton' | 'per' | 'duty';
+
+/** Qué dos valores quedan fijos al editar cada campo del pulso; el tercero se recalcula.
+ *  Frecuencia y DC mantienen el DC (se ajusta Ton); Ton y período mantienen Ton (se ajusta el DC). */
+export function pulseFixedAfter(edited: 'ton' | 'per' | 'frq' | 'duty'): [PulseLinked, PulseLinked] {
+  return edited === 'frq' || edited === 'duty' ? ['duty', 'per'] : ['ton', 'per'];
+}
 
 export function pulseDuty(ton: number, per: number, tr: number, tf: number): number {
   return (tr / 2 + ton + tf / 2) / per;

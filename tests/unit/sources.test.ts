@@ -1,6 +1,6 @@
 // Ventana de fuentes (#47): leer y escribir el valor de V/I con la sintaxis de LTspice.
 import { describe, expect, it } from 'vitest';
-import { emptySource, engNumber, parseSource, pulseDuty, solvePulse, spiceNumber, waveAt, writeSource } from '../../src/sim/sources.ts';
+import { emptySource, engNumber, parseSource, pulseDuty, pulseFixedAfter, solvePulse, spiceNumber, waveAt, writeSource } from '../../src/sim/sources.ts';
 import { sourceSyntax } from '../../src/netlist/tongspice.ts';
 import { csvPoints } from '../../src/schematic/SourceDialog.tsx';
 
@@ -105,6 +105,37 @@ describe('números y campos vinculados del pulso', () => {
     // Ton y ciclo útil fijos: las rampas cambian el período (y la frecuencia)
     expect(solvePulse(['ton', 'duty'], { ton: 4e-3, per: 0, duty: 0.5, tr: 2e-3, tf: 2e-3 }).per).toBeCloseTo(12e-3);
     expect(solvePulse(['ton', 'per'], { ton: 4e-3, per: 10e-3, duty: 0, tr: 0, tf: 0 }).duty).toBeCloseTo(0.4);
+  });
+
+  it('pulso: frecuencia y DC fijos reajustan Ton; Ton y período fijos reajustan el DC (#122)', () => {
+    // 10 ms, Ton 5 ms, rampas de 1 µs: DC 50,01 %
+    const base = { ton: 5e-3, per: 10e-3, duty: 0.5001, tr: 1e-6, tf: 1e-6 };
+    expect(pulseFixedAfter('frq')).toEqual(['duty', 'per']);
+    expect(pulseFixedAfter('duty')).toEqual(['duty', 'per']);
+    expect(pulseFixedAfter('ton')).toEqual(['ton', 'per']);
+    expect(pulseFixedAfter('per')).toEqual(['ton', 'per']);
+    // frecuencia 200 Hz: el período es 5 ms, el DC se mantiene y Ton baja
+    const f = solvePulse(pulseFixedAfter('frq'), { ...base, per: 1 / 200 });
+    expect(f.ton).toBeCloseTo(2.4995e-3, 9);
+    expect(f.duty).toBeCloseTo(0.5001, 9);
+    // DC 40 %: el período se mantiene y Ton cambia
+    const d = solvePulse(pulseFixedAfter('duty'), { ...base, duty: 0.4 });
+    expect(d.per).toBeCloseTo(10e-3, 12);
+    expect(d.ton).toBeCloseTo(3.999e-3, 9);
+    // Ton 4 ms: el DC se reajusta y el período queda igual
+    const t = solvePulse(pulseFixedAfter('ton'), { ...base, ton: 4e-3 });
+    expect(t.per).toBeCloseTo(10e-3, 12);
+    expect(t.duty).toBeCloseTo(0.4001, 9);
+    // período 20 ms: Ton queda en 5 ms y el DC baja
+    const p = solvePulse(pulseFixedAfter('per'), { ...base, per: 20e-3 });
+    expect(p.ton).toBe(5e-3);
+    expect(p.duty).toBeCloseTo(0.25005, 9);
+  });
+
+  it('valores con más cifras para no perder la inversa de la frecuencia', () => {
+    expect(engNumber(1 / 3e3, 12)).toBe('333.333333333u');
+    expect(engNumber(3.999e-3, 12)).toBe('3.999m');
+    expect(engNumber(1 / 3e3)).toBe('333u');
   });
 
   it('vista previa: valores de la forma de onda', () => {

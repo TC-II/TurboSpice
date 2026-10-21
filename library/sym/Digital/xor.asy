@@ -1,0 +1,45 @@
+Version 4
+SymbolType CELL
+ARC Normal -96 32 32 160 -32 32 23 64
+ARC Normal -96 -32 32 96 23 64 -32 96
+ARC Normal -152 0 -23 129 -32 32 -32 96
+LINE Normal -16 94 -16 96
+ARC Normal -160 0 -31 129 -40 32 -40 96
+LINE Normal -48 32 -40 32
+LINE Normal -48 48 -33 48
+LINE Normal -48 64 -31 64
+LINE Normal -48 80 -33 80
+LINE Normal -48 96 -40 96
+LINE Normal 10 48 16 48
+LINE Normal 10 80 20 80
+CIRCLE Normal 20 76 28 84
+LINE Normal 28 80 32 80
+WINDOW 0 16 24 Left 2
+WINDOW 3 16 112 Left 2
+SYMATTR Prefix A
+SYMATTR SpiceModel XOR
+SYMATTR Description Compuerta XOR: alta si exactamente una entrada está alta
+PIN -48 32 NONE 0
+PINATTR PinName a
+PINATTR SpiceOrder 1
+PIN -48 48 NONE 0
+PINATTR PinName b
+PINATTR SpiceOrder 2
+PIN -48 64 NONE 0
+PINATTR PinName c
+PINATTR SpiceOrder 3
+PIN -48 80 NONE 0
+PINATTR PinName d
+PINATTR SpiceOrder 4
+PIN -48 96 NONE 0
+PINATTR PinName e
+PINATTR SpiceOrder 5
+PIN 32 80 NONE 0
+PINATTR PinName _Q
+PINATTR SpiceOrder 6
+PIN 16 48 NONE 0
+PINATTR PinName Q
+PINATTR SpiceOrder 7
+PIN -16 96 NONE 0
+PINATTR PinName com
+PINATTR SpiceOrder 8

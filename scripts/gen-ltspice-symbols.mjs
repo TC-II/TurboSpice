@@ -89,12 +89,14 @@ function toSvg(g) {
   }
 }
 
-function svgDoc(gs, pins) {
+function svgDoc(gs, pins, tight = false) {
   const xs = [], ys = [];
   const add = (x, y) => { xs.push(x); ys.push(y); };
   for (const g of gs) {
     if (g.k === 'L' || g.k === 'R') { add(g.x1, g.y1); add(g.x2, g.y2); }
-    else if (g.k === 'C' || g.k === 'A') { add(g.cx - g.r, g.cy - g.r); add(g.cx + g.r, g.cy + g.r); }
+    else if (g.k === 'C' || (g.k === 'A' && !tight)) { add(g.cx - g.r, g.cy - g.r); add(g.cx + g.r, g.cy + g.r); }
+    // tight: el arco ocupa sólo su recorrido (los de las compuertas son de círculos grandes)
+    else if (g.k === 'A') for (let i = 0, span = ((g.a1 - g.a0) % 360 + 360) % 360 || 360; i <= 32; i++) add(...pt(g.cx, g.cy, g.r, g.a0 + (span * i) / 32));
     else for (const p of g.pts) add(...p);
   }
   for (const [x, y] of pins) add(x, y);
@@ -151,6 +153,27 @@ const opamp = (top, invUp, supplies) => {
   return [...polyline([-32, top], [32, cy], [-32, top + 64], [-32, top]), ...minus(-22, ym), ...plus(-22, yp),
     ...(supplies ? [L(0, top - 0, 0, top + 16), L(0, top + 48, 0, top + 64)] : [])];
 };
+
+// compuertas digitales (dispositivos A): entradas a la izquierda, Q y _Q a la derecha (_Q con
+// burbuja), com abajo; los pines que no dibuja el gráfico llevan un tramo hasta el cuerpo
+const stubs = (x, ys, bodyX) => ys.map((y) => L(x, y, bodyX(y), y));
+const notQ = (x0, y, pin) => [L(x0, y, pin - 12, y), C(pin - 8, y, 4), L(pin - 4, y, pin, y)];
+// AND: frente semicircular de centro (-12, 64)
+const andX = (y) => r1(-12 + Math.sqrt(32 ** 2 - (y - 64) ** 2));
+const andGate = [
+  L(-24, 32, -24, 96), L(-24, 32, -12, 32), L(-24, 96, -12, 96), A(-12, 64, 32, -90, 90),
+  ...stubs(-32, [32, 48, 64, 80, 96], () => -24), L(andX(48), 48, 32, 48), ...notQ(andX(80), 80, 32),
+];
+// OR: dorso cóncavo de centro (-88, 64) y frente en punta de arcos de radio 64
+const orBack = (y, dx = 0) => r1(-88 - dx + Math.sqrt(64.5 ** 2 - (y - 64) ** 2));
+const orFront = r1(-32 + Math.sqrt(64 ** 2 - 48 ** 2));
+const orBody = [A(-32, 96, 64, 30, 90), A(-32, 32, 64, -90, -30), A(-88, 64, 64.5, -29.7, 29.7), L(-16, 94, -16, 96)];
+const orGate = [...orBody, ...stubs(-32, [48, 64, 80], orBack), L(orFront, 48, 32, 48), ...notQ(orFront, 80, 32)];
+const xorGate = [...orBody, A(-96, 64, 64.5, -29.7, 29.7), ...stubs(-48, [32, 48, 64, 80, 96], (y) => orBack(y, 8)),
+  L(orFront, 48, 16, 48), ...notQ(orFront, 80, 32)];
+// buffers: triángulo con la entrada en (0, 64)
+const bufTri = (y0, y1, tip) => [...polyline([8, y0], [tip, 64], [8, y1], [8, y0]), L(0, 64, 8, 64)];
+const gate = (model, desc) => ['A', '', desc, [`SpiceModel ${model}`]];
 
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
 const SYMBOLS = {
@@ -242,6 +265,25 @@ const SYMBOLS = {
     ['SpiceModel level1', 'Value2 Avol=1Meg GBW=10Meg Vos=0', 'SpiceLine En=0 Enk=0 In=0 Ink=0 Rin=500Meg', 'ModelFile UniversalOpAmp1.lib']],
   'Misc/EuropeanPolcap': ['C', 'C', [[16, 0, 'A', 1], [16, 64, 'B', 2]], { 0: [24, 4, 'Left'], 3: [24, 64, 'Left'] },
     'Capacitor polarizado (gráfico europeo)', [L(16, 0, 16, 28), L(16, 36, 16, 64), L(0, 28, 32, 28), F([0, 36], [32, 36], [32, 41], [0, 41]), ...plus(4, 16, 3)]],
+  // compuertas digitales: Vhigh, Vlow, Ref, Td, Trise, Tfall, Tau, Rout, Cout en SpiceLine
+  'Digital/and': ((a) => [a[0], a[1], [[-32, 32, 'a', 1], [-32, 48, 'b', 2], [-32, 64, 'c', 3], [-32, 80, 'd', 4], [-32, 96, 'e', 5],
+    [32, 80, '_Q', 6], [32, 48, 'Q', 7], [-16, 96, 'com', 8]], { 0: [16, 24, 'Left'], 3: [16, 112, 'Left'] }, a[2], andGate, a[3]])(
+    gate('AND', 'Compuerta AND (hasta 5 entradas) con salida complementaria')),
+  'Digital/or': ((a) => [a[0], a[1], [[-32, 32, 'a', 1], [-32, 48, 'b', 2], [-32, 64, 'c', 3], [-32, 80, 'd', 4], [-32, 96, 'e', 5],
+    [32, 80, '_Q', 6], [32, 48, 'Q', 7], [-16, 96, 'com', 8]], { 0: [-8, 8, 'Left'], 3: [-8, 128, 'Left'] }, a[2], orGate, a[3]])(
+    gate('OR', 'Compuerta OR (hasta 5 entradas) con salida complementaria')),
+  'Digital/xor': ((a) => [a[0], a[1], [[-48, 32, 'a', 1], [-48, 48, 'b', 2], [-48, 64, 'c', 3], [-48, 80, 'd', 4], [-48, 96, 'e', 5],
+    [32, 80, '_Q', 6], [16, 48, 'Q', 7], [-16, 96, 'com', 8]], { 0: [16, 24, 'Left'], 3: [16, 112, 'Left'] }, a[2], xorGate, a[3]])(
+    gate('XOR', 'Compuerta XOR: alta si exactamente una entrada está alta')),
+  'Digital/buf': ((a) => [a[0], a[1], [[0, 64, 'in', 1], [64, 80, '_Q', 6], [64, 48, 'Q', 7], [0, 96, 'com', 8]],
+    { 0: [8, 16, 'Left'], 3: [8, 120, 'Left'] }, a[2], [...bufTri(24, 104, 56), L(36.8, 48, 64, 48), ...notQ(36.8, 80, 64), L(0, 96, 8, 96)], a[3]])(
+    gate('BUF', 'Buffer digital con salida complementaria')),
+  'Digital/buf1': ((a) => [a[0], a[1], [[0, 64, 'in', 1], [64, 64, 'Q', 7], [0, 80, 'com', 8]],
+    { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, a[2], [...bufTri(40, 88, 56), L(56, 64, 64, 64), L(0, 80, 8, 80)], a[3]])(
+    gate('BUF', 'Buffer digital')),
+  'Digital/inv': ((a) => [a[0], a[1], [[0, 64, 'in', 1], [64, 64, '_Q', 6], [0, 80, 'com', 8]],
+    { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, a[2], [...bufTri(40, 88, 52), C(56, 64, 4), L(60, 64, 64, 64), L(0, 80, 8, 80)], a[3]])(
+    gate('BUF', 'Inversor digital (salida _Q de un BUF)')),
 };
 
 // Skins que no se generan: son los npn.svg y pnp.svg (BJT con cápsula) del skin Default de
@@ -266,6 +308,6 @@ for (const [path, [prefix, value, pins, windows, desc, graphics, extra = []]] of
   // en minúsculas: la librería busca el skin por el nombre exacto y después en minúsculas, y los
   // .asc escriben el mismo símbolo con distintas mayúsculas (UniversalOpamp2, universalopamp2)
   if (ASC_PARSER_SKINS.has(path)) continue;
-  writeFileSync(join(LIB, 'skins', 'default', `${path.split('/').pop().toLowerCase()}.svg`), svgDoc(graphics, pins));
+  writeFileSync(join(LIB, 'skins', 'default', `${path.split('/').pop().toLowerCase()}.svg`), svgDoc(graphics, pins, path.startsWith('Digital/')));
 }
 console.log(`${Object.keys(SYMBOLS).length} símbolos escritos en library/sym/ (con su skin)`);

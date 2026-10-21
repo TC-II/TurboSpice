@@ -1,0 +1,22 @@
+Version 4
+SymbolType CELL
+LINE Normal 8 40 56 64
+LINE Normal 56 64 8 88
+LINE Normal 8 88 8 40
+LINE Normal 0 64 8 64
+LINE Normal 56 64 64 64
+LINE Normal 0 80 8 80
+WINDOW 0 8 32 Left 2
+WINDOW 3 8 104 Left 2
+SYMATTR Prefix A
+SYMATTR SpiceModel BUF
+SYMATTR Description Buffer digital
+PIN 0 64 NONE 0
+PINATTR PinName in
+PINATTR SpiceOrder 1
+PIN 64 64 NONE 0
+PINATTR PinName Q
+PINATTR SpiceOrder 7
+PIN 0 80 NONE 0
+PINATTR PinName com
+PINATTR SpiceOrder 8

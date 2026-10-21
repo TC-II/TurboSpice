@@ -54,7 +54,7 @@ import {
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, dcSourcesAsCell, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -380,7 +380,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   const loadDoc = useCallback(
-    (d: AscDoc, f: FileState) => {
+    (d0: AscDoc, f: FileState) => {
+      // las fuentes V con valor DC se muestran como Cell (#121)
+      const d = dcSourcesAsCell(d0, lib);
       // la lista de simulaciones guardada en el archivo sale del documento
       const { doc: clean, sims: list } = takeSims(d, findAnalysis(d)?.value ?? null);
       history.reset(clean);
@@ -395,7 +397,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       setTool({ kind: 'select' });
       setDocKey((k) => k + 1);
     },
-    [history, setTool],
+    [history, setTool, lib],
   );
 
   const [recent, setRecent] = useState<RecentFile[]>([]);

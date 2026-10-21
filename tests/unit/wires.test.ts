@@ -11,6 +11,7 @@ import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import {
   addWire,
   dragSegment,
+  dcSourcesAsCell,
   dragSegmentStraight,
   duplicateItems,
   mergeCollinear,
@@ -385,6 +386,19 @@ describe('cambio de símbolo (fuente V ↔ Cell, #120)', () => {
     expect(ortho(m)).toBe(true);
     expect(sameConnections(d, m, lib)).toBe(true);
     expect(setSymbolType(m, 0, 'voltage', lib).symbols[0]).toMatchObject({ type: 'voltage', x: 0, y: 0 });
+  });
+
+  it('al abrir, la V con valor DC pasa a cell (cables incluidos); la de forma de onda y la vacía no', () => {
+    const d = asc(
+      'SYMBOL voltage 0 0 R0\nSYMATTR InstName V1\nSYMATTR Value 5\nWIRE 0 16 0 -32\nWIRE 0 96 0 128\n' +
+        'SYMBOL voltage 200 0 R0\nSYMATTR InstName V2\nSYMATTR Value SINE(0 1 1k)\n' +
+        'SYMBOL voltage 400 0 R0\nSYMATTR InstName V3\nSYMATTR Value ""\n',
+    );
+    const m = dcSourcesAsCell(d, lib);
+    expect(m.symbols.map((s) => s.type)).toEqual(['cell', 'voltage', 'voltage']);
+    expect(m.symbols[0]).toMatchObject({ x: 0, y: 16 });
+    expect(sameConnections(d, m, lib)).toBe(true);
+    expect(dcSourcesAsCell(m, lib)).toBe(m);
   });
 });
 

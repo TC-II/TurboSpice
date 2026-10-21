@@ -4,6 +4,7 @@ import { defaultWindows, effectiveWindows, ltspiceDefaultAs, ltspiceWindows } fr
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
+import { parseSource } from '../sim/sources.ts';
 import { localBox, pinPoints, pivotNear, snap, symbolPivot, type ItemRef } from './geometry.ts';
 import { mapShape, shapePoints, shiftShape } from './shapes.ts';
 
@@ -628,6 +629,20 @@ export function setSymbolType(doc: AscDoc, index: number, type: string, lib: Lib
   let out: AscDoc = { ...doc, symbols: doc.symbols.map((s, i) => (i === index ? next : s)) };
   before.forEach((p, i) => {
     if (i > 0 && target[i] && !samePt(p, target[i])) out = moveVertex(out, p, target[i], lib);
+  });
+  return out;
+}
+
+/**
+ * Al abrir un .asc, una fuente V con valor DC usa el símbolo Cell (#121). Sólo cambia el símbolo:
+ * el componente sigue siendo V y los cables se siguen con `setSymbolType`.
+ */
+export function dcSourcesAsCell(doc: AscDoc, lib: Library): AscDoc {
+  let out = doc;
+  doc.symbols.forEach((s, i) => {
+    if (s.type !== 'voltage') return;
+    const p = parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') });
+    if (p?.kind === 'dc' && p.dc.trim()) out = setSymbolType(out, i, 'cell', lib);
   });
   return out;
 }

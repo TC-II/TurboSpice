@@ -140,10 +140,16 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     const maxOrder = Math.max(0, ...byOrder.keys());
     const nodes: string[] = [];
     const pinNames: string[] = [];
+    // dispositivos A (compuertas digitales): los pines sueltos y los que faltan van a 0, sin
+    // gastar números NC_xx
+    const digital = prefix.toUpperCase() === 'A';
     for (let o = 1; o <= maxOrder; o++) {
       const p = byOrder.get(o);
-      if (p && !p.node) ncNames.set(p.key, (p.node = nc('NC')));
-      nodes.push(p ? p.node : nc('MP'));
+      if (p && !p.node) {
+        if (digital) p.node = '0';
+        else ncNames.set(p.key, (p.node = nc('NC')));
+      }
+      nodes.push(p ? p.node : digital ? '0' : nc('MP'));
       pinNames.push(p?.name ?? '');
     }
     // Nodos implícitos: sustrato del BJT a tierra, bulk del MOSFET de 3 pines a la fuente

@@ -304,6 +304,16 @@ SYMATTR Value V=u(ddt(u(V(a))))
     expect(toNgspice(n, 't', resolver).text).toContain('V=((ddt(((V(a)) > 0 ? 1 : 0))) > 0 ? 1 : 0)');
   });
 
+  it('fuentes B: if(x,y,z) es y si x >= 0,5 y si no z (#129)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B1
+SYMATTR Value V=if(sin(2*pi*time)+.5,2,-2)
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('V=((sin(2*pi*time)+.5) >= 0.5 ? (2) : (-2))');
+  });
+
   it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680
@@ -591,6 +601,7 @@ describe('funciones de LTspice que numparam no conoce (#56)', () => {
     expect(translateFunctions('{u(uramp(x)-1)}')).toBe('{((max((x), 0)-1) > 0 ? 1 : 0)}');
     expect(translateFunctions('{buf(a)+inv(b)}')).toBe('{((a) > 0.5 ? 1 : 0)+((b) > 0.5 ? 0 : 1)}');
     expect(translateFunctions('{round(x)}')).toBe('{(sgn(x)*floor(abs(x)+0.5))}');
+    expect(translateFunctions('.param p=if(x,2,3)')).toBe('.param p=((x) >= 0.5 ? (2) : (3))');
     expect(translateFunctions('{hypot(a, b)}')).toBe('{sqrt(pow(a,2)+pow(b,2))}');
   });
 

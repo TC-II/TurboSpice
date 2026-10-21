@@ -220,6 +220,8 @@ function splitArgs(args: string): string[] {
 // Funciones de LTspice que el numparam de ngspice no conoce (en las fuentes B sí andan)
 const LT_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   u: ([x, ...r]) => (r.length ? null : `((${x}) > 0 ? 1 : 0)`),
+  // if(x,y,z): y si x >= 0,5 (medido: 0,5 da y; 0,4999 da z); la de ngspice no la evalúa así
+  if: ([c, a, b, ...r]) => (b === undefined || r.length ? null : `((${c}) >= 0.5 ? (${a}) : (${b}))`),
   uramp: ([x, ...r]) => (r.length ? null : `max((${x}), 0)`),
   buf: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 1 : 0)`),
   inv: ([x, ...r]) => (r.length ? null : `((${x}) > 0.5 ? 0 : 1)`),
@@ -248,7 +250,7 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   random: ([x, ...r]) => (r.length ? null : smoothRand(x)),
   white: ([x, ...r]) => (r.length ? null : `(${smoothRand(x)}-0.5)`),
 };
-const B_FUNCTION_RE = /\b(u|buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
+const B_FUNCTION_RE = /\b(u|if|buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
 
 function hashRand(n: string): string {
   const s = `(sin((${n})*12.9898+78.233)*43758.5453)`;

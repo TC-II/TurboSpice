@@ -152,32 +152,35 @@ valor barrido, como lo muestra LTspice.
 
 ## Resultados contra LTspice (corpus completo)
 
-Corrida del 20/10/2026: 5.572 casos (5.378 `.asc` únicos + 194 variantes de simulación), cada uno
-con TurboSpice y con `LTspice -b`. Harness y clasificador en `tests/corpus/` (`run.mjs`,
-`worker.mjs`, `analyze.mjs`); hallazgos en [hallazgos-corpus.md](hallazgos-corpus.md).
+Corrida del 21/10/2026 (main en `f366c5d`): 5.572 casos (5.378 `.asc` únicos + 194 variantes de
+simulación), cada uno con TurboSpice y con `LTspice -b`. Harness y clasificador en `tests/corpus/`
+(`run.mjs`, `worker.mjs`, `analyze.mjs`; `rebuild-mirror.mjs` rearma el espejo del corpus);
+hallazgos en [hallazgos-corpus.md](hallazgos-corpus.md). Entre paréntesis, la corrida del 20/10.
 
 | Medición | Resultado |
 |---|---|
-| Representación (parse + render) | 3.633 ok (65 %) · 1.929 con símbolos faltantes · 10 timeout |
-| Símbolos faltantes | 831 símbolos distintos |
-| Netlist vs `LTspice -netlist` | 2.659 idéntica (48 %) · 279 equivalente · 2.334 distinta · 291 sin netlist de LTspice |
-| Con directiva de simulación | 4.406 (LTspice simula 2.894 · falla 1.512) |
-| Igual o parecido a LTspice | **890** (811 igual · 61 parecido · 18 parecido-forma) |
-| Distinto (simula, no coincide) | 445 |
-| Incompleto (simula con símbolos faltantes; no es "ok") | 1.113 (751 con LTspice OK; #108) |
-| Error en TurboSpice | 1.507: 807 fallan también en LTspice, **700 con LTspice OK** |
-| Sólo TurboSpice simula | 307 |
+| Representación (parse + render) | 4.095 ok (73 %; antes 3.633) · 1.471 con símbolos faltantes (1.929) · 6 timeout |
+| Símbolos faltantes | 724 símbolos distintos (767) |
+| Netlist vs `LTspice -netlist` | 3.018 idéntica (54 %; 2.659) · 378 equivalente (279) · 1.880 distinta (2.334) · 291 sin netlist de LTspice |
+| Con directiva de simulación | 4.410 (LTspice simula 2.893 · falla 1.517) |
+| Igual o parecido a LTspice | **1.019** (890): 922 igual · 76 parecido · 21 parecido-forma |
+| Distinto (simula, no coincide) | 499 (445) |
+| Incompleto (simula con símbolos faltantes; avisa desde #108) | 890 (1.113); 645 con LTspice OK (751) |
+| Error en TurboSpice | 1.497: 867 fallan también en LTspice, **630 con LTspice OK** (700) |
+| Sólo TurboSpice simula | 382 (307) |
 
 | Grupo | casos | representación ok | netlist idéntica | igual + parecido |
 |---|---|---|---|---|
-| E3-Circuitos-Esquematicos | 254 | 253 | 235 | 36 de 57 |
-| TC2-Circuitos-Esquematicos | 213 | 209 | 180 | 32 de 72 |
-| TC2-Sim | 182 | 165 | 162 | 69 de 168 |
-| sueltos | 724 | 565 | 518 | 162 de 542 |
-| sueltos-librerias | 368 | 131 | 225 | 36 de 327 |
-| sueltos-LargeCollection | 3.831 | 2.310 | 1.339 | 555 de 3.240 |
+| E3-Circuitos-Esquematicos | 254 | 254 | 234 | 36 de 58 |
+| TC2-Circuitos-Esquematicos | 213 | 209 | 180 | 31 de 72 |
+| TC2-Sim | 182 | 167 | 162 | 69 de 167 |
+| sueltos | 724 | 694 | 601 | 204 de 542 |
+| sueltos-librerias | 368 | 133 | 236 | 36 de 327 |
+| sueltos-LargeCollection | 3.831 | 2.638 | 1.605 | 643 de 3.244 |
 
-Los 700 errores con LTspice OK, por causa (primera pasada por mensaje de error):
+El `.tran … startup` (#100) está resuelto en una rama aparte, sin mezclar: no entra en esta corrida.
+
+Los 700 errores con LTspice OK de la corrida del 20/10, por causa (primera pasada por mensaje de error):
 
 | Causa | casos | issue |
 |---|---|---|

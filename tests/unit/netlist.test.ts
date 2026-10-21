@@ -10,7 +10,7 @@ import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
-import { patchModelFile, toNgspice } from '../../src/netlist/tongspice.ts';
+import { patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
@@ -183,7 +183,12 @@ SYMATTR InstName B1
 SYMATTR Value V=delay(V(in),V(td))
 `);
     expect(v.text).toMatch(/^A__B1__delay0 B1__delay0_in B1__delay0 B1__delay0_t B1__delay0_m$/m);
-    expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{1\} has_delay_cnt=true\)$/m);
+    // delmax = min(tmax, tstop): ngspice lo recorta al final de la simulación (#131)
+    expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{min\(1e30,dly_tstop\)\} has_delay_cnt=true\)$/m);
+    expect(v.text).toContain('V=(V(td))/(min(1e30,dly_tstop))');
+    const prep = prepareSimulation({ ...v, text: `${v.text.replace(/\.end\s*$/, '')}.tran 1u 20m
+.end` }, () => '');
+    expect(prep.netlist).toMatch(/^\.param dly_tstop=20m$/m);
     expect(v.warnings.some((w) => /delay\(\) con retardo variable/.test(w))).toBe(true);
   });
 

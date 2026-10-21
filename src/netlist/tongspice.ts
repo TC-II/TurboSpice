@@ -327,14 +327,16 @@ export function expandStateFunctions(name: string, expr: string, lines: string[]
       if (!/\b[vi]\s*\(|\btime\b/i.test(t)) {
         lines.push(`T__${n} ${n}_in 0 ${n} 0 Z0=1 TD={${t.replace(/[{}]/g, '')}}`, `R__${n} ${n} 0 1`);
       } else {
-        // el control del code model es la fracción de delmax (delmin = 0)
-        const dmax = tmax ? tmax.replace(/[{}]/g, '') : '1';
+        // el control del code model es la fracción de delmax (delmin = 0); ngspice recorta delmax
+        // al final de la simulación (si fuera mayor, la fracción dejaría de ser t/delmax), así que
+        // delmax = min(tmax, tstop); prepareSimulation define dly_tstop con el tstop del .tran
+        const dmax = `min(${tmax ? tmax.replace(/[{}]/g, '') : '1e30'},dly_tstop)`;
         lines.push(
           `B__${n}_t ${n}_t 0 V=(${t})/(${dmax})`,
           `A__${n} ${n}_in ${n} ${n}_t ${n}_m`,
           `.model ${n}_m delay(delmin=0 delmax={${dmax}} has_delay_cnt=true)`,
         );
-        warnings.push(`${name}: delay() con retardo variable se resuelve al paso del .tran${tmax ? '' : ' (hasta 1 s)'}`);
+        warnings.push(`${name}: delay() con retardo variable se resuelve al paso del .tran`);
       }
       rep = `V(${n})`;
     }
@@ -968,6 +970,12 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   for (const w of lapWarnings) if (!warnings.includes(w)) warnings.push(w);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
+  // delay() con retardo variable usa dly_tstop (ver expandStateFunctions): el tstop del .tran
+  let text = main.text;
+  if (/dly_tstop/.test(text) || Object.values(files).some((f) => /dly_tstop/.test(f))) {
+    const tstop = /^\.tran\s+\S+\s+(\S+)/im.exec(text)?.[1];
+    text = text.replace(/^(\s*\.end\s*)$/im, `.param dly_tstop=${tstop ?? '1'}\n$1`);
+  }
   // nodos sin camino de continua a tierra: como LTspice (ver floating.ts)
-  return { netlist: fixFloatingNodes(main.text, files).text, files, warnings };
+  return { netlist: fixFloatingNodes(text, files).text, files, warnings };
 }

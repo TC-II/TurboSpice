@@ -400,8 +400,37 @@ function fixParam(line: string): string {
   return m[1] + parts.join(' ');
 }
 
+/**
+ * Período y retardo de las fuentes SINE V e I de la netlist (las de frecuencia con parámetros
+ * no se pueden evaluar y no cuentan)
+ */
+function sinePeriods(lt: LtNetlist): { period: number; delay: number }[] {
+  const out: { period: number; delay: number }[] = [];
+  for (const e of [...lt.elements, ...lt.blocks.flatMap((b) => b.lt.elements)]) {
+    if (!/^[VI]$/i.test(e.prefix)) continue;
+    const m = /\bSIN(?:E)?\s*\(([^)]*)\)/i.exec(e.value);
+    if (!m) continue;
+    const a = m[1].trim().split(/[\s,]+/).map(parseSpiceNumber);
+    const f = a[2];
+    if (f > 0 && Number.isFinite(f)) out.push({ period: 1 / f, delay: Number.isFinite(a[3]) ? a[3] : 0 });
+  }
+  return out;
+}
+
+/**
+ * Paso máximo de LTspice (medido con LTspice -b): nunca más de tstop/1024 y, con fuentes SINE,
+ * nunca más de T/8.7 (con .tran 0.003 3 y una SINE de 1 kHz da ~48.000 puntos). ngspice usa
+ * min(paso, tstop/50) y sin elementos reactivos submuestrea la senoide; se pone ese tmax en el
+ * .tran salvo que el usuario haya pedido uno menor (#101).
+ */
+function ltspiceTmax(tstop: number, sines: { period: number; delay: number }[]): number {
+  let h = tstop / 1024;
+  for (const s of sines) if (s.delay < tstop) h = Math.min(h, s.period / 8.7);
+  return h;
+}
+
 /** ".tran tstop" o ".tran 0 tstop ..." → ".tran paso tstop ..." (ngspice exige paso > 0) */
-function fixTran(line: string, warnings: string[]): string {
+function fixTran(line: string, warnings: string[], sines: { period: number; delay: number }[] = []): string {
   const m = /^\.tran\s+(.*)$/i.exec(line.trim());
   if (!m) return line;
   const args = m[1].split(/\s+/);
@@ -416,6 +445,15 @@ function fixTran(line: string, warnings: string[]): string {
     if (Number.isFinite(tstop)) nums[0] = formatSpiceNumber(tstop / 1000);
     // ".tran 0 {6/fz}": el paso también como expresión
     else if (/^\{.*\}$/.test(nums[1] ?? '')) nums[0] = `{(${nums[1].slice(1, -1)})/1000}`;
+  }
+  if (Number.isFinite(tstop) && tstop > 0 && sines.length) {
+    const h = ltspiceTmax(tstop, sines);
+    const user = nums.length > 3 ? parseSpiceNumber(nums[3]) : Infinity;
+    // un tmax con parámetros se deja como está
+    if (!Number.isNaN(user) && h < user) {
+      while (nums.length < 3) nums.push('0');
+      nums[3] = formatSpiceNumber(h);
+    }
   }
   return ['.tran', ...nums, ...flags.filter((f) => /^uic$/i.test(f))].join(' ');
 }
@@ -619,6 +657,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
   out.push(...implicit);
 
+  const sines = sinePeriods(lt);
   const steps: Step[] = [];
   const measures: string[] = [];
   // .control con marcas de sección: se combina con los barridos en lugar de reemplazarlos
@@ -643,7 +682,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       if (l === 'run') {
         for (const a of analyses) {
           const kind = /^\.(\w+)/.exec(a)![1].toLowerCase();
-          body.push(`${indent}${fixTran(a, warnings).slice(1)}`, `${indent}set ts_plot_${kind} = $curplot`);
+          body.push(`${indent}${fixTran(a, warnings, sines).slice(1)}`, `${indent}set ts_plot_${kind} = $curplot`);
         }
       } else if (/^meas\s+(\w+)/i.test(l)) {
         body.push(`${indent}setplot $ts_plot_${/^meas\s+(\w+)/i.exec(l)![1].toLowerCase()}`, raw);
@@ -709,7 +748,7 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
         continue;
       }
       // ".param x 20" (LTspice lo acepta sin "=") → ".param x=20"
-      out.push(fixParam(translateFunctions(translateRandom(fixTran(line, warnings))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3')));
+      out.push(fixParam(translateFunctions(translateRandom(fixTran(line, warnings, sines))).replace(/^(\.param\s+)([A-Za-z_]\w*)\s+(?!=)(\S.*)$/i, '$1$2=$3')));
     }
   }
 

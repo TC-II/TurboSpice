@@ -187,10 +187,17 @@ SYMATTR Value V=delay(V(in),V(td))
     expect(v.warnings.some((w) => /delay\(\) con retardo variable/.test(w))).toBe(true);
   });
 
-  it('archivo de modelos: idt de las fuentes B con los auxiliares adentro del .subckt', () => {
-    const t = patchModelFile('.subckt a in out\nB_s out 0 V=idt(V(in))/{T}\n.ends a', new Map());
+  it('archivo de modelos: idt/rand de las fuentes B con los auxiliares adentro del .subckt', () => {
+    const t = patchModelFile('.subckt a in out\nB_s out 0 V=idt(V(in))/{T}\nB2 x 0 V=rand(time)\n.ends a', new Map());
     expect(t).toMatch(/^B_s out 0 V=V\(B_s__idt0\)\/\{T\}\nC__B_s__idt0 B_s__idt0 0 1\nB__B_s__idt0 0 B_s__idt0 I=/m);
+    expect(t).not.toMatch(/rand\(/);
     expect(t).toMatch(/\.ends a$/);
+  });
+
+  it('fuente B: rand/random/white → hash pseudoaleatorio de floor(x)', () => {
+    const t = bsrc('V=rand(time*10)>.5+white(time)');
+    expect(t).not.toMatch(/\b(rand|white|random)\(/);
+    expect(t).toMatch(/sin\(\(floor\(time\*10\)\)\*12\.9898/);
   });
 
   it('resistencia de comportamiento "R= expr" → r={expr} (sigue siendo R)', () => {

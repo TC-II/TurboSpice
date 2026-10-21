@@ -239,8 +239,23 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   // table(x, x1,y1, x2,y2…) de LTspice es la pwl(x, …) de la fuente B de ngspice (interpola
   // lineal y fuera del rango mantiene el extremo)
   table: (a) => (a.length < 3 || a.length % 2 === 0 ? null : `pwl(${a.join(',')})`),
+  // rand(x): escalonada en [0,1), cambia en cada entero de x; random(x) pasa por los mismos
+  // valores en los enteros e interpola suave; white(x) es random(x)-0.5. ngspice no tiene nada
+  // parecido en la fuente B: hash pseudoaleatorio de floor(x) (otra semilla que LTspice)
+  rand: ([x, ...r]) => (r.length ? null : hashRand(`floor(${x})`)),
+  random: ([x, ...r]) => (r.length ? null : smoothRand(x)),
+  white: ([x, ...r]) => (r.length ? null : `(${smoothRand(x)}-0.5)`),
 };
-const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table)\s*\(/gi;
+const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
+
+function hashRand(n: string): string {
+  const s = `(sin((${n})*12.9898+78.233)*43758.5453)`;
+  return `(${s}-floor(${s}))`;
+}
+function smoothRand(x: string): string {
+  const f = `((${x})-floor(${x}))`;
+  return `(${hashRand(`floor(${x})`)}+(${hashRand(`floor(${x})+1`)}-${hashRand(`floor(${x})`)})*${f}*${f}*(3-2*${f}))`;
+}
 
 /**
  * Funciones con estado de las fuentes B de LTspice, que necesitan elementos auxiliares:
@@ -814,10 +829,10 @@ export function patchModelFile(text: string, subcktParams: Map<string, Map<strin
   let depth = 0;
   const all = text.split(/\r\n|\r|\n/);
   const lines = all.map((line, k) => {
-    // fuentes B de una sola línea: funciones de LTspice que ngspice no tiene (idt, delay…); los
+    // fuentes B de una sola línea: funciones de LTspice que ngspice no tiene (idt, rand…); los
     // elementos auxiliares van justo después, en el mismo .subckt
     const b = /^(\s*(B\S*)\s+\S+\s+\S+\s+)(\S.*)$/i.exec(line);
-    if (b && /\b(idt|sdt|idtmod|delay)\s*\(/i.test(b[3]) && !/^\s*\+/.test(all[k + 1] ?? '')) {
+    if (b && /\b(idt|sdt|idtmod|delay|rand|random|white)\s*\(/i.test(b[3]) && !/^\s*\+/.test(all[k + 1] ?? '')) {
       const aux: string[] = [];
       const value = translateExpression(expandStateFunctions(b[2], b[3].replace(/([A-Za-z_]\w*)\s+\(/g, '$1('), aux, []), B_FUNCTION_RE, B_FUNCTIONS);
       return [b[1] + value, ...aux].join('\n');

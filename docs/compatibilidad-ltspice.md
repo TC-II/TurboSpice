@@ -102,6 +102,18 @@ En LTspice los `.asy` y `.lib` propios suelen estar junto al `.asc`. En TurboSpi
 - Se pueden generar símbolos: uno rectangular para un `.subckt` (con `ModelFile`) o uno de bloque
   para un `.asc` (puertos = etiquetas con `IOPIN`, o todas si no hay).
 
+**Librería de LTspice del usuario** (**Archivo › Importar librería de LTspice**, #126): se elige la
+carpeta `lib` de la instalación de LTspice y `sym/`, `sub/` y `cmp/` quedan en el IndexedDB del
+navegador (no se publican: son de Analog Devices). Cada esquemático trae de ahí sólo lo que le
+falta, después de la librería propia y de los archivos del usuario: sus símbolos, el archivo de
+modelos de cada uno (`ModelFile`, o `SpiceModel` cuando es un archivo, como `LTC.lib` en los
+símbolos de ADI: el subcircuito es `Value`), los `.lib`/`.include` de sus directivas y, como
+LTspice, el archivo que define cada modelo o subcircuito usado que nadie más define.
+Medido con los 4.152 ejemplos de LTspice: con la librería se dibujan completos 4.098 (sin ella,
+67) y la netlist es idéntica a la de LTspice en 3.973 (57). La simulación coincide sólo en 134 de
+3.957: muchos modelos de ADI están cifrados o usan dispositivos propios de LTspice que ngspice
+no tiene.
+
 ## Estudio (barridos, tolerancias, mediciones)
 
 El panel **Estudio** genera directivas que LTspice entiende, así que un estudio va y viene:

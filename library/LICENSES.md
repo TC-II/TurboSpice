@@ -13,8 +13,10 @@
 | `window-defaults.json` | Derivado por `scripts/derive-window-defaults.mjs` de esquemáticos `.asc` guardados por LTspice | Datos de posición observados (no contiene contenido de terceros). |
 
 La librería estándar de LTspice (`lib/cmp/standard.*`, `lib/sub`, `lib/sym` de Analog Devices) **no** se
-redistribuye: su licencia no lo permite. Los modelos que hagan falta de ahí se importan localmente desde
-la instalación de LTspice de cada usuario (fase 6) o se reemplazan por modelos con licencia libre.
+redistribuye: su licencia no lo permite. Cada usuario puede importar la de su propia instalación
+(**Archivo › Importar librería de LTspice**, `src/library/ltspiceLib.ts`): queda sólo en el IndexedDB de
+su navegador y no se sube a ningún lado. Los modelos que hagan falta para todos se reemplazan por
+modelos con licencia libre.
 
 `tests/fixtures/asc/`: ejercicios de práctica de Teoría de Circuitos II (ITBA), con permiso; las `.net`
 de referencia las generó LTspice 24.1.10 a partir de esos archivos.

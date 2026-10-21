@@ -45,6 +45,8 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
     resolve: (p) => lib.resolveModelFile(p),
     defines: (m) => lib.definesModel(m),
     cmpFile: (m) => lib.cmpFileDefining(m),
+    // sólo si no lo define la librería propia ni un archivo del usuario
+    ltspiceFile: (m) => (lib.definesModel(m, false) ? undefined : lib.ltspiceFileDefining(m)),
   });
   const texts = Object.fromEntries(
     await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),

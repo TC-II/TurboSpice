@@ -26,6 +26,8 @@ export interface ModelResolver {
   defines?(name: string): boolean;
   /** Archivo de library/cmp que define este .model (se incluye solo, como la standard.bjt de LTspice) */
   cmpFile?(name: string): string | undefined;
+  /** Archivo de la librería de LTspice del usuario que define este modelo/subcircuito (se incluye solo) */
+  ltspiceFile?(name: string): string | undefined;
 }
 
 export interface NgspiceNetlist {
@@ -663,11 +665,17 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   if (models.defines) {
     for (const e of lt.elements) {
       if (!/^[DQMJXZ]/i.test(e.prefix)) continue;
-      const model = e.prefix.toUpperCase() === 'X' ? (e.attrs.get('SpiceModel') || e.value.split(' ')[0]) : e.value.split(/\s/)[0];
+      // SpiceModel puede ser el archivo (LTC.lib, como en los símbolos de ADI): el modelo es Value
+      const sm = e.attrs.get('SpiceModel');
+      const model = e.prefix.toUpperCase() === 'X' && sm && !/\.(lib|sub|mod|inc|cir|txt)$/i.test(sm) ? sm : e.value.split(/\s/)[0];
       const implicit = lt.implicitModels.some((m) => m.split(' ')[1].toLowerCase() === model.toLowerCase());
-      if (model && !implicit && !local.has(model.toLowerCase()) && !models.defines(model)) {
-        warnings.push(`${e.name}: no se encontró el modelo "${model}"`);
-      }
+      if (!model || implicit || local.has(model.toLowerCase())) continue;
+      // definido sólo en la librería de LTspice del usuario: se incluye solo, como hace LTspice
+      const ltFile = models.ltspiceFile?.(model);
+      if (ltFile) {
+        const r = include(ltFile);
+        if (r && !out.includes(r)) out.push(r);
+      } else if (!models.defines(model)) warnings.push(`${e.name}: no se encontró el modelo "${model}"`);
     }
   }
 

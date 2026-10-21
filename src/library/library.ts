@@ -24,6 +24,8 @@ export const CMP_DIR = 'cmp/';
 export const USER_PREFIX = 'user/';
 /** Carpeta con que se muestran los símbolos del usuario en el buscador */
 export const USER_DIR = 'Mis símbolos';
+/** Prefijo de los archivos de modelos tomados de la librería de LTspice del usuario (ltspiceLib.ts) */
+export const LTSPICE_PREFIX = 'ltspice/';
 
 /** Nombres de .subckt y .model definidos en un archivo de modelos */
 export function scanModels(text: string): { subckts: string[]; models: string[] } {
@@ -49,6 +51,14 @@ export class Library implements SymbolSource {
   /** Esquemáticos del usuario usados como bloques jerárquicos: nombre sin .asc (minúsculas) → texto */
   private userSchematics = new Map<string, { name: string; text: string }>();
   private schCache = new Map<string, AscDoc>();
+  /**
+   * Librería de la instalación de LTspice del usuario (importada a su navegador, no se publica):
+   * se consulta después de la propia y sólo tiene lo que pidieron los esquemáticos abiertos
+   * (ver ltspiceLib.ts). Símbolos por ruta relativa a lib/sym y por nombre base; archivos de
+   * modelos por nombre de archivo.
+   */
+  private ltSymbols = new Map<string, string>();
+  private ltModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
 
   readonly bundle: LibraryBundle;
 
@@ -73,14 +83,46 @@ export class Library implements SymbolSource {
   symbol(type: string): SymbolDef | undefined {
     const name = baseName(type).toLowerCase();
     const extra = this.extra.get(name);
-    const path = extra ? `extra:${name}` : this.resolvePath(type);
+    const lt = extra || this.resolvePath(type) ? undefined : this.ltSymbol(type);
+    const path = extra ? `extra:${name}` : lt ? `ltspice:${lt.key}` : this.resolvePath(type);
     if (!path) return undefined;
     let def = this.cache.get(path);
     if (!def) {
-      def = parseAsy(extra ?? this.bundle.symbols[path], baseName(type));
+      def = parseAsy(extra ?? lt?.text ?? this.bundle.symbols[path], baseName(type));
       this.cache.set(path, def);
     }
     return def;
+  }
+
+  private ltSymbol(type: string): { key: string; text: string } | undefined {
+    const path = symbolPath(type).toLowerCase();
+    const name = baseName(type).toLowerCase();
+    const key = this.ltSymbols.has(path) ? path : name;
+    const text = this.ltSymbols.get(key);
+    return text === undefined ? undefined : { key, text };
+  }
+
+  /** Símbolo de la librería de LTspice del usuario, por su ruta relativa a lib/sym (sin .asy) */
+  addLtspiceSymbol(path: string, asyText: string): void {
+    const p = path.toLowerCase();
+    this.ltSymbols.set(p, asyText);
+    if (!this.ltSymbols.has(baseName(p))) this.ltSymbols.set(baseName(p), asyText);
+  }
+
+  /** Archivo de modelos de la librería de LTspice del usuario */
+  addLtspiceModelFile(name: string, text: string): void {
+    this.ltModels.set(name.toLowerCase(), { name, text, ...scanModels(text) });
+  }
+
+  hasLtspiceModelFile(name: string): boolean {
+    return this.ltModels.has(name.toLowerCase());
+  }
+
+  /** Archivo de la librería de LTspice ya cargado que define este .subckt/.model */
+  ltspiceFileDefining(name: string): string | undefined {
+    const n = name.toLowerCase();
+    for (const m of this.ltModels.values()) if (m.subckts.some((x) => x.toLowerCase() === n) || m.models.some((x) => x.toLowerCase() === n)) return m.name;
+    return undefined;
   }
 
   addSymbol(name: string, asyText: string): void {
@@ -136,6 +178,7 @@ export class Library implements SymbolSource {
 
   /** Contenido de un archivo de modelos del usuario resuelto con resolveModelFile ("user/x.lib") */
   userFile(rel: string): string | undefined {
+    if (rel.startsWith(LTSPICE_PREFIX)) return this.ltModels.get(rel.slice(LTSPICE_PREFIX.length).toLowerCase())?.text;
     return rel.startsWith(USER_PREFIX) ? this.userModels.get(rel.slice(USER_PREFIX.length).toLowerCase())?.text : undefined;
   }
 
@@ -158,13 +201,17 @@ export class Library implements SymbolSource {
     const exact = files.find((f) => lower === f.toLowerCase() || lower.endsWith(`/${f.toLowerCase()}`));
     if (exact) return exact;
     const base = lower.split('/').pop();
-    return files.find((f) => f.toLowerCase().split('/').pop() === base);
+    const own = files.find((f) => f.toLowerCase().split('/').pop() === base);
+    if (own) return own;
+    // por último, la librería de LTspice del usuario
+    const lt = this.ltModels.get(base!);
+    return lt ? LTSPICE_PREFIX + lt.name.toLowerCase() : undefined;
   }
 
   /** ¿Algún archivo de modelos de la librería define este .model/.subckt? */
-  definesModel(name: string): boolean {
+  definesModel(name: string, withLtspice = true): boolean {
     const n = name.toLowerCase();
-    return [...Object.values(this.bundle.subs), ...this.userModels.values()].some(
+    return [...Object.values(this.bundle.subs), ...this.userModels.values(), ...(withLtspice ? this.ltModels.values() : [])].some(
       (s) => s.subckts.some((x) => x.toLowerCase() === n) || s.models.some((x) => x.toLowerCase() === n),
     );
   }

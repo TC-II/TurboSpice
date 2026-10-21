@@ -26,6 +26,7 @@ import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx'
 import { Icon } from './ui/icons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
+import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
@@ -316,6 +317,21 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     loadUserFiles().then(setUserFiles);
   }, []);
+  // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
+  // cada esquemático trae de ahí sólo los símbolos y modelos que le faltan
+  const [ltIndex, setLtIndex] = useState<LtspiceIndex>();
+  const ltInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    loadLtspiceIndex().then(setLtIndex);
+  }, []);
+  useEffect(() => {
+    if (!ltIndex) return;
+    let alive = true;
+    prefetchLtspice(doc, lib, ltIndex).then((n) => alive && n && setLibVersion((v) => v + 1));
+    return () => {
+      alive = false;
+    };
+  }, [doc, lib, ltIndex]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib, libVersion]);
   const conn = lt.conn;
@@ -620,6 +636,24 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
+  // carpeta lib de LTspice (lib/sym, lib/sub, lib/cmp): de Analog Devices, no se redistribuye; queda
+  // en el IndexedDB de este navegador y no se sube a ningún lado
+  const doImportLtspice = async (files: File[]) => {
+    try {
+      setMessage('Importando la librería de LTspice…');
+      const index = await importLtspiceLibrary(files, (done, total) => setMessage(`Importando la librería de LTspice: ${done} de ${total} archivos…`));
+      setLtIndex(index);
+      setMessage(`Librería de LTspice importada: ${index.count.symbols} símbolos y ${index.count.models} archivos de modelos. Queda sólo en este navegador.`);
+    } catch (e) {
+      setMessage(`No se pudo importar la librería de LTspice: ${(e as Error).message}`);
+    }
+  };
+  const doRemoveLtspice = async () => {
+    await removeLtspiceLibrary();
+    setLtIndex(undefined);
+    setMessage('Se quitó la librería de LTspice de este navegador (lo ya cargado se va al recargar la página)');
+  };
+
   const doShare = async () => {
     const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
     const hash = await shareHash(bytes, file.name);
@@ -665,6 +699,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // simulación de la lista a la que van los resultados
     const id = sims.active;
     try {
+      if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
       const built = await buildSimulation(doc, lib, file.name);
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       const tooBig = built.tooBig.map((p) => p.text);
@@ -1411,6 +1446,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
+        {
+          label: ltIndex ? 'Librería de LTspice' : 'Importar librería de LTspice…',
+          items: [
+            { label: ltIndex ? 'Volver a importar…' : 'Elegir la carpeta lib…', onClick: () => ltInput.current?.click() },
+            ...(ltIndex
+              ? [
+                  { label: `${ltIndex.count.symbols} símbolos, ${ltIndex.count.models} archivos de modelos (${new Date(ltIndex.time).toLocaleDateString()})`, disabled: true, onClick: () => {} },
+                  { label: 'Quitar', onClick: doRemoveLtspice },
+                ]
+              : []),
+          ],
+        },
         'sep',
         { label: 'Ejemplos', items: EXAMPLES.map((x) => ({ label: x.replace('.asc', ''), onClick: () => doExample(x) })) },
         {
@@ -1811,6 +1858,18 @@ ${ltNetlistText(sim.built.lt)}
               <button onClick={() => setOfferView(null)}>No</button>
             </div>
           )}
+          {/* carpeta lib de LTspice (Archivo → Importar librería de LTspice) */}
+          <input
+            ref={ltInput}
+            type="file"
+            hidden
+            {...{ webkitdirectory: '', directory: '' }}
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = '';
+              if (files.length) doImportLtspice(files);
+            }}
+          />
           {message && (
             <div className="toast" onClick={() => setMessage(undefined)}>
               {message}

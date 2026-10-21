@@ -230,6 +230,24 @@ TEXT 0 240 Left 2 !.ic I(L9)=3
     expect(r.text).not.toMatch(/^\.ic.*I\(/m);
   });
 
+  it('.tran con una SINE: paso máximo T/8.7 como LTspice (#101)', () => {
+    const sch = (tran: string, sine = 'SINE(0 1 1k)') => ng(`Version 4
+SHEET 1 880 680
+SYMBOL voltage 0 0 R0
+SYMATTR InstName V1
+SYMATTR Value ${sine}
+TEXT 0 200 Left 2 !${tran}
+`).text;
+    expect(sch('.tran 0.003 3')).toContain('.tran 0.003 3 0 0.000114942528736');
+    expect(sch('.tran 0.003 3 0 1')).toContain('.tran 0.003 3 0 0.000114942528736');
+    expect(sch('.tran 0.003 3 0 1u')).toContain('.tran 0.003 3 0 1u');
+    // tstop corto: tstop/1024
+    expect(sch('.tran 30m')).toContain('.tran 0.00003 30m 0 0.000029296875');
+    // arranca después de tstop: sólo tstop/1024; frecuencia con parámetros: no cambia
+    expect(sch('.tran 3', 'SINE(0 1 1k 5)')).toContain('.tran 0.003 3 0 0.0029296875');
+    expect(sch('.tran 3', 'SINE(0 1 {f})')).toMatch(/^\.tran 0\.003 3$/m);
+  });
+
   it('.tran de un argumento y .step como bucle en .control', () => {
     const r = ng(`Version 4
 SHEET 1 880 680
@@ -402,7 +420,7 @@ TEXT 0 200 Left 2 !.tran 0 100u 0 0.1u startup
     expect(r.text).toMatch(/^V2 \S+ \S+ SINE\(1 2 10k\)$/m);
     expect(r.text).toMatch(/^I1 \S+ \S+ DC \{2\*x\} PWL\(0 0 20u \{2\*x\}\)$/m);
     expect(r.text).toMatch(/^V3 \S+ \S+ DC 4 AC 1 PWL\(0 0 20u 4\)$/m);
-    expect(r.text).toMatch(/^\.tran 1e-7 100u 0 0\.1u$/m);
+    expect(r.text).toMatch(/^\.tran 1e-7 100u 0 9\.765625e-8$/m);
     expect(r.warnings.join()).not.toContain('startup');
   });
 

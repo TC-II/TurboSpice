@@ -6,6 +6,7 @@
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
+import { translateDigital } from './digital.ts';
 import { fixFloatingNodes } from './floating.ts';
 import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
 import { collectModels, replaceAko } from './ako.ts';
@@ -631,6 +632,12 @@ function convertElements(
       }
     }
     const letter = name[0].toUpperCase();
+    // compuertas digitales de LTspice (ver digital.ts)
+    const gate = letter === 'A' ? translateDigital(name, e.nodes, e.value, warnings) : undefined;
+    if (gate) {
+      out.push(...gate);
+      continue;
+    }
     // Valor por defecto del símbolo sin cambiar ("R", "C", "L"…): falta asignarlo.
     // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
     if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {

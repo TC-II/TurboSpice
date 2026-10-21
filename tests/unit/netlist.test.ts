@@ -9,6 +9,7 @@ import { replaceIdealDiodes } from '../../src/netlist/idealdiode.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
+import { translateDigital } from '../../src/netlist/digital.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
 import { ngNodeName, patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
@@ -864,5 +865,70 @@ describe('nodos flotantes (como LTspice: gmin en el último nodo creado de cada 
       'C5 5 0 1n', 'X1 7 8 nada', 'C7 1 7 1n', '.model npn NPN', '.model nm VDMOS', '.end'].join('\n');
     expect(floatingNodes(net, {})).toEqual([]);
     expect(fixFloatingNodes(net, {}).text).toBe(net);
+  });
+});
+
+describe('compuertas digitales de LTspice (A: AND, OR, XOR, BUF; #106)', () => {
+  // el XOR tiene las entradas 16 más a la izquierda
+  const gate = (type: string, spiceLine = '', x = type === 'xor' ? 16 : 0) =>
+    netFromAsc(`Version 4
+SHEET 1 880 680
+WIRE -32 32 -64 32
+WIRE -32 48 -64 48
+FLAG -64 32 a
+FLAG -64 48 b
+FLAG 32 48 q
+SYMBOL Digital\\${type} ${x} 0 R0
+SYMATTR InstName A1
+${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
+`);
+  const ng = (lt: ReturnType<typeof netFromAsc>) => toNgspice(lt, 't', resolver).text;
+
+  it('línea A como LTspice: 8 nodos, los pines sueltos y los que el símbolo no tiene van a 0', () => {
+    expect(ltNetlistText(gate('and', 'Vhigh=5 Td=1n'))).toMatch(/^A1 a b 0 0 0 0 q 0 AND Vhigh=5 Td=1n$/m);
+    expect(ltNetlistText(gate('inv'))).toMatch(/^A1 0 0 0 0 0 0 0 0 BUF$/m);
+    // los NC_xx no se gastan en la compuerta
+    const r = netFromAsc('Version 4\nSHEET 1 880 680\nSYMBOL Digital\\and 96 0 R0\nSYMATTR InstName A1\nSYMBOL res 300 0 R0\nSYMATTR InstName R1\n');
+    expect(ltNetlistText(r)).toMatch(/^R1 NC_01 NC_02 R$/m);
+  });
+
+  it('AND: producto de las entradas conectadas (las de 0 no participan), umbral (Vhigh+Vlow)/2 respecto de com', () => {
+    const t = ng(gate('and', 'Vhigh=5'));
+    expect(t).toMatch(/^B_A1__x A1__x 0 V=min\(max\(\(V\(a,0\)-\(\{5\}\+\{0\}\)\/2\)\*1e4\+0\.5,0\),1\)\*min\(max\(\(V\(b,0\)/m);
+    expect(t).toMatch(/^B_A1__q q 0 V=\{0\}\+\(\{5\}-\{0\}\)\*V\(A1__x\)$/m);
+    expect(t).not.toMatch(/^A1 /m);
+    expect(t).toMatch(/^R_A1__i1 a 0 1e12$/m);
+  });
+
+  it('OR, XOR (exactamente una alta) y AND sin entradas (= 1)', () => {
+    expect(ng(gate('or'))).toMatch(/V=1-\(1-min\(.*\)\)\*\(1-min\(.*\)\)$/m);
+    const x = ng(gate('xor')).split('\n').find((l) => l.startsWith('B_A1__x'))!;
+    expect(x.match(/\*\(1-min\(/g)?.length).toBe(2);
+    expect(ng(netFromAsc('Version 4\nSHEET 1 880 680\nFLAG 32 48 q\nSYMBOL Digital\\and 0 0 R0\nSYMATTR InstName A1\n'))).toMatch(/^B_A1__x A1__x 0 V=1$/m);
+  });
+
+  it('Td inercial (línea T + retención), Trise/Tfall con slew (uno toma el otro), Tau RC, Rout/Cout', () => {
+    const t = ng(gate('and', 'Td=2n Trise=10n Tau=1n Rout=10 Cout=1p'));
+    expect(t).toMatch(/^T_A1__d A1__x 0 A1__d 0 Z0=1 TD=\{2n\}$/m);
+    expect(t).toMatch(/^B_A1__h 0 A1__h I=\(abs\(V\(A1__x\)-V\(A1__d\)\)<0\.5\) \? \(V\(A1__x\)-V\(A1__h\)\) : 0$/m);
+    expect(t).toMatch(/^A_A1__s A1__h A1__s A1__sm$/m);
+    expect(t).toMatch(/^\.model A1__sm slew\(rise_slope=\{1\/\(10n\)\} fall_slope=\{1\/\(10n\)\}\)$/m);
+    expect(t).toMatch(/^C_A1__t A1__t 0 \{1n\}$/m);
+    expect(t).toMatch(/^C_A1__h A1__h 0 \{\(2n\)\/100\}$/m);
+    expect(t).toMatch(/^B_A1__q A1__q 0 V=.*min\(max\(V\(A1__t\),0\),1\)$/m);
+    expect(t).toMatch(/^R_A1__q A1__q q \{10\}$/m);
+    expect(t).toMatch(/^C_A1__q q 0 \{1p\}$/m);
+  });
+
+  it('buf: Q y _Q complementaria; los modelos que no son compuertas quedan como estaban', () => {
+    const t = ng(netFromAsc('Version 4\nSHEET 1 880 680\nFLAG 64 48 q\nFLAG 64 80 qb\nFLAG 0 64 a\nSYMBOL Digital\\buf 0 0 R0\nSYMATTR InstName A1\n'));
+    expect(t).toMatch(/^B_A1__qb qb 0 V=\{1\}-\(\{1\}-\{0\}\)\*V\(A1__x\)$/m);
+    expect(t).toMatch(/^B_A1__q q 0 /m);
+    const w: string[] = [];
+    expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'DFLOP', w)).toBeUndefined();
+    // parámetros sin "=" (como en TCLib/Charge_Pump.lib)
+    const l = translateDigital('A4', ['u', '0', '0', '0', 'd', '0', 'c', '0'], 'AND Vhigh {Vcc} Trise 1n Tfall 2n', w)!;
+    expect(l).toContain('.model A4__sm slew(rise_slope={1/(1n)} fall_slope={1/(2n)})');
+    expect(l).toContain('B_A4__q c 0 V={0}+({Vcc}-{0})*min(max(V(A4__s),0),1)');
   });
 });

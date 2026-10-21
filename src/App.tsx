@@ -54,7 +54,7 @@ import {
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -1991,11 +1991,12 @@ ${ltNetlistText(sim.built.lt)}
           onClose={() => setDialog(null)}
           onAttributes={() => setDialog({ kind: 'attrs', index: dialog.index })}
           windowDefaults={lib.windowDefaults}
-          onApply={(attrs, labels) => {
+          onApply={(attrs, labels, type) => {
             setDialog(null);
             const s = doc.symbols[dialog.index];
             const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => v !== (s.attrs.get(k) ?? null)));
             let d = Object.keys(changed).length ? setSymbolAttrs(doc, dialog.index, changed) : doc;
+            if (type && type !== s.type) d = setSymbolType(d, dialog.index, type, lib);
             if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
             if (d !== doc) commit(d);
           }}

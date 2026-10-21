@@ -59,6 +59,10 @@ const DEFAULT_ARGS: Partial<Record<SourceKind, string[]>> = {
   sffm: ['0', '1', '10k', '5', '1k'],
 };
 
+/** Símbolos de la fuente de tensión: el V por defecto y Cell para la continua (#120) */
+const V_SYMBOL = 'voltage';
+const CELL_SYMBOL = 'cell';
+
 /** Un campo del formulario: índice de args (número) o campo propio */
 type FieldKey = number | 'dc' | 'acMag' | 'acPhase' | 'per' | 'frq' | 'duty';
 interface FieldDef {
@@ -131,8 +135,8 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   inst: SymbolInst;
   def: SymbolDef | undefined;
   windowDefaults: WindowDefaults;
-  /** atributos a escribir (null = se borra) y rótulos que se muestran u ocultan */
-  onApply(attrs: Record<string, string | null>, labels: Map<number, LabelPatch>): void;
+  /** atributos a escribir (null = se borra), rótulos que se muestran u ocultan y símbolo nuevo si cambia */
+  onApply(attrs: Record<string, string | null>, labels: Map<number, LabelPatch>, type?: string): void;
   onClose(): void;
   /** abrir el diálogo genérico de atributos (InstName, rótulos…) */
   onAttributes(): void;
@@ -146,12 +150,12 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
     SpiceLine: inst.attrs.get('SpiceLine'),
   };
   const parsed = useMemo(() => parseSource(original), []);
-  // una fuente sin valor arranca con un DC de 1: abrir y apretar Enter ya deja una fuente válida
-  const blankDc = !parsed || (parsed.kind === 'dc' && !parsed.dc.trim());
-  const [spec, setSpec] = useState<SourceSpec>(() => (parsed && !blankDc ? parsed : { ...(parsed ?? emptySource()), kind: 'dc', dc: '1' }));
+  // una fuente sin valor (recién colocada) arranca en Seno: abrir y apretar Enter ya deja una fuente válida
+  const blankSrc = !parsed || (parsed.kind === 'dc' && !parsed.dc.trim());
+  const [spec, setSpec] = useState<SourceSpec>(() => (parsed && !blankSrc ? parsed : { ...(parsed ?? emptySource()), kind: 'sine' }));
   // valores que la ventana completó sola (DC al abrir, AC o Valor DC al entrar a esas pestañas):
   // si no se tocaron, se sacan al ir a otra pestaña (mirar AC no debe dejar un "AC 1" puesto)
-  const autoFilled = useRef<{ acMag?: string; dc?: string }>(blankDc ? { dc: '1' } : {});
+  const autoFilled = useRef<{ acMag?: string; dc?: string }>({});
   // los parámetros de cada forma de onda se recuerdan al cambiar de pestaña
   const [argsBy, setArgsBy] = useState<Partial<Record<SourceKind, string[]>>>(() => ({ ...DEFAULT_ARGS, ...(parsed ? { [parsed.kind]: parsed.args } : {}) }));
   const [text, setText] = useState<string | null>(() => (parsed || !original.Value.trim() ? null : [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ')));
@@ -282,13 +286,20 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
     </span>
   );
 
+  // la fuente V cambia de símbolo según la forma de onda: DC usa Cell y el resto el V. Un símbolo
+  // que el usuario eligió a mano (batería, Pila…) no se toca, ni tampoco una fuente de corriente
+  const symbolFor = (k: SourceKind) => {
+    if (current || (inst.type !== V_SYMBOL && inst.type !== CELL_SYMBOL)) return undefined;
+    return k === 'dc' ? CELL_SYMBOL : V_SYMBOL;
+  };
+
   const submit = () => {
     if (text !== null) {
       const p = parseSource({ Value: text });
-      if (p) return onApply(writeSource(p), labels());
+      if (p) return onApply(writeSource(p), labels(), symbolFor(p.kind));
       return onApply({ Value: text.trim(), Value2: null, SpiceLine: null }, labels());
     }
-    onApply(writeSource(full), labels());
+    onApply(writeSource(full), labels(), symbolFor(kind));
   };
 
   const name = eff.get('InstName') ?? baseName(inst.type);

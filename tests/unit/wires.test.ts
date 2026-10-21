@@ -21,6 +21,7 @@ import {
   placeSymbol,
   removeVertex,
   sameConnections,
+  setSymbolType,
   splitWire,
   transformItems,
 } from '../../src/schematic/edit.ts';
@@ -369,6 +370,21 @@ describe('un cable no atraviesa componentes (#45)', () => {
     const m = transformItems(d, one, 'rotate', lib);
     expect(ws(m)).toEqual([[l.x - 64, l.y, l.x, l.y], [r.x, r.y, r.x + 64, r.y]]);
     expect(net(m)).toMatch(/^R1 (a b|b a) /m);
+  });
+});
+
+describe('cambio de símbolo (fuente V ↔ Cell, #120)', () => {
+  it('el primer pin queda, el otro se mueve y los cables lo siguen; volver al V recupera el origen', () => {
+    const d = asc('SYMBOL voltage 0 0 R0\nSYMATTR InstName V1\nWIRE 0 16 0 -32\nWIRE 0 96 0 128\n');
+    const m = setSymbolType(d, 0, 'cell', lib);
+    expect(m.symbols[0]).toMatchObject({ type: 'cell', x: 0, y: 16 });
+    expect(pinPoints(m.symbols[0], lib.symbol('cell'))).toEqual([
+      { x: 0, y: 16 },
+      { x: 0, y: 80 },
+    ]);
+    expect(ortho(m)).toBe(true);
+    expect(sameConnections(d, m, lib)).toBe(true);
+    expect(setSymbolType(m, 0, 'voltage', lib).symbols[0]).toMatchObject({ type: 'voltage', x: 0, y: 0 });
   });
 });
 

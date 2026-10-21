@@ -610,6 +610,28 @@ export function setSymbolAttrs(doc: AscDoc, index: number, attrs: Record<string,
   };
 }
 
+/**
+ * Cambia el símbolo de una pieza sin cambiar su componente (la fuente V pasa a Cell para DC).
+ * El primer pin queda donde estaba y el resto va a los del símbolo nuevo; los cables que llegan
+ * a esos pines se siguen con `moveVertex`, así no quedan desconectados.
+ */
+export function setSymbolType(doc: AscDoc, index: number, type: string, lib: Library): AscDoc {
+  const inst = doc.symbols[index];
+  if (inst.type === type) return doc;
+  const before = pinPoints(inst, lib.symbol(inst.type));
+  const moved: SymbolInst = { ...inst, type };
+  const after = pinPoints(moved, lib.symbol(type));
+  const dx = before[0] && after[0] ? before[0].x - after[0].x : 0;
+  const dy = before[0] && after[0] ? before[0].y - after[0].y : 0;
+  const next: SymbolInst = { ...moved, x: inst.x + dx, y: inst.y + dy };
+  const target = pinPoints(next, lib.symbol(type));
+  let out: AscDoc = { ...doc, symbols: doc.symbols.map((s, i) => (i === index ? next : s)) };
+  before.forEach((p, i) => {
+    if (i > 0 && target[i] && !samePt(p, target[i])) out = moveVertex(out, p, target[i], lib);
+  });
+  return out;
+}
+
 export function setText(doc: AscDoc, index: number, patch: Partial<SchText>): AscDoc {
   return { ...doc, texts: doc.texts.map((t, i) => (i === index ? { ...t, ...patch } : t)) };
 }

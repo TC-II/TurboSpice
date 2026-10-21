@@ -1,0 +1,37 @@
+# Hallazgos (borrador)
+- [FIX 5d7d72f] símbolos sin pines con Prefix X → línea "X5" (TCLib\Special\node)
+- [FIX 4480b85] nombre de red con varias etiquetas: regla LTspice (mayor y, mayor x, última)
+- [FIX 651aeaa] TCLib actualizada (NPN/PNP_nice Vsat, pot)
+- [FIX ec72038] params "K = 1" con espacios
+- [FIX 0b5df37] corpus/smoke en Windows + cmpFile en simulate.mjs
+- [ISSUE] .tran startup ignorado (356 archivos del corpus); p.ej. TC2-Sim/TC044 - Toro Modelado
+- [ISSUE] modelos faltantes en library/cmp (ver #6): UMZ5_1N, BZX84B6V8LY...
+- [ISSUE] símbolos faltantes: Digital\*, OpAmps\UniversalOpAmp (+modelo)
+- [AGENTE] bi2, Misc\EuropeanResistor
+- [FIX 2ef870a] B-source 'LIMIT (' con espacio (TC061 SR)
+- [ISSUE] nodo llamado temp/temper rompe fuentes B en ngspice (TC060 Lamp Potencia real)
+- [EXPERIMENTO] .options rshunt=1e12 arregla nodos flotantes (TC061 Modelo Interno OA Param → igual); medir en todo el corpus
+- [FIX 2ef870a] LIMIT ( en B
+- [FIX a869fbf] .tran 0 {expr}, ';' en directivas, round/buf/inv/hypot en B
+- [FIX 81a0038] .param con espacios (silenciosamente mal en ngspice)
+- [ISSUE] dispositivos A digitales de LTspice (Charge_Pump.lib, Digital\*)
+- [FIX 1d15159] log/sqrt de negativos en B (TC Parciales/Draft6)
+- [ISSUE+EXPERIMENTO] control de paso: LTspice max dt ≈ min(T_sine/8.7, tstop/1024) ignorando tstep; ngspice min(tstep, tstop/50) → submuestrea (Draft6: 1018 vs 4006 pts)
+- [FIX 81a0038] .param con espacios
+- [FIX cac9147] V(alias) en expresiones → V(red)
+- [ISSUE] CD4046B: ModelFile en la línea X (TS emite TCLib\CD4046B.lib CD4046B CD4046B)
+- [ISSUE?] nodos P001 (pines que se tocan sin cable)
+- [FIX 8002f20] SpiceModel como archivo .lib sin ModelFile (CD4046B)
+- [ISSUE] CD4046B.lib: params no declarados en subckt anidados + scoping dinámico de .param (td1, cval) → ngspice falla. Probado: agregar params de instancias anidadas al header + ponerlos ANTES de los defaults (vdd1={vdd}) resuelve 'vdd', quedan td1/cval/trise1 (scope dinámico)
+- [TCLIB] VCO.lib usa Vi_min sin declararlo (LTspice también falla si el usuario pisa Value)
+- [ISSUE baja] redes sin cables: LTspice P### con contador compartido con N### y orden de encuentro; TS N### al final (repro-P001.asc). Sólo nombres.
+- [FIX 6becfc3] continuación + en directivas (.meas)
+- [ISSUE] simula en silencio con símbolos faltantes (elementos omitidos → resultados 0)
+- [FIX f413d81] K con inductores sin prefijo L
+- [FIX 5fa07c4] llaves parciales, RKM .param, IC= capacitor a tierra (13/79 mejoran)
+- [ISSUE] IC= capacitor flotante (y I(L) en .ic / IC= de inductores): requiere op en 2 pasadas
+- [ISSUE] params de instancia exclusivos de LTspice: tol, pwr, rpar(L?), n, repeat, laplace, hc, chemi, electrolytic, v (ver corpus)
+- [ISSUE] .ic I(L1)=0 (ngspice sólo tensiones)
+- [ISSUE] resistencias de comportamiento R=f(V())
+- [PENDIENTE-FIX] .model X AKO: <base en library/cmp> no incluye el cmp (1N750, BC548C?…) ids 4950 4951 4953 5064 5065
+- [COMENTARIO #6] 115 modelos faltantes en 222 archivos: BC548C 36, 2N5551C 36, BC558C 29, MJL21194C 26, MJL21193C 22, 2N5401C 21, MJE243C 21, MJE253C 21, GREEN 21 (LED), BC558A 10, BC548A 9, BD135P 8...

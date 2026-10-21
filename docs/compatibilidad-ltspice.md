@@ -24,7 +24,12 @@ acá van los agregados y las reglas de la netlist.
   inicio y fin para que siga antihorario).
 - Verificado: parse → serialize reproduce **4712/4712** archivos del corpus anterior línea por línea.
   Sobre el corpus completo (corrida del 20/10/2026) reproduce **5.351 de 5.369** (18 difieren,
-  pendiente de revisar; 9 no llegaron a esa etapa).
+  9 no llegaron a esa etapa). Las 18 diferencias no son pérdidas: 9 no son esquemáticos (metadatos
+  `__MACOSX/._*`, documentación de TeX Live con extensión `.asc`, una página de error de GitHub
+  guardada como `.asc`) y 9 son archivos que no guardó LTspice (generados por Schematic-Redraw,
+  editados a mano, `text` en minúscula, espacios al final): TurboSpice escribe los mismos elementos
+  en el orden y formato en que los guarda LTspice (WIRE, FLAG, SYMBOL, TEXT), igual que haría
+  LTspice al volver a guardarlos.
 
 ## Guardado "todo explícito"
 

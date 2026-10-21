@@ -428,6 +428,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .pane-chart.selecting .u-select { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28), inset 0 0 0 1px var(--accent); }
 /* barra de resultados: la vista elegida en el menú y las herramientas del visor */
 .results-view { font-size: 13px; font-weight: 600; color: var(--fg); }
+.incomplete-badge { font-size: 12px; font-weight: 600; color: var(--err); border-color: var(--err); background: transparent; padding: 1px 8px; }
 .viewer-tools { display: inline-flex; align-items: center; gap: 6px; }
 .viewer-tools:empty { display: none; }
 .viewer-tools button { padding: 2px 10px; font-size: 13px; }

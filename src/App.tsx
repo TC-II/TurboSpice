@@ -709,10 +709,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       } else if (built.controlPanes.length) setPanes(built.controlPanes);
       const errs = result.errors.length ? result.errors : [];
       setStatus(errs.length && !result.plots.length ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
+      // símbolos faltantes: el circuito simulado no es el del esquemático, el aviso va primero (#108)
+      const missing = built.missingSymbols;
       setMessage(
-        built.warnings.length
-          ? `${built.warnings.length === 1 ? built.warnings[0] : `${built.warnings.length} avisos`} — ver la pestaña Problemas`
-          : undefined,
+        missing.length
+          ? `Simulación incompleta: no se encontr${missing.length === 1 ? 'ó el símbolo' : 'aron los símbolos'} ${missing.join(', ')} y se ` +
+              `omiti${missing.length === 1 ? 'ó' : 'eron'} del circuito. Los resultados no corresponden al esquemático.`
+          : built.warnings.length
+            ? `${built.warnings.length === 1 ? built.warnings[0] : `${built.warnings.length} avisos`} — ver la pestaña Problemas`
+            : undefined,
       );
       if (result.plots.length) {
         setTool({ kind: 'probe' });
@@ -1511,7 +1516,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const problems = sim
     ? [
         ...sim.result.errors.map((text) => ({ kind: 'err' as const, text })),
-        ...sim.built.warnings.map((text) => ({ kind: 'warn' as const, text })),
+        ...sim.built.warnings.map((text) => ({ kind: /^Símbolo no encontrado:/.test(text) ? ('err' as const) : ('warn' as const), text })),
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
@@ -1838,6 +1843,16 @@ ${ltNetlistText(sim.built.lt)}
                   <Icon name="caret" size={14} />
                 </MenuButton>
               </div>
+              {/* queda a la vista mientras se miran estos resultados, aunque se cierre el aviso (#108) */}
+              {(sim.built.missingSymbols?.length ?? 0) > 0 && (
+                <button
+                  className="incomplete-badge"
+                  onClick={() => setPanel('problems')}
+                  title={`Faltan ${sim.built.missingSymbols.join(', ')}: se omitieron del circuito y los resultados no corresponden al esquemático`}
+                >
+                  Simulación incompleta
+                </button>
+              )}
               {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
               {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
               {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} onAdd={addExpr} />}

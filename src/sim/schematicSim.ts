@@ -35,6 +35,8 @@ export interface BuiltSimulation {
   controlPanes: Pane[];
   /** análisis que no entran en memoria: no se simula (#58) */
   tooBig: SizeProblem[];
+  /** símbolos que no están en la librería: sus elementos se omiten y el circuito simulado es otro (#108) */
+  missingSymbols: string[];
 }
 
 export async function buildSimulation(doc: AscDoc, lib: Library, title: string): Promise<BuiltSimulation> {
@@ -60,7 +62,8 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
     .filter((l) => ANALYSIS_LINE.test(l));
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
-  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors };
+  const missingSymbols = [...new Set(lt.warnings.flatMap((w) => /^Símbolo no encontrado: (.+)$/.exec(w)?.[1] ?? []))];
+  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols };
 }
 
 /** Vector de ngspice con la tensión de una red */

@@ -114,6 +114,14 @@ const igbt = (p) => [
 const plate = (y, top) => [L(0, top, 0, y), L(-16, y, 16, y)];
 const grid = (y, side) => [L(-20, y, 20, y, true), side < 0 ? L(-48, y, -20, y) : L(20, y, 48, y)];
 const cathode = (y, pin) => [L(-16, y, 16, y), L(16, y, 16, y - 6), ...polyline([-16, y], [-16, y + 10], pin)];
+// amp. op.: triángulo de (-32, top) a (-32, top + 64) con la punta en (32, top + 32); entradas
+// "-" e "+" a ±16 del centro y, si tiene, alimentaciones en x=0
+const opamp = (top, invUp, supplies) => {
+  const cy = top + 32;
+  const [ym, yp] = invUp ? [cy - 16, cy + 16] : [cy + 16, cy - 16];
+  return [...polyline([-32, top], [32, cy], [-32, top + 64], [-32, top]), ...minus(-22, ym), ...plus(-22, yp),
+    ...(supplies ? [L(0, top - 0, 0, top + 16), L(0, top + 48, 0, top + 64)] : [])];
+};
 
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
 const SYMBOLS = {
@@ -190,6 +198,19 @@ const SYMBOLS = {
     'Línea RC distribuida (URC)', [L(16, 0, 16, 8), L(16, 56, 16, 64), R(10, 8, 22, 56), L(2, 12, 2, 52), L(-16, 32, 2, 32)]],
   'Misc/xvaristor': ['X', 'varistor', [[16, 16, 'A', 1], [16, 96, 'B', 2]], { 0: [36, 40, 'Left'], 3: [36, 76, 'Left'] },
     'Varistor: el modelo lo provee el usuario', [L(16, 16, 16, 27), L(16, 85, 16, 96), R(5, 27, 27, 85), ...polyline([-4, 84], [2, 84], [30, 28])]],
+  // amplificadores operacionales: los modelos propios están en library/sub (opamp.sub,
+  // UniversalOpAmp1.lib, UniversalOpAmp2.lib); opamp2 usa el modelo que indique Value
+  'OpAmps/opamp': ['X', 'opamp', [[-32, 48, 'invin', 1], [-32, 80, 'noninvin', 2], [32, 64, 'out', 3]], { 0: [0, 32, 'Left'] },
+    'Amp. op. de un polo (Aol, GBW); requiere .lib opamp.sub', opamp(32, true, false), ['SpiceLine Aol=100K', 'SpiceLine2 GBW=10Meg']],
+  'OpAmps/opamp2': ['X', 'opamp2', [[-32, 80, 'In+', 1], [-32, 48, 'In-', 2], [0, 32, 'V+', 3], [0, 96, 'V-', 4], [32, 64, 'OUT', 5]],
+    { 0: [16, 32, 'Left'], 3: [16, 96, 'Left'] }, 'Amp. op. con alimentación; Value es el nombre del modelo', opamp(32, true, true)],
+  'OpAmps/UniversalOpamp2': ['X', '', [[-32, 16, 'In+', 1], [-32, -16, 'In-', 2], [0, -32, 'V+', 3], [0, 32, 'V-', 4], [32, 0, 'OUT', 5]],
+    { 0: [16, -32, 'Left'] }, 'Amp. op. universal: Avol, GBW, slew, límites de salida y de corriente', opamp(-32, true, true),
+    ['SpiceModel level2', 'Value2 Avol=1Meg GBW=10Meg Slew=10Meg', 'SpiceLine Ilimit=25m Rail=0 Vos=0',
+      'SpiceLine2 En=0 Enk=0 In=0 Ink=0 Rin=500Meg', 'ModelFile UniversalOpAmp2.lib']],
+  'OpAmps/UniversalOpAmp': ['X', '', [[-32, 16, 'In+', 1], [-32, -16, 'In-', 2], [0, -32, 'V+', 3], [0, 32, 'V-', 4], [32, 0, 'OUT', 5]],
+    { 0: [16, -32, 'Left'] }, 'Amp. op. universal de un polo (Avol, GBW, Vos), salida sin límites', opamp(-32, true, true),
+    ['SpiceModel level1', 'Value2 Avol=1Meg GBW=10Meg Vos=0', 'SpiceLine En=0 Enk=0 In=0 Ink=0 Rin=500Meg', 'ModelFile UniversalOpAmp1.lib']],
   'Misc/EuropeanPolcap': ['C', 'C', [[16, 0, 'A', 1], [16, 64, 'B', 2]], { 0: [24, 4, 'Left'], 3: [24, 64, 'Left'] },
     'Capacitor polarizado (gráfico europeo)', [L(16, 0, 16, 28), L(16, 36, 16, 64), L(0, 28, 32, 28), F([0, 36], [32, 36], [32, 41], [0, 41]), ...plus(4, 16, 3)]],
 };
@@ -209,6 +230,8 @@ for (const [path, [prefix, value, pins, windows, desc, graphics, extra = []]] of
   const asy = join(LIB, 'sym', `${path}.asy`);
   mkdirSync(dirname(asy), { recursive: true });
   writeFileSync(asy, lines.join('\r\n') + '\r\n', 'latin1');
-  writeFileSync(join(LIB, 'skins', 'default', `${path.split('/').pop()}.svg`), svgDoc(graphics, pins));
+  // en minúsculas: la librería busca el skin por el nombre exacto y después en minúsculas, y los
+  // .asc escriben el mismo símbolo con distintas mayúsculas (UniversalOpamp2, universalopamp2)
+  writeFileSync(join(LIB, 'skins', 'default', `${path.split('/').pop().toLowerCase()}.svg`), svgDoc(graphics, pins));
 }
 console.log(`${Object.keys(SYMBOLS).length} símbolos escritos en library/sym/ (con su skin)`);

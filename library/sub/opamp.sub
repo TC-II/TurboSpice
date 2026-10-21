@@ -1,0 +1,10 @@
+* Amplificador operacional de un polo (TurboSpice). Mismo uso que el opamp.sub de LTspice:
+* símbolo OpAmps\opamp y la directiva ".lib opamp.sub".
+*   Aol: ganancia de lazo abierto en continua
+*   GBW: producto ganancia-ancho de banda (el polo queda en GBW/Aol)
+* Salida ideal (sin límites de alimentación ni de corriente), referida a tierra.
+.subckt opamp inm inp out params: Aol=100K GBW=10Meg
+Gamp 0 out inp inm {Aol}
+Rpolo out 0 1
+Cpolo out 0 {Aol/(6.283185307179586*GBW)}
+.ends opamp

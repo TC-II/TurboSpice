@@ -1,0 +1,18 @@
+* Amplificador operacional universal, nivel 1 (TurboSpice). Mismo uso que el UniversalOpAmp1.lib de
+* LTspice: símbolo OpAmps\UniversalOpAmp, SpiceModel level1.
+*   Avol: ganancia de lazo abierto en continua    GBW: producto ganancia-ancho de banda
+*   Vos: tensión de offset de entrada              Rin: resistencia de entrada (de cada entrada a
+*                                                  cada alimentación, 2·Rin)
+* Un polo, salida lineal sin límites de alimentación ni de corriente, referida a tierra.
+* Los parámetros de ruido (En, Enk, In, Ink, Incm, Incmk) se aceptan pero no se modelan.
+.subckt level1 inp inm vp vn out params: Avol=1Meg GBW=10Meg Slew=10Meg Ilimit=25m Rail=0 Vos=0
++ En=0 Enk=0 In=0 Ink=0 Incm=0 Incmk=0 Rin=1G
+Rinp1 inp vp {2*Rin}
+Rinp2 inp vn {2*Rin}
+Rinm1 inm vp {2*Rin}
+Rinm2 inm vn {2*Rin}
+* transconductancia sobre Rout || Cout: ganancia Avol y polo en GBW/Avol
+Bamp 0 out I={Avol/0.1}*(V(inp)-V(inm)+{Vos})
+Rout out 0 0.1
+Cout out 0 {Avol/(6.283185307179586*GBW*0.1)}
+.ends level1

@@ -142,6 +142,7 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | Capacitor de la base de datos: `electrolytic` suelto (a veces con comilla), `MTBF=`, `ppPkg=` (66 casos del corpus fallaban; #111) | Se quitan (informativos) |
 | Fuente B con `tripdv=`/`tripdt=` (35 casos con `Rpar`/`Cpar`; #112) | Se quitan; `Rpar`/`Cpar` como R/C en paralelo |
 | `table(x, x1,y1, …)` en fuentes B (16 casos; #113) | `pwl(x, x1,y1, …)` de la fuente B |
+| `OpAmps\opamp` + `.lib opamp.sub` (Aol, GBW); `OpAmps\UniversalOpAmp` (`level1`) y `OpAmps\UniversalOpamp2` (`level2`: slew, `Rail`, `Ilimit`) — modelos de ADI, no redistribuibles | Modelos propios equivalentes en `library/sub` (#107, #116). En el corpus, 44 de los 92 casos con LTspice OK pasan a coincidir; `level2` difiere todavía cerca de la resonancia en filtros de Q muy alto (#117) |
 | Integración por defecto `modified trap` | ngspice usa `trap` (diferencia conocida) |
 
 Con varios `.step`, el primero es el que varía más rápido (bucle interno). **Pendiente de verificar

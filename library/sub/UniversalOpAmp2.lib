@@ -1,0 +1,34 @@
+* Amplificador operacional universal, nivel 2 (TurboSpice). Mismo uso que el UniversalOpAmp2.lib de
+* LTspice: símbolo OpAmps\UniversalOpamp2, SpiceModel level2.
+*   Avol: ganancia de lazo abierto en continua    GBW: producto ganancia-ancho de banda
+*   Slew: velocidad de crecimiento (V/s)          Vos: tensión de offset de entrada
+*   Rail: distancia mínima de la salida a cada alimentación
+*   Ilimit: corriente máxima de salida (se toma de V+ al entregar y va a V- al absorber)
+*   Rin: resistencia de entrada (de cada entrada a cada alimentación, 2·Rin)
+* Etapa de entrada: transconductancia limitada (slew) sobre R || C referidas al punto medio de
+* las alimentaciones, con el nodo interno acotado a las alimentaciones. Etapa de salida: seguidor
+* de 10 Ω con la tensión acotada a [V- + Rail, V+ - Rail] y la corriente a ±Ilimit.
+* Los parámetros de ruido (En, Enk, In, Ink, Incm, Incmk) se aceptan pero no se modelan.
+.subckt level2 inp inm vp vn out params: Avol=1Meg GBW=10Meg Slew=10Meg Ilimit=25m Rail=0 Vos=0
++ En=0 Enk=0 In=0 Ink=0 Incm=0 Incmk=0 Rin=1G
+.param Rx=1Meg
+.param Cx={Avol/(6.283185307179586*GBW*Rx)}
+.param Islew={Slew*Cx}
+Rinp1 inp vp {2*Rin}
+Rinp2 inp vn {2*Rin}
+Rinm1 inm vp {2*Rin}
+Rinm2 inm vn {2*Rin}
+* ganancia Avol = (Avol/Rx)·Rx, polo en GBW/Avol; la corriente acotada a ±Islew fija el slew
+Bgm 0 x I=min(max({Avol/Rx}*(V(inp)-V(inm)+{Vos}), -{Islew}), {Islew})
+Rx1 x vp {2*Rx}
+Rx2 x vn {2*Rx}
+Cx1 x vp {Cx/2}
+Cx2 x vn {Cx/2}
+* el nodo interno no pasa de las alimentaciones (si no, tarda en salir de saturación)
+Bcl x 0 I=max(V(x)-V(vp), 0) + min(V(x)-V(vn), 0)
+* salida: 10 Ω hacia la tensión interna acotada, con la corriente limitada a ±Ilimit. Es una sola
+* fuente (lineal en pequeña señal); la corriente que entrega sale de V+ y la que absorbe va a V-
+Bout 0 out I=min(max((min(max(V(x), V(vn)+{Rail}), V(vp)-{Rail})-V(out))/10, -{Ilimit}), {Ilimit})
+Bvp vp 0 I=max(min(max((min(max(V(x), V(vn)+{Rail}), V(vp)-{Rail})-V(out))/10, -{Ilimit}), {Ilimit}), 0)
+Bvn 0 vn I=max(-min(max((min(max(V(x), V(vn)+{Rail}), V(vp)-{Rail})-V(out))/10, -{Ilimit}), {Ilimit}), 0)
+.ends level2

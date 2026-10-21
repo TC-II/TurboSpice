@@ -280,7 +280,7 @@ SYMBOL bi 0 0 R0
 SYMATTR InstName B1
 SYMATTR Value I=LIMIT ( -V(a) , 1 , -1 ) * U (V(a))
 `);
-    expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * U(V(a))');
+    expect(toNgspice(n, 't', resolver).text).toContain('I=LIMIT( -V(a) , 1 , -1 ) * ((V(a)) > 0 ? 1 : 0)');
   });
 
   it('fuentes B: round, buf, inv e hypot fuera de llaves (ngspice no las tiene)', () => {
@@ -291,7 +291,17 @@ SYMATTR InstName B2
 SYMATTR Value V=u(time*1200-round(time*1200))+buf(V(a))
 `);
     const t = toNgspice(n, 't', resolver).text;
-    expect(t).toContain('V=u(time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5)))+((V(a)) > 0.5 ? 1 : 0)');
+    expect(t).toContain('V=((time*1200-(sgn(time*1200)*floor(abs(time*1200)+0.5))) > 0 ? 1 : 0)+((V(a)) > 0.5 ? 1 : 0)');
+  });
+
+  it('fuentes B: u(x) es 0 en x = 0 (la u() de ngspice vale 0,5) (#128)', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL bv 0 0 R0
+SYMATTR InstName B6
+SYMATTR Value V=u(ddt(u(V(a))))
+`);
+    expect(toNgspice(n, 't', resolver).text).toContain('V=((ddt(((V(a)) > 0 ? 1 : 0))) > 0 ? 1 : 0)');
   });
 
   it('fuentes B: log y sqrt de negativos acotados como en LTspice', () => {

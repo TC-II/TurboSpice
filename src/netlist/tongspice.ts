@@ -248,7 +248,7 @@ const B_FUNCTIONS: Record<string, (a: string[]) => string | null> = {
   random: ([x, ...r]) => (r.length ? null : smoothRand(x)),
   white: ([x, ...r]) => (r.length ? null : `(${smoothRand(x)}-0.5)`),
 };
-const B_FUNCTION_RE = /\b(buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
+const B_FUNCTION_RE = /\b(u|buf|inv|round|hypot|log|ln|log10|sqrt|table|rand|random|white)\s*\(/gi;
 
 function hashRand(n: string): string {
   const s = `(sin((${n})*12.9898+78.233)*43758.5453)`;

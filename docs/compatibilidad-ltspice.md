@@ -1,8 +1,9 @@
 # Compatibilidad con LTspice
 
 TurboSpice abre y guarda `.asc` de LTspice como formato nativo. Este documento reúne las reglas que
-se verificaron contra LTspice 24.1.10 (`LTspice.exe -netlist` y `-b` bajo Wine) y contra un corpus de
-4712 `.asc` reales. La especificación de base es la de
+se verificaron contra LTspice 24.1.10 (`LTspice.exe -netlist` y `-b` bajo Wine, y en Windows) y contra
+un corpus de 5.378 `.asc` reales (5.572 casos contando las variantes de simulación; ver
+[Resultados contra LTspice](#resultados-contra-ltspice-corpus-completo)). La especificación de base es la de
 [ASC-Parser](https://github.com/javierpetrucci/ASC-Parser/blob/main/LTSpice_ASC_ASY_Format_Specification.md);
 acá van los agregados y las reglas de la netlist.
 
@@ -21,7 +22,9 @@ acá van los agregados y las reglas de la netlist.
   elipse; en `ARC` siguen el punto **final** y después el de **inicio**, en sentido antihorario.
   Se eligen, mueven, copian, rotan y espejan como el resto (al espejar un arco se intercambian
   inicio y fin para que siga antihorario).
-- Verificado: parse → serialize reproduce **4712/4712** archivos del corpus línea por línea.
+- Verificado: parse → serialize reproduce **4712/4712** archivos del corpus anterior línea por línea.
+  Sobre el corpus completo (corrida del 20/10/2026) reproduce **5.351 de 5.369** (18 difieren,
+  pendiente de revisar; 9 no llegaron a esa etapa).
 
 ## Guardado "todo explícito"
 
@@ -144,8 +147,52 @@ con el oráculo** (#10): LTspice no está disponible bajo `xvfb-run` en la máqu
 Un `.op` (o `.tf`) con un único `.step` genera además un gráfico de cada resultado en función del
 valor barrido, como lo muestra LTspice.
 
-Corpus de la materia simulado en ngspice: 35/80 sin errores; de los restantes, 32 usan modelos de la
-librería estándar de LTspice (`BC547C`, `1N4148`, …) que no se pueden redistribuir.
+## Resultados contra LTspice (corpus completo)
+
+Corrida del 20/10/2026: 5.572 casos (5.378 `.asc` únicos + 194 variantes de simulación), cada uno
+con TurboSpice y con `LTspice -b`. Harness y clasificador en `tests/corpus/` (`run.mjs`,
+`worker.mjs`, `analyze.mjs`); hallazgos en [hallazgos-corpus.md](hallazgos-corpus.md).
+
+| Medición | Resultado |
+|---|---|
+| Representación (parse + render) | 3.633 ok (65 %) · 1.929 con símbolos faltantes · 10 timeout |
+| Símbolos faltantes | 831 símbolos distintos |
+| Netlist vs `LTspice -netlist` | 2.659 idéntica (48 %) · 279 equivalente · 2.334 distinta · 291 sin netlist de LTspice |
+| Con directiva de simulación | 4.406 (LTspice simula 2.894 · falla 1.512) |
+| Igual o parecido a LTspice | **890** (811 igual · 61 parecido · 18 parecido-forma) |
+| Distinto (simula, no coincide) | 445 |
+| Incompleto (simula con símbolos faltantes; no es "ok") | 1.113 (751 con LTspice OK; #108) |
+| Error en TurboSpice | 1.507: 807 fallan también en LTspice, **700 con LTspice OK** |
+| Sólo TurboSpice simula | 307 |
+
+| Grupo | casos | representación ok | netlist idéntica | igual + parecido |
+|---|---|---|---|---|
+| E3-Circuitos-Esquematicos | 254 | 253 | 235 | 36 de 57 |
+| TC2-Circuitos-Esquematicos | 213 | 209 | 180 | 32 de 72 |
+| TC2-Sim | 182 | 165 | 162 | 69 de 168 |
+| sueltos | 724 | 565 | 518 | 162 de 542 |
+| sueltos-librerias | 368 | 131 | 225 | 36 de 327 |
+| sueltos-LargeCollection | 3.831 | 2.310 | 1.339 | 555 de 3.240 |
+
+Los 700 errores con LTspice OK, por causa (primera pasada por mensaje de error):
+
+| Causa | casos | issue |
+|---|---|---|
+| Símbolos faltantes | 269 | #106, #107, #108 |
+| Modelo no encontrado | ~97 | #6 |
+| Parámetros/funciones de LTspice (`electrolytic`, `tripdv`, `Rpar` en B, `table()`) — **arreglado** | 74 | #111, #112, #113 |
+| Matriz singular / nodos flotantes | ~62 | #102 |
+| Subcircuito no encontrado | 43 | — |
+| Laplace en E/G/B | 42 | #110 |
+| Funciones de fuente B sin equivalente (`idt`, `sdt`, `white`, `rand`, `delay`) | ~35 | — |
+| Inductor no lineal (`Hc=`, `Br=`, `Bs=`) | 14 | — |
+| `.dc` sin paso, `.dc dec`/`list`, `.TEMP=`, `.noise … list` | ~20 | — |
+
+Modelos faltantes: de los que no encuentra TurboSpice, 68 (en 137 archivos) están en casos donde
+LTspice simula; otros 184 (en 307 archivos, BC548C, 2N5551C…) faltan también en LTspice. Detalle en #6.
+
+Ya medido, no repetir: `.options rshunt=1e12` global baja los equivalentes de 350 a 337, y `tmax=1`
+global los sube apenas a 359 pero pasa casos de *igual* a *distinto* (corrida de 1.165 casos).
 
 ## Herramientas
 

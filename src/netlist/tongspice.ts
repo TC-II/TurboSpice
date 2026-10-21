@@ -11,6 +11,7 @@ import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import { stripLtspiceInfo } from '../library/cmp.ts';
 import type { Element, LtNetlist } from './ltnetlist.ts';
+import { replaceLaplaceLines, translateLaplace } from './laplace.ts';
 import { formatSpiceNumber, fromRkm, parseSpiceNumber } from './spicenum.ts';
 import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
 
@@ -483,7 +484,10 @@ function convertElements(
     // corriente inicial del inductor como restricción del punto de operación (ver holdAtOp):
     // la fuente B va en serie con L sola, adentro de Rpar (LTspice fuerza el flujo L·IC)
     const lic = letter === 'L' && holdIc && e.nodes.length === 2 && !coupled.has(e.name.toLowerCase().replace(/^l§/, '')) ? splitParams(value).params.get('ic') : undefined;
-    const lines = expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings);
+    const fixed = sourceSyntax(letter, translateFunctions(translateRandom(value)));
+    // Laplace=… de E, G y B (ver laplace.ts); en E y G sin fixBraces, que corta la expresión
+    const lap = translateLaplace(name, letter, e.nodes, letter === 'B' ? fixed : translateFunctions(translateRandom(e.value)), warnings);
+    const lines = lap ?? expandElement(name, letter, e.nodes, fixed, warnings);
     if (lic !== undefined) {
       const [n, a, b, ...rest] = lines[0].split(' ');
       lines[0] = [n, a, `${name}__ic`, ...rest].join(' ');
@@ -783,7 +787,8 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   const warnings = [...net.warnings];
   const files: Record<string, string> = {};
   // (los informativos de LTspice en los .model, como Iave o Vpk, hacen fallar a ngspice)
-  for (const rel of net.includes) files[rel] = stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams));
+  // Laplace= en E/G/B de los archivos y de los .subckt escritos como directiva (ver laplace.ts)
+  for (const rel of net.includes) files[rel] = replaceLaplaceLines(stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams)), warnings);
   // ako: se resuelve con los modelos de todos los archivos y de la netlist
   const models = collectModels(net.text);
   for (const t of Object.values(files)) collectModels(t, models);
@@ -795,7 +800,9 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
     warnings.push(...a.warnings, ...r.warnings);
     for (const [k, v] of r.found) external.set(k, v);
   }
-  const ako = replaceAko(stripLtspiceInfo(net.text), models);
+  const lapWarnings: string[] = [];
+  const ako = replaceAko(replaceLaplaceLines(stripLtspiceInfo(net.text), lapWarnings), models);
+  for (const w of lapWarnings) if (!warnings.includes(w)) warnings.push(w);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
   return { netlist: main.text, files, warnings };

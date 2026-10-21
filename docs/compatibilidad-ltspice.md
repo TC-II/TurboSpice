@@ -149,6 +149,7 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 | Capacitor de la base de datos: `electrolytic` suelto (a veces con comilla), `MTBF=`, `ppPkg=` (66 casos del corpus fallaban; #111) | Se quitan (informativos) |
 | Fuente B con `tripdv=`/`tripdt=` (35 casos con `Rpar`/`Cpar`; #112) | Se quitan; `Rpar`/`Cpar` como R/C en paralelo |
 | `table(x, x1,y1, …)` en fuentes B (16 casos; #113) | `pwl(x, x1,y1, …)` de la fuente B |
+| `Laplace=H(s)` en E, G y B (`E1 o 0 i 0 Laplace=1/(1+s/w0)`, `B1 o 0 V=V(a)-V(b) Laplace=…`, `Laplace(…)`, `Laplace {V(in)} = {H}`, también en archivos de modelos como `TCLib/fdnr.lib`). H se lleva a cociente de polinomios en s con los parámetros como expresiones de numparam (andan `.step` y parámetros de subcircuito); `mtol`, `window`, `nfft`, `cache` se ignoran. Lo no racional (`exp(-s*T)`, `sqrt(s)`, `abs(s)`, `s**alpha`) se avisa. En el corpus, de 47 casos con Laplace y LTspice OK (todos fallaban): 8 igual/parecido, 10 distinto, 3 incompleto, 17 no racionales (avisados), 9 por otras causas (`rand`, subcircuito, símbolos). En `.ac` la salida coincide exacta; en `.tran` LTspice calcula la Laplace por respuesta impulsiva y se aparta de la solución exacta (p.ej. segundo orden con ζ=0,5: LTspice sin sobrepico, ngspice 16 % como da la teoría); #110 | Parte propia → code model XSPICE `s_xfer` (con `denormalized_freq` si los coeficientes son de órdenes muy distintos); numerador de mayor grado → cadena de derivadores (C de 1 F + V de 0 V + H); la salida es el elemento original controlado por esa tensión |
 | `OpAmps\opamp` + `.lib opamp.sub` (Aol, GBW); `OpAmps\UniversalOpAmp` (`level1`) y `OpAmps\UniversalOpamp2` (`level2`: slew, `Rail`, `Ilimit`) — modelos de ADI, no redistribuibles | Modelos propios equivalentes en `library/sub` (#107, #116). En el corpus, 44 de los 92 casos con LTspice OK pasan a coincidir; `level2` difiere todavía cerca de la resonancia en filtros de Q muy alto (#117) |
 | Integración por defecto `modified trap` | ngspice usa `trap` (diferencia conocida) |
 
@@ -196,7 +197,7 @@ Los 700 errores con LTspice OK de la corrida del 20/10, por causa (primera pasad
 | Parámetros/funciones de LTspice (`electrolytic`, `tripdv`, `Rpar` en B, `table()`) — **arreglado** | 74 | #111, #112, #113 |
 | Matriz singular / nodos flotantes | ~62 | #102 |
 | Subcircuito no encontrado | 43 | — |
-| Laplace en E/G/B | 42 | #110 |
+| Laplace en E/G/B — **arreglado** lo racional (quedan 17 no racionales, avisados) | 42 | #110 |
 | Funciones de fuente B sin equivalente (`idt`, `sdt`, `white`, `rand`, `delay`) | ~35 | — |
 | Inductor no lineal (`Hc=`, `Br=`, `Bs=`) | 14 | — |
 | `.dc` sin paso, `.dc dec`/`list`, `.TEMP=`, `.noise … list` | ~20 | — |

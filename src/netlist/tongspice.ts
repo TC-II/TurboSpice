@@ -349,7 +349,7 @@ const DROP_DIRECTIVES = /^\.(backanno|wave|save\s+none|loadbias|savebias)\b/i;
  * (es una restricción del punto de operación); ngspice sólo con uic. Con un terminal a tierra
  * equivale a ".ic V(b)=1". Con los dos terminales flotantes no hay equivalente directo en .ic.
  */
-function capacitorIcs(lt: LtNetlist): string[] {
+function capacitorIcs(lt: LtNetlist, names: Map<string, string>, hold: boolean): string[] {
   const out: string[] = [];
   const done = new Set<string>();
   for (const e of lt.elements) {
@@ -357,13 +357,56 @@ function capacitorIcs(lt: LtNetlist): string[] {
     const ic = splitParams(e.value).params.get('ic');
     if (ic === undefined) continue;
     const [a, b] = e.nodes;
-    const v = ic.replace(/^\{(.*)\}$/, '$1');
-    const [node, val] = b === '0' ? [a, ic] : a === '0' ? [b, `{-(${v})}`] : [];
+    const v = icValue(ic).replace(/^\{(.*)\}$/, '$1');
+    if (a !== '0' && b !== '0' && a !== b) {
+      if (hold) out.push(`B__${names.get(e.name) ?? e.name}_ic ${a} ${b} I=${holdAtOp(`V(${a},${b})-(${icValue(ic)})`)}`);
+      continue;
+    }
+    const [node, val] = b === '0' ? [a, icValue(ic)] : a === '0' ? [b, `{-(${v})}`] : [];
     if (!node || node === '0' || done.has(node)) continue;
     done.add(node);
     out.push(`.ic V(${node})=${val}`);
   }
   return out;
+}
+
+/**
+ * Con un .tran sin uic, LTspice toma el IC= de los capacitores y el de los inductores (o .ic
+ * I(L)) como restricción del punto de operación: el capacitor hace de fuente de tensión y el
+ * inductor de fuente de corriente de ese valor (también con IC=0); después el transitorio sigue
+ * libre (medido con LTspice -b). Los capacitores flotantes y los inductores se emulan con una
+ * fuente B que sólo actúa en el punto de operación (time=0) y se anula para t>0: en paralelo
+ * con el capacitor una conductancia grande hacia V=IC, en serie con el inductor una tensión que
+ * lleva su corriente a IC. Los capacitores a tierra usan .ic, que hace lo mismo.
+ */
+const holdAtOp = (err: string) => `(time > 0) ? 0 : 1e6*(${err})`;
+
+/**
+ * Inductores nombrados en un acoplamiento K: con K LTspice no fuerza su corriente inicial de
+ * una forma simple (en un flyback con .ic I(L2)=0.3m arranca con 27 µA), así que no se emulan.
+ */
+function coupledInductors(lt: LtNetlist): Set<string> {
+  const out = new Set<string>();
+  for (const t of lt.texts) {
+    if (t.kind !== 'directive') continue;
+    for (const l of t.text.split(/\\n|\n/)) {
+      const k = /^\s*K\S*\s+(.*)$/i.exec(l.replace(/\s*;.*$/, ''));
+      if (k) for (const n of k[1].trim().split(/\s+/).slice(0, -1)) out.add(n.toLowerCase().replace(/^l§/, ''));
+    }
+  }
+  return out;
+}
+
+/** "IC=Vinic" (un parámetro sin llaves): numparam sólo lo reemplaza entre llaves */
+const icValue = (ic: string) => (/^[A-Za-z_]\w*$/.test(ic) ? `{${ic}}` : ic);
+
+function tranHoldsIc(lt: LtNetlist): boolean {
+  const tran = lt.texts
+    .filter((t) => t.kind === 'directive')
+    .flatMap((t) => t.text.split(/\\n|\n/))
+    .map((l) => l.replace(/\s*;.*$/, '').trim())
+    .filter((l) => /^\.tran\b/i.test(l));
+  return tran.length > 0 && !tran.some((l) => /\suic\b/i.test(l));
 }
 
 /**
@@ -408,8 +451,11 @@ function convertElements(
   subcktParams: Map<string, Map<string, string>>,
   inductorIcs = new Map<string, string>(),
   startup = false,
+  holdIc = false,
+  coupled = new Set<string>(),
 ): string[] {
   const out: string[] = [];
+  const extra: string[] = [];
   for (const e of lt.elements) {
     const name = ngspiceName(e, used);
     names.set(e.name, name);
@@ -434,10 +480,19 @@ function convertElements(
     const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
     if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
     if (startup && (letter === 'V' || letter === 'I')) value = startupRamp(value);
-    out.push(...expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings));
+    // corriente inicial del inductor como restricción del punto de operación (ver holdAtOp):
+    // la fuente B va en serie con L sola, adentro de Rpar (LTspice fuerza el flujo L·IC)
+    const lic = letter === 'L' && holdIc && e.nodes.length === 2 && !coupled.has(e.name.toLowerCase().replace(/^l§/, '')) ? splitParams(value).params.get('ic') : undefined;
+    const lines = expandElement(name, letter, e.nodes, sourceSyntax(letter, translateFunctions(translateRandom(value))), warnings);
+    if (lic !== undefined) {
+      const [n, a, b, ...rest] = lines[0].split(' ');
+      lines[0] = [n, a, `${name}__ic`, ...rest].join(' ');
+      extra.push(`B__${name}_ic ${name}__ic ${b} V=${holdAtOp(`(${icValue(lic)})-I(${name})`)}`);
+    }
+    out.push(...lines);
   }
 
-  return out;
+  return [...out, ...extra];
 }
 
 export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): NgspiceNetlist {
@@ -467,9 +522,10 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
   for (const t of lt.texts) {
     if (t.kind === 'directive') for (const l of t.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
   }
-  for (const [l, v] of inductorIcs) if (parseSpiceNumber(v) !== 0) warnings.push(`.ic I(${l})=${v}: ngspice usa la corriente inicial del inductor sólo con .tran uic`);
-  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt)));
-  out.push(...capacitorIcs(lt));
+  const holdIc = tranHoldsIc(lt);
+  for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(`.ic I(${l})=${v}: ngspice usa la corriente inicial del inductor sólo con .tran uic`);
+  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt)));
+  out.push(...capacitorIcs(lt, names, holdIc));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
   out.push(...implicit);

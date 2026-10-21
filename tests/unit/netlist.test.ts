@@ -365,6 +365,43 @@ TEXT 0 200 Left 2 !.tran 100u
     expect(toNgspice(n, 't', resolver).text).toMatch(/^V1 \S+ \S+ 5$/m);
   });
 
+  it('IC= de capacitor flotante e inductor sin uic → fuente B que sólo actúa en el punto de operación', () => {
+    const asc = (tran: string) => `Version 4
+SHEET 1 880 680
+SYMBOL cap 0 16 R0
+SYMATTR InstName C1
+SYMATTR Value 1u IC=2
+SYMBOL ind 200 16 R0
+SYMATTR InstName L1
+SYMATTR Value 1m IC={i0}
+TEXT 0 200 Left 2 !${tran}
+`;
+    const t = toNgspice(netFromAsc(asc('.tran 5m')), 't', resolver).text;
+    expect(t).toMatch(/^B__C1_ic (\S+) (\S+) I=\(time > 0\) \? 0 : 1e6\*\(V\(\1,\2\)-\(2\)\)$/m);
+    expect(t).toMatch(/^L1 \S+ L1__ic 1m /m);
+    expect(t).toMatch(/^R__L1 L1__s \S+ 1m$/m);
+    expect(t).toMatch(/^B__L1_ic L1__ic L1__s V=\(time > 0\) \? 0 : 1e6\*\(\(\{i0\}\)-I\(L1\)\)$/m);
+    // con uic ngspice ya usa los IC= de los elementos
+    const u = toNgspice(netFromAsc(asc('.tran 0 5m 0 1u uic')), 't', resolver).text;
+    expect(u).not.toContain('B__');
+  });
+
+  it('IC= sin uic: inductores acoplados con K quedan como antes; un parámetro sin llaves va entre llaves', () => {
+    const n = netFromAsc(`Version 4
+SHEET 1 880 680
+SYMBOL ind 200 16 R0
+SYMATTR InstName L1
+SYMATTR Value 1m IC=1
+SYMBOL cap 0 16 R0
+SYMATTR InstName C1
+SYMATTR Value 1u IC=Vinic
+TEXT 0 200 Left 2 !.tran 5m\\nK1 L1 L2 1
+`);
+    const t = toNgspice(n, 't', resolver).text;
+    expect(t).not.toContain('B__L1_ic');
+    expect(t).toMatch(/^B__C1_ic .* 1e6\*\(V\(\S+\)-\(\{Vinic\}\)\)$/m);
+  });
+
   it('IC= de un capacitor a tierra → .ic (LTspice lo usa sin uic)', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680

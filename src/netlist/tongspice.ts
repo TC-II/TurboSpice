@@ -751,7 +751,9 @@ export function toNgspice(lt: LtNetlist, title: string, models: ModelResolver): 
       const sm = e.attrs.get('SpiceModel');
       const model = e.prefix.toUpperCase() === 'X' && sm && !/\.(lib|sub|mod|inc|cir|txt)$/i.test(sm) ? sm : e.value.split(/\s/)[0];
       const implicit = lt.implicitModels.some((m) => m.split(' ')[1].toLowerCase() === model.toLowerCase());
-      if (!model || implicit || local.has(model.toLowerCase())) continue;
+      // los bloques jerárquicos se escriben como .subckt más abajo
+      const block = lt.blocks.some((b) => b.name.toLowerCase() === model.toLowerCase());
+      if (!model || implicit || block || local.has(model.toLowerCase())) continue;
       // definido sólo en la librería de LTspice del usuario: se incluye solo, como hace LTspice
       const ltFile = models.ltspiceFile?.(model);
       if (ltFile) {

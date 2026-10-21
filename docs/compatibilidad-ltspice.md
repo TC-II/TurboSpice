@@ -63,6 +63,15 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
 
 ## Conectividad y netlist (como `LTspice -netlist`)
 
+- Bloque jerárquico cuyo `.asy` (`SymbolType BLOCK`) no tiene `Prefix` (los 80 de `LTspice_cmosedu`,
+  entre otros): LTspice lo instancia igual como `X§<InstName>` (aunque InstName empiece con X); con
+  parámetros (SpiceLine) escribe `X§U1 a b nombre params: G=1`. Antes TurboSpice lo descartaba sin
+  aviso. En 654 casos del corpus que usan bloques sin Prefix, de los 400 con LTspice OK:
+  igual/parecido pasa de 67 a 129 y las netlists idénticas/equivalentes de 0 a 52 (las demás
+  difieren en detalles de texto: `100MEG`→`100Meg`, mayúsculas de los puertos). Error en TurboSpice
+  sube de 31 a 55: ahora se simula el contenido de los bloques y aparecen traducciones pendientes
+  adentro (`table()`, `PWL` con expresiones, líneas que ngspice no acepta); antes esos casos
+  "andaban" sin los bloques. #127
 - Un punto de interés (pin, etiqueta, extremo de cable) sobre el **interior** de un cable se conecta.
   Dos cables que se cruzan por el medio **no**.
 - `Misc\jumper` une las redes de sus dos pines y no genera línea en la netlist (aunque su `.asy`
@@ -146,7 +155,7 @@ empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta).
 |---|---|
 | Inductor sin `Rser` → **1 mΩ** en serie (medido: 1 V sobre 1 H da 1000 A) | `Rser=1m` explícito |
 | `Rser`, `Lser`, `Rpar`, `Cpar` en L, C, V | Elementos reales agregados |
-| Diodo ideal `D(Ron=… Vfwd=… Roff=… Vrev=… Rrev=… Ilimit=…)` — ngspice lo acepta pero lo trata como una resistencia (resultado erróneo sin aviso) | Fuente `B` lineal por tramos con la misma definición |
+| Diodo ideal `D(Ron=… Vfwd=… Roff=… Vrev=… Rrev=… Ilimit=…)` — ngspice lo acepta pero lo trata como una resistencia (resultado erróneo sin aviso) | Fuente `B` lineal por tramos con la misma definición. `Ron=0` (o `Rrev=0`) conduce como 1 mΩ, medido con `-b` (#127) |
 | `.lib archivo` (sin sección) | `.include` |
 | Parámetros de instancia no declarados en el `.subckt` | Se agregan al encabezado con `params:` |
 | `.end nombre` cerrando un subcircuito, `.param x 20` | `.ends`, `.param x=20` |
@@ -211,7 +220,7 @@ Los 700 errores con LTspice OK de la corrida del 20/10, por causa (primera pasad
 | Símbolos faltantes | 269 | #106, #107, #108 |
 | Modelo no encontrado | ~97 | #6 |
 | Parámetros/funciones de LTspice (`electrolytic`, `tripdv`, `Rpar` en B, `table()`) — **arreglado** | 74 | #111, #112, #113 |
-| Matriz singular / nodos flotantes — **arreglado** lo flotante (33 de 61 pasan a simular) | ~62 | #102 |
+| Matriz singular / nodos flotantes — **arreglado** lo flotante y los bloques sin `Prefix` (37 de 61 pasan a simular, 7 igual/parecido; de los 24 que quedan, 18 usan símbolos que faltan —`modulate`, `sample`, `schmitt`, `dflop`, `ntc_resistor`—, 2 el `level2` de `UniversalOpAmp2.lib` que da NaN, 1 Laplace `exp(-sT)` y 3 sin diagnosticar: 607, 2778, 3232) | ~62 | #102, #127 |
 | Subcircuito no encontrado | 43 | — |
 | Laplace en E/G/B — **arreglado** lo racional (quedan 17 no racionales, avisados) | 42 | #110 |
 | Funciones de fuente B sin equivalente (`idt`, `sdt`, `idtmod`, `white`, `rand`, `random`, `delay`) — **arreglado** (de 50 casos en la corrida del 21/10: 0 quedan con *no such function*; 17 igual/parecido, 14 distinto, 8 incompleto, 11 fallan por otras causas) | ~35 | #123, #124, #125 |

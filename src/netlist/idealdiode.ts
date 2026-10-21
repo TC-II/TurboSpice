@@ -34,6 +34,9 @@ function parseModelParams(body: string): Map<string, string> {
   return params;
 }
 
+/** LTspice no deja Ron/Rrev en 0: medido con -b, Ron=0 conduce como 1 mΩ */
+const minR = (r: string) => (r.startsWith('{') ? `{max(${r.slice(1, -1)}, 1m)}` : /^[+]?0*\.?0*(e[+-]?\d+)?$/i.test(r) ? '1m' : r);
+
 const val = (v: string) => (v.startsWith('{') ? `(${v.slice(1, -1)})` : v);
 
 function current(m: IdealModel, v: string): string {
@@ -75,12 +78,12 @@ export function replaceIdealDiodes(text: string, external = new Map<string, Idea
     if (other.length) warnings.push(`Diodo ideal ${m[1]}: parámetros ignorados (${other.join(', ')})`);
     if (p.has('epsilon') || p.has('revepsilon')) warnings.push(`Diodo ideal ${m[1]}: Epsilon (transición suave) no se modela`);
     found.set(m[1].toLowerCase(), {
-      ron: p.get('ron') ?? '1',
+      ron: minR(p.get('ron') ?? '1'),
       // LTspice: sin Roff el diodo apagado conduce sólo Gmin
       roff: p.get('roff') ?? '1e12',
       vfwd: p.get('vfwd') ?? '0',
       vrev: p.get('vrev'),
-      rrev: p.get('rrev') ?? p.get('ron') ?? '1',
+      rrev: minR(p.get('rrev') ?? p.get('ron') ?? '1'),
       ilimit: p.get('ilimit'),
       revilimit: p.get('revilimit'),
     });

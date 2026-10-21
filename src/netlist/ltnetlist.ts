@@ -122,7 +122,10 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       return;
     }
     const attrs = effectiveAttrs(s, def);
-    const prefix = attrs.get('Prefix') ?? '';
+    // Bloque jerárquico sin Prefix: LTspice lo instancia igual, como X§<InstName> (aunque
+    // InstName empiece con X)
+    const blockNoPrefix = def.symbolType.toUpperCase() === 'BLOCK' && !attrs.get('Prefix');
+    const prefix = blockNoPrefix ? 'X' : (attrs.get('Prefix') ?? '');
     // Símbolos sin prefijo o sin pines (decorativos, flechas, puntos) no generan línea
     if (!prefix || !def.pins.length) return;
     const instName = attrs.get('InstName') ?? '';
@@ -171,14 +174,16 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     // Bloque jerárquico: el subcircuito es el .asc con el nombre del símbolo
     if (def.symbolType.toUpperCase() === 'BLOCK') {
       const name = baseName(s.type);
+      // con parámetros (SpiceLine) LTspice escribe "X§U1 a b nombre params: G=1"
       if (!value) value = name;
+      else if (/^[^\s=]+=/.test(value)) value = `${name} params: ${value}`;
       addBlock(name, def);
     }
 
     const modelFile = attrs.get('ModelFile') || libModel;
     if (modelFile && !modelFiles.includes(modelFile)) modelFiles.push(modelFile);
 
-    elements.push({ sym: si, name: elementName(prefix, instName), prefix, nodes, pinNames, value, attrs });
+    elements.push({ sym: si, name: blockNoPrefix ? `X§${instName}` : elementName(prefix, instName), prefix, nodes, pinNames, value, attrs });
   });
 
   const implicitModels: string[] = [];

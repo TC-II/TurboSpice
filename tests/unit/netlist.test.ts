@@ -505,6 +505,9 @@ TEXT 0 0 Left 2 !.param R_CROSSOVER=1K94\\n.param ton=(1/(2*{f}))\\n.param tp= 2
     const r = replaceIdealDiodes('D1 a k di\n.model di D(Ron=1 Vfwd=0.5)');
     expect(r.text).toContain('BD1 a k I=(V(a,k)>=0.5) ? (0.5/1e12+(V(a,k)-0.5)/1) : (V(a,k)/1e12)');
     expect(r.models).toEqual(['di']);
+    // Ron=0: LTspice conduce como 1 mΩ (medido con -b), no divide por 0 (#127)
+    expect(replaceIdealDiodes('D1 a k di\n.model di D(Ron=0 Roff=1G)').text).toContain('(V(a,k)-0)/1m)');
+    expect(replaceIdealDiodes('D1 a k di\n.model di D(Ron={r})').text).toContain('/(max(r, 1m)))');
   });
 });
 
@@ -557,6 +560,19 @@ describe('símbolos y bloques del usuario', () => {
     expect(text).toContain('.subckt div in out\nR1 in out 1k\nR2 out 0 {R}');
     const ng = toNgspice(lt, 't', { resolve: () => undefined });
     expect(ng.text).toMatch(/\.subckt div in out\nR1 in out 1k\nR2 out 0 \{R\}\n\.param R=2k\n\.ends div/);
+    // .asy de bloque sin Prefix (LTspice_cmosedu): LTspice lo instancia igual, como X§<InstName> (#127)
+    const sym = makeSymbol({ name: 'div', pins: ports, block: true });
+    expect(sym).toMatch(/SYMATTR Prefix/);
+    mine.addSymbol('div', sym.replace(/^SYMATTR Prefix.*\r?\n/m, ''));
+    const lt2 = ltNetlist(top, mine);
+    expect(lt2.warnings).toEqual([]);
+    expect(ltNetlistText(lt2)).toContain('X§X1 a b div');
+    // parámetros de instancia (SpiceLine): el nombre del bloque va antes, con "params:"
+    const top3 = parseAsc(`Version 4\nSHEET 1 880 680\nFLAG -32 0 a\nFLAG 32 0 b\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMATTR SpiceLine R=5k\nTEXT 0 100 Left 2 !.op\n`);
+    const lt3 = ltNetlist(top3, mine);
+    expect(ltNetlistText(lt3)).toContain('X§X1 a b div params: R=5k');
+    // el bloque no es un modelo que falte
+    expect(toNgspice(lt3, 't', { resolve: () => undefined, defines: () => false }).warnings).toEqual([]);
   });
 });
 

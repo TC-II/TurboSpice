@@ -1,0 +1,57 @@
+[
+ {
+  "n": "100",
+  "title": ".tran … startup se ignora: LTspice arranca las fuentes en rampa desde 0",
+  "fixed": null
+ },
+ {
+  "n": "101",
+  "title": "Paso máximo del .tran: LTspice refina según las fuentes; ngspice submuestrea",
+  "fixed": null
+ },
+ {
+  "n": "102",
+  "title": "Nodos flotantes: LTspice simula igual, ngspice falla o da otro punto de operación",
+  "fixed": null
+ },
+ {
+  "n": "103",
+  "title": "IC= de un capacitor flotante (y .ic I(L)/IC= de inductores) sin uic: falta emular a LTspice",
+  "fixed": null
+ },
+ {
+  "n": "104",
+  "title": "Un nodo llamado \"temp\" (o \"temper\") rompe las fuentes B en ngspice",
+  "fixed": null
+ },
+ {
+  "n": "105",
+  "title": "CD4046B.lib (TCLib) no simula en ngspice: parámetros no declarados en subcircuitos anidados y alcance dinámico de .param",
+  "fixed": null
+ },
+ {
+  "n": "106",
+  "title": "Dispositivos digitales de LTspice (A-devices: AND, XOR, DFLOP, BUF, INV…) y símbolos Digital\\*",
+  "fixed": null
+ },
+ {
+  "n": "107",
+  "title": "Símbolo OpAmps\\UniversalOpAmp (y su modelo level1/level2) no existe",
+  "fixed": null
+ },
+ {
+  "n": "108",
+  "title": "Simula sin avisar cuando faltan símbolos: los elementos se omiten y los resultados son ceros",
+  "fixed": null
+ },
+ {
+  "n": "109",
+  "title": "Netlist: redes sin cables (pines que se tocan) se llaman P001 en LTspice",
+  "fixed": null
+ },
+ {
+  "n": "110",
+  "title": "Fuentes E/G con Laplace (laplace=…) no se traducen",
+  "fixed": null
+ }
+]

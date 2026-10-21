@@ -142,6 +142,10 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
             <input type="checkbox" checked={a.uic} onChange={(e) => set({ ...a, uic: e.target.checked })} /> Usar condiciones iniciales
             (UIC: no calcula el punto de operación; arranca de las IC=)
           </label>
+          <label className="check">
+            <input type="checkbox" checked={a.startup} onChange={(e) => set({ ...a, startup: e.target.checked })} /> Arrancar las fuentes desde 0
+            (startup: las fuentes de DC suben en una rampa de 20 µs)
+          </label>
         </>
       );
     case 'ac':

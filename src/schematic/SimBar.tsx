@@ -11,7 +11,14 @@ import type { CircuitInfo, Picker } from './simDialogs.tsx';
 type BarField =
   | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
-  | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis };
+  | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
+  /** casillas una debajo de la otra */
+  | { kind: 'checks'; label: string; checks: Extract<BarField, { kind: 'check' }>[] };
+
+const UIC_TITLE =
+  'UIC (use initial conditions): no calcula el punto de operación. Arranca con todo en 0 salvo las condiciones iniciales (IC= de capacitores e inductores, .ic); las fuentes ya están en su valor desde t=0.';
+const STARTUP_TITLE =
+  'startup (de LTspice): calcula el punto de operación con las fuentes de DC del esquemático en 0 y las lleva a su valor en una rampa de 20 µs. Las fuentes SINE, PULSE, PWL… y las de adentro de subcircuitos no cambian. Sirve para ver el arranque de fuentes, osciladores y PLL.';
 
 const POINTS: Record<Sweep['type'], string> = { dec: 'Puntos/década', oct: 'Puntos/octava', lin: 'Puntos' };
 
@@ -43,7 +50,14 @@ function barRows(a: Analysis): BarField[][] {
           text('Tiempo final', a.tstop, (tstop) => ({ ...a, tstop })),
           text('Guardar desde', a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0' }),
           text('Paso máximo', a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto' }),
-          { kind: 'check', label: 'UIC', value: a.uic, set: (uic) => ({ ...a, uic }) },
+          {
+            kind: 'checks',
+            label: 'opciones',
+            checks: [
+              { kind: 'check', label: 'UIC', value: a.uic, set: (uic) => ({ ...a, uic }), title: UIC_TITLE },
+              { kind: 'check', label: 'startup', value: a.startup, set: (startup) => ({ ...a, startup }), title: STARTUP_TITLE },
+            ],
+          },
         ],
       ];
     case 'ac':
@@ -192,8 +206,16 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
           {rows.map((r, i) => (
             <div className="sb-row" key={i}>
               {r.map((f) =>
-                f.kind === 'check' ? (
-                  <label key={f.label} className="sb-check">
+                f.kind === 'checks' ? (
+                  <div key={f.label} className="sb-checks">
+                    {f.checks.map((c) => (
+                      <label key={c.label} className="sb-check" title={c.title}>
+                        <input type="checkbox" checked={c.value} onChange={(e) => change(c.set(e.target.checked))} /> {c.label}
+                      </label>
+                    ))}
+                  </div>
+                ) : f.kind === 'check' ? (
+                  <label key={f.label} className="sb-check" title={f.title}>
                     <input type="checkbox" checked={f.value} onChange={(e) => change(f.set(e.target.checked))} /> {f.label}
                   </label>
                 ) : f.kind === 'select' ? (

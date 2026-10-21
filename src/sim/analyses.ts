@@ -19,7 +19,7 @@ export interface DcSweep {
 }
 
 export type Analysis =
-  | { kind: 'tran'; tstop: string; tstart: string; tmax: string; tstep: string; uic: boolean }
+  | { kind: 'tran'; tstop: string; tstart: string; tmax: string; tstep: string; uic: boolean; startup: boolean }
   | { kind: 'ac'; sweep: Sweep }
   | { kind: 'dc'; sweeps: DcSweep[] }
   | { kind: 'noise'; out: string; ref: string; src: string; sweep: Sweep }
@@ -50,7 +50,7 @@ const SWEEP: Sweep = { type: 'dec', points: '100', start: '1', stop: '1meg' };
 export function defaultAnalysis(kind: AnalysisKind): Analysis {
   switch (kind) {
     case 'tran':
-      return { kind, tstop: '10m', tstart: '', tmax: '', tstep: '', uic: false };
+      return { kind, tstop: '10m', tstart: '', tmax: '', tstep: '', uic: false, startup: false };
     case 'ac':
       return { kind, sweep: { ...SWEEP } };
     case 'dc':
@@ -82,6 +82,7 @@ export function formatAnalysis(a: Analysis): string {
       const opt = [a.tstart, a.tmax].some((x) => x.trim()) || a.tstep.trim();
       const parts = opt ? ['.tran', a.tstep.trim() || '0', a.tstop, a.tstart.trim() || '0', a.tmax.trim()] : ['.tran', a.tstop];
       if (a.uic) parts.push('uic');
+      if (a.startup) parts.push('startup');
       return parts.filter((x) => x !== '').join(' ');
     }
     case 'ac':
@@ -133,12 +134,13 @@ export function parseAnalysis(line: string): Analysis | null {
   switch (kind) {
     case 'tran': {
       const uic = a.some((x) => /^uic$/i.test(x));
+      const startup = a.some((x) => /^startup$/i.test(x));
       const nums = a.filter((x) => !/^[a-z]/i.test(x) || x.startsWith('{'));
-      if (a.some((x) => /^[a-z]/i.test(x) && !/^uic$/i.test(x))) return null; // startup, steady…
-      if (nums.length === 1) return { kind, tstop: nums[0], tstart: '', tmax: '', tstep: '', uic };
+      if (a.some((x) => /^[a-z]/i.test(x) && !/^(uic|startup)$/i.test(x))) return null; // steady, nodiscard…
+      if (nums.length === 1) return { kind, tstop: nums[0], tstart: '', tmax: '', tstep: '', uic, startup };
       if (nums.length < 2) return null;
       const [tstep, tstop, tstart = '', tmax = ''] = nums;
-      return { kind, tstop, tstart: tstart === '0' ? '' : tstart, tmax, tstep: tstep === '0' ? '' : tstep, uic };
+      return { kind, tstop, tstart: tstart === '0' ? '' : tstart, tmax, tstep: tstep === '0' ? '' : tstep, uic, startup };
     }
     case 'ac': {
       const sweep = parseSweep(a);

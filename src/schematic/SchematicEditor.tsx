@@ -35,6 +35,10 @@ import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from '.
 import { shapeBox, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
 
+/** Fin de un tramo horizontal o vertical desde `a`, según de qué lado de los 45° quede `b` */
+const orthoEnd = (a: Point, b: Point): Point =>
+  Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? { x: b.x, y: a.y } : { x: a.x, y: b.y };
+
 export type Tool =
   | { kind: 'select' }
   | { kind: 'wire'; start: Point | null }
@@ -541,16 +545,11 @@ export function SchematicEditor(props: Props) {
           setTool({ kind: 'wire', start: g });
           return;
         }
-        // con Ctrl, un solo tramo recto (puede ir en diagonal); si no, en L
-        let d: AscDoc;
-        if (e.ctrlKey || e.metaKey) d = addWire(doc, tool.start, g, lib);
-        else {
-          const corner = { x: g.x, y: tool.start.y };
-          d = addWire(addWire(doc, tool.start, corner, lib), corner, g, lib);
-        }
-        const ends = connectsAt(doc, g, lib) && !(g.x === tool.start.x && g.y === tool.start.y);
-        commit(d);
-        setTool({ kind: 'wire', start: ends ? null : g });
+        // con Ctrl, un tramo recto (puede ir en diagonal); si no, uno solo horizontal o vertical
+        const end = e.ctrlKey || e.metaKey ? g : orthoEnd(tool.start, g);
+        const ends = connectsAt(doc, end, lib) && !(end.x === tool.start.x && end.y === tool.start.y);
+        commit(addWire(doc, tool.start, end, lib));
+        setTool({ kind: 'wire', start: ends ? null : end });
         return;
       }
       case 'place':
@@ -976,16 +975,12 @@ export function SchematicEditor(props: Props) {
       />
       <g className="schematic placing">{ghost}</g>
       {tool.kind === 'wire' && tool.start && (
-        // el cable que se está trazando, igual a como va a quedar (en L, o recto con Ctrl)
+        // el cable que se está trazando, igual a como va a quedar (horizontal/vertical, o recto con Ctrl)
         <g className="wires drawing">
-          {ctrlHeld ? (
-            <line x1={tool.start.x} y1={tool.start.y} x2={g.x} y2={g.y} />
-          ) : (
-            <>
-              <line x1={tool.start.x} y1={tool.start.y} x2={g.x} y2={tool.start.y} />
-              <line x1={g.x} y1={tool.start.y} x2={g.x} y2={g.y} />
-            </>
-          )}
+          {(() => {
+            const end = ctrlHeld ? g : orthoEnd(tool.start, g);
+            return <line x1={tool.start.x} y1={tool.start.y} x2={end.x} y2={end.y} />;
+          })()}
         </g>
       )}
       {tool.kind === 'select' && !drag && vertices.length > 0 && (

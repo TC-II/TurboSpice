@@ -63,6 +63,7 @@ await page.keyboard.press('Escape');
 // Cable de V1+ al pin izquierdo de R1 (termina solo al llegar a un pin)
 await page.keyboard.press('w');
 await click(0, 16);
+await click(0, -32); // cada click es un solo tramo
 await click(16, -32);
 await page.keyboard.press('Escape');
 // Tierras

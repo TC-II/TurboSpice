@@ -679,6 +679,7 @@ export const es: Record<string, string> = {
   'Pins:': 'Pines:',
   'Placing {type} · Ctrl+R rotate · Ctrl+E mirror · Esc to finish': 'Colocando {type} · Ctrl+R rotar · Ctrl+E espejar · Esc para terminar',
   'Plot': 'Gráfico',
+  'Result plot': 'Plot',
   'Plot %1 against %2': 'Graficar %1 en función de %2',
   'Plot analysis': 'Análisis del gráfico',
   'Plot signal %1 in pane %2 with color %3 in %4': 'Graficar la señal %1 en el panel %2 con color %3 en %4',

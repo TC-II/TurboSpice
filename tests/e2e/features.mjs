@@ -96,7 +96,7 @@ await page.getByRole('button', { name: 'Redes' }).click();
 await openExample(page, 'Bode RLC.asc');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Compartir' }).click();
-const link = await page.locator('.modal input[aria-label="Link"]').inputValue();
+const link = await page.locator('.modal input[aria-label="Enlace"]').inputValue();
 check(/#c=[\w-]+&n=Bode%20RLC\.asc$/.test(link), `genera el link (${link.length} caracteres)`);
 check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ bytes/) !== null, 'el diálogo dice cuántos bytes ocupa el circuito comprimido');
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
@@ -428,7 +428,7 @@ await page.locator('input[type=file][accept=".plt"]').setInputFiles({
 await page.locator('.pane').nth(1).waitFor();
 check((await page.locator('.pane').count()) === 2 && (await paneChips(1)).join() === 'V(n002)', `importar un .plt de LTspice aplica sus paneles (${await paneChips(0)} | ${await paneChips(1)})`);
 await page.getByRole('button', { name: 'Compartir' }).click();
-const viewLink = await page.locator('.modal input[aria-label="Link"]').inputValue();
+const viewLink = await page.locator('.modal input[aria-label="Enlace"]').inputValue();
 check(!viewLink.includes('&v='), 'el link ya no lleva la vista aparte (va dentro del .asc)');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
 {

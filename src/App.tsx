@@ -2439,7 +2439,7 @@ ${ltNetlistText(sim.built.lt)}
                 <>
                   {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}
                   {sim.result.plots.length > 1 && (
-                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label={t('Plot')} title={t('Result to view (the simulation returned several)')}>
+                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label={t('Result plot')} title={t('Result to view (the simulation returned several)')}>
                       {sim.result.plots.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}

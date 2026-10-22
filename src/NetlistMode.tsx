@@ -160,7 +160,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
         <section className="results">
           {result && (
             <div className="toolbar">
-              <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label={t('Plot')}>
+              <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label={t('Result plot')}>
                 {result.plots.map((p) => (
                   <option key={p.name}>{p.name}</option>
                 ))}

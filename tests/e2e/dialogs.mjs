@@ -3,7 +3,7 @@
 // Uso: node tests/e2e/dialogs.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
+import { openExample, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -23,6 +23,9 @@ const check = (ok, msg) => {
 
 await page.goto(URL);
 await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+// el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)
+await openExample(page, 'RC Filter');
+await page.locator('svg.editor .sym').first().waitFor();
 const sym = (name) =>
   page.locator('svg.editor .symbols .sym').filter({ has: page.locator('text.win', { hasText: new RegExp(`^${name}$`) }) }).locator('.body');
 const edit = async (name) => {

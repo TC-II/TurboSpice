@@ -409,6 +409,17 @@ function PaneView(props: {
   const programmatic = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
+  // la grilla del tema oscuro queda sobre el fondo claro)
+  const [scheme, setScheme] = useState(0);
+  useEffect(() => {
+    const bump = () => setScheme((n) => n + 1);
+    const mo = new MutationObserver(bump);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', bump);
+    return () => (mo.disconnect(), mq.removeEventListener('change', bump));
+  }, []);
 
   useEffect(() => {
     const el = host.current;
@@ -438,10 +449,10 @@ function PaneView(props: {
         {
           values: (_u, tt) => tt.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
           stroke: muted,
-          grid: { stroke: grid, show: showGrid },
-          ticks: { stroke: grid },
+          grid: { stroke: grid, width: 1, show: showGrid },
+          ticks: { stroke: grid, width: 1 },
         },
-        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid, show: showGrid }, ticks: { stroke: grid }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
+        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
         ...(hasRight
           ? [{ scale: data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i', side: 1, values: ticks, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
           : []),
@@ -541,7 +552,7 @@ function PaneView(props: {
               ctx.save();
               ctx.strokeStyle = fg;
               ctx.setLineDash([5, 4]);
-              ctx.lineWidth = dpr;
+              ctx.lineWidth = 1.5 * dpr;
               ctx.beginPath();
               ctx.moveTo(px, top);
               ctx.lineTo(px, top + height);
@@ -692,10 +703,10 @@ function PaneView(props: {
       chart.current = null;
       u.destroy();
     };
-    // el gráfico se recrea sólo si cambian los datos, la grilla o el modo zoom (Z, el recuadro en X e Y
-    // se configura al crearlo); xRange y los cursores se aplican aparte
+    // el gráfico se recrea sólo si cambian los datos, la grilla, el tema o el modo zoom (Z, el
+    // recuadro en X e Y se configura al crearlo); xRange y los cursores se aplican aparte
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, showGrid, zoomMode]);
+  }, [data, showGrid, zoomMode, scheme]);
 
   useEffect(() => {
     const u = chart.current;

@@ -196,5 +196,14 @@ Las diez partes están hechas (#149–#158). Detalles que se decidieron al imple
 - **Exportar a LTspice**: verificado con `LTspice -netlist` sobre los ejemplos exportados.
 - **Drive**: la cola, la versión y la subida por partes están probadas con un `fetch` falso
   (`tests/unit/drive.test.ts`); falta probarlas con una cuenta real.
-- **Proyecto de prueba**: `public/examples/prueba.turbo` (Archivo › Ejemplos › Proyecto de prueba),
-  generado con `npx vite-node scripts/make-prueba-turbo.ts`.
+- **Proyectos de ejemplo** (`npx vite-node scripts/make-examples.ts`, desde los `.asc` de `examples/`):
+  - `public/examples/Sample Project.turbo` (antes `prueba.turbo`): es lo que ve un usuario nuevo la
+    primera vez. Tres variantes con corridas y un opamp como archivo del proyecto (`OA_Sample`); el
+    inversor lleva `AC 1` en la fuente para que la simulación «Bandwidth» tenga excitación.
+  - `public/examples/Examples.turbo`: los ejemplos sueltos, una variante cada uno. Archivo › Examples
+    abre el proyecto en la variante elegida.
+- **Exportar**: queda sólo «Export project» (una carpeta por variante); exportar una sola variante se
+  sacó del menú.
+- **My symbols and models**: es uno solo para todos los proyectos. Con sesión de Google se guarda en
+  `TurboSpice/My symbols and models.json` de Drive (`src/cloud/userLibrary.ts`); el navegador guarda
+  una copia y al iniciar sesión se unen (por nombre, gana el más nuevo).

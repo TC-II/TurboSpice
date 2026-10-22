@@ -51,12 +51,11 @@ export async function simCommand(page, label) {
   if (label) await page.locator('.analysis-list button', { hasText: label }).first().click();
 }
 
-/** Abre un ejemplo y espera a que esté cargado (nombre en la barra, sin cambios) */
+/** Abre un ejemplo (una variante del proyecto Examples) y espera a que esté cargado */
 export async function openExample(page, name) {
-  await menu(page, 'Archivo', 'Ejemplos', name.replace(/\.asc$/, ''));
-  // el .asc se abre como un proyecto con su nombre (la cápsula «Proyecto · Variante», #150)
-  const project = name.replace(/\.asc$/, '');
-  await page.waitForFunction((f) => document.querySelector('.capsule-project')?.textContent === f, project);
+  const variant = name.replace(/\.asc$/, '');
+  await menu(page, 'Archivo', 'Ejemplos', variant);
+  await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.capsule-variant')?.textContent === v, variant);
 }
 
 /** Borrar con el control deslizante (#150, #151): lo lleva hasta el final con el teclado */

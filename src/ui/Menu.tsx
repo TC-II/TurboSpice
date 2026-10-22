@@ -23,14 +23,14 @@ export type MenuItem =
       /** doble clic en el ítem: renombrarlo (sin repetir los `taken`) */
       rename?: { taken: string[]; onRename(name: string): void };
       actions?: MenuAction[];
+      /** ícono antes del nombre (para destacar un ítem) */
+      icon?: IconName;
     }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | 'sep';
 
-export interface MenuDef {
-  label: string;
-  items: MenuItem[];
-}
+/** Un menú (con sus ítems) o un ítem suelto en el menú principal */
+export type MenuDef = { label: string; items: MenuItem[] } | { label: string; onClick(): void; icon?: IconName };
 
 /** Botón que despliega una lista de menú */
 export function MenuButton({ items, label, title, className, disabled, openRef, children }: {
@@ -97,7 +97,7 @@ export function MenuButton({ items, label, title, className, disabled, openRef, 
 export function AppMenu({ menus }: { menus: MenuDef[] }) {
   return (
     <MenuButton
-      items={menus.map((m) => ({ label: m.label, items: m.items }))}
+      items={menus.map((m) => ('items' in m ? { label: m.label, items: m.items } : { label: m.label, onClick: m.onClick, icon: m.icon }))}
       label={t('Menu')}
       title={t('Menu: {p0}', { p0: menus.map((m) => m.label).join(', ') })}
       className="app-menu-btn"
@@ -253,6 +253,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
               >
                 <span>
                   {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
+                  {it.icon && <Icon name={it.icon} size={14} />}
                   {it.label}
                 </span>
                 {it.shortcut && <span className="sc">{it.shortcut}</span>}

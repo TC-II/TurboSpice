@@ -1,5 +1,5 @@
 // Cápsula de la barra superior (#150): «Proyecto · Variante» con una flecha, como Simular. Cada
-// parte se renombra con doble clic. La flecha despliega Clone Current | Blank y la lista de
+// parte se renombra con doble clic. La flecha despliega New Variant | Clone current y la lista de
 // variantes: clic para pasar a una, doble clic para renombrarla, duplicar y borrar a la derecha.
 import { useEffect, useRef, useState } from 'react';
 import { EditableName, NameInput } from '../ui/EditableName.tsx';
@@ -77,11 +77,11 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
       {open && (
         <div className="capsule-pop" role="menu" aria-label={t('Variants')}>
           <div className="capsule-split" role="group" aria-label={t('New variant')}>
+            <button onClick={act(onBlank)} title={t('Empty variant: no circuit or simulations')}>
+              {t('New Variant')}
+            </button>
             <button onClick={act(onClone)} title={t('Copy of this variant (circuit, simulations and history) with another name')}>
               {t('Clone current')}
-            </button>
-            <button onClick={act(onBlank)} title={t('Empty variant: no circuit or simulations')}>
-              {t('Blank')}
             </button>
           </div>
           <ul className="capsule-list">

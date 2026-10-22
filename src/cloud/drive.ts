@@ -12,7 +12,7 @@ const TURBO_MIME = 'application/json';
 const FIELDS = 'id,name,modifiedTime,version';
 /** Desde este tamaño se sube por partes (la subida multipart admite hasta 5 MB) */
 export const RESUMABLE_MIN = 5 * 1024 * 1024;
-const mimeOf = (name: string) => (/\.turbo$/i.test(name) ? TURBO_MIME : ASC_MIME);
+const mimeOf = (name: string) => (/\.(turbo|json)$/i.test(name) ? TURBO_MIME : ASC_MIME);
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 
@@ -96,6 +96,13 @@ export class DriveClient {
     return r.files.filter((f) => /\.(turbo|asc)$/i.test(f.name));
   }
 
+  /** Archivos de la carpeta con este nombre exacto (el más reciente primero) */
+  async find(name: string): Promise<DriveFile[]> {
+    const q = `${qString(await this.folderId())} in parents and trashed = false and name = ${qString(name)}`;
+    const params = new URLSearchParams({ q, fields: `files(${FIELDS})`, orderBy: 'modifiedTime desc', spaces: 'drive' });
+    return (await this.json<{ files: DriveFile[] }>(`${API}/files?${params}`)).files;
+  }
+
   /** Nombre, fecha y versión actuales de un archivo */
   meta(id: string): Promise<DriveFile> {
     return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`);
@@ -137,7 +144,7 @@ export class DriveClient {
     const mime = mimeOf(name);
     const meta: Record<string, unknown> = { name, mimeType: mime };
     // los proyectos se marcan como de TurboSpice
-    if (mime === TURBO_MIME) meta.appProperties = { turbospice: '1' };
+    if (/\.turbo$/i.test(name)) meta.appProperties = { turbospice: '1' };
     if (!id) meta.parents = [await this.folderId()];
     const target = `${UPLOAD}/files${id ? `/${encodeURIComponent(id)}` : ''}`;
     const method = id ? 'PATCH' : 'POST';

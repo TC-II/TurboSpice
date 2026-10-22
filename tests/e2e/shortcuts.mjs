@@ -3,7 +3,7 @@
 // Uso: node tests/e2e/shortcuts.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, resultsView, skipWelcome } from './lib.mjs';
+import { menu, openExample, resultsView, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -24,7 +24,10 @@ const check = (ok, msg) => {
 
 await page.goto(URL);
 await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
-await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
+await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
+// el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)
+await openExample(page, 'RC Filter');
+await page.locator('svg.editor .sym').first().waitFor();
 
 const svg = page.locator('svg.editor');
 const viewBox = () => svg.getAttribute('viewBox');

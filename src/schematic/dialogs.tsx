@@ -600,8 +600,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],
       ['M', t('Move: click an element (or a box); it follows the cursor until the next click; wires don\'t stretch')],
       ['S', t('Drag: like M, but wires stretch')],
-      ['Supr · Backspace', t('Delete the selection (no selection: delete mode, by click or box)')],
-      ['F6', t('Duplicate the selection')],
+      ['Del · Backspace', t('Delete the selection (no selection: delete mode, by click or box)')],
       ['Ctrl+C · Ctrl+X · Ctrl+V', t('Copy · cut · paste (also between tabs)')],
       ['Ctrl+A', t('Select all')],
       ['Ctrl+R · Ctrl+E', t('Rotate · mirror')],
@@ -619,7 +618,9 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['Alt+R · Ctrl+Enter', t('Simulate')],
       ['Alt+S', t('Abort the simulation')],
       ['Ctrl+L', t('View the simulation log (or problems)')],
-      ['Ctrl+S · Ctrl+O', t('Save · open')],
+      ['Ctrl+S · Ctrl+Shift+S · Ctrl+O', t('Save · save as · open')],
+      ['Ctrl+1 · Ctrl+0', t('Show · hide the results panel')],
+      ['F7 · F8 · Esc', t('Back to the selection tool')],
       ['?', t('This help')],
     ],
   ],
@@ -628,7 +629,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
     [
       [t('Space'), t('Fit (see everything)')],
       ['Z · Shift+Z', t('Zoom to a box (X and Y) · previous zoom')],
-      ['Ctrl+Y', 'Autoescala vertical'],
+      ['Ctrl+Y', t('Vertical autoscale')],
       ['Ctrl+G', t('Show/hide the grid')],
       ['A', t('Add trace (expression field, with autocomplete)')],
       ['P · B', t('Add pane · add pane below the active one')],
@@ -726,20 +727,39 @@ export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }
       <div className="welcome about">
         <h3><Logo size={28} /> <span><span className="logo">Turbo</span>Spice</span></h3>
         <p>
-          {t('An LTspice-like circuit simulator that runs entirely in your browser (ngspice in WebAssembly): nothing is uploaded to any server. It opens and saves LTspice')}{' '}<code>.asc</code> {t('files, so you can go back and forth between the two.')}
+          {t('Circuit simulator that runs the')}{' '}<strong>ngspice</strong>{' '}{t('engine, compiled in WebAssembly. Compatible with LTspice .ASC file format.')}
         </p>
-        <ul>
-          <li>
-            <a href={repo} target="_blank" rel="noopener noreferrer">{t('Source code and bug reports')}</a>
-          </li>
-          <li>
-            <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">{t('Privacy policy')}</a>
-          </li>
-          <li>{t('Simulation with')}{' '}<strong>ngspice</strong>{t('; schematic format:')}{' '}<code>.asc</code> {t('from LTspice.')}</li>
-        </ul>
+        <p>{t('Designed and developed by Agustín Gullino and Javier Petrucci.')}</p>
+        <p className="about-links">
+          <a href={repo} target="_blank" rel="noopener noreferrer">{t('Source code and bug reports')}</a>
+          <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">{t('Privacy policy')}</a>
+        </p>
       </div>
       <div className="buttons">
         <button className="primary" onClick={onClose}>{t('Close')}</button>
+      </div>
+    </Modal>
+  );
+}
+
+/** Archivo › Importar en este proyecto: qué se puede traer y cómo armar el .zip, antes de elegir */
+export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onClose(): void }) {
+  return (
+    <Modal title={t('Import into this project')} onClose={onClose} wide>
+      <div className="import-info">
+        <p>{t('Everything you import is added to the open project; nothing is replaced.')}</p>
+        <ul>
+          <li><strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each folder becomes a variant (the root too), and each')}{' '}<code>.asc</code>{' '}{t('in it, one of its simulations. The')}{' '}<code>.asy</code>, <code>.lib</code>, <code>.sub</code>{' '}{t('anywhere in the .zip go to the project files.')}</li>
+          <li><strong>.asc</strong> — {t('loose schematics: each one becomes a variant.')}</li>
+          <li><strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its variants.')}</li>
+        </ul>
+        <p className="hint">
+          {t('To build the .zip: put each version of the circuit in its own folder (the folder name becomes the variant name), with one .asc per simulation, and add the symbols and models the circuits use that are not in the standard library. Then compress the whole folder.')}
+        </p>
+      </div>
+      <div className="buttons">
+        <button onClick={onClose}>{t('Cancel')}</button>
+        <button className="primary" onClick={onChoose} autoFocus>{t('Choose files…')}</button>
       </div>
     </Modal>
   );
@@ -818,7 +838,7 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
         </p>
       ) : (
       <p className="hint">
-        {t('They\'re saved in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2); models (')}<code>.lib</code>,{' '}
+        {t('Shared by all your projects. Signed in with Google, they are saved in your Drive (TurboSpice › My symbols and models.json); otherwise, in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2); models (')}<code>.lib</code>,{' '}
         <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>{t('; an')}{' '}<code>.asc</code> {t('with its block symbol is used as a subcircuit (hierarchy, like in LTspice).')}
       </p>
       )}

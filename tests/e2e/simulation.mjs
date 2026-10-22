@@ -30,7 +30,7 @@ const check = (ok, msg) => {
 
 await page.goto(URL);
 await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
-await page.locator('svg.editor .sym').first().waitFor(); // ejemplo "Filtro RC"
+await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
 
 const svg = page.locator('svg.editor');
 const at = async (x, y) => {
@@ -94,7 +94,7 @@ check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opció
 await page.screenshot({ path: `${OUT}/simulation.png` });
 
 // --- #39: varias simulaciones; cada una conserva su gráfico ---
-await openExample(page, 'Filtro RC');
+await openExample(page, 'RC Filter');
 const directive = () => page.locator('.texts .directive').first().textContent();
 const chipNames = () => page.locator('.trace-chip .name').allTextContents();
 const simulate = async () => {
@@ -163,7 +163,7 @@ check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxO
 // el proyecto guardado (.turbo, #149) tiene las tres simulaciones, la activa y la vista de cada una
 await page.evaluate(() => delete window.showSaveFilePicker);
 const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
-check(download.suggestedFilename() === 'Filtro RC.turbo', `se guarda como proyecto (${download.suggestedFilename()})`);
+check(download.suggestedFilename() === 'Examples.turbo', `se guarda como proyecto (${download.suggestedFilename()})`);
 const saved = variantOf((await parseTurbo(readFileSync(await download.path(), 'utf8'))).project);
 check(saved.sims.length === 3 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .turbo guardado tiene las tres simulaciones y la activa');
 const views = saved.sims.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');

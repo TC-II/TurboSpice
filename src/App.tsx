@@ -16,7 +16,7 @@ import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.t
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, ImportInfoDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
@@ -71,7 +71,7 @@ import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, dcSourcesAsCell, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, openProjectFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
@@ -98,6 +98,7 @@ import { download, exportSchematic } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
+import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
 import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
@@ -107,7 +108,11 @@ const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
 /** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
 const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
-const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc', 'Barrido RC (.step).asc', 'prueba.turbo'];
+// public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
+// y los ejemplos sueltos, una variante cada uno de Examples.turbo
+const SAMPLE = 'Sample Project.turbo';
+const EXAMPLES_TURBO = 'Examples.turbo';
+const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
 
 type Dialog =
   | { kind: 'picker' }
@@ -120,6 +125,7 @@ type Dialog =
   | { kind: 'share'; url: string }
   | { kind: 'help' }
   | { kind: 'userfiles' }
+  | { kind: 'importinfo' }
   | { kind: 'study' }
   | { kind: 'runs' }
   | { kind: 'about' }
@@ -391,6 +397,28 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     loadUserFiles().then(setUserFiles);
   }, []);
+  // con sesión de Google, «My symbols and models» vive en Drive (USER_LIBRARY_NAME), el mismo para
+  // todos los proyectos; al entrar se une con lo que haya en este navegador
+  const userLibId = useRef<string>();
+  const account = google.account?.emailAddress ?? google.account?.displayName;
+  useEffect(() => {
+    userLibId.current = undefined;
+    if (!account) return;
+    let off = false;
+    (async () => {
+      const remote = await pullUserLibrary(drive);
+      const merged = mergeUserFiles(remote.files ?? [], await loadUserFiles());
+      if (off) return;
+      for (const f of merged) registerUserFile(lib, f);
+      setUserFiles(merged);
+      saveUserFiles(merged);
+      setLibVersion((v) => v + 1);
+      userLibId.current = remote.files && userLibraryText(merged) === userLibraryText(remote.files) ? remote.id : await pushUserLibrary(drive, merged, remote.id);
+    })().catch((e: Error) => !off && setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
+    return () => {
+      off = true;
+    };
+  }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
     lib.setProjectFiles(project.files);
@@ -571,10 +599,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, []);
 
   /** Abre los bytes de un .turbo o de un .asc (`at`: dónde está el archivo, si es un .turbo) */
-  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'> = {}) => {
+  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'> = {}, variant?: string) => {
     const utf8 = new TextDecoder().decode(bytes);
     if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
-      const { project: p, warnings } = await parseTurbo(utf8);
+      const { project: parsed, warnings } = await parseTurbo(utf8);
+      const p = selectVariant(parsed, parsed.variants.find((v) => v.name === variant)?.id ?? parsed.activeVariant);
       const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
       loadProject(p, f);
       remember(p, f);
@@ -634,9 +663,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           // sesión ilegible: seguir con el ejemplo
         }
       }
-      const b = await (await fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)).arrayBuffer();
+      const b = await (await fetch(`${BASE}examples/${encodeURIComponent(SAMPLE)}`)).arrayBuffer();
       if (touched.current) return;
-      loadDoc(readAsc(new Uint8Array(b), EXAMPLES[0]).doc, EXAMPLES[0]);
+      // sin pasar por recientes: es lo que se ve al entrar, no algo que abrió el usuario
+      const { project: sample } = await parseTurbo(new TextDecoder().decode(b));
+      if (touched.current) return;
+      loadProject(sample, { name: SAMPLE });
     })()
       .catch(() => {})
       .finally(() => setRestored(true));
@@ -929,11 +961,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const doNew = () => confirmDiscard() && loadProject(newProject(t('Untitled')), { name: t('Untitled{EXT}', { EXT }) });
 
-  const doExample = async (name: string) => {
+  /** Abre un proyecto de public/examples, opcionalmente en una de sus variantes */
+  const doExample = async (name: string, variant?: string) => {
     if (!confirmDiscard()) return;
     const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
-    if (/\.turbo$/i.test(name)) return openBytes(new Uint8Array(b), name);
-    loadDoc(readAsc(new Uint8Array(b), name).doc, name);
+    return openBytes(new Uint8Array(b), name, {}, variant);
   };
 
   const run = async () => {
@@ -1459,6 +1491,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setUserFiles(next);
     saveUserFiles(next);
     setLibVersion((v) => v + 1);
+    if (account)
+      pushUserLibrary(drive, next, userLibId.current)
+        .then((id) => (userLibId.current = id))
+        .catch((e: Error) => setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
   };
   const addUserFiles = async (files: File[]) => {
     const next = [...userFiles];
@@ -1532,12 +1568,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!r.refs.length) return;
     commit(r.doc);
     setTool({ kind: 'select' });
-    setSelection(r.refs);
-  };
-  const duplicate = () => {
-    if (!selection.length) return;
-    const r = duplicateItems(doc, selection, 32, 32, lib);
-    commit(r.doc);
     setSelection(r.refs);
   };
   const deleteSelection = () => {
@@ -1708,8 +1738,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case 'Delete':
         case 'Backspace':
           return handled(), deleteSelection();
-        case 'F6':
-          return handled(), duplicate();
         case '?':
           return handled(), setDialog({ kind: 'help' });
         case 'F7':
@@ -1889,9 +1917,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
         { label: t('Export to PDF'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdf },
         'sep',
-        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a variant), .asy, .lib, .sub'), onClick: () => importInput.current?.click() },
-        { label: t('Export the variant to LTspice (.zip)'), title: t('One .asc per simulation plus the project files they use'), onClick: () => exportZip(false) },
-        { label: t('Export everything to LTspice (.zip)'), title: t('One folder per variant'), onClick: () => exportZip(true) },
+        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a variant), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
+        { label: t('Export project'), title: t('A .zip for LTspice: one folder per variant, with an .asc per simulation and the project files they use'), onClick: () => exportZip(true) },
         'sep',
         { label: t('Share link…'), onClick: doShare },
         { label: t('Project files…'), title: t('Symbols and models saved in the .turbo, for all variants'), onClick: () => setDialog({ kind: 'projectfiles' }) },
@@ -1909,7 +1936,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           ],
         },
         'sep',
-        { label: t('Examples'), items: EXAMPLES.map((x) => ({ label: /\.turbo$/i.test(x) ? t('Test project (.turbo)') : x.replace('.asc', ''), onClick: () => doExample(x) })) },
+        {
+          label: t('Examples'),
+          items: [
+            { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
+            'sep',
+            ...EXAMPLES.map((x) => ({ label: x, title: t('Variant of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
+          ],
+        },
         {
           label: t('Recent'),
           items: recent.map((r, i) => ({
@@ -1934,8 +1968,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Cut'), shortcut: 'Ctrl+X', onClick: () => copySelection(true), disabled: !selection.length },
         { label: t('Copy'), shortcut: 'Ctrl+C', onClick: () => copySelection(), disabled: !selection.length },
         { label: t('Paste'), shortcut: 'Ctrl+V', onClick: paste },
-        { label: t('Duplicate'), shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
-        { label: t('Delete'), shortcut: 'Backspace', onClick: deleteSelection },
+        { label: t('Delete'), shortcut: 'Del', onClick: deleteSelection },
         { label: t('Select all'), shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), selectAll()) },
         'sep',
         { label: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
@@ -2002,12 +2035,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Help'),
       items: [
         { label: t('Keyboard shortcuts'), shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
-        { label: t('About TurboSpice'), onClick: () => setDialog({ kind: 'about' }) },
-        'sep',
-        { label: t('LTspice compatibility'), onClick: () => window.open(`${REPO}/blob/main/docs/compatibilidad-ltspice.md`, '_blank', 'noopener') },
         { label: t('Report a problem'), onClick: () => window.open(`${REPO}/issues`, '_blank', 'noopener') },
       ],
     },
+    // directo en el menú (no dentro de Ayuda), con ícono, para que se encuentre
+    { label: t('About TurboSpice'), icon: 'info', onClick: () => setDialog({ kind: 'about' }) },
   ];
 
   // Problemas de la última simulación: avisos de la traducción y errores de ngspice; los que
@@ -2088,7 +2120,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
-        { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
+        { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Del', onClick: deleteSelection, active: tool.kind === 'delete' },
       ],
     },
     {
@@ -2722,6 +2754,15 @@ ${ltNetlistText(sim.built.lt)}
         />
       )}
       {dialog?.kind === 'about' && <AboutDialog repo={REPO} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'importinfo' && (
+        <ImportInfoDialog
+          onChoose={() => {
+            setDialog(null);
+            importInput.current?.click();
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
       {dialog?.kind === 'drive' && (
         <DriveDialog
           currentId={file.driveId}

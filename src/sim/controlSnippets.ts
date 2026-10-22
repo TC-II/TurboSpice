@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Fragmentos de ejemplo para el bloque .control de ngspice (probados en el motor WASM:
 // tests/unit/control.test.ts). Los nombres R1, out, etc. son de ejemplo.
 
@@ -9,43 +10,43 @@ export interface Snippet {
 
 export const CONTROL_SNIPPETS: Snippet[] = [
   {
-    label: 'Correr los análisis',
-    help: 'Ejecuta los análisis del esquemático (.tran, .ac…). Sin "run" el bloque sólo hace lo que indique.',
+    label: t('Run the analyses'),
+    help: t('Runs the schematic\'s analyses (.tran, .ac…). Without "run" the block only does what it says.'),
     code: 'run',
   },
   {
-    label: 'Barrer un componente',
-    help: 'Cambia el valor de un componente y simula en cada paso: aparece un resultado por valor (tran1, tran2…).',
+    label: t('Sweep a component'),
+    help: t('Changes a component\'s value and simulates at each step: one result per value (tran1, tran2…).'),
     code: 'foreach val 500 1k 2k\n  alter R1 $val\n  run\nend',
   },
   {
-    label: 'Barrer un .param',
-    help: 'Cambia un parámetro definido con .param y vuelve a simular.',
+    label: t('Sweep a .param'),
+    help: t('Changes a parameter defined with .param and simulates again.'),
     code: 'foreach val 1 2 4\n  alterparam k = $val\n  reset\n  run\nend',
   },
   {
     label: 'Monte Carlo',
-    help: 'Repite la simulación variando un componente al azar (distribución normal, σ = 5%).',
+    help: t('Repeats the simulation varying a component at random (normal distribution, σ = 5%).'),
     code: 'let n = 0\ndowhile n < 10\n  let rval = 1k * (1 + 0.05 * sgauss(0))\n  alter R1 = rval\n  run\n  let n = n + 1\nend',
   },
   {
-    label: 'Medir (meas)',
-    help: 'Mide sobre el resultado del último análisis; el valor queda en el Log.',
+    label: t('Measure (meas)'),
+    help: t('Measures on the result of the last analysis; the value goes to the Log.'),
     code: 'run\nmeas tran vmax MAX v(out)\nmeas tran trise TRIG v(out) VAL=0.1 RISE=1 TARG v(out) VAL=0.9 RISE=1',
   },
   {
-    label: 'Calcular un vector',
-    help: 'Crea un vector nuevo a partir de otros; aparece en Resultados para graficarlo.',
-    code: 'run\nlet ganancia_db = db(v(out))\nlet fase = 180/pi * cph(v(out))',
+    label: t('Compute a vector'),
+    help: t('Creates a new vector from others; it shows up in Results to plot it.'),
+    code: t('run\nlet gain_db = db(v(out))\nlet phase = 180/pi * cph(v(out))'),
   },
   {
-    label: 'Imprimir valores',
-    help: 'Escribe en el Log (mean, max, min, rms…).',
-    code: 'run\necho Valor medio de la salida:\nprint mean(v(out))',
+    label: t('Print values'),
+    help: t('Writes to the Log (mean, max, min, rms…).'),
+    code: t('run\necho Mean output value:\nprint mean(v(out))'),
   },
   {
     label: 'FFT',
-    help: 'Espectro de una señal del transitorio (crea un resultado "spec").',
+    help: t('Spectrum of a transient signal (creates a "spec" result).'),
     code: 'run\nlinearize v(out)\nfft v(out)',
   },
 ];

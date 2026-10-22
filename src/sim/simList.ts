@@ -10,6 +10,7 @@ import type { ComplexMode } from '../waveform/curves.ts';
 import { si } from '../waveform/series.ts';
 import type { Pane, PlotState } from '../waveform/view.ts';
 import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, type AnalysisKind, type Sweep } from './analyses.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Lo que se veía de una simulación: se recupera al volver a elegirla */
 export interface SimView {
@@ -57,8 +58,8 @@ function quantity(v: string, unit: string): string {
   const n = parseSpiceNumber(v);
   if (!Number.isFinite(n)) return v;
   if (n === 0) return '0';
-  const t = si(n);
-  return `${t.replace(/[a-zµ]+$/i, '')} ${t.replace(/^[^a-zµ]+/i, '')}${unit}`;
+  const tt = si(n);
+  return `${tt.replace(/[a-zµ]+$/i, '')} ${tt.replace(/^[^a-zµ]+/i, '')}${unit}`;
 }
 const range = (a: string, b: string, unit: string) => `${quantity(a || '0', unit)}–${quantity(b, unit)}`;
 const sweepRange = (s: Sweep) => range(s.start, s.stop, 'Hz');
@@ -84,7 +85,7 @@ export function analysisLabel(line: string): string {
     case 'op':
       return label;
     case 'tf':
-      return `Transferencia ${volts(a.out)}/${a.src}`;
+      return t('Transfer {p0}/{src}', { p0: volts(a.out), src: a.src });
     case 'sens':
       return `${label} ${volts(a.out)}${a.ac ? ` ${sweepRange(a.sweep)}` : ''}`;
     case 'pz':
@@ -116,7 +117,7 @@ export function duplicateSim(l: SimList, id: string): SimList {
   const i = l.items.findIndex((s) => s.id === id);
   if (i < 0 || l.items.length >= MAX_SIMS) return l;
   const src = l.items[i];
-  const copy: SimInstance = { ...structuredClone(src), id: newId(), ...(src.name ? { name: `${src.name} (copia)` } : {}) };
+  const copy: SimInstance = { ...structuredClone(src), id: newId(), ...(src.name ? { name: t('{name} (copy)', { name: src.name }) } : {}) };
   return { items: [...l.items.slice(0, i + 1), copy, ...l.items.slice(i + 1)], active: copy.id };
 }
 
@@ -235,7 +236,7 @@ const validList = (v: unknown): v is SimList => {
  * si el archivo se editó en LTspice): si no está en la lista, cambia el comando de la activa.
  */
 export function takeSims(doc: AscDoc, line: string | null): { doc: AscDoc; sims: SimList } {
-  if (!doc.texts.some((t) => isDataTextOf(t, 'sims'))) return { doc, sims: simsFromLine(line) };
+  if (!doc.texts.some((tt) => isDataTextOf(tt, 'sims'))) return { doc, sims: simsFromLine(line) };
   const v = readData(doc, 'sims');
   const sims = validList(v) ? (v.items.some((s) => s.id === v.active) ? v : { ...v, active: v.items[0]?.id ?? '' }) : null;
   return { doc: writeData(doc, 'sims', undefined), sims: sims ? followLine(sims, line) : simsFromLine(line) };

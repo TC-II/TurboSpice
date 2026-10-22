@@ -3,6 +3,7 @@
 // dos paneles a toda la ventana y restaurar la división anterior. Expandir el esquemático es
 // también la forma de colapsar los resultados (#36): no hay forma de descartarlos.
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/i18n.ts';
 
 /** Panel expandido a toda la ventana ('' = dividido) */
 export type Expanded = '' | 'schematic' | 'results';
@@ -116,7 +117,7 @@ export function ResultsSplitter({
     return (
       <div className={`splitter expanded ${expanded}`} role="separator" aria-orientation={side ? 'vertical' : 'horizontal'}>
         <div className="split-actions">
-          {btn('', expanded === 'schematic' ? 'Mostrar resultados' : 'Mostrar esquemático', expanded === 'schematic' ? (side ? '◀' : '▲') : side ? '▶' : '▼', '0')}
+          {btn('', expanded === 'schematic' ? t('Show results') : t('Show schematic'), expanded === 'schematic' ? (side ? '◀' : '▲') : side ? '▶' : '▼', '0')}
         </div>
       </div>
     );
@@ -127,7 +128,7 @@ export function ResultsSplitter({
       className={`splitter${touched ? ' touched' : ''}${dragging ? ' dragging' : ''}`}
       role="separator"
       aria-orientation={side ? 'vertical' : 'horizontal'}
-      title="Arrastrar para cambiar el tamaño de los resultados; doble click alterna con 50 %"
+      title={t('Drag to resize the results; double-click toggles 50 %')}
       onPointerDown={(e) => {
         if (e.pointerType !== 'mouse') {
           setTouched(true);
@@ -171,8 +172,8 @@ export function ResultsSplitter({
       }}
     >
       <div className="split-actions">
-        {btn('schematic', 'Expandir esquemático', side ? '▶' : '▼', '1')}
-        {btn('results', 'Expandir resultados', side ? '◀' : '▲', '2')}
+        {btn('schematic', t('Expand schematic'), side ? '▶' : '▼', '1')}
+        {btn('results', t('Expand results'), side ? '◀' : '▲', '2')}
       </div>
     </div>
   );

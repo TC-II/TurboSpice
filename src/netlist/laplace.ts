@@ -11,6 +11,7 @@
 // Lo que no es racional en s (exp(-s*T), sqrt(s), abs(s), potencias no enteras) no tiene
 // traducción: se avisa y la línea queda como está.
 import { parseSpiceNumber } from './spicenum.ts';
+import { t } from '../i18n/i18n.ts';
 
 type Coef = number | string;
 type Poly = Coef[]; // coeficientes en potencias ascendentes de s
@@ -92,7 +93,7 @@ function tokenize(src: string): Tok[] {
     const num = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-z]*/i.exec(src.slice(i));
     if (num) {
       const v = parseSpiceNumber(num[0]);
-      if (!Number.isFinite(v)) throw new Unsupported(`número "${num[0]}"`);
+      if (!Number.isFinite(v)) throw new Unsupported(t('number "{p0}"', { p0: num[0] }));
       out.push({ t: 'num', v, s: num[0] });
       i += num[0].length;
       continue;
@@ -113,7 +114,7 @@ function tokenize(src: string): Tok[] {
       i++;
       continue;
     }
-    throw new Unsupported(`carácter "${c}"`);
+    throw new Unsupported(t('character "{c}"', { c }));
   }
   return out;
 }
@@ -124,11 +125,11 @@ function parseRational(src: string): Rat {
   const peek = () => toks[p];
   const isOp = (v: string) => peek()?.t === 'op' && peek().v === v;
   const expect = (v: string) => {
-    if (!isOp(v)) throw new Unsupported(`se esperaba "${v}"`);
+    if (!isOp(v)) throw new Unsupported(t('expected "{v}"', { v }));
     p++;
   };
   // texto de una subexpresión constante, tal cual (para funciones de constantes como sqrt(2*pi))
-  const textBetween = (a: number, b: number) => toks.slice(a, b).map((t) => (t.t === 'num' ? t.s : t.v)).join('');
+  const textBetween = (a: number, b: number) => toks.slice(a, b).map((tt) => (tt.t === 'num' ? tt.s : tt.v)).join('');
 
   function sum(): Rat {
     let r = term();
@@ -165,31 +166,31 @@ function parseRational(src: string): Rat {
     p++;
     const e = unary();
     const k = constOf(e);
-    if (k === null) throw new Unsupported('exponente con s');
+    if (k === null) throw new Unsupported(t('exponent with s'));
     const c = constOf(base);
     if (c !== null) return constR(isNum(c) && isNum(k) ? c ** k : `${wrap(c)}**${wrap(k)}`);
-    if (!isNum(k) || !Number.isInteger(k)) throw new Unsupported('potencia no entera de s');
+    if (!isNum(k) || !Number.isInteger(k)) throw new Unsupported(t('non-integer power of s'));
     let r = constR(1);
     for (let i = 0; i < Math.abs(k); i++) r = mulR(r, base);
     return k < 0 ? invR(r) : r;
   }
   function atom(): Rat {
-    const t = peek();
-    if (!t) throw new Unsupported('expresión incompleta');
-    if (t.t === 'num') {
+    const tt = peek();
+    if (!tt) throw new Unsupported(t('incomplete expression'));
+    if (tt.t === 'num') {
       p++;
-      return constR(t.v);
+      return constR(tt.v);
     }
-    if (t.t === 'op' && t.v === '(') {
+    if (tt.t === 'op' && tt.v === '(') {
       p++;
       const r = sum();
       expect(')');
       return r;
     }
-    if (t.t === 'id') {
+    if (tt.t === 'id') {
       p++;
-      if (t.v.toLowerCase() === 's') return { n: [0, 1], d: [1] };
-      if (!isOp('(')) return constR(t.v);
+      if (tt.v.toLowerCase() === 's') return { n: [0, 1], d: [1] };
+      if (!isOp('(')) return constR(tt.v);
       // función: sólo de constantes (sqrt(2*pi)); de s no es racional
       const start = p;
       p++;
@@ -198,14 +199,14 @@ function parseRational(src: string): Rat {
         const u = toks[p++];
         if (u.t === 'op' && u.v === '(') depth++;
         if (u.t === 'op' && u.v === ')') depth--;
-        if (u.t === 'id' && u.v.toLowerCase() === 's') throw new Unsupported(`${t.v}() de s`);
+        if (u.t === 'id' && u.v.toLowerCase() === 's') throw new Unsupported(t('{v}() of s', { v: tt.v }));
       }
-      if (depth) throw new Unsupported('paréntesis sin cerrar');
+      if (depth) throw new Unsupported(t('unclosed parenthesis'));
       const args = textBetween(start, p);
-      if (/^\(\s*-\s*1\s*\)$/.test(args) && t.v.toLowerCase() === 'sqrt') throw new Unsupported('sqrt(-1)');
-      return constR(`${t.v}${args}`);
+      if (/^\(\s*-\s*1\s*\)$/.test(args) && tt.v.toLowerCase() === 'sqrt') throw new Unsupported('sqrt(-1)');
+      return constR(`${tt.v}${args}`);
     }
-    throw new Unsupported(`"${t.v}" inesperado`);
+    throw new Unsupported(`"${tt.v}" inesperado`);
   }
 
   const r = sum();
@@ -324,7 +325,7 @@ export function translateLaplace(name: string, letter: string, nodes: string[], 
   if (!/laplace/i.test(value) || !'EGB'.includes(letter)) return null;
   const lv = splitLaplace(value);
   if (!lv || (letter === 'B' && !lv.input) || (letter !== 'B' && !lv.input && nodes.length < 4)) {
-    warnings.push(`${name}: no se reconoce la forma de "Laplace" en "${value}"`);
+    warnings.push(t('{name}: the "Laplace" form in "{value}" isn\'t recognized', { name, value }));
     return null;
   }
   let rat: Rat;
@@ -332,7 +333,7 @@ export function translateLaplace(name: string, letter: string, nodes: string[], 
     rat = parseRational(lv.gain ? `(${lv.gain})*(${lv.expr})` : lv.expr);
   } catch (e) {
     if (!(e instanceof Unsupported)) throw e;
-    warnings.push(`${name}: la transferencia Laplace=${lv.expr} no es un cociente de polinomios en s (${e.message}); ngspice no la puede simular`);
+    warnings.push(t('{name}: the transfer Laplace={expr} isn\'t a ratio of polynomials in s ({message}); ngspice can\'t simulate it', { name, expr: lv.expr, message: e.message }));
     return null;
   }
   const [op, on, ip, inn] = nodes;

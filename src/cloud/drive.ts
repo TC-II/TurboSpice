@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Google Drive (API REST v3) con el scope `drive.file`: la app sólo ve los archivos que creó
 // ella misma. Los proyectos (.turbo, JSON) y los .asc se guardan en una carpeta "TurboSpice" en
 // la raíz del Drive del usuario. Cada archivo trae su `version` (sube con cada cambio): así se
@@ -148,7 +149,7 @@ export class DriveClient {
         body: JSON.stringify(meta),
       });
       const at = start.headers.get('Location');
-      if (!at) throw new Error('Google Drive: no devolvió dónde subir el archivo');
+      if (!at) throw new Error(t('Google Drive: didn\'t say where to upload the file'));
       return this.json<DriveFile>(at, { method: 'PUT', headers: { 'Content-Type': mime }, body: bytes as BlobPart });
     }
     const { body, contentType } = multipart(meta, bytes, undefined, mime);
@@ -161,7 +162,7 @@ export class DriveClient {
 export function uniqueName(name: string, taken: string[]): string {
   const ext = /\.turbo$/i.test(name) ? '.turbo' : '.asc';
   const base = name.replace(/\.(asc|turbo)$/i, '');
-  const used = new Set(taken.map((t) => t.toLowerCase()));
+  const used = new Set(taken.map((tt) => tt.toLowerCase()));
   let n = `${base}${ext}`;
   for (let i = 2; used.has(n.toLowerCase()); i++) n = `${base} (${i})${ext}`;
   return n;

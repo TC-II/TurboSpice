@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Símbolos generados: un rectángulo con los pines a los costados, para un .subckt de un
 // archivo de modelos o para un esquemático usado como bloque jerárquico (como el
 // "Hierarchy → Create symbol" de LTspice).
@@ -43,7 +44,7 @@ export function makeSymbol(o: { name: string; pins: string[]; block?: boolean; m
   ];
   if (!o.block) out.push(`SYMATTR Value ${o.name}`);
   if (o.modelFile) out.push(`SYMATTR ModelFile ${o.modelFile}`);
-  out.push(`SYMATTR Description ${o.description ?? (o.block ? `Bloque ${o.name}` : `Subcircuito ${o.name}`)}`);
+  out.push(`SYMATTR Description ${o.description ?? (o.block ? t('Block {name}', { name: o.name }) : t('Subcircuit {name}', { name: o.name }))}`);
   let order = 1;
   const pin = (x: number, y: number, side: 'LEFT' | 'RIGHT', name: string) =>
     out.push(`PIN ${x} ${y} ${side} 8`, `PINATTR PinName ${name}`, `PINATTR SpiceOrder ${order++}`);

@@ -14,13 +14,14 @@ import { analysisLabel, takeSims } from '../sim/simList.ts';
 import { projectFileKind, simLabel, uniqueFileName, uniqueLabel, variantOf } from './project.ts';
 import { newId, variantFromAsc, type Project, type ProjectFile, type Sim, type Variant } from './turbo.ts';
 import { makeZip, type ZipEntry } from './zip.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Nombre de archivo válido en Windows */
-export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '_').replace(/[. ]+$/, '').trim() || 'sin nombre';
+export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '_').replace(/[. ]+$/, '').trim() || t('unnamed');
 
 /** Archivos del proyecto que usan estos circuitos: símbolos por nombre, modelos nombrados en el texto */
 export function usedFiles(files: ProjectFile[], ascTexts: string[]): ProjectFile[] {
-  const types = new Set(ascTexts.flatMap((t) => parseAsc(t).symbols.map((s) => baseName(s.type).toLowerCase())));
+  const types = new Set(ascTexts.flatMap((tt) => parseAsc(tt).symbols.map((s) => baseName(s.type).toLowerCase())));
   const syms = files.filter((f) => f.kind === 'symbol' && types.has(f.name.replace(/\.asy$/i, '').toLowerCase()));
   const hay = [...ascTexts, ...syms.map((s) => s.text)].join('\n').toLowerCase();
   return [...syms, ...files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()))];

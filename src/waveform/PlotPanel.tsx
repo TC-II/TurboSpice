@@ -11,6 +11,7 @@ import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './
 import { scaleOf, si, siFixed } from './series.ts';
 import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
 export type PlotAction =
@@ -159,8 +160,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? f(p) : p)));
   const moveTrace = (from: number, ti: number, to: number) => {
     if (from === to) return;
-    const t = panes[from].traces[ti];
-    setPanes(panes.map((p, k) => (k === from ? { traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { traces: [...p.traces, t] } : p)));
+    const tt = panes[from].traces[ti];
+    setPanes(panes.map((p, k) => (k === from ? { traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { traces: [...p.traces, tt] } : p)));
   };
 
   useImperativeHandle(handle, () => ({
@@ -238,20 +239,20 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button
         className={cursorMode ? 'active' : ''}
         onClick={() => setCursorMode((v) => !v)}
-        title="Cursores: click = cursor A, Shift+click o click derecho = cursor B; arrastrar una línea la mueve (Alt: a los puntos simulados, flechas: punto a punto; C; Shift+C los borra)"
+        title={t('Cursors: click = cursor A, Shift+click or right-click = cursor B; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)')}
       >
-        Cursores
+        {t('Cursors')}
       </button>
       {onFft && data[0]?.xName === 'time' && (
-        <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title="Espectro (FFT) y distorsión armónica de una traza">
+        <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title={t('Spectrum (FFT) and harmonic distortion of a trace')}>
           FFT…
         </button>
       )}
-      <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title="Máximo, mínimo, pico a pico, promedio, eficaz y frecuencia en el rango visible">
-        Medidas
+      <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title={t('Maximum, minimum, peak-to-peak, average, RMS and frequency in the visible range')}>
+        {t('Stats')}
       </button>
-      <button onClick={() => zoomTo(null, {})} title="Ver todo (Espacio o doble click en el gráfico; Z: zoom a un recuadro, Shift+Z: zoom anterior)">
-        Ajustar
+      <button onClick={() => zoomTo(null, {})} title={t('See everything (Space or double-click on the plot; Z: zoom to a box, Shift+Z: previous zoom)')}>
+        {t('Fit')}
       </button>
     </>
   );
@@ -261,22 +262,22 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     <div className="plot-panel">
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
       {(zoomMode || removing) && (
-        <p className="hint plot-info">{zoomMode ? 'Arrastrá un recuadro para hacer zoom · Esc cancela' : 'Click en el nombre de una traza para quitarla · Esc termina'}</p>
+        <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
       )}
       {fftOpen && onFft && (
         <div className="plot-tools fft-tools">
-          <select value={fftExpr} aria-label="Traza para la FFT" onChange={(e) => setFftExpr(e.target.value)}>
-            <option value="">Traza…</option>
-            {[...new Set(panes.flatMap((p) => p.traces.map((t) => t.expr)))].map((e) => (
+          <select value={fftExpr} aria-label={t('Trace for the FFT')} onChange={(e) => setFftExpr(e.target.value)}>
+            <option value="">{t('Trace…')}</option>
+            {[...new Set(panes.flatMap((p) => p.traces.map((tt) => tt.expr)))].map((e) => (
               <option key={e} value={e}>{e}</option>
             ))}
           </select>
-          <select value={fftWindow} aria-label="Ventana" onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
+          <select value={fftWindow} aria-label={t('Window')} onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
             {WINDOWS.map(([w, l]) => (
-              <option key={w} value={w}>Ventana {l}</option>
+              <option key={w} value={w}>{t('Window')}{' '}{l}</option>
             ))}
           </select>
-          <span className="hint">{range ? `Rango visible: ${si(range[0])}s … ${si(range[1])}s` : 'Todo el transitorio (hacé zoom para elegir un rango, p.ej. sin el arranque)'}</span>
+          <span className="hint">{range ? t('Visible range: {p0}s … {p1}s', { p0: si(range[0]), p1: si(range[1]) }) : t('The whole transient (zoom in to choose a range, e.g. without the start-up)')}</span>
           <button
             className="primary"
             disabled={!fftExpr}
@@ -285,7 +286,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
               setFftOpen(false);
             }}
           >
-            Calcular
+            {t('Compute')}
           </button>
         </div>
       )}
@@ -342,15 +343,15 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       {(cursorMode || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
           {cursorMode && (
-            <section className="readout-card" aria-label="Cursores">
-              <h4>Cursores</h4>
+            <section className="readout-card" aria-label={t('Cursors')}>
+              <h4>{t('Cursors')}</h4>
               <CursorTable data={data} cursors={previewX !== undefined ? { ...cursors, a: previewX } : cursors} preview={unplaced} setCursors={setCursors} />
-              {unplaced && <p className="hint">Click en el gráfico para fijar el cursor A; Shift+click o click derecho para el B. Arrastrá las líneas para moverlas.</p>}
+              {unplaced && <p className="hint">{t('Click on the plot to set cursor A; Shift+click or right-click for B. Drag the lines to move them.')}</p>}
             </section>
           )}
           {showStats && allVisible.length > 0 && (
-            <section className="readout-card" aria-label="Medidas">
-              <h4>Medidas</h4>
+            <section className="readout-card" aria-label={t('Stats')}>
+              <h4>{t('Stats')}</h4>
               <StatsTable data={data} range={range} />
             </section>
           )}
@@ -418,7 +419,7 @@ function PaneView(props: {
     const fg = css.getPropertyValue('--fg').trim();
     const bg = css.getPropertyValue('--bg').trim() || '#fff';
     const markColor = { pole: css.getPropertyValue('--err').trim(), zero: css.getPropertyValue('--accent').trim() };
-    const ticks = (_u: uPlot, t: number[]) => t.map((x) => si(x, 3));
+    const ticks = (_u: uPlot, tt: number[]) => tt.map((x) => si(x, 3));
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
@@ -435,7 +436,7 @@ function PaneView(props: {
       },
       axes: [
         {
-          values: (_u, t) => t.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
+          values: (_u, tt) => tt.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
           stroke: muted,
           grid: { stroke: grid, show: showGrid },
           ticks: { stroke: grid },
@@ -746,25 +747,25 @@ function PaneView(props: {
       }}
     >
       <div className="pane-legend">
-        {pane.traces.map((t: Trace, ti) => {
+        {pane.traces.map((tt: Trace, ti) => {
           const c = firstCurve(ti);
           const err = data.errors.get(ti);
           const v = hover !== null && c ? c.y[hover] : NaN;
           return (
             <span
-              key={`${t.expr}${ti}`}
-              className={`trace-chip${t.hidden ? ' off' : ''}${err ? ' bad' : ''}`}
+              key={`${tt.expr}${ti}`}
+              className={`trace-chip${tt.hidden ? ' off' : ''}${err ? ' bad' : ''}`}
               draggable
               onDragStart={(e) => e.dataTransfer.setData('application/x-trace', JSON.stringify({ pane: index, trace: ti }))}
-              onPointerEnter={() => props.onHoverExpr?.(t.expr)}
+              onPointerEnter={() => props.onHoverExpr?.(tt.expr)}
               onPointerLeave={() => props.onHoverExpr?.(undefined)}
-              title={err ?? 'Click: mostrar/ocultar · arrastrar a otro panel · color en el cuadrado'}
+              title={err ?? t('Click: show/hide · drag to another pane · color in the square')}
             >
-              <label className="swatch" style={{ background: traceColor(t, ti) }}>
+              <label className="swatch" style={{ background: traceColor(tt, ti) }}>
                 <input
                   type="color"
-                  aria-label={`Color de ${t.expr}`}
-                  value={traceColor(t, ti)}
+                  aria-label={t('Color of {expr}', { expr: tt.expr })}
+                  value={traceColor(tt, ti)}
                   onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, color: e.target.value } : x)) }))}
                 />
               </label>
@@ -776,11 +777,11 @@ function PaneView(props: {
                   }))
                 }
               >
-                {t.expr}
+                {tt.expr}
               </button>
               {/* el lugar del valor queda reservado aunque el mouse no esté sobre el gráfico */}
           {err ? <span className="err">{err}</span> : <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>}
-              <button className="x" aria-label={`Quitar ${t.expr}`} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
+              <button className="x" aria-label={t('Remove {expr}', { expr: tt.expr })} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
                 ✕
               </button>
             </span>
@@ -801,8 +802,8 @@ function PaneView(props: {
           </span>
         )}
         {props.canRemove && (
-          <button className="pane-x" onClick={props.onRemove} title="Quitar el panel">
-            Quitar panel
+          <button className="pane-x" onClick={props.onRemove} title={t('Remove the pane')}>
+            {t('Remove pane')}
           </button>
         )}
       </div>
@@ -823,12 +824,12 @@ function PaneView(props: {
         />
       ) : (
         <p className="empty pane-empty">
-          {pane.traces.length ? 'Ninguna traza se puede graficar en este análisis.' : 'Panel vacío: medí con la punta de prueba, escribí una expresión o arrastrá una traza acá.'}
+          {pane.traces.length ? t('No trace can be plotted in this analysis.') : t('Empty pane: probe with the probe tool, type an expression or drag a trace here.')}
         </p>
       )}
       {props.onAddBelow && (
         <div className="pane-add">
-          <button aria-label="Agregar panel" title="Agregar un panel debajo (P)" onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>
+          <button aria-label={t('Add pane')} title={t('Add a pane below (P)')} onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>
             +
           </button>
         </div>
@@ -844,8 +845,8 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
   const labels = [...new Set(data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => c.label)))];
   const xu = xUnit(data[0]?.xName);
   const traceSelect = (k: 'ta' | 'tb', name: string) => (
-    <select value={cursors[k] ?? ''} aria-label={`Traza del cursor ${name}`} onChange={(e) => setCursors((c) => ({ ...c, [k]: e.target.value || undefined }))}>
-      <option value="">{name}: sin traza</option>
+    <select value={cursors[k] ?? ''} aria-label={t('Cursor {name} trace', { name })} onChange={(e) => setCursors((c) => ({ ...c, [k]: e.target.value || undefined }))}>
+      <option value="">{name}{t(': no trace')}</option>
       {labels.map((l) => (
         <option key={l} value={l}>
           {name}: {l}
@@ -859,10 +860,10 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
         {traceSelect('ta', 'A')}
         {traceSelect('tb', 'B')}
         <button disabled={a === undefined || preview} onClick={() => setCursors((c) => ({ ...c, a: undefined, sel: 'b' }))}>
-          Borrar A
+          {t('Clear A')}
         </button>
         <button disabled={b === undefined} onClick={() => setCursors((c) => ({ ...c, b: undefined, sel: 'a' }))}>
-          Borrar B
+          {t('Clear B')}
         </button>
         <button onClick={() => setCursors((c) => ({ ...c, a: c.b, b: c.a, ta: c.tb, tb: c.ta }))} title="Intercambiar A y B">
           A ⇄ B
@@ -871,11 +872,11 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
       <table className="scalars readout">
         <thead>
           <tr>
-            <th>Traza</th>
-            <th className={preview ? 'preview' : undefined} title={preview ? 'Sigue al mouse: click para fijarlo' : undefined}>A ({fix(a ?? NaN, xu)})</th>
+            <th>{t('Trace')}</th>
+            <th className={preview ? 'preview' : undefined} title={preview ? t('Follows the mouse: click to fix it') : undefined}>A ({fix(a ?? NaN, xu)})</th>
             <th>B ({fix(b ?? NaN, xu)})</th>
             <th>B − A</th>
-            <th>pendiente</th>
+            <th>{t('slope')}</th>
           </tr>
         </thead>
         <tbody>
@@ -912,13 +913,13 @@ function StatsTable({ data, range }: { data: PaneData[]; range: Range | null }) 
     <table className="scalars readout">
       <thead>
         <tr>
-          <th>Traza</th>
-          <th>Mínimo</th>
-          <th>Máximo</th>
-          <th>Pico a pico</th>
-          <th>Promedio</th>
-          <th>Eficaz</th>
-          <th>Frecuencia / −3 dB</th>
+          <th>{t('Trace')}</th>
+          <th>{t('Minimum')}</th>
+          <th>{t('Maximum')}</th>
+          <th>{t('Peak to peak')}</th>
+          <th>{t('Average')}</th>
+          <th>{t('RMS')}</th>
+          <th>{t('Frequency / −3 dB')}</th>
         </tr>
       </thead>
       <tbody>

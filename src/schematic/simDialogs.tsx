@@ -14,6 +14,7 @@ import {
 } from '../sim/analyses.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
 import { Modal } from './dialogs.tsx';
+import { t } from '../i18n/i18n.ts';
 
 /** Valor numérico SPICE (1k, 10meg…) o expresión entre llaves */
 const validNumber = (s: string) => /^\{.+\}$/.test(s.trim()) || Number.isFinite(parseSpiceNumber(s));
@@ -50,8 +51,8 @@ function Field({ label, value, onChange, placeholder, hint, required, number, li
           <button
             type="button"
             className="pick-btn"
-            title={pick.what === 'net' ? 'Elegir la red en el esquemático' : 'Elegir la fuente en el esquemático'}
-            aria-label={`Elegir ${label} en el esquemático`}
+            title={pick.what === 'net' ? t('Pick the net on the schematic') : t('Pick the source on the schematic')}
+            aria-label={t('Pick {label} on the schematic', { label })}
             onClick={(e) => {
               e.preventDefault();
               pick.picker(pick.what).then((v) => v && onChange(v));
@@ -64,7 +65,7 @@ function Field({ label, value, onChange, placeholder, hint, required, number, li
         input
       )}
       {auto ? (
-        <small>Nombre automático: puede cambiar al editar el circuito. Conviene ponerle una etiqueta a la red (F4).</small>
+        <small>{t('Automatic name: it may change when you edit the circuit. Better give the net a label (F4).')}</small>
       ) : (
         hint && <small>{hint}</small>
       )}
@@ -94,24 +95,24 @@ function SweepFields({ sweep, onChange, unit = 'Hz' }: { sweep: Sweep; onChange(
   return (
     <>
       <Select
-        label="Tipo de barrido"
+        label={t('Sweep type')}
         value={sweep.type}
         options={[
-          ['dec', 'Por década'],
-          ['oct', 'Por octava'],
-          ['lin', 'Lineal'],
+          ['dec', t('Per decade')],
+          ['oct', t('Per octave')],
+          ['lin', t('Linear')],
         ]}
         onChange={(type) => onChange({ ...sweep, type })}
       />
       <Field
-        label={sweep.type === 'lin' ? 'Cantidad de puntos' : `Puntos por ${sweep.type === 'dec' ? 'década' : 'octava'}`}
+        label={sweep.type === 'lin' ? t('Number of points') : t('Points per {p0}', { p0: sweep.type === 'dec' ? t('decade') : t('octave') })}
         value={sweep.points}
         number
         required
         onChange={(points) => onChange({ ...sweep, points })}
       />
-      <Field label={`Frecuencia inicial [${unit}]`} value={sweep.start} number required onChange={(start) => onChange({ ...sweep, start })} />
-      <Field label={`Frecuencia final [${unit}]`} value={sweep.stop} number required onChange={(stop) => onChange({ ...sweep, stop })} />
+      <Field label={t('Start frequency [{unit}]', { unit })} value={sweep.start} number required onChange={(start) => onChange({ ...sweep, start })} />
+      <Field label={t('Stop frequency [{unit}]', { unit })} value={sweep.stop} number required onChange={(stop) => onChange({ ...sweep, stop })} />
     </>
   );
 }
@@ -134,17 +135,15 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
     case 'tran':
       return (
         <>
-          <Field label="Tiempo final" value={a.tstop} number required placeholder="10m" onChange={(tstop) => set({ ...a, tstop })} />
-          <Field label="Guardar desde" value={a.tstart} number placeholder="0" hint="Descarta lo anterior (p.ej. el transitorio inicial)" onChange={(tstart) => set({ ...a, tstart })} />
-          <Field label="Paso máximo" value={a.tmax} number placeholder="automático" hint="Limitarlo mejora la resolución de señales rápidas" onChange={(tmax) => set({ ...a, tmax })} />
-          <Field label="Paso de salida" value={a.tstep} number placeholder="automático" onChange={(tstep) => set({ ...a, tstep })} />
+          <Field label={t('Stop time')} value={a.tstop} number required placeholder="10m" onChange={(tstop) => set({ ...a, tstop })} />
+          <Field label={t('Save from')} value={a.tstart} number placeholder="0" hint={t('Discards what comes before (e.g. the initial transient)')} onChange={(tstart) => set({ ...a, tstart })} />
+          <Field label={t('Maximum step')} value={a.tmax} number placeholder={t('automatic')} hint={t('Limiting it improves the resolution of fast signals')} onChange={(tmax) => set({ ...a, tmax })} />
+          <Field label={t('Output step')} value={a.tstep} number placeholder={t('automatic')} onChange={(tstep) => set({ ...a, tstep })} />
           <label className="check">
-            <input type="checkbox" checked={a.uic} onChange={(e) => set({ ...a, uic: e.target.checked })} /> Usar condiciones iniciales
-            (UIC: no calcula el punto de operación; arranca de las IC=)
+            <input type="checkbox" checked={a.uic} onChange={(e) => set({ ...a, uic: e.target.checked })} /> {t('Use initial conditions (UIC: doesn\'t compute the operating point; starts from the IC=)')}
           </label>
           <label className="check">
-            <input type="checkbox" checked={a.startup} onChange={(e) => set({ ...a, startup: e.target.checked })} /> Arrancar las fuentes desde 0
-            (startup: las fuentes de DC suben en una rampa de 20 µs)
+            <input type="checkbox" checked={a.startup} onChange={(e) => set({ ...a, startup: e.target.checked })} /> {t('Start the sources from 0 (startup: DC sources rise in a 20 µs ramp)')}
           </label>
         </>
       );
@@ -162,11 +161,11 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
             };
             return (
               <fieldset key={i}>
-                <legend>{i === 0 ? 'Fuente a barrer' : 'Segunda fuente (opcional, genera una familia de curvas)'}</legend>
-                <Field label="Fuente" value={s.src} list="sim-sources" required={i === 0} onChange={(src) => upd({ src })} pick={picker && { what: 'source', picker }} />
-                <Field label="Inicio" value={s.start} number required={!!s.src} onChange={(start) => upd({ start })} />
-                <Field label="Fin" value={s.stop} number required={!!s.src} onChange={(stop) => upd({ stop })} />
-                <Field label="Incremento" value={s.step} number required={!!s.src} onChange={(step) => upd({ step })} />
+                <legend>{i === 0 ? t('Source to sweep') : t('Second source (optional, makes a family of curves)')}</legend>
+                <Field label={t('Source')} value={s.src} list="sim-sources" required={i === 0} onChange={(src) => upd({ src })} pick={picker && { what: 'source', picker }} />
+                <Field label={t('Start')} value={s.start} number required={!!s.src} onChange={(start) => upd({ start })} />
+                <Field label={t('Stop')} value={s.stop} number required={!!s.src} onChange={(stop) => upd({ stop })} />
+                <Field label={t('Increment')} value={s.step} number required={!!s.src} onChange={(step) => upd({ step })} />
               </fieldset>
             );
           })}
@@ -175,27 +174,27 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
     case 'noise':
       return (
         <>
-          {node('Nodo de salida', a.out, (out) => set({ ...a, out }))}
-          {node('Referencia', a.ref, (ref) => set({ ...a, ref }), 'Vacío = tierra', false)}
-          {source('Fuente de entrada', a.src, (src) => set({ ...a, src }))}
+          {node(t('Output node'), a.out, (out) => set({ ...a, out }))}
+          {node(t('Reference'), a.ref, (ref) => set({ ...a, ref }), t('Empty = ground'), false)}
+          {source(t('Input source'), a.src, (src) => set({ ...a, src }))}
           <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />
         </>
       );
     case 'op':
-      return <p className="hint">No tiene parámetros.</p>;
+      return <p className="hint">{t('It has no parameters.')}</p>;
     case 'tf':
       return (
         <>
-          {node('Salida', a.out, (out) => set({ ...a, out }), 'Nodo, o I(Vx) para una corriente')}
-          {source('Fuente de entrada', a.src, (src) => set({ ...a, src }))}
+          {node(t('Output'), a.out, (out) => set({ ...a, out }), t('Node, or I(Vx) for a current'))}
+          {source(t('Input source'), a.src, (src) => set({ ...a, src }))}
         </>
       );
     case 'sens':
       return (
         <>
-          {node('Salida', a.out, (out) => set({ ...a, out }))}
+          {node(t('Output'), a.out, (out) => set({ ...a, out }))}
           <label className="check">
-            <input type="checkbox" checked={a.ac} onChange={(e) => set({ ...a, ac: e.target.checked })} /> Sensibilidad en AC (en frecuencia)
+            <input type="checkbox" checked={a.ac} onChange={(e) => set({ ...a, ac: e.target.checked })} /> {t('AC sensitivity (vs frequency)')}
           </label>
           {a.ac && <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />}
         </>
@@ -203,26 +202,26 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
     case 'pz':
       return (
         <>
-          {node('Entrada +', a.inP, (inP) => set({ ...a, inP }))}
-          {node('Entrada −', a.inN, (inN) => set({ ...a, inN }))}
-          {node('Salida +', a.outP, (outP) => set({ ...a, outP }))}
-          {node('Salida −', a.outN, (outN) => set({ ...a, outN }))}
+          {node(t('Input +'), a.inP, (inP) => set({ ...a, inP }))}
+          {node(t('Input −'), a.inN, (inN) => set({ ...a, inN }))}
+          {node(t('Output +'), a.outP, (outP) => set({ ...a, outP }))}
+          {node(t('Output −'), a.outN, (outN) => set({ ...a, outN }))}
           <Select
-            label="Transferencia"
+            label={t('Transfer')}
             value={a.type}
             options={[
-              ['vol', 'Tensión de salida / tensión de entrada'],
-              ['cur', 'Tensión de salida / corriente de entrada'],
+              ['vol', t('Output voltage / input voltage')],
+              ['cur', t('Output voltage / input current')],
             ]}
             onChange={(type) => set({ ...a, type })}
           />
           <Select
-            label="Calcular"
+            label={t('Compute')}
             value={a.which}
             options={[
-              ['pz', 'Polos y ceros'],
-              ['pol', 'Sólo polos'],
-              ['zer', 'Sólo ceros'],
+              ['pz', t('Poles and zeros')],
+              ['pol', t('Poles only')],
+              ['zer', t('Zeros only')],
             ]}
             onChange={(which) => set({ ...a, which })}
           />
@@ -232,7 +231,7 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
       return (
         <>
           <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />
-          <Field label="f2/f1 (intermodulación)" value={a.f2overf1} number placeholder="sólo armónicos" hint="Entre 0 y 1; vacío = distorsión armónica" onChange={(f2overf1) => set({ ...a, f2overf1 })} />
+          <Field label={t('f2/f1 (intermodulation)')} value={a.f2overf1} number placeholder={t('harmonics only')} hint={t('Between 0 and 1; empty = harmonic distortion')} onChange={(f2overf1) => set({ ...a, f2overf1 })} />
         </>
       );
     case 'sp':
@@ -240,7 +239,7 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
         <>
           <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />
           <label className="check">
-            <input type="checkbox" checked={a.noise} onChange={(e) => set({ ...a, noise: e.target.checked })} /> Calcular también parámetros de ruido
+            <input type="checkbox" checked={a.noise} onChange={(e) => set({ ...a, noise: e.target.checked })} /> {t('Also compute noise parameters')}
           </label>
         </>
       );
@@ -268,12 +267,12 @@ export function SimulationDialog({ initial, analysis, info, onApply, onClose, pi
   const errors = validateAnalysis(a);
 
   return (
-    <Modal title="Comando de simulación" onClose={onClose} wide hidden={hidden}>
+    <Modal title={t('Simulation command')} onClose={onClose} wide hidden={hidden}>
       <datalist id="sim-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       {initial && !parsed && (
         <p className="hint warn">
-          La directiva actual (<code>{initial}</code>) usa opciones que este formulario no maneja; al aceptar se reemplaza.
+          {t('The current directive (')}<code>{initial}</code>{t(') uses options this form doesn\'t handle; accepting replaces it.')}
         </p>
       )}
       <div className="simdlg">
@@ -292,13 +291,13 @@ export function SimulationDialog({ initial, analysis, info, onApply, onClose, pi
       </div>
       <div className="sim-preview">
         <code>{line}</code>
-        {meta.ngspiceOnly && <span className="hint">LTspice no tiene este análisis: se guarda como comentario que LTspice ignora y TurboSpice ejecuta.</span>}
+        {meta.ngspiceOnly && <span className="hint">{t('LTspice doesn\'t have this analysis: it\'s saved as a comment that LTspice ignores and TurboSpice runs.')}</span>}
         {errors.length > 0 && <span className="hint warn">{errors.join(' · ')}</span>}
       </div>
       <div className="buttons">
-        <button type="button" onClick={onClose}>Cancelar</button>
+        <button type="button" onClick={onClose}>{t('Cancel')}</button>
         <button type="button" className="primary" disabled={errors.length > 0} onClick={() => onApply(line, meta.ngspiceOnly)}>
-          Aceptar
+          {t('OK')}
         </button>
       </div>
     </Modal>
@@ -336,7 +335,7 @@ export function ControlDialog({ initial, onApply, onRemove, onClose, picker, hid
   };
   const hasRun = useMemo(() => /^\s*(run|tran|ac|dc|op|noise|tf|pz|sens|disto|sp)\b/im.test(body), [body]);
   return (
-    <Modal title="Bloque .control (scripts de ngspice)" onClose={onClose} wide hidden={hidden}>
+    <Modal title={t('.control block (ngspice scripts)')} onClose={onClose} wide hidden={hidden}>
       <div className="controldlg">
         <div className="control-editor">
           <div className="control-frame">.control</div>
@@ -357,25 +356,23 @@ export function ControlDialog({ initial, onApply, onRemove, onClose, picker, hid
           />
           <div className="control-frame">.endc</div>
           {!hasRun && body.trim() && (
-            <p className="hint warn">El bloque no ejecuta ningún análisis: agregá "run" para correr los del esquemático.</p>
+            <p className="hint warn">{t('The block doesn\'t run any analysis: add "run" to run the schematic\'s.')}</p>
           )}
           <p className="hint">
-            Con un bloque .control, los análisis se corren sólo cuando el bloque lo indica. "plot" no abre ventanas: los
-            vectores que crees con "let" aparecen en Resultados, y lo que imprimas con "print"/"echo"/"meas" en el Log.
-            LTspice no tiene .control: se guarda como comentario que LTspice ignora.
+            {t('With a .control block, analyses run only when the block says so. "plot" doesn\'t open windows: vectors you create with "let" show up in Results, and what you print with "print"/"echo"/"meas" in the Log. LTspice has no .control: it\'s saved as a comment that LTspice ignores.')}
           </p>
         </div>
         <div className="snippets">
-          <h3>Insertar</h3>
+          <h3>{t('Insert')}</h3>
           {picker && (
             <div className="pick-row">
-              <button type="button" title="Elegir una red en el esquemático e insertar v(red) en el cursor" onClick={() => picker('net').then((v) => v && insertInline(`v(${v.toLowerCase()})`))}>
-                <strong>⌖ v(red)</strong>
-                <small>Tensión de una red elegida en el esquemático</small>
+              <button type="button" title={t('Pick a net on the schematic and insert v(net) at the cursor')} onClick={() => picker('net').then((v) => v && insertInline(`v(${v.toLowerCase()})`))}>
+                <strong>{t('⌖ v(net)')}</strong>
+                <small>{t('Voltage of a net picked on the schematic')}</small>
               </button>
-              <button type="button" title="Elegir una fuente en el esquemático e insertar i(fuente) en el cursor" onClick={() => picker('source').then((v) => v && insertInline(`i(${v.toLowerCase()})`))}>
-                <strong>⌖ i(fuente)</strong>
-                <small>Corriente de una fuente elegida en el esquemático</small>
+              <button type="button" title={t('Pick a source on the schematic and insert i(source) at the cursor')} onClick={() => picker('source').then((v) => v && insertInline(`i(${v.toLowerCase()})`))}>
+                <strong>{t('⌖ i(source)')}</strong>
+                <small>{t('Current of a source picked on the schematic')}</small>
               </button>
             </div>
           )}
@@ -389,11 +386,11 @@ export function ControlDialog({ initial, onApply, onRemove, onClose, picker, hid
       </div>
       <div className="buttons">
         {onRemove && (
-          <button type="button" className="danger" onClick={onRemove}>Quitar bloque</button>
+          <button type="button" className="danger" onClick={onRemove}>{t('Remove block')}</button>
         )}
         <span className="spacer" />
-        <button type="button" onClick={onClose}>Cancelar</button>
-        <button type="button" className="primary" onClick={() => onApply(body)}>Aceptar</button>
+        <button type="button" onClick={onClose}>{t('Cancel')}</button>
+        <button type="button" className="primary" onClick={() => onApply(body)}>{t('OK')}</button>
       </div>
     </Modal>
   );

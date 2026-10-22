@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Modelos "a kind of" de LTspice: `.model TIP32Cm ako:TIP32C (Bf=20)` hereda los parámetros
 // de TIP32C y cambia Bf. ngspice no lo tiene: se reemplaza por un .model completo.
 
@@ -33,8 +34,8 @@ function parseAko(s: string): { base: string; type?: string; params: [string, st
   const m = /^ako:\s*([^\s(]+)\s*(.*)$/i.exec(s);
   if (!m) return null;
   // el tipo es una palabra que no es "clave=" (".model X ako:Y BF=10" no tiene tipo)
-  const t = /^([A-Za-z]\w*)(?=\s*\(|\s*$|\s+[^=\s])/.exec(m[2]);
-  return { base: m[1], type: t?.[1], params: parseParams(t ? m[2].slice(t[0].length) : m[2]) };
+  const tt = /^([A-Za-z]\w*)(?=\s*\(|\s*$|\s+[^=\s])/.exec(m[2]);
+  return { base: m[1], type: tt?.[1], params: parseParams(tt ? m[2].slice(tt[0].length) : m[2]) };
 }
 
 /** Modelos definidos en un texto (sin los ako:) */
@@ -42,9 +43,9 @@ export function collectModels(text: string, into = new Map<string, ModelDef>()):
   for (const { line } of logicalLines(text)) {
     const m = MODEL.exec(line);
     if (!m || /^ako:/i.test(m[2].trim())) continue;
-    const t = /^([A-Za-z]\w*)\s*(.*)$/.exec(m[2].trim());
-    if (!t) continue;
-    if (!into.has(m[1].toLowerCase())) into.set(m[1].toLowerCase(), { type: t[1], params: parseParams(t[2]) });
+    const tt = /^([A-Za-z]\w*)\s*(.*)$/.exec(m[2].trim());
+    if (!tt) continue;
+    if (!into.has(m[1].toLowerCase())) into.set(m[1].toLowerCase(), { type: tt[1], params: parseParams(tt[2]) });
   }
   return into;
 }
@@ -94,7 +95,7 @@ export function replaceAko(text: string, known: Map<string, ModelDef>): { text: 
       defined.set(m[1].toLowerCase(), def);
       out.push(`* ${l.line.trim()}`, `.model ${m[1]} ${def.type}(${def.params.map(([k, v]) => `${k}=${v}`).join(' ')})`);
     } else {
-      warnings.push(`${m[1]}: no se encontró el modelo base ${a.base} (ako:)`);
+      warnings.push(t('{p0}: base model {base} not found (ako:)', { p0: m[1], base: a.base }));
       out.push(`* ${l.line.trim()}`);
     }
   }

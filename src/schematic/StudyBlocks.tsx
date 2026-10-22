@@ -3,11 +3,14 @@
 import { useEffect, useRef } from 'react';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
+import * as En from 'blockly/msg/en';
 import * as Es from 'blockly/msg/es';
 import { blockDefinitions, toolbox, type WorkspaceJson } from '../sim/studyBlocks.ts';
 import type { StudyInfo } from './StudyPanel.tsx';
+import { getLang, t } from '../i18n/i18n.ts';
 
-Blockly.setLocale(Es as unknown as Record<string, string>);
+// los textos propios de Blockly (menús, «Eliminar bloque»…), en el idioma de la interfaz
+Blockly.setLocale((getLang() === 'es' ? Es : En) as unknown as Record<string, string>);
 
 /** Opciones de los desplegables "qué variar": se leen del circuito abierto */
 let currentInfo: StudyInfo | null = null;
@@ -16,9 +19,9 @@ function targetOptions(): [string, string][] {
   const info = currentInfo;
   const opts: [string, string][] = [];
   for (const c of info?.components ?? []) if (/^[RCL]$/i.test(c.prefix)) opts.push([`${c.name} (${c.value})`, `component:${c.name}`]);
-  for (const s of info?.sources ?? []) opts.push([`fuente ${s}`, `source:${s}`]);
-  for (const p of info?.params ?? []) opts.push([`parámetro ${p}`, `param:${p}`]);
-  opts.push(['la temperatura', 'temp']);
+  for (const s of info?.sources ?? []) opts.push([t('source {s}', { s }), `source:${s}`]);
+  for (const p of info?.params ?? []) opts.push([t('parameter {p}', { p }), `param:${p}`]);
+  opts.push([t('the temperature'), 'temp']);
   return opts;
 }
 
@@ -62,8 +65,8 @@ function theme(dark: boolean): Blockly.Theme {
 }
 
 const isDark = () => {
-  const t = document.documentElement.getAttribute('data-theme');
-  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const tt = document.documentElement.getAttribute('data-theme');
+  return tt ? tt === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
 };
 
 export default function StudyBlocks({ initial, info, onChange }: { initial: WorkspaceJson; info: StudyInfo; onChange(ws: WorkspaceJson): void }) {

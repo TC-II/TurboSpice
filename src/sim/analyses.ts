@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Comandos de análisis: modelo editable, generación y lectura de la línea SPICE.
 // Se usa la sintaxis común a LTspice y ngspice; los análisis que sólo tiene ngspice
 // se guardan como comentario (ver netlist/directives.ts).
@@ -33,16 +34,16 @@ export type Analysis =
 export type AnalysisKind = Analysis['kind'];
 
 export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean; help: string }[] = [
-  { kind: 'tran', label: 'Transitorio', ngspiceOnly: false, help: 'Respuesta en el tiempo (.tran).' },
-  { kind: 'ac', label: 'AC (Bode)', ngspiceOnly: false, help: 'Respuesta en frecuencia de pequeña señal alrededor del punto de operación (.ac). Las fuentes de excitación necesitan "AC 1" en su valor.' },
-  { kind: 'op', label: 'Punto de operación', ngspiceOnly: false, help: 'Tensiones y corrientes de continua (.op).' },
-  { kind: 'dc', label: 'Barrido DC', ngspiceOnly: false, help: 'Barre el valor de una o dos fuentes y resuelve el punto de operación en cada paso (.dc).' },
-  { kind: 'noise', label: 'Ruido', ngspiceOnly: false, help: 'Densidad espectral de ruido en la salida y referida a la entrada (.noise).' },
-  { kind: 'tf', label: 'Función de transferencia DC', ngspiceOnly: false, help: 'Ganancia, resistencia de entrada y de salida en continua (.tf).' },
-  { kind: 'sens', label: 'Sensibilidad', ngspiceOnly: true, help: 'Sensibilidad de una salida respecto de cada parámetro del circuito (.sens).' },
-  { kind: 'pz', label: 'Polos y ceros', ngspiceOnly: true, help: 'Polos y ceros de una función de transferencia (.pz).' },
-  { kind: 'disto', label: 'Distorsión', ngspiceOnly: true, help: 'Distorsión armónica e intermodulación de pequeña señal (.disto). Las fuentes necesitan DISTOF1/DISTOF2.' },
-  { kind: 'sp', label: 'Parámetros S', ngspiceOnly: true, help: 'Parámetros S (.sp). Los puertos son fuentes de tensión con "portnum N z0 50" en su valor.' },
+  { kind: 'tran', label: t('Transient'), ngspiceOnly: false, help: t('Response over time (.tran).') },
+  { kind: 'ac', label: 'AC (Bode)', ngspiceOnly: false, help: t('Small-signal frequency response around the operating point (.ac). Excitation sources need "AC 1" in their value.') },
+  { kind: 'op', label: t('Operating point'), ngspiceOnly: false, help: t('DC voltages and currents (.op).') },
+  { kind: 'dc', label: t('DC sweep'), ngspiceOnly: false, help: t('Sweeps the value of one or two sources and solves the operating point at each step (.dc).') },
+  { kind: 'noise', label: t('Noise'), ngspiceOnly: false, help: t('Noise spectral density at the output and referred to the input (.noise).') },
+  { kind: 'tf', label: t('DC transfer function'), ngspiceOnly: false, help: t('DC gain, input and output resistance (.tf).') },
+  { kind: 'sens', label: t('Sensitivity'), ngspiceOnly: true, help: t('Sensitivity of an output to each circuit parameter (.sens).') },
+  { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
+  { kind: 'disto', label: t('Distortion'), ngspiceOnly: true, help: t('Small-signal harmonic and intermodulation distortion (.disto). Sources need DISTOF1/DISTOF2.') },
+  { kind: 'sp', label: t('S-parameters'), ngspiceOnly: true, help: t('S-parameters (.sp). The ports are voltage sources with "portnum N z0 50" in their value.') },
 ];
 
 const SWEEP: Sweep = { type: 'dec', points: '100', start: '1', stop: '1meg' };
@@ -113,8 +114,8 @@ export function formatAnalysis(a: Analysis): string {
 
 export const ANALYSIS_LINE = /^\s*\.(tran|ac|dc|noise|op|tf|sens|pz|disto|sp)\b/i;
 
-function parseSweep(t: string[]): Sweep | null {
-  const [type, points, start, stop] = t;
+function parseSweep(tt: string[]): Sweep | null {
+  const [type, points, start, stop] = tt;
   if (!/^(dec|oct|lin)$/i.test(type ?? '') || stop === undefined) return null;
   return { type: type.toLowerCase() as SweepType, points, start, stop };
 }
@@ -128,9 +129,9 @@ function unwrapV(s: string): [string, string] {
 /** Interpreta una línea de análisis; null si no se reconoce (se edita como texto libre) */
 export function parseAnalysis(line: string): Analysis | null {
   // V(a, b) con espacios: juntarlo en un token
-  const t = line.trim().replace(/\(\s*([^)]*?)\s*\)/g, (_, x: string) => `(${x.replace(/\s+/g, '')})`).split(/\s+/);
-  const kind = t[0]?.slice(1).toLowerCase();
-  const a = t.slice(1);
+  const tt = line.trim().replace(/\(\s*([^)]*?)\s*\)/g, (_, x: string) => `(${x.replace(/\s+/g, '')})`).split(/\s+/);
+  const kind = tt[0]?.slice(1).toLowerCase();
+  const a = tt.slice(1);
   switch (kind) {
     case 'tran': {
       const uic = a.some((x) => /^uic$/i.test(x));
@@ -191,20 +192,20 @@ export function validateAnalysis(a: Analysis): string[] {
   const errs: string[] = [];
   const num = (v: string, what: string, required = true) => {
     if (!v.trim()) {
-      if (required) errs.push(`Falta ${what}`);
-    } else if (!isNum(v)) errs.push(`${what}: "${v}" no es un número`);
+      if (required) errs.push(t('{what} is missing', { what }));
+    } else if (!isNum(v)) errs.push(t('{what}: "{v}" isn\'t a number', { what, v }));
   };
   const sweep = (s: Sweep) => {
-    num(s.points, 'la cantidad de puntos');
-    num(s.start, 'el inicio');
-    num(s.stop, 'el fin');
+    num(s.points, t('the number of points'));
+    num(s.start, t('the start'));
+    num(s.stop, t('the stop'));
   };
   switch (a.kind) {
     case 'tran':
-      num(a.tstop, 'el tiempo final');
-      num(a.tstart, 'el tiempo de inicio', false);
-      num(a.tmax, 'el paso máximo', false);
-      num(a.tstep, 'el paso de salida', false);
+      num(a.tstop, t('the stop time'));
+      num(a.tstart, t('the start time'), false);
+      num(a.tmax, t('the maximum step'), false);
+      num(a.tstep, t('the output step'), false);
       break;
     case 'ac':
     case 'disto':
@@ -215,30 +216,30 @@ export function validateAnalysis(a: Analysis): string[] {
     case 'dc':
       a.sweeps.forEach((s, i) => {
         if (!s.src) {
-          if (i === 0) errs.push('Falta la fuente a barrer');
+          if (i === 0) errs.push(t('The source to sweep is missing'));
           return;
         }
-        num(s.start, 'el inicio');
-        num(s.stop, 'el fin');
-        num(s.step, 'el incremento');
+        num(s.start, t('the start'));
+        num(s.stop, t('the stop'));
+        num(s.step, t('the increment'));
       });
       break;
     case 'noise':
-      if (!a.out) errs.push('Falta el nodo de salida');
-      if (!a.src) errs.push('Falta la fuente de entrada');
+      if (!a.out) errs.push(t('The output node is missing'));
+      if (!a.src) errs.push(t('The input source is missing'));
       sweep(a.sweep);
       break;
     case 'tf':
-      if (!a.out) errs.push('Falta la salida');
-      if (!a.src) errs.push('Falta la fuente de entrada');
+      if (!a.out) errs.push(t('The output is missing'));
+      if (!a.src) errs.push(t('The input source is missing'));
       break;
     case 'sens':
-      if (!a.out) errs.push('Falta la salida');
+      if (!a.out) errs.push(t('The output is missing'));
       if (a.ac) sweep(a.sweep);
       break;
     case 'pz':
-      for (const [v, w] of [[a.inP, 'entrada +'], [a.inN, 'entrada −'], [a.outP, 'salida +'], [a.outN, 'salida −']]) {
-        if (!v) errs.push(`Falta el nodo de ${w}`);
+      for (const [v, w] of [[a.inP, t('input +')], [a.inN, t('input −')], [a.outP, t('output +')], [a.outN, t('output −')]]) {
+        if (!v) errs.push(t('The {w} node is missing', { w }));
       }
       break;
   }

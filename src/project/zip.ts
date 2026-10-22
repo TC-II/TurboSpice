@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Zip mínimo (#157), sin dependencias: escribe sin comprimir (los .asc son chicos) y lee
 // archivos guardados sin comprimir o con deflate (DecompressionStream). Nombres en UTF-8.
 
@@ -8,13 +9,13 @@ export interface ZipEntry {
 }
 
 const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
+  const tt = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
     for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c >>> 0;
+    tt[n] = c >>> 0;
   }
-  return t;
+  return tt;
 })();
 
 export function crc32(data: Uint8Array): number {
@@ -103,14 +104,14 @@ export async function readZip(bytes: Uint8Array): Promise<ZipEntry[]> {
       break;
     }
   }
-  if (end < 0) throw new Error('No es un archivo .zip');
+  if (end < 0) throw new Error(t('Not a .zip file'));
   const count = v.getUint16(end + 10, true);
   let p = v.getUint32(end + 16, true);
   const utf8 = new TextDecoder();
   const latin = new TextDecoder('windows-1252');
   const out: ZipEntry[] = [];
   for (let n = 0; n < count; n++) {
-    if (v.getUint32(p, true) !== 0x02014b50) throw new Error('El .zip está dañado');
+    if (v.getUint32(p, true) !== 0x02014b50) throw new Error(t('The .zip is damaged'));
     const flags = v.getUint16(p + 8, true);
     const method = v.getUint16(p + 10, true);
     const size = v.getUint32(p + 20, true);
@@ -126,7 +127,7 @@ export async function readZip(bytes: Uint8Array): Promise<ZipEntry[]> {
     const raw = bytes.subarray(start, start + size);
     if (method === 0) out.push({ path, data: raw.slice() });
     else if (method === 8) out.push({ path, data: await inflateRaw(raw) });
-    else throw new Error(`${path}: método de compresión ${method} no soportado`);
+    else throw new Error(t('{path}: compression method {method} not supported', { path, method }));
   }
   return out;
 }

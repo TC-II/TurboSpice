@@ -2,12 +2,13 @@
 // clic afuera guardan, Esc cancela. Un nombre vacío o repetido marca el borde en rojo y no se
 // guarda (al salir del campo se descarta).
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../i18n/i18n.ts';
 
 /** Error del nombre propuesto, o null si sirve */
 export function nameError(name: string, taken: string[] = []): string | null {
   const n = name.trim();
-  if (!n) return 'El nombre no puede estar vacío';
-  if (taken.some((t) => t.trim().toLowerCase() === n.toLowerCase())) return `Ya hay uno que se llama «${n}»`;
+  if (!n) return t('The name can\'t be empty');
+  if (taken.some((tt) => tt.trim().toLowerCase() === n.toLowerCase())) return t('There\'s already one called «{n}»', { n });
   return null;
 }
 
@@ -36,7 +37,7 @@ export function NameInput({ value, taken, onDone, label }: {
       value={text}
       aria-label={label}
       aria-invalid={!!err}
-      title={err ?? 'Enter guarda · Esc cancela'}
+      title={err ?? t('Enter saves · Esc cancels')}
       size={Math.max(6, text.length + 1)}
       autoFocus
       onChange={(e) => setText(e.target.value)}
@@ -83,7 +84,7 @@ export function EditableName({ value, taken, onRename, label, className, title }
   return (
     <span
       className={`editable-name${className ? ` ${className}` : ''}`}
-      title={title ?? `${value} (doble clic para renombrar)`}
+      title={title ?? t('{value} (double-click to rename)', { value })}
       onDoubleClick={(e) => {
         e.stopPropagation();
         setEditing(true);

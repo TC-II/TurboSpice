@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Compuertas digitales de LTspice (dispositivos A: AND, OR, XOR, BUF) traducidas a ngspice.
 //
 // La línea de LTspice tiene siempre 8 nodos: "A1 in1 in2 in3 in4 in5 _Q Q com MODELO params".
@@ -21,8 +22,8 @@ const GATES = new Set(['and', 'or', 'xor', 'buf']);
 /** Parámetros "k=v" o "k v" (LTspice acepta los dos; v puede ser {expr}) de la línea A */
 function params(text: string): Map<string, string> {
   const out = new Map<string, string>();
-  const t = text.replace(/\s*=\s*/g, ' ').match(/\{[^{}]*\}|[^\s{}]+/g) ?? [];
-  for (let i = 0; i + 1 < t.length; i += 2) out.set(t[i].toLowerCase(), t[i + 1].replace(/^\{|\}$/g, ''));
+  const tt = text.replace(/\s*=\s*/g, ' ').match(/\{[^{}]*\}|[^\s{}]+/g) ?? [];
+  for (let i = 0; i + 1 < tt.length; i += 2) out.set(tt[i].toLowerCase(), tt[i + 1].replace(/^\{|\}$/g, ''));
   return out;
 }
 
@@ -38,7 +39,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   // tripdt/tripdv sólo controlan el paso de LTspice
   const known = new Set(['vhigh', 'vlow', 'ref', 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
   const ignored = [...p.keys()].filter((k) => !known.has(k));
-  if (ignored.length) warnings.push(`${name}: parámetros de la compuerta sin traducir: ${ignored.join(', ')}`);
+  if (ignored.length) warnings.push(t('{name}: gate parameters not translated: {p1}', { name, p1: ignored.join(', ') }));
   const num = (k: string, d: string) => `{${p.get(k) ?? d}}`;
   const vh = num('vhigh', '1'), vl = num('vlow', '0');
   const ref = p.has('ref') ? num('ref', '') : `(${vh}+${vl})/2`;

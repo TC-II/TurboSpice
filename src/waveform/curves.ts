@@ -4,6 +4,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
 import { isLogScale, resample, scaleOf } from './series.ts';
 import { PALETTE, traceColor, type Pane } from './view.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Cómo se muestran las trazas complejas (AC): Bode = magnitud en dB y fase a la vez */
 export type ComplexMode = 'bode' | 'db' | 'phase' | 'mag' | 'reim' | 'smith';
@@ -49,8 +50,8 @@ export function shade(hex: string, k: number, n: number): string {
   if (n <= 1 || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
   const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
   // de más oscuro a más claro alrededor del color base
-  const t = (k / (n - 1)) * 1.1 - 0.55;
-  const out = c.map((v) => Math.round(t < 0 ? v * (1 + t) : v + (255 - v) * t));
+  const tt = (k / (n - 1)) * 1.1 - 0.55;
+  const out = c.map((v) => Math.round(tt < 0 ? v * (1 + tt) : v + (255 - v) * tt));
   return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
@@ -77,21 +78,21 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   const x = segs.length > 1 ? scale.real.slice(segs[0][0], segs[0][1]) : scale.real;
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
-  const visible = pane.traces.filter((t) => !t.hidden);
-  const hasV = visible.some((t) => !isCurrentExpr(t.expr));
-  const hasI = visible.some((t) => isCurrentExpr(t.expr));
+  const visible = pane.traces.filter((tt) => !tt.hidden);
+  const hasV = visible.some((tt) => !isCurrentExpr(tt.expr));
+  const hasI = visible.some((tt) => isCurrentExpr(tt.expr));
   let complex = false;
   // con una sola traza y varias corridas, cada corrida con un color de la paleta
   const perRunColor = pane.traces.length === 1 && all.length > 1;
 
-  pane.traces.forEach((t, ti) => {
-    const base = traceColor(t, ti);
+  pane.traces.forEach((tt, ti) => {
+    const base = traceColor(tt, ti);
     all.forEach((r, ri) => {
       const rs = scaleOf(r);
       if (!rs) return;
       let w;
       try {
-        w = evalTrace(t.expr, { resolve: ctx.resolver(r), scale: rs.real, scaleName: rs.name });
+        w = evalTrace(tt.expr, { resolve: ctx.resolver(r), scale: rs.real, scaleName: rs.name });
       } catch (e) {
         if (ri === 0) errors.set(ti, (e as Error).message);
         return;
@@ -106,28 +107,28 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
         for (let k = 0; k < mag.length; k++) mag[k] = Math.hypot(w.re[k], w.im[k]);
         const db = mag.map((m) => 20 * Math.log10(m));
         const ph = unwrapDeg(w.re, w.im);
-        if (ctx.mode === 'bode') parts.push({ y: db, axis: 'y', dash: false, suffix: '' }, { y: ph, axis: 'ph', dash: true, suffix: ' (fase)' });
+        if (ctx.mode === 'bode') parts.push({ y: db, axis: 'y', dash: false, suffix: '' }, { y: ph, axis: 'ph', dash: true, suffix: t(' (phase)') });
         else if (ctx.mode === 'db') parts.push({ y: db, axis: 'y', dash: false, suffix: '' });
         else if (ctx.mode === 'phase') parts.push({ y: ph, axis: 'y', dash: false, suffix: '' });
         else if (ctx.mode === 'mag') parts.push({ y: mag, axis: 'y', dash: false, suffix: '' });
         else parts.push({ y: w.re, axis: 'y', dash: false, suffix: ' (re)' }, { y: w.im, axis: 'y', dash: true, suffix: ' (im)' });
       } else {
-        parts.push({ y: w.re, axis: isCurrentExpr(t.expr) && hasV ? 'i' : 'y', dash: false, suffix: '' });
+        parts.push({ y: w.re, axis: isCurrentExpr(tt.expr) && hasV ? 'i' : 'y', dash: false, suffix: '' });
       }
       for (const p of parts) {
         const y = toX(p.y);
         if (segs.length > 1) {
           segs.forEach(([a, b], si) => {
             const xs = scale.real.slice(a, b);
-            curves.push({ label: `${t.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!t.hidden, runLabel: `#${si + 1}` });
+            curves.push({ label: `${tt.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!tt.hidden, runLabel: `#${si + 1}` });
           });
         } else {
-          curves.push({ label: `${t.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, hidden: !!t.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}) });
+          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}) });
         }
       }
     });
   });
 
-  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? (visible.every((t) => /^\s*V\(/i.test(t.expr)) ? 'V' : '') : hasI ? 'A' : '';
+  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? (visible.every((tt) => /^\s*V\(/i.test(tt.expr)) ? 'V' : '') : hasI ? 'A' : '';
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
 }

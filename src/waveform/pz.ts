@@ -1,6 +1,7 @@
 // Polos y ceros (.pz): raíces de cada corrida, f₀, Q, ζ y τ, escalas del plano s.
 import type { SimPlot } from '../engine/ngspice.ts';
 import { si } from './series.ts';
+import { t } from '../i18n/i18n.ts';
 
 export const PZ_VECTOR = /^(pole|zero)\(\d+\)$/i;
 export const isPzPlot = (p: SimPlot) => p.vectors.some((v) => PZ_VECTOR.test(v.name));
@@ -94,13 +95,13 @@ export function ticks(lo: number, hi: number, step: number): number[] {
   return out;
 }
 
-const CSV_HEAD = ['corrida', 'tipo', 'n', 're [rad/s]', 'im [rad/s]', 'f0 [Hz]', 'Q', 'zeta', 'tau [s]'];
+const CSV_HEAD = [t('run'), t('type'), 'n', 're [rad/s]', 'im [rad/s]', 'f0 [Hz]', 'Q', 'zeta', 'tau [s]'];
 
 /** Tabla de raíces a CSV */
 export function pzCsv(roots: Root[], label: (run: number) => string): string {
   const rows = roots.map((r) => {
     const i = rootInfo(r);
-    return [label(r.run), r.kind === 'pole' ? 'polo' : 'cero', r.n, r.re, r.im, i.f0, i.q, i.zeta, i.tau].map((x) =>
+    return [label(r.run), r.kind === 'pole' ? t('pole') : t('zero'), r.n, r.re, r.im, i.f0, i.q, i.zeta, i.tau].map((x) =>
       typeof x === 'number' ? (Number.isFinite(x) ? String(x) : '') : `"${x}"`,
     );
   });

@@ -21,6 +21,12 @@ npm run preview & npm run e2e   # e2e en Chromium (CHROMIUM=/ruta si no está en
 npm test                 # tests unitarios (vitest)
 ```
 
+## Idiomas
+
+La interfaz es nativa en inglés, con traducción al español (botón **EN ES** en la barra superior).
+Los textos nuevos se escriben en inglés con `t()` y su traducción va en `src/i18n/es.ts`: ver
+[docs/i18n.md](docs/i18n.md). Control: `node scripts/i18n/check.mjs`.
+
 ## Deploy
 
 `.github/workflows/deploy.yml` compila el motor (cacheado), corre los tests y publica `dist/`

@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { NameInput } from './EditableName.tsx';
 import { Icon, type IconName } from './icons.tsx';
+import { t } from '../i18n/i18n.ts';
 
 /** Botón chico a la derecha de un ítem (duplicar, borrar, historial…) */
 export interface MenuAction {
@@ -97,8 +98,8 @@ export function AppMenu({ menus }: { menus: MenuDef[] }) {
   return (
     <MenuButton
       items={menus.map((m) => ({ label: m.label, items: m.items }))}
-      label="Menú"
-      title={`Menú: ${menus.map((m) => m.label).join(', ')}`}
+      label={t('Menu')}
+      title={t('Menu: {p0}', { p0: menus.map((m) => m.label).join(', ') })}
       className="app-menu-btn"
     >
       <Icon name="menu" />
@@ -217,7 +218,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
                 <NameInput
                   value={it.label}
                   taken={it.rename.taken}
-                  label={`Nombre de ${it.label}`}
+                  label={t('Name of {label}', { label: it.label })}
                   onDone={(n) => {
                     setEditing(null);
                     if (n) it.rename!.onRename(n);
@@ -231,7 +232,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
                 aria-label={it.label}
                 aria-keyshortcuts={it.shortcut}
                 disabled={it.disabled}
-                title={it.title ?? (it.rename ? 'Doble clic para renombrar' : undefined)}
+                title={it.title ?? (it.rename ? t('Double-click to rename') : undefined)}
                 onClick={() => {
                   clearTimeout(clickTimer.current);
                   const go = () => {

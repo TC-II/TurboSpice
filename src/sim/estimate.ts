@@ -4,6 +4,7 @@
 // rechaza con una estimación y una propuesta de menos puntos.
 import { formatSpiceNumber, parseSpiceNumber } from '../netlist/spicenum.ts';
 import { parseAnalysis, type Analysis, type Sweep } from './analyses.ts';
+import { t } from '../i18n/i18n.ts';
 
 /**
  * Por encima de esto no se simula. ngspice agranda los vectores con realloc (el viejo y el
@@ -106,7 +107,7 @@ export function countVectors(netlist: string, files: Record<string, string> = {}
       }
       const sub = /^\.subckt\s+(\S+)\s*(.*)$/i.exec(l);
       if (sub) {
-        cur = { ports: sub[2].split(/\s+/).filter((t) => t && !t.includes('=') && !/^params:$/i.test(t)), lines: [] };
+        cur = { ports: sub[2].split(/\s+/).filter((tt) => tt && !tt.includes('=') && !/^params:$/i.test(tt)), lines: [] };
         subckts.set(sub[1].toLowerCase(), cur);
         continue;
       }
@@ -119,7 +120,7 @@ export function countVectors(netlist: string, files: Record<string, string> = {}
     }
   };
   collect(netlist, true);
-  for (const t of Object.values(files)) collect(t, false);
+  for (const tt of Object.values(files)) collect(tt, false);
 
   // (memo por subcircuito: vectores internos de una instancia)
   const memo = new Map<string, number>();
@@ -131,7 +132,7 @@ export function countVectors(netlist: string, files: Record<string, string> = {}
       const tok = l.split(/\s+/);
       const letter = tok[0][0].toUpperCase();
       if (letter === 'X') {
-        const plain = tok.slice(1).filter((t) => !t.includes('=') && !/^params:$/i.test(t));
+        const plain = tok.slice(1).filter((tt) => !tt.includes('=') && !/^params:$/i.test(tt));
         const name = plain.pop()?.toLowerCase() ?? '';
         for (const n of plain) nodes.add(n.toLowerCase());
         vectors += depth > 8 ? 0 : inner(name, depth + 1);
@@ -174,17 +175,17 @@ export interface SizeCheck {
 
 /** Misma línea con menos puntos (para .ac/.noise: puntos por década; para .tran: paso máximo) */
 function fewerPoints(line: string, a: Analysis, factor: number): string | undefined {
-  const t = line.trim().split(/\s+/);
+  const tt = line.trim().split(/\s+/);
   if ('sweep' in a && a.kind !== 'sens') {
-    const i = t.findIndex((x) => /^(dec|oct|lin)$/i.test(x));
+    const i = tt.findIndex((x) => /^(dec|oct|lin)$/i.test(x));
     if (i < 0) return undefined;
-    const n = parseSpiceNumber(t[i + 1]);
+    const n = parseSpiceNumber(tt[i + 1]);
     // (en dec/oct, más de 1000 puntos no aportan: tampoco se proponen)
     const want = Math.max(1, Math.min(Math.floor(n * factor), a.sweep.type === 'lin' ? Infinity : 1000));
     // un número redondo: 10, 20, 50, 100, 200, 500…
     const round = [1, 2, 5].flatMap((m) => [0, 1, 2, 3, 4, 5, 6].map((e) => m * 10 ** e)).filter((x) => x <= want).sort((x, y) => y - x)[0] ?? 1;
-    t[i + 1] = String(round);
-    return t.join(' ');
+    tt[i + 1] = String(round);
+    return tt.join(' ');
   }
   if (a.kind === 'tran') {
     const p = analysisPoints(a);
@@ -209,7 +210,7 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     if (!Number.isFinite(points)) continue;
     if ('sweep' in a && a.sweep.type !== 'lin' && parseSpiceNumber(a.sweep.points) > MAX_PER_DECADE * (a.sweep.type === 'oct' ? 0.3 : 1)) {
       out.warnings.push({
-        text: `${line}: ${fmtCount(parseSpiceNumber(a.sweep.points))} puntos por ${a.sweep.type === 'dec' ? 'década' : 'octava'} casi nunca aportan resolución (con 100 a 1000 alcanza)`,
+        text: t('{line}: {p1} points per {p2} hardly ever add resolution (100 to 1000 is enough)', { line, p1: fmtCount(parseSpiceNumber(a.sweep.points)), p2: a.sweep.type === 'dec' ? t('decade') : t('octave') }),
       });
     }
     vectors ??= countVectors(netlist, files);
@@ -217,15 +218,15 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     const bytes = points * vectors * (complex ? 16 : 8) * runs;
     if (bytes <= MAX_SIM_BYTES && points <= MAX_POINTS) continue;
     const to = fewerPoints(line, a, Math.min(TARGET_BYTES / bytes, TARGET_POINTS / points));
-    const per = runs > 1 ? ` × ${runs} corridas` : '';
+    const per = runs > 1 ? t(' × {runs} runs', { runs }) : '';
     const why =
       bytes > MAX_SIM_BYTES
-        ? `≈ ${fmtBytes(bytes)}: más de lo que el navegador puede guardar y graficar`
-        : `≈ ${fmtBytes(bytes)}: demasiados puntos para simular y graficar en un tiempo razonable`;
+        ? t('≈ {p0}: more than the browser can store and plot', { p0: fmtBytes(bytes) })
+        : t('≈ {p0}: too many points to simulate and plot in a reasonable time', { p0: fmtBytes(bytes) });
     out.errors.push({
       text:
-        `${line} genera ${fmtCount(points)} puntos × ${vectors} vectores${per} ${why}, así que no se simula.` +
-        (to ? ` Probá con «${to}».` : ' Reducí la cantidad de puntos.'),
+        t('{line} produces {p1} points × {vectors} vectors{per} {why}, so it isn\'t simulated.', { line, p1: fmtCount(points), vectors, per, why }) +
+        (to ? t(' Try «{to}».', { to }) : t(' Lower the number of points.')),
       fix: to ? { from: line, to } : undefined,
     });
   }

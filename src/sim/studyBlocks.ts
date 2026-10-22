@@ -7,6 +7,7 @@ import { parseStep } from '../netlist/step.ts';
 import { PALETTE, type PlotView } from '../waveform/view.ts';
 import type { MeasAnalysis } from './meas.ts';
 import { measureLines, MEASURE_KINDS, stepLine, type MeasureKind, type Study, type StudyMeasure, type StudySweep, type SweepTarget } from './study.ts';
+import { t } from '../i18n/i18n.ts';
 
 // --- JSON de Blockly ----------------------------------------------------------------------
 
@@ -39,58 +40,58 @@ export function targetOf(v: string): SweepTarget | null {
   return null;
 }
 
-export const targetKey = (t: SweepTarget) => (t.kind === 'temp' ? 'temp' : t.kind === 'model' ? '' : `${t.kind}:${t.name}`);
+export const targetKey = (tt: SweepTarget) => (tt.kind === 'temp' ? 'temp' : tt.kind === 'model' ? '' : `${tt.kind}:${tt.name}`);
 
 /** Mediciones que se pueden usar desde bloques (con su análisis) */
 export const BLOCK_MEASURES: [MeasureKind, string, MeasAnalysis | null][] = [
-  ['max', 'el máximo', null],
-  ['min', 'el mínimo', null],
-  ['pp', 'el pico a pico', null],
-  ['avg', 'el promedio', null],
-  ['rms', 'el valor eficaz', 'tran'],
-  ['at', 'el valor en (A)', null],
-  ['rise', 'el tiempo de subida (de A a B)', 'tran'],
-  ['fall', 'el tiempo de bajada (de A a B)', 'tran'],
-  ['period', 'el período (cruce por A)', 'tran'],
-  ['freq', 'la frecuencia (cruce por A)', 'tran'],
-  ['gainAt', 'la ganancia en dB a la frecuencia A', 'ac'],
-  ['f3db', 'la frecuencia de corte (−3 dB)', 'ac'],
-  ['f0db', 'la frecuencia de cruce por 0 dB', 'ac'],
-  ['phaseMargin', 'el margen de fase', 'ac'],
+  ['max', t('the maximum'), null],
+  ['min', t('the minimum'), null],
+  ['pp', t('the peak-to-peak'), null],
+  ['avg', t('the average'), null],
+  ['rms', t('the RMS value'), 'tran'],
+  ['at', t('the value at (A)'), null],
+  ['rise', t('the rise time (from A to B)'), 'tran'],
+  ['fall', t('the fall time (from A to B)'), 'tran'],
+  ['period', t('the period (crossing A)'), 'tran'],
+  ['freq', t('the frequency (crossing A)'), 'tran'],
+  ['gainAt', t('the gain in dB at frequency A'), 'ac'],
+  ['f3db', t('the cutoff frequency (−3 dB)'), 'ac'],
+  ['f0db', t('the 0 dB crossover frequency'), 'ac'],
+  ['phaseMargin', t('the phase margin'), 'ac'],
 ];
 
 /** Colores del bloque "Graficar señal" (la paleta del visor) */
 export const PLOT_COLORS: [string, string][] = [
-  ['automático', 'auto'],
-  ...(['verde', 'azul', 'rojo', 'turquesa', 'violeta', 'gris', 'naranja', 'oliva', 'fucsia', 'azul oscuro'] as const).map((n, i): [string, string] => [n, PALETTE[i]]),
+  [t('automatic'), 'auto'],
+  ...(['green', 'blue', 'red', 'turquoise', 'violet', 'gray', 'orange', 'olive', 'fuchsia', 'dark blue'] as const).map((n, i): [string, string] => [t(n), PALETTE[i]]),
 ];
 
 /** Definiciones JSON de los bloques propios; los desplegables de componentes los completa la UI */
 export function blockDefinitions(): object[] {
   const stmt = { previousStatement: null, nextStatement: null };
   return [
-    { type: 'ts_simulate', message0: 'Simular el análisis del esquemático', colour: COLORS.sim, tooltip: 'Corre los análisis del esquemático (.tran, .ac…)', ...stmt },
+    { type: 'ts_simulate', message0: t('Simulate the schematic\'s analysis'), colour: COLORS.sim, tooltip: t('Runs the schematic\'s analyses (.tran, .ac…)'), ...stmt },
     {
       type: 'ts_for_list',
-      message0: 'Para cada valor %1 de %2 en %3 %4 %5',
+      message0: t('For each value %1 of %2 in %3 %4 %5'),
       args0: [
-        { type: 'field_variable', name: 'VAR', variable: 'valor' },
-        { type: 'field_dropdown', name: 'TARGET', options: [['(elegir)', '']] },
+        { type: 'field_variable', name: 'VAR', variable: t('value') },
+        { type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] },
         { type: 'field_input', name: 'VALUES', text: '1k 2k 5k' },
         { type: 'input_dummy' },
         { type: 'input_statement', name: 'DO' },
       ],
       colour: COLORS.loop,
-      tooltip: 'Repite los bloques de adentro con cada valor (separados por espacios)',
+      tooltip: t('Repeats the inner blocks with each value (separated by spaces)'),
       ...stmt,
     },
     {
       type: 'ts_for_range',
-      message0: 'Para cada valor %1 de %2 %3 desde %4 hasta %5 paso %6 %7 %8',
+      message0: t('For each value %1 of %2 %3 from %4 to %5 step %6 %7 %8'),
       args0: [
-        { type: 'field_variable', name: 'VAR', variable: 'valor' },
-        { type: 'field_dropdown', name: 'TARGET', options: [['(elegir)', '']] },
-        { type: 'field_dropdown', name: 'MODE', options: [['lineal', 'lin'], ['por década', 'dec'], ['por octava', 'oct']] },
+        { type: 'field_variable', name: 'VAR', variable: t('value') },
+        { type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] },
+        { type: 'field_dropdown', name: 'MODE', options: [[t('linear'), 'lin'], [t('per decade'), 'dec'], [t('per octave'), 'oct']] },
         { type: 'field_input', name: 'START', text: '1k' },
         { type: 'field_input', name: 'STOP', text: '10k' },
         { type: 'field_input', name: 'STEP', text: '1k' },
@@ -98,27 +99,27 @@ export function blockDefinitions(): object[] {
         { type: 'input_statement', name: 'DO' },
       ],
       colour: COLORS.loop,
-      tooltip: 'Barrido lineal (paso) o logarítmico (puntos por década/octava)',
+      tooltip: t('Linear sweep (step) or logarithmic (points per decade/octave)'),
       ...stmt,
     },
     {
       type: 'ts_repeat',
-      message0: 'Repetir %1 veces %2 %3',
+      message0: t('Repeat %1 times %2 %3'),
       args0: [{ type: 'field_number', name: 'TIMES', value: 3, min: 1, precision: 1 }, { type: 'input_dummy' }, { type: 'input_statement', name: 'DO' }],
       colour: COLORS.loop,
       ...stmt,
     },
     {
       type: 'ts_set',
-      message0: 'Poner %1 en %2',
-      args0: [{ type: 'field_dropdown', name: 'TARGET', options: [['(elegir)', '']] }, { type: 'input_value', name: 'VALUE' }],
+      message0: t('Set %1 to %2'),
+      args0: [{ type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] }, { type: 'input_value', name: 'VALUE' }],
       colour: COLORS.circuit,
-      tooltip: 'Cambia el valor de un componente, un parámetro, una fuente o la temperatura',
+      tooltip: t('Changes the value of a component, a parameter, a source or the temperature'),
       ...stmt,
     },
     {
       type: 'ts_measure',
-      message0: 'Medir %1 de %2 A %3 B %4 → %5',
+      message0: t('Measure %1 of %2 A %3 B %4 → %5'),
       args0: [
         { type: 'field_dropdown', name: 'KIND', options: BLOCK_MEASURES.map(([k, l]) => [l, k]) },
         { type: 'field_input', name: 'SIGNAL', text: 'V(out)' },
@@ -127,12 +128,12 @@ export function blockDefinitions(): object[] {
         { type: 'field_variable', name: 'VAR', variable: 'medida' },
       ],
       colour: COLORS.measure,
-      tooltip: 'Mide la señal en la última simulación y guarda el resultado en la variable',
+      tooltip: t('Measures the signal in the last simulation and stores the result in the variable'),
       ...stmt,
     },
     {
       type: 'ts_print',
-      message0: 'Mostrar en el Log %1',
+      message0: t('Print to the Log %1'),
       args0: [{ type: 'input_value', name: 'VALUE' }],
       colour: COLORS.show,
       ...stmt,
@@ -140,24 +141,24 @@ export function blockDefinitions(): object[] {
     {
       type: 'ts_message',
       message0: 'Mensaje %1',
-      args0: [{ type: 'field_input', name: 'TEXT', text: 'listo' }],
+      args0: [{ type: 'field_input', name: 'TEXT', text: t('done') }],
       colour: COLORS.show,
       ...stmt,
     },
     {
       type: 'ts_plot_xy',
-      message0: 'Graficar %1 en función de %2',
+      message0: t('Plot %1 against %2'),
       args0: [
         { type: 'field_variable', name: 'Y', variable: 'medida' },
-        { type: 'field_variable', name: 'X', variable: 'valor' },
+        { type: 'field_variable', name: 'X', variable: t('value') },
       ],
       colour: COLORS.show,
-      tooltip: 'Agrega un punto (x, y) cada vez que se ejecuta; al terminar aparece el gráfico',
+      tooltip: t('Adds an (x, y) point every time it runs; when done the plot shows up'),
       ...stmt,
     },
     {
       type: 'ts_plot_signal',
-      message0: 'Graficar la señal %1 en el panel %2 con color %3 en %4',
+      message0: t('Plot signal %1 in pane %2 with color %3 in %4'),
       args0: [
         { type: 'field_input', name: 'SIGNAL', text: 'V(out)' },
         { type: 'field_number', name: 'PANE', value: 1, min: 1, precision: 1 },
@@ -166,15 +167,15 @@ export function blockDefinitions(): object[] {
           type: 'field_dropdown',
           name: 'ANALYSIS',
           options: [
-            ['transitorio', 'tran'],
+            [t('transient'), 'tran'],
             ['AC (Bode)', 'ac'],
-            ['barrido DC', 'dc'],
-            ['ruido', 'noise'],
+            [t('dc sweep'), 'dc'],
+            [t('noise'), 'noise'],
           ],
         },
       ],
       colour: COLORS.show,
-      tooltip: 'Qué mostrar en los resultados de ese análisis (lo mismo que "Recordar vista"); no se ejecuta en cada corrida',
+      tooltip: t('What to show in that analysis\' results (same as "Remember view"); it doesn\'t run on every run'),
       ...stmt,
     },
   ];
@@ -188,14 +189,14 @@ export function toolbox(): object {
   return {
     kind: 'categoryToolbox',
     contents: [
-      cat('Simular', COLORS.sim, [b('ts_simulate')]),
-      cat('Circuito', COLORS.circuit, [b('ts_set', { inputs: { VALUE: num(1000) } })]),
-      cat('Repetir', COLORS.loop, [b('ts_for_list'), b('ts_for_range'), b('ts_repeat')]),
-      cat('Medir', COLORS.measure, [b('ts_measure')]),
-      cat('Calcular', '%{BKY_MATH_HUE}', [b('math_number'), b('math_arithmetic', { inputs: { A: num(1), B: num(1) } }), b('math_single', { inputs: { NUM: num(9) } })]),
-      cat('Lógica', '%{BKY_LOGIC_HUE}', [b('controls_if'), b('logic_compare'), b('logic_operation'), b('logic_negate'), b('logic_boolean')]),
+      cat(t('Simulate'), COLORS.sim, [b('ts_simulate')]),
+      cat(t('Circuit'), COLORS.circuit, [b('ts_set', { inputs: { VALUE: num(1000) } })]),
+      cat(t('Repeat'), COLORS.loop, [b('ts_for_list'), b('ts_for_range'), b('ts_repeat')]),
+      cat(t('Measure'), COLORS.measure, [b('ts_measure')]),
+      cat(t('Compute'), '%{BKY_MATH_HUE}', [b('math_number'), b('math_arithmetic', { inputs: { A: num(1), B: num(1) } }), b('math_single', { inputs: { NUM: num(9) } })]),
+      cat(t('Logic'), '%{BKY_LOGIC_HUE}', [b('controls_if'), b('logic_compare'), b('logic_operation'), b('logic_negate'), b('logic_boolean')]),
       cat('Variables', '%{BKY_VARIABLES_HUE}', [], { custom: 'VARIABLE' }),
-      cat('Mostrar', COLORS.show, [b('ts_plot_signal'), b('ts_plot_xy'), b('ts_print'), b('ts_message'), b('text')]),
+      cat(t('Show'), COLORS.show, [b('ts_plot_signal'), b('ts_plot_xy'), b('ts_print'), b('ts_message'), b('text')]),
     ],
   };
 }
@@ -251,7 +252,7 @@ class Compiler {
 
   expr(b: BlockJson | undefined): string {
     if (!b) {
-      this.errors.push('Falta un valor en un bloque');
+      this.errors.push(t('A block is missing a value'));
       return '0';
     }
     switch (b.type) {
@@ -273,7 +274,7 @@ class Compiler {
         if (f) return `${f}(${a})`;
         if (field(b, 'OP') === 'NEG') return `(-${a})`;
         if (field(b, 'OP') === 'POW10') return `(10^${a})`;
-        this.errors.push(`Operación no disponible: ${field(b, 'OP')}`);
+        this.errors.push(t('Operation not available: {p0}', { p0: field(b, 'OP') }));
         return a;
       }
       case 'logic_compare': {
@@ -285,20 +286,20 @@ class Compiler {
       case 'logic_negate':
         return `(not ${this.expr(input(b, 'BOOL'))})`;
       default:
-        this.errors.push(`Bloque de valor no soportado: ${b.type}`);
+        this.errors.push(t('Unsupported value block: {type}', { type: b.type }));
         return '0';
     }
   }
 
   /** Asigna un objetivo (componente, parámetro, fuente, temperatura) desde una variable de shell */
-  assign(t: SweepTarget, value: string): string[] {
-    switch (t.kind) {
+  assign(tt: SweepTarget, value: string): string[] {
+    switch (tt.kind) {
       case 'component':
-        return [`alter ${t.name.toLowerCase()} = ${value}`];
+        return [`alter ${tt.name.toLowerCase()} = ${value}`];
       case 'source':
-        return [`alter ${t.name.toLowerCase()} dc = ${value}`];
+        return [`alter ${tt.name.toLowerCase()} dc = ${value}`];
       case 'param':
-        return [`alterparam ${t.name} = ${value}`, 'reset'];
+        return [`alterparam ${tt.name} = ${value}`, 'reset'];
       case 'temp':
         return [`option temp = ${value}`];
       default:
@@ -307,15 +308,15 @@ class Compiler {
   }
 
   values(b: BlockJson): string[] | null {
-    const t = targetOf(field(b, 'TARGET'));
-    if (!t) {
-      this.errors.push('Elegí qué variar en un bloque "Para cada valor"');
+    const tt = targetOf(field(b, 'TARGET'));
+    if (!tt) {
+      this.errors.push(t('Choose what to vary in a "For each value" block'));
       return null;
     }
-    const s = loopSweep(b, t);
+    const s = loopSweep(b, tt);
     const r = parseStep(stepLine(s));
     if (typeof r === 'string') {
-      this.errors.push(`Valores inválidos en "Para cada valor de ${'name' in t ? t.name : 'temperatura'}": ${r}`);
+      this.errors.push(t('Invalid values in "For each value of {p0}": {r}', { p0: 'name' in tt ? tt.name : t('temperature'), r }));
       return null;
     }
     return r.values.map(formatSpiceNumber);
@@ -356,26 +357,26 @@ class Compiler {
       case 'ts_for_list':
       case 'ts_for_range': {
         const vals = this.values(b);
-        const t = targetOf(field(b, 'TARGET'));
-        if (!vals || !t) return [];
+        const tt = targetOf(field(b, 'TARGET'));
+        if (!vals || !tt) return [];
         const v = this.shell(this.varName(b, 'VAR'));
-        const sc = [...scope, { t, v }];
+        const sc = [...scope, { t: tt, v }];
         // con un parámetro (reset) hay que volver a aplicar los valores de los bucles de afuera
         const params = sc.filter((x) => x.t.kind === 'param');
         const setup = params.length
           ? [...params.map((x) => `alterparam ${(x.t as { name: string }).name} = $${x.v}`), 'reset', ...sc.filter((x) => x.t.kind !== 'param').flatMap((x) => this.assign(x.t, `$${x.v}`))]
-          : this.assign(t, `$${v}`);
+          : this.assign(tt, `$${v}`);
         return [`foreach ${v} ${vals.join(' ')}`, ...setup.map((l) => `  ${l}`), ...body('DO', sc), 'end'];
       }
       case 'ts_repeat':
         return [`repeat ${Math.max(1, Math.round(Number(b.fields?.TIMES ?? 1)))}`, ...body('DO'), 'end'];
       case 'ts_set': {
-        const t = targetOf(field(b, 'TARGET'));
-        if (!t) {
-          this.errors.push('Elegí qué cambiar en un bloque "Poner"');
+        const tt = targetOf(field(b, 'TARGET'));
+        if (!tt) {
+          this.errors.push(t('Choose what to change in a "Set" block'));
           return [];
         }
-        return ['let ts_tmp = ' + this.expr(input(b, 'VALUE')), 'set ts_val = "$&ts_tmp"', ...this.assign(t, '$ts_val')];
+        return ['let ts_tmp = ' + this.expr(input(b, 'VALUE')), 'set ts_val = "$&ts_tmp"', ...this.assign(tt, '$ts_val')];
       }
       case 'ts_measure':
         return this.measure(b, this.varName(b, 'VAR'));
@@ -420,16 +421,16 @@ class Compiler {
         return [`echo "${XY_PREFIX} ${p.id}" $${this.shell(x)} $${this.shell(y)}`];
       }
       default:
-        this.errors.push(`Bloque no soportado: ${b.type}`);
+        this.errors.push(t('Unsupported block: {type}', { type: b.type }));
         return [];
     }
   }
 }
 
-function loopSweep(b: BlockJson, t: SweepTarget): StudySweep {
+function loopSweep(b: BlockJson, tt: SweepTarget): StudySweep {
   return b.type === 'ts_for_list'
-    ? { target: t, mode: 'list', list: field(b, 'VALUES'), start: '', stop: '', step: '', enabled: true }
-    : { target: t, mode: field(b, 'MODE') as StudySweep['mode'], list: '', start: field(b, 'START'), stop: field(b, 'STOP'), step: field(b, 'STEP'), enabled: true };
+    ? { target: tt, mode: 'list', list: field(b, 'VALUES'), start: '', stop: '', step: '', enabled: true }
+    : { target: tt, mode: field(b, 'MODE') as StudySweep['mode'], list: '', start: field(b, 'START'), stop: field(b, 'STOP'), step: field(b, 'STEP'), enabled: true };
 }
 
 function blockMeasure(b: BlockJson, name: string, analysis: MeasAnalysis): StudyMeasure {
@@ -459,9 +460,9 @@ function asCards(top: BlockJson[], analysis: MeasAnalysis, varName: (b: BlockJso
   let core = top.slice(0, 1);
   // bucles anidados, cada uno con un solo bloque adentro (o el núcleo)
   while (core.length === 1 && (core[0].type === 'ts_for_list' || core[0].type === 'ts_for_range')) {
-    const t = targetOf(field(core[0], 'TARGET'));
-    if (!t) return null;
-    sweeps.unshift(loopSweep(core[0], t));
+    const tt = targetOf(field(core[0], 'TARGET'));
+    if (!tt) return null;
+    sweeps.unshift(loopSweep(core[0], tt));
     core = chain(input(core[0], 'DO'));
   }
   if (core[0]?.type !== 'ts_simulate') return null;
@@ -548,8 +549,8 @@ export function studyToBlocks(st: Study): WorkspaceJson {
   // la vista de resultados, como bloques "Graficar señal" al final
   for (const [kind, panes] of Object.entries(st.plot ?? {})) {
     panes.forEach((p, pi) =>
-      p.traces.forEach((t) =>
-        core.push({ type: 'ts_plot_signal', fields: { SIGNAL: t.expr, PANE: pi + 1, COLOR: t.color && PLOT_COLORS.some(([, c]) => c === t.color) ? t.color : 'auto', ANALYSIS: kind } }),
+      p.traces.forEach((tt) =>
+        core.push({ type: 'ts_plot_signal', fields: { SIGNAL: tt.expr, PANE: pi + 1, COLOR: tt.color && PLOT_COLORS.some(([, c]) => c === tt.color) ? tt.color : 'auto', ANALYSIS: kind } }),
       ),
     );
   }

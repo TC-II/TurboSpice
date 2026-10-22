@@ -4,6 +4,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons.tsx';
 import { MenuButton, type MenuItem } from './Menu.tsx';
+import { t } from '../i18n/i18n.ts';
 
 export interface ToolDef {
   icon: IconName;
@@ -27,7 +28,7 @@ export interface ToolGroup {
   tools: ToolDef[];
 }
 
-export const toolTitle = (t: { title: string; shortcut?: string }) => (t.shortcut ? `${t.title} (${t.shortcut})` : t.title);
+export const toolTitle = (tt: { title: string; shortcut?: string }) => (tt.shortcut ? `${tt.title} (${tt.shortcut})` : tt.title);
 
 export function ToolButton({ tool }: { tool: ToolDef }) {
   if (tool.items)
@@ -86,10 +87,10 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
   const hidden = groups.slice(shown);
   const moreItems: MenuItem[] = hidden.flatMap((g, i) => [
     ...(i ? ['sep' as const] : []),
-    ...g.tools.map((t): MenuItem =>
-      t.items
-        ? { label: t.label, items: t.items, disabled: t.disabled }
-        : { label: t.label, shortcut: t.shortcut, title: t.title, onClick: t.onClick ?? (() => {}), disabled: t.disabled, checked: t.active },
+    ...g.tools.map((tt): MenuItem =>
+      tt.items
+        ? { label: tt.label, items: tt.items, disabled: tt.disabled }
+        : { label: tt.label, shortcut: tt.shortcut, title: tt.title, onClick: tt.onClick ?? (() => {}), disabled: tt.disabled, checked: tt.active },
     ),
   ]);
 
@@ -97,14 +98,14 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
     <div className="iconbar" role="toolbar" aria-label={label} ref={bar}>
       {groups.slice(0, shown).map((g) => (
         <div key={g.id} className="group" role="group" aria-label={g.label} data-group={g.id}>
-          {g.tools.map((t) => (
-            <ToolButton key={t.label} tool={t} />
+          {g.tools.map((tt) => (
+            <ToolButton key={tt.label} tool={tt} />
           ))}
         </div>
       ))}
       {hidden.length > 0 && (
         <div className="group more">
-          <MenuButton items={moreItems} label="Más herramientas" title={`Más herramientas: ${hidden.map((g) => g.label.toLowerCase()).join(', ')}`}>
+          <MenuButton items={moreItems} label={t('More tools')} title={t('More tools: {p0}', { p0: hidden.map((g) => g.label.toLowerCase()).join(', ') })}>
             <Icon name="more" />
           </MenuButton>
         </div>

@@ -2,17 +2,18 @@
 // dibujito en el medio del símbolo de la fuente de tensión, que muestra qué forma de onda tiene.
 import type { ReactNode } from 'react';
 import type { SourceKind } from '../sim/sources.ts';
+import { t } from '../i18n/i18n.ts';
 
 export const KINDS: { kind: SourceKind; label: string; icon: ReactNode }[] = [
-  { kind: 'sine', label: 'Seno', icon: <path d="M3 10C9 -2 15 -2 21 10S33 22 39 10" /> },
+  { kind: 'sine', label: t('Sine'), icon: <path d="M3 10C9 -2 15 -2 21 10S33 22 39 10" /> },
   { kind: 'ac', label: 'AC', icon: <path d="M12 16H36M16 16L33 5M28 5H33V10" strokeLinecap="round" strokeLinejoin="round" /> },
-  { kind: 'pulse', label: 'Pulso', icon: <path d="M3 16H9L11 4H19L21 16H27L29 4H37L39 16H43" /> },
-  { kind: 'dc', label: 'Valor DC', icon: <path d="M23 1V7M13 7H33M17 12H29M23 12V19" strokeLinecap="round" /> },
-  { kind: 'exp', label: 'Exponencial', icon: <path d="M3 17H8C12 5 18 4 24 4C28 4 29 4 30 5C33 15 38 17 43 17" /> },
+  { kind: 'pulse', label: t('Pulse'), icon: <path d="M3 16H9L11 4H19L21 16H27L29 4H37L39 16H43" /> },
+  { kind: 'dc', label: t('DC value'), icon: <path d="M23 1V7M13 7H33M17 12H29M23 12V19" strokeLinecap="round" /> },
+  { kind: 'exp', label: t('Exponential'), icon: <path d="M3 17H8C12 5 18 4 24 4C28 4 29 4 30 5C33 15 38 17 43 17" /> },
   { kind: 'sffm', label: 'FM (SFFM)', icon: <path d={fmIcon()} strokeWidth="1.3" /> },
   {
     kind: 'pwl',
-    label: 'Por puntos',
+    label: t('Piecewise linear'),
     icon: (
       <>
         <path d="M3 16L12 6L20 12L30 3L43 15" />

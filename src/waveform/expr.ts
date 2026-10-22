@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Expresiones de trazas al estilo LTspice: V(out), V(a,b), I(R1), Ic(Q1), V(out)/V(in),
 // db(V(out)), d(V(c)), 2*I(L1)… Se evalúan punto a punto sobre vectores reales o complejos.
 // Con .step, V(out)@2 es el vector de la segunda corrida (como en LTspice).
@@ -42,7 +43,7 @@ export function parseExpr(src: string): Node {
   };
   const expect = (c: string) => {
     ws();
-    if (src[i] !== c) throw new ExprError(`se esperaba "${c}" en la posición ${i + 1}`);
+    if (src[i] !== c) throw new ExprError(t('expected "{c}" at position {p1}', { c, p1: i + 1 }));
     i++;
   };
 
@@ -65,7 +66,7 @@ export function parseExpr(src: string): Node {
       return { t: 'num', v: parseFloat(num[1] + (num[2] ?? '')) * (num[3] ? SUFFIX[num[3].toLowerCase()] : 1) };
     }
     const id = /^[A-Za-z_][\w.#@:[\]§$]*/.exec(src.slice(i));
-    if (!id) throw new ExprError(`expresión inválida en la posición ${i + 1}`);
+    if (!id) throw new ExprError(t('invalid expression at position {p0}', { p0: i + 1 }));
     const name = id[0];
     i += name.length;
     ws();
@@ -77,13 +78,13 @@ export function parseExpr(src: string): Node {
     i++;
     if (isRefFn(name)) {
       const close = src.indexOf(')', i);
-      if (close < 0) throw new ExprError('falta ")"');
+      if (close < 0) throw new ExprError(t('missing ")"'));
       const args = src
         .slice(i, close)
         .split(',')
         .map((a) => a.trim());
       i = close + 1;
-      if (!args[0]) throw new ExprError(`${name}() necesita un argumento`);
+      if (!args[0]) throw new ExprError(t('{name}() needs an argument', { name }));
       // "V(out)@2": en la corrida 2
       const at = /^\s*@(\d+)/.exec(src.slice(i));
       if (at) i += at[0].length;
@@ -101,7 +102,7 @@ export function parseExpr(src: string): Node {
       }
     }
     expect(')');
-    if (!FUNCTIONS.includes(name.toLowerCase())) throw new ExprError(`función desconocida: ${name}`);
+    if (!FUNCTIONS.includes(name.toLowerCase())) throw new ExprError(t('unknown function: {name}', { name }));
     return { t: 'call', fn: name.toLowerCase(), args };
   }
   function power(): Node {
@@ -252,12 +253,12 @@ function ev(n: Node, ctx: EvalContext): C {
       if (v === 'j') return { re: fill(1, 0), im: fill(1, 1) };
       // un nombre suelto es un nodo, como en LTspice ("out" = V(out))
       const w = ctx.resolve('V', [n.name], n.run);
-      if (!w) throw new ExprError(`no existe ${n.name}${n.run ? `@${n.run}` : ''}`);
+      if (!w) throw new ExprError(t('{name}{p1} doesn\'t exist', { name: n.name, p1: n.run ? `@${n.run}` : '' }));
       return { re: w.re, im: w.im ?? null };
     }
     case 'ref': {
       const w = ctx.resolve(n.fn, n.args, n.run);
-      if (!w) throw new ExprError(`no existe ${n.fn}(${n.args.join(',')})${n.run ? `@${n.run}` : ''}`);
+      if (!w) throw new ExprError(t('{fn}({p1}){p2} doesn\'t exist', { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
       return { re: w.re, im: w.im ?? null };
     }
     case 'un': {
@@ -283,7 +284,7 @@ function ev(n: Node, ctx: EvalContext): C {
     case 'call': {
       const args = n.args.map((x) => ev(x, ctx));
       const a = args[0];
-      if (!a) throw new ExprError(`${n.fn}() necesita un argumento`);
+      if (!a) throw new ExprError(t('{fn}() needs an argument', { fn: n.fn }));
       switch (n.fn) {
         case 'db':
           return map1(a, (r, j) => [20 * Math.log10(Math.hypot(r, j)), 0], true);
@@ -319,11 +320,11 @@ function ev(n: Node, ctx: EvalContext): C {
         case 'sgn':
           return map1(a, (r) => [Math.sign(r), 0], true);
         case 'pow':
-          if (!args[1]) throw new ExprError('pow(x, y) necesita dos argumentos');
+          if (!args[1]) throw new ExprError(t('pow(x, y) needs two arguments'));
           return map2(a, args[1], cpow);
         case 'min':
         case 'max': {
-          if (!args[1]) throw new ExprError(`${n.fn}(a, b) necesita dos argumentos`);
+          if (!args[1]) throw new ExprError(t('{fn}(a, b) needs two arguments', { fn: n.fn }));
           const f = n.fn === 'min' ? Math.min : Math.max;
           return map2(a, args[1], (ar, _ai, br) => [f(ar, br), 0]);
         }

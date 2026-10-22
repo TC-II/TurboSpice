@@ -18,6 +18,7 @@ import { parseStep } from '../netlist/step.ts';
 import { viewFromDoc, withView, type PlotView } from '../waveform/view.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
 import { parseMeas, type MeasAnalysis, type MeasDef } from './meas.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type SweepTarget =
   | { kind: 'component'; name: string }
@@ -136,37 +137,37 @@ export interface Study {
 
 /** Comentario del .asc que guarda el programa de bloques (base64 del JSON) */
 export const STUDY_BLOCKS = DATA_TAGS.study;
-export const isStudyBlocksText = (t: { kind: string; text: string }) => isDataTextOf(t, 'study');
+export const isStudyBlocksText = (tt: { kind: string; text: string }) => isDataTextOf(tt, 'study');
 
 export const emptyStudy = (): Study => ({ sweeps: [], tolerance: null, measures: [], custom: null });
 
 /** Descripción de las mediciones disponibles, por análisis (para el formulario) */
 export const MEASURE_KINDS: { kind: MeasureKind; label: string; analysis: MeasAnalysis[] }[] = [
-  { kind: 'max', label: 'Máximo', analysis: ['tran', 'ac', 'dc', 'noise'] },
-  { kind: 'min', label: 'Mínimo', analysis: ['tran', 'ac', 'dc', 'noise'] },
-  { kind: 'pp', label: 'Pico a pico', analysis: ['tran', 'dc'] },
-  { kind: 'avg', label: 'Promedio', analysis: ['tran', 'dc'] },
-  { kind: 'rms', label: 'Valor eficaz (RMS)', analysis: ['tran'] },
-  { kind: 'at', label: 'Valor en un punto', analysis: ['tran', 'ac', 'dc', 'noise'] },
-  { kind: 'rise', label: 'Tiempo de subida', analysis: ['tran'] },
-  { kind: 'fall', label: 'Tiempo de bajada', analysis: ['tran'] },
-  { kind: 'delay', label: 'Retardo entre dos señales', analysis: ['tran'] },
-  { kind: 'period', label: 'Período', analysis: ['tran'] },
-  { kind: 'freq', label: 'Frecuencia', analysis: ['tran'] },
-  { kind: 'gainAt', label: 'Ganancia (dB) en una frecuencia', analysis: ['ac'] },
-  { kind: 'f3db', label: 'Frecuencia de corte (−3 dB)', analysis: ['ac'] },
-  { kind: 'f0db', label: 'Frecuencia de cruce por 0 dB', analysis: ['ac'] },
-  { kind: 'phaseMargin', label: 'Margen de fase', analysis: ['ac'] },
-  { kind: 'noise', label: 'Ruido integrado en una banda', analysis: ['noise'] },
-  { kind: 'raw', label: '.meas escrito a mano', analysis: ['tran', 'ac', 'dc', 'noise', 'op', 'tf'] },
+  { kind: 'max', label: t('Maximum'), analysis: ['tran', 'ac', 'dc', 'noise'] },
+  { kind: 'min', label: t('Minimum'), analysis: ['tran', 'ac', 'dc', 'noise'] },
+  { kind: 'pp', label: t('Peak to peak'), analysis: ['tran', 'dc'] },
+  { kind: 'avg', label: t('Average'), analysis: ['tran', 'dc'] },
+  { kind: 'rms', label: t('RMS value'), analysis: ['tran'] },
+  { kind: 'at', label: t('Value at a point'), analysis: ['tran', 'ac', 'dc', 'noise'] },
+  { kind: 'rise', label: t('Rise time'), analysis: ['tran'] },
+  { kind: 'fall', label: t('Fall time'), analysis: ['tran'] },
+  { kind: 'delay', label: t('Delay between two signals'), analysis: ['tran'] },
+  { kind: 'period', label: t('Period'), analysis: ['tran'] },
+  { kind: 'freq', label: t('Frequency'), analysis: ['tran'] },
+  { kind: 'gainAt', label: t('Gain (dB) at a frequency'), analysis: ['ac'] },
+  { kind: 'f3db', label: t('Cutoff frequency (−3 dB)'), analysis: ['ac'] },
+  { kind: 'f0db', label: t('0 dB crossover frequency'), analysis: ['ac'] },
+  { kind: 'phaseMargin', label: t('Phase margin'), analysis: ['ac'] },
+  { kind: 'noise', label: t('Integrated noise in a band'), analysis: ['noise'] },
+  { kind: 'raw', label: t('hand-written .meas'), analysis: ['tran', 'ac', 'dc', 'noise', 'op', 'tf'] },
 ];
 
 // --- tarjetas → directivas ----------------------------------------------------------------
 
 export function stepLine(s: StudySweep): string {
-  const t = s.target;
+  const tt = s.target;
   const what =
-    t.kind === 'component' || t.kind === 'param' ? `param ${t.name}` : t.kind === 'source' ? t.name : t.kind === 'temp' ? 'temp' : `${t.model}(${t.param})`;
+    tt.kind === 'component' || tt.kind === 'param' ? `param ${tt.name}` : tt.kind === 'source' ? tt.name : tt.kind === 'temp' ? 'temp' : `${tt.model}(${tt.param})`;
   if (s.mode === 'list') return `.step ${what} list ${s.list.trim()}`;
   const mode = s.mode === 'lin' ? '' : `${s.mode} `;
   return `.step ${mode}${what} ${s.start} ${s.stop} ${s.step}`;
@@ -222,9 +223,9 @@ export function toleranceValue(it: ToleranceItem, mode: StudyTolerance['mode'], 
 
 export const BINARY_FUNC = '.func binary(run,index) floor(run/(2**index))-2*floor(run/(2**(index+1)))';
 
-function toleranceLines(t: StudyTolerance): string[] {
-  if (t.mode === 'worst') return [BINARY_FUNC, `.step param run 0 ${2 ** t.items.length - 1} 1`];
-  return [`.step param run 1 ${t.runs} 1`];
+function toleranceLines(tt: StudyTolerance): string[] {
+  if (tt.mode === 'worst') return [BINARY_FUNC, `.step param run 0 ${2 ** tt.items.length - 1} 1`];
+  return [`.step param run 1 ${tt.runs} 1`];
 }
 
 /** Directivas activas e inactivas del estudio (sin el .control) */
@@ -257,10 +258,10 @@ const isAnalysisMark = (l: string) => l.trim() === EXTRA_ANALYSES || l.trim() ==
  */
 export function analysesFromDoc(doc: AscDoc): StudyAnalysis[] {
   const out: StudyAnalysis[] = [];
-  for (const t of doc.texts) {
-    if (isDataText(t) || isControlBlock(t.text)) continue;
-    const enabled = t.kind === 'directive' || isNgspiceComment(t.text);
-    for (const l of t.text.split('\\n')) if (ANALYSIS_LINE.test(l)) out.push({ enabled, line: l.trim() });
+  for (const tt of doc.texts) {
+    if (isDataText(tt) || isControlBlock(tt.text)) continue;
+    const enabled = tt.kind === 'directive' || isNgspiceComment(tt.text);
+    for (const l of tt.text.split('\\n')) if (ANALYSIS_LINE.test(l)) out.push({ enabled, line: l.trim() });
   }
   return out;
 }
@@ -276,16 +277,16 @@ export const activeAnalyses = (list: StudyAnalysis[]) => list.filter((a) => a.en
 export function applyAnalyses(doc: AscDoc, list: StudyAnalysis[]): AscDoc {
   let anchor: { x: number; y: number } | null = null;
   const texts: SchText[] = [];
-  for (const t of doc.texts) {
-    const lines = t.text.split('\\n');
-    const keep = isDataText(t) || isControlBlock(t.text) ? lines : lines.filter((l) => !ANALYSIS_LINE.test(l) && !isAnalysisMark(l));
+  for (const tt of doc.texts) {
+    const lines = tt.text.split('\\n');
+    const keep = isDataText(tt) || isControlBlock(tt.text) ? lines : lines.filter((l) => !ANALYSIS_LINE.test(l) && !isAnalysisMark(l));
     if (keep.length === lines.length) {
-      texts.push(t);
+      texts.push(tt);
       continue;
     }
     const left = keep.filter((l) => l.trim());
-    anchor ??= { x: t.x, y: t.y + (left.length ? left.length * 24 + 16 : 0) };
-    if (left.length) texts.push({ ...t, text: keep.join('\\n') });
+    anchor ??= { x: tt.x, y: tt.y + (left.length ? left.length * 24 + 16 : 0) };
+    if (left.length) texts.push({ ...tt, text: keep.join('\\n') });
   }
   const text = (at: { x: number; y: number }, kind: SchText['kind'], lines: string[]): SchText => ({ x: at.x, y: at.y, align: 'Left', size: 2, kind, text: lines.join('\\n') });
   const [main, ...extra] = activeAnalyses(list).map((a) => a.line.trim());
@@ -310,9 +311,9 @@ interface Line {
 
 function directiveLines(doc: AscDoc): Line[] {
   const out: Line[] = [];
-  doc.texts.forEach((t, ti) => {
-    if (t.kind === 'comment' && isControlBlock(t.text)) return;
-    t.text.split('\\n').forEach((value, li) => out.push({ text: ti, line: li, value: value.trim(), enabled: t.kind === 'directive' }));
+  doc.texts.forEach((tt, ti) => {
+    if (tt.kind === 'comment' && isControlBlock(tt.text)) return;
+    tt.text.split('\\n').forEach((value, li) => out.push({ text: ti, line: li, value: value.trim(), enabled: tt.kind === 'directive' }));
   });
   return out;
 }
@@ -458,7 +459,7 @@ export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
   // bloques ilegibles: quedan las tarjetas reconstruidas desde las directivas
   const blocks = readData(doc, 'study');
   if (blocks !== undefined) st.blocks = blocks;
-  const control = doc.texts.find((t) => isControlBlock(t.text));
+  const control = doc.texts.find((tt) => isControlBlock(tt.text));
   if (control) {
     const body = control.text.split('\\n').slice(1, -1);
     const h = controlHooks(body);
@@ -494,21 +495,21 @@ function stripStudy(doc: AscDoc, swept: Set<string>, keepControl: boolean): { te
   };
   let anchor: { x: number; y: number } | null = null;
   const texts: SchText[] = [];
-  for (const t of doc.texts) {
-    if (isStudyBlocksText(t)) continue;
-    if (isControlBlock(t.text)) {
-      if (keepControl) texts.push(t);
-      else anchor ??= { x: t.x, y: t.y };
+  for (const tt of doc.texts) {
+    if (isStudyBlocksText(tt)) continue;
+    if (isControlBlock(tt.text)) {
+      if (keepControl) texts.push(tt);
+      else anchor ??= { x: tt.x, y: tt.y };
       continue;
     }
-    const lines = t.text.split('\\n');
+    const lines = tt.text.split('\\n');
     const keep = lines.filter((l) => !isStudyLine(l));
-    if (keep.length === lines.length) texts.push(t);
+    if (keep.length === lines.length) texts.push(tt);
     else {
       const left = keep.filter((l) => l.trim());
       // el estudio va donde estaba; si en ese texto quedan otras líneas, debajo de ellas
-      anchor ??= { x: t.x, y: t.y + (left.length ? left.length * 24 + 16 : 0) };
-      if (left.length) texts.push({ ...t, text: keep.join('\\n') });
+      anchor ??= { x: tt.x, y: tt.y + (left.length ? left.length * 24 + 16 : 0) };
+      if (left.length) texts.push({ ...tt, text: keep.join('\\n') });
     }
   }
   return { texts, anchor };
@@ -585,7 +586,7 @@ export function applyStudy(doc: AscDoc, lib: SymbolSource, st: Study): AscDoc {
   // paso personalizado: bloque .control (comentario)
   if (st.custom) {
     const text = ['.control', ...customBody(st.custom), '.endc'].join('\\n');
-    const i = texts.findIndex((t) => isControlBlock(t.text));
+    const i = texts.findIndex((tt) => isControlBlock(tt.text));
     if (i >= 0) texts[i] = { ...texts[i], kind: 'comment', text };
     else {
       texts.push({ x: at.x, y, align: 'Left', size: 2, kind: 'comment', text });

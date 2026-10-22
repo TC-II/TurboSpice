@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
+import { t } from '../i18n/i18n.ts';
 
 type BarField =
   | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number }
@@ -16,25 +17,25 @@ type BarField =
   | { kind: 'checks'; label: string; checks: Extract<BarField, { kind: 'check' }>[] };
 
 const UIC_TITLE =
-  'UIC (use initial conditions): no calcula el punto de operación. Arranca con todo en 0 salvo las condiciones iniciales (IC= de capacitores e inductores, .ic); las fuentes ya están en su valor desde t=0.';
+  t('UIC (use initial conditions): doesn\'t compute the operating point. It starts with everything at 0 except the initial conditions (IC= on capacitors and inductors, .ic); sources are already at their value from t=0.');
 const STARTUP_TITLE =
-  'startup (de LTspice): calcula el punto de operación con las fuentes de DC del esquemático en 0 y las lleva a su valor en una rampa de 20 µs. Las fuentes SINE, PULSE, PWL… y las de adentro de subcircuitos no cambian. Sirve para ver el arranque de fuentes, osciladores y PLL.';
+  t('startup (from LTspice): computes the operating point with the schematic\'s DC sources at 0 and brings them to their value in a 20 µs ramp. SINE, PULSE, PWL… sources and those inside subcircuits don\'t change. Useful to see sources, oscillators and PLLs starting up.');
 
-const POINTS: Record<Sweep['type'], string> = { dec: 'Puntos/década', oct: 'Puntos/octava', lin: 'Puntos' };
+const POINTS: Record<Sweep['type'], string> = { dec: t('Points/decade'), oct: t('Points/octave'), lin: t('Points') };
 
 /** Barrido en frecuencia: inicio, fin, puntos y tipo de barrido */
 const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
-  { kind: 'text', label: 'F inicio', value: s.start, set: (start) => set({ ...s, start }) },
-  { kind: 'text', label: 'F fin', value: s.stop, set: (stop) => set({ ...s, stop }) },
+  { kind: 'text', label: t('F start'), value: s.start, set: (start) => set({ ...s, start }) },
+  { kind: 'text', label: t('F stop'), value: s.stop, set: (stop) => set({ ...s, stop }) },
   { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5 },
   {
     kind: 'select',
-    label: 'Barrido',
+    label: t('Sweep'),
     value: s.type,
     options: [
-      ['dec', 'por década'],
-      ['oct', 'por octava'],
-      ['lin', 'lineal'],
+      ['dec', t('per decade')],
+      ['oct', t('per octave')],
+      ['lin', t('linear')],
     ],
     set: (type) => set({ ...s, type: type as Sweep['type'] }),
   },
@@ -47,12 +48,12 @@ function barRows(a: Analysis): BarField[][] {
     case 'tran':
       return [
         [
-          text('Tiempo final', a.tstop, (tstop) => ({ ...a, tstop })),
-          text('Guardar desde', a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0' }),
-          text('Paso máximo', a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto' }),
+          text(t('Stop time'), a.tstop, (tstop) => ({ ...a, tstop })),
+          text(t('Save from'), a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0' }),
+          text(t('Maximum step'), a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto' }),
           {
             kind: 'checks',
-            label: 'opciones',
+            label: t('options'),
             checks: [
               { kind: 'check', label: 'UIC', value: a.uic, set: (uic) => ({ ...a, uic }), title: UIC_TITLE },
               { kind: 'check', label: 'startup', value: a.startup, set: (startup) => ({ ...a, startup }), title: STARTUP_TITLE },
@@ -73,54 +74,54 @@ function barRows(a: Analysis): BarField[][] {
         };
         const n = i + 1;
         return [
-          text(`Fuente ${n}`, s.src, (src) => upd({ src }), { list: 'sources', placeholder: i ? 'opcional' : '', width: 6 }),
-          text(`Inicio ${n}`, s.start, (start) => upd({ start })),
-          text(`Fin ${n}`, s.stop, (stop) => upd({ stop })),
-          text(`Incremento ${n}`, s.step, (step) => upd({ step })),
+          text(t('Source {n}', { n }), s.src, (src) => upd({ src }), { list: 'sources', placeholder: i ? t('optional') : '', width: 6 }),
+          text(t('Start {n}', { n }), s.start, (start) => upd({ start })),
+          text(t('Stop {n}', { n }), s.stop, (stop) => upd({ stop })),
+          text(t('Increment {n}', { n }), s.step, (step) => upd({ step })),
         ];
       });
     case 'noise':
       return [
         [
-          text('Salida', a.out, (out) => ({ ...a, out }), { list: 'nets' }),
-          text('Referencia', a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: 'tierra' }),
-          text('Fuente', a.src, (src) => ({ ...a, src }), { list: 'sources' }),
+          text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }),
+          text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') }),
+          text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources' }),
         ],
         sweepFields(a.sweep, (sweep) => ({ ...a, sweep })),
       ];
     case 'op':
       return [];
     case 'tf':
-      return [[text('Salida', a.out, (out) => ({ ...a, out }), { list: 'nets' }), text('Fuente', a.src, (src) => ({ ...a, src }), { list: 'sources' })]];
+      return [[text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }), text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources' })]];
     case 'sens':
       return [
-        [text('Salida', a.out, (out) => ({ ...a, out }), { list: 'nets' }), { kind: 'check', label: 'En AC', value: a.ac, set: (ac) => ({ ...a, ac }) }],
+        [text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }), { kind: 'check', label: t('In AC'), value: a.ac, set: (ac) => ({ ...a, ac }) }],
         ...(a.ac ? [sweepFields(a.sweep, (sweep) => ({ ...a, sweep }))] : []),
       ];
     case 'pz':
       return [
         [
-          text('Entrada +', a.inP, (inP) => ({ ...a, inP }), { list: 'nets' }),
-          text('Entrada −', a.inN, (inN) => ({ ...a, inN }), { list: 'nets' }),
-          text('Salida +', a.outP, (outP) => ({ ...a, outP }), { list: 'nets' }),
-          text('Salida −', a.outN, (outN) => ({ ...a, outN }), { list: 'nets' }),
+          text(t('Input +'), a.inP, (inP) => ({ ...a, inP }), { list: 'nets' }),
+          text(t('Input −'), a.inN, (inN) => ({ ...a, inN }), { list: 'nets' }),
+          text(t('Output +'), a.outP, (outP) => ({ ...a, outP }), { list: 'nets' }),
+          text(t('Output −'), a.outN, (outN) => ({ ...a, outN }), { list: 'nets' }),
         ],
         [
-          { kind: 'select', label: 'Transferencia', value: a.type, options: [['vol', 'V/V'], ['cur', 'V/I']], set: (type) => ({ ...a, type: type as 'vol' }) },
-          { kind: 'select', label: 'Calcular', value: a.which, options: [['pz', 'polos y ceros'], ['pol', 'polos'], ['zer', 'ceros']], set: (which) => ({ ...a, which: which as 'pz' }) },
+          { kind: 'select', label: t('Transfer'), value: a.type, options: [['vol', 'V/V'], ['cur', 'V/I']], set: (type) => ({ ...a, type: type as 'vol' }) },
+          { kind: 'select', label: t('Compute'), value: a.which, options: [['pz', t('poles and zeros')], ['pol', t('poles')], ['zer', t('zeros')]], set: (which) => ({ ...a, which: which as 'pz' }) },
         ],
       ];
     case 'disto':
       return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), text('f2/f1', a.f2overf1, (f2overf1) => ({ ...a, f2overf1 }), { placeholder: '—' })]];
     case 'sp':
-      return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), { kind: 'check', label: 'Ruido', value: a.noise, set: (noise) => ({ ...a, noise }) }]];
+      return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), { kind: 'check', label: t('Noise'), value: a.noise, set: (noise) => ({ ...a, noise }) }]];
   }
 }
 
 /** Estado de la simulación elegida: sin correr, corriendo, lista o con error */
 export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
-const STATE_TEXT: Record<SimState, string> = { idle: 'Sin correr', running: 'Simulando…', ok: 'Lista', err: 'Error' };
+const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
 export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun, onRename, onDelete }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
@@ -174,15 +175,15 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   const rows = sim && draft ? barRows(draft) : [];
 
   return (
-    <div className="simbar" role="group" aria-label="Simulación elegida">
+    <div className="simbar" role="group" aria-label={t('Selected simulation')}>
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       {!sim ? (
-        <span className="sb-hint">Seleccionar tipo de simulación</span>
+        <span className="sb-hint">{t('Select simulation type')}</span>
       ) : naming !== null ? (
         <input
           className="sb-name-edit"
-          aria-label="Nombre de la simulación"
+          aria-label={t('Simulation name')}
           value={naming}
           placeholder={sim.name}
           size={Math.max(12, naming.length + 1)}
@@ -195,14 +196,14 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
           }}
         />
       ) : (
-        <button className="sb-name" title={`${line}\nClick para renombrarla (vacío: nombre automático)`} onClick={() => setNaming(sim.custom ? sim.name : '')}>
+        <button className="sb-name" title={t('{line}\nClick to rename it (empty: automatic name)', { line })} onClick={() => setNaming(sim.custom ? sim.name : '')}>
           {sim.name}
         </button>
       )}
       {sim && (
         <div className="sb-rows">
           {!draft && <code className="sb-line">{line}</code>}
-          {draft && !rows.length && <span className="sb-hint">Sin parámetros</span>}
+          {draft && !rows.length && <span className="sb-hint">{t('No parameters')}</span>}
           {rows.map((r, i) => (
             <div className="sb-row" key={i}>
               {r.map((f) =>
@@ -249,8 +250,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                       <button
                         type="button"
                         className="pick-btn"
-                        title={f.list === 'nets' ? 'Elegir la red en el esquemático' : 'Elegir la fuente en el esquemático'}
-                        aria-label={`Elegir ${f.label} en el esquemático`}
+                        title={f.list === 'nets' ? t('Pick the net on the schematic') : t('Pick the source on the schematic')}
+                        aria-label={t('Pick {label} on the schematic', { label: f.label })}
                         onClick={(e) => {
                           e.preventDefault();
                           picker(f.list === 'nets' ? 'net' : 'source').then((v) => v && change(f.set(v)));
@@ -270,19 +271,19 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
         <span
           className={`status sim-state ${state}`}
           role="status"
-          aria-label={`Simulación: ${STATE_TEXT[state].toLowerCase()}`}
+          aria-label={t('Simulation: {p0}', { p0: STATE_TEXT[state].toLowerCase() })}
           title={stateDetail ? `${STATE_TEXT[state]}: ${stateDetail}` : STATE_TEXT[state]}
         />
       )}
       {sim && errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
       {sim && (
-        <button className="sb-delete" aria-label="Borrar simulación" title="Borrar esta simulación (y sus resultados)" onClick={onDelete}>
+        <button className="sb-delete" aria-label={t('Delete simulation')} title={t('Delete this simulation (and its results)')} onClick={onDelete}>
           <Icon name="delete" size={16} />
         </button>
       )}
       {sim && stale && !running && (
-        <button className="sb-run" onClick={onRun} title="Sus resultados ya no están en memoria (se conservan los de las últimas simulaciones vistas)">
-          Volver a correr
+        <button className="sb-run" onClick={onRun} title={t('Its results are no longer in memory (those of the last simulations viewed are kept)')}>
+          {t('Run again')}
         </button>
       )}
     </div>

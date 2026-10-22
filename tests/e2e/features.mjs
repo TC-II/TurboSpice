@@ -5,7 +5,7 @@
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome } from './lib.mjs';
+import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome, spanishUi } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -986,6 +986,7 @@ await page.locator('svg.editor .sym').first().waitFor();
 
 // primera visita: sin pantalla de bienvenida; "Acerca de" sólo desde Ayuda
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+await spanishUi(fresh);
 const fp = await fresh.newPage();
 await fp.goto(URL);
 await fp.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });

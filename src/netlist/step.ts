@@ -7,6 +7,7 @@
 //   .step NPN 2N2222(VAF) 50 100 25 (parámetro de un modelo)
 // Varios .step se anidan; el primero es el que varía más rápido (bucle interno).
 import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type StepTarget =
   | { kind: 'param'; name: string }
@@ -26,58 +27,58 @@ export const MAX_RUNS = 1000;
 const MODEL_TYPES = /^(npn|pnp|nmos|pmos|d|njf|pjf|lpnp|vdmos|sw|csw|ako)$/i;
 
 export function parseStep(line: string): Step | string {
-  const t = line.trim().split(/\s+/).slice(1);
+  const tt = line.trim().split(/\s+/).slice(1);
   let mode = 'lin';
-  if (/^(lin|dec|oct)$/i.test(t[0] ?? '')) mode = t.shift()!.toLowerCase();
+  if (/^(lin|dec|oct)$/i.test(tt[0] ?? '')) mode = tt.shift()!.toLowerCase();
   let target: StepTarget;
-  const first = t.shift() ?? '';
+  const first = tt.shift() ?? '';
   if (/^param$/i.test(first)) {
-    const name = t.shift();
-    if (!name) return 'falta el nombre del parámetro';
+    const name = tt.shift();
+    if (!name) return t('missing parameter name');
     target = { kind: 'param', name };
   } else if (/^temp$/i.test(first)) target = { kind: 'temp' };
   else {
     // ".step NPN 2N2222(VAF) …" (el tipo es opcional)
-    const tok = MODEL_TYPES.test(first) && /\(/.test(t[0] ?? '') ? t.shift()! : first;
+    const tok = MODEL_TYPES.test(first) && /\(/.test(tt[0] ?? '') ? tt.shift()! : first;
     const m = /^([^()]+)\((\w+)\)$/.exec(tok);
     target = m ? { kind: 'model', model: m[1], param: m[2] } : { kind: 'source', name: tok };
   }
-  if (/^(lin|dec|oct)$/i.test(t[0] ?? '')) mode = t.shift()!.toLowerCase();
+  if (/^(lin|dec|oct)$/i.test(tt[0] ?? '')) mode = tt.shift()!.toLowerCase();
 
   let values: number[];
-  if (/^list$/i.test(t[0] ?? '')) {
-    values = t.slice(1).map(parseSpiceNumber);
+  if (/^list$/i.test(tt[0] ?? '')) {
+    values = tt.slice(1).map(parseSpiceNumber);
   } else {
-    if (t.length < 3) return 'faltan inicio, fin e incremento';
-    const [a, b, c] = t.slice(0, 3).map(parseSpiceNumber);
-    if (![a, b, c].every(Number.isFinite) || c === 0) return 'valores inválidos';
+    if (tt.length < 3) return t('missing start, stop and increment');
+    const [a, b, c] = tt.slice(0, 3).map(parseSpiceNumber);
+    if (![a, b, c].every(Number.isFinite) || c === 0) return t('invalid values');
     values = [];
     if (mode === 'lin') {
       const inc = Math.sign(b - a) * Math.abs(c) || Math.abs(c);
       const n = Math.floor((b - a) / inc + 1e-9);
       for (let i = 0; i <= Math.min(n, MAX_RUNS); i++) values.push(a + i * inc);
     } else {
-      if (a <= 0 || b <= 0) return 'un barrido logarítmico necesita valores positivos';
+      if (a <= 0 || b <= 0) return t('a logarithmic sweep needs positive values');
       const base = mode === 'dec' ? 10 : 2;
       const n = Math.log(b / a) / Math.log(base);
       const total = Math.floor(Math.abs(n) * c + 1e-9);
       for (let i = 0; i <= Math.min(total, MAX_RUNS); i++) values.push(a * base ** ((Math.sign(n) * i) / c));
     }
   }
-  if (!values.length || values.some((v) => !Number.isFinite(v))) return 'valores inválidos';
+  if (!values.length || values.some((v) => !Number.isFinite(v))) return t('invalid values');
   return { target, values, line };
 }
 
-export function stepLabel(t: StepTarget): string {
-  switch (t.kind) {
+export function stepLabel(tt: StepTarget): string {
+  switch (tt.kind) {
     case 'param':
-      return t.name;
+      return tt.name;
     case 'source':
-      return t.name;
+      return tt.name;
     case 'temp':
       return 'temp';
     case 'model':
-      return `${t.model}(${t.param})`;
+      return `${tt.model}(${tt.param})`;
   }
 }
 
@@ -115,7 +116,7 @@ export interface StepHooks {
 
 export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefined, hooks?: StepHooks): StepPlan | string {
   const total = steps.reduce((n, s) => n * s.values.length, 1);
-  if (total > MAX_RUNS) return `el barrido tiene ${total} corridas (máximo ${MAX_RUNS})`;
+  if (total > MAX_RUNS) return t('the sweep has {total} runs (maximum {MAX_RUNS})', { total, MAX_RUNS });
   const body: string[] = [];
   const params = steps.filter((s) => s.target.kind === 'param');
   const vars = steps.map((_, i) => `ts_step${i}`);
@@ -123,12 +124,12 @@ export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefin
   if (params.length) body.push('reset');
   for (const [i, s] of steps.entries()) {
     const v = `$${vars[i]}`;
-    const t = s.target;
-    if (t.kind === 'temp') body.push(`option temp = ${v}`);
-    else if (t.kind === 'model') body.push(`altermod ${t.model.toLowerCase()} ${t.param.toLowerCase()} = ${v}`);
-    else if (t.kind === 'source') {
-      const n = ngName(t.name);
-      if (!n) return `no existe la fuente ${t.name}`;
+    const tt = s.target;
+    if (tt.kind === 'temp') body.push(`option temp = ${v}`);
+    else if (tt.kind === 'model') body.push(`altermod ${tt.model.toLowerCase()} ${tt.param.toLowerCase()} = ${v}`);
+    else if (tt.kind === 'source') {
+      const n = ngName(tt.name);
+      if (!n) return t('source {name} doesn\'t exist', { name: tt.name });
       body.push(`alter ${n.toLowerCase()} dc = ${v}`);
     }
   }

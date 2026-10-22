@@ -24,6 +24,7 @@ import {
 } from '../sim/study.ts';
 import { Modal } from './dialogs.tsx';
 import { AnalysisForm, type Picker } from './simDialogs.tsx';
+import { t } from '../i18n/i18n.ts';
 
 const StudyBlocks = lazy(() => import('./StudyBlocks.tsx'));
 
@@ -46,8 +47,8 @@ export function sweepRuns(s: StudySweep): number | null {
 export function totalRuns(st: Study): number {
   let n = 1;
   for (const s of st.sweeps) if (s.enabled) n *= sweepRuns(s) ?? 1;
-  const t = st.tolerance;
-  if (t?.enabled && t.items.length) n *= t.mode === 'worst' ? 2 ** t.items.length : Number(t.runs) || 1;
+  const tt = st.tolerance;
+  if (tt?.enabled && tt.items.length) n *= tt.mode === 'worst' ? 2 ** tt.items.length : Number(tt.runs) || 1;
   return n;
 }
 
@@ -59,11 +60,11 @@ export function studyCode(st: Study): string {
 }
 
 const SWEEP_KINDS: [SweepTarget['kind'], string][] = [
-  ['component', 'Valor de un componente'],
-  ['param', 'Un parámetro (.param)'],
-  ['source', 'Una fuente (valor DC)'],
-  ['temp', 'La temperatura'],
-  ['model', 'Un parámetro de un modelo'],
+  ['component', t('A component\'s value')],
+  ['param', t('A parameter (.param)')],
+  ['source', t('A source (DC value)')],
+  ['temp', t('The temperature')],
+  ['model', t('A model parameter')],
 ];
 
 /** Valor original para usar dentro de una expresión: µ → u */
@@ -87,7 +88,7 @@ function Card({ title, enabled, onToggle, onRemove, children, extra }: {
           <strong>{title}</strong>
         </label>
         {extra}
-        <button className="x" onClick={onRemove} aria-label={`Quitar ${title}`} title="Quitar">✕</button>
+        <button className="x" onClick={onRemove} aria-label={t('Remove {title}', { title })} title={t('Remove')}>✕</button>
       </header>
       <div className="study-body">{children}</div>
     </section>
@@ -120,8 +121,8 @@ function PickInput({ value, onChange, picker, what, list, placeholder, label }: 
         <button
           type="button"
           className="pick-btn"
-          aria-label={`Elegir ${label} en el esquemático`}
-          title="Elegir en el esquemático"
+          aria-label={t('Pick {label} on the schematic', { label })}
+          title={t('Pick on the schematic')}
           onClick={() => picker(what).then((v) => v && onChange(what === 'net' ? `V(${v})` : v))}
         >
           ⌖
@@ -132,7 +133,7 @@ function PickInput({ value, onChange, picker, what, list, placeholder, label }: 
 }
 
 function SweepCard({ s, set, remove, info, picker }: { s: StudySweep; set(s: StudySweep): void; remove(): void; info: StudyInfo; picker?: Picker }) {
-  const t = s.target;
+  const tt = s.target;
   const runs = sweepRuns(s);
   const setTarget = (kind: SweepTarget['kind']) => {
     const target: SweepTarget = kind === 'temp' ? { kind } : kind === 'model' ? { kind, model: '', param: '' } : { kind, name: '' };
@@ -145,66 +146,66 @@ function SweepCard({ s, set, remove, info, picker }: { s: StudySweep; set(s: Stu
   };
   return (
     <Card
-      title={`Barrido${'name' in t && t.name ? ` de ${t.name}` : t.kind === 'temp' ? ' de temperatura' : ''}`}
+      title={t('Sweep{p0}', { p0: 'name' in tt && tt.name ? t(' of {name}', { name: tt.name }) : tt.kind === 'temp' ? t(' of temperature') : '' })}
       enabled={s.enabled}
       onToggle={(enabled) => set({ ...s, enabled })}
       onRemove={remove}
-      extra={<span className="hint">{runs === null ? 'valores inválidos' : `${runs} corrida${runs === 1 ? '' : 's'}`}</span>}
+      extra={<span className="hint">{runs === null ? t('invalid values') : t('{runs} run{p1}', { runs, p1: runs === 1 ? '' : 's' })}</span>}
     >
-      <Row label="Qué variar">
-        <select value={t.kind} onChange={(e) => setTarget(e.target.value as SweepTarget['kind'])} aria-label="Qué variar">
+      <Row label={t('What to vary')}>
+        <select value={tt.kind} onChange={(e) => setTarget(e.target.value as SweepTarget['kind'])} aria-label={t('What to vary')}>
           {SWEEP_KINDS.map(([k, l]) => (
             <option key={k} value={k}>{l}</option>
           ))}
         </select>
       </Row>
-      {t.kind === 'component' && (
-        <Row label="Componente" hint={s.original ? `Valor original: ${s.original} (pasa a {${t.name}})` : undefined}>
-          <PickInput value={t.name} onChange={setComponent} picker={picker} what="component" list="study-components" label="Componente" />
+      {tt.kind === 'component' && (
+        <Row label={t('Component')} hint={s.original ? t('Original value: {original} (becomes {{name}})', { original: s.original, name: tt.name }) : undefined}>
+          <PickInput value={tt.name} onChange={setComponent} picker={picker} what="component" list="study-components" label={t('Component')} />
         </Row>
       )}
-      {t.kind === 'param' && (
-        <Row label="Parámetro" hint="Usalo en un valor como {nombre}">
-          <input value={t.name} list="study-params" spellCheck={false} aria-label="Parámetro" onChange={(e) => set({ ...s, target: { kind: 'param', name: e.target.value.trim() } })} />
+      {tt.kind === 'param' && (
+        <Row label={t('Parameter')} hint={t('Use it in a value as {nombre}')}>
+          <input value={tt.name} list="study-params" spellCheck={false} aria-label={t('Parameter')} onChange={(e) => set({ ...s, target: { kind: 'param', name: e.target.value.trim() } })} />
         </Row>
       )}
-      {t.kind === 'source' && (
-        <Row label="Fuente">
-          <PickInput value={t.name} onChange={(name) => set({ ...s, target: { kind: 'source', name } })} picker={picker} what="source" list="study-sources" label="Fuente" />
+      {tt.kind === 'source' && (
+        <Row label={t('Source')}>
+          <PickInput value={tt.name} onChange={(name) => set({ ...s, target: { kind: 'source', name } })} picker={picker} what="source" list="study-sources" label={t('Source')} />
         </Row>
       )}
-      {t.kind === 'model' && (
+      {tt.kind === 'model' && (
         <>
-          <Row label="Modelo">
-            <input value={t.model} spellCheck={false} aria-label="Modelo" placeholder="2N2222" onChange={(e) => set({ ...s, target: { ...t, model: e.target.value.trim() } })} />
+          <Row label={t('Model')}>
+            <input value={tt.model} spellCheck={false} aria-label={t('Model')} placeholder="2N2222" onChange={(e) => set({ ...s, target: { ...tt, model: e.target.value.trim() } })} />
           </Row>
-          <Row label="Parámetro del modelo">
-            <input value={t.param} spellCheck={false} aria-label="Parámetro del modelo" placeholder="BF" onChange={(e) => set({ ...s, target: { ...t, param: e.target.value.trim() } })} />
+          <Row label={t('Model parameter')}>
+            <input value={tt.param} spellCheck={false} aria-label={t('Model parameter')} placeholder="BF" onChange={(e) => set({ ...s, target: { ...tt, param: e.target.value.trim() } })} />
           </Row>
         </>
       )}
-      <Row label="Cómo">
-        <select value={s.mode} onChange={(e) => set({ ...s, mode: e.target.value as StudySweep['mode'] })} aria-label="Cómo">
-          <option value="list">Lista de valores</option>
-          <option value="lin">Lineal (inicio, fin, paso)</option>
-          <option value="dec">Por década</option>
-          <option value="oct">Por octava</option>
+      <Row label={t('How')}>
+        <select value={s.mode} onChange={(e) => set({ ...s, mode: e.target.value as StudySweep['mode'] })} aria-label={t('How')}>
+          <option value="list">{t('List of values')}</option>
+          <option value="lin">{t('Linear (start, stop, step)')}</option>
+          <option value="dec">{t('Per decade')}</option>
+          <option value="oct">{t('Per octave')}</option>
         </select>
       </Row>
       {s.mode === 'list' ? (
-        <Row label="Valores" hint="Separados por espacios: 1k 2k 5k">
-          <input value={s.list} spellCheck={false} aria-label="Valores" onChange={(e) => set({ ...s, list: e.target.value })} />
+        <Row label={t('Values')} hint={t('Separated by spaces: 1k 2k 5k')}>
+          <input value={s.list} spellCheck={false} aria-label={t('Values')} onChange={(e) => set({ ...s, list: e.target.value })} />
         </Row>
       ) : (
         <div className="study-triple">
-          <Row label="Inicio">
-            <input value={s.start} aria-label="Inicio" onChange={(e) => set({ ...s, start: e.target.value.trim() })} />
+          <Row label={t('Start')}>
+            <input value={s.start} aria-label={t('Start')} onChange={(e) => set({ ...s, start: e.target.value.trim() })} />
           </Row>
-          <Row label="Fin">
-            <input value={s.stop} aria-label="Fin" onChange={(e) => set({ ...s, stop: e.target.value.trim() })} />
+          <Row label={t('Stop')}>
+            <input value={s.stop} aria-label={t('Stop')} onChange={(e) => set({ ...s, stop: e.target.value.trim() })} />
           </Row>
-          <Row label={s.mode === 'lin' ? 'Paso' : `Puntos por ${s.mode === 'dec' ? 'década' : 'octava'}`}>
-            <input value={s.step} aria-label="Paso" onChange={(e) => set({ ...s, step: e.target.value.trim() })} />
+          <Row label={s.mode === 'lin' ? t('Step') : t('Points per {p0}', { p0: s.mode === 'dec' ? t('decade') : t('octave') })}>
+            <input value={s.step} aria-label={t('Step')} onChange={(e) => set({ ...s, step: e.target.value.trim() })} />
           </Row>
         </div>
       )}
@@ -213,87 +214,87 @@ function SweepCard({ s, set, remove, info, picker }: { s: StudySweep; set(s: Stu
 }
 
 function ToleranceCard({ st, set, info, picker }: { st: Study; set(st: Study): void; info: StudyInfo; picker?: Picker }) {
-  const t = st.tolerance!;
-  const upd = (patch: Partial<typeof t>) => set({ ...st, tolerance: { ...t, ...patch } });
-  const setItem = (i: number, patch: Partial<ToleranceItem>) => upd({ items: t.items.map((it, k) => (k === i ? { ...it, ...patch } : it)) });
+  const tt = st.tolerance!;
+  const upd = (patch: Partial<typeof tt>) => set({ ...st, tolerance: { ...tt, ...patch } });
+  const setItem = (i: number, patch: Partial<ToleranceItem>) => upd({ items: tt.items.map((it, k) => (k === i ? { ...it, ...patch } : it)) });
   const addComponent = (name: string) => {
     const c = info.components.find((x) => x.name.toLowerCase() === name.toLowerCase());
-    if (!c || t.items.some((i) => i.component === c.name)) return;
-    upd({ items: [...t.items, { component: c.name, tol: c.prefix.toUpperCase() === 'C' ? '10' : '5', dist: 'uniform', original: plain(c.value) }] });
+    if (!c || tt.items.some((i) => i.component === c.name)) return;
+    upd({ items: [...tt.items, { component: c.name, tol: c.prefix.toUpperCase() === 'C' ? '10' : '5', dist: 'uniform', original: plain(c.value) }] });
   };
   const addAll = (prefix: string, tol: string) => {
     const add = info.components
-      .filter((c) => c.prefix.toUpperCase() === prefix && isNumeric(c.value) && !t.items.some((i) => i.component === c.name))
+      .filter((c) => c.prefix.toUpperCase() === prefix && isNumeric(c.value) && !tt.items.some((i) => i.component === c.name))
       .map((c) => ({ component: c.name, tol, dist: 'uniform' as const, original: plain(c.value) }));
-    upd({ items: [...t.items, ...add] });
+    upd({ items: [...tt.items, ...add] });
   };
-  const candidates = info.components.filter((c) => isNumeric(c.value) && !t.items.some((i) => i.component === c.name));
+  const candidates = info.components.filter((c) => isNumeric(c.value) && !tt.items.some((i) => i.component === c.name));
   return (
     <Card
-      title="Tolerancias"
-      enabled={t.enabled}
+      title={t('Tolerances')}
+      enabled={tt.enabled}
       onToggle={(enabled) => upd({ enabled })}
       onRemove={() => set({ ...st, tolerance: null })}
-      extra={<span className="hint">{t.mode === 'worst' ? `${2 ** t.items.length} corridas` : `${t.runs} corridas`}</span>}
+      extra={<span className="hint">{tt.mode === 'worst' ? t('{p0} runs', { p0: 2 ** tt.items.length }) : t('{runs} runs', { runs: tt.runs })}</span>}
     >
-      <Row label="Tipo de análisis">
-        <select value={t.mode} onChange={(e) => upd({ mode: e.target.value as typeof t.mode })} aria-label="Tipo de análisis de tolerancias">
-          <option value="montecarlo">Monte Carlo (valores al azar)</option>
-          <option value="worst">Caso peor (todas las combinaciones ±tol)</option>
+      <Row label={t('Analysis type')}>
+        <select value={tt.mode} onChange={(e) => upd({ mode: e.target.value as typeof tt.mode })} aria-label={t('Tolerance analysis type')}>
+          <option value="montecarlo">{t('Monte Carlo (random values)')}</option>
+          <option value="worst">{t('Worst case (all ±tol combinations)')}</option>
         </select>
       </Row>
-      {t.mode === 'montecarlo' && (
-        <Row label="Corridas">
-          <input value={t.runs} aria-label="Corridas" onChange={(e) => upd({ runs: e.target.value.replace(/\D/g, '') })} />
+      {tt.mode === 'montecarlo' && (
+        <Row label={t('Runs')}>
+          <input value={tt.runs} aria-label={t('Runs')} onChange={(e) => upd({ runs: e.target.value.replace(/\D/g, '') })} />
         </Row>
       )}
       <div className="tol-quick">
-        <button onClick={() => addAll('R', '5')}>Todas las resistencias 5 %</button>
-        <button onClick={() => addAll('C', '10')}>Todos los capacitores 10 %</button>
-        <button onClick={() => addAll('L', '10')}>Todos los inductores 10 %</button>
+        <button onClick={() => addAll('R', '5')}>{t('All resistors 5 %')}</button>
+        <button onClick={() => addAll('C', '10')}>{t('All capacitors 10 %')}</button>
+        <button onClick={() => addAll('L', '10')}>{t('All inductors 10 %')}</button>
       </div>
       <table className="tol-table">
         <thead>
           <tr>
-            <th>Componente</th>
-            <th>Valor</th>
-            <th>Tolerancia (%)</th>
-            {t.mode === 'montecarlo' && <th>Distribución</th>}
+            <th>{t('Component')}</th>
+            <th>{t('Value')}</th>
+            <th>{t('Tolerance (%)')}</th>
+            {tt.mode === 'montecarlo' && <th>{t('Distribution')}</th>}
             <th />
           </tr>
         </thead>
         <tbody>
-          {t.items.map((it, i) => (
+          {tt.items.map((it, i) => (
             <tr key={it.component}>
               <td>{it.component}</td>
               <td>{it.original}</td>
               <td>
-                <input value={it.tol} aria-label={`Tolerancia de ${it.component}`} onChange={(e) => setItem(i, { tol: e.target.value.trim() })} />
+                <input value={it.tol} aria-label={t('Tolerance of {component}', { component: it.component })} onChange={(e) => setItem(i, { tol: e.target.value.trim() })} />
               </td>
-              {t.mode === 'montecarlo' && (
+              {tt.mode === 'montecarlo' && (
                 <td>
-                  <select value={it.dist} aria-label={`Distribución de ${it.component}`} onChange={(e) => setItem(i, { dist: e.target.value as ToleranceItem['dist'] })}>
-                    <option value="uniform">Uniforme</option>
+                  <select value={it.dist} aria-label={t('Distribution of {component}', { component: it.component })} onChange={(e) => setItem(i, { dist: e.target.value as ToleranceItem['dist'] })}>
+                    <option value="uniform">{t('Uniform')}</option>
                     <option value="gauss">Normal (tol = 3σ)</option>
                   </select>
                 </td>
               )}
               <td>
-                <button className="x" aria-label={`Quitar ${it.component}`} onClick={() => upd({ items: t.items.filter((_, k) => k !== i) })}>✕</button>
+                <button className="x" aria-label={t('Remove {component}', { component: it.component })} onClick={() => upd({ items: tt.items.filter((_, k) => k !== i) })}>✕</button>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
       <div className="tol-add">
-        <select value="" aria-label="Agregar componente" onChange={(e) => e.target.value && addComponent(e.target.value)}>
-          <option value="">Agregar componente…</option>
+        <select value="" aria-label={t('Add component')} onChange={(e) => e.target.value && addComponent(e.target.value)}>
+          <option value="">{t('Add component…')}</option>
           {candidates.map((c) => (
             <option key={c.name} value={c.name}>{c.name} ({c.value})</option>
           ))}
         </select>
         {picker && (
-          <button className="pick-btn" aria-label="Elegir componente con tolerancia en el esquemático" onClick={() => picker('component').then((v) => v && addComponent(v))}>
+          <button className="pick-btn" aria-label={t('Pick a component with tolerance on the schematic')} onClick={() => picker('component').then((v) => v && addComponent(v))}>
             ⌖
           </button>
         )}
@@ -323,29 +324,29 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
     lines = [];
   }
   return (
-    <Card title={`Medición ${m.name}`} enabled={m.enabled} onToggle={(enabled) => set({ ...m, enabled })} onRemove={remove}>
+    <Card title={t('Measurement {name}', { name: m.name })} enabled={m.enabled} onToggle={(enabled) => set({ ...m, enabled })} onRemove={remove}>
       <div className="study-triple">
-        <Row label="Nombre">
-          <input value={m.name} aria-label="Nombre de la medición" onChange={(e) => set({ ...m, name: e.target.value.replace(/[^\w]/g, '') })} />
+        <Row label={t('Name')}>
+          <input value={m.name} aria-label={t('Measurement name')} onChange={(e) => set({ ...m, name: e.target.value.replace(/[^\w]/g, '') })} />
         </Row>
-        <Row label="Análisis">
+        <Row label={t('Analysis')}>
           <select
             value={m.analysis}
-            aria-label="Análisis de la medición"
+            aria-label={t('Measurement analysis')}
             onChange={(e) => {
               const analysis = e.target.value as MeasAnalysis;
               const ok = MEASURE_KINDS.find((k) => k.kind === m.kind)?.analysis.includes(analysis);
               set({ ...m, analysis, kind: ok ? m.kind : (MEASURE_KINDS.find((k) => k.analysis.includes(analysis))!.kind as MeasureKind) });
             }}
           >
-            <option value="tran">Transitorio</option>
+            <option value="tran">{t('Transient')}</option>
             <option value="ac">AC</option>
-            <option value="dc">Barrido DC</option>
-            <option value="noise">Ruido</option>
+            <option value="dc">{t('DC sweep')}</option>
+            <option value="noise">{t('Noise')}</option>
           </select>
         </Row>
-        <Row label="Qué medir">
-          <select value={m.kind} aria-label="Qué medir" onChange={(e) => set({ ...m, kind: e.target.value as MeasureKind, line: m.line ?? lines[0] })}>
+        <Row label={t('What to measure')}>
+          <select value={m.kind} aria-label={t('What to measure')} onChange={(e) => set({ ...m, kind: e.target.value as MeasureKind, line: m.line ?? lines[0] })}>
             {kinds.map((k) => (
               <option key={k.kind} value={k.kind}>{k.label}</option>
             ))}
@@ -353,31 +354,31 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
         </Row>
       </div>
       {m.kind === 'raw' ? (
-        <Row label=".meas" hint="Sintaxis de LTspice">
-          <input value={m.line ?? ''} spellCheck={false} aria-label="Línea .meas" onChange={(e) => set({ ...m, line: e.target.value })} />
+        <Row label=".meas" hint={t('LTspice syntax')}>
+          <input value={m.line ?? ''} spellCheck={false} aria-label={t('.meas line')} onChange={(e) => set({ ...m, line: e.target.value })} />
         </Row>
       ) : (
         <>
-          {signal(m.kind === 'delay' ? 'Señal de referencia' : 'Señal', 'signal')}
-          {m.kind === 'delay' && signal('Señal retardada', 'signal2')}
-          {(m.kind === 'at' || m.kind === 'gainAt') && field(m.analysis === 'tran' ? 'Instante' : m.analysis === 'dc' ? 'Valor del barrido' : 'Frecuencia', 'at', unit && `en ${unit}`)}
+          {signal(m.kind === 'delay' ? t('Reference signal') : t('Signal'), 'signal')}
+          {m.kind === 'delay' && signal(t('Delayed signal'), 'signal2')}
+          {(m.kind === 'at' || m.kind === 'gainAt') && field(m.analysis === 'tran' ? 'Instante' : m.analysis === 'dc' ? t('Sweep value') : t('Frequency'), 'at', unit && t('in {unit}', { unit }))}
           {(m.kind === 'rise' || m.kind === 'fall') && (
             <div className="study-triple">
-              {field(m.kind === 'rise' ? 'Desde el nivel' : 'Desde el nivel (alto)', 'level', 'p.ej. 10 % del valor final')}
-              {field(m.kind === 'rise' ? 'Hasta el nivel' : 'Hasta el nivel (bajo)', 'level2', 'p.ej. 90 %')}
+              {field(m.kind === 'rise' ? t('From level') : t('From level (high)'), 'level', t('e.g. 10 % of the final value'))}
+              {field(m.kind === 'rise' ? t('To level') : t('To level (low)'), 'level2', 'p.ej. 90 %')}
             </div>
           )}
           {m.kind === 'delay' && (
             <div className="study-triple">
-              {field('Nivel en la referencia', 'level')}
-              {field('Nivel en la retardada', 'level2', 'vacío = el mismo')}
+              {field(t('Level on the reference'), 'level')}
+              {field(t('Level on the delayed one'), 'level2', t('empty = the same'))}
             </div>
           )}
-          {(m.kind === 'period' || m.kind === 'freq') && field('Nivel de cruce', 'level', 'p.ej. el valor medio de la señal')}
+          {(m.kind === 'period' || m.kind === 'freq') && field(t('Crossing level'), 'level', t('e.g. the signal\'s mean value'))}
           {['max', 'min', 'pp', 'avg', 'rms', 'noise'].includes(m.kind) && (
             <div className="study-triple">
-              {field('Desde', 'from', 'vacío = todo')}
-              {field('Hasta', 'to')}
+              {field(t('From'), 'from', t('empty = all'))}
+              {field(t('To'), 'to')}
             </div>
           )}
         </>
@@ -403,23 +404,23 @@ function AnalysisCard({ a, index, primary, set, remove, picker }: {
   const errors = parsed ? validateAnalysis(parsed) : [];
   return (
     <Card
-      title={`Simulación ${index + 1}${meta ? `: ${meta.label}` : ''}`}
+      title={t('Simulation {p0}{p1}', { p0: index + 1, p1: meta ? `: ${meta.label}` : '' })}
       enabled={a.enabled}
       onToggle={(enabled) => set({ ...a, enabled })}
       onRemove={remove}
       extra={
         a.enabled && (
-          <span className="hint">{primary && !meta?.ngspiceOnly ? 'principal (la que corre LTspice)' : 'sólo TurboSpice'}</span>
+          <span className="hint">{primary && !meta?.ngspiceOnly ? t('main (the one LTspice runs)') : t('TurboSpice only')}</span>
         )
       }
     >
-      <Row label="Análisis">
+      <Row label={t('Analysis')}>
         <select
           value={kind ?? ''}
-          aria-label="Tipo de análisis"
+          aria-label={t('Analysis type')}
           onChange={(e) => set({ ...a, line: formatAnalysis(defaultAnalysis(e.target.value as AnalysisKind)) })}
         >
-          {!meta && <option value="">(otro)</option>}
+          {!meta && <option value="">{t('(other)')}</option>}
           {ANALYSES.map((x) => (
             <option key={x.kind} value={x.kind}>
               {x.label}
@@ -433,8 +434,8 @@ function AnalysisCard({ a, index, primary, set, remove, picker }: {
           <AnalysisForm a={parsed} set={(x) => set({ ...a, line: formatAnalysis(x) })} picker={picker} />
         </div>
       ) : (
-        <Row label="Directiva" hint="Opciones que el formulario no maneja: se edita como texto">
-          <input value={a.line} spellCheck={false} aria-label="Directiva del análisis" onChange={(e) => set({ ...a, line: e.target.value })} />
+        <Row label={t('Directive')} hint={t('Options the form doesn\'t handle: it\'s edited as text')}>
+          <input value={a.line} spellCheck={false} aria-label={t('Analysis directive')} onChange={(e) => set({ ...a, line: e.target.value })} />
         </Row>
       )}
       <code className="study-line">{a.line}</code>
@@ -450,17 +451,17 @@ function cleanPlot(v: PlotView | undefined): PlotView | undefined {
   if (!v) return v;
   const out: PlotView = {};
   for (const [k, panes] of Object.entries(v)) {
-    const ps = panes.map((p) => ({ traces: p.traces.filter((t) => t.expr.trim()) })).filter((p) => p.traces.length);
+    const ps = panes.map((p) => ({ traces: p.traces.filter((tt) => tt.expr.trim()) })).filter((p) => p.traces.length);
     if (ps.length) out[k] = ps;
   }
   return out;
 }
 
 const PLOT_KINDS: [string, string][] = [
-  ['tran', 'Transitorio'],
+  ['tran', t('Transient')],
   ['ac', 'AC (Bode)'],
-  ['dc', 'Barrido DC'],
-  ['noise', 'Ruido'],
+  ['dc', t('DC sweep')],
+  ['noise', t('Noise')],
 ];
 
 function PlotCard({ view, set, remove, picker, preferred }: {
@@ -478,14 +479,14 @@ function PlotCard({ view, set, remove, picker, preferred }: {
     const { [kind]: _, ...rest } = view;
     set(p.length ? { ...rest, [kind]: p } : rest);
   };
-  const setTrace = (pi: number, ti: number, t: Trace | null) =>
-    setPanes(panes.map((p, k) => (k === pi ? { traces: t ? p.traces.map((x, j) => (j === ti ? t : x)) : p.traces.filter((_, j) => j !== ti) } : p)));
+  const setTrace = (pi: number, ti: number, tt: Trace | null) =>
+    setPanes(panes.map((p, k) => (k === pi ? { traces: tt ? p.traces.map((x, j) => (j === ti ? tt : x)) : p.traces.filter((_, j) => j !== ti) } : p)));
   const addTrace = (pi: number, expr: string) => setPanes(panes.map((p, k) => (k === pi ? { traces: [...p.traces, { expr }] } : p)));
   const label = (k: string) => PLOT_KINDS.find(([x]) => x === k)?.[1] ?? `.${k}`;
   return (
-    <Card title="Gráfico" enabled onToggle={(v) => !v && remove()} onRemove={remove}>
-      <Row label="Análisis">
-        <select value={kind} aria-label="Análisis del gráfico" onChange={(e) => setKind(e.target.value)}>
+    <Card title={t('Plot')} enabled onToggle={(v) => !v && remove()} onRemove={remove}>
+      <Row label={t('Analysis')}>
+        <select value={kind} aria-label={t('Plot analysis')} onChange={(e) => setKind(e.target.value)}>
           {[...new Set([...kinds, ...PLOT_KINDS.map(([k]) => k)])].map((k) => (
             <option key={k} value={k}>
               {label(k)}
@@ -497,42 +498,42 @@ function PlotCard({ view, set, remove, picker, preferred }: {
       {panes.map((p, pi) => (
         <fieldset key={pi} className="study-pane">
           <legend>
-            Panel {pi + 1}
-            <button className="x" aria-label={`Quitar el panel ${pi + 1}`} title="Quitar el panel" onClick={() => setPanes(panes.filter((_, k) => k !== pi))}>
+            {t('Pane')}{' '}{pi + 1}
+            <button className="x" aria-label={t('Remove pane {p0}', { p0: pi + 1 })} title={t('Remove the pane')} onClick={() => setPanes(panes.filter((_, k) => k !== pi))}>
               ✕
             </button>
           </legend>
-          {p.traces.map((t, ti) => (
+          {p.traces.map((tt, ti) => (
             <div key={ti} className="study-trace">
               <input
                 type="color"
                 className="color"
-                aria-label={`Color de ${t.expr || 'la señal'}`}
-                value={traceColor(t, ti)}
-                onChange={(e) => setTrace(pi, ti, { ...t, color: e.target.value })}
+                aria-label={t('Color of {p0}', { p0: tt.expr || t('the signal') })}
+                value={traceColor(tt, ti)}
+                onChange={(e) => setTrace(pi, ti, { ...tt, color: e.target.value })}
               />
-              <PickInput value={t.expr} onChange={(expr) => setTrace(pi, ti, { ...t, expr })} picker={picker} what="net" list="sim-nets-v" label={`Señal ${ti + 1} del panel ${pi + 1}`} placeholder="V(out) o V(out)/V(in)" />
-              <button className="x" aria-label={`Quitar ${t.expr || 'la señal'}`} title="Quitar" onClick={() => setTrace(pi, ti, null)}>
+              <PickInput value={tt.expr} onChange={(expr) => setTrace(pi, ti, { ...tt, expr })} picker={picker} what="net" list="sim-nets-v" label={t('Signal {p0} of pane {p1}', { p0: ti + 1, p1: pi + 1 })} placeholder="V(out) o V(out)/V(in)" />
+              <button className="x" aria-label={t('Remove {p0}', { p0: tt.expr || t('the signal') })} title={t('Remove')} onClick={() => setTrace(pi, ti, null)}>
                 ✕
               </button>
             </div>
           ))}
           <div className="tol-quick">
-            <button onClick={() => addTrace(pi, '')}>+ Señal</button>
+            <button onClick={() => addTrace(pi, '')}>{t('+ Signal')}</button>
             {picker && (
-              <button onClick={() => picker('net').then((v) => v && addTrace(pi, `V(${v})`))} title="Elegir una red en el esquemático">
-                + Señal del esquemático ⌖
+              <button onClick={() => picker('net').then((v) => v && addTrace(pi, `V(${v})`))} title={t('Choose a net on the schematic')}>
+                {t('+ Signal from the schematic ⌖')}
               </button>
             )}
           </div>
         </fieldset>
       ))}
       <div className="tol-quick">
-        <button onClick={() => setPanes([...panes, { traces: [] }])}>+ Panel de {label(kind)}</button>
+        <button onClick={() => setPanes([...panes, { traces: [] }])}>{t('+ Pane for')}{' '}{label(kind)}</button>
       </div>
       <p className="hint">
-        Es la misma vista que "Recordar vista" en los resultados: se aplica en cada simulación y se guarda dentro del .asc.
-        {kind === 'ac' ? ' En AC cada señal se muestra como Bode (magnitud y fase).' : ''}
+        {t('It\'s the same view as "Remember view" in the results: it\'s applied on every simulation and saved inside the .asc.')}
+        {kind === 'ac' ? t(' In AC each signal is shown as a Bode plot (magnitude and phase).') : ''}
       </p>
     </Card>
   );
@@ -609,14 +610,14 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
   const problems = [
     ...analyses.flatMap((a, i) => {
       const p = parseAnalysis(a.line);
-      return a.enabled && p && validateAnalysis(p).length ? [`Revisá los datos de la simulación ${i + 1}`] : [];
+      return a.enabled && p && validateAnalysis(p).length ? [t('Check the data of simulation {p0}', { p0: i + 1 })] : [];
     }),
-    ...st.sweeps.filter((s) => s.enabled && sweepRuns(s) === null).map(() => 'Hay un barrido con valores inválidos'),
-    ...st.sweeps.filter((s) => s.target.kind === 'component' && (!s.target.name || s.original === undefined)).map(() => 'Elegí el componente a barrer'),
-    ...st.measures.filter((m) => m.kind !== 'raw' && !m.signal).map((m) => `Falta la señal de ${m.name}`),
+    ...st.sweeps.filter((s) => s.enabled && sweepRuns(s) === null).map(() => t('There\'s a sweep with invalid values')),
+    ...st.sweeps.filter((s) => s.target.kind === 'component' && (!s.target.name || s.original === undefined)).map(() => t('Pick the component to sweep')),
+    ...st.measures.filter((m) => m.kind !== 'raw' && !m.signal).map((m) => t('The signal of {name} is missing', { name: m.name })),
   ];
   return (
-    <Modal title="Estudio" onClose={onClose} wide hidden={hidden}>
+    <Modal title={t('Study')} onClose={onClose} wide hidden={hidden}>
       <datalist id="study-components">{info.components.map((c) => <option key={c.name} value={c.name}>{c.value}</option>)}</datalist>
       <datalist id="study-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="study-params">{info.params.map((n) => <option key={n} value={n} />)}</datalist>
@@ -624,7 +625,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="sim-nets-v">{info.nets.map((n) => <option key={n} value={`V(${n})`} />)}</datalist>
       <nav className="tabs study-tabs">
-        <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>Tarjetas</button>
+        <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>{t('Cards')}</button>
         <button
           className={tab === 'blocks' ? 'active' : ''}
           onClick={() => {
@@ -634,7 +635,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             setTab('blocks');
           }}
         >
-          Bloques
+          {t('Blocks')}
         </button>
         <button
           className={tab === 'code' ? 'active' : ''}
@@ -643,12 +644,12 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             setTab('code');
           }}
         >
-          Ver código
+          {t('View code')}
         </button>
         {tab !== 'blocks' && (
           <span className="hint study-runs">
-            {runs} corrida{runs === 1 ? '' : 's'} en total
-            {active.length > 0 && ` · cada una corre ${active.map((a) => `.${kindOf(a.line)}`).join(', ')}`}
+            {runs} {t('run')}{runs === 1 ? '' : 's'} {t('in total')}
+            {active.length > 0 && t(' · each one runs {p0}', { p0: active.map((a) => `.${kindOf(a.line)}`).join(', ') })}
           </span>
         )}
       </nav>
@@ -667,8 +668,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           ))}
           {active.length > 1 && (
             <p className="hint warn">
-              LTspice corre un solo análisis por simulación: en el .asc la primera simulación activa queda como directiva y las demás como
-              comentario que LTspice ignora y sólo ejecuta TurboSpice.
+              {t('LTspice runs a single analysis per simulation: in the .asc the first active simulation stays as a directive and the others as a comment that LTspice ignores and only TurboSpice runs.')}
             </p>
           )}
           {st.sweeps.map((s, i) => (
@@ -692,15 +692,15 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             />
           ))}
           {st.custom && (
-            <Card title="Paso personalizado (.control)" enabled onToggle={(v) => !v && set({ ...st, custom: null })} onRemove={() => set({ ...st, custom: null })}>
-              <Row label="Cómo se combina">
+            <Card title={t('Custom step (.control)')} enabled onToggle={(v) => !v && set({ ...st, custom: null })} onRemove={() => set({ ...st, custom: null })}>
+              <Row label={t('How it\'s combined')}>
                 <select
                   value={st.custom.mode}
-                  aria-label="Modo del paso personalizado"
+                  aria-label={t('Custom step mode')}
                   onChange={(e) => set({ ...st, custom: { ...st.custom!, mode: e.target.value as 'full' | 'hooks' } })}
                 >
-                  <option value="hooks">Con los barridos: antes / después de cada corrida y al final</option>
-                  <option value="full">Bloque completo: el .control decide qué simular</option>
+                  <option value="hooks">{t('With the sweeps: before / after each run and at the end')}</option>
+                  <option value="full">{t('Full block: the .control decides what to simulate')}</option>
                 </select>
               </Row>
               {st.custom.mode === 'full' ? (
@@ -708,19 +708,19 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
                   className="study-control"
                   rows={8}
                   spellCheck={false}
-                  aria-label="Bloque .control"
+                  aria-label={t('.control block')}
                   value={st.custom.body}
                   onChange={(e) => set({ ...st, custom: { ...st.custom!, body: e.target.value } })}
                 />
               ) : (
                 (['before', 'after', 'final'] as const).map((k) => (
-                  <Row key={k} label={{ before: 'Antes de cada corrida', after: 'Después de cada corrida', final: 'Al final' }[k]}>
+                  <Row key={k} label={{ before: t('Before each run'), after: t('After each run'), final: t('At the end') }[k]}>
                     <textarea
                       rows={3}
                       spellCheck={false}
-                      aria-label={{ before: 'Antes de cada corrida', after: 'Después de cada corrida', final: 'Al final' }[k]}
+                      aria-label={{ before: t('Before each run'), after: t('After each run'), final: t('At the end') }[k]}
                       value={st.custom![k]}
-                      placeholder={k === 'after' ? 'print v(out)' : k === 'final' ? 'echo listo' : 'set ...'}
+                      placeholder={k === 'after' ? 'print v(out)' : k === 'final' ? t('echo done') : 'set ...'}
                       onChange={(e) => set({ ...st, custom: { ...st.custom!, [k]: e.target.value } })}
                     />
                   </Row>
@@ -736,8 +736,8 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
                 </div>
               )}
               <p className="hint warn">
-                LTspice no tiene .control: se guarda como comentario que LTspice ignora, así que este paso sólo corre en TurboSpice.
-                {st.custom.mode === 'full' && (st.sweeps.length || st.tolerance) ? ' En modo "bloque completo" los barridos y tolerancias se ignoran.' : ''}
+                {t('LTspice has no .control: it\'s saved as a comment that LTspice ignores, so this step only runs in TurboSpice.')}
+                {st.custom.mode === 'full' && (st.sweeps.length || st.tolerance) ? t(' In "full block" mode sweeps and tolerances are ignored.') : ''}
               </p>
             </Card>
           )}
@@ -754,24 +754,23 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             />
           )}
           <div className="study-add">
-            <button onClick={add.analysis}>+ Simulación</button>
-            <button onClick={add.sweep}>+ Barrido</button>
-            <button onClick={add.tolerance} disabled={!!st.tolerance}>+ Tolerancias</button>
-            <button onClick={add.measure}>+ Medición</button>
-            <button onClick={add.custom} disabled={!!st.custom}>+ Paso personalizado</button>
-            <button onClick={add.plot} disabled={plotOpen}>+ Gráfico</button>
+            <button onClick={add.analysis}>{t('+ Simulation')}</button>
+            <button onClick={add.sweep}>{t('+ Sweep')}</button>
+            <button onClick={add.tolerance} disabled={!!st.tolerance}>{t('+ Tolerances')}</button>
+            <button onClick={add.measure}>{t('+ Measurement')}</button>
+            <button onClick={add.custom} disabled={!!st.custom}>{t('+ Custom step')}</button>
+            <button onClick={add.plot} disabled={plotOpen}>{t('+ Plot')}</button>
           </div>
           {!analyses.length && !st.sweeps.length && !st.tolerance && !st.measures.length && !st.custom && !plotOpen && (
             <p className="empty pad">
-              Agregá simulaciones (.tran, .ac…), qué graficar, un barrido (variar un componente, una fuente, la temperatura…), tolerancias (Monte Carlo o caso peor) o mediciones
-              (tiempo de subida, f a −3 dB…). Se guardan como .step y .meas, así que el .asc sigue simulando igual en LTspice.
+              {t('Add simulations (.tran, .ac…), what to plot, a sweep (vary a component, a source, the temperature…), tolerances (Monte Carlo or worst case) or measurements (rise time, f at −3 dB…). They\'re saved as .step and .meas, so the .asc still simulates the same in LTspice.')}
             </p>
           )}
         </div>
       )}
       {tab === 'blocks' && blocks && (
         <>
-          <Suspense fallback={<p className="empty pad">Cargando el editor de bloques…</p>}>
+          <Suspense fallback={<p className="empty pad">{t('Loading the block editor…')}</p>}>
             <StudyBlocks
               initial={blocks}
               info={info}
@@ -786,26 +785,25 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
               {compiled.errors.length
                 ? compiled.errors.join(' · ')
                 : compiled.ltspice
-                  ? 'Se guarda como .step y .meas: el .asc sigue simulando igual en LTspice.'
-                  : 'Usa lógica que LTspice no tiene: se guarda como bloque .control (sólo TurboSpice). Los bloques quedan guardados en el .asc.'}
+                  ? t('Saved as .step and .meas: the .asc still simulates the same in LTspice.')
+                  : t('It uses logic LTspice doesn\'t have: it\'s saved as a .control block (TurboSpice only). The blocks are saved in the .asc.')}
             </p>
           )}
         </>
       )}
       {tab === 'code' && (
         <div className="study-code">
-          <textarea spellCheck={false} rows={14} aria-label="Código del estudio" value={shownCode} onChange={(e) => setCode(e.target.value)} />
+          <textarea spellCheck={false} rows={14} aria-label={t('Study code')} value={shownCode} onChange={(e) => setCode(e.target.value)} />
           <p className="hint">
-            Las líneas que empiezan con ";" están desactivadas. Podés editar a mano: al aplicar, lo que se reconoce vuelve a ser tarjetas y el
-            resto queda como directiva.
+            {t('Lines starting with ";" are disabled. You can edit by hand: when applying, what\'s recognized becomes cards again and the rest stays as a directive.')}
           </p>
         </div>
       )}
       {tab === 'cards' && problems.length > 0 && <p className="hint warn">{[...new Set(problems)].join(' · ')}</p>}
       <div className="buttons">
-        <button onClick={onClose}>Cancelar</button>
+        <button onClick={onClose}>{t('Cancel')}</button>
         {tab === 'code' && code !== null ? (
-          <button className="primary" onClick={() => onApplyCode(code)}>Aplicar código</button>
+          <button className="primary" onClick={() => onApplyCode(code)}>{t('Apply code')}</button>
         ) : tab === 'blocks' ? (
           <button
             className="primary"
@@ -814,7 +812,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
               compiled && onApply(withOriginals({ ...compiled.study, analyses: st.analyses, plot: cleanPlot(compiled.study.plot ?? st.plot), blocks: blocks ?? undefined }))
             }
           >
-            Aplicar
+            {t('Apply')}
           </button>
         ) : (
           <button
@@ -823,7 +821,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             // editar las tarjetas descarta el programa de bloques (ya no coincidiría)
             onClick={() => onApply({ ...st, plot: cleanPlot(st.plot), blocks: cardsTouched.current ? undefined : st.blocks })}
           >
-            Aplicar
+            {t('Apply')}
           </button>
         )}
       </div>

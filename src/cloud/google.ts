@@ -4,6 +4,7 @@
 // integración queda apagada y la app funciona como siempre (guardado local y autoguardado).
 import { useSyncExternalStore } from 'react';
 import { DriveClient, type DriveUser } from './drive.ts';
+import { t } from '../i18n/i18n.ts';
 
 export const CLIENT_ID: string = import.meta.env?.VITE_GOOGLE_CLIENT_ID ?? '';
 export const SCOPE = 'https://www.googleapis.com/auth/drive.file';
@@ -97,8 +98,8 @@ function loadGis(): Promise<Oauth2> {
     const s = document.createElement('script');
     s.src = GIS_URL;
     s.async = true;
-    s.onload = () => (window.google?.accounts?.oauth2 ? resolve(window.google.accounts.oauth2) : reject(new Error('Google Identity Services no cargó')));
-    s.onerror = () => reject(new Error('No se pudo cargar Google Identity Services (¿sin conexión?)'));
+    s.onload = () => (window.google?.accounts?.oauth2 ? resolve(window.google.accounts.oauth2) : reject(new Error(t('Google Identity Services didn\'t load'))));
+    s.onerror = () => reject(new Error(t('Could not load Google Identity Services (offline?)')));
     document.head.appendChild(s);
   });
   gis.catch(() => (gis = null));
@@ -116,14 +117,14 @@ function requestToken(prompt: string): Promise<string> {
             client_id: CLIENT_ID,
             scope: SCOPE,
             callback: (r) => {
-              if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || 'Google no devolvió un token'));
-              if (!oauth2.hasGrantedAllScopes(r, SCOPE)) return reject(new Error('Hace falta permitir el acceso a Google Drive para guardar ahí'));
+              if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || t('Google didn\'t return a token')));
+              if (!oauth2.hasGrantedAllScopes(r, SCOPE)) return reject(new Error(t('You need to allow access to Google Drive to save there')));
               token = { value: r.access_token, expires: Date.now() + Number(r.expires_in ?? 3600) * 1000 };
               writeJson('session', TOKEN_KEY, token);
               resolve(r.access_token);
             },
             error_callback: (e) =>
-              reject(new Error(e.type === 'popup_closed' ? 'Se cerró la ventana de Google' : e.type === 'popup_failed_to_open' ? 'El navegador bloqueó la ventana de Google' : e.message || 'Error de Google')),
+              reject(new Error(e.type === 'popup_closed' ? t('The Google window was closed') : e.type === 'popup_failed_to_open' ? t('The browser blocked the Google window') : e.message || t('Google error'))),
           });
           client.requestAccessToken({ prompt, login_hint: state.account?.emailAddress });
         }),
@@ -134,7 +135,7 @@ function requestToken(prompt: string): Promise<string> {
 
 /** Token válido para Drive; si venció pide otro (sin volver a preguntar si ya hay permiso) */
 export async function getToken(force = false): Promise<string> {
-  if (!CLIENT_ID) throw new Error('El inicio de sesión con Google no está configurado');
+  if (!CLIENT_ID) throw new Error(t('Google sign-in isn\'t configured'));
   if (!force && tokenValid()) return token!.value;
   return requestToken('');
 }
@@ -155,12 +156,12 @@ export async function signIn(): Promise<void> {
 }
 
 export function signOut(): void {
-  const t = token?.value;
+  const tt = token?.value;
   token = null;
   writeJson('session', TOKEN_KEY, null);
   writeJson('local', USER_KEY, null);
   set({ account: null });
-  if (t) window.google?.accounts?.oauth2?.revoke(t);
+  if (tt) window.google?.accounts?.oauth2?.revoke(tt);
 }
 
 /** Inicial para el circulito de la cuenta */

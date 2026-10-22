@@ -16,6 +16,7 @@ import type { Element, LtNetlist } from './ltnetlist.ts';
 import { replaceLaplaceLines, translateLaplace } from './laplace.ts';
 import { formatSpiceNumber, fromRkm, parseSpiceNumber } from './spicenum.ts';
 import { parseStep, stepPlan, type Step, type StepHooks, type StepRuns } from './step.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Resistencia serie que LTspice agrega a todo inductor sin Rser */
 export const LTSPICE_INDUCTOR_RSER = '1m';
@@ -76,12 +77,12 @@ function splitParams(value: string): { main: string; params: Map<string, string>
   // tokens respetando paréntesis y llaves: "SINE(0 1 1k)" o "{a*2}" son un solo token
   // LTspice acepta espacios alrededor del "=" ("K = 1"); no toca ==, >=, <=, !=
   const tokens = value.replace(/([A-Za-z_]\w*)\s*=\s*(?=[^=\s])/g, '$1=').match(/(?:[^\s({]+|\([^)]*\)|\{[^}]*\})+/g) ?? [];
-  for (const t of tokens) {
-    const m = /^([A-Za-z_]\w*)=(.+)$/.exec(t);
+  for (const tt of tokens) {
+    const m = /^([A-Za-z_]\w*)=(.+)$/.exec(tt);
     if (m) {
       params.set(m[1].toLowerCase(), m[2]);
       order.push(m[1]);
-    } else main.push(t);
+    } else main.push(tt);
   }
   return { main: main.join(' '), params, order };
 }
@@ -160,7 +161,7 @@ function expandElement(name: string, letter: string, nodes: string[], value: str
   if (rpar) lines.push(`R__${name}_par ${a} ${b} ${rpar}`);
   if (cpar) lines.push(`C__${name}_par ${a} ${b} ${cpar}`);
   for (const k of order) {
-    if (k.toLowerCase() === 'ipk' || k.toLowerCase() === 'rlshunt') warnings.push(`${name}: ${k} no se soporta en ngspice y se ignora`);
+    if (k.toLowerCase() === 'ipk' || k.toLowerCase() === 'rlshunt') warnings.push(t('{name}: {k} isn\'t supported by ngspice and is ignored', { name, k }));
   }
   return lines;
 }
@@ -323,21 +324,21 @@ export function expandStateFunctions(name: string, expr: string, lines: string[]
         rep = `((${off})+V(${n})-(${mod})*floor(V(${n})/(${mod})))`;
       } else rep = `V(${n})`;
     } else if (fn === 'delay' && (args.length === 2 || args.length === 3)) {
-      const [x, t, tmax] = args;
+      const [x, tt, tmax] = args;
       lines.push(`B__${n} ${n}_in 0 V=${x}`);
-      if (!/\b[vi]\s*\(|\btime\b/i.test(t)) {
-        lines.push(`T__${n} ${n}_in 0 ${n} 0 Z0=1 TD={${t.replace(/[{}]/g, '')}}`, `R__${n} ${n} 0 1`);
+      if (!/\b[vi]\s*\(|\btime\b/i.test(tt)) {
+        lines.push(`T__${n} ${n}_in 0 ${n} 0 Z0=1 TD={${tt.replace(/[{}]/g, '')}}`, `R__${n} ${n} 0 1`);
       } else {
         // el control del code model es la fracción de delmax (delmin = 0); ngspice recorta delmax
         // al final de la simulación (si fuera mayor, la fracción dejaría de ser t/delmax), así que
         // delmax = min(tmax, tstop); prepareSimulation define dly_tstop con el tstop del .tran
         const dmax = `min(${tmax ? tmax.replace(/[{}]/g, '') : '1e30'},dly_tstop)`;
         lines.push(
-          `B__${n}_t ${n}_t 0 V=(${t})/(${dmax})`,
+          `B__${n}_t ${n}_t 0 V=(${tt})/(${dmax})`,
           `A__${n} ${n}_in ${n} ${n}_t ${n}_m`,
           `.model ${n}_m delay(delmin=0 delmax={${dmax}} has_delay_cnt=true)`,
         );
-        warnings.push(`${name}: delay() con retardo variable se resuelve al paso del .tran`);
+        warnings.push(t('{name}: delay() with a variable delay is resolved at the .tran step', { name }));
       }
       rep = `V(${n})`;
     }
@@ -410,7 +411,7 @@ export function translateFunctions(text: string): string {
  */
 function fixBraces(value: string): string {
   if (!value.includes('{')) return value;
-  const count = (t: string, c: string) => t.split(c).length - 1;
+  const count = (tt: string, c: string) => tt.split(c).length - 1;
   return value.replace(/\S+/g, (tok) => {
     const kv = /^([A-Za-z_]\w*=)(.*)$/.exec(tok);
     const [k, v] = kv ? [kv[1], kv[2]] : ['', tok];
@@ -481,7 +482,7 @@ function fixTran(line: string, warnings: string[], sines: { period: number; dela
   const nums = args.filter((a) => !flags.includes(a));
   // startup se emula en las fuentes (ver startupRamp)
   const unsupported = flags.filter((f) => !/^(uic|startup)$/i.test(f));
-  if (unsupported.length) warnings.push(`.tran: opciones de LTspice ignoradas (${unsupported.join(', ')})`);
+  if (unsupported.length) warnings.push(t('.tran: LTspice options ignored ({p0})', { p0: unsupported.join(', ') }));
   if (nums.length === 1) nums.unshift('0');
   const tstop = parseSpiceNumber(nums[1]);
   if (parseSpiceNumber(nums[0]) === 0) {
@@ -547,9 +548,9 @@ const holdAtOp = (err: string) => `(time > 0) ? 0 : 1e6*(${err})`;
  */
 function coupledInductors(lt: LtNetlist): Set<string> {
   const out = new Set<string>();
-  for (const t of lt.texts) {
-    if (t.kind !== 'directive') continue;
-    for (const l of t.text.split(/\\n|\n/)) {
+  for (const tt of lt.texts) {
+    if (tt.kind !== 'directive') continue;
+    for (const l of tt.text.split(/\\n|\n/)) {
       const k = /^\s*K\S*\s+(.*)$/i.exec(l.replace(/\s*;.*$/, ''));
       if (k) for (const n of k[1].trim().split(/\s+/).slice(0, -1)) out.add(n.toLowerCase().replace(/^l§/, ''));
     }
@@ -562,8 +563,8 @@ const icValue = (ic: string) => (/^[A-Za-z_]\w*$/.test(ic) ? `{${ic}}` : ic);
 
 function tranHoldsIc(lt: LtNetlist): boolean {
   const tran = lt.texts
-    .filter((t) => t.kind === 'directive')
-    .flatMap((t) => t.text.split(/\\n|\n/))
+    .filter((tt) => tt.kind === 'directive')
+    .flatMap((tt) => tt.text.split(/\\n|\n/))
     .map((l) => l.replace(/\s*;.*$/, '').trim())
     .filter((l) => /^\.tran\b/i.test(l));
   return tran.length > 0 && !tran.some((l) => /\suic\b/i.test(l));
@@ -577,10 +578,10 @@ function tranHoldsIc(lt: LtNetlist): boolean {
 function splitIc(line: string, currents: Map<string, string>): string | null {
   if (!/^\.ic\b/i.test(line)) return line;
   const rest: string[] = [];
-  for (const t of line.slice(3).trim().match(/(?:[^\s=]+\s*=\s*)?\S+/g) ?? []) {
-    const m = /^I\(([^)]+)\)\s*=\s*(\S+)$/i.exec(t);
+  for (const tt of line.slice(3).trim().match(/(?:[^\s=]+\s*=\s*)?\S+/g) ?? []) {
+    const m = /^I\(([^)]+)\)\s*=\s*(\S+)$/i.exec(tt);
     if (m) currents.set(m[1].toLowerCase(), m[2]);
-    else rest.push(t);
+    else rest.push(tt);
   }
   return rest.length ? `.ic ${rest.join(' ')}` : null;
 }
@@ -600,7 +601,7 @@ export function startupRamp(value: string): string {
 }
 
 function hasStartup(lt: LtNetlist): boolean {
-  return lt.texts.some((t) => t.kind === 'directive' && t.text.split('\n').some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
+  return lt.texts.some((tt) => tt.kind === 'directive' && tt.text.split('\n').some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
 }
 
 function convertElements(
@@ -641,7 +642,7 @@ function convertElements(
     // Valor por defecto del símbolo sin cambiar ("R", "C", "L"…): falta asignarlo.
     // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
     if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {
-      warnings.push(`${e.name} no tiene valor asignado`);
+      warnings.push(t('{name} has no value assigned', { name: e.name }));
     }
     if (letter === 'X') {
       const { main, params, order } = splitParams(e.value);
@@ -692,15 +693,15 @@ export const ngNodeName = (net: string): string => (/^(temp|temper)$/i.test(net)
 function renameReservedNodes(lt: LtNetlist): LtNetlist {
   const used = lt.elements.some((e) => e.nodes.some((n) => ngNodeName(n) !== n));
   if (!used) return lt;
-  const expr = (t: string) =>
-    t.replace(/\b([vV])\(\s*([^()]*?)\s*\)/g, (m, f: string, a: string) => {
+  const expr = (tt: string) =>
+    tt.replace(/\b([vV])\(\s*([^()]*?)\s*\)/g, (m, f: string, a: string) => {
       const args = a.split(',').map((x) => ngNodeName(x.trim()));
       return args.join(',') === a.replace(/\s+/g, '') ? m : `${f}(${args.join(',')})`;
     });
   return {
     ...lt,
     elements: lt.elements.map((e) => ({ ...e, nodes: e.nodes.map(ngNodeName), value: expr(e.value) })),
-    texts: lt.texts.map((t) => ({ ...t, text: expr(t.text) })),
+    texts: lt.texts.map((tt) => ({ ...tt, text: expr(tt.text) })),
   };
 }
 
@@ -720,7 +721,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const include = (path: string, section?: string): string | null => {
     const rel = models.resolve(path);
     if (!rel) {
-      warnings.push(`No se encontró el archivo de modelos "${path}"`);
+      warnings.push(t('Model file "{path}" not found', { path }));
       return null;
     }
     if (!includes.includes(rel)) includes.push(rel);
@@ -729,11 +730,11 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
 
   // corrientes de inductor de los .ic (ver splitIc); el texto restante se vuelve a procesar abajo
   const inductorIcs = new Map<string, string>();
-  for (const t of lt.texts) {
-    if (t.kind === 'directive') for (const l of t.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
+  for (const tt of lt.texts) {
+    if (tt.kind === 'directive') for (const l of tt.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
   }
   const holdIc = tranHoldsIc(lt);
-  for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(`.ic I(${l})=${v}: ngspice usa la corriente inicial del inductor sólo con .tran uic`);
+  for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t('.ic I({l})={v}: ngspice uses the inductor\'s initial current only with .tran uic', { l, v }));
   out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt)));
   out.push(...capacitorIcs(lt, names, holdIc));
   const implicit = [...lt.implicitModels];
@@ -744,7 +745,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const steps: Step[] = [];
   const measures: string[] = [];
   // .control con marcas de sección: se combina con los barridos en lugar de reemplazarlos
-  const ctl = lt.texts.find((t) => isControlBlock(t.text));
+  const ctl = lt.texts.find((tt) => isControlBlock(tt.text));
   const hooks = ctl ? controlHooks(ctl.text.split('\\n').slice(1, -1)) : null;
   // .control generado por bloques: "run" corre cada análisis y recuerda su plot, y cada
   // "meas" se hace sobre el plot de su análisis (después de "run" el actual es el último)
@@ -752,8 +753,8 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const blocksCtl = ctl && ctl.text.split('\\n').some((l) => l.trim() === '* bloques') ? ctl : undefined;
   if (blocksCtl) {
     const analyses = lt.texts
-      .filter((t) => (t.kind === 'directive' || isNgspiceComment(t.text)) && !isControlBlock(t.text))
-      .flatMap((t) => t.text.split('\\n'))
+      .filter((tt) => (tt.kind === 'directive' || isNgspiceComment(tt.text)) && !isControlBlock(tt.text))
+      .flatMap((tt) => tt.text.split('\\n'))
       .map((l) => l.trim())
       .filter((l) => /^\.(tran|ac|dc|noise|op|tf)\b/i.test(l));
     const body: string[] = [];
@@ -773,15 +774,15 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     }
     out.push('.control', ...body, '.endc');
   }
-  for (const t of lt.texts) {
-    if (hooks && t === ctl) continue;
-    if (blocksCtl && t === blocksCtl) continue;
+  for (const tt of lt.texts) {
+    if (hooks && tt === ctl) continue;
+    if (blocksCtl && tt === blocksCtl) continue;
     // Comentarios que son directivas de ngspice (.control, .pz…): se ejecutan
-    const comment = t.kind === 'comment' && !isNgspiceComment(t.text);
+    const comment = tt.kind === 'comment' && !isNgspiceComment(tt.text);
     // "+ …" continúa la línea anterior (p.ej. un .meas en dos renglones): se une antes de
     // procesarla, si no la continuación queda suelta cuando la directiva se comenta
     const joined: string[] = [];
-    for (const l of t.text.split('\\n')) {
+    for (const l of tt.text.split('\\n')) {
       if (/^\s*\+/.test(l) && joined.length) joined[joined.length - 1] += ` ${l.trim().slice(1).trim()}`;
       else joined.push(l);
     }
@@ -825,9 +826,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
       // prefijo (L§N2); se usan los nombres de ngspice
       const k = /^(K\S*)\s+(.*)$/i.exec(line);
       if (k) {
-        const ng = (t: string) => names.get(t) ?? names.get(`L§${t}`) ?? [...names].find(([a]) => a.toLowerCase() === t.toLowerCase() || a.toLowerCase() === `l§${t.toLowerCase()}`)?.[1] ?? t;
+        const ng = (tt: string) => names.get(tt) ?? names.get(`L§${tt}`) ?? [...names].find(([a]) => a.toLowerCase() === tt.toLowerCase() || a.toLowerCase() === `l§${tt.toLowerCase()}`)?.[1] ?? tt;
         const toks = k[2].split(/\s+/);
-        out.push([k[1], ...toks.map((t, i) => (i < toks.length - 1 ? ng(t) : t))].join(' '));
+        out.push([k[1], ...toks.map((tt, i) => (i < toks.length - 1 ? ng(tt) : tt))].join(' '));
         continue;
       }
       // fuente B escrita a mano (p.ej. "Bvco a 0 V=TABLE(…)")
@@ -852,8 +853,8 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   // Modelos referenciados que no aparecen definidos en ningún lado
   const local = new Set(
     lt.texts
-      .filter((t) => t.kind === 'directive')
-      .flatMap((t) => [...t.text.matchAll(/(?:^|\\n)\s*\.(?:model|subckt)\s+(\S+)/gi)].map((m) => m[1].toLowerCase())),
+      .filter((tt) => tt.kind === 'directive')
+      .flatMap((tt) => [...tt.text.matchAll(/(?:^|\\n)\s*\.(?:model|subckt)\s+(\S+)/gi)].map((m) => m[1].toLowerCase())),
   );
   // Los de library/cmp (la lista de la que se eligen) se incluyen solos, salvo que el
   // esquemático los defina: como LTspice con su standard.bjt, .dio, .jft y .mos
@@ -865,8 +866,8 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
       if (rel && !includes.includes(rel)) out.push(include(rel)!);
     }
     // ".model Dz ako: 1N750 (bv=4.3)": el modelo base también puede estar en library/cmp
-    for (const t of lt.texts) {
-      for (const m of t.text.split('\\n').join('\n').matchAll(/^\s*\.model\s+\S+\s+ako:\s*([^\s(]+)/gim)) {
+    for (const tt of lt.texts) {
+      for (const m of tt.text.split('\\n').join('\n').matchAll(/^\s*\.model\s+\S+\s+ako:\s*([^\s(]+)/gim)) {
         const rel = !local.has(m[1].toLowerCase()) ? models.cmpFile(m[1]) : undefined;
         if (rel && !includes.includes(rel)) out.push(include(rel)!);
       }
@@ -887,7 +888,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
       if (ltFile) {
         const r = include(ltFile);
         if (r && !out.includes(r)) out.push(r);
-      } else if (!models.defines(model)) warnings.push(`${e.name}: no se encontró el modelo "${model}"`);
+      } else if (!models.defines(model)) warnings.push(t('{name}: model "{model}" not found', { name: e.name, model }));
     }
   }
 
@@ -895,9 +896,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   for (const b of lt.blocks) {
     out.push(`.subckt ${b.name} ${b.ports.join(' ')}`);
     out.push(...convertElements(b.lt, new Set(), new Map(), warnings, subcktParams));
-    for (const t of b.lt.texts) {
-      if (t.kind !== 'directive') continue;
-      for (const raw of t.text.split('\\n')) {
+    for (const tt of b.lt.texts) {
+      if (tt.kind !== 'directive') continue;
+      for (const raw of tt.text.split('\\n')) {
         const line = raw.trim();
         if (/^\.(model|param|func|subckt|ends|include|inc|lib)\b/i.test(line) || /^[+]/.test(line)) {
           const lib = /^\.(lib|include|inc)\s+("?)([^"]+)\2(?:\s+(\S+))?\s*$/i.exec(line);
@@ -919,9 +920,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */
 function declaredParams(lt: LtNetlist): Set<string> {
   const out = new Set<string>();
-  for (const t of lt.texts) {
-    if (t.kind !== 'directive') continue;
-    for (const line of t.text.split('\\n')) {
+  for (const tt of lt.texts) {
+    if (tt.kind !== 'directive') continue;
+    for (const line of tt.text.split('\\n')) {
       const m = /^\s*\.param\s+(.*)$/i.exec(line);
       if (!m) continue;
       for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) out.add(p[1].toLowerCase());
@@ -942,8 +943,8 @@ function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out:
       declared.add(s.target.name.toLowerCase());
     }
   }
-  if (!hooks && lt.texts.some((t) => isControlBlock(t.text))) {
-    warnings.push('.step se ignora porque el esquemático tiene un bloque .control (el bloque decide qué simular)');
+  if (!hooks && lt.texts.some((tt) => isControlBlock(tt.text))) {
+    warnings.push(t('.step is ignored because the schematic has a .control block (the block decides what to simulate)'));
     return undefined;
   }
   const byName = new Map([...names].map(([k, v]) => [k.toLowerCase(), v]));
@@ -1026,7 +1027,7 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   for (const rel of net.includes) files[rel] = replaceLaplaceLines(stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams)), warnings);
   // ako: se resuelve con los modelos de todos los archivos y de la netlist
   const models = collectModels(net.text);
-  for (const t of Object.values(files)) collectModels(t, models);
+  for (const tt of Object.values(files)) collectModels(tt, models);
   const external = new Map();
   for (const rel of net.includes) {
     const a = replaceAko(files[rel], models);

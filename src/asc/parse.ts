@@ -11,6 +11,7 @@ import {
   type SymbolInst,
   type TextWindow,
 } from './model.ts';
+import { t } from '../i18n/i18n.ts';
 
 const SHAPES = new Set<ShapeKind>(['LINE', 'RECTANGLE', 'CIRCLE', 'ARC']);
 
@@ -32,7 +33,7 @@ function fields(line: string, n: number): string[] {
 
 const num = (s: string) => {
   const v = Number(s);
-  if (!Number.isFinite(v)) throw new Error(`número inválido: ${s}`);
+  if (!Number.isFinite(v)) throw new Error(t('invalid number: {s}', { s }));
   return v;
 };
 
@@ -101,7 +102,7 @@ export function parseAsc(text: string): AscDoc {
         const parts = line.trim().split(/\s+/);
         const [x, y, orient] = parts.slice(-3);
         const type = line.trim().slice('SYMBOL'.length).trim().split(/\s+/).slice(0, -3).join(' ');
-        if (!ORIENTS.includes(orient as Orient)) throw new Error(`orientación inválida: ${line}`);
+        if (!ORIENTS.includes(orient as Orient)) throw new Error(t('invalid orientation: {line}', { line }));
         sym = { type, x: num(x), y: num(y), orient: orient as Orient, windows: new Map(), attrs: new Map() };
         doc.symbols.push(sym);
         break;

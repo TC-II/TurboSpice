@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Diodo "ideal" de LTspice (.model X D(Ron=… Vfwd=… Roff=… Vrev=… Rrev=… Ilimit=…)).
 // ngspice no lo tiene: acepta el modelo sin error pero lo trata como una resistencia, así
 // que los resultados saldrían mal en silencio. Se reemplaza cada instancia por una fuente
@@ -75,8 +76,8 @@ export function replaceIdealDiodes(text: string, external = new Map<string, Idea
     const p = parseModelParams(m[2]);
     if (![...p.keys()].some((k) => IDEAL_PARAMS.includes(k))) continue;
     const other = [...p.keys()].filter((k) => !IDEAL_PARAMS.includes(k));
-    if (other.length) warnings.push(`Diodo ideal ${m[1]}: parámetros ignorados (${other.join(', ')})`);
-    if (p.has('epsilon') || p.has('revepsilon')) warnings.push(`Diodo ideal ${m[1]}: Epsilon (transición suave) no se modela`);
+    if (other.length) warnings.push(t('Ideal diode {p0}: parameters ignored ({p1})', { p0: m[1], p1: other.join(', ') }));
+    if (p.has('epsilon') || p.has('revepsilon')) warnings.push(t('Ideal diode {p0}: Epsilon (smooth transition) isn\'t modeled', { p0: m[1] }));
     found.set(m[1].toLowerCase(), {
       ron: minR(p.get('ron') ?? '1'),
       // LTspice: sin Roff el diodo apagado conduce sólo Gmin

@@ -7,6 +7,7 @@ import { download, schematicPng, schematicSvg } from '../schematic/exportSchemat
 import { complexText, niceStep, pzCsv, pzRoots, rootInfo, ticks, unstable, type Root } from './pz.ts';
 import { si } from './series.ts';
 import { PALETTE } from './view.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** lado máximo del mapa [px] */
 const MAX = 360;
@@ -34,7 +35,7 @@ interface Props {
 
 const fmtNum = (x: number, digits = 3) => (Number.isFinite(x) ? String(Number(x.toPrecision(digits))) : '—');
 
-export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props) {
+export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: Props) {
   const roots = useMemo(() => pzRoots(runs), [runs]);
   const [hz, setHz] = useState(false);
   const [log, setLog] = useState(false);
@@ -178,30 +179,30 @@ export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props
     <div className={`pz-view${compact ? ' compact' : ''}`}>
       <div className="pz-side">
         <div className="plot-tools">
-          <button onClick={() => setView(null)} title="Ver todos los polos y ceros (doble click en el mapa)">
-            Ajustar
+          <button onClick={() => setView(null)} title={t('See all poles and zeros (double-click on the map)')}>
+            {t('Fit')}
           </button>
-          <select value={hz ? 'hz' : 'rad'} aria-label="Unidades" onChange={(e) => setHz(e.target.value === 'hz')}>
+          <select value={hz ? 'hz' : 'rad'} aria-label={t('Units')} onChange={(e) => setHz(e.target.value === 'hz')}>
             <option value="rad">rad/s</option>
             <option value="hz">Hz (s/2π)</option>
           </select>
-          <label className="check inline" title="Radio en décadas de |s| (conserva el ángulo, o sea ζ): para polos muy separados">
+          <label className="check inline" title={t('Radius in decades of |s| (keeps the angle, i.e. ζ): for widely spread poles')}>
             <input type="checkbox" checked={log} onChange={(e) => setLog(e.target.checked)} /> Log
           </label>
-          <label className="check inline" title="Rectas de ζ constante y círculos de ω₀ constante">
-            <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} /> Guías ζ/ω₀
+          <label className="check inline" title={t('Lines of constant ζ and circles of constant ω₀')}>
+            <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} /> {t('ζ/ω₀ guides')}
           </label>
           <select
             value=""
-            aria-label="Exportar polos y ceros"
+            aria-label={t('Export poles and zeros')}
             onChange={(e) => {
               void exportAs(e.target.value);
               e.target.value = '';
             }}
           >
-            <option value="">Exportar…</option>
-            <option value="png">Mapa a PNG</option>
-            <option value="svg">Mapa a SVG</option>
+            <option value="">{t('Export…')}</option>
+            <option value="png">{t('Map to PNG')}</option>
+            <option value="svg">{t('Map to SVG')}</option>
             <option value="csv">Tabla a CSV</option>
           </select>
         </div>
@@ -299,7 +300,7 @@ export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props
           {hr && hi && (
             <div className="pz-tip" style={{ left: `${(px(pts[hover!][0]) / W) * 100}%`, top: `${(py(pts[hover!][1]) / W) * 100}%` }}>
               <b>
-                {hr.kind === 'pole' ? 'polo' : 'cero'} {hr.n}
+                {hr.kind === 'pole' ? t('pole') : t('zero')} {hr.n}
                 {multi ? ` · ${runLabel(hr.run)}` : ''}
               </b>
               <span>
@@ -312,10 +313,10 @@ export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props
             </div>
           )}
         </div>
-        {!compact && <p className="hint pz-help">Rueda: zoom · arrastrar: mover · Shift+arrastrar: zoom a un recuadro · doble click: ajustar</p>}
+        {!compact && <p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
         {bad.length > 0 && (
           <p className="hint warn">
-            ⚠ {bad.length === 1 ? 'Un polo' : `${bad.length} polos`} en el semiplano derecho: el circuito es inestable{multi ? ' (en alguna corrida)' : ''}.
+            ⚠ {bad.length === 1 ? t('A pole') : t('{length} poles', { length: bad.length })} {t('in the right half-plane: the circuit is unstable')}{multi ? t(' (in some run)') : ''}.
           </p>
         )}
         {multi && (
@@ -333,7 +334,7 @@ export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props
           <table className="scalars">
             <thead>
               <tr>
-                {multi && <th>Corrida</th>}
+                {multi && <th>{t('Run')}</th>}
                 <th />
                 <th>{hz ? 's/2π [Hz]' : 's [rad/s]'}</th>
                 <th>f₀ = |s|/2π</th>
@@ -356,7 +357,7 @@ export function PzPlane({ runs, labels, name = 'polos y ceros', compact }: Props
                     onPointerLeave={() => setHover(null)}
                   >
                     {multi && <td style={{ color: color(r) }}>{runLabel(r.run)}</td>}
-                    <th>{r.kind === 'pole' ? `× polo ${r.n}` : `○ cero ${r.n}`}</th>
+                    <th>{r.kind === 'pole' ? t('× pole {n}', { n: r.n }) : t('○ zero {n}', { n: r.n })}</th>
                     <td>{complexText(r.re / unit, r.im / unit)}</td>
                     <td>{si(info.f0)}Hz</td>
                     <td>{Number.isFinite(info.q) ? fmtNum(info.q) : '—'}</td>

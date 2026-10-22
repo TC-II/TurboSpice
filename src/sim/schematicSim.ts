@@ -3,26 +3,27 @@
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
-import { ltNetlist, type LtNetlist } from '../netlist/ltnetlist.ts';
+import { ltNetlist, type LtNetlist, missingSymbolIn } from '../netlist/ltnetlist.ts';
 import { ngNodeName, prepareSimulation, toNgspice, type NgspiceNetlist } from '../netlist/tongspice.ts';
 import { isControlBlock, isNgspiceComment } from '../netlist/directives.ts';
 import { controlPlots, type Pane } from '../waveform/view.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
 import { checkSimSize, type SizeProblem } from './estimate.ts';
+import { t } from '../i18n/i18n.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
 const fileCache = new Map<string, string>();
 
 async function fetchModelFile(rel: string): Promise<string> {
-  let t = fileCache.get(rel);
-  if (t === undefined) {
+  let tt = fileCache.get(rel);
+  if (tt === undefined) {
     const res = await fetch(LIB_URL + rel.split('/').map(encodeURIComponent).join('/'));
-    if (!res.ok) throw new Error(`No se pudo descargar ${rel}`);
-    t = decode(new Uint8Array(await res.arrayBuffer())).text;
-    fileCache.set(rel, t);
+    if (!res.ok) throw new Error(t('Could not download {rel}', { rel }));
+    tt = decode(new Uint8Array(await res.arrayBuffer())).text;
+    fileCache.set(rel, tt);
   }
-  return t;
+  return tt;
 }
 
 export interface BuiltSimulation {
@@ -54,17 +55,17 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   const prep = prepareSimulation(ng, (rel) => texts[rel]);
   // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba
   const netlist = prep.netlist.replace(/\n\.end\s*$/i, '\n.options savecurrents\n.end');
-  const control = lt.texts.find((t) => isControlBlock(t.text));
+  const control = lt.texts.find((tt) => isControlBlock(tt.text));
   const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
   // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
   const analyses = lt.texts
-    .filter((t) => (t.kind === 'directive' || isNgspiceComment(t.text)) && !isControlBlock(t.text))
-    .flatMap((t) => t.text.split('\\n'))
+    .filter((tt) => (tt.kind === 'directive' || isNgspiceComment(tt.text)) && !isControlBlock(tt.text))
+    .flatMap((tt) => tt.text.split('\\n'))
     .map((l) => l.trim())
     .filter((l) => ANALYSIS_LINE.test(l));
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
-  const missingSymbols = [...new Set(lt.warnings.flatMap((w) => /^Símbolo no encontrado: (.+)$/.exec(w)?.[1] ?? []))];
+  const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
   return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols };
 }
 

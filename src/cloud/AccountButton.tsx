@@ -5,6 +5,7 @@ import { pickAscFiles } from '../schematic/fileio.ts';
 import type { DriveFile } from './drive.ts';
 import { FOLDER_NAME, uniqueName } from './drive.ts';
 import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
+import { t } from '../i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -49,8 +50,8 @@ export function AccountButton() {
     <div className="account" ref={box}>
       <button
         className={`account-btn${a ? ' signed-in' : ' google'}`}
-        aria-label={a ? `Cuenta de Google: ${a.displayName}` : 'Iniciar sesión con Google'}
-        title={a ? `${a.displayName}${a.emailAddress ? ` (${a.emailAddress})` : ''}` : 'Iniciar sesión con Google'}
+        aria-label={a ? t('Google account: {displayName}', { displayName: a.displayName }) : t('Sign in with Google')}
+        title={a ? `${a.displayName}${a.emailAddress ? ` (${a.emailAddress})` : ''}` : t('Sign in with Google')}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -73,17 +74,17 @@ export function AccountButton() {
                 <strong>{a.displayName}</strong>
                 {a.emailAddress && <span>{a.emailAddress}</span>}
               </div>
-              <p className="hint">Tus simulaciones viven en la carpeta «{FOLDER_NAME}» de tu Google Drive: Abrir (Ctrl+O) las lista y Guardar (Ctrl+S) las guarda ahí.</p>
-              <button role="menuitem" onClick={() => (signOut(), setOpen(false))}>Cerrar sesión</button>
+              <p className="hint">{t('Your simulations live in the «')}{FOLDER_NAME}{t('» folder of your Google Drive: Open (Ctrl+O) lists them and Save (Ctrl+S) saves them there.')}</p>
+              <button role="menuitem" onClick={() => (signOut(), setOpen(false))}>{t('Sign out')}</button>
             </>
           ) : (
             <>
               <ul className="account-ticks">
-                <li>Se creará la carpeta <strong>{FOLDER_NAME}</strong> en tu Google Drive.</li>
-                <li>TurboSpice <strong>sólo puede ver los archivos que crea él mismo</strong>.</li>
+                <li>{t('This creates the folder')}{' '}<strong>{FOLDER_NAME}</strong> {t('in your Google Drive.')}</li>
+                <li>TurboSpice <strong>{t('can only see the files it creates itself')}</strong>.</li>
               </ul>
               <button role="menuitem" className="primary" onClick={login} disabled={g.busy}>
-                {g.busy ? 'Conectando…' : 'Iniciar sesión con Google'}
+                {g.busy ? 'Conectando…' : t('Sign in with Google')}
               </button>
             </>
           )}
@@ -145,23 +146,23 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
   const names = (files ?? []).map((f) => f.name);
   const rename = (f: DriveFile) => {
     const ext = /\.turbo$/i.test(f.name) ? '.turbo' : '.asc';
-    const n = window.prompt('Nuevo nombre', f.name.replace(/\.(asc|turbo)$/i, ''))?.trim();
+    const n = window.prompt(t('New name'), f.name.replace(/\.(asc|turbo)$/i, ''))?.trim();
     if (!n) return;
     const name = `${n.replace(/\.(asc|turbo)$/i, '')}${ext}`;
     if (name === f.name) return;
-    if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(`Ya hay un «${name}» en la carpeta`);
+    if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(t('There\'s already a «{name}» in the folder', { name }));
     run('Renombrando…', async () => onRenamed?.(await drive.rename(f.id, name)));
   };
-  const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(f.name.replace(/(\.(asc|turbo))?$/i, ' (copia)$1'), names)));
+  const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(f.name.replace(/(\.(asc|turbo))?$/i, t(' (copy)$1')), names)));
   const trash = (f: DriveFile) => {
-    if (!window.confirm(`¿Mandar «${f.name}» a la papelera de Google Drive?`)) return;
+    if (!window.confirm(t('Move «{name}» to the Google Drive trash?', { name: f.name }))) return;
     run('Borrando…', async () => (await drive.trash(f.id), onTrashed?.(f.id)));
   };
   const importLocal = async () => {
     const picked = await pickAscFiles();
     if (!picked.length) return;
     let saved: DriveFile[] = [];
-    await run(picked.length > 1 ? `Importando ${picked.length} archivos…` : 'Importando…', async () => {
+    await run(picked.length > 1 ? t('Importing {length} files…', { length: picked.length }) : t('Importing…'), async () => {
       saved = await importToDrive(picked, names);
     });
     // uno solo: se abre directamente; varios: quedan en la lista
@@ -171,13 +172,13 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
   const q = query.trim().toLowerCase();
   const shown = (files ?? []).filter((f) => !q || f.name.toLowerCase().includes(q));
   return (
-    <Modal title="Mis simulaciones" onClose={onClose} large>
+    <Modal title={t('My simulations')} onClose={onClose} large>
       <div className="drive-browser">
-        <p className="hint">Carpeta «{FOLDER_NAME}» de tu Google Drive.</p>
+        <p className="hint">{t('Folder «')}{FOLDER_NAME}{t('» folder of your Google Drive.')}</p>
         <input
           type="search"
           className="drive-search"
-          placeholder="Buscar por nombre…"
+          placeholder={t('Search by name…')}
           value={query}
           autoFocus
           spellCheck={false}
@@ -186,22 +187,22 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
         />
         {error && <p className="hint warn">{error}</p>}
         {!files ? (
-          !error && <p className="hint">Cargando…</p>
+          !error && <p className="hint">{t('Loading…')}</p>
         ) : !files.length ? (
-          <p className="hint">Todavía no hay proyectos. Guardá con Ctrl+S o importá un .asc de tu computadora.</p>
+          <p className="hint">{t('No projects yet. Save with Ctrl+S or import an .asc from your computer.')}</p>
         ) : !shown.length ? (
-          <p className="hint">Nada coincide con «{query}».</p>
+          <p className="hint">{t('Nothing matches «')}{query}».</p>
         ) : (
           <ul className="drive-list">
             {shown.map((f) => (
               <li key={f.id} className={f.id === currentId ? 'current' : ''}>
-                <button className="drive-open" onClick={() => onOpen(f)} title="Abrir" disabled={!!busy}>
+                <button className="drive-open" onClick={() => onOpen(f)} title={t('Open')} disabled={!!busy}>
                   <span>{f.name}</span>
                   {f.modifiedTime && <span className="hint">{new Date(f.modifiedTime).toLocaleString()}</span>}
                 </button>
-                <button className="drive-act" title="Renombrar" aria-label={`Renombrar ${f.name}`} onClick={() => rename(f)} disabled={!!busy}>✎</button>
-                <button className="drive-act" title="Duplicar" aria-label={`Duplicar ${f.name}`} onClick={() => duplicate(f)} disabled={!!busy}>⧉</button>
-                <button className="drive-act" title="Mandar a la papelera" aria-label={`Borrar ${f.name}`} onClick={() => trash(f)} disabled={!!busy}>🗑</button>
+                <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>✎</button>
+                <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>⧉</button>
+                <button className="drive-act" title={t('Move to trash')} aria-label={t('Delete {name}', { name: f.name })} onClick={() => trash(f)} disabled={!!busy}>🗑</button>
               </li>
             ))}
           </ul>
@@ -209,10 +210,10 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
       </div>
       <div className="buttons">
         {busy && <span className="hint">{busy}</span>}
-        <button type="button" onClick={importLocal} disabled={!!busy} title="Sube uno o más .asc de tu computadora a la carpeta y abre el archivo (si es uno)">
-          Importar desde la PC…
+        <button type="button" onClick={importLocal} disabled={!!busy} title={t('Uploads one or more .asc files from your computer to the folder and opens the file (if it\'s just one)')}>
+          {t('Import from computer…')}
         </button>
-        <button type="button" onClick={onClose}>Cerrar</button>
+        <button type="button" onClick={onClose}>{t('Close')}</button>
       </div>
     </Modal>
   );

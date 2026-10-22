@@ -1,7 +1,12 @@
 // Utilidades comunes de los e2e.
 
-/** Evita el diálogo de bienvenida de la primera visita */
-export const skipWelcome = (target) => target.addInitScript(() => localStorage.setItem('turbospice.welcomed', '1'));
+/** Los e2e verifican la interfaz en español (#72; por defecto es inglés) */
+export const spanishUi = (target) => target.addInitScript(() => localStorage.setItem('turbospice.lang', 'es'));
+/** Evita el diálogo de bienvenida de la primera visita (y deja la interfaz en español) */
+export const skipWelcome = async (target) => {
+  await spanishUi(target);
+  await target.addInitScript(() => localStorage.setItem('turbospice.welcomed', '1'));
+};
 /** Ver › Mostrar el comando de simulación (#48): para los tests que leen el .tran dibujado */
 export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 

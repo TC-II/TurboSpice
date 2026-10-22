@@ -1,40 +1,40 @@
-// Netlists de ejemplo para la UI provisional (fase 1)
+// Netlists de ejemplo del modo netlist (los nombres se traducen al mostrarlos)
 export const EXAMPLES: Record<string, string> = {
-  'Transitorio RC': `* Filtro RC: respuesta al escalón
+  'RC transient': `* RC filter: step response
 V1 in 0 PULSE(0 1 0 1u 1u 5m 10m) AC 1
 R1 in out 1k
 C1 out 0 1u
 .tran 10u 20m
 .end`,
-  'AC (Bode) RLC': `* Pasabajos RLC de 2do orden
+  'AC (Bode) RLC': `* 2nd-order RLC low-pass
 V1 in 0 AC 1
 R1 in a 10
 L1 a out 1m
 C1 out 0 1u
 .ac dec 100 100 100k
 .end`,
-  'DC: curvas de un BJT': `* Curvas Ic-Vce de un NPN
+  'DC: BJT curves': `* Ic-Vce curves of an NPN
 Vce c 0 0
 Ib 0 b 10u
 Q1 c b 0 qn
 .model qn NPN(BF=150 IS=1e-14 VAF=80)
 .dc Vce 0 10 0.05 Ib 10u 50u 10u
 .end`,
-  'Ruido': `* Ruido de salida de un divisor
+  'Noise': `* Output noise of a divider
 V1 in 0 DC 0 AC 1
 R1 in out 10k
 R2 out 0 10k
 C1 out 0 1n
 .noise v(out) V1 dec 20 10 10meg
 .end`,
-  'Polos y ceros': `* Polos y ceros de un RLC
+  'Poles and zeros': `* Poles and zeros of an RLC
 V1 in 0 AC 1
 R1 in a 10
 L1 a out 1m
 C1 out 0 1u
 .pz in 0 out 0 vol pz
 .end`,
-  'XSPICE digital': `* Contador de 2 bits con flip-flops D (XSPICE)
+  'XSPICE digital': `* 2-bit counter with D flip-flops (XSPICE)
 Vclk clk 0 PULSE(0 1 0 1n 1n 0.5u 1u)
 Aadc [clk] [dclk] adc1
 Ainv1 q0 nq0 inv1
@@ -50,7 +50,7 @@ R1 a1 0 1k
 .model dff1 d_dff
 .tran 10n 8u
 .end`,
-  'Script .control': `* Barrido de R con un loop .control
+  '.control script': `* Sweeping R with a .control loop
 V1 in 0 PULSE(0 1 0 1u 1u 5m 10m)
 R1 in out 1k
 C1 out 0 1u

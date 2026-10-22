@@ -3,6 +3,7 @@
 // "+C3, −R2, R1 1k→2k2". Se usa en el historial de corridas: cada una contra la anterior.
 import type { AscDoc, SymbolInst, Wire } from '../asc/model.ts';
 import { isDataText } from '../asc/dataText.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type Mark = 'added' | 'changed';
 
@@ -76,24 +77,24 @@ export function diffCircuits(prev: AscDoc, next: AscDoc): CircuitDiff {
   const wiresAdded = extra(prev.wires, next.wires, wireKey);
   const wiresRemoved = extra(next.wires, prev.wires, wireKey).map((i) => prev.wires[i]);
   const wires = new Map<number, Mark>(wiresAdded.map((i) => [i, 'added']));
-  if (wiresAdded.length) parts.push(`+${plural(wiresAdded.length, 'cable', 'cables')}`);
-  if (wiresRemoved.length) parts.push(`−${plural(wiresRemoved.length, 'cable', 'cables')}`);
+  if (wiresAdded.length) parts.push(`+${plural(wiresAdded.length, t('wire'), t('wires'))}`);
+  if (wiresRemoved.length) parts.push(`−${plural(wiresRemoved.length, t('wire'), t('wires'))}`);
 
   const flagKey = (f: AscDoc['flags'][number]) => `${f.x},${f.y},${f.name}`;
   const flagsAdded = extra(prev.flags, next.flags, flagKey);
   const flagsRemoved = extra(next.flags, prev.flags, flagKey).length;
   const flags = new Map<number, Mark>(flagsAdded.map((i) => [i, 'added']));
-  if (flagsAdded.length || flagsRemoved) parts.push('etiquetas');
+  if (flagsAdded.length || flagsRemoved) parts.push(t('labels'));
 
   // directivas y comentarios visibles (los datos ";.plot", ";.study"… no cuentan)
-  const shown = (d: AscDoc) => d.texts.filter((t) => !isDataText(t));
-  const textKey = (t: AscDoc['texts'][number]) => `${t.kind}:${t.text}`;
+  const shown = (d: AscDoc) => d.texts.filter((tt) => !isDataText(tt));
+  const textKey = (tt: AscDoc['texts'][number]) => `${tt.kind}:${tt.text}`;
   const textsAdded = extra(shown(prev), shown(next), textKey);
   const textsRemoved = extra(shown(next), shown(prev), textKey).length;
   const nextShown = shown(next);
   const texts = new Map<number, Mark>(textsAdded.map((i) => [next.texts.indexOf(nextShown[i]), 'changed']));
-  if (textsAdded.length || textsRemoved) parts.push(nextShown.some((t, i) => textsAdded.includes(i) && t.kind === 'directive') || textsRemoved ? 'directivas' : 'textos');
+  if (textsAdded.length || textsRemoved) parts.push(nextShown.some((tt, i) => textsAdded.includes(i) && tt.kind === 'directive') || textsRemoved ? t('directives') : t('texts'));
 
   const same = !parts.length;
-  return { symbols, wires, flags, texts, removed: { symbols: removedSyms, wires: wiresRemoved }, summary: same ? 'sin cambios' : parts.join(', '), same };
+  return { symbols, wires, flags, texts, removed: { symbols: removedSyms, wires: wiresRemoved }, summary: same ? t('no changes') : parts.join(', '), same };
 }

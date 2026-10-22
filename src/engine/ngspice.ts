@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Wrapper sobre la API compartida de ngspice (sharedspice.h) compilada a WebAssembly.
 // Corre en un Web Worker (o en Node para tests). Sólo sintaxis TS "borrable" para
 // que Node pueda importarlo directamente.
@@ -73,7 +74,7 @@ interface EmModule {
 export type NgspiceFactory = (opts: Record<string, unknown>) => Promise<unknown>;
 
 export const OUT_OF_MEMORY =
-  'Memoria insuficiente: la simulación genera más datos de los que admite el navegador. Bajá la cantidad de puntos (menos puntos por década en .ac, un paso máximo mayor en .tran).';
+  t('Out of memory: the simulation produces more data than the browser can hold. Lower the number of points (fewer points per decade in .ac, a larger maximum step in .tran).');
 /** Mensajes de ngspice o de Emscripten cuando se queda sin memoria */
 export const OUT_OF_MEMORY_RE = /can't allocate|not enough memory|out of memory|cannot enlarge memory|\bOOM\b/i;
 

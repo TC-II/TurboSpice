@@ -4,6 +4,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { vectorExpr } from '../sim/traces.ts';
 import { complexText } from './pz.ts';
 import { si } from './series.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Tabla de valores escalares; ordenable por nombre o por |valor|, con filtro */
 export function ResultTable({ plot }: { plot: SimPlot }) {
@@ -20,20 +21,20 @@ export function ResultTable({ plot }: { plot: SimPlot }) {
   return (
     <div className="result-table">
       <div className="plot-tools">
-        <input className="filter" placeholder="Filtrar…" aria-label="Filtrar" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className="filter" placeholder={t('Filter…')} aria-label={t('Filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <label className="check inline">
-          <input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> Ocultar ceros
+          <input type="checkbox" checked={hideZero} onChange={(e) => setHideZero(e.target.checked)} /> {t('Hide zeros')}
         </label>
-        <span className="hint">{rows.length} de {plot.vectors.length}</span>
+        <span className="hint">{rows.length} {t('of')}{' '}{plot.vectors.length}</span>
       </div>
       <table className="scalars">
         <thead>
           <tr>
             <th>
-              <button className="sort" onClick={() => setSort('name')}>Nombre{sort === 'name' ? ' ▾' : ''}</button>
+              <button className="sort" onClick={() => setSort('name')}>{t('Name')}{sort === 'name' ? ' ▾' : ''}</button>
             </th>
             <th>
-              <button className="sort" onClick={() => setSort('abs')}>Valor{sort === 'abs' ? ' (|x| ▾)' : ''}</button>
+              <button className="sort" onClick={() => setSort('abs')}>{t('Value')}{sort === 'abs' ? ' (|x| ▾)' : ''}</button>
             </th>
           </tr>
         </thead>

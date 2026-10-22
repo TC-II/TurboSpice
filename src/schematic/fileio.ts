@@ -6,6 +6,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { makeExplicit, type SymbolSource } from '../asc/resolve.ts';
 import { serializeAsc } from '../asc/serialize.ts';
+import { t } from '../i18n/i18n.ts';
 
 // Tipos mínimos de la File System Access API (no están en lib.dom de TypeScript 5.7)
 interface FileHandle {
@@ -21,8 +22,8 @@ declare global {
   }
 }
 
-const ASC_TYPE = { description: 'Esquemático de LTspice', accept: { 'application/octet-stream': ['.asc'] } };
-const TURBO_TYPE = { description: 'Proyecto de TurboSpice', accept: { 'application/json': ['.turbo'] } };
+const ASC_TYPE = { description: t('LTspice schematic'), accept: { 'application/octet-stream': ['.asc'] } };
+const TURBO_TYPE = { description: t('TurboSpice project'), accept: { 'application/json': ['.turbo'] } };
 const TYPES = [ASC_TYPE];
 
 export interface OpenedFile {
@@ -87,7 +88,7 @@ export interface PickedFile {
 export async function openProjectFile(): Promise<PickedFile | null> {
   if (window.showOpenFilePicker) {
     try {
-      const [handle] = await window.showOpenFilePicker({ types: [{ description: 'Proyecto de TurboSpice o esquemático de LTspice', accept: { 'application/octet-stream': ['.turbo', '.asc'] } }] });
+      const [handle] = await window.showOpenFilePicker({ types: [{ description: t('TurboSpice project or LTspice schematic'), accept: { 'application/octet-stream': ['.turbo', '.asc'] } }] });
       const file = await handle.getFile();
       return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), handle };
     } catch (e) {

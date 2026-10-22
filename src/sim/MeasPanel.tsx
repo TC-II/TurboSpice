@@ -2,6 +2,7 @@
 import { si } from '../waveform/series.ts';
 import { columnStats, histogram, measNumber, type MeasTable } from './measResults.ts';
 import type { MeasResult } from './meas.ts';
+import { t } from '../i18n/i18n.ts';
 
 function fmtResult(r: MeasResult | undefined): string {
   if (!r) return '';
@@ -21,7 +22,7 @@ function Histogram({ values, label }: { values: number[]; label: string }) {
   const bw = W / bins.length;
   return (
     <figure className="histogram">
-      <svg viewBox={`0 0 ${W} ${H + 14}`} role="img" aria-label={`Histograma de ${label}`}>
+      <svg viewBox={`0 0 ${W} ${H + 14}`} role="img" aria-label={t('Histogram of {label}', { label })}>
         {bins.map((b, i) => (
           <rect key={i} x={i * bw + 1} y={H - (b.count / max) * H} width={bw - 2} height={(b.count / max) * H}>
             <title>{`${si(b.from, 4)} … ${si(b.to, 4)}: ${b.count}`}</title>
@@ -46,7 +47,7 @@ export function MeasPanel({ table }: { table: MeasTable }) {
       <table className="scalars meas-table">
         <thead>
           <tr>
-            {many && <th>Corrida</th>}
+            {many && <th>{t('Run')}</th>}
             {table.names.map((n) => (
               <th key={n}>{n}</th>
             ))}
@@ -66,7 +67,7 @@ export function MeasPanel({ table }: { table: MeasTable }) {
           <tfoot>
             {(['mean', 'sigma', 'min', 'max'] as const).map((k) => (
               <tr key={k}>
-                <th>{{ mean: 'Media', sigma: 'Desvío (σ)', min: 'Mínimo', max: 'Máximo' }[k]}</th>
+                <th>{{ mean: 'Media', sigma: t('Std. dev. (σ)'), min: t('Minimum'), max: t('Maximum') }[k]}</th>
                 {cols.map((c, i) => {
                   const s = columnStats(c);
                   return <td key={i}>{s ? si(s[k], 5) : ''}</td>;
@@ -83,7 +84,7 @@ export function MeasPanel({ table }: { table: MeasTable }) {
           ))}
         </div>
       )}
-      {many && <p className="hint">Para graficar una medición en función del parámetro barrido, elegí el plot "meas vs …" y agregá la traza con su nombre.</p>}
+      {many && <p className="hint">{t('To plot a measurement against the swept parameter, choose the "meas vs …" plot and add the trace with its name.')}</p>}
     </div>
   );
 }

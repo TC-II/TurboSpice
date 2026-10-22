@@ -5,6 +5,7 @@
 //   standard.cap, .ind, .res, .bead  "nombre clave=valor …" (en LTspice son binarios)
 
 import { parseSpiceNumber } from '../netlist/spicenum.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type CmpKind = 'bjt' | 'dio' | 'jft' | 'mos' | 'cap' | 'ind' | 'res' | 'bead';
 
@@ -37,8 +38,8 @@ const kindOfFile = (file: string): CmpKind | undefined =>
 function readParams(s: string): { params: Map<string, string>; flags: Set<string> } {
   const params = new Map<string, string>();
   const flags = new Set<string>();
-  const t = s.replace(/\s*=\s*/g, '=').split(/[\s,]+/).filter(Boolean);
-  for (const tok of t) {
+  const tt = s.replace(/\s*=\s*/g, '=').split(/[\s,]+/).filter(Boolean);
+  for (const tok of tt) {
     const i = tok.indexOf('=');
     if (i > 0) params.set(tok.slice(0, i).toLowerCase(), tok.slice(i + 1));
     else flags.add(tok.toLowerCase());
@@ -86,41 +87,41 @@ export interface CmpColumn {
 
 export const CMP_COLUMNS: Record<CmpKind, CmpColumn[]> = {
   bjt: [
-    { key: '@type', label: 'Tipo' },
+    { key: '@type', label: t('Type') },
     { key: 'vceo', label: 'Vceo', unit: 'V' },
     { key: 'icrating', label: 'Ic', unit: 'A' },
     { key: 'bf', label: 'β (BF)' },
     { key: 'vaf', label: 'VAF', unit: 'V' },
     { key: 'cjc', label: 'Cjc', unit: 'F' },
     { key: 'tf', label: 'TF', unit: 's' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   dio: [
-    { key: 'type', label: 'Tipo' },
+    { key: 'type', label: t('Type') },
     { key: 'vpk', label: 'Vpk', unit: 'V' },
     { key: 'iave', label: 'Iave', unit: 'A' },
     { key: 'bv', label: 'BV', unit: 'V' },
     { key: 'is', label: 'Is', unit: 'A' },
     { key: 'cjo', label: 'Cjo', unit: 'F' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   jft: [
-    { key: '@type', label: 'Canal' },
+    { key: '@type', label: t('Channel') },
     { key: 'vto', label: 'Vto', unit: 'V' },
     { key: 'beta', label: 'Beta', unit: 'A/V²' },
     { key: 'lambda', label: 'λ', unit: '1/V' },
     { key: 'cgs', label: 'Cgs', unit: 'F' },
     { key: 'cgd', label: 'Cgd', unit: 'F' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   mos: [
-    { key: '@channel', label: 'Canal' },
+    { key: '@channel', label: t('Channel') },
     { key: 'vds', label: 'Vds', unit: 'V' },
     { key: 'ron', label: 'Ron', unit: 'Ω' },
     { key: 'qg', label: 'Qg', unit: 'C' },
     { key: 'vto', label: 'Vto', unit: 'V' },
     { key: 'cgs', label: 'Cgs', unit: 'F' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   cap: [
     { key: 'c', label: 'C', unit: 'F' },
@@ -128,8 +129,8 @@ export const CMP_COLUMNS: Record<CmpKind, CmpColumn[]> = {
     { key: 'irms', label: 'Irms', unit: 'A' },
     { key: 'rser', label: 'Rser', unit: 'Ω' },
     { key: 'lser', label: 'Lser', unit: 'H' },
-    { key: 'type', label: 'Tipo' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'type', label: t('Type') },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   ind: [
     { key: 'l', label: 'L', unit: 'H' },
@@ -137,20 +138,20 @@ export const CMP_COLUMNS: Record<CmpKind, CmpColumn[]> = {
     { key: 'rser', label: 'Rser', unit: 'Ω' },
     { key: 'rpar', label: 'Rpar', unit: 'Ω' },
     { key: 'cpar', label: 'Cpar', unit: 'F' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   res: [
     { key: 'r', label: 'R', unit: 'Ω' },
-    { key: 'tol', label: 'Tolerancia' },
-    { key: 'p', label: 'Potencia', unit: 'W' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'tol', label: t('Tolerance') },
+    { key: 'p', label: t('Power'), unit: 'W' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
   bead: [
     { key: 'z100m', label: 'Z @100 MHz', unit: 'Ω' },
     { key: 'idc', label: 'Idc', unit: 'A' },
     { key: 'rdc', label: 'Rdc', unit: 'Ω' },
     { key: 'l', label: 'L', unit: 'H' },
-    { key: 'mfg', label: 'Fabricante' },
+    { key: 'mfg', label: t('Manufacturer') },
   ],
 };
 
@@ -182,10 +183,10 @@ export function cmpChoicesFor(prefix: string, symbol: string): { kind: CmpKind; 
   switch (pre) {
     case 'QN':
     case 'QP':
-      return [{ kind: 'bjt', label: 'Transistores', accept: (p) => p.type === (pre === 'QN' ? 'NPN' : 'PNP') }];
+      return [{ kind: 'bjt', label: t('Transistors'), accept: (p) => p.type === (pre === 'QN' ? 'NPN' : 'PNP') }];
     case 'D': {
       const want = sym === 'zener' ? 'zener' : sym === 'schottky' ? 'schottky' : sym === 'led' ? 'led' : sym === 'varactor' ? 'varactor' : '';
-      return [{ kind: 'dio', label: 'Diodos', accept: (p) => p.type === 'D' && (!want || dioType(p) === want) }];
+      return [{ kind: 'dio', label: t('Diodes'), accept: (p) => p.type === 'D' && (!want || dioType(p) === want) }];
     }
     case 'JN':
     case 'JP':
@@ -196,14 +197,14 @@ export function cmpChoicesFor(prefix: string, symbol: string): { kind: CmpKind; 
       if (/4$/.test(sym)) return [];
       return [{ kind: 'mos', label: 'MOSFET', accept: (p) => p.type === 'VDMOS' && p.flags.has('pchan') === (pre === 'MP') }];
     case 'C':
-      return [{ kind: 'cap', label: 'Capacitores', accept: () => true }];
+      return [{ kind: 'cap', label: t('Capacitors'), accept: () => true }];
     case 'L':
       return [
-        { kind: 'ind', label: 'Inductores', accept: () => true },
+        { kind: 'ind', label: t('Inductors'), accept: () => true },
         { kind: 'bead', label: 'Ferrites', accept: () => true },
       ];
     case 'R':
-      return [{ kind: 'res', label: 'Resistores', accept: () => true }];
+      return [{ kind: 'res', label: t('Resistors'), accept: () => true }];
     default:
       return [];
   }

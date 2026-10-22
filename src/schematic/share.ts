@@ -1,3 +1,4 @@
+import { t } from '../i18n/i18n.ts';
 // Compartir un circuito con un link: el .asc (explícito) comprimido con deflate y en
 // base64url, dentro del hash (#c=…&n=nombre), así nunca llega a ningún servidor.
 
@@ -43,7 +44,7 @@ export async function readShareHash(hash: string): Promise<{ bytes: Uint8Array; 
   } catch {
     view = undefined; // una vista ilegible no impide abrir el circuito
   }
-  return { bytes, name: params.get('n') || 'Compartido.asc', ...(view ? { view } : {}) };
+  return { bytes, name: params.get('n') || t('Shared.asc'), ...(view ? { view } : {}) };
 }
 
 /** Largo a partir del cual el link puede no funcionar en chats o mails */

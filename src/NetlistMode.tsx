@@ -5,6 +5,7 @@ import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { EXAMPLES } from './examples.ts';
 import { Plot } from './waveform/Plot.tsx';
 import { displayName, scaleOf, si, type ComplexView } from './waveform/series.ts';
+import { t } from './i18n/i18n.ts';
 
 export type Status =
   | { kind: 'loading' }
@@ -57,7 +58,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
   const abort = () => {
     engine.abort();
     engine.ready.then(() => setStatus({ kind: 'idle' }));
-    setStatus({ kind: 'error', message: 'Simulación abortada' });
+    setStatus({ kind: 'error', message: t('Simulation aborted') });
   };
 
   const plot: SimPlot | undefined = result?.plots.find((p) => p.name === plotName);
@@ -87,7 +88,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
   const goToLine = () => {
     const ta = editor.current;
     if (!ta) return;
-    const n = Number(window.prompt('Ir a la línea:'));
+    const n = Number(window.prompt(t('Go to line:')));
     if (!Number.isInteger(n) || n < 1) return;
     const lines = netlist.split('\n');
     const start = lines.slice(0, n - 1).reduce((s, l) => s + l.length + 1, 0);
@@ -124,19 +125,19 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
     <div className="netlist-mode">
       <header className="toolbar-row">
         <select
-          aria-label="Ejemplos"
+          aria-label={t('Examples')}
           onChange={(e) => setNetlist(EXAMPLES[e.target.value])}
           defaultValue={FIRST}
         >
           {Object.keys(EXAMPLES).map((k) => (
-            <option key={k}>{k}</option>
+            <option key={k} value={k}>{t(k)}</option>
           ))}
         </select>
         {running ? (
-          <button onClick={abort} title="Abortar (Alt+S)">Abortar</button>
+          <button onClick={abort} title={t('Abort (Alt+S)')}>{t('Abort')}</button>
         ) : (
-          <button className="primary" onClick={simulate} disabled={status.kind === 'loading'} title="Simular (Alt+R / Ctrl+Enter)">
-            Simular
+          <button className="primary" onClick={simulate} disabled={status.kind === 'loading'} title={t('Simulate (Alt+R / Ctrl+Enter)')}>
+            {t('Simulate')}
           </button>
         )}
         <StatusText status={status} />
@@ -153,7 +154,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !running) simulate();
             }}
           />
-          <pre className="log" ref={logRef} tabIndex={-1} title="Log de ngspice (Ctrl+L)">{log.join('\n')}</pre>
+          <pre className="log" ref={logRef} tabIndex={-1} title={t('ngspice log (Ctrl+L)')}>{log.join('\n')}</pre>
         </section>
 
         <section className="results">
@@ -165,12 +166,12 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
                 ))}
               </select>
               {isComplex && scale && (
-                <select value={view} onChange={(e) => setView(e.target.value as ComplexView)} aria-label="Vista">
-                  <option value="db">Magnitud (dB)</option>
-                  <option value="phase">Fase (°)</option>
-                  <option value="mag">Magnitud</option>
+                <select value={view} onChange={(e) => setView(e.target.value as ComplexView)} aria-label={t('Display')}>
+                  <option value="db">{t('Magnitude (dB)')}</option>
+                  <option value="phase">{t('Phase (°)')}</option>
+                  <option value="mag">{t('Magnitude')}</option>
                   <option value="re">Real</option>
-                  <option value="im">Imaginaria</option>
+                  <option value="im">{t('Imaginary')}</option>
                 </select>
               )}
             </div>
@@ -189,7 +190,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
             </>
           )}
           {plot && !scale && <ScalarTable plot={plot} />}
-          {!result && <p className="empty">Escribí o elegí una netlist y presioná Simular (Alt+R o Ctrl+Enter). Ctrl+G: ir a una línea · Ctrl+L: log.</p>}
+          {!result && <p className="empty">{t('Write or pick a netlist and press Simulate (Alt+R or Ctrl+Enter). Ctrl+G: go to a line · Ctrl+L: log.')}</p>}
         </section>
       </main>
     </div>
@@ -224,13 +225,13 @@ export function ScalarTable({ plot }: { plot: SimPlot }) {
 export function StatusText({ status }: { status: Status }) {
   switch (status.kind) {
     case 'loading':
-      return <span className="status">Cargando motor…</span>;
+      return <span className="status">{t('Loading engine…')}</span>;
     case 'idle':
-      return <span className="status">Listo</span>;
+      return <span className="status">{t('Ready')}</span>;
     case 'running':
-      return <span className="status">Simulando… {status.percent ? `${status.percent.toFixed(0)}%` : ''}</span>;
+      return <span className="status">{t('Simulating…')}{' '}{status.percent ? `${status.percent.toFixed(0)}%` : ''}</span>;
     case 'done':
-      return <span className="status ok">Completado en {status.ms.toFixed(0)} ms</span>;
+      return <span className="status ok">{t('Done in')}{' '}{status.ms.toFixed(0)} ms</span>;
     case 'error':
       return <span className="status err">{status.message}</span>;
   }

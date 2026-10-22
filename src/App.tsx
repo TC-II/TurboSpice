@@ -5,7 +5,7 @@ import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts
 import { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
-import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
+import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
@@ -101,6 +101,7 @@ import { drive, useGoogle } from './cloud/google.ts';
 import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
+import { getLang, setLang, t } from './i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -150,9 +151,9 @@ interface FileState {
 // Serialización cacheada por documento (el autoguardado y el cambio de simulación la usan seguido)
 const ascCache = new WeakMap<AscDoc, string>();
 const ascText = (d: AscDoc) => {
-  let t = ascCache.get(d);
-  if (t === undefined) ascCache.set(d, (t = serializeAsc(d)));
-  return t;
+  let tt = ascCache.get(d);
+  if (tt === undefined) ascCache.set(d, (tt = serializeAsc(d)));
+  return tt;
 };
 
 const isTyping = (e: KeyboardEvent) =>
@@ -161,7 +162,7 @@ const isTyping = (e: KeyboardEvent) =>
 type Theme = 'auto' | 'light' | 'dark';
 
 /** Tema claro/oscuro elegido en la app (por defecto, el del sistema) */
-function useTheme(): [Theme, (t: Theme) => void] {
+function useTheme(): [Theme, (tt: Theme) => void] {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
       return (localStorage.getItem('turbospice.theme') as Theme) || 'auto';
@@ -211,7 +212,7 @@ const userFileKind = (name: string): UserFile['kind'] | null =>
 let clipboardFallback = '';
 
 /** Nombre de cada vista del panel de resultados (en el botón Resultados) */
-const PANEL_NAMES = { plot: 'Gráfico', netlist: 'Netlist', log: 'Log', problems: 'Problemas', meas: 'Mediciones' } as const;
+const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Problems'), meas: t('Measurements') };
 
 export function App() {
   const engine = useMemo(() => new EngineClient(), []);
@@ -227,7 +228,7 @@ export function App() {
         for (const f of await loadUserFiles()) registerUserFile(l, f);
         setLib(l);
       })
-      .catch((e: Error) => setLibError(`No se pudo cargar la librería: ${e.message}`));
+      .catch((e: Error) => setLibError(t('Could not load the library: {message}', { message: e.message })));
     return () => engine.abort();
   }, [engine]);
 
@@ -245,7 +246,7 @@ export function App() {
         <h1><Logo /> <span><span className="logo">Turbo</span>Spice</span></h1>
         {mode === 'netlist' ? (
           <nav className="tabs">
-            <button onClick={() => setMode('schematic')}>Esquemático</button>
+            <button onClick={() => setMode('schematic')}>{t('Schematic')}</button>
             <button className="active">Netlist</button>
           </nav>
         ) : (
@@ -260,7 +261,7 @@ export function App() {
         (lib ? (
           <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot }} onNetlist={() => setMode('netlist')} />
         ) : (
-          <p className="empty pad">{libError ?? 'Cargando librería…'}</p>
+          <p className="empty pad">{libError ?? t('Loading library…')}</p>
         ))}
     </div>
   );
@@ -278,10 +279,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const liveDoc = history.value;
   const docRef = useRef(liveDoc);
   docRef.current = liveDoc;
-  const [file, setFile] = useState<FileState>({ name: `Sin título${EXT}` });
+  const [file, setFile] = useState<FileState>({ name: t('Untitled{EXT}', { EXT }) });
   // proyecto (.turbo, #149): variantes y simulaciones, cada una con su circuito. El que se está
   // editando vive en `history` y pasa al proyecto al cambiar de simulación o al guardar (snapshot)
-  const [project, setProjectState] = useState<Project>(() => newProject('Sin título'));
+  const [project, setProjectState] = useState<Project>(() => newProject(t('Untitled')));
   const projectRef = useRef(project);
   projectRef.current = project;
   const [dirty, setDirty] = useState(false);
@@ -407,17 +408,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!incoming.length) return;
     const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
     if (r.added.length) editProject({ ...projectRef.current, files: r.files });
-    setMessage(r.added.length ? `Agregados al proyecto: ${r.added.join(', ')}` : 'No se agregó nada (ya estaban)');
+    setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
   };
   const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
   /** Símbolo para un .subckt de un archivo de modelos del proyecto */
   const makeProjectSymbol = (file: string, name: string) => {
     const f = projectRef.current.files.find((x) => x.name === file);
     const pins = f && subcktPins(f.text, name);
-    if (!pins) return setMessage(`No se encontró .subckt ${name} en ${file}`);
+    if (!pins) return setMessage(t('No .subckt {name} found in {file}', { name, file }));
     const sym = { name: `${name}.asy`, kind: 'symbol' as const, text: makeSymbol({ name, pins, block: false, modelFile: file }) };
     editProject({ ...projectRef.current, files: [...projectRef.current.files.filter((x) => x.name.toLowerCase() !== sym.name.toLowerCase()), sym] });
-    setMessage(`Símbolo ${name} creado: está en el buscador de componentes (F2) en "${PROJECT_DIR}"`);
+    setMessage(t('Symbol {name} created: it\'s in the component browser (F2) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
   };
 
   // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
@@ -446,9 +447,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Elegir una red o fuente en el esquemático desde un diálogo (que queda oculto mientras)
   const [picking, setPicking] = useState<{ what: PickWhat; resolve(v: string | null): void; prev: Tool } | null>(null);
 
-  const setTool = useCallback((t: Tool) => {
-    setToolState(t);
-    if (t.kind !== 'select' && t.kind !== 'move' && t.kind !== 'zoom') setSelection([]);
+  const setTool = useCallback((tt: Tool) => {
+    setToolState(tt);
+    if (tt.kind !== 'select' && tt.kind !== 'move' && tt.kind !== 'zoom') setSelection([]);
   }, []);
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
@@ -491,7 +492,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const commit = useCallback(
     (next: AscDoc) => {
-      if (viewingRef.current) return setMessage('Es una corrida anterior (sólo lectura): Restore la trae al presente');
+      if (viewingRef.current) return setMessage(t('This is a previous run (read-only): Restore brings it to the present'));
       offerValues.current?.(docRef.current, next);
       history.commit(next);
     },
@@ -592,7 +593,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     try {
       shared = await readShareHash(location.hash);
     } catch {
-      setMessage('El link no contiene un circuito válido');
+      setMessage(t('The link doesn\'t contain a valid circuit'));
     }
     if (shared === undefined && !/[#&]c=/.test(location.hash)) return false;
     window.history.replaceState(null, '', location.pathname + location.search);
@@ -626,7 +627,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           if (touched.current) return;
           loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
           setDirty(session.dirty);
-          const notes = [...(session.dirty ? [`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`] : []), ...warnings];
+          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: new Date(session.time).toLocaleString() })] : []), ...warnings];
           if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {
@@ -645,12 +646,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // pilas de deshacer no se guardan, #154)
   useEffect(() => {
     if (!restored) return;
-    const t = setTimeout(() => {
+    const tt = setTimeout(() => {
       serializeTurbo(snapshot()).then((turbo) =>
         saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }),
       );
     }, 600);
-    return () => clearTimeout(t);
+    return () => clearTimeout(tt);
   }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
 
   // Migración: vista guardada en el navegador para este nombre de archivo (versiones
@@ -672,16 +673,29 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return () => window.removeEventListener('hashchange', h);
   });
 
-  // Aviso al cerrar con cambios sin guardar
+  // Aviso al cerrar con cambios sin guardar (no al recargar para cambiar de idioma: se guardó todo)
+  const reloading = useRef(false);
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
-      if (dirty) e.preventDefault();
+      if (dirty && !reloading.current) e.preventDefault();
     };
     window.addEventListener('beforeunload', h);
     return () => window.removeEventListener('beforeunload', h);
   }, [dirty]);
 
-  const confirmDiscard = () => !dirty || window.confirm('Hay cambios sin guardar. ¿Descartarlos?');
+  /**
+   * Cambiar de idioma (#72): el idioma se fija al cargar la página, así que se guarda el proyecto
+   * (con lo que se está editando) y se recarga; el autoguardado lo trae de vuelta con sus resultados
+   */
+  const switchLang = async () => {
+    const turbo = await serializeTurbo(snapshot());
+    await saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() });
+    setLang(getLang() === 'en' ? 'es' : 'en');
+    reloading.current = true;
+    location.reload();
+  };
+
+  const confirmDiscard = () => !dirty || window.confirm(t('There are unsaved changes. Discard them?'));
 
   // Con la sesión de Google iniciada, Abrir muestra "Mis simulaciones" (la carpeta del Drive);
   // los archivos del equipo entran con Importar. Sin sesión, abre un .asc del equipo.
@@ -692,12 +706,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const files = picked ?? (await pickAscFiles());
     if (!files.length) return;
     try {
-      setMessage(files.length > 1 ? `Importando ${files.length} archivos a Google Drive…` : `Importando ${files[0].name} a Google Drive…`);
+      setMessage(files.length > 1 ? t('Importing {length} files to Google Drive…', { length: files.length }) : t('Importing {p0} to Google Drive…', { p0: files[0].name }));
       const saved = await importToDrive(files);
       if (saved.length === 1) await openDriveFile(saved[0]);
-      else setMessage(`Importados ${saved.length} archivos a «Mis simulaciones»`);
+      else setMessage(t('Imported {length} files to «My simulations»', { length: saved.length }));
     } catch (e) {
-      setMessage(`No se pudo importar: ${(e as Error).message}`);
+      setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -708,7 +722,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // el handle de un .asc no sirve para guardar el proyecto: se guarda aparte
       if (f) await openBytes(f.bytes, f.name, /\.turbo$/i.test(f.name) ? { handle: f.handle } : {});
     } catch (e) {
-      setMessage(`No se pudo abrir: ${(e as Error).message}`);
+      setMessage(t('Could not open: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -727,7 +741,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setProjectState({ ...p, name: projectName(saved.name) });
     setDirty(false);
     remember(p, saved);
-    setMessage(`Guardado${where}: ${saved.name}`);
+    setMessage(t('Saved{where}: {name}', { where, name: saved.name }));
   };
 
   /** Guardar en el equipo */
@@ -738,7 +752,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const r = await saveFile(bytes, name, file.handle, saveAs);
       if (r) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, p);
     } catch (e) {
-      setMessage(`No se pudo guardar: ${(e as Error).message}`);
+      setMessage(t('Could not save: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -770,7 +784,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (editRev.current === rev) setDirty(false);
     if (!auto) {
       remember(p, saved);
-      setMessage(`Guardado en Google Drive: ${r.name}`);
+      setMessage(t('Saved to Google Drive: {name}', { name: r.name }));
     }
   };
   const queueDriveSave = (auto: boolean, force = false) => {
@@ -780,7 +794,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     driveBusy.current = true;
     saveToDrive(auto, force)
-      .catch((e: Error) => setMessage(`No se pudo guardar en Google Drive: ${e.message}`))
+      .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
       .finally(() => {
         driveBusy.current = false;
         const next = drivePending.current;
@@ -805,10 +819,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         remember(snapshotRef.current(), f, true);
         return await openBytes(await drive.download(f.driveId), f.name, { driveId: f.driveId, driveVersion: (await drive.meta(f.driveId)).version });
       }
-      const name = uniqueName(`${projectName(f.name)} (copia)${EXT}`, (await drive.list()).map((x) => x.name));
+      const name = uniqueName(t('{p0} (copy){EXT}', { p0: projectName(f.name), EXT }), (await drive.list()).map((x) => x.name));
       const { p, bytes } = await turboBytes(name);
       const r = await drive.save(name, bytes);
-      savedAs({ ...f, name: r.name, driveId: r.id, driveVersion: r.version }, p, ' en Google Drive');
+      savedAs({ ...f, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
     } catch (e) {
       setMessage(`Google Drive: ${(e as Error).message}`);
     }
@@ -820,7 +834,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     let name = turboName(file.name);
     let id: string | undefined;
     if (!id && saveAs) {
-      const n = window.prompt('Nombre del proyecto en Google Drive', projectName(name))?.trim();
+      const n = window.prompt(t('Project name in Google Drive'), projectName(name))?.trim();
       if (!n) return;
       name = turboName(n);
     }
@@ -829,14 +843,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (!id) {
         const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
         if (same) {
-          if (!window.confirm(`Ya hay un «${same.name}» en Google Drive. ¿Reemplazarlo?`)) return;
+          if (!window.confirm(t('There\'s already a «{name}» in Google Drive. Replace it?', { name: same.name }))) return;
           id = same.id;
         }
       }
       const r = await drive.save(name, bytes, id);
-      savedAs({ ...file, name: r.name, driveId: r.id, driveVersion: r.version }, p, ' en Google Drive');
+      savedAs({ ...file, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
     } catch (e) {
-      setMessage(`No se pudo guardar en Google Drive: ${(e as Error).message}`);
+      setMessage(t('Could not save to Google Drive: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -850,7 +864,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       setDialog(null);
       await openBytes(bytes, d.name, /\.turbo$/i.test(d.name) ? { driveId: d.id, driveVersion: d.version ?? (await drive.meta(d.id)).version } : {});
     } catch (e) {
-      setMessage(`No se pudo abrir de Google Drive: ${(e as Error).message}`);
+      setMessage(t('Could not open from Google Drive: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -858,18 +872,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // en el IndexedDB de este navegador y no se sube a ningún lado
   const doImportLtspice = async (files: File[]) => {
     try {
-      setMessage('Importando la librería de LTspice…');
-      const index = await importLtspiceLibrary(files, (done, total) => setMessage(`Importando la librería de LTspice: ${done} de ${total} archivos…`));
+      setMessage(t('Importing the LTspice library…'));
+      const index = await importLtspiceLibrary(files, (done, total) => setMessage(t('Importing the LTspice library: {done} of {total} files…', { done, total })));
       setLtIndex(index);
-      setMessage(`Librería de LTspice importada: ${index.count.symbols} símbolos y ${index.count.models} archivos de modelos. Queda sólo en este navegador.`);
+      setMessage(t('LTspice library imported: {symbols} symbols and {models} model files. It stays only in this browser.', { symbols: index.count.symbols, models: index.count.models }));
     } catch (e) {
-      setMessage(`No se pudo importar la librería de LTspice: ${(e as Error).message}`);
+      setMessage(t('Could not import the LTspice library: {p0}', { p0: (e as Error).message }));
     }
   };
   const doRemoveLtspice = async () => {
     await removeLtspiceLibrary();
     setLtIndex(undefined);
-    setMessage('Se quitó la librería de LTspice de este navegador (lo ya cargado se va al recargar la página)');
+    setMessage(t('The LTspice library was removed from this browser (what\'s already loaded goes away when the page reloads)'));
   };
 
   // el link y el PDF llevan el circuito que se está viendo, como .asc
@@ -889,7 +903,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const hash = await shareHash(bytes, ascName());
     const url = `${PDF_TOOL}#${hash}`;
     if (tab) tab.location.href = url;
-    else setMessage('El navegador bloqueó la pestaña nueva: permitila para exportar a PDF.');
+    else setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
   };
 
   const doRecent = async (i: number) => {
@@ -909,11 +923,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       else remember(p, { name: r.name, ...at });
       if (warnings.length) setMessage(warnings.join(' · '));
     } catch (e) {
-      setMessage(`No se pudo abrir: ${(e as Error).message}`);
+      setMessage(t('Could not open: {p0}', { p0: (e as Error).message }));
     }
   };
 
-  const doNew = () => confirmDiscard() && loadProject(newProject('Sin título'), { name: `Sin título${EXT}` });
+  const doNew = () => confirmDiscard() && loadProject(newProject(t('Untitled')), { name: t('Untitled{EXT}', { EXT }) });
 
   const doExample = async (name: string) => {
     if (!confirmDiscard()) return;
@@ -984,7 +998,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
       else if (remembered) {
         setPanes(remembered);
-        if (built.controlPanes.length) built.warnings.push('Se usa la vista recordada en lugar de los "plot" del .control');
+        if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
       } else if (built.controlPanes.length) setPanes(built.controlPanes);
       const errs = result.errors.length ? result.errors : [];
       setStatus(errs.length && !result.plots.length ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
@@ -992,10 +1006,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const missing = built.missingSymbols;
       setMessage(
         missing.length
-          ? `Simulación incompleta: no se encontr${missing.length === 1 ? 'ó el símbolo' : 'aron los símbolos'} ${missing.join(', ')} y se ` +
-              `omiti${missing.length === 1 ? 'ó' : 'eron'} del circuito. Los resultados no corresponden al esquemático.`
+          ? missing.length === 1
+            ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
+            : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
           : built.warnings.length
-            ? `${built.warnings.length === 1 ? built.warnings[0] : `${built.warnings.length} avisos`} — ver la pestaña Problemas`
+            ? t('{p0} — see the Problems tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
             : undefined,
       );
       if (result.plots.length) {
@@ -1011,11 +1026,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const abort = () => {
     engine.abort();
     engine.ready.then(() => setStatus({ kind: 'idle' }));
-    setStatus({ kind: 'error', message: 'Simulación abortada' });
+    setStatus({ kind: 'error', message: t('Simulation aborted') });
   };
   /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
   const showLog = () => {
-    if (!sim) return setMessage('Todavía no hay simulación: simulá con Alt+R');
+    if (!sim) return setMessage(t('No simulation yet: simulate with Alt+R'));
     setPanel(sim.result.errors.length ? 'problems' : 'log');
   };
 
@@ -1096,7 +1111,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // del mismo tipo que otra: se parte de sus parámetros
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
     const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo()))));
-    if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    if (!r) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
@@ -1114,7 +1129,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const duplicateSim = (id: string) => {
     const r = duplicateProjectSim(leave(), id);
-    if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    if (!r) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
@@ -1150,13 +1165,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       try {
         await drive.rename(file.driveId, newName);
       } catch (e) {
-        setMessage(`No se pudo renombrar en Google Drive: ${(e as Error).message}`);
+        setMessage(t('Could not rename in Google Drive: {p0}', { p0: (e as Error).message }));
       }
       return;
     }
     // el archivo del equipo no se puede renombrar desde el navegador: Guardar pide dónde
     setFile({ ...file, name: newName, handle: undefined });
-    if (file.handle) setMessage(`Al guardar (Ctrl+S) se crea «${newName}»`);
+    if (file.handle) setMessage(t('Saving (Ctrl+S) will create «{newName}»', { newName }));
   };
 
   /** Restore: la corrida pasa a ser el circuito actual (un paso más de deshacer) */
@@ -1167,14 +1182,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     viewingRef.current = false;
     setValueOffer(null);
     history.commit(parseAsc(r.asc));
-    setMessage(`Se trajo al presente la corrida del ${new Date(r.time).toLocaleString()} (Ctrl+Z la deshace)`);
+    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: new Date(r.time).toLocaleString() }));
   };
   /** Clonar: una simulación nueva con el circuito de esa corrida */
   const cloneRun = (id: string) => {
     const r = curRuns.find((x) => x.id === id);
     if (!r || !curSim) return;
-    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || 'Sin análisis'} (${new Date(r.time).toLocaleString()})`);
-    if (!res) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString()})`);
+    if (!res) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
     enter(res.project);
     markDirty();
   };
@@ -1205,7 +1220,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     editProject(p);
     setValueOffer(null);
-    setMessage(`Aplicado en ${n === 1 ? '1 simulación' : `${n} simulaciones`}`);
+    setMessage(t('Applied to {p0}', { p0: n === 1 ? t('1 simulation') : t('{n} simulations', { n }) }));
   };
   const curSim = activeSim(sims);
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
@@ -1225,7 +1240,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       return setMessage((e as Error).message);
     }
     const sp = spectrum(sc.real, w.re, o);
-    const t = thd(sp);
+    const tt = thd(sp);
     const name = `fft ${o.expr} (${plot.name})`;
     const derived: SimPlot = {
       name,
@@ -1233,7 +1248,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { name: 'frequency', type: 2, real: sp.freq },
         { name: 'mag', type: 0, real: sp.amp },
       ],
-      info: `${o.expr}: fundamental ${si(t.fundamental)}Hz, amplitud ${si(t.amplitude)} · THD ${t.thd.toFixed(3)} % (armónicas 2 a ${t.harmonics.length + 1}) · ${sp.n} puntos, ventana ${o.window}`,
+      info: t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points, {window} window', { expr: o.expr, p1: si(tt.fundamental), p2: si(tt.amplitude), p3: tt.thd.toFixed(3), p4: tt.harmonics.length + 1, n: sp.n, window: o.window }),
     };
     setSim({ ...sim, result: { ...sim.result, plots: [...sim.result.plots.filter((p) => p.name !== name), derived] } });
     selectPlot(name, panesByKind.current.get('fft') ?? [{ traces: [{ expr: 'db(mag)' }] }]);
@@ -1282,7 +1297,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
     if (!sim || sim.doc !== doc || !(showOp || tool.kind === 'probe')) return undefined;
-    const traces = panes.flatMap((p) => p.traces.map((t, i) => ({ t, color: traceColor(t, i) }))).filter((x) => !x.t.hidden);
+    const traces = panes.flatMap((p) => p.traces.map((tt, i) => ({ t: tt, color: traceColor(tt, i) }))).filter((x) => !x.t.hidden);
     // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
     const colorOf = (target: { symbol: number; pin?: number }) => {
       const expr = probeExpr(sim.built, target);
@@ -1301,15 +1316,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const netColors = useMemo(() => {
     const m = new Map<string, string>();
     if (tool.kind !== 'probe') return m;
-    for (const p of panes) p.traces.forEach((t, i) => {
-      const n = /^V\(([^()]+)\)$/i.exec(t.expr.trim());
-      if (n && !t.hidden && !m.has(n[1].toLowerCase())) m.set(n[1].toLowerCase(), traceColor(t, i));
+    for (const p of panes) p.traces.forEach((tt, i) => {
+      const n = /^V\(([^()]+)\)$/i.exec(tt.expr.trim());
+      if (n && !tt.hidden && !m.has(n[1].toLowerCase())) m.set(n[1].toLowerCase(), traceColor(tt, i));
     });
     return m;
   }, [panes, tool.kind]);
   // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla
   // no llega el pointerleave)
-  const traceNetShown = traceNet && panes.some((p) => p.traces.some((t) => sameExpr(t.expr, `V(${traceNet})`))) ? traceNet : undefined;
+  const traceNetShown = traceNet && panes.some((p) => p.traces.some((tt) => sameExpr(tt.expr, `V(${traceNet})`))) ? traceNet : undefined;
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
@@ -1323,13 +1338,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
     const i = Math.min(activePane, panes.length - 1);
-    if (panes[i]?.traces.some((t) => sameExpr(t.expr, expr))) return;
+    if (panes[i]?.traces.some((tt) => sameExpr(tt.expr, expr))) return;
     const sc = scaleOf(plot);
-    if (!sc) return setMessage(`${plot.name} no tiene eje X: elegí otro análisis para graficar`);
+    if (!sc) return setMessage(t('{name} has no X axis: choose another analysis to plot', { name: plot.name }));
     try {
       evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
     } catch {
-      return setMessage(`No hay datos de ${expr} en ${plot.name}`);
+      return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
     editPanes(addTraceTo(panes, i, expr));
   };
@@ -1354,7 +1369,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const reapplyView = () => {
     const v = plot && plotView[plotKind(plot.name)];
     if (v) editPanes(v);
-    else setMessage('No hay una vista guardada para este análisis (se importa con un .plt)');
+    else setMessage(t('There\'s no saved view for this analysis (import one with a .plt)'));
   };
   const acceptOfferedView = () => {
     if (offerView) setPlotView({ ...offerView, ...plotView });
@@ -1362,10 +1377,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const importPlt = (bytes: Uint8Array) => {
     const v = parsePlt(decode(bytes).text);
-    if (!Object.keys(v).length) return setMessage('El .plt no tiene vistas que TurboSpice entienda');
+    if (!Object.keys(v).length) return setMessage(t('The .plt has no views TurboSpice understands'));
     setPlotView({ ...plotView, ...v });
     if (plot && v[plotKind(plot.name)]) setPanes(v[plotKind(plot.name)]);
-    setMessage(`Vista importada del .plt (${Object.keys(v).map((k) => `.${k}`).join(', ')})`);
+    setMessage(t('View imported from the .plt ({p0})', { p0: Object.keys(v).map((k) => `.${k}`).join(', ') }));
   };
   const exportPlt = () => {
     const v = plot ? { ...plotView, [plotKind(plot.name)]: panes } : plotView;
@@ -1389,12 +1404,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : { kind: 'attrs', index: ref.index });
     }
     else if (ref.kind === 'text') {
-      const t = doc.texts[ref.index];
-      const ls = t.text.split('\\n');
+      const tt = doc.texts[ref.index];
+      const ls = tt.text.split('\\n');
       // Como en LTspice: un comando de análisis abre el menú de simulación
-      if (isControlBlock(t.text)) setDialog({ kind: 'control', index: ref.index });
+      if (isControlBlock(tt.text)) setDialog({ kind: 'control', index: ref.index });
       else if (ls.length === 1 && ANALYSIS_LINE.test(ls[0])) setDialog({ kind: 'sim', found: { text: ref.index, line: 0, value: ls[0].trim() } });
-      else setDialog({ kind: 'text', index: ref.index, textKind: t.kind });
+      else setDialog({ kind: 'text', index: ref.index, textKind: tt.kind });
     } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
     else if (ref.kind === 'shape') {
       // doble click en una figura de la selección: el estilo va a todas las seleccionadas
@@ -1438,7 +1453,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Avisa si el circuito usa símbolos que no están en la librería ni entre los del usuario */
   const warnMissing = (d: AscDoc) => {
     const miss = missingSymbols(d);
-    if (miss.length) setMessage(`Faltan símbolos: ${miss.join(', ')}. Agregalos en Archivo › Mis símbolos y modelos.`);
+    if (miss.length) setMessage(t('Missing symbols: {p0}. Add them in File › My symbols and models.', { p0: miss.join(', ') }));
   };
   const storeUserFiles = (next: UserFile[]) => {
     setUserFiles(next);
@@ -1459,7 +1474,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       added.push(f.name);
     }
     storeUserFiles(next);
-    if (added.length) setMessage(`Agregados: ${added.join(', ')}`);
+    if (added.length) setMessage(t('Added: {p0}', { p0: added.join(', ') }));
   };
   const removeUserFile = (name: string) => {
     const f = userFiles.find((x) => x.name === name);
@@ -1474,11 +1489,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const f = userFiles.find((x) => x.name === file);
     if (!f) return;
     const pins = f.kind === 'schematic' ? schematicPorts(parseAsc(f.text).flags) : subcktPins(f.text, name);
-    if (!pins) return setMessage(`No se encontró .subckt ${name} en ${file}`);
+    if (!pins) return setMessage(t('No .subckt {name} found in {file}', { name, file }));
     const uf: UserFile = { name: `${name}.asy`, kind: 'symbol', text: makeSymbol({ name, pins, block: f.kind === 'schematic', modelFile: f.kind === 'model' ? file : undefined }), time: Date.now() };
     registerUserFile(lib, uf);
     storeUserFiles([...userFiles.filter((x) => x.name.toLowerCase() !== uf.name.toLowerCase()), uf]);
-    setMessage(`Símbolo ${name} creado: está en el buscador de componentes (F2) en "${USER_DIR}"`);
+    setMessage(t('Symbol {name} created: it\'s in the component browser (F2) under "{USER_DIR}"', { name, USER_DIR }));
   };
   const userFileInfo = (): UserFileInfo[] =>
     userFiles.map((f) => ({
@@ -1549,9 +1564,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const kind = found ? parseAnalysis(found.value)?.kind : undefined;
     const analysis = kind === 'ac' || kind === 'dc' || kind === 'noise' || kind === 'op' || kind === 'tf' ? kind : 'tran';
     const params = new Set<string>();
-    for (const t of doc.texts) {
-      if (t.kind !== 'directive') continue;
-      for (const l of t.text.split('\\n')) for (const m of l.matchAll(/^\s*\.param\s+(.*)$/gi)) for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) params.add(p[1]);
+    for (const tt of doc.texts) {
+      if (tt.kind !== 'directive') continue;
+      for (const l of tt.text.split('\\n')) for (const m of l.matchAll(/^\s*\.param\s+(.*)$/gi)) for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) params.add(p[1]);
     }
     return {
       components: doc.symbols
@@ -1635,7 +1650,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
               if (!e.shiftKey) return;
               handled();
               if (allRuns.length > 1) setDialog({ kind: 'runs' });
-              else setMessage('Este análisis no tiene varias corridas (.step)');
+              else setMessage(t('This analysis doesn\'t have several runs (.step)'));
               return;
             case 'o':
               return handled(), pltInput.current?.click();
@@ -1768,12 +1783,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       enter({ ...p, files: merged.files }, true);
       markDirty();
       const parts = [
-        ...(variants.length ? [`${variants.length === 1 ? 'la variante' : `${variants.length} variantes:`} ${variants.join(', ')}`] : []),
-        ...(merged.added.length ? [`${merged.added.length === 1 ? 'el archivo' : `${merged.added.length} archivos:`} ${merged.added.join(', ')}`] : []),
+        ...(variants.length ? [`${variants.length === 1 ? t('the variant') : t('{length} variants:', { length: variants.length })} ${variants.join(', ')}`] : []),
+        ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
-      setMessage(parts.length ? `Se importó ${parts.join(' y ')}` : 'No había nada para importar (.asc, .asy, .lib, .sub o .zip)');
+      setMessage(parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)'));
     } catch (e) {
-      setMessage(`No se pudo importar: ${(e as Error).message}`);
+      setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }
   };
   const exportZip = (all: boolean) => {
@@ -1825,12 +1840,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
   // Figuras: en el menú Dibujar y en el botón de la barra (#64)
   const shapeItems: MenuItem[] = [
-    { label: 'Línea', shortcut: 'J', onClick: shapeTool('LINE') },
-    { label: 'Rectángulo', shortcut: 'K', onClick: shapeTool('RECTANGLE') },
-    { label: 'Círculo', shortcut: 'O', onClick: shapeTool('CIRCLE') },
-    { label: 'Arco', shortcut: 'U', onClick: shapeTool('ARC') },
+    { label: t('Line'), shortcut: 'J', onClick: shapeTool('LINE') },
+    { label: t('Rectangle'), shortcut: 'K', onClick: shapeTool('RECTANGLE') },
+    { label: t('Circle'), shortcut: 'O', onClick: shapeTool('CIRCLE') },
+    { label: t('Arc'), shortcut: 'U', onClick: shapeTool('ARC') },
     'sep',
-    { label: 'Estilo de línea…', onClick: () => openLineStyle() },
+    { label: t('Line style…'), onClick: () => openLineStyle() },
   ];
   // Desplegable de Simular: las simulaciones guardadas (se elige cuál ver, #39); los tipos de
   // análisis, que crean una simulación nueva con sus parámetros en la barra; los comandos a mano
@@ -1838,159 +1853,159 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const simItems: MenuItem[] = [
     ...sims.items.map(
       (x): MenuItem => ({
-        label: simName(x) || 'Sin análisis',
-        title: `${x.line} (doble clic para renombrar)`,
+        label: simName(x) || t('No analysis'),
+        title: t('{line} (double-click to rename)', { line: x.line }),
         checked: x.id === sims.active,
         onClick: () => goSim(x.id),
         rename: { taken: sims.items.filter((y) => y.id !== x.id).map((y) => simName(y)), onRename: (n) => editProject(renameProjectSim(projectRef.current, x.id, n)) },
         actions: [
-          ...(variant.sims.find((y) => y.id === x.id)?.runs.length ? [{ icon: 'clock' as const, label: 'Historial', onClick: () => openHistory(x.id) }] : []),
-          { icon: 'copy', label: 'Duplicar', onClick: () => duplicateSim(x.id) },
-          { icon: 'trash', label: 'Borrar', onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) },
+          ...(variant.sims.find((y) => y.id === x.id)?.runs.length ? [{ icon: 'clock' as const, label: t('History'), onClick: () => openHistory(x.id) }] : []),
+          { icon: 'copy', label: t('Duplicate'), onClick: () => duplicateSim(x.id) },
+          { icon: 'trash', label: t('Delete'), onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) },
         ],
       }),
     ),
     ...(sims.items.length
-      ? [{ label: 'Circuito base (sin simulación)', title: 'El circuito de la variante fuera de las simulaciones', checked: !sims.active, onClick: () => goSim('') }]
+      ? [{ label: t('Base circuit (no simulation)'), title: t('The variant\'s circuit outside the simulations'), checked: !sims.active, onClick: () => goSim('') }]
       : []),
     'sep',
-    ...ANALYSES.map((x) => ({ label: x.label, title: `Nueva simulación: ${x.help}`, onClick: () => newSim(x.kind), disabled: sims.items.length >= MAX_SIMS })),
+    ...ANALYSES.map((x) => ({ label: x.label, title: t('New simulation: {help}', { help: x.help }), onClick: () => newSim(x.kind), disabled: sims.items.length >= MAX_SIMS })),
     'sep',
-    { label: 'Comando de simulación…', shortcut: 'A', onClick: () => openSimulation() },
-    { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+    { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
+    { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
-    { label: 'Estudio…', shortcut: 'Alt+E', onClick: openStudy },
-    { label: 'Bloque .control…', shortcut: 'Alt+C', onClick: openControl },
+    { label: t('Study…'), shortcut: 'Alt+E', onClick: openStudy },
+    { label: t('.control block…'), shortcut: 'Alt+C', onClick: openControl },
   ];
   const menus: MenuDef[] = [
     {
-      label: 'Archivo',
+      label: t('File'),
       items: [
-        { label: 'Nuevo', onClick: doNew },
-        { label: google.account ? 'Abrir (Mis simulaciones)…' : 'Abrir…', shortcut: 'Ctrl+O', onClick: doOpen },
-        ...(google.account ? [{ label: 'Importar desde la PC…', onClick: () => doImport() }] : []),
-        { label: 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
-        ...(google.account ? [{ label: 'Exportar a la PC…', onClick: () => doSaveLocal(true) }] : []),
-        { label: 'Exportar a PDF', title: 'Abre ASC-Parser con este circuito; no se sube a ningún servidor', onClick: doExportPdf },
+        { label: t('New'), onClick: doNew },
+        { label: google.account ? t('Open (My simulations)…') : t('Open…'), shortcut: 'Ctrl+O', onClick: doOpen },
+        ...(google.account ? [{ label: t('Import from computer…'), onClick: () => doImport() }] : []),
+        { label: t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { label: t('Save as…'), shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
+        ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
+        { label: t('Export to PDF'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdf },
         'sep',
-        { label: 'Importar a este proyecto…', title: '.zip, .asc (cada uno, una variante), .asy, .lib, .sub', onClick: () => importInput.current?.click() },
-        { label: 'Exportar la variante a LTspice (.zip)', title: 'Un .asc por simulación y los archivos del proyecto que usan', onClick: () => exportZip(false) },
-        { label: 'Exportar todo a LTspice (.zip)', title: 'Una carpeta por variante', onClick: () => exportZip(true) },
+        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a variant), .asy, .lib, .sub'), onClick: () => importInput.current?.click() },
+        { label: t('Export the variant to LTspice (.zip)'), title: t('One .asc per simulation plus the project files they use'), onClick: () => exportZip(false) },
+        { label: t('Export everything to LTspice (.zip)'), title: t('One folder per variant'), onClick: () => exportZip(true) },
         'sep',
-        { label: 'Compartir link…', onClick: doShare },
-        { label: 'Archivos del proyecto…', title: 'Símbolos y modelos guardados en el .turbo, para todas las variantes', onClick: () => setDialog({ kind: 'projectfiles' }) },
-        { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
+        { label: t('Share link…'), onClick: doShare },
+        { label: t('Project files…'), title: t('Symbols and models saved in the .turbo, for all variants'), onClick: () => setDialog({ kind: 'projectfiles' }) },
+        { label: t('My symbols and models…'), onClick: () => setDialog({ kind: 'userfiles' }) },
         {
-          label: ltIndex ? 'Librería de LTspice' : 'Importar librería de LTspice…',
+          label: ltIndex ? t('LTspice library') : t('Import LTspice library…'),
           items: [
-            { label: ltIndex ? 'Volver a importar…' : 'Elegir la carpeta lib…', onClick: () => ltInput.current?.click() },
+            { label: ltIndex ? t('Import again…') : t('Choose the lib folder…'), onClick: () => ltInput.current?.click() },
             ...(ltIndex
               ? [
-                  { label: `${ltIndex.count.symbols} símbolos, ${ltIndex.count.models} archivos de modelos (${new Date(ltIndex.time).toLocaleDateString()})`, disabled: true, onClick: () => {} },
-                  { label: 'Quitar', onClick: doRemoveLtspice },
+                  { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString() }), disabled: true, onClick: () => {} },
+                  { label: t('Remove'), onClick: doRemoveLtspice },
                 ]
               : []),
           ],
         },
         'sep',
-        { label: 'Ejemplos', items: EXAMPLES.map((x) => ({ label: /\.turbo$/i.test(x) ? 'Proyecto de prueba (.turbo)' : x.replace('.asc', ''), onClick: () => doExample(x) })) },
+        { label: t('Examples'), items: EXAMPLES.map((x) => ({ label: /\.turbo$/i.test(x) ? t('Test project (.turbo)') : x.replace('.asc', ''), onClick: () => doExample(x) })) },
         {
-          label: 'Recientes',
+          label: t('Recent'),
           items: recent.map((r, i) => ({
-            label: `${r.name.replace(/\.asc$/i, '')}${r.unsaved ? ' (sin guardar)' : ''}`,
+            label: `${r.name.replace(/\.asc$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
             title: new Date(r.time).toLocaleString(),
             onClick: () => doRecent(i),
           })),
         },
         'sep',
-        { label: 'Exportar esquemático a SVG', onClick: () => exportImage('svg') },
-        { label: 'Exportar esquemático a PNG', onClick: () => exportImage('png') },
-        { label: 'Exportar netlist de LTspice (.net)', onClick: () => exportNetlist('net') },
-        { label: 'Exportar netlist de ngspice (.cir)', onClick: () => exportNetlist('cir') },
+        { label: t('Export schematic to SVG'), onClick: () => exportImage('svg') },
+        { label: t('Export schematic to PNG'), onClick: () => exportImage('png') },
+        { label: t('Export LTspice netlist (.net)'), onClick: () => exportNetlist('net') },
+        { label: t('Export ngspice netlist (.cir)'), onClick: () => exportNetlist('cir') },
       ],
     },
     {
-      label: 'Editar',
+      label: t('Edit'),
       items: [
-        { label: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
-        { label: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
+        { label: t('Undo'), shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
+        { label: t('Redo'), shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
         'sep',
-        { label: 'Cortar', shortcut: 'Ctrl+X', onClick: () => copySelection(true), disabled: !selection.length },
-        { label: 'Copiar', shortcut: 'Ctrl+C', onClick: () => copySelection(), disabled: !selection.length },
-        { label: 'Pegar', shortcut: 'Ctrl+V', onClick: paste },
-        { label: 'Duplicar', shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
-        { label: 'Borrar', shortcut: 'Backspace', onClick: deleteSelection },
-        { label: 'Seleccionar todo', shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), selectAll()) },
+        { label: t('Cut'), shortcut: 'Ctrl+X', onClick: () => copySelection(true), disabled: !selection.length },
+        { label: t('Copy'), shortcut: 'Ctrl+C', onClick: () => copySelection(), disabled: !selection.length },
+        { label: t('Paste'), shortcut: 'Ctrl+V', onClick: paste },
+        { label: t('Duplicate'), shortcut: 'F6', onClick: duplicate, disabled: !selection.length },
+        { label: t('Delete'), shortcut: 'Backspace', onClick: deleteSelection },
+        { label: t('Select all'), shortcut: 'Ctrl+A', onClick: () => (setTool({ kind: 'select' }), selectAll()) },
         'sep',
-        { label: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
-        { label: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        { label: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
+        { label: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         'sep',
-        { label: 'Mover (sin estirar cables)', shortcut: 'M', onClick: () => startMove(false) },
-        { label: 'Arrastrar (estirando cables)', shortcut: 'S', onClick: () => startMove(true) },
+        { label: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false) },
+        { label: t('Drag (stretching wires)'), shortcut: 'S', onClick: () => startMove(true) },
       ],
     },
     {
-      label: 'Dibujar',
+      label: t('Draw'),
       items: [
-        { label: 'Cable', shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }) },
-        { label: 'Componente…', shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }) },
-        { label: 'Resistencia', shortcut: 'R', onClick: placeTool('res') },
+        { label: t('Wire'), shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }) },
+        { label: t('Component…'), shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }) },
+        { label: t('Resistor'), shortcut: 'R', onClick: placeTool('res') },
         { label: 'Capacitor', shortcut: 'C', onClick: placeTool('cap') },
         { label: 'Inductor', shortcut: 'L', onClick: placeTool('ind') },
-        { label: 'Diodo', shortcut: 'D', onClick: placeTool('diode') },
-        { label: 'Fuente de tensión', shortcut: 'V', onClick: placeTool('voltage') },
-        { label: 'Fuente de corriente', shortcut: 'I', onClick: placeTool('current') },
-        { label: 'Tierra', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }) },
-        { label: 'Etiqueta de red…', shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
+        { label: t('Diode'), shortcut: 'D', onClick: placeTool('diode') },
+        { label: t('Voltage source'), shortcut: 'V', onClick: placeTool('voltage') },
+        { label: t('Current source'), shortcut: 'I', onClick: placeTool('current') },
+        { label: t('Ground'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }) },
+        { label: t('Net label…'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
-        { label: 'Directiva SPICE…', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
-        { label: 'Comentario…', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+        { label: t('Comment…'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
         'sep',
         ...shapeItems,
       ],
     },
     {
-      label: 'Simular',
+      label: t('Simulate'),
       items: [
-        { label: 'Simular', shortcut: 'Alt+R', onClick: run, disabled: running || status.kind === 'loading' },
-        { label: 'Abortar', shortcut: 'Alt+S', onClick: abort, disabled: !running },
-        { label: 'Ver el log', shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
+        { label: t('Simulate'), shortcut: 'Alt+R', onClick: run, disabled: running || status.kind === 'loading' },
+        { label: t('Abort'), shortcut: 'Alt+S', onClick: abort, disabled: !running },
+        { label: t('View the log'), shortcut: 'Ctrl+L', onClick: showLog, disabled: !sim },
         'sep',
         ...simItems,
         'sep',
-        { label: 'Punta de prueba', onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
-        { label: 'Anotar punto de operación', onClick: () => setShowOp((v) => !v), disabled: !bias, checked: showOp },
+        { label: t('Probe'), onClick: () => setTool({ kind: 'probe' }), disabled: !sim },
+        { label: t('Annotate operating point'), onClick: () => setShowOp((v) => !v), disabled: !bias, checked: showOp },
       ],
     },
     {
-      label: 'Ver',
+      label: t('View'),
       items: [
-        { label: 'Ajustar a la vista', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
-        { label: 'Zoom a un recuadro', shortcut: 'Z', onClick: zoomBox },
-        { label: 'Zoom anterior', shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
-        { label: 'Grilla', shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
-        { label: 'Marcas de pines sueltos', shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: 'Mostrar el comando de simulación', title: 'Dibujar .tran, .ac… sobre el esquemático, como LTspice', onClick: toggleSimCommand, checked: showSimCommand },
-        { label: 'Nombres de las redes', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
-        { label: 'Resultados al costado', onClick: () => setSide(!resultsSide), checked: resultsSide },
-        { label: 'Panel de resultados', shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
+        { label: t('Fit to view'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
+        { label: t('Zoom to a box'), shortcut: 'Z', onClick: zoomBox },
+        { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
+        { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
+        { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
+        { label: t('Show the simulation command'), title: t('Draw .tran, .ac… on the schematic, like LTspice'), onClick: toggleSimCommand, checked: showSimCommand },
+        { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
+        { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
+        { label: t('Results panel'), shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
         'sep',
-        { label: 'Editor de netlist (SPICE)', onClick: onNetlist },
+        { label: t('Netlist editor (SPICE)'), onClick: onNetlist },
         'sep',
-        { label: 'Tema automático (del sistema)', onClick: () => setTheme('auto'), checked: theme === 'auto' },
-        { label: 'Tema claro', onClick: () => setTheme('light'), checked: theme === 'light' },
-        { label: 'Tema oscuro', onClick: () => setTheme('dark'), checked: theme === 'dark' },
+        { label: t('Automatic theme (system)'), onClick: () => setTheme('auto'), checked: theme === 'auto' },
+        { label: t('Light theme'), onClick: () => setTheme('light'), checked: theme === 'light' },
+        { label: t('Dark theme'), onClick: () => setTheme('dark'), checked: theme === 'dark' },
       ],
     },
     {
-      label: 'Ayuda',
+      label: t('Help'),
       items: [
-        { label: 'Atajos de teclado', shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
-        { label: 'Acerca de TurboSpice', onClick: () => setDialog({ kind: 'about' }) },
+        { label: t('Keyboard shortcuts'), shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
+        { label: t('About TurboSpice'), onClick: () => setDialog({ kind: 'about' }) },
         'sep',
-        { label: 'Compatibilidad con LTspice', onClick: () => window.open(`${REPO}/blob/main/docs/compatibilidad-ltspice.md`, '_blank', 'noopener') },
-        { label: 'Reportar un problema', onClick: () => window.open(`${REPO}/issues`, '_blank', 'noopener') },
+        { label: t('LTspice compatibility'), onClick: () => window.open(`${REPO}/blob/main/docs/compatibilidad-ltspice.md`, '_blank', 'noopener') },
+        { label: t('Report a problem'), onClick: () => window.open(`${REPO}/issues`, '_blank', 'noopener') },
       ],
     },
   ];
@@ -2000,7 +2015,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const problems = sim
     ? [
         ...sim.result.errors.map((text) => ({ kind: 'err' as const, text })),
-        ...sim.built.warnings.map((text) => ({ kind: /^Símbolo no encontrado:/.test(text) ? ('err' as const) : ('warn' as const), text })),
+        ...sim.built.warnings.map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
@@ -2037,51 +2052,51 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const toolGroups: ToolGroup[] = [
     {
       id: 'file',
-      label: 'Archivo',
+      label: t('File'),
       tools: [
-        { icon: 'new', label: 'Nuevo', title: 'Nuevo esquemático', onClick: doNew },
-        { icon: 'save', label: 'Guardar', title: google.account ? 'Guardar en Google Drive' : 'Guardar', shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { icon: 'pdf', label: 'Exportar a PDF', title: 'Exportar a PDF (se abre ASC-Parser con este circuito)', onClick: doExportPdf },
-        { icon: 'open', label: 'Abrir', title: google.account ? 'Mis simulaciones (Google Drive)' : 'Abrir .asc', shortcut: 'Ctrl+O', onClick: doOpen },
+        { icon: 'new', label: t('New'), title: t('New schematic'), onClick: doNew },
+        { icon: 'save', label: t('Save'), title: google.account ? t('Save to Google Drive') : t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
+        { icon: 'pdf', label: t('Export to PDF'), title: t('Export to PDF (opens ASC-Parser with this circuit)'), onClick: doExportPdf },
+        { icon: 'open', label: t('Open'), title: google.account ? t('My simulations (Google Drive)') : t('Open .asc'), shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },
     {
       id: 'history',
-      label: 'Historial',
+      label: t('History'),
       tools: [
-        { icon: 'undo', label: 'Deshacer', title: 'Deshacer', shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
-        { icon: 'redo', label: 'Rehacer', title: 'Rehacer', shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
+        { icon: 'undo', label: t('Undo'), title: t('Undo'), shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
+        { icon: 'redo', label: t('Redo'), title: t('Redo'), shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
       ],
     },
     {
       id: 'draw',
-      label: 'Dibujo',
+      label: t('Drawing'),
       tools: [
-        { icon: 'select', label: 'Seleccionar', title: 'Seleccionar y mover', shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
-        { icon: 'wire', label: 'Cable', title: 'Cable', shortcut: 'F3 / W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
-        { icon: 'component', label: 'Componente', title: 'Componente', shortcut: 'P / F2', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
-        { icon: 'ground', label: 'Tierra', title: 'Tierra (GND)', shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
-        { icon: 'label', label: 'Etiqueta', title: 'Etiqueta de red', shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
-        { icon: 'text', label: 'Texto', title: 'Texto (comentario)', shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
-        { icon: 'shapes', label: 'Figuras', title: 'Figuras: línea, rectángulo, círculo, arco', items: shapeItems, active: tool.kind === 'shape' },
-        { icon: 'directive', label: 'Directiva', title: 'Directiva SPICE libre', shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
+        { icon: 'select', label: t('Select'), title: t('Select and move'), shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
+        { icon: 'wire', label: t('Wire'), title: t('Wire'), shortcut: 'F3 / W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
+        { icon: 'component', label: t('Component'), title: t('Component'), shortcut: 'P / F2', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
+        { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
+        { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
+        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' },
+        { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
     },
     {
       id: 'edit',
-      label: 'Edición',
+      label: t('Editing'),
       tools: [
-        { icon: 'rotate', label: 'Rotar', title: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
-        { icon: 'mirror', label: 'Espejar', title: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
-        { icon: 'delete', label: 'Borrar', title: 'Borrar', shortcut: 'Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
+        { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
+        { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
+        { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
       ],
     },
     {
       id: 'view',
-      label: 'Vista',
+      label: t('Display'),
       tools: [
-        { icon: 'fit', label: 'Ajustar', title: 'Ajustar a la vista (Z: zoom a un recuadro, Shift+Z: zoom anterior)', shortcut: 'Espacio', onClick: () => editor.current?.fit() },
-        { icon: 'nets', label: 'Redes', title: 'Mostrar los nombres de todas las redes, sin modificar el esquemático', shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
+        { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
+        { icon: 'nets', label: t('Nets'), title: t('Show the names of all the nets, without changing the schematic'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
       ],
     },
   ];
@@ -2093,19 +2108,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     ? []
     : [
         {
-          label: 'Exportar',
+          label: t('Export'),
           items: [
-            { label: 'Trazas a CSV', disabled: !canExportPlot, onClick: () => download(`${exportBase()}.csv`, new Blob([plotPanel.current?.csv() ?? ''], { type: 'text/csv' })) },
+            { label: t('Traces to CSV'), disabled: !canExportPlot, onClick: () => download(`${exportBase()}.csv`, new Blob([plotPanel.current?.csv() ?? ''], { type: 'text/csv' })) },
             {
-              label: 'Gráfico a PNG',
+              label: t('Plot to PNG'),
               disabled: !canExportPlot,
               onClick: async () => {
                 const b = await plotPanel.current?.png();
                 if (b) download(`${exportBase()}.png`, b);
               },
             },
-            { label: 'Vista a .plt (LTspice)', onClick: () => exportPlt() },
-            { label: 'Importar vista .plt…', shortcut: 'O', onClick: () => pltInput.current?.click() },
+            { label: t('View to .plt (LTspice)'), onClick: () => exportPlt() },
+            { label: t('Import .plt view…'), shortcut: 'O', onClick: () => pltInput.current?.click() },
             'sep',
             { label: 'Netlist .cir (ngspice)', onClick: () => download(`${exportBase()}.cir`, new Blob([sim.built.netlist], { type: 'text/plain' })) },
             { label: 'Netlist .net (LTspice)', onClick: () => download(`${exportBase()}.net`, new Blob([`* ${ascName()}
@@ -2115,8 +2130,8 @@ ${ltNetlistText(sim.built.lt)}
         },
         'sep',
         { label: 'Netlist', checked: panel === 'netlist', onClick: () => setPanel('netlist') },
-        ...(sim.meas ? [{ label: `Mediciones (${sim.meas.names.length})`, checked: panel === 'meas', onClick: () => setPanel('meas') }] : []),
-        { label: `Problemas${problems.length ? ` (${problems.length})` : ''}`, checked: panel === 'problems', onClick: () => setPanel('problems') },
+        ...(sim.meas ? [{ label: t('Measurements ({length})', { length: sim.meas.names.length }), checked: panel === 'meas', onClick: () => setPanel('meas') }] : []),
+        { label: t('Problems{p0}', { p0: problems.length ? ` (${problems.length})` : '' }), checked: panel === 'problems', onClick: () => setPanel('problems') },
         { label: 'Log', shortcut: 'Ctrl+L', checked: panel === 'log', onClick: () => setPanel('log') },
       ];
 
@@ -2141,16 +2156,25 @@ ${ltNetlistText(sim.built.lt)}
             />
             <button
               className="theme-btn"
-              aria-label="Cambiar tema"
-              title={`Tema: ${theme === 'auto' ? 'automático (del sistema)' : theme === 'light' ? 'claro' : 'oscuro'}`}
+              aria-label={t('Change theme')}
+              title={t('Theme: {p0}', { p0: theme === 'auto' ? t('automatic (system)') : theme === 'light' ? t('light') : t('dark') })}
               onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
             >
               <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
               {theme === 'auto' && <span className="auto">A</span>}
             </button>
-            <button className="share-btn" aria-label="Compartir" title="Copiar un link que abre este circuito" onClick={doShare}>
+            <button
+              className="lang-btn"
+              aria-label={t('Change language')}
+              title={t('Language: English · Spanish (the page reloads; your work is kept)')}
+              onClick={switchLang}
+            >
+              <span className={getLang() === 'en' ? 'on' : ''}>EN</span>
+              <span className={getLang() === 'es' ? 'on' : ''}>ES</span>
+            </button>
+            <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
               <Icon name="share" />
-              <span className="txt">Compartir</span>
+              <span className="txt">{t('Share')}</span>
             </button>
           </>,
           slots.right,
@@ -2159,25 +2183,25 @@ ${ltNetlistText(sim.built.lt)}
         createPortal(
           <>
             {/* vistas: con las dos prendidas, pantalla partida */}
-            <nav className="tabs view-tabs" aria-label="Vistas">
-              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? 'Esquemático' : schematicShown && resultsShown ? 'Esquemático a pantalla completa (Ctrl+1)' : schematicShown ? 'Esquemático' : 'Agregar el esquemático en pantalla partida (Ctrl+0)'}>
-                Esquemático
+            <nav className="tabs view-tabs" aria-label={t('Views')}>
+              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? t('Schematic') : schematicShown && resultsShown ? t('Schematic full screen (Ctrl+1)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}>
+                {t('Schematic')}
               </button>
               <button
                 className={resultsShown ? 'active' : ''}
                 aria-pressed={resultsShown}
                 disabled={!sim}
                 onClick={showResultsView}
-                title={!sim ? 'Todavía no hay resultados: simulá primero' : schematicShown && resultsShown ? 'Resultados a pantalla completa (Ctrl+2)' : resultsShown ? 'Resultados' : 'Agregar los resultados en pantalla partida (Ctrl+0)'}
+                title={!sim ? t('No results yet: simulate first') : schematicShown && resultsShown ? t('Results full screen (Ctrl+2)') : resultsShown ? t('Results') : t('Add the results in split screen (Ctrl+0)')}
               >
-                Resultados
+                {t('Results')}
               </button>
             </nav>
-            <div className="layout-btns" role="group" aria-label="Disposición de los resultados">
-              <button className={resultsSide ? 'active' : ''} aria-pressed={resultsSide} aria-label="Resultados al costado" title="Resultados al costado" onClick={() => setSide(true)}>
+            <div className="layout-btns" role="group" aria-label={t('Results layout')}>
+              <button className={resultsSide ? 'active' : ''} aria-pressed={resultsSide} aria-label={t('Results on the side')} title={t('Results on the side')} onClick={() => setSide(true)}>
                 <Icon name="layoutSide" size={16} />
               </button>
-              <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label="Resultados abajo" title="Resultados abajo" onClick={() => setSide(false)}>
+              <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label={t('Results below')} title={t('Results below')} onClick={() => setSide(false)}>
                 <Icon name="layoutStack" size={16} />
               </button>
             </div>
@@ -2185,29 +2209,29 @@ ${ltNetlistText(sim.built.lt)}
           slots.tabs,
         )}
       <Toolbar
-        label="Herramientas"
+        label={t('Tools')}
         groups={toolGroups}
         fixed={
           <>
             {/* Simular partido: la acción principal simula y la flecha despliega las simulaciones */}
-            <div className="split" role="group" aria-label="Simulación">
+            <div className="split" role="group" aria-label={t('Simulation')}>
               {running ? (
-                <button className="labeled" onClick={abort} aria-label="Abortar" title="Abortar la simulación (Alt+S)">
-                  <Icon name="stop" /> Abortar
+                <button className="labeled" onClick={abort} aria-label={t('Abort')} title={t('Abort the simulation (Alt+S)')}>
+                  <Icon name="stop" /> {t('Abort')}
                 </button>
               ) : (
                 <button
                   className="primary"
                   onClick={simulate}
                   disabled={status.kind === 'loading'}
-                  aria-label="Simular"
+                  aria-label={t('Simulate')}
                   aria-keyshortcuts="Alt+R Control+Enter"
-                  title={canRun ? 'Simular (Alt+R / Ctrl+Enter)' : 'Elegir qué simular'}
+                  title={canRun ? t('Simulate (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
                 >
-                  <Icon name="run" /> Simular
+                  <Icon name="run" /> {t('Simulate')}
                 </button>
               )}
-              <MenuButton items={simItems} label="Tipo de simulación" title="Simulaciones y tipos de análisis" className={running ? 'labeled' : 'primary'} openRef={simMenu}>
+              <MenuButton items={simItems} label={t('Simulation type')} title={t('Simulations and analysis types')} className={running ? 'labeled' : 'primary'} openRef={simMenu}>
                 <Icon name="caret" size={14} />
               </MenuButton>
             </div>
@@ -2215,8 +2239,8 @@ ${ltNetlistText(sim.built.lt)}
             <span className="tb-sep" />
             <button
               className={tool.kind === 'probe' ? 'active' : ''}
-              aria-label="Medir"
-              title={sim ? 'Punta de prueba: click en un cable (tensión) o componente (corriente)' : 'Punta de prueba: simulá primero'}
+              aria-label={t('Measure')}
+              title={sim ? t('Probe: click a wire (voltage) or a component (current)') : t('Probe: simulate first')}
               disabled={!sim}
               onClick={() => setTool(tool.kind === 'probe' ? { kind: 'select' } : { kind: 'probe' })}
             >
@@ -2224,8 +2248,8 @@ ${ltNetlistText(sim.built.lt)}
             </button>
             <button
               className={showOp && bias ? 'active' : ''}
-              aria-label="Anotar OP"
-              title={bias ? 'Anotar el punto de operación en el esquemático (sin modificarlo)' : sim ? 'Punto de operación: el circuito cambió desde la última simulación' : 'Punto de operación: simulá primero'}
+              aria-label={t('Annotate OP')}
+              title={bias ? t('Annotate the operating point on the schematic (without changing it)') : sim ? t('Operating point: the circuit changed since the last simulation') : t('Operating point: simulate first')}
               disabled={!bias}
               onClick={() => setShowOp((v) => !v)}
             >
@@ -2244,7 +2268,7 @@ ${ltNetlistText(sim.built.lt)}
                 : status.kind === 'error'
                   ? status.message
                   : status.kind === 'done' && sim
-                    ? `completada en ${status.ms.toFixed(0)} ms`
+                    ? t('done in {p0} ms', { p0: status.ms.toFixed(0) })
                     : undefined
             }
             stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
@@ -2296,7 +2320,7 @@ ${ltNetlistText(sim.built.lt)}
           />
           {historyOpen && curSim && (
             <HistoryPanel
-              sim={simName(curSim) || 'Sin análisis'}
+              sim={simName(curSim) || t('No analysis')}
               runs={curRuns}
               picked={viewed?.id ?? ''}
               currentChanges={currentChanges}
@@ -2311,31 +2335,31 @@ ${ltNetlistText(sim.built.lt)}
           )}
           {viewed && (
             <div className="pick-banner history-banner">
-              Corrida del {new Date(viewed.time).toLocaleString()} · sólo lectura
+              {t('Run from')}{' '}{new Date(viewed.time).toLocaleString()} {t('· read-only')}
               <button onClick={() => restoreRun(viewed.id)}>Restore</button>
-              <button onClick={() => setViewRun('')}>Volver al actual</button>
+              <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
             </div>
           )}
           {picking && (
             <div className="pick-banner">
-              {picking.what === 'net' ? 'Elegí una red en el esquemático' : picking.what === 'source' ? 'Elegí una fuente (V o I) en el esquemático' : 'Elegí un componente en el esquemático'}
-              <button onClick={() => endPick(null)}>Cancelar</button>
+              {picking.what === 'net' ? t('Pick a net on the schematic') : picking.what === 'source' ? t('Pick a source (V or I) on the schematic') : t('Pick a component on the schematic')}
+              <button onClick={() => endPick(null)}>{t('Cancel')}</button>
             </div>
           )}
           {valueOffer && !picking && (
             <div className="pick-banner">
-              {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} también en{' '}
-              {valueOffer.sims.length === 1 ? '1 simulación' : `${valueOffer.sims.length} simulaciones`}
-              <button onClick={applyValueOffer} title={`Cambiar a ${valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ')} en las otras simulaciones`}>
-                Aplicar
+              {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} {t('also in')}{' '}
+              {valueOffer.sims.length === 1 ? t('1 simulation') : t('{length} simulations', { length: valueOffer.sims.length })}
+              <button onClick={applyValueOffer} title={t('Change to {p0} in the other simulations', { p0: valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ') })}>
+                {t('Apply')}
               </button>
               <button onClick={() => setValueOffer(null)}>No</button>
             </div>
           )}
           {offerView && !picking && (
             <div className="pick-banner">
-              Hay una vista de resultados de {file.name} guardada en este navegador. ¿Incorporarla al .asc?
-              <button onClick={acceptOfferedView}>Incorporar</button>
+              {t('There\'s a results view of')}{' '}{file.name} {t('saved in this browser. Add it to the .asc?')}
+              <button onClick={acceptOfferedView}>{t('Add')}</button>
               <button onClick={() => setOfferView(null)}>No</button>
             </div>
           )}
@@ -2390,11 +2414,11 @@ ${ltNetlistText(sim.built.lt)}
             />
             <div className="toolbar small results-bar">
               {/* como Simular: el botón vuelve al gráfico; la flecha, a exportar y al resto de las vistas */}
-              <div className="split" role="group" aria-label="Vista de resultados">
-                <button className="active" onClick={() => setPanel('plot')} title="Volver al gráfico de resultados">
-                  Resultados
+              <div className="split" role="group" aria-label={t('Results view')}>
+                <button className="active" onClick={() => setPanel('plot')} title={t('Back to the results plot')}>
+                  {t('Results')}
                 </button>
-                <MenuButton items={resultsItems} label="Más vistas de resultados" title="Exportar, netlist, log y problemas" className="active">
+                <MenuButton items={resultsItems} label={t('More results views')} title={t('Export, netlist, log and problems')} className="active">
                   <Icon name="caret" size={14} />
                 </MenuButton>
               </div>
@@ -2403,9 +2427,9 @@ ${ltNetlistText(sim.built.lt)}
                 <button
                   className="incomplete-badge"
                   onClick={() => setPanel('problems')}
-                  title={`Faltan ${sim.built.missingSymbols.join(', ')}: se omitieron del circuito y los resultados no corresponden al esquemático`}
+                  title={t('Missing {p0}: they were left out of the circuit and the results don\'t match the schematic', { p0: sim.built.missingSymbols.join(', ') })}
                 >
-                  Simulación incompleta
+                  {t('Incomplete simulation')}
                 </button>
               )}
               {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
@@ -2415,7 +2439,7 @@ ${ltNetlistText(sim.built.lt)}
                 <>
                   {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}
                   {sim.result.plots.length > 1 && (
-                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label="Plot" title="Resultado a ver (la simulación devolvió varios)">
+                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label="Plot" title={t('Result to view (the simulation returned several)')}>
                       {sim.result.plots.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}
@@ -2425,36 +2449,36 @@ ${ltNetlistText(sim.built.lt)}
                     </select>
                   )}
                   {isComplex && scale && (
-                    <select value={mode} onChange={(e) => setMode(e.target.value as ComplexMode)} aria-label="Vista">
-                      <option value="bode">Bode (dB y fase)</option>
-                      <option value="db">Magnitud (dB)</option>
-                      <option value="phase">Fase (°)</option>
-                      <option value="mag">Magnitud</option>
-                      <option value="reim">Real e imaginaria</option>
-                      <option value="smith">Carta de Smith</option>
+                    <select value={mode} onChange={(e) => setMode(e.target.value as ComplexMode)} aria-label={t('Display')}>
+                      <option value="bode">{t('Bode (dB and phase)')}</option>
+                      <option value="db">{t('Magnitude (dB)')}</option>
+                      <option value="phase">{t('Phase (°)')}</option>
+                      <option value="mag">{t('Magnitude')}</option>
+                      <option value="reim">{t('Real and imaginary')}</option>
+                      <option value="smith">{t('Smith chart')}</option>
                     </select>
                   )}
                   {/* Cursores, FFT, Medidas y Ajustar (los pone el visor) */}
                   <span className="viewer-tools" ref={setViewerTools} />
                   {withPz && (
-                    <label className="check inline" title="Mapa de polos y ceros (.pz) al lado del gráfico; sus f₀ se marcan en el eje">
-                      <input type="checkbox" checked={pzSide} onChange={(e) => setPzSide(e.target.checked)} /> Polos y ceros
+                    <label className="check inline" title={t('Pole-zero map (.pz) next to the plot; its f₀ are marked on the axis')}>
+                      <input type="checkbox" checked={pzSide} onChange={(e) => setPzSide(e.target.checked)} /> {t('Poles and zeros')}
                     </label>
                   )}
                   {allRuns.length > 1 && (
                     <label className="check inline">
-                      <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> Superponer las{' '}
-                      {allRuns.length} corridas
+                      <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> {t('Overlay the')}{' '}
+                      {allRuns.length} {t('runs')}
                     </label>
                   )}
                   {allRuns.length > 1 && overlay && (
-                    <button onClick={() => setDialog({ kind: 'runs' })} title="Elegir qué corridas mostrar (Shift+S)">
-                      Corridas{hiddenRuns.size ? ` (${visibleRuns.length}/${allRuns.length})` : ''}…
+                    <button onClick={() => setDialog({ kind: 'runs' })} title={t('Choose which runs to show (Shift+S)')}>
+                      {t('Runs')}{hiddenRuns.size ? ` (${visibleRuns.length}/${allRuns.length})` : ''}…
                     </button>
                   )}
                 </>
               )}
-              <button className="close" onClick={() => setExpanded('schematic')} aria-label="Ocultar resultados" title="Ocultar resultados (Ctrl+1)">
+              <button className="close" onClick={() => setExpanded('schematic')} aria-label={t('Hide results')} title={t('Hide results (Ctrl+1)')}>
                 {resultsSide ? '▶' : '▼'}
               </button>
             </div>
@@ -2499,11 +2523,11 @@ ${ltNetlistText(sim.built.lt)}
                   <ul className="problems">
                     {problems.map((p, i) => (
                       <li key={i}>
-                        <span className={`kind ${p.kind}`}>{p.kind === 'err' ? 'error' : 'aviso'}</span>
+                        <span className={`kind ${p.kind}`}>{p.kind === 'err' ? 'error' : t('warning')}</span>
                         <span>{p.text}</span>
                         {p.sym !== undefined && (
                           <button className="link" onClick={() => goTo(p.sym!)}>
-                            ver en el esquemático
+                            {t('show on the schematic')}
                           </button>
                         )}
                         {p.fix && (
@@ -2511,17 +2535,17 @@ ${ltNetlistText(sim.built.lt)}
                             className="link"
                             onClick={() => {
                               commit(replaceLine(doc, p.fix!.from, p.fix!.to));
-                              setMessage(`Cambiado a «${p.fix!.to}»: simulá de nuevo con Alt+R`);
+                              setMessage(t('Changed to «{p0}»: simulate again with Alt+R', { p0: p.fix!.to }));
                             }}
                           >
-                            usar «{p.fix.to}»
+                            {t('use «')}{p.fix.to}»
                           </button>
                         )}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="empty pad">Sin problemas.</p>
+                  <p className="empty pad">{t('No problems.')}</p>
                 ))}
             </div>
           </section>
@@ -2677,15 +2701,14 @@ ${ltNetlistText(sim.built.lt)}
         />
       )}
       {driveConflict && (
-        <Modal title="El archivo cambió en Google Drive" onClose={() => setDriveConflict(null)}>
+        <Modal title={t('The file changed in Google Drive')} onClose={() => setDriveConflict(null)}>
           <p>
-            «{driveConflict.name}» se modificó en Google Drive (en otra pestaña u otra computadora) después de que lo abriste.
-            No se guardó nada para no pisar esos cambios.
+            «{driveConflict.name}{t('» was modified in Google Drive (in another tab or computer) after you opened it. Nothing was saved, so those changes aren\'t overwritten.')}
           </p>
           <div className="buttons">
-            <button onClick={() => resolveDriveConflict('reload')} title="Abre la versión de Drive; lo de acá queda en Recientes">Recargar la de Drive</button>
-            <button onClick={() => resolveDriveConflict('copy')}>Guardar la mía como copia</button>
-            <button className="danger" onClick={() => resolveDriveConflict('overwrite')}>Sobrescribir</button>
+            <button onClick={() => resolveDriveConflict('reload')} title={t('Opens the Drive version; what you have here stays in Recent')}>{t('Reload the Drive version')}</button>
+            <button onClick={() => resolveDriveConflict('copy')}>{t('Save mine as a copy')}</button>
+            <button className="danger" onClick={() => resolveDriveConflict('overwrite')}>{t('Overwrite')}</button>
           </div>
         </Modal>
       )}
@@ -2714,8 +2737,8 @@ ${ltNetlistText(sim.built.lt)}
       )}
       {dialog?.kind === 'deleteSim' && (
         <SlideConfirm
-          title="Borrar la simulación"
-          message={`Se borra «${simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || 'Sin análisis'}» con su circuito y su historial de corridas.`}
+          title={t('Delete the simulation')}
+          message={t('«{p0}» will be deleted with its circuit and its run history.', { p0: simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || t('No analysis') })}
           onClose={() => setDialog(null)}
           onConfirm={() => {
             setDialog(null);
@@ -2725,8 +2748,8 @@ ${ltNetlistText(sim.built.lt)}
       )}
       {dialog?.kind === 'deleteVariant' && (
         <SlideConfirm
-          title="Borrar la variante"
-          message={`Se borra «${variantOf(project, dialog.id).name}» con todas sus simulaciones y su historial.`}
+          title={t('Delete the variant')}
+          message={t('«{p0}» will be deleted with all its simulations and their history.', { p0: variantOf(project, dialog.id).name })}
           onClose={() => setDialog(null)}
           onConfirm={() => {
             setDialog(null);
@@ -2769,36 +2792,36 @@ ${ltNetlistText(sim.built.lt)}
   );
 }
 
-function toolHint(t: Tool): string {
-  switch (t.kind) {
+function toolHint(tt: Tool): string {
+  switch (tt.kind) {
     case 'select':
       return '';
     case 'wire':
-      return t.start ? 'Click para fijar el tramo (Ctrl: en línea recta) · click derecho o Esc para terminar' : 'Click para empezar el cable';
+      return tt.start ? t('Click to fix the segment (Ctrl: straight line) · right-click or Esc to finish') : t('Click to start the wire');
     case 'place':
-      return `Colocando ${t.type} · Ctrl+R rotar · Ctrl+E espejar · Esc para terminar`;
+      return t('Placing {type} · Ctrl+R rotate · Ctrl+E mirror · Esc to finish', { type: tt.type });
     case 'flag':
-      return t.name === '0' ? 'Click para colocar tierra · Esc para terminar' : `Click para colocar la etiqueta "${t.name}"`;
+      return tt.name === '0' ? t('Click to place ground · Esc to finish') : t('Click to place the label "{name}"', { name: tt.name });
     case 'text':
-      return 'Click para ubicar el texto';
+      return t('Click to place the text');
     case 'delete':
-      return 'Click en un elemento para borrarlo · arrastrar un recuadro borra todo lo que queda adentro · Esc para terminar';
+      return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
     case 'probe':
-      return 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar';
+      return t('Click a wire to see its voltage or a component for its current · Esc to edit');
     case 'move':
-      return t.refs
-        ? `Click para soltar${t.stretch ? ' (los cables se estiran)' : ''} · click derecho o Esc cancela`
-        : `${t.stretch ? 'Arrastrar (los cables se estiran)' : 'Mover (sin estirar cables)'}: click en un elemento o recuadro para elegir · Esc para terminar`;
+      return tt.refs
+        ? t('Click to drop{p0} · right-click or Esc cancels', { p0: tt.stretch ? t(' (wires stretch)') : '' })
+        : t('{p0}: click an element or drag a box to choose · Esc to finish', { p0: tt.stretch ? t('Drag (wires stretch)') : t('Move (without stretching wires)') });
     case 'shape': {
-      const n = t.pts.length;
-      if (t.shape === 'ARC' && n >= 2) return `${n === 2 ? 'Click en el punto de inicio del arco' : 'Click en el punto final (sentido antihorario)'} · click derecho cancela`;
-      if (n) return `Click para terminar${t.shape === 'ARC' ? ' la caja del arco' : ''} · click derecho cancela`;
-      const what = { LINE: 'la línea', RECTANGLE: 'el rectángulo', CIRCLE: 'el círculo (su caja)', ARC: 'el arco (la caja de su elipse)' }[t.shape];
-      return `Click para empezar ${what} · Dibujar › Estilo de línea · Esc para terminar`;
+      const n = tt.pts.length;
+      if (tt.shape === 'ARC' && n >= 2) return t('{p0} · right-click cancels', { p0: n === 2 ? t("Click the arc's start point") : t('Click the end point (counterclockwise)') });
+      if (n) return t('Click to finish{p0} · right-click cancels', { p0: tt.shape === 'ARC' ? t(' the arc\'s box') : '' });
+      const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t('the arc (its ellipse\'s box)') }[tt.shape];
+      return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
     }
     case 'zoom':
-      return 'Arrastrá un recuadro para hacer zoom (click: acercar) · Shift+Z: zoom anterior';
+      return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':
-      return t.what === 'net' ? 'Click en un cable o pin para elegir su red · Esc cancela' : t.what === 'source' ? 'Click en una fuente V o I para elegirla · Esc cancela' : 'Click en un componente para elegirlo · Esc cancela';
+      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
   }
 }

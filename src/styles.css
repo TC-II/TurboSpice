@@ -880,3 +880,8 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .history-hint { margin: 0; padding: 6px 12px; font-size: 11px; color: var(--fg-muted); border-top: 1px solid var(--border); }
 .history-banner { background: var(--diff-chg); }
 @media (max-width: 700px) { .canvas-wrap.with-history { padding-right: 0; } .history-panel { width: min(280px, 85%); box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
+
+/* ---------- Idioma (#72) ---------- */
+.lang-btn { display: inline-flex; gap: 2px; border: 0; background: transparent; padding: 4px 6px; font: 600 11px system-ui, sans-serif; color: var(--fg-muted); }
+.lang-btn .on { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+.lang-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }

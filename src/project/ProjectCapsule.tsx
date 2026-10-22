@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditableName, NameInput } from '../ui/EditableName.tsx';
 import { Icon } from '../ui/icons.tsx';
+import { t } from '../i18n/i18n.ts';
 
 export interface CapsuleVariant {
   id: string;
@@ -58,28 +59,28 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
   return (
     <div className="capsule" ref={root}>
       <span className="capsule-names">
-        <EditableName value={project} onRename={onRenameProject} label="Nombre del proyecto" className="capsule-project" title={`Proyecto «${project}» (doble clic para renombrar)`} />
+        <EditableName value={project} onRename={onRenameProject} label={t('Project name')} className="capsule-project" title={t('Project «{project}» (double-click to rename)', { project })} />
         <span className="capsule-dot">·</span>
         <EditableName
           value={cur.name}
           taken={others(cur.id)}
           onRename={(n) => onRenameVariant(cur.id, n)}
-          label="Nombre de la variante"
+          label={t('Variant name')}
           className="capsule-variant"
-          title={`Variante «${cur.name}» (doble clic para renombrar)`}
+          title={t('Variant «{name}» (double-click to rename)', { name: cur.name })}
         />
-        {dirty && <span className="capsule-dirty" title="Hay cambios sin guardar">•</span>}
+        {dirty && <span className="capsule-dirty" title={t('There are unsaved changes')}>•</span>}
       </span>
-      <button ref={btn} className={`capsule-caret${open ? ' open' : ''}`} aria-label="Variantes" aria-haspopup="menu" aria-expanded={open} title="Variantes del proyecto" onClick={() => setOpen(!open)}>
+      <button ref={btn} className={`capsule-caret${open ? ' open' : ''}`} aria-label={t('Variants')} aria-haspopup="menu" aria-expanded={open} title={t('Project variants')} onClick={() => setOpen(!open)}>
         <Icon name="caret" size={14} />
       </button>
       {open && (
-        <div className="capsule-pop" role="menu" aria-label="Variantes">
-          <div className="capsule-split" role="group" aria-label="Variante nueva">
-            <button onClick={act(onClone)} title="Copia de esta variante (circuito, simulaciones e historial) con otro nombre">
+        <div className="capsule-pop" role="menu" aria-label={t('Variants')}>
+          <div className="capsule-split" role="group" aria-label={t('New variant')}>
+            <button onClick={act(onClone)} title={t('Copy of this variant (circuit, simulations and history) with another name')}>
               Clone Current
             </button>
-            <button onClick={act(onBlank)} title="Variante vacía: sin circuito ni simulaciones">
+            <button onClick={act(onBlank)} title={t('Empty variant: no circuit or simulations')}>
               Blank
             </button>
           </div>
@@ -91,7 +92,7 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
                     <NameInput
                       value={v.name}
                       taken={others(v.id)}
-                      label={`Nombre de ${v.name}`}
+                      label={t('Name of {name}', { name: v.name })}
                       onDone={(n) => {
                         setEditing(null);
                         if (n) onRenameVariant(v.id, n);
@@ -103,7 +104,7 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
                     className="capsule-row-name"
                     role="menuitemradio"
                     aria-checked={v.id === active}
-                    title={`${v.name} · ${v.sims === 1 ? '1 simulación' : `${v.sims} simulaciones`} (doble clic para renombrar)`}
+                    title={t('{name} · {p1} (double-click to rename)', { name: v.name, p1: v.sims === 1 ? t('1 simulation') : t('{sims} simulations', { sims: v.sims }) })}
                     onClick={() => {
                       clearTimeout(clickTimer.current);
                       clickTimer.current = setTimeout(act(() => onSelect(v.id)), 250);
@@ -118,13 +119,13 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
                     <span className="sc">{v.sims}</span>
                   </button>
                 )}
-                <button className="icon-btn" aria-label={`Duplicar ${v.name}`} title="Duplicar" onClick={act(() => onDuplicate(v.id))}>
+                <button className="icon-btn" aria-label={t('Duplicate {name}', { name: v.name })} title={t('Duplicate')} onClick={act(() => onDuplicate(v.id))}>
                   <Icon name="copy" size={14} />
                 </button>
                 <button
                   className="icon-btn"
-                  aria-label={`Borrar ${v.name}`}
-                  title={variants.length > 1 ? 'Borrar' : 'Es la única variante'}
+                  aria-label={t('Delete {name}', { name: v.name })}
+                  title={variants.length > 1 ? t('Delete') : t('It\'s the only variant')}
                   disabled={variants.length === 1}
                   onClick={act(() => onDelete(v.id))}
                 >

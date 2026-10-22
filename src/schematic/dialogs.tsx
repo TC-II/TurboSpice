@@ -29,12 +29,13 @@ export function checkValue(prefix: string, value: string): { value: string; info
   const v = [main, ...rest].join(' ');
   if (/^\{.*\}$/.test(main) || /=/.test(main)) return { value: v };
   const x = parseSpiceNumber(main);
-  if (!Number.isFinite(x)) return { value: v, warn: `"${first}" no parece un valor numérico (ej.: 4.7k, 4k7, 10u, 1meg, {R})` };
+  if (!Number.isFinite(x)) return { value: v, warn: t('"{first}" doesn\'t look like a numeric value (e.g. 4.7k, 4k7, 10u, 1meg, {R})', { first }) };
   // "1M" es mili en SPICE: avisar, es un error clásico
-  const milli = /^[\d.]+M$/.test(main) ? ' — ojo: M es mili; mega es "meg"' : '';
+  const milli = /^[\d.]+M$/.test(main) ? t(' — careful: M is milli; mega is "meg"') : '';
   return { value: v, info: `= ${si(x, 4)}${unit}${milli}` };
 }
 import { SymbolView } from './SchematicCanvas.tsx';
+import { getLang, t } from '../i18n/i18n.ts';
 
 /** margen mínimo de los diálogos contra los bordes de la ventana */
 const MODAL_MARGIN = 16;
@@ -59,13 +60,13 @@ export function Modal({ title, children, onClose, wide, large, hidden }: {
   useLayoutEffect(() => {
     const el = box.current;
     if (!el || hidden) return;
-    let t: number | null = null;
+    let tt: number | null = null;
     const place = (center: boolean) => {
       const vh = window.innerHeight;
       const h = el.offsetHeight;
-      if (center || t === null) t = Math.max(MODAL_MARGIN, (vh - h) / 2);
-      else if (t + h > vh - MODAL_MARGIN) t = Math.max(MODAL_MARGIN, vh - MODAL_MARGIN - h);
-      setTop(t);
+      if (center || tt === null) tt = Math.max(MODAL_MARGIN, (vh - h) / 2);
+      else if (tt + h > vh - MODAL_MARGIN) tt = Math.max(MODAL_MARGIN, vh - MODAL_MARGIN - h);
+      setTop(tt);
     };
     place(true);
     const ro = new ResizeObserver(() => place(false));
@@ -133,12 +134,12 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   const current = items[Math.min(sel, items.length - 1)];
   return (
     // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
-    <Modal title="Componente" onClose={onClose} wide>
+    <Modal title={t('Component')} onClose={onClose} wide>
       <div className="picker">
         <div className="picker-list">
           <input
             ref={input}
-            placeholder="Buscar (p.ej. res, cap, OA_Ideal, npn)…"
+            placeholder={t('Search (e.g. res, cap, OA_Ideal, npn)…')}
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
@@ -171,7 +172,7 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
           {current && <p>{current.desc}</p>}
           {current && (
             <p className="pins">
-              Pines: {lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
+              {t('Pins:')}{' '}{lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
             </p>
           )}
         </div>
@@ -305,8 +306,8 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
                   type="checkbox"
                   className="attr-vis"
                   checked={row.visible}
-                  title="Visible en el esquemático"
-                  aria-label={`${k} visible en el esquemático`}
+                  title={t('Visible on the schematic')}
+                  aria-label={t('{k} visible on the schematic', { k })}
                   onChange={(e) => setVisible(row.win, e.target.checked)}
                 />
               ) : (
@@ -318,15 +319,15 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
         })}
         {passive && (
           <details className="src-adv" open={partsOpen} onToggle={(e) => setPartsOpen(e.currentTarget.open)}>
-            <summary>Avanzado: modelo de fabricante</summary>
+            <summary>{t('Advanced: manufacturer model')}</summary>
             {partsOpen && table}
           </details>
         )}
-        {rows.length > 0 && <p className="hint">Los rótulos se arrastran con el mouse (Shift: libre).</p>}
+        {rows.length > 0 && <p className="hint">{t('Labels can be dragged with the mouse (Shift: free).')}</p>}
         {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
         <div className="buttons">
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="primary">Aceptar</button>
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="submit" className="primary">{t('OK')}</button>
         </div>
       </form>
     </Modal>
@@ -347,14 +348,14 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
   useEffect(() => ta.current?.focus(), []);
   const submit = () => text.trim() && onApply(text.replace(/\r?\n/g, '\\n'), k);
   return (
-    <Modal title={k === 'directive' ? 'Directiva SPICE' : 'Comentario'} onClose={onClose}>
+    <Modal title={k === 'directive' ? t('SPICE directive') : t('Comment')} onClose={onClose}>
       <div className="textdlg">
         <div className="seg">
           <label>
-            <input type="radio" checked={k === 'directive'} onChange={() => setK('directive')} /> Directiva SPICE
+            <input type="radio" checked={k === 'directive'} onChange={() => setK('directive')} /> {t('SPICE directive')}
           </label>
           <label>
-            <input type="radio" checked={k === 'comment'} onChange={() => setK('comment')} /> Comentario
+            <input type="radio" checked={k === 'comment'} onChange={() => setK('comment')} /> {t('Comment')}
           </label>
         </div>
         <textarea
@@ -362,16 +363,16 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
           rows={6}
           spellCheck={false}
           value={text}
-          placeholder={k === 'directive' ? '.tran 10m\n.ac dec 100 1 1meg' : 'Texto'}
+          placeholder={k === 'directive' ? '.tran 10m\n.ac dec 100 1 1meg' : t('Text')}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) submit();
           }}
         />
-        <p className="hint">Ctrl+Enter para aceptar. Una directiva por línea.</p>
+        <p className="hint">{t('Ctrl+Enter to accept. One directive per line.')}</p>
         <div className="buttons">
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="button" className="primary" onClick={submit}>Aceptar</button>
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="button" className="primary" onClick={submit}>{t('OK')}</button>
         </div>
       </div>
     </Modal>
@@ -391,7 +392,7 @@ export function FlagDialog({ initial, onApply, onClose }: {
     input.current?.select();
   }, []);
   return (
-    <Modal title="Nombre de red" onClose={onClose}>
+    <Modal title={t('Net name')} onClose={onClose}>
       <form
         className="attrs"
         onSubmit={(e) => {
@@ -400,12 +401,12 @@ export function FlagDialog({ initial, onApply, onClose }: {
         }}
       >
         <label>
-          <span>Nombre</span>
+          <span>{t('Name')}</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
         <div className="buttons">
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="primary">Aceptar</button>
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="submit" className="primary">{t('OK')}</button>
         </div>
       </form>
     </Modal>
@@ -422,7 +423,7 @@ export function LineStyleDialog({ initial, count, onApply, onClose }: {
 }) {
   const [style, setStyle] = useState(initial);
   return (
-    <Modal title="Estilo de línea" onClose={onClose}>
+    <Modal title={t('Line style')} onClose={onClose}>
       <form
         className="attrs line-styles"
         onSubmit={(e) => {
@@ -431,7 +432,7 @@ export function LineStyleDialog({ initial, count, onApply, onClose }: {
         }}
       >
         <p className="hint">
-          {count ? `Se aplica a ${count === 1 ? 'la figura seleccionada' : `las ${count} figuras seleccionadas`} y a las que se dibujen después.` : 'Se aplica a las figuras que se dibujen.'}
+          {count ? t('Applies to {p0} and to the ones drawn afterwards.', { p0: count === 1 ? t('the selected shape') : t('the {count} selected shapes', { count }) }) : t('Applies to the shapes that get drawn.')}
         </p>
         {LINE_STYLES.map((ls) => (
           <label key={ls.value} className="line-style">
@@ -443,8 +444,8 @@ export function LineStyleDialog({ initial, count, onApply, onClose }: {
           </label>
         ))}
         <div className="buttons">
-          <button type="button" onClick={onClose}>Cancelar</button>
-          <button type="submit" className="primary">Aceptar</button>
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="submit" className="primary">{t('OK')}</button>
         </div>
       </form>
     </Modal>
@@ -471,19 +472,19 @@ export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) 
   const packed = new URLSearchParams(url.slice(url.indexOf('#') + 1)).get('c') ?? '';
   const bytes = Math.floor((packed.length * 3) / 4);
   return (
-    <Modal title="Compartir circuito" onClose={onClose}>
+    <Modal title={t('Share circuit')} onClose={onClose}>
       <div className="textdlg">
         <input ref={input} readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()} />
-        <p className="hint">El link contiene todo el circuito comprimido en {bytes.toLocaleString('es')} bytes.</p>
+        <p className="hint">{t('The link holds the whole circuit compressed in')}{' '}{bytes.toLocaleString('es')} bytes.</p>
         {copied ? (
-          <p className="hint ok"><span aria-hidden="true">✓</span> Link copiado en portapapeles</p>
+          <p className="hint ok"><span aria-hidden="true">✓</span> {t('Link copied to the clipboard')}</p>
         ) : copied === false ? (
-          <p className="hint">Copiá el link con Ctrl+C.</p>
+          <p className="hint">{t('Copy the link with Ctrl+C.')}</p>
         ) : null}
-        {url.length > LONG_LINK && <p className="hint warn">Es un link largo: puede cortarse en algunos chats o mails.</p>}
+        {url.length > LONG_LINK && <p className="hint warn">{t('It\'s a long link: some chats or e-mails may cut it.')}</p>}
         <div className="buttons">
-          <button type="button" onClick={copy}>Copiar</button>
-          <button type="button" className="primary" onClick={onClose}>Listo</button>
+          <button type="button" onClick={copy}>{t('Copy')}</button>
+          <button type="button" className="primary" onClick={onClose}>{t('Ready')}</button>
         </div>
       </div>
     </Modal>
@@ -493,72 +494,72 @@ export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) 
 // Los de la configuración de LTspice que usamos (LTspice.ini): dependen de dónde está el mouse
 const SHORTCUTS: [string, [string, string][]][] = [
   [
-    'Esquemático',
+    t('Schematic'),
     [
-      ['P · F2', 'Componente (buscador)'],
-      ['R · C · L · D · V · I', 'Resistencia, capacitor, inductor, diodo, fuente de tensión, fuente de corriente'],
-      ['G', 'Tierra'],
-      ['W · F3', 'Cable (click derecho o Esc termina)'],
-      ['N · F4', 'Etiqueta de red'],
-      ['. · T', 'Directiva SPICE · comentario'],
-      ['J · K · O · U', 'Línea · rectángulo · círculo · arco (decorativos)'],
-      ['M', 'Mover: click en un elemento (o recuadro), sigue al cursor hasta el próximo click; los cables no se estiran'],
-      ['S', 'Arrastrar: igual que M, pero los cables se estiran'],
-      ['Supr · Backspace', 'Borrar la selección (sin selección: modo borrar, con click o recuadro)'],
-      ['F6', 'Duplicar la selección'],
-      ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
-      ['Ctrl+A', 'Seleccionar todo'],
-      ['Ctrl+R · Ctrl+E', 'Rotar · espejar'],
-      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer (también Ctrl+Y)'],
-      ['Arrastrar', 'Mover (los cables siguen); con Ctrl, sin arrastrar cables'],
-      ['Click repetido', 'Alterna entre elementos superpuestos'],
-      ['Arrastrar un rótulo', 'Mueve InstName/Value de un componente seleccionado'],
-      ['Rueda', 'Zoom'],
-      ['Botón medio · derecho · Espacio+arrastrar', 'Desplazar'],
-      ['Espacio · Inicio', 'Ajustar a la vista'],
-      ['Z · Shift+Z', 'Zoom a un recuadro · zoom anterior'],
-      ['Ctrl+G · Ctrl+U', 'Mostrar/ocultar la grilla · las marcas de pines sueltos'],
-      ['Alt+N', 'Mostrar los nombres de las redes'],
-      ['A · Alt+E · Alt+C', 'Comando de simulación · estudio · bloque .control'],
-      ['Alt+R · Ctrl+Enter', 'Simular'],
-      ['Alt+S', 'Abortar la simulación'],
-      ['Ctrl+L', 'Ver el log (o los problemas) de la simulación'],
-      ['Ctrl+S · Ctrl+O', 'Guardar · abrir'],
-      ['?', 'Esta ayuda'],
+      ['P · F2', t('Component (browser)')],
+      ['R · C · L · D · V · I', t('Resistor, capacitor, inductor, diode, voltage source, current source')],
+      ['G', t('Ground')],
+      ['W · F3', t('Wire (right-click or Esc finishes)')],
+      ['N · F4', t('Net label')],
+      ['. · T', t('SPICE directive · comment')],
+      ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],
+      ['M', t('Move: click an element (or a box); it follows the cursor until the next click; wires don\'t stretch')],
+      ['S', t('Drag: like M, but wires stretch')],
+      ['Supr · Backspace', t('Delete the selection (no selection: delete mode, by click or box)')],
+      ['F6', t('Duplicate the selection')],
+      ['Ctrl+C · Ctrl+X · Ctrl+V', t('Copy · cut · paste (also between tabs)')],
+      ['Ctrl+A', t('Select all')],
+      ['Ctrl+R · Ctrl+E', t('Rotate · mirror')],
+      ['Ctrl+Z · Ctrl+Shift+Z', t('Undo · redo (also Ctrl+Y)')],
+      [t('Drag'), t('Move (wires follow); with Ctrl, without dragging wires')],
+      [t('Repeated click'), t('Cycles through overlapping elements')],
+      [t('Drag a label'), t('Moves the InstName/Value of a selected component')],
+      [t('Wheel'), 'Zoom'],
+      [t('Middle button · right button · Space+drag'), t('Pan')],
+      [t('Space · Home'), t('Fit to view')],
+      ['Z · Shift+Z', t('Zoom to a box · previous zoom')],
+      ['Ctrl+G · Ctrl+U', t('Show/hide the grid · the unconnected pin marks')],
+      ['Alt+N', t('Show the net names')],
+      ['A · Alt+E · Alt+C', t('Simulation command · study · .control block')],
+      ['Alt+R · Ctrl+Enter', t('Simulate')],
+      ['Alt+S', t('Abort the simulation')],
+      ['Ctrl+L', t('View the simulation log (or problems)')],
+      ['Ctrl+S · Ctrl+O', t('Save · open')],
+      ['?', t('This help')],
     ],
   ],
   [
-    'Visor de resultados (con el mouse sobre los gráficos)',
+    t('Results viewer (with the mouse over the plots)'),
     [
-      ['Espacio', 'Ajustar (ver todo)'],
-      ['Z · Shift+Z', 'Zoom a un recuadro (X e Y) · zoom anterior'],
+      [t('Space'), t('Fit (see everything)')],
+      ['Z · Shift+Z', t('Zoom to a box (X and Y) · previous zoom')],
       ['Ctrl+Y', 'Autoescala vertical'],
-      ['Ctrl+G', 'Mostrar/ocultar la grilla'],
-      ['A', 'Agregar traza (campo de expresión, con autocompletado)'],
-      ['P · B', 'Agregar panel · agregar panel debajo del activo'],
-      ['U · D', 'Mover el panel activo arriba · abajo'],
-      ['Backspace', 'Quitar trazas: click en el nombre (Esc termina)'],
-      ['C · Shift+C', 'Cursores · borrar los cursores'],
-      ['Shift+S', 'Elegir qué corridas de un .step mostrar'],
-      ['O · Ctrl+Espacio', 'Abrir una vista .plt · volver a aplicar la vista recordada'],
-      ['Ctrl+Z · Ctrl+Shift+Z', 'Deshacer · rehacer los cambios de la vista (trazas, paneles, colores)'],
-      ['Alt+R · Alt+S · Ctrl+L', 'Simular · abortar · log'],
+      ['Ctrl+G', t('Show/hide the grid')],
+      ['A', t('Add trace (expression field, with autocomplete)')],
+      ['P · B', t('Add pane · add pane below the active one')],
+      ['U · D', t('Move the active pane up · down')],
+      ['Backspace', t('Remove traces: click the name (Esc finishes)')],
+      ['C · Shift+C', t('Cursors · clear the cursors')],
+      ['Shift+S', t('Choose which runs of a .step to show')],
+      [t('O · Ctrl+Space'), t('Open a .plt view · apply the remembered view again')],
+      ['Ctrl+Z · Ctrl+Shift+Z', t('Undo · redo the view changes (traces, panes, colors)')],
+      ['Alt+R · Alt+S · Ctrl+L', t('Simulate · abort · log')],
     ],
   ],
   [
-    'Modo Netlist',
+    t('Netlist mode'),
     [
-      ['Alt+R · Ctrl+Enter', 'Simular'],
-      ['Alt+S', 'Abortar'],
-      ['Ctrl+L', 'Ver el log'],
-      ['Ctrl+G', 'Ir a una línea'],
+      ['Alt+R · Ctrl+Enter', t('Simulate')],
+      ['Alt+S', t('Abort')],
+      ['Ctrl+L', t('View the log')],
+      ['Ctrl+G', t('Go to a line')],
     ],
   ],
 ];
 
 export function HelpDialog({ onClose }: { onClose(): void }) {
   return (
-    <Modal title="Atajos de teclado" onClose={onClose} wide>
+    <Modal title={t('Keyboard shortcuts')} onClose={onClose} wide>
       {SHORTCUTS.map(([section, rows]) => (
         <section key={section}>
           <h3>{section}</h3>
@@ -581,9 +582,9 @@ export function HelpDialog({ onClose }: { onClose(): void }) {
           </table>
         </section>
       ))}
-      <p className="hint">En táctil: pellizcar para zoom, dos dedos para desplazar, mantener apretado para editar.</p>
+      <p className="hint">{t('On touch screens: pinch to zoom, two fingers to pan, long-press to edit.')}</p>
       <div className="buttons">
-        <button className="primary" onClick={onClose}>Cerrar</button>
+        <button className="primary" onClick={onClose}>{t('Close')}</button>
       </div>
     </Modal>
   );
@@ -604,7 +605,7 @@ export function RunsDialog({ runs, hidden, onApply, onClose }: {
     setOff(next);
   };
   return (
-    <Modal title="Corridas a mostrar" onClose={onClose}>
+    <Modal title={t('Runs to show')} onClose={onClose}>
       <div className="runs-list">
         {runs.map((r) => (
           <label key={r.name} className="check">
@@ -613,11 +614,11 @@ export function RunsDialog({ runs, hidden, onApply, onClose }: {
         ))}
       </div>
       <div className="buttons">
-        <button onClick={() => setOff(new Set())}>Todas</button>
-        <button onClick={() => setOff(new Set(runs.map((r) => r.name)))}>Ninguna</button>
-        <button onClick={onClose}>Cancelar</button>
+        <button onClick={() => setOff(new Set())}>{t('All')}</button>
+        <button onClick={() => setOff(new Set(runs.map((r) => r.name)))}>{t('None')}</button>
+        <button onClick={onClose}>{t('Cancel')}</button>
         <button className="primary" disabled={off.size === runs.length} onClick={() => onApply(off)}>
-          Aceptar
+          {t('OK')}
         </button>
       </div>
     </Modal>
@@ -626,25 +627,24 @@ export function RunsDialog({ runs, hidden, onApply, onClose }: {
 
 export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }) {
   return (
-    <Modal title="Acerca de TurboSpice" onClose={onClose}>
+    <Modal title={t('About TurboSpice')} onClose={onClose}>
       <div className="welcome about">
         <h3><Logo size={28} /> <span><span className="logo">Turbo</span>Spice</span></h3>
         <p>
-          Un simulador de circuitos tipo LTspice que corre entero en tu navegador (ngspice en WebAssembly): nada se sube a
-          ningún servidor. Abre y guarda <code>.asc</code> de LTspice, así que podés ir y volver entre los dos.
+          {t('An LTspice-like circuit simulator that runs entirely in your browser (ngspice in WebAssembly): nothing is uploaded to any server. It opens and saves LTspice')}{' '}<code>.asc</code> {t('files, so you can go back and forth between the two.')}
         </p>
         <ul>
           <li>
-            <a href={repo} target="_blank" rel="noopener noreferrer">Código fuente y reporte de problemas</a>
+            <a href={repo} target="_blank" rel="noopener noreferrer">{t('Source code and bug reports')}</a>
           </li>
           <li>
-            <a href="privacidad.html" target="_blank" rel="noopener noreferrer">Política de privacidad</a>
+            <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">{t('Privacy policy')}</a>
           </li>
-          <li>Simulación con <strong>ngspice</strong>; formato de esquemáticos <code>.asc</code> de LTspice.</li>
+          <li>{t('Simulation with')}{' '}<strong>ngspice</strong>{t('; schematic format:')}{' '}<code>.asc</code> {t('from LTspice.')}</li>
         </ul>
       </div>
       <div className="buttons">
-        <button className="primary" onClick={onClose}>Cerrar</button>
+        <button className="primary" onClick={onClose}>{t('Close')}</button>
       </div>
     </Modal>
   );
@@ -680,16 +680,16 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
               <li key={f.name}>
                 <div className="uf-head">
                   <code>{f.name}</code>
-                  <button className="danger small" onClick={() => onRemove(f.name)} aria-label={`Quitar ${f.name}`}>Quitar</button>
+                  <button className="danger small" onClick={() => onRemove(f.name)} aria-label={t('Remove {name}', { name: f.name })}>{t('Remove')}</button>
                 </div>
                 {kind === 'model' && f.items.length > 0 && (
                   <div className="uf-items">
                     {f.items.map((sub) =>
                       hasSymbol(sub) ? (
-                        <span key={sub} className="uf-done" title="Ya hay un símbolo con este nombre">✓ {sub}</span>
+                        <span key={sub} className="uf-done" title={t('There\'s already a symbol with this name')}>✓ {sub}</span>
                       ) : (
-                        <button key={sub} onClick={() => onMakeSymbol(f.name, sub)} title={`Crear un símbolo para el subcircuito ${sub}`}>
-                          Crear símbolo de {sub}
+                        <button key={sub} onClick={() => onMakeSymbol(f.name, sub)} title={t('Create a symbol for subcircuit {sub}', { sub })}>
+                          {t('Create symbol for')}{' '}{sub}
                         </button>
                       ),
                     )}
@@ -697,11 +697,11 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
                 )}
                 {kind === 'schematic' && (
                   <div className="uf-items">
-                    <span className="hint">Puertos: {f.items.join(', ') || '(sin etiquetas)'}</span>
+                    <span className="hint">{t('Ports:')}{' '}{f.items.join(', ') || t('(no labels)')}</span>
                     {hasSymbol(f.name.replace(/\.asc$/i, '')) ? (
-                      <span className="uf-done">✓ símbolo de bloque</span>
+                      <span className="uf-done">{t('✓ block symbol')}</span>
                     ) : (
-                      <button onClick={() => onMakeSymbol(f.name, f.name.replace(/\.asc$/i, ''))}>Crear símbolo de bloque</button>
+                      <button onClick={() => onMakeSymbol(f.name, f.name.replace(/\.asc$/i, ''))}>{t('Create block symbol')}</button>
                     )}
                   </div>
                 )}
@@ -715,40 +715,38 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
     );
   };
   return (
-    <Modal title={project ? `Archivos del proyecto «${project}»` : 'Mis símbolos y modelos'} onClose={onClose} wide>
+    <Modal title={project ? t('Project files «{project}»', { project }) : t('My symbols and models')} onClose={onClose} wide>
       {project ? (
         <p className="hint">
-          Se guardan dentro del proyecto (.turbo) y valen para todas sus variantes; ganan a los de «Mis símbolos y modelos» y a
-          los de la librería. Los símbolos (<code>.asy</code>) aparecen en el buscador (F2) en «Proyecto»; los modelos (
-          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>) se usan al simular como si estuvieran junto al <code>.asc</code>.
+          {t('They\'re saved inside the project (.turbo) and apply to all its variants; they take precedence over «My symbols and models» and over the library. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2) under «Project»; models (')}
+          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>.
         </p>
       ) : (
       <p className="hint">
-        Se guardan en este navegador. Los símbolos (<code>.asy</code>) aparecen en el buscador (F2); los modelos (<code>.lib</code>,{' '}
-        <code>.sub</code>, <code>.mod</code>) se usan al simular como si estuvieran junto al <code>.asc</code>; un <code>.asc</code> con
-        su símbolo de bloque se usa como subcircuito (jerarquía, como en LTspice).
+        {t('They\'re saved in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2); models (')}<code>.lib</code>,{' '}
+        <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>{t('; an')}{' '}<code>.asc</code> {t('with its block symbol is used as a subcircuit (hierarchy, like in LTspice).')}
       </p>
       )}
       <div className="buttons left">
-        <button className="primary" onClick={() => input.current?.click()}>Agregar archivos…</button>
+        <button className="primary" onClick={() => input.current?.click()}>{t('Add files…')}</button>
         <input
           ref={input}
           type="file"
           multiple
           hidden
           accept={project ? '.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb' : '.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb,.asc'}
-          aria-label="Archivos de símbolos y modelos"
+          aria-label={t('Symbol and model files')}
           onChange={(e) => {
             if (e.target.files?.length) onAdd([...e.target.files]);
             e.target.value = '';
           }}
         />
       </div>
-      {section('symbol', 'Símbolos', 'Ninguno todavía.')}
-      {section('model', 'Modelos y subcircuitos', 'Ninguno todavía.')}
-      {!project && section('schematic', 'Bloques jerárquicos (.asc)', 'Ninguno todavía.')}
+      {section('symbol', t('Symbols'), t('None yet.'))}
+      {section('model', t('Models and subcircuits'), t('None yet.'))}
+      {!project && section('schematic', t('Hierarchical blocks (.asc)'), t('None yet.'))}
       <div className="buttons">
-        <button className="primary" onClick={onClose}>Cerrar</button>
+        <button className="primary" onClick={onClose}>{t('Close')}</button>
       </div>
     </Modal>
   );

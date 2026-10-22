@@ -7,6 +7,7 @@ import { serializeAsc } from '../asc/serialize.ts';
 import { emptyDoc, type AscDoc } from '../asc/model.ts';
 import { findAnalysis, setAnalysisLine } from '../schematic/directivesEdit.ts';
 import { takeSims, type SimView } from '../sim/simList.ts';
+import { t } from '../i18n/i18n.ts';
 
 export const FORMAT = 'turbospice';
 export const VERSION = 1;
@@ -71,7 +72,7 @@ export const EMPTY_ASC = serializeAsc(emptyDoc());
 export const activeVariant = (p: Project): Variant => p.variants.find((v) => v.id === p.activeVariant) ?? p.variants[0];
 
 /** Proyecto nuevo con una variante vacía */
-export function newProject(name: string, variantName = 'Variante 1'): Project {
+export function newProject(name: string, variantName = t('Variant 1')): Project {
   const now = Date.now();
   const v: Variant = { id: newId('v'), name: variantName, base: EMPTY_ASC, activeSim: '', sims: [] };
   return { name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] };
@@ -101,7 +102,7 @@ export function variantFromAsc(doc: AscDoc, name: string): Variant {
 /** Proyecto con una sola variante, «Variante 1»: la del .asc (al abrir un .asc de LTspice) */
 export function projectFromAsc(doc: AscDoc, fileName: string): Project {
   const name = projectName(fileName);
-  const v = variantFromAsc(doc, 'Variante 1');
+  const v = variantFromAsc(doc, t('Variant 1'));
   const now = Date.now();
   return { name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] };
 }
@@ -201,12 +202,12 @@ export interface ParsedTurbo {
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 const str = (v: unknown, what: string): string => {
-  if (typeof v !== 'string') throw new Error(`.turbo inválido: falta ${what}`);
+  if (typeof v !== 'string') throw new Error(t('invalid .turbo: missing {what}', { what }));
   return v;
 };
 const time = (v: unknown) => {
-  const t = typeof v === 'string' ? Date.parse(v) : NaN;
-  return Number.isFinite(t) ? t : Date.now();
+  const tt = typeof v === 'string' ? Date.parse(v) : NaN;
+  return Number.isFinite(tt) ? tt : Date.now();
 };
 
 /** ¿El texto es un .turbo? (sin validarlo entero) */
@@ -222,27 +223,27 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   try {
     raw = JSON.parse(text);
   } catch {
-    throw new Error('.turbo inválido: no es JSON');
+    throw new Error(t('invalid .turbo: not JSON'));
   }
-  if (!isObj(raw) || raw.format !== FORMAT) throw new Error('No es un archivo de TurboSpice');
-  if (typeof raw.version !== 'number' || raw.version > VERSION) throw new Error(`.turbo de una versión más nueva (${String(raw.version)}): actualizá TurboSpice`);
-  if (!Array.isArray(raw.variants) || !raw.variants.length) throw new Error('.turbo inválido: no tiene variantes');
+  if (!isObj(raw) || raw.format !== FORMAT) throw new Error(t('Not a TurboSpice file'));
+  if (typeof raw.version !== 'number' || raw.version > VERSION) throw new Error(t('.turbo from a newer version ({p0}): update TurboSpice', { p0: String(raw.version) }));
+  if (!Array.isArray(raw.variants) || !raw.variants.length) throw new Error(t('invalid .turbo: it has no variants'));
   const blobsIn = isObj(raw.blobs) ? raw.blobs : {};
   const warnings: string[] = [];
   // verificación de cada blob (una sola vez)
   const ok = new Map<string, string | null>();
-  for (const [h, t] of Object.entries(blobsIn)) ok.set(h, typeof t === 'string' && (await hashText(t)) === h ? t : null);
+  for (const [h, tt] of Object.entries(blobsIn)) ok.set(h, typeof tt === 'string' && (await hashText(tt)) === h ? tt : null);
   const get = (h: unknown): string | null => (typeof h === 'string' ? (ok.get(h) ?? null) : null);
 
   const files: ProjectFile[] = Array.isArray(raw.files)
     ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model'))
     : [];
   const variants: Variant[] = raw.variants.map((vr: unknown, vi: number): Variant => {
-    if (!isObj(vr)) throw new Error('.turbo inválido: variante mal formada');
-    const vname = str(vr.name, `el nombre de la variante ${vi + 1}`);
+    if (!isObj(vr)) throw new Error(t('invalid .turbo: malformed variant'));
+    const vname = str(vr.name, t('the name of variant {p0}', { p0: vi + 1 }));
     const sims: Sim[] = (Array.isArray(vr.sims) ? vr.sims : []).map((sr: unknown): Sim => {
-      if (!isObj(sr)) throw new Error('.turbo inválido: simulación mal formada');
-      const id = str(sr.id, 'el id de una simulación');
+      if (!isObj(sr)) throw new Error(t('invalid .turbo: malformed simulation'));
+      const id = str(sr.id, t('the id of a simulation'));
       const runs: Run[] = (Array.isArray(sr.runs) ? sr.runs : []).filter(isObj).map((rr) => {
         const asc = get(rr.asc);
         return {
@@ -256,25 +257,25 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
       const damagedRuns = runs.filter((r) => r.damaged).length;
       const name = typeof sr.name === 'string' && sr.name ? sr.name : undefined;
       const label = `«${vname}${name ? ` · ${name}` : ''}»`;
-      if (damagedRuns) warnings.push(`${label}: ${damagedRuns === 1 ? 'una corrida del historial está dañada' : `${damagedRuns} corridas del historial están dañadas`}`);
+      if (damagedRuns) warnings.push(`${label}: ${damagedRuns === 1 ? t('one run in the history is damaged') : t('{damagedRuns} runs in the history are damaged', { damagedRuns })}`);
       let asc = get(sr.current);
       if (asc === null) {
         asc = [...runs].reverse().find((r) => !r.damaged)?.asc ?? EMPTY_ASC;
-        warnings.push(`${label}: el circuito actual está dañado; se recuperó ${asc === EMPTY_ASC ? 'vacío' : 'el de la última corrida'}`);
+        warnings.push(t('{label}: the current circuit is damaged; recovered {p1}', { label, p1: asc === EMPTY_ASC ? t('empty') : t('the one from the last run') }));
       }
       return { id, ...(name ? { name } : {}), asc, ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}), runs };
     });
     let base = get(vr.base);
     if (base === null) {
       base = sims[0]?.asc ?? EMPTY_ASC;
-      warnings.push(`«${vname}»: el circuito base está dañado; se recuperó ${sims.length ? 'el de su primera simulación' : 'vacío'}`);
+      warnings.push(t('«{vname}»: the base circuit is damaged; recovered {p1}', { vname, p1: sims.length ? t('the one from its first simulation') : t('empty') }));
     }
     const activeSim = typeof vr.activeSim === 'string' && sims.some((s) => s.id === vr.activeSim) ? vr.activeSim : '';
-    return { id: str(vr.id, 'el id de una variante'), name: vname, base, activeSim, sims };
+    return { id: str(vr.id, t('the id of a variant')), name: vname, base, activeSim, sims };
   });
   const activeVariant = typeof raw.activeVariant === 'string' && variants.some((v) => v.id === raw.activeVariant) ? raw.activeVariant : variants[0].id;
   return {
-    project: { name: str(raw.name, 'el nombre del proyecto'), created: time(raw.created), modified: time(raw.modified), files, activeVariant, variants },
+    project: { name: str(raw.name, t('the project name')), created: time(raw.created), modified: time(raw.modified), files, activeVariant, variants },
     warnings,
   };
 }

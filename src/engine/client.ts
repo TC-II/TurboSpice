@@ -1,6 +1,7 @@
 // API del motor para la UI: promesas sobre el Worker de ngspice.
 import { OUT_OF_MEMORY, OUT_OF_MEMORY_RE, type SimResult, type SimulateOptions } from './ngspice.ts';
 import type { WorkerRequest, WorkerResponse } from './protocol.ts';
+import { t } from '../i18n/i18n.ts';
 
 export interface SimOutcome {
   result: SimResult;
@@ -51,7 +52,7 @@ export class EngineClient {
       } else p.resolve();
     };
     this.worker.onerror = (ev) => {
-      const err = new Error(friendly(ev.message || 'Error en el Worker del motor'));
+      const err = new Error(friendly(ev.message || t('Error in the engine Worker')));
       const sim = [...this.pending.values()].some((p) => p.sim);
       for (const p of this.pending.values()) p.reject(err);
       this.pending.clear();
@@ -77,7 +78,7 @@ export class EngineClient {
   /** Corta la simulación en curso: termina el Worker y levanta uno nuevo. */
   abort(): void {
     this.worker.terminate();
-    for (const p of this.pending.values()) p.reject(new Error('Simulación abortada'));
+    for (const p of this.pending.values()) p.reject(new Error(t('Simulation aborted')));
     this.pending.clear();
     this.spawn();
   }

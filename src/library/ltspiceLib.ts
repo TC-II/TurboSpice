@@ -9,6 +9,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { baseName, symbolPath } from '../asc/model.ts';
 import { decode } from '../asc/encoding.ts';
 import type { Library } from './library.ts';
+import { t } from '../i18n/i18n.ts';
 
 const DB = 'turbospice-ltspice';
 const FILES = 'files';
@@ -68,7 +69,7 @@ export async function importLtspiceLibrary(files: File[], onProgress?: (done: nu
   const wanted = files
     .map((f) => ({ f, rel: libRelative((f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name) }))
     .filter((x): x is { f: File; rel: string } => !!x.rel && /^(sym\/.*\.asy|(sub|cmp)\/[^/]+)$/i.test(x.rel));
-  if (!wanted.length) throw new Error('No es la carpeta lib de LTspice: no tiene sym/, sub/ ni cmp/');
+  if (!wanted.length) throw new Error(t('This isn\'t LTspice\'s lib folder: it has no sym/, sub/ or cmp/'));
   const index: LtspiceIndex = { symPath: {}, sym: {}, model: {}, file: {}, time: Date.now(), count: { symbols: 0, models: 0 } };
   await removeLtspiceLibrary();
   const d = await db();
@@ -150,9 +151,9 @@ export async function prefetchLtspice(doc: AscDoc, lib: Library, index: LtspiceI
   }
 
   // .lib/.include de las directivas que no resuelve la librería propia
-  for (const t of doc.texts) {
-    if (t.kind !== 'directive') continue;
-    for (const m of t.text.matchAll(/(?:^|\\n)\s*\.(?:lib|include|inc)\s+("?)([^"\\]+?)\1(?:\s|\\n|$)/gi)) {
+  for (const tt of doc.texts) {
+    if (tt.kind !== 'directive') continue;
+    for (const m of tt.text.matchAll(/(?:^|\\n)\s*\.(?:lib|include|inc)\s+("?)([^"\\]+?)\1(?:\s|\\n|$)/gi)) {
       if (!lib.resolveModelFile(m[2])) await addModelFile(fileKey(m[2]));
     }
   }

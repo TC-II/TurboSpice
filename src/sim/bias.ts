@@ -5,6 +5,7 @@ import type { Element } from '../netlist/ltnetlist.ts';
 import { si } from '../waveform/series.ts';
 import { elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type Bias = Record<string, number>;
 
@@ -31,8 +32,8 @@ export function biasParams(sim: BuiltSimulation): string[] {
 /** Directivas que cambian el circuito: sin comentarios ni comandos de análisis */
 const circuitDirectives = (doc: AscDoc) =>
   doc.texts
-    .filter((t) => t.kind === 'directive')
-    .flatMap((t) => t.text.split('\\n'))
+    .filter((tt) => tt.kind === 'directive')
+    .flatMap((tt) => tt.text.split('\\n'))
     .filter((l) => !ANALYSIS_LINE.test(l))
     .join('\n');
 
@@ -67,14 +68,14 @@ export function netBias(bias: Bias, net: string): BiasInfo | null {
 function bjtRegion(vbe: number, vbc: number, s: number): string {
   const be = s * vbe;
   const bc = s * vbc;
-  if (be < 0.4) return 'corte';
-  return bc > 0.4 ? 'saturación' : 'activa directa';
+  if (be < 0.4) return t('cutoff');
+  return bc > 0.4 ? t('saturation') : t('forward active');
 }
 
 /** Región de un MOSFET. `s` = 1 en canal N, -1 en canal P (ngspice da von con signo) */
 function mosRegion(vgs: number, vds: number, von: number, vdsat: number, s: number): string {
-  if (s * vgs < s * von) return 'corte';
-  return Math.abs(vds) < Math.abs(vdsat) ? 'triodo (lineal)' : 'saturación';
+  if (s * vgs < s * von) return t('cutoff');
+  return Math.abs(vds) < Math.abs(vdsat) ? t('triode (linear)') : t('saturation');
 }
 
 export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element): BiasInfo | null {
@@ -120,7 +121,7 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element): Bias
           `Vce = ${fmt(vce, 'V')}`,
           `gm = ${fmt(p('gm'), 'S')}`,
           ...(ic !== undefined && ib ? [`β = Ic/Ib = ${si(ic / ib, 4)}`] : []),
-          ...(vbe !== undefined && vbc !== undefined ? [`Región: ${bjtRegion(vbe, vbc, pol)}`] : []),
+          ...(vbe !== undefined && vbc !== undefined ? [t('Region: {p0}', { p0: bjtRegion(vbe, vbc, pol) })] : []),
         ],
         short: fmt(ic, 'A'),
       };
@@ -138,7 +139,7 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element): Bias
           `gm = ${fmt(p('gm'), 'S')}`,
           `gds = ${fmt(p('gds'), 'S')}`,
           ...(vgs !== undefined && vds !== undefined && von !== undefined && vdsat !== undefined
-            ? [`Región: ${mosRegion(vgs, vds, von, vdsat, pol)}`]
+            ? [t('Region: {p0}', { p0: mosRegion(vgs, vds, von, vdsat, pol) })]
             : []),
         ],
         short: fmt(p('id'), 'A'),

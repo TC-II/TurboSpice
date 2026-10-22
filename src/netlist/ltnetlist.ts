@@ -3,6 +3,7 @@
 import { baseName, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { connectivity, type Connectivity } from './connectivity.ts';
+import { t } from '../i18n/i18n.ts';
 
 export interface Element {
   /** índice en doc.symbols */
@@ -72,12 +73,12 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
   const addBlock = (name: string, def: SymbolDef) => {
     if (blocks.some((b) => b.name.toLowerCase() === name.toLowerCase())) return;
     if (parents.some((p) => p.toLowerCase() === name.toLowerCase())) {
-      warnings.push(`El bloque ${name} se contiene a sí mismo`);
+      warnings.push(t('Block {name} contains itself', { name }));
       return;
     }
     const sub = lib.schematic?.(name);
     if (!sub) {
-      warnings.push(`Falta el esquemático ${name}.asc del bloque ${name}`);
+      warnings.push(t('Missing schematic {name}.asc for block {name1}', { name, name1: name }));
       return;
     }
     const lt = ltNetlist(sub, lib, [...parents, name]);
@@ -92,7 +93,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
     blocks.push({ name, ports, lt });
   };
-  const conn = connectivity(doc, (t) => lib.symbol(t));
+  const conn = connectivity(doc, (tt) => lib.symbol(tt));
   let ncCounter = 0;
   const nc = (kind: 'NC' | 'MP') => `${kind}_${String(++ncCounter).padStart(2, '0')}`;
 
@@ -118,7 +119,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
   doc.symbols.forEach((s, si) => {
     const def = lib.symbol(s.type);
     if (!def) {
-      warnings.push(`Símbolo no encontrado: ${baseName(s.type)}`);
+      warnings.push(t('Symbol not found: {p0}', { p0: baseName(s.type) }));
       return;
     }
     const attrs = effectiveAttrs(s, def);
@@ -200,7 +201,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     if (!standardLibs.includes(FAMILIES[f].lib)) standardLibs.push(FAMILIES[f].lib);
   }
 
-  const texts: Directive[] = doc.texts.map((t) => ({ kind: t.kind, text: t.text }));
+  const texts: Directive[] = doc.texts.map((tt) => ({ kind: tt.kind, text: tt.text }));
   return { elements, implicitModels, standardLibs, texts, modelFiles, conn, ncNames, blocks, warnings };
 }
 
@@ -224,9 +225,9 @@ export function ltNetlistText(n: LtNetlist): string {
       done.add(lib);
     }
   }
-  for (const t of n.texts) {
-    const lines = t.text.split('\\n');
-    if (t.kind === 'directive') out.push(...lines);
+  for (const tt of n.texts) {
+    const lines = tt.text.split('\\n');
+    if (tt.kind === 'directive') out.push(...lines);
     else out.push(...lines.map((l) => `* ${l}`));
   }
   // LTspice lista los ModelFile en orden alfabético
@@ -241,4 +242,10 @@ export function ltNetlistText(n: LtNetlist): string {
   }
   out.push('.backanno', '.end');
   return out.join('\n');
+}
+
+/** Símbolo que nombra un aviso «Symbol not found: X» (en el idioma que sea), o null */
+export function missingSymbolIn(warning: string): string | null {
+  const [pre, post] = t('Symbol not found: {p0}').split('{p0}');
+  return warning.startsWith(pre) && warning.endsWith(post) && warning.length > pre.length + post.length ? warning.slice(pre.length, warning.length - post.length) : null;
 }

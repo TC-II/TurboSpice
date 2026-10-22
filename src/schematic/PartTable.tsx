@@ -4,6 +4,7 @@
 // (ascendente, y alternando con cada click).
 import { useMemo, useState } from 'react';
 import { CMP_COLUMNS, cmpCell, compareCells, type CmpKind, type CmpPart } from '../library/cmp.ts';
+import { t } from '../i18n/i18n.ts';
 
 export interface PartGroup {
   kind: CmpKind;
@@ -40,7 +41,7 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
     <div className="parts">
       <div className="parts-head">
         {groups.length > 1 && (
-          <div className="seg" role="radiogroup" aria-label="Lista">
+          <div className="seg" role="radiogroup" aria-label={t('List')}>
             {groups.map((x, i) => (
               <label key={x.kind}>
                 <input type="radio" checked={i === g} onChange={() => setG(i)} /> {x.label}
@@ -50,8 +51,8 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
         )}
         <input
           type="search"
-          aria-label="Buscar en la librería"
-          placeholder={`Buscar ${group.label.toLowerCase()} por nombre o fabricante`}
+          aria-label={t('Search the library')}
+          placeholder={t('Search {p0} by name or manufacturer', { p0: group.label.toLowerCase() })}
           value={q}
           onChange={(e) => setQ(e.target.value)}
           // Enter en el buscador elige la primera fila (no acepta el diálogo)
@@ -67,7 +68,7 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
         <table>
           <thead>
             <tr>
-              <th className="sortable" aria-sort={ariaSort('')} onClick={() => sortBy('')}>Nombre</th>
+              <th className="sortable" aria-sort={ariaSort('')} onClick={() => sortBy('')}>{t('Name')}</th>
               {cols.map((c) => (
                 <th key={c.key} className="sortable" aria-sort={ariaSort(c.key)} onClick={() => sortBy(c.key)}>
                   {c.label}
@@ -93,7 +94,7 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
             ))}
             {!rows.length && (
               <tr className="empty">
-                <td colSpan={cols.length + 1}>{group.parts.length ? 'Nada coincide con la búsqueda' : 'Todavía no hay componentes de este tipo en la librería'}</td>
+                <td colSpan={cols.length + 1}>{group.parts.length ? t('Nothing matches the search') : t('There are no components of this type in the library yet')}</td>
               </tr>
             )}
           </tbody>

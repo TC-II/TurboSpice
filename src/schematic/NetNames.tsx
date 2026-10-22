@@ -3,6 +3,7 @@
 import type { AscDoc, Point } from '../asc/model.ts';
 import type { Connectivity, Net } from '../netlist/connectivity.ts';
 import { snap } from './geometry.ts';
+import { t } from '../i18n/i18n.ts';
 
 export interface NetName {
   name: string;
@@ -134,7 +135,7 @@ export function NetNamesLayer({ names, paired, avoid, scale, onHover, onName }: 
               onName(n.at);
             }}
           >
-            <title>{n.nameable && onName ? `${n.name} · click para ponerle nombre` : n.name}</title>
+            <title>{n.nameable && onName ? t('{name} · click to name it', { name: n.name }) : n.name}</title>
             <line x1={n.at.x} y1={n.at.y} x2={n.at.x} y2={y + h} />
             <rect x={x} y={y} width={w} height={h} rx={3 / scale} />
             <text x={x + w / 2} y={y + h / 2} fontSize={fs} textAnchor="middle" dominantBaseline="central">

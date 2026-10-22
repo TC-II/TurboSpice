@@ -10,6 +10,7 @@
 import type { SimPlot } from '../engine/ngspice.ts';
 import { evalTrace, ExprError, type Resolver, type Wave } from '../waveform/expr.ts';
 import { scaleOf } from '../waveform/series.ts';
+import { t } from '../i18n/i18n.ts';
 
 export type MeasAnalysis = 'tran' | 'ac' | 'dc' | 'noise' | 'op' | 'tf';
 export type Aggregate = 'max' | 'min' | 'pp' | 'avg' | 'rms' | 'integ';
@@ -73,17 +74,17 @@ function tokenize(s: string): string[] {
 const unbrace = (s: string) => s.replace(/^\{(.*)\}$/, '$1');
 
 export function parseMeas(line: string): MeasDef | string {
-  const t = tokenize(line.trim().replace(/^\.meas(ure)?\s+/i, ''));
+  const tt = tokenize(line.trim().replace(/^\.meas(ure)?\s+/i, ''));
   const def: Partial<MeasDef> & { line: string } = { line: line.trim() };
-  if (/^(tran|ac|dc|noise|op|tf)$/i.test(t[0] ?? '')) def.analysis = t.shift()!.toLowerCase() as MeasAnalysis;
-  def.name = t.shift();
-  if (!def.name) return 'falta el nombre';
+  if (/^(tran|ac|dc|noise|op|tf)$/i.test(tt[0] ?? '')) def.analysis = tt.shift()!.toLowerCase() as MeasAnalysis;
+  def.name = tt.shift();
+  if (!def.name) return t('missing name');
   let i = 0;
-  const peek = () => t[i]?.toLowerCase();
-  const next = () => t[i++];
+  const peek = () => tt[i]?.toLowerCase();
+  const next = () => tt[i++];
   /** "clave=valor" o "clave valor" */
   const value = () => {
-    if (t[i] === '=') i++;
+    if (tt[i] === '=') i++;
     return unbrace(next() ?? '');
   };
   /** lhs=rhs (o "VAL=rhs" con lhs implícito) seguido de TD=, RISE=… */
@@ -93,9 +94,9 @@ export function parseMeas(line: string): MeasDef | string {
     if (lhs.toLowerCase() === 'val') {
       rhs = value();
       lhs = lhsDefault ?? '';
-    } else if (t[i] === '=') {
+    } else if (tt[i] === '=') {
       i++;
-      if (peek() === 'val' && t[i + 1] === '=') i += 2;
+      if (peek() === 'val' && tt[i + 1] === '=') i += 2;
       rhs = unbrace(next() ?? '');
     } else if (peek() === 'val') {
       i++;
@@ -122,9 +123,9 @@ export function parseMeas(line: string): MeasDef | string {
     i++;
     def.kind = head as MeasDef['kind'];
     def.expr = unbrace(next() ?? '');
-    if (!def.expr) return `falta la expresión de ${head.toUpperCase()}`;
+    if (!def.expr) return t('missing expression for {p0}', { p0: head.toUpperCase() });
   }
-  while (i < t.length) {
+  while (i < tt.length) {
     const k = next().toLowerCase();
     if (k === 'at') def.at = value();
     else if (k === 'from') def.from = value();
@@ -133,14 +134,14 @@ export function parseMeas(line: string): MeasDef | string {
     else if (k === 'trig') def.trig = crossing();
     else if (k === 'targ') def.targ = crossing(def.trig?.lhs);
     else if (k === 'td' && def.when) def.when.td = value();
-    else return `no se entiende "${t[i - 1]}"`;
+    else return t('"{p0}" isn\'t understood', { p0: tt[i - 1] });
   }
   if (!def.kind) {
     if (def.when) def.kind = 'when';
     else if (def.trig && def.targ) def.kind = 'trigtarg';
-    else return 'falta FIND, WHEN, MAX, MIN, PP, AVG, RMS, INTEG, TRIG/TARG o PARAM';
+    else return t('missing FIND, WHEN, MAX, MIN, PP, AVG, RMS, INTEG, TRIG/TARG or PARAM');
   }
-  if ((def.kind === 'find' || def.kind === 'deriv') && !def.at && !def.when) return `${def.kind.toUpperCase()} necesita AT= o WHEN`;
+  if ((def.kind === 'find' || def.kind === 'deriv') && !def.at && !def.when) return t('{p0} needs AT= or WHEN', { p0: def.kind.toUpperCase() });
   return def as MeasDef;
 }
 
@@ -171,7 +172,7 @@ function wave(src: string, c: Ctx): Wave {
 function num(src: string, c: Ctx): number {
   const w = wave(src, c);
   if (w.re.length && w.re.every((v) => v === w.re[0])) return w.re[0];
-  throw new ExprError(`"${src}" no es un valor constante`);
+  throw new ExprError(t('"{src}" isn\'t a constant value', { src }));
 }
 
 /** En AC las comparaciones y agregados usan el módulo (como LTspice) */
@@ -263,13 +264,13 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
       return { value: num(def.expr!, ctx) };
     case 'when': {
       const at = cross(def.when!, ctx);
-      if (!Number.isFinite(at)) throw new ExprError('la condición WHEN no se cumple');
+      if (!Number.isFinite(at)) throw new ExprError(t('the WHEN condition is never met'));
       return { value: at, at };
     }
     case 'find':
     case 'deriv': {
       const at = def.at !== undefined ? num(def.at, ctx) : cross(def.when!, ctx);
-      if (!Number.isFinite(at)) throw new ExprError('la condición WHEN no se cumple');
+      if (!Number.isFinite(at)) throw new ExprError(t('the WHEN condition is never met'));
       const w = wave(def.kind === 'deriv' ? `d(${def.expr})` : def.expr!, ctx);
       // en OP (un solo punto) no hay eje que recorrer
       if (x.length <= 1) return { value: w.re[0], ...(w.im ? { im: w.im[0] } : {}) };
@@ -278,8 +279,8 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
     case 'trigtarg': {
       const a = cross(def.trig!, ctx);
       const b = cross(def.targ!, ctx);
-      if (!Number.isFinite(a)) throw new ExprError('TRIG no ocurre');
-      if (!Number.isFinite(b)) throw new ExprError('TARG no ocurre');
+      if (!Number.isFinite(a)) throw new ExprError(t('TRIG doesn\'t occur'));
+      if (!Number.isFinite(b)) throw new ExprError(t('TARG doesn\'t occur'));
       return { value: b - a };
     }
     default: {
@@ -287,7 +288,7 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
       let to = def.to !== undefined ? num(def.to, ctx) : x[x.length - 1];
       if (def.trig) from = cross(def.trig, ctx);
       if (def.targ) to = cross(def.targ, ctx);
-      if (!Number.isFinite(from) || !Number.isFinite(to)) throw new ExprError('el rango TRIG/TARG no ocurre');
+      if (!Number.isFinite(from) || !Number.isFinite(to)) throw new ExprError(t('the TRIG/TARG range doesn\'t occur'));
       const y = realPart(wave(def.expr!, ctx));
       // ruido: INTEG de una densidad (V/√Hz) es el valor eficaz en la banda, √∫v²df (como LTspice)
       if (def.kind === 'integ' && /^noise/i.test(ctx.plot.name)) {

@@ -5,12 +5,13 @@
 import { useEffect, useRef } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import type { Run } from './turbo.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** '' = el circuito actual */
 export type HistoryPick = string;
 
-const when = (t: number) => {
-  const d = new Date(t);
+const when = (tt: number) => {
+  const d = new Date(tt);
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -50,18 +51,18 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
   };
   const shown = [...runs].reverse();
   return (
-    <aside className="history-panel" aria-label={`Historial de ${sim}`}>
+    <aside className="history-panel" aria-label={t('History of {sim}', { sim })}>
       <header>
         <Icon name="clock" size={16} />
         <span className="history-title" title={sim}>{sim}</span>
-        <button className="close" onClick={onClose} aria-label="Cerrar el historial" title="Cerrar el historial (Esc)">
+        <button className="close" onClick={onClose} aria-label={t('Close the history')} title={t('Close the history (Esc)')}>
           <Icon name="close" size={14} />
         </button>
       </header>
       <div
         className="history-list"
         role="listbox"
-        aria-label="Corridas"
+        aria-label={t('Runs')}
         aria-activedescendant={`hist-${picked || 'current'}`}
         tabIndex={0}
         ref={list}
@@ -76,8 +77,8 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
         }}
       >
         <div id="hist-current" data-id="current" role="option" aria-selected={!picked} className={`history-item current${!picked ? ' picked' : ''}`} onClick={() => onPick('')}>
-          <span className="history-when">Actual (sin simular)</span>
-          <span className="history-sum">{currentChanges && currentChanges !== 'sin cambios' ? currentChanges : runs.length ? 'igual a la última corrida' : 'todavía no se simuló'}</span>
+          <span className="history-when">{t('Current (not simulated)')}</span>
+          <span className="history-sum">{currentChanges && currentChanges !== t('no changes') ? currentChanges : runs.length ? t('same as the last run') : t('not simulated yet')}</span>
         </div>
         {shown.map((r, i) => {
           const first = i === shown.length - 1;
@@ -90,18 +91,18 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
               aria-selected={picked === r.id}
               aria-disabled={r.damaged}
               className={`history-item${picked === r.id ? ' picked' : ''}${r.damaged ? ' damaged' : ''}`}
-              title={r.damaged ? 'Esta corrida está dañada en el archivo: no se puede ver' : new Date(r.time).toLocaleString()}
+              title={r.damaged ? t('This run is damaged in the file: it can\'t be shown') : new Date(r.time).toLocaleString()}
               onClick={() => !r.damaged && onPick(r.id)}
             >
               <span className="history-when">{when(r.time)}</span>
-              <span className="history-sum">{r.damaged ? 'dañada' : r.summary || (first ? 'primera corrida' : 'sin cambios')}</span>
+              <span className="history-sum">{r.damaged ? t('damaged') : r.summary || (first ? t('first run') : t('no changes'))}</span>
               {picked === r.id && (
                 <span className="history-actions">
-                  <button className="primary" onClick={(e) => (e.stopPropagation(), onRestore(r.id))} title="Traer este circuito al presente: pasa a ser el actual (Ctrl+Z lo deshace)">
+                  <button className="primary" onClick={(e) => (e.stopPropagation(), onRestore(r.id))} title={t('Bring this circuit to the present: it becomes the current one (Ctrl+Z undoes it)')}>
                     Restore
                   </button>
-                  <button onClick={(e) => (e.stopPropagation(), onClone(r.id))} title="Una simulación nueva con este circuito">
-                    Clonar
+                  <button onClick={(e) => (e.stopPropagation(), onClone(r.id))} title={t('A new simulation with this circuit')}>
+                    {t('Clone')}
                   </button>
                 </span>
               )}
@@ -109,7 +110,7 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
           );
         })}
       </div>
-      <p className="history-hint">↑/↓ para recorrer · Enter: Restore · Esc: volver al actual</p>
+      <p className="history-hint">{t('↑/↓ to browse · Enter: Restore · Esc: back to current')}</p>
     </aside>
   );
 }

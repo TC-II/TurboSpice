@@ -21,6 +21,7 @@ import {
 } from '../sim/sources.ts';
 import { labelRows, Modal } from './dialogs.tsx';
 import { KINDS } from './sourceIcons.tsx';
+import { t } from '../i18n/i18n.ts';
 
 /** Valores por defecto de cada forma de onda al elegirla por primera vez */
 const DEFAULT_ARGS: Partial<Record<SourceKind, string[]>> = {
@@ -50,23 +51,23 @@ const f = (key: FieldKey, label: string, unit: FieldDef['unit'], id: string, opt
 /** Filas de 4 campos de cada pestaña, en orden de importancia (no el de SPICE) */
 const LAYOUT: Record<Exclude<SourceKind, 'pwl'>, FieldDef[][]> = {
   sine: [
-    [f(1, 'Amplitud', 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, 'Frecuencia', 'Hz', 'per'), f('per', 'Período', 's', 'per')],
-    [f(5, 'Fase', '°', 'phi', true), f(3, 'Tdelay', 's', 'td', true), f(4, 'Amortiguamiento θ', '1/s', 'theta', true), f(6, 'Ncycles', '', 'n', true)],
+    [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, t('Frequency'), 'Hz', 'per'), f('per', t('Period'), 's', 'per')],
+    [f(5, t('Phase'), '°', 'phi', true), f(3, 'Tdelay', 's', 'td', true), f(4, 'Amortiguamiento θ', '1/s', 'theta', true), f(6, 'Ncycles', '', 'n', true)],
   ],
-  ac: [[f('acMag', 'Amplitud', 'V', 'amp'), f('acPhase', 'Fase', '°', 'phi', true)]],
+  ac: [[f('acMag', t('Amplitude'), 'V', 'amp'), f('acPhase', t('Phase'), '°', 'phi', true)]],
   pulse: [
-    [f(0, 'V1 (inicial)', 'V', 'v1'), f(1, 'V2 (pulso)', 'V', 'v2')],
-    [f(5, 'Ton', 's', 'ton'), f('per', 'Período', 's', 'per'), f('frq', 'Frecuencia', 'Hz', 'per'), f('duty', 'DC', '%', 'duty')],
+    [f(0, t('V1 (initial)'), 'V', 'v1'), f(1, t('V2 (pulse)'), 'V', 'v2')],
+    [f(5, 'Ton', 's', 'ton'), f('per', t('Period'), 's', 'per'), f('frq', t('Frequency'), 'Hz', 'per'), f('duty', 'DC', '%', 'duty')],
     [f(3, 'Trise', 's', 'tr', true), f(4, 'Tfall', 's', 'tf', true), f(2, 'Tdelay', 's', 'td', true), f(7, 'Ncycles', '', 'n', true)],
   ],
-  dc: [[f('dc', 'Valor DC', 'V', 'dc')]],
+  dc: [[f('dc', t('DC value'), 'V', 'dc')]],
   exp: [
-    [f(0, 'V1', 'V', 'v1'), f(1, 'V2', 'V', 'v2'), f(3, 'τ subida', 's', 'tau1'), f(5, 'τ bajada', 's', 'tau2')],
-    [f(2, 'Inicio subida', 's', 'td1', true), f(4, 'Inicio bajada', 's', 'td2')],
+    [f(0, 'V1', 'V', 'v1'), f(1, 'V2', 'V', 'v2'), f(3, t('rise τ'), 's', 'tau1'), f(5, t('fall τ'), 's', 'tau2')],
+    [f(2, t('Rise start'), 's', 'td1', true), f(4, t('Fall start'), 's', 'td2')],
   ],
   sffm: [
-    [f(1, 'Amplitud', 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, 'Portadora', 'Hz', 'fc'), f(4, 'Moduladora', 'Hz', 'fs')],
-    [f(3, 'Índice de modulación', '', 'mdi')],
+    [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, 'Portadora', 'Hz', 'fc'), f(4, 'Moduladora', 'Hz', 'fs')],
+    [f(3, t('Modulation index'), '', 'mdi')],
   ],
 };
 
@@ -235,7 +236,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   const fieldsText = [...args, spec.dc, spec.acMag, ...spec.points.flat()];
   const mega = fieldsText.find((s) => looksLikeMegaTypo(s ?? ''));
   const notFit = pulse && (n(args[3]) || 0) + (n(args[5]) || 0) + (n(args[4]) || 0) > n(args[6]) * 1.0001;
-  const warn = [notFit ? 'Trise + Ton + Tfall no entra en el período.' : '', mega ? `"${mega.trim()}" es ${mega.trim().slice(0, -1)} mili, como en LTspice; para mega escribí ${mega.trim().slice(0, -1)}Meg.` : '']
+  const warn = [notFit ? t('Trise + Ton + Tfall doesn\'t fit in the period.') : '', mega ? t('"{p0}" is {p1} milli, like in LTspice; for mega write {p2}Meg.', { p0: mega.trim(), p1: mega.trim().slice(0, -1), p2: mega.trim().slice(0, -1) }) : '']
     .filter(Boolean)
     .join(' ');
 
@@ -256,15 +257,15 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   }, [kind]);
   const labels = () => new Map(shown.filter((r) => visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
   const showToggles = shown.length > 0 && (
-    <span className="src-show" role="group" aria-label="Mostrar en el esquemático">
-      Mostrar:
+    <span className="src-show" role="group" aria-label={t('Show on the schematic')}>
+      {t('Show:')}
       {shown.map((r) => (
-        <label key={r.win} title={`${r.attr === 'InstName' ? 'El nombre' : 'El valor'} se ve en el esquemático`}>
+        <label key={r.win} title={t('{p0} is shown on the schematic', { p0: r.attr === 'InstName' ? t('The name') : t('The value') })}>
           <input type="checkbox" checked={!!visible.get(r.win)} onChange={(e) => {
               if (r.attr === 'Value') valueTouched.current = true;
               setVisible(new Map(visible).set(r.win, e.target.checked));
             }} />
-          {r.attr === 'InstName' ? 'Nombre' : 'Valor'}
+          {r.attr === 'InstName' ? t('Name') : t('Value')}
         </label>
       ))}
     </span>
@@ -287,23 +288,23 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   };
 
   const name = eff.get('InstName') ?? baseName(inst.type);
-  const title = `${current ? 'Fuente de corriente' : 'Fuente de tensión'} ${name}`;
+  const title = `${current ? t('Current source') : t('Voltage source')} ${name}`;
 
   if (text !== null)
     return (
       <Modal title={title} onClose={onClose} wide>
         <form className="srcdlg-text" onSubmit={(e) => (e.preventDefault(), submit())}>
           {!parsed && text === [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ') && (
-            <p className="hint">Esta fuente tiene algo que el formulario no sabe editar: se edita como texto.</p>
+            <p className="hint">{t('This source has something the form can\'t edit: it\'s edited as text.')}</p>
           )}
-          <input aria-label="Valor de la fuente" value={text} onChange={(e) => setText(e.target.value)} autoFocus />
-          <p className="hint">Sintaxis de LTspice, por ejemplo: SINE(0 1 1k) AC 1 Rser=1</p>
+          <input aria-label={t('Source value')} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+          <p className="hint">{t('LTspice syntax, for example: SINE(0 1 1k) AC 1 Rser=1')}</p>
           <div className="buttons">
             {showToggles}
             <button
               type="button"
               disabled={!parseSource({ Value: text })}
-              title={parseSource({ Value: text }) ? '' : 'El formulario no sabe editar este valor'}
+              title={parseSource({ Value: text }) ? '' : t('The form can\'t edit this value')}
               onClick={() => {
                 const p = parseSource({ Value: text });
                 if (!p) return;
@@ -312,12 +313,12 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
                 setText(null);
               }}
             >
-              Formulario
+              {t('Form')}
             </button>
             <button type="button" onClick={onAttributes}>Atributos…</button>
             <span className="spacer" />
-            <button type="button" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="primary">Aceptar</button>
+            <button type="button" onClick={onClose}>{t('Cancel')}</button>
+            <button type="submit" className="primary">{t('OK')}</button>
           </div>
         </form>
       </Modal>
@@ -326,7 +327,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   return (
     <Modal title={title} onClose={onClose} wide>
       <form className="srcdlg" onSubmit={(e) => (e.preventDefault(), submit())}>
-        <div className="src-tabs" role="tablist" aria-orientation="vertical" aria-label="Forma de onda">
+        <div className="src-tabs" role="tablist" aria-orientation="vertical" aria-label={t('Waveform')}>
           {KINDS.map((k) => (
             <button
               key={k.kind}
@@ -354,7 +355,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
               {LAYOUT[kind].map((row, i) => (
                 <div className="src-row" key={`${kind}-${i}`}>
                   {row.map((fd, j) => (
-                    <label key={String(fd.key)} title={fd.key === 'duty' ? 'Ciclo útil (duty cycle): (Trise/2 + Ton + Tfall/2) / Período' : isDerived(fd.key) ? 'Calculado a partir de los otros' : undefined}>
+                    <label key={String(fd.key)} title={fd.key === 'duty' ? t('Duty cycle: (Trise/2 + Ton + Tfall/2) / Period') : isDerived(fd.key) ? t('Computed from the others') : undefined}>
                       {fd.label}
                       {unitOf(fd.unit) ? ` [${unitOf(fd.unit)}]` : ''}
                       <LiveInput
@@ -371,21 +372,21 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
                   ))}
                 </div>
               ))}
-              {kind === 'ac' && <p className="hint">Sólo para .ac y .noise: en transitorio y en el punto de operación vale 0 {current ? 'A' : 'V'}.</p>}
+              {kind === 'ac' && <p className="hint">{t('Only for .ac and .noise: in transient and at the operating point it\'s 0')}{' '}{current ? 'A' : 'V'}.</p>}
             </>
           )}
           <details className="src-adv">
-            <summary>{kind === 'ac' ? 'Avanzado: parásitos y sintaxis' : 'Avanzado: AC, DC, parásitos y sintaxis'}</summary>
+            <summary>{kind === 'ac' ? t('Advanced: parasitics and syntax') : t('Advanced: AC, DC, parasitics and syntax')}</summary>
             <div className="src-row">
               {kind !== 'ac' && (
                 <>
                   <label>
-                    Amplitud AC
-                    <input aria-label="Amplitud AC" value={spec.acMag} placeholder="—" onChange={(e) => setSpec({ ...spec, acMag: e.target.value })} />
+                    {t('AC amplitude')}
+                    <input aria-label={t('AC amplitude')} value={spec.acMag} placeholder="—" onChange={(e) => setSpec({ ...spec, acMag: e.target.value })} />
                   </label>
                   <label>
-                    Fase AC [°]
-                    <input aria-label="Fase AC" value={spec.acPhase} placeholder="0" onChange={(e) => setSpec({ ...spec, acPhase: e.target.value })} />
+                    {t('AC phase [°]')}
+                    <input aria-label={t('AC phase')} value={spec.acPhase} placeholder="0" onChange={(e) => setSpec({ ...spec, acPhase: e.target.value })} />
                   </label>
                 </>
               )}
@@ -402,16 +403,16 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
                 </>
               )}
               {kind !== 'dc' && kind !== 'ac' && (
-                <label title="El que usan .op y .dc (si no, el valor de la forma de onda en t = 0)">
-                  DC para .op [{current ? 'A' : 'V'}]
-                  <input aria-label="DC para .op" value={spec.dc} placeholder="—" onChange={(e) => setSpec({ ...spec, dc: e.target.value })} />
+                <label title={t('The one .op and .dc use (otherwise, the waveform\'s value at t = 0)')}>
+                  {t('DC for .op [')}{current ? 'A' : 'V'}]
+                  <input aria-label={t('DC for .op')} value={spec.dc} placeholder="—" onChange={(e) => setSpec({ ...spec, dc: e.target.value })} />
                 </label>
               )}
             </div>
-            <p className="hint">Valor que se guarda en el .asc</p>
+            <p className="hint">{t('Value saved in the .asc')}</p>
             <code className="src-line">{fullLine(full)}</code>
             <div className="buttons left">
-              <button type="button" onClick={() => setText(fullLine(full))}>Editar como texto</button>
+              <button type="button" onClick={() => setText(fullLine(full))}>{t('Edit as text')}</button>
               <button type="button" onClick={onAttributes}>Atributos…</button>
             </div>
           </details>
@@ -419,8 +420,8 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
           <div className="buttons">
             {showToggles}
             <span className="spacer" />
-            <button type="button" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="primary">Aceptar</button>
+            <button type="button" onClick={onClose}>{t('Cancel')}</button>
+            <button type="submit" className="primary">{t('OK')}</button>
           </div>
         </div>
       </form>
@@ -497,7 +498,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
         <Dim x1={xb} x2={xc} y={22} label="Ton" on={on('ton')} />
         <Dim x1={xc} x2={xd} y={22} label="Tf" on={on('tf')} />
         <Dim x1={x0} x2={xa} y={132} label="Td" on={on('td')} />
-        <Dim x1={xa} x2={xe} y={132} label="Período = 1/f" on={on('per')} />
+        <Dim x1={xa} x2={xe} y={132} label={t('Period = 1/f')} on={on('per')} />
       </>
     );
   } else if (spec.kind === 'sine') {
@@ -512,9 +513,9 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     const span = td + 2 * T;
     let d = `M${x0} ${yc}`;
     for (let i = 0; i <= 240; i++) {
-      const t = (span * i) / 240;
-      const y = t < td ? Math.sin(ph) : Math.exp(-th * (t - td)) * Math.sin(2 * Math.PI * fr * (t - td) + ph);
-      d += `L${(x0 + (t / span) * 430).toFixed(1)} ${(yc - A * y).toFixed(1)}`;
+      const tt = (span * i) / 240;
+      const y = tt < td ? Math.sin(ph) : Math.exp(-th * (tt - td)) * Math.sin(2 * Math.PI * fr * (tt - td) + ph);
+      d += `L${(x0 + (tt / span) * 430).toFixed(1)} ${(yc - A * y).toFixed(1)}`;
     }
     const xs = x0 + (td / span) * 430;
     const xp = xs + (T / span) * 430;
@@ -524,7 +525,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
         <Level y={yc} label="Offset" to={505} on={on('off')} />
         <Level y={yc - A} label="+A" to={xs + (T / span) * 107} on={on('amp')} />
         {td > 0 && <Dim x1={x0} x2={xs} y={138} label="Td" on={on('td')} />}
-        <Dim x1={xs} x2={xp} y={18} label="Período = 1/f" on={on('per')} />
+        <Dim x1={xs} x2={xp} y={18} label={t('Period = 1/f')} on={on('per')} />
       </>
     );
   } else if (spec.kind === 'ac') {
@@ -571,25 +572,25 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     const a2 = a2raw || a1;
     const span = t2 + 5 * a2;
     const sc = 430 / span;
-    const X = (t: number) => x0 + t * sc;
+    const X = (tt: number) => x0 + tt * sc;
     const yl = 104;
     const yh = 36;
     let d = `M${x0} ${yl}`;
     for (let i = 0; i <= 240; i++) {
-      const t = (span * i) / 240;
+      const tt = (span * i) / 240;
       let y = 0;
-      if (t > t1) y += 1 - Math.exp(-(t - t1) / a1);
-      if (t > t2) y -= 1 - Math.exp(-(t - t2) / a2);
-      d += `L${X(t).toFixed(1)} ${(yl + (yh - yl) * y).toFixed(1)}`;
+      if (tt > t1) y += 1 - Math.exp(-(tt - t1) / a1);
+      if (tt > t2) y -= 1 - Math.exp(-(tt - t2) / a2);
+      d += `L${X(tt).toFixed(1)} ${(yl + (yh - yl) * y).toFixed(1)}`;
     }
     body = (
       <>
         <path className="wave" d={d} />
         <Level y={yh} label="V2" to={X(t2)} on={on('v2')} />
         <Level y={yl} label="V1" to={x0} on={on('v1')} />
-        {t1 > 0 && <Dim x1={x0} x2={X(t1)} y={130} label="inicio" on={on('td1')} />}
+        {t1 > 0 && <Dim x1={x0} x2={X(t1)} y={130} label={t('start')} on={on('td1')} />}
         <Dim x1={X(t1)} x2={X(t1) + Math.max(30, a1 * sc)} y={20} label="τ↑" on={on('tau1')} />
-        <Dim x1={x0} x2={X(t2)} y={144} label="inicio bajada" on={on('td2')} />
+        <Dim x1={x0} x2={X(t2)} y={144} label={t('fall start')} on={on('td2')} />
         <Dim x1={X(t2)} x2={X(t2) + Math.max(30, a2 * sc)} y={20} label="τ↓" on={on('tau2')} />
       </>
     );
@@ -597,7 +598,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     body = (
       <>
         <path className="wave" d="M70 64H500" />
-        <Level y={64} label="Valor" to={70} on={on('dc')} />
+        <Level y={64} label={t('Value')} to={70} on={on('dc')} />
         <g className="axis">
           <line x1={70} y1={112} x2={500} y2={112} />
           <text x={500} y={128} textAnchor="end">t</text>
@@ -611,8 +612,8 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     const span = 2 / fs;
     let d = 'M70 74';
     for (let i = 0; i <= 600; i++) {
-      const t = (span * i) / 600;
-      d += `L${(70 + (t / span) * 430).toFixed(1)} ${(74 - 40 * Math.sin(2 * Math.PI * fc * t + m * Math.sin(2 * Math.PI * fs * t))).toFixed(1)}`;
+      const tt = (span * i) / 600;
+      d += `L${(70 + (tt / span) * 430).toFixed(1)} ${(74 - 40 * Math.sin(2 * Math.PI * fc * tt + m * Math.sin(2 * Math.PI * fs * tt))).toFixed(1)}`;
     }
     body = (
       <>
@@ -624,7 +625,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     );
   }
   return (
-    <svg className="src-draw" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Forma de onda con sus parámetros">
+    <svg className="src-draw" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('Waveform with its parameters')}>
       {body}
     </svg>
   );
@@ -642,12 +643,12 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
   const setPts = (p: [string, string][]) => setSpec({ ...spec, points: p });
   type Geo = ReturnType<typeof geometry>;
   function geometry(p: [string, string][]) {
-    const nums = p.map(([t, v]) => [spiceNumber(t), spiceNumber(v)]).filter(([t, v]) => isFinite(t) && isFinite(v));
-    const T = Math.max(...nums.map(([t]) => t), 1e-3) * 1.15;
+    const nums = p.map(([tt, v]) => [spiceNumber(tt), spiceNumber(v)]).filter(([tt, v]) => isFinite(tt) && isFinite(v));
+    const T = Math.max(...nums.map(([tt]) => tt), 1e-3) * 1.15;
     const lo = Math.min(0, ...nums.map(([, v]) => v));
     const hi = Math.max(1, ...nums.map(([, v]) => v)) * 1.1;
     return {
-      X: (t: number) => 66 + (t / T) * 430,
+      X: (tt: number) => 66 + (tt / T) * 430,
       Y: (v: number) => 124 - ((v - lo) / (hi - lo)) * 104,
       iX: (x: number) => ((x - 66) / 430) * T,
       iY: (y: number) => lo + ((124 - y) / 104) * (hi - lo),
@@ -666,7 +667,7 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
   useEffect(() => {
     if (sel >= 0) table.current?.querySelectorAll('tbody tr')[sel]?.scrollIntoView({ block: 'nearest' });
   }, [sel]);
-  const valid = pts.map(([t, v], i) => ({ t: spiceNumber(t), v: spiceNumber(v), i })).filter((q) => isFinite(q.t) && isFinite(q.v));
+  const valid = pts.map(([tt, v], i) => ({ t: spiceNumber(tt), v: spiceNumber(v), i })).filter((q) => isFinite(q.t) && isFinite(q.v));
   const order = [...valid].sort((a, b) => a.t - b.t);
   const path = order.length ? `M${geo.X(0)} ${geo.Y(order[0].v)}` + order.map((q) => `L${geo.X(q.t).toFixed(1)} ${geo.Y(q.v).toFixed(1)}`).join('') + 'H505' : '';
   const selPt = valid.find((q) => q.i === sel);
@@ -688,14 +689,14 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
           className="src-draw"
           viewBox={`0 0 ${W} ${H}`}
           role="img"
-          aria-label="Puntos de la forma de onda: click para agregar, arrastrar para mover"
+          aria-label={t('Waveform points: click to add, drag to move')}
           onPointerMove={(e) => {
             if (!drag.current || sel < 0) return;
             const [x, y] = toSvg(e);
-            const t = Math.max(0, drag.current.geo.iX(x));
+            const tt = Math.max(0, drag.current.geo.iX(x));
             const v = drag.current.geo.iY(y);
             drag.current.moved = true;
-            setPts(pts.map((p, j) => (j === sel ? [engNumber(t), String(Number(v.toPrecision(3)))] : p)) as [string, string][]);
+            setPts(pts.map((p, j) => (j === sel ? [engNumber(tt), String(Number(v.toPrecision(3)))] : p)) as [string, string][]);
           }}
           onPointerUp={() => {
             if (!drag.current) return;
@@ -717,9 +718,9 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
             className="src-pwl-hit"
             onClick={(e) => {
               const [x, y] = toSvg(e);
-              const t = geo.iX(x);
-              if (t < 0) return;
-              const s = sorted([...pts, [engNumber(t), String(Number(geo.iY(y).toPrecision(2)))]], pts.length);
+              const tt = geo.iX(x);
+              if (tt < 0) return;
+              const s = sorted([...pts, [engNumber(tt), String(Number(geo.iY(y).toPrecision(2)))]], pts.length);
               setPts(s.p);
               setSel(s.i);
             }}
@@ -742,15 +743,15 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
             />
           ))}
           <text className="src-pwl-tip" x={505} y={144} textAnchor="end">
-            click: agregar · arrastrar: mover
+            {t('click: add · drag: move')}
           </text>
         </svg>
         {box && sel >= 0 && (
           <div className="src-pop" style={box}>
-            t<input aria-label="Tiempo del punto" value={pts[sel][0]} onChange={(e) => set(sel, 0, e.target.value)} />
+            t<input aria-label={t('Point time')} value={pts[sel][0]} onChange={(e) => set(sel, 0, e.target.value)} />
             <span />
-            A<input aria-label="Amplitud del punto" value={pts[sel][1]} onChange={(e) => set(sel, 1, e.target.value)} />
-            <button type="button" aria-label="Quitar punto" title="Quitar punto" onClick={() => remove(sel)}>
+            A<input aria-label={t('Point amplitude')} value={pts[sel][1]} onChange={(e) => set(sel, 1, e.target.value)} />
+            <button type="button" aria-label={t('Remove point')} title={t('Remove point')} onClick={() => remove(sel)}>
               ×
             </button>
           </div>
@@ -761,8 +762,8 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
           <thead>
             <tr>
               <th>#</th>
-              <th>Tiempo [s]</th>
-              <th>Amplitud [{unit}]</th>
+              <th>{t('Time [s]')}</th>
+              <th>{t('Amplitude [')}{unit}]</th>
               <th />
             </tr>
           </thead>
@@ -771,13 +772,13 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
               <tr key={i} className={i === sel ? 'on' : ''} onFocus={() => setSel(i)}>
                 <td>{i + 1}</td>
                 <td>
-                  <input aria-label={`Tiempo ${i + 1}`} value={p[0]} onChange={(e) => set(i, 0, e.target.value)} />
+                  <input aria-label={t('Time {p0}', { p0: i + 1 })} value={p[0]} onChange={(e) => set(i, 0, e.target.value)} />
                 </td>
                 <td>
-                  <input aria-label={`Amplitud ${i + 1}`} value={p[1]} onChange={(e) => set(i, 1, e.target.value)} />
+                  <input aria-label={t('Amplitude {p0}', { p0: i + 1 })} value={p[1]} onChange={(e) => set(i, 1, e.target.value)} />
                 </td>
                 <td>
-                  <button type="button" aria-label={`Quitar punto ${i + 1}`} onClick={() => remove(i)}>
+                  <button type="button" aria-label={t('Remove point {p0}', { p0: i + 1 })} onClick={() => remove(i)}>
                     ×
                   </button>
                 </td>
@@ -787,10 +788,10 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
         </table>
       </div>
       <div className="buttons left">
-        <button type="button" onClick={() => (setPts([...pts, ['', '']]), setSel(pts.length))}>+ Punto</button>
+        <button type="button" onClick={() => (setPts([...pts, ['', '']]), setSel(pts.length))}>{t('+ Point')}</button>
         <CsvImport onPoints={(p) => (setPts(p), setSel(-1))} />
         <label className="src-check">
-          <input type="checkbox" checked={spec.repeat} onChange={(e) => setSpec({ ...spec, repeat: e.target.checked })} /> Repetir
+          <input type="checkbox" checked={spec.repeat} onChange={(e) => setSpec({ ...spec, repeat: e.target.checked })} /> {t('Repeat')}
         </label>
       </div>
     </>
@@ -802,7 +803,7 @@ function CsvImport({ onPoints }: { onPoints(p: [string, string][]): void }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
-      <button type="button" onClick={() => input.current?.click()}>Importar CSV</button>
+      <button type="button" onClick={() => input.current?.click()}>{t('Import CSV')}</button>
       <input
         ref={input}
         type="file"

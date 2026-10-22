@@ -6,6 +6,7 @@ import { serializeAsc } from '../asc/serialize.ts';
 import { findAnalysis, removeAnalysis } from '../schematic/directivesEdit.ts';
 import { analysisLabel, MAX_SIMS, type SimView } from '../sim/simList.ts';
 import { EMPTY_ASC, newId, type Project, type ProjectFile, type Run, type Sim, type Variant } from './turbo.ts';
+import { t } from '../i18n/i18n.ts';
 
 // --- lectura ----------------------------------------------------------------------------------
 
@@ -22,7 +23,7 @@ export function lineOf(asc: string): string {
 }
 
 /** Nombre que se muestra: el propio, o el automático del comando de análisis */
-export const simLabel = (s: Sim, line = lineOf(s.asc)) => s.name || (line ? analysisLabel(line) : 'Sin análisis');
+export const simLabel = (s: Sim, line = lineOf(s.asc)) => s.name || (line ? analysisLabel(line) : t('No analysis'));
 
 export const variantOf = (p: Project, id = p.activeVariant): Variant => p.variants.find((v) => v.id === id) ?? p.variants[0];
 export const simOf = (v: Variant, id = v.activeSim): Sim | undefined => v.sims.find((s) => s.id === id);
@@ -32,7 +33,7 @@ export const activeAsc = (v: Variant) => simOf(v)?.asc ?? v.base;
 
 /** «x», «x (2)», «x (3)»… que no esté entre `taken` (sin distinguir mayúsculas) */
 export function uniqueLabel(name: string, taken: string[]): string {
-  const used = new Set(taken.map((t) => t.trim().toLowerCase()));
+  const used = new Set(taken.map((tt) => tt.trim().toLowerCase()));
   if (!used.has(name.trim().toLowerCase())) return name;
   const base = name.replace(/\s*\(\d+\)$/, '');
   for (let i = 2; ; i++) if (!used.has(`${base} (${i})`.toLowerCase())) return `${base} (${i})`;
@@ -86,7 +87,7 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
   const v = variantOf(p);
   const src = simOf(v, simId);
   if (!src || v.sims.length >= MAX_SIMS) return null;
-  const name = uniqueLabel(`${simLabel(src)} (copia)`, v.sims.map((s) => simLabel(s)));
+  const name = uniqueLabel(t('{p0} (copy)', { p0: simLabel(src) }), v.sims.map((s) => simLabel(s)));
   const s: Sim = { id: newId('s'), name, asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), runs: [] };
   const i = v.sims.indexOf(src);
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims: [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)], activeSim: s.id })), id: s.id };
@@ -115,7 +116,7 @@ export const renameSim = (p: Project, simId: string, name: string): Project =>
 export function recordRun(p: Project, simId: string, asc: string, time = Date.now(), summary?: string): { project: Project; run: Run } {
   const v = variantOf(p);
   const s = simOf(v, simId);
-  if (!s) throw new Error(`No existe la simulación ${simId}`);
+  if (!s) throw new Error(t('Simulation {simId} doesn\'t exist', { simId }));
   const last = s.runs[s.runs.length - 1];
   const run: Run = last && !last.damaged && last.asc === asc ? { ...last, time } : { id: newId('r'), time, asc, ...(summary ? { summary } : {}) };
   const runs = last && run.id === last.id ? [...s.runs.slice(0, -1), run] : [...s.runs, run];
@@ -132,7 +133,7 @@ export function cloneVariant(p: Project, id: string, name?: string): { project: 
   const v: Variant = {
     ...structuredClone(src),
     id: newId('v'),
-    name: name ?? uniqueLabel(`${src.name} (copia)`, p.variants.map((x) => x.name)),
+    name: name ?? uniqueLabel(t('{name} (copy)', { name: src.name }), p.variants.map((x) => x.name)),
   };
   // ids nuevos para las simulaciones (los resultados en memoria van por id)
   const ids = new Map(v.sims.map((s) => [s.id, newId('s')]));
@@ -144,7 +145,7 @@ export function cloneVariant(p: Project, id: string, name?: string): { project: 
 
 /** Variante vacía (sin circuito ni simulaciones), al final y activa */
 export function blankVariant(p: Project, name?: string): { project: Project; id: string } {
-  const v: Variant = { id: newId('v'), name: name ?? uniqueLabel('Variante 1', p.variants.map((x) => x.name)), base: EMPTY_ASC, activeSim: '', sims: [] };
+  const v: Variant = { id: newId('v'), name: name ?? uniqueLabel(t('Variant 1'), p.variants.map((x) => x.name)), base: EMPTY_ASC, activeSim: '', sims: [] };
   return { project: touch({ ...p, variants: [...p.variants, v], activeVariant: v.id }), id: v.id };
 }
 
@@ -221,7 +222,7 @@ export const projectFileKind = (name: string): ProjectFile['kind'] | null =>
 
 /** «x (2).lib», «x (3).lib»… que no esté entre `taken` */
 export function uniqueFileName(name: string, taken: string[]): string {
-  const used = new Set(taken.map((t) => t.toLowerCase()));
+  const used = new Set(taken.map((tt) => tt.toLowerCase()));
   if (!used.has(name.toLowerCase())) return name;
   const m = /^(.*?)(\.[^.]*)?$/.exec(name)!;
   for (let i = 2; ; i++) {

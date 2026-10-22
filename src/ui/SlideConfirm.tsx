@@ -2,8 +2,9 @@
 // suelta antes del final vuelve al principio; con el teclado, flecha derecha / Fin hasta 100.
 import { useState } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
+import { t } from '../i18n/i18n.ts';
 
-export function SlideConfirm({ title, message, action = 'Deslizá para borrar', onConfirm, onClose }: {
+export function SlideConfirm({ title, message, action = t('Slide to delete'), onConfirm, onClose }: {
   title: string;
   message: string;
   action?: string;
@@ -19,7 +20,7 @@ export function SlideConfirm({ title, message, action = 'Deslizá para borrar', 
     <Modal title={title} onClose={onClose}>
       <p>{message}</p>
       <div className="slide-confirm" style={{ ['--slide' as string]: `${v}%` }}>
-        <span className="slide-label">{v >= 100 ? 'Soltá para borrar' : action}</span>
+        <span className="slide-label">{v >= 100 ? t('Release to delete') : action}</span>
         <input
           type="range"
           min={0}
@@ -33,7 +34,7 @@ export function SlideConfirm({ title, message, action = 'Deslizá para borrar', 
         />
       </div>
       <div className="buttons">
-        <button onClick={onClose} autoFocus>Cancelar</button>
+        <button onClick={onClose} autoFocus>{t('Cancel')}</button>
       </div>
     </Modal>
   );

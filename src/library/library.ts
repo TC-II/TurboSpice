@@ -4,6 +4,7 @@ import { parseAsc, parseAsy } from '../asc/parse.ts';
 import { baseName, symbolPath, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import type { SymbolSource, WindowDefaults } from '../asc/resolve.ts';
 import { parseCmp, type CmpKind, type CmpPart } from './cmp.ts';
+import { t } from '../i18n/i18n.ts';
 
 export interface LibraryBundle {
   /** ruta relativa a library/sym sin extensión (p.ej. "TCLib/OA_param2") → texto .asy */
@@ -23,13 +24,13 @@ export const CMP_DIR = 'cmp/';
 /** Prefijo de las rutas de archivos de modelos del usuario en el FS del motor */
 export const USER_PREFIX = 'user/';
 /** Carpeta con que se muestran los símbolos del usuario en el buscador */
-export const USER_DIR = 'Mis símbolos';
+export const USER_DIR = t('My symbols');
 /** Prefijo de los archivos de modelos tomados de la librería de LTspice del usuario (ltspiceLib.ts) */
 export const LTSPICE_PREFIX = 'ltspice/';
 /** Archivos de modelos del proyecto abierto (#155): ganan a los del usuario y a la librería */
 export const PROJECT_PREFIX = 'project/';
 /** Carpeta del buscador (F2) con los símbolos del proyecto */
-export const PROJECT_DIR = 'Proyecto';
+export const PROJECT_DIR = t('Project');
 
 /** Nombres de .subckt y .model definidos en un archivo de modelos */
 export function scanModels(text: string): { subckts: string[]; models: string[] } {

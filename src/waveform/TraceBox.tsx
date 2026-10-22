@@ -2,6 +2,7 @@
 // con el "+" del final. Con el foco en la caja, la punta de prueba escribe en ella en lugar de
 // graficar (para armar expresiones sin tipear los nombres).
 import { useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { t } from '../i18n/i18n.ts';
 
 export interface TraceBoxHandle {
   focus(): void;
@@ -64,15 +65,15 @@ export function TraceBox({ names, onAdd, handle }: {
           list="trace-names"
           value={expr}
           spellCheck={false}
-          placeholder="Agregar traza: V(out)/V(in), I(R1)…"
-          aria-label="Expresión"
-          title="Enter o + agrega la traza (A: ir a la caja). Con el foco acá, click en un nodo o componente del esquemático escribe su nombre"
+          placeholder={t('Add trace: V(out)/V(in), I(R1)…')}
+          aria-label={t('Expression')}
+          title={t('Enter or + adds the trace (A: go to the box). With the focus here, clicking a node or component on the schematic types its name')}
           onChange={(e) => {
             setExpr(e.target.value);
             setError(undefined);
           }}
         />
-        <button type="submit" className="expr-add" aria-label="Agregar traza" title="Agregar la traza (Enter)" disabled={!expr.trim()}>
+        <button type="submit" className="expr-add" aria-label={t('Add trace')} title={t('Add the trace (Enter)')} disabled={!expr.trim()}>
           +
         </button>
       </span>

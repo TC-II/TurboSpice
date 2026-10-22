@@ -4,14 +4,15 @@
 // antihorario (spec §12 de ASC-Parser).
 import type { Point, Shape } from '../asc/model.ts';
 import type { Box } from './geometry.ts';
+import { t } from '../i18n/i18n.ts';
 
 /** Estilos de línea de LTspice (`[style]` al final de la línea): sin estilo = sólida */
 export const LINE_STYLES = [
-  { value: '', label: 'Sólida', dash: undefined },
-  { value: '1', label: 'Guiones', dash: '10 5' },
-  { value: '2', label: 'Puntos', dash: '2 5' },
-  { value: '3', label: 'Raya y punto', dash: '10 5 2 5' },
-  { value: '4', label: 'Raya y dos puntos', dash: '10 5 2 5 2 5' },
+  { value: '', label: t('Solid'), dash: undefined },
+  { value: '1', label: t('Dashes'), dash: '10 5' },
+  { value: '2', label: t('Dots'), dash: '2 5' },
+  { value: '3', label: t('Dash-dot'), dash: '10 5 2 5' },
+  { value: '4', label: t('Dash-dot-dot'), dash: '10 5 2 5 2 5' },
 ] as const;
 
 export const lineDash = (style?: string) => LINE_STYLES.find((s) => s.value === (style ?? ''))?.dash;
@@ -51,8 +52,8 @@ export function shapeOutline(s: Shape): Point[] {
 
 const segDist = (p: Point, a: Point, b: Point) => {
   const l2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-  const t = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2)) : 0;
-  return Math.hypot(p.x - (a.x + t * (b.x - a.x)), p.y - (a.y + t * (b.y - a.y)));
+  const tt = l2 ? Math.max(0, Math.min(1, ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2)) : 0;
+  return Math.hypot(p.x - (a.x + tt * (b.x - a.x)), p.y - (a.y + tt * (b.y - a.y)));
 };
 
 /** Distancia de p al trazo de la figura (sólo el borde: el interior no la elige) */

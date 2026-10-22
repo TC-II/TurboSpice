@@ -283,7 +283,11 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   const [patches, setPatches] = useState(new Map<number, LabelPatch>());
   const focusAttr = rows.find((r) => r.win === focusLabel)?.attr ?? 'Value';
   const first = useRef<HTMLInputElement>(null);
+  // con una tabla de la librería (transistores, diodos…) el cursor arranca en su buscador, salvo
+  // que se haya abierto desde un rótulo
+  const searchFirst = !!parts?.length && focusLabel === undefined;
   useEffect(() => {
+    if (searchFirst) return;
     first.current?.focus();
     first.current?.select();
   }, []);
@@ -316,7 +320,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
       return a.SpiceLine === line && a.Value.toLowerCase() === (eff.get('Value') ?? '').toLowerCase();
     }));
   });
-  const table = !!parts?.length && <PartTable groups={parts} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />;
+  const table = !!parts?.length && <PartTable groups={parts} autoFocus={searchFirst} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />;
   const submit = (from = vals) => {
     const vals = from;
     const check = checkValue(prefix, vals.Value ?? '');

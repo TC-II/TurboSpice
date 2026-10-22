@@ -12,8 +12,10 @@ export interface PartGroup {
   parts: CmpPart[];
 }
 
-export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
+export function PartTable({ groups, selected, onPick, onPickAndAccept, autoFocus }: {
   groups: PartGroup[];
+  /** el cursor arranca en el buscador */
+  autoFocus?: boolean;
   /** nombre de la pieza elegida (para resaltar su fila) */
   selected?: string;
   onPick(p: CmpPart): void;
@@ -51,6 +53,7 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept }: {
         )}
         <input
           type="search"
+          autoFocus={autoFocus}
           aria-label={t('Search the library')}
           placeholder={t('Search {p0} by name or manufacturer', { p0: group.label.toLowerCase() })}
           value={q}

@@ -1,7 +1,7 @@
 // Explorador de componentes (F2): carpetas primero, después los sueltos y al final el contenido de
 // las subcarpetas; Characters sólo entrando a mano.
 import { describe, expect, it } from 'vitest';
-import { pickerItems, type PickerItem } from '../../src/schematic/dialogs.tsx';
+import { pickerItems, searchRank, type PickerItem } from '../../src/schematic/dialogs.tsx';
 
 const PATHS = [
   'Digital/and',
@@ -28,6 +28,15 @@ describe('explorador de componentes', () => {
   it('dentro de una carpeta: subir, subcarpetas (Characters incluida) y sueltos', () => {
     expect(show(pickerItems(PATHS, 'TCLib/Special', '', desc))).toEqual(['..', '[TCLib/Special/Characters]', 'TCLib/Special/arrow']);
     expect(show(pickerItems(PATHS, 'TCLib/Special/Characters', '', desc))).toEqual(['..', 'TCLib/Special/Characters/Goku']);
+  });
+
+  it('la búsqueda ordena por nombre: igual, empieza con, contiene; la descripción al final', () => {
+    const paths = ['EuropeanPolcap', 'lpnp', 'pnp', 'pnp2', 'polcap', 'zener'];
+    const d = (p: string) => (p.endsWith('olcap') ? 'Polarized capacitor (with a zener-like note)' : '');
+    expect(show(pickerItems(paths, '', 'pnp', d))).toEqual(['pnp', 'pnp2', 'lpnp']);
+    expect(show(pickerItems(paths, '', 'ze', d))).toEqual(['zener', 'EuropeanPolcap', 'polcap']);
+    expect(searchRank('Misc/DIAC', '', ['misc'])).toBe(3);
+    expect(searchRank('res', 'Resistor', ['res', 'xyz'])).toBe(Infinity);
   });
 
   it('la búsqueda recorre toda la librería salvo Characters', () => {

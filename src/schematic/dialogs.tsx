@@ -1,5 +1,5 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
@@ -100,7 +100,7 @@ export function Modal({ title, children, onClose, wide, large, hidden }: {
 }
 
 /** Dibujo del símbolo (cuerpo, sin rótulos salvo `labels`), ajustado a su caja */
-function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Library; className: string; labels?: boolean }) {
+const SymbolPreview = memo(function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Library; className: string; labels?: boolean }) {
   const def = lib.symbol(path);
   if (!def) return <svg className={className} />;
   const b = localBox(def, lib.skin(path)?.viewBox);
@@ -116,11 +116,32 @@ function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Li
       </g>
     </svg>
   );
-}
+});
 
 /** Carpetas que no aparecen en la búsqueda ni en el listado (sólo entrando a mano) */
 const HIDDEN_DIRS = ['TCLib/Special/Characters'];
 const hiddenIn = (path: string, dir: string) => HIDDEN_DIRS.some((h) => (path === h || path.startsWith(`${h}/`)) && !(dir === h || dir.startsWith(`${h}/`)));
+
+/**
+ * Qué tan bien coincide un componente con la búsqueda (menor = mejor; Infinity = no coincide).
+ * Manda el nombre: igual, empieza con, contiene; después la carpeta y por último la descripción.
+ * Con varias palabras, todas tienen que aparecer y se suman.
+ */
+export function searchRank(path: string, desc: string, words: string[]): number {
+  const name = (path.split('/').pop() ?? path).toLowerCase();
+  const dir = path.toLowerCase().slice(0, -name.length);
+  const d = desc.toLowerCase();
+  let rank = 0;
+  for (const w of words) {
+    if (name === w) rank += 0;
+    else if (name.startsWith(w)) rank += 1;
+    else if (name.includes(w)) rank += 2;
+    else if (dir.includes(w)) rank += 3;
+    else if (d.includes(w)) rank += 4;
+    else return Infinity;
+  }
+  return rank;
+}
 
 export type PickerItem = { kind: 'up' } | { kind: 'dir'; path: string } | { kind: 'sym'; path: string; desc: string };
 
@@ -135,13 +156,50 @@ export function pickerItems(paths: string[], dir: string, query: string, descOf:
   const visible = paths.filter((p) => !hiddenIn(p, dir));
   const sym = (p: string): PickerItem => ({ kind: 'sym', path: p, desc: descOf(p) });
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length) return visible.map(sym).filter((it) => it.kind === 'sym' && words.every((w) => `${it.path} ${it.desc}`.toLowerCase().includes(w)));
+  if (words.length)
+    return visible
+      .map((p, i) => ({ p, i, rank: searchRank(p, descOf(p), words) }))
+      .filter((x) => Number.isFinite(x.rank))
+      .sort((a, b) => a.rank - b.rank || a.i - b.i)
+      .map((x) => sym(x.p));
   const inside = paths.filter((p) => p.startsWith(prefix));
   const dirs = [...new Set(inside.map((p) => p.slice(prefix.length)).filter((r) => r.includes('/')).map((r) => prefix + r.split('/')[0]))];
   const loose = inside.filter((p) => !p.slice(prefix.length).includes('/'));
   const nested = visible.filter((p) => p.startsWith(prefix) && p.slice(prefix.length).includes('/'));
   return [...(dir ? [{ kind: 'up' } as const] : []), ...dirs.map((d): PickerItem => ({ kind: 'dir', path: d })), ...loose.map(sym), ...nested.map(sym)];
 }
+
+/** Una fila del explorador; memo: al mover el mouse sólo se redibujan las dos que cambian */
+const PickerRow = memo(function PickerRow({ it, index, active, dir, lib, onEnter, onChoose }: {
+  it: PickerItem;
+  index: number;
+  active: boolean;
+  dir: string;
+  lib: Library;
+  onEnter(i: number): void;
+  onChoose(it: PickerItem): void;
+}) {
+  const name = (p: string) => p.split('/').pop() ?? p;
+  // carpeta relativa a la que se está viendo (para los que están más abajo)
+  const sub = it.kind === 'sym' ? it.path.slice(dir ? dir.length + 1 : 0).split('/').slice(0, -1).join('/') : '';
+  return (
+    <li className={`${active ? 'active' : ''}${it.kind !== 'sym' ? ' folder' : ''}`} onPointerEnter={() => onEnter(index)} onClick={() => onChoose(it)}>
+      {it.kind === 'sym' ? (
+        <>
+          <SymbolPreview path={it.path} lib={lib} className="thumb" />
+          <span className="path">{name(it.path)}</span>
+          <span className="desc">{sub ? `${sub} · ` : ''}{it.desc}</span>
+        </>
+      ) : (
+        <>
+          <span className="thumb folder-icon"><Icon name="open" size={22} /></span>
+          <span className="path">{it.kind === 'up' ? '..' : name(it.path)}</span>
+          <span className="desc">{it.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
+        </>
+      )}
+    </li>
+  );
+});
 
 /** F2: buscar y elegir un componente de la librería, o recorrerla por carpetas */
 export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick(path: string): void; onClose(): void }) {
@@ -151,7 +209,12 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
   useEffect(() => input.current?.focus(), []);
-  const items = useMemo(() => pickerItems(lib.symbolPaths(), dir, q, (p) => lib.symbol(p)?.attrs.get('Description') ?? '').slice(0, 500), [q, dir, lib]);
+  // rutas y descripciones se leen una vez; al tipear sólo se filtra y ordena
+  const all = useMemo(() => {
+    const paths = lib.symbolPaths();
+    return { paths, desc: new Map(paths.map((p) => [p, lib.symbol(p)?.attrs.get('Description') ?? ''])) };
+  }, [lib]);
+  const items = useMemo(() => pickerItems(all.paths, dir, q, (p) => all.desc.get(p) ?? '').slice(0, 500), [q, dir, all]);
   const current = items[Math.min(sel, items.length - 1)];
   const go = (d: string) => {
     setDir(d);
@@ -160,8 +223,10 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
     input.current?.focus();
   };
   const up = () => go(dir.split('/').slice(0, -1).join('/'));
-  const choose = (it: PickerItem) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : onPick(it.path));
-  const name = (p: string) => p.split('/').pop() ?? p;
+  // estable entre renders: las filas (memo) no se redibujan al mover el mouse
+  const chooseRef = useRef<(it: PickerItem) => void>(() => {});
+  chooseRef.current = (it) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : onPick(it.path));
+  const choose = useCallback((it: PickerItem) => chooseRef.current(it), []);
   return (
     // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
     <Modal title={t('Component')} onClose={onClose} wide>
@@ -185,26 +250,7 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
           {dir && !q && <div className="picker-dir">{dir}</div>}
           <ul ref={list}>
             {items.map((it, i) => (
-              <li
-                key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`}
-                className={`${it === current ? 'active' : ''}${it.kind !== 'sym' ? ' folder' : ''}`}
-                onPointerEnter={() => setSel(i)}
-                onClick={() => choose(it)}
-              >
-                {it.kind === 'sym' ? (
-                  <>
-                    <SymbolPreview path={it.path} lib={lib} className="thumb" />
-                    <span className="path">{name(it.path)}</span>
-                    <span className="desc">{it.path.slice(dir ? dir.length + 1 : 0).includes('/') ? `${it.path.slice(dir ? dir.length + 1 : 0).split('/').slice(0, -1).join('/')} · ` : ''}{it.desc}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="thumb folder-icon"><Icon name="open" size={22} /></span>
-                    <span className="path">{it.kind === 'up' ? '..' : name(it.path)}</span>
-                    <span className="desc">{it.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
-                  </>
-                )}
-              </li>
+              <PickerRow key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`} it={it} index={i} active={it === current} dir={dir} lib={lib} onEnter={setSel} onChoose={choose} />
             ))}
           </ul>
         </div>

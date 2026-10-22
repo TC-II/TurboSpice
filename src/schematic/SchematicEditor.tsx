@@ -787,13 +787,11 @@ export function SchematicEditor(props: Props) {
     }
     if (drag.mode === 'move' && preview && drag.moved) {
       commit(preview);
-      // al mover se limpian los cables (pueden cambiar de índice): reubicar la selección
+      // al mover se limpian los cables (pueden cambiar de índice): reubicar la selección donde
+      // terminaron los cables seleccionados (trasladados o estirados)
       const g = snapPoint(toDoc(e));
-      const [dx, dy] = [g.x - drag.start.x, g.y - drag.start.y];
-      const moved = drag.refs.flatMap((r) => {
-        const w = r.kind === 'wire' ? doc.wires[r.index] : undefined;
-        return w ? [{ x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }] : [];
-      });
+      const moved: Wire[] = [];
+      moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib, moved);
       if (moved.length) setSelection([...drag.refs.filter((r) => r.kind !== 'wire'), ...wiresOn(preview, moved).map((index) => ({ kind: 'wire' as const, index }))]);
     }
     if (drag.mode === 'vertex' || drag.mode === 'segment') {

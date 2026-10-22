@@ -166,8 +166,10 @@ export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc
  * mueve: los cables no seleccionados que llegan a un punto movido se estiran (en L si eran
  * horizontales o verticales) y donde algo fijo (pin, etiqueta, cable que pasa) tocaba algo
  * movido se agrega un cable en L que los une. Al final se limpian los cables (mergeCollinear).
+ * En `selOut` quedan los tramos donde terminaron los cables seleccionados (para reubicar la
+ * selección: después de limpiar los cables cambian de índice).
  */
-export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, drag: boolean, lib: Library): AscDoc {
+export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, drag: boolean, lib: Library, selOut?: Wire[]): AscDoc {
   if (!dx && !dy) return doc;
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t, sh] = [sel('symbol'), sel('wire'), sel('flag'), sel('text'), sel('shape')];
@@ -187,6 +189,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   const moveWire = (wr: Wire) => {
     const m = shift(wr);
     moved.add(m);
+    selOut?.push(m);
     return m;
   };
   const finish = (wires: Wire[]) =>
@@ -209,9 +212,10 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   const otherSelEnds = (i: number, p: Point) => doc.wires.some((o, j) => j !== i && w.has(j) && ends(o).some((e) => samePt(e, p)));
   const unselEnd = (p: Point) => doc.wires.some((o, j) => !w.has(j) && ends(o).some((e) => samePt(e, p)));
   const pinned = (i: number, p: Point) => unselEnd(p) && !moving.has(key(p)) && !otherSelEnds(i, p);
+  const stretchedSel = new Set<number>();
   doc.wires.forEach((wr, i) => {
     const along = (wr.y1 === wr.y2 && dx !== 0) || (wr.x1 === wr.x2 && dy !== 0);
-    if (w.has(i) && along && ends(wr).some((p) => pinned(i, p))) w.delete(i);
+    if (w.has(i) && along && ends(wr).some((p) => pinned(i, p))) w.delete(i), stretchedSel.add(i);
   });
   doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.set(key(p), p)));
   // …y lo fijo que se apoya en el interior de un cable seleccionado (una T) también lo sigue
@@ -242,7 +246,9 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     const q = sa ? b : a;
     const m = mv(sa ? a : b);
     const c = wr.y1 === wr.y2 ? { x: m.x, y: q.y } : wr.x1 === wr.x2 ? { x: q.x, y: m.y } : m;
+    const from = wires.length;
     pushPath(wires, sa ? [m, c, q] : [q, c, m]);
+    if (stretchedSel.has(i)) selOut?.push(...wires.slice(from));
   });
   for (const p of anchored) {
     const corner = { x: p.x + dx, y: p.y };

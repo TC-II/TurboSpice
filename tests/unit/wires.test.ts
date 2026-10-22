@@ -16,6 +16,7 @@ import {
   duplicateItems,
   mergeCollinear,
   moveItems,
+  wiresOn,
   moveVertex,
   moveVertexStraight,
   pasteItems,
@@ -254,6 +255,25 @@ SYMBOL res 0 0 R0
     expect(ws(m)).toContainEqual([48, -32, 48, 16]);
     expect(ws(m)).toContainEqual([48, 96, 48, 144]);
     expect(ortho(m)).toBe(true);
+    expect(net(m)).toBe(net(d));
+  });
+
+  it('después de arrastrar a lo largo, la selección sigue a los cables estirados', () => {
+    const d = asc(`WIRE -64 -32 16 -32
+WIRE 16 -32 96 -32
+WIRE 16 -32 16 16
+WIRE -64 144 16 144
+WIRE 16 144 96 144
+WIRE 16 96 16 144
+SYMBOL res 0 0 R0
+`);
+    const out: Wire[] = [];
+    const up = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 2 }, { kind: 'wire', index: 5 }], 0, -16, true, lib, out);
+    const sel = wiresOn(up, out).map((index) => ({ kind: 'wire' as const, index }));
+    expect(sel.map((r) => ws(up)[r.index]).sort()).toEqual([[16, -32, 16, 0], [16, 80, 16, 144]]);
+    const m = moveItems(up, [{ kind: 'symbol', index: 0 }, ...sel], -32, 0, true, lib);
+    expect(ws(m)).toContainEqual([-16, -32, -16, 0]);
+    expect(ws(m)).toContainEqual([-16, 80, -16, 144]);
     expect(net(m)).toBe(net(d));
   });
 

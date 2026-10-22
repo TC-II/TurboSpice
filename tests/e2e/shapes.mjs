@@ -41,7 +41,7 @@ await page.evaluate((asc) => {
   dt.items.add(new File([asc], 'figuras.asc', { type: 'text/plain' }));
   window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 }, ASC);
-await page.waitForFunction(() => document.querySelector('.filename')?.textContent === 'figuras.asc');
+await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'figuras');
 
 const svg = page.locator('svg.editor');
 const shapes = svg.locator('.shapes > *');

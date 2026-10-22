@@ -4,10 +4,9 @@
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome } from './lib.mjs';
-import { decode } from '../../src/asc/encoding.ts';
-import { parseAsc } from '../../src/asc/parse.ts';
-import { takeSims } from '../../src/sim/simList.ts';
+import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome, slideToDelete } from './lib.mjs';
+import { lineOf, simOf, variantOf } from '../../src/project/project.ts';
+import { parseTurbo } from '../../src/project/turbo.ts';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -161,13 +160,13 @@ check((await maxOf()).startsWith('5 @'), `con sus resultados en memoria, sin vol
 await simType(page, 'Barrido DC V1 0–2 V');
 check((await chipNames()).join() === 'V(N001)', `la segunda conserva el suyo (${(await chipNames()).join()})`);
 check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxOf()})`);
-// el archivo guarda la lista (en un comentario que TurboSpice no dibuja) y la activa como directiva
+// el proyecto guardado (.turbo, #149) tiene las tres simulaciones, la activa y la vista de cada una
 await page.evaluate(() => delete window.showSaveFilePicker);
 const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
-const savedText = decode(new Uint8Array(readFileSync(await download.path()))).text;
-check(/^TEXT .* !\.dc V1 0 2 0\.01$/m.test(savedText) && /^TEXT .* ;\.sims \S+$/m.test(savedText), 'el .asc guardado tiene la activa y la lista');
-const reopened = takeSims(parseAsc(savedText), '.dc V1 0 2 0.01').sims;
-const views = reopened.items.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join());
+check(download.suggestedFilename() === 'Filtro RC.turbo', `se guarda como proyecto (${download.suggestedFilename()})`);
+const saved = variantOf((await parseTurbo(readFileSync(await download.path(), 'utf8'))).project);
+check(saved.sims.length === 3 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .turbo guardado tiene las tres simulaciones y la activa');
+const views = saved.sims.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');
 // (la primera es el .tran del ejemplo, sin trazas)
 check(views.join(' | ') === ' | V(out) | V(N001)', `la lista del archivo conserva la vista de cada una (${views.join(' | ')})`);
 // y el autoguardado también: al recargar sigue la lista
@@ -181,13 +180,17 @@ await page.getByLabel('Nombre de la simulación').fill('Curva corta');
 await page.getByLabel('Nombre de la simulación').press('Enter');
 check((await page.locator('.simbar .sb-name').textContent()) === 'Curva corta', 'click en el nombre la renombra');
 await page.getByRole('button', { name: 'Borrar simulación' }).click();
-check((await directive()) === '.dc V1 0 5 0.1', 'la × borra la activa y pasa a la otra');
+await slideToDelete(page);
+check((await directive()) === '.dc V1 0 5 0.1', 'la × borra la activa (deslizando) y pasa a la otra');
 // al lado de la fuente, elegirla en el esquemático (como en el menú completo)
 await page.getByRole('button', { name: 'Elegir Fuente 1 en el esquemático' }).click();
 check(await page.locator('.pick-banner').isVisible(), 'el botón de la fuente pide elegirla en el esquemático');
 await page.locator('.pick-banner').getByRole('button', { name: 'Cancelar' }).click();
 // borrar hasta la última: la barra queda vacía y Simular despliega el menú para elegir
-while (await page.getByRole('button', { name: 'Borrar simulación' }).count()) await page.getByRole('button', { name: 'Borrar simulación' }).click();
+while (await page.getByRole('button', { name: 'Borrar simulación' }).count()) {
+  await page.getByRole('button', { name: 'Borrar simulación' }).click();
+  await slideToDelete(page);
+}
 check((await page.locator('.simbar .sb-name').count()) === 0 && (await page.locator('.simbar').textContent()).includes('Seleccionar tipo de simulación') && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'se puede borrar la única: la barra pide elegir un tipo y sale su comando del esquemático');
 await page.getByRole('button', { name: 'Simular', exact: true }).click();
 check(await page.getByRole('menu', { name: 'Tipo de simulación' }).isVisible(), 'sin simulación, Simular despliega el menú');

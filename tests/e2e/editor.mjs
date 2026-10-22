@@ -9,6 +9,9 @@ import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
+import { activeAsc, variantOf } from '../../src/project/project.ts';
+import { parseTurbo } from '../../src/project/turbo.ts';
+import { readZip } from '../../src/project/zip.ts';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -38,6 +41,14 @@ await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 })
 await page.getByRole('button', { name: 'Nuevo' }).click();
 
 const svg = page.locator('svg.editor');
+// la vista se reajusta al documento vacío un cuadro después: esperar a que quede quieta
+await svg.locator('.symbols > g').first().waitFor({ state: 'detached' }).catch(() => {});
+for (let last = '', i = 0; i < 20; i++) {
+  const vb = await svg.getAttribute('viewBox');
+  if (vb === last) break;
+  last = vb;
+  await page.waitForTimeout(100);
+}
 const at = async (x, y) => {
   const box = await svg.boundingBox();
   const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
@@ -45,6 +56,9 @@ const at = async (x, y) => {
 };
 const click = async (x, y) => {
   const p = await at(x, y);
+  // colocar usa la última posición del puntero: primero se mueve, como una persona
+  await page.mouse.move(p.x, p.y);
+  await page.waitForTimeout(30);
   await page.mouse.click(p.x, p.y);
 };
 
@@ -82,8 +96,11 @@ check((await page.locator('svg.editor .symbols > g').count()) === 3, 'tres compo
 // Valores: doble click en R1 y C1
 const setValue = async (x, y, v) => {
   const p = await at(x, y);
+  await page.locator('.modal').waitFor({ state: 'detached' });
+  await page.mouse.move(p.x, p.y);
+  await page.waitForTimeout(100);
   await page.mouse.dblclick(p.x, p.y);
-  await page.locator('.modal label.attr-row input:not([type=checkbox])').nth(1).fill(v);
+  await page.locator('.modal label.attr-row input:not([type=checkbox])').nth(1).fill(v, { timeout: 5000 });
   await page.keyboard.press('Enter');
 };
 await setValue(56, -32, '1k');
@@ -91,11 +108,30 @@ await setValue(96, 0, '1µ');
 const p = await at(0, 56);
 // doble click en la fuente: ventana de configuración (#47). Una fuente nueva arranca en
 // Seno: con Enter ya queda una fuente válida
-await page.mouse.dblclick(p.x, p.y);
 const src = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
+await page.locator('.modal').waitFor({ state: 'detached' });
+await page.mouse.move(p.x, p.y);
+await page.waitForTimeout(100);
+await page.mouse.dblclick(p.x, p.y);
+await src.waitFor({ timeout: 5000 });
 check((await src.getByRole('tab', { selected: true }).textContent()) === 'Seno', 'una fuente nueva abre en Seno');
 await page.keyboard.press('Enter');
-check((await page.locator('svg.editor .sym text', { hasText: /^SINE\(/ }).count()) === 1, 'Enter deja la fuente en SINE(…)');
+// el valor de una fuente que no es DC no se dibuja (#147): se lee en su ventana
+const sourceValue = async () => {
+  // con el foco en la caja de trazas, el click en el esquemático escribe ahí
+  await page.evaluate(() => document.activeElement?.blur?.());
+  // y con la punta de prueba el doble click mide: Esc vuelve a seleccionar
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  const q = await at(0, 56);
+  await page.mouse.dblclick(q.x, q.y);
+  await src.waitFor({ timeout: 5000 });
+  const v = (await src.locator('.src-line').textContent()) ?? '';
+  await page.keyboard.press('Escape');
+  await src.waitFor({ state: 'detached' });
+  return v;
+};
+check(/^SINE\(/.test(await sourceValue()), 'Enter deja la fuente en SINE(…)');
 // …y al pasarla a Pulso el DC no queda como DC para .op
 await page.mouse.dblclick(p.x, p.y);
 await src.getByRole('tab', { name: 'Pulso' }).click();
@@ -117,19 +153,25 @@ await page.keyboard.press('Escape');
 
 // Deshacer / rehacer el último cambio (valor de V1)
 await page.keyboard.press('Control+z');
-const afterUndo = await page.locator('svg.editor').textContent();
-check(!afterUndo.includes('PULSE'), 'Ctrl+Z deshace el último cambio');
+check(!(await sourceValue()).includes('PULSE'), 'Ctrl+Z deshace el último cambio');
 await page.keyboard.press('Control+y');
-check((await page.locator('svg.editor').textContent()).includes('PULSE'), 'Ctrl+Y lo rehace');
+check((await sourceValue()).includes('PULSE'), 'Ctrl+Y lo rehace');
 
-// Guardar (descarga) y verificar el archivo
+// Guardar (descarga): el proyecto .turbo (#149) con el circuito
 const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
 const path = `${OUT}/${download.suggestedFilename()}`;
 await download.saveAs(path);
-const doc = parseAsc(decode(new Uint8Array(readFileSync(path))).text);
+check(path.endsWith('.turbo'), `se guarda como proyecto (${download.suggestedFilename()})`);
+const saved = parseAsc(activeAsc(variantOf((await parseTurbo(readFileSync(path, 'utf8'))).project)));
+check(saved.symbols.length === 3 && saved.flags.length === 2 && saved.texts.length === 1, 'proyecto guardado con 3 símbolos, 2 tierras y 1 directiva');
+// Exportar a LTspice (#157): el .asc del zip, todo explícito
+const [zipDl] = await Promise.all([page.waitForEvent('download'), menu(page, 'Archivo', 'Exportar la variante a LTspice (.zip)')]);
+const entries = await readZip(new Uint8Array(readFileSync(await zipDl.path())));
+const ascEntry = entries.find((e) => e.path.endsWith('.asc'));
+const doc = parseAsc(decode(ascEntry?.data ?? new Uint8Array()).text);
 const lib = new Library(buildBundle());
 const net = ltNetlistText(ltNetlist(doc, lib));
-check(doc.symbols.length === 3 && doc.flags.length === 2 && doc.texts.length === 1, 'archivo guardado con 3 símbolos, 2 tierras y 1 directiva');
+check(doc.symbols.length === 3 && doc.flags.length === 2 && doc.texts.length === 1, `.asc exportado con 3 símbolos, 2 tierras y 1 directiva (${ascEntry?.path})`);
 check(doc.symbols.every((s) => s.windows.has(0) && s.windows.has(3) && s.attrs.has('Value') && s.attrs.has('Prefix')), 'todo explícito (WINDOW 0/3, Value, Prefix)');
 check(/^R1 [NP]\d+ [NP]\d+ 1k$/m.test(net) && /^C1 [NP]\d+ 0 1u$/m.test(net) && /^V1 [NP]\d+ 0 PULSE/m.test(net), `netlist del archivo guardado:\n${net.replace(/^/gm, '    ')}`);
 

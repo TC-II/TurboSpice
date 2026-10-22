@@ -1913,7 +1913,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         {
           label: t('Recent'),
           items: recent.map((r, i) => ({
-            label: `${r.name.replace(/\.asc$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
+            label: `${r.name.replace(/\.(asc|turbo)$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
             title: new Date(r.time).toLocaleString(locale()),
             onClick: () => doRecent(i),
           })),

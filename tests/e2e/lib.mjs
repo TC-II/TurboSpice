@@ -16,7 +16,11 @@ async function pick(page, path) {
     const menus = page.getByRole('menu');
     const item = menus.getByRole('menuitem', { name: label, exact: true }).or(menus.getByRole('menuitemcheckbox', { name: label, exact: true })).last();
     if (i < path.length - 1) await item.hover();
-    else await item.click();
+    else {
+      await item.click();
+      // las simulaciones de la lista esperan un momento por si es un doble clic (renombrar, #151)
+      await page.waitForTimeout(300);
+    }
   }
 }
 
@@ -50,6 +54,15 @@ export async function simCommand(page, label) {
 /** Abre un ejemplo y espera a que esté cargado (nombre en la barra, sin cambios) */
 export async function openExample(page, name) {
   await menu(page, 'Archivo', 'Ejemplos', name.replace(/\.asc$/, ''));
-  const file = name.endsWith('.asc') ? name : `${name}.asc`;
-  await page.waitForFunction((f) => document.querySelector('.filename')?.textContent === f, file);
+  // el .asc se abre como un proyecto con su nombre (la cápsula «Proyecto · Variante», #150)
+  const project = name.replace(/\.asc$/, '');
+  await page.waitForFunction((f) => document.querySelector('.capsule-project')?.textContent === f, project);
+}
+
+/** Borrar con el control deslizante (#150, #151): lo lleva hasta el final con el teclado */
+export async function slideToDelete(page) {
+  const slider = page.locator('.slide-confirm input[type=range]');
+  await slider.focus();
+  await slider.press('End');
+  await page.locator('.slide-confirm').waitFor({ state: 'detached', timeout: 5000 });
 }

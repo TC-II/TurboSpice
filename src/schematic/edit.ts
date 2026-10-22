@@ -201,6 +201,15 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   );
   const stayFlags = new Set<string>();
   doc.flags.forEach((fl, i) => (f.has(i) ? moving.set(key(fl), fl) : stayFlags.add(key(fl))));
+  // Un cable seleccionado cuyo extremo es un codo con un cable no seleccionado (y nada más lo
+  // mueve) no se traslada entero: se estira como si no estuviera seleccionado, así el codo queda
+  // en su lugar y el cable no sobresale (igual que al mover sólo el componente).
+  const otherSelEnds = (i: number, p: Point) => doc.wires.some((o, j) => j !== i && w.has(j) && ends(o).some((e) => samePt(e, p)));
+  const unselEnd = (p: Point) => doc.wires.some((o, j) => !w.has(j) && ends(o).some((e) => samePt(e, p)));
+  const pinned = (i: number, p: Point) => unselEnd(p) && !moving.has(key(p)) && !otherSelEnds(i, p);
+  doc.wires.forEach((wr, i) => {
+    if (w.has(i) && ends(wr).some((p) => pinned(i, p))) w.delete(i);
+  });
   doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.set(key(p), p)));
   // …y lo fijo que se apoya en el interior de un cable seleccionado (una T) también lo sigue
   const selWires = doc.wires.filter((_, i) => w.has(i));

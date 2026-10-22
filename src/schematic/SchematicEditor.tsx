@@ -24,6 +24,7 @@ import {
   textBox,
   visibleText,
   wireVertexAt,
+  fixedPoints,
   sameRef,
   type Box,
   type ItemRef,
@@ -919,12 +920,14 @@ export function SchematicEditor(props: Props) {
   }, [tool, g.x, g.y, lib, ctrlHeld, doc, ...(arcEnd(tool, cursor) ? [cursor.x, cursor.y] : [0, 0])]);
 
   // codos arrastrables de los cables seleccionados
+  // (un extremo de cable es codo si no está sobre un pin o una etiqueta: wireVertexAt con tol 0)
   const vertices = useMemo(() => {
     const out = new Map<string, Point>();
+    const fixed = fixedPoints(doc, lib);
     for (const r of selection) {
       const w = r.kind === 'wire' ? doc.wires[r.index] : undefined;
       if (!w) continue;
-      for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) if (wireVertexAt(doc, e, lib, 0)) out.set(`${e.x},${e.y}`, e);
+      for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) if (!fixed.has(`${e.x},${e.y}`)) out.set(`${e.x},${e.y}`, e);
     }
     return [...out.values()];
   }, [selection, doc, lib]);

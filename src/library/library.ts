@@ -48,6 +48,10 @@ export class Library implements SymbolSource {
   private byPath = new Map<string, string>();
   private byName = new Map<string, string>();
   private cache = new Map<string, SymbolDef>();
+  /** type tal como viene del .asc → su símbolo (se pide miles de veces por render, #182) */
+  private resolved = new Map<string, SymbolDef | undefined>();
+  /** Sube cada vez que cambia qué símbolo resuelve un tipo (para cachés por documento, #183) */
+  rev = 0;
   private cmpCache = new Map<CmpKind, CmpPart[]>();
   /** Símbolos agregados por el usuario o importados de su LTspice (ganan a los del bundle) */
   private extra = new Map<string, string>();
@@ -89,6 +93,18 @@ export class Library implements SymbolSource {
   }
 
   symbol(type: string): SymbolDef | undefined {
+    if (this.resolved.has(type)) return this.resolved.get(type);
+    const def = this.lookup(type);
+    this.resolved.set(type, def);
+    return def;
+  }
+
+  private symbolsChanged(): void {
+    this.resolved.clear();
+    this.rev++;
+  }
+
+  private lookup(type: string): SymbolDef | undefined {
     const name = baseName(type).toLowerCase();
     const proj = this.projSymbols.get(name);
     const extra = proj ?? this.extra.get(name);
@@ -116,6 +132,7 @@ export class Library implements SymbolSource {
     const p = path.toLowerCase();
     this.ltSymbols.set(p, asyText);
     if (!this.ltSymbols.has(baseName(p))) this.ltSymbols.set(baseName(p), asyText);
+    this.symbolsChanged();
   }
 
   /** Archivo de modelos de la librería de LTspice del usuario */
@@ -137,11 +154,13 @@ export class Library implements SymbolSource {
   addSymbol(name: string, asyText: string): void {
     this.extra.set(name.toLowerCase(), asyText);
     this.cache.delete(`extra:${name.toLowerCase()}`);
+    this.symbolsChanged();
   }
 
   removeSymbol(name: string): void {
     this.extra.delete(name.toLowerCase());
     this.cache.delete(`extra:${name.toLowerCase()}`);
+    this.symbolsChanged();
   }
 
   /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
@@ -149,6 +168,7 @@ export class Library implements SymbolSource {
     for (const k of this.projSymbols.keys()) this.cache.delete(`project:${k}`);
     this.projSymbols.clear();
     this.projModels.clear();
+    this.symbolsChanged();
     for (const f of files) {
       if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
       else this.projModels.set(f.name.toLowerCase(), { name: f.name, text: f.text, ...scanModels(f.text) });

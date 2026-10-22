@@ -7,7 +7,7 @@ import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { displayValue, flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
+import { displayValue, flagDirection, fontSize, junctionPoints, pinPoints, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
@@ -194,7 +194,9 @@ export interface CanvasProps {
 }
 
 export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
-  const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
+  // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
+  const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
+  const isSel = (r: ItemRef) => selected.has(`${r.kind}:${r.index}`);
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
   const junctions = junctionPoints(doc, lib);

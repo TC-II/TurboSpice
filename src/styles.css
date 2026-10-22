@@ -213,7 +213,7 @@ svg.editor.tool-move { cursor: move; }
 .sym.hover:not(.sel) { color: var(--sch-hl); }
 .loose rect { stroke: var(--err); stroke-width: 1; fill: none; }
 .flag { color: var(--sch-sym); stroke: currentColor; }
-.flag .flagdot { fill: var(--sch-bg); stroke: var(--sch-wire); }
+.flag .flagdot { fill: var(--sch-bg); stroke: currentColor; }
 .flag text { fill: var(--sch-label); }
 .flag.sel { color: var(--sch-sel); }
 .flag.sel text { fill: var(--sch-sel); }

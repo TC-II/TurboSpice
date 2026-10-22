@@ -10,7 +10,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value NMF
 SYMATTR Prefix Z
-SYMATTR Description MESFET canal N
+SYMATTR Description N-channel MESFET
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

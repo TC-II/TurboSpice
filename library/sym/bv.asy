@@ -10,7 +10,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 96 Left 2
 SYMATTR Value V=F(...)
 SYMATTR Prefix B
-SYMATTR Description Fuente de tensión comportamental
+SYMATTR Description Behavioral voltage source
 PIN 0 16 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

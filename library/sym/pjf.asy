@@ -10,7 +10,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value PJF
 SYMATTR Prefix JP
-SYMATTR Description JFET canal P
+SYMATTR Description P-channel JFET
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

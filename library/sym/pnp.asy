@@ -10,7 +10,7 @@ WINDOW 0 84 32 Left 2
 WINDOW 3 84 68 Left 2
 SYMATTR Value PNP
 SYMATTR Prefix QP
-SYMATTR Description Transistor bipolar PNP
+SYMATTR Description PNP bipolar transistor
 PIN 64 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

@@ -11,7 +11,7 @@ WINDOW 0 36 40 Left 2
 WINDOW 3 36 80 Left 2
 SYMATTR Value L
 SYMATTR Prefix L
-SYMATTR Description Inductor de valor fijo
+SYMATTR Description Fixed-value inductor
 PIN 16 16 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

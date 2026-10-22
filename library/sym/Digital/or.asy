@@ -15,7 +15,7 @@ WINDOW 0 -8 8 Left 2
 WINDOW 3 -8 128 Left 2
 SYMATTR Prefix A
 SYMATTR SpiceModel OR
-SYMATTR Description Compuerta OR (hasta 5 entradas) con salida complementaria
+SYMATTR Description OR gate (up to 5 inputs) with complementary output
 PIN -32 32 NONE 0
 PINATTR PinName a
 PINATTR SpiceOrder 1

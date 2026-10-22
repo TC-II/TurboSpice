@@ -14,7 +14,7 @@ WINDOW 0 48 0 Left 2
 WINDOW 3 48 72 Left 2
 SYMATTR Value TRIAC
 SYMATTR Prefix X
-SYMATTR Description TRIAC: el modelo lo provee el usuario
+SYMATTR Description TRIAC: user-supplied model
 PIN 32 0 NONE 0
 PINATTR PinName MT2
 PINATTR SpiceOrder 1

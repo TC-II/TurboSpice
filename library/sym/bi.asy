@@ -10,7 +10,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 80 Left 2
 SYMATTR Value I=F(...)
 SYMATTR Prefix B
-SYMATTR Description Fuente de corriente comportamental
+SYMATTR Description Behavioral current source
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

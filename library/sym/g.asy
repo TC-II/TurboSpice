@@ -12,7 +12,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 96 Left 2
 SYMATTR Value G
 SYMATTR Prefix G
-SYMATTR Description Fuente de corriente controlada por tensión
+SYMATTR Description Voltage-controlled current source
 PIN 0 96 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

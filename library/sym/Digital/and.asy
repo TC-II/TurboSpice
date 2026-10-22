@@ -17,7 +17,7 @@ WINDOW 0 16 24 Left 2
 WINDOW 3 16 112 Left 2
 SYMATTR Prefix A
 SYMATTR SpiceModel AND
-SYMATTR Description Compuerta AND (hasta 5 entradas) con salida complementaria
+SYMATTR Description AND gate (up to 5 inputs) with complementary output
 PIN -32 32 NONE 0
 PINATTR PinName a
 PINATTR SpiceOrder 1

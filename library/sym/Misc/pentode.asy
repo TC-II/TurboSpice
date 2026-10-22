@@ -17,7 +17,7 @@ WINDOW 0 8 -80 Left 2
 WINDOW 3 -24 80 Left 2
 SYMATTR Value Pentrode
 SYMATTR Prefix X
-SYMATTR Description Pentodo: el modelo lo provee el usuario
+SYMATTR Description Pentode: user-supplied model
 PIN -32 64 NONE 0
 PINATTR PinName Cathode
 PINATTR SpiceOrder 1

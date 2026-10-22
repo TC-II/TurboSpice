@@ -14,7 +14,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value NMOS
 SYMATTR Prefix MN
-SYMATTR Description MOSFET canal N con sustrato explícito
+SYMATTR Description N-channel MOSFET with explicit substrate (bulk) connection
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

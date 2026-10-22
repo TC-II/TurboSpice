@@ -14,7 +14,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value NIGBT
 SYMATTR Prefix Z
-SYMATTR Description IGBT canal N
+SYMATTR Description N-channel IGBT
 PIN 48 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

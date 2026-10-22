@@ -12,7 +12,7 @@ WINDOW 0 16 32 Left 2
 WINDOW 3 16 96 Left 2
 SYMATTR Value opamp2
 SYMATTR Prefix X
-SYMATTR Description Amp. op. con alimentación; Value es el nombre del modelo
+SYMATTR Description Op amp with supply pins; Value is the model name
 PIN -32 80 NONE 0
 PINATTR PinName In+
 PINATTR SpiceOrder 1

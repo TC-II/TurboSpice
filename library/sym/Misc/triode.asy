@@ -13,7 +13,7 @@ WINDOW 0 8 -64 Left 2
 WINDOW 3 -24 64 Left 2
 SYMATTR Value Triode
 SYMATTR Prefix X
-SYMATTR Description Triodo: el modelo lo provee el usuario
+SYMATTR Description Triode: user-supplied model
 PIN 0 -48 NONE 0
 PINATTR PinName Plate
 PINATTR SpiceOrder 1

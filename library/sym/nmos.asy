@@ -13,7 +13,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value NMOS
 SYMATTR Prefix MN
-SYMATTR Description MOSFET canal N
+SYMATTR Description N-channel MOSFET
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

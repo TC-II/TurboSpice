@@ -13,7 +13,7 @@ WINDOW 0 24 4 Left 2
 WINDOW 3 24 64 Left 2
 SYMATTR Value C
 SYMATTR Prefix C
-SYMATTR Description Capacitor polarizado (gráfico europeo)
+SYMATTR Description Polarized capacitor (European symbol)
 PIN 16 0 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

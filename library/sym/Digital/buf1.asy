@@ -10,7 +10,7 @@ WINDOW 0 8 32 Left 2
 WINDOW 3 8 104 Left 2
 SYMATTR Prefix A
 SYMATTR SpiceModel BUF
-SYMATTR Description Buffer digital
+SYMATTR Description Digital buffer
 PIN 0 64 NONE 0
 PINATTR PinName in
 PINATTR SpiceOrder 1

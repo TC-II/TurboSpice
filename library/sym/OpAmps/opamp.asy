@@ -11,7 +11,7 @@ SYMATTR Value opamp
 SYMATTR Prefix X
 SYMATTR SpiceLine Aol=100K
 SYMATTR SpiceLine2 GBW=10Meg
-SYMATTR Description Amp. op. de un polo (Aol, GBW); requiere .lib opamp.sub
+SYMATTR Description Single-pole op amp (Aol, GBW); needs .lib opamp.sub
 PIN -32 48 NONE 0
 PINATTR PinName invin
 PINATTR SpiceOrder 1

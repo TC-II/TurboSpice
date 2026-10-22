@@ -10,7 +10,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 96 Left 2
 SYMATTR Value V
 SYMATTR Prefix V
-SYMATTR Description Fuente de tensión: DC, AC, PULSE, SINE, PWL, EXP o SFFM
+SYMATTR Description Voltage source: DC, AC, PULSE, SINE, PWL, EXP or SFFM
 PIN 0 16 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

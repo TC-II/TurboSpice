@@ -12,7 +12,7 @@ WINDOW 0 0 -16 Bottom 2
 WINDOW 3 0 16 Top 2
 SYMATTR Value Td=50n Z0=50
 SYMATTR Prefix T
-SYMATTR Description Línea de transmisión ideal sin pérdidas
+SYMATTR Description Lossless ideal transmission line
 PIN -48 -16 NONE 0
 PINATTR PinName I1
 PINATTR SpiceOrder 1

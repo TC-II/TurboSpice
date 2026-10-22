@@ -15,7 +15,7 @@ WINDOW 0 72 32 Left 2
 WINDOW 3 72 68 Left 2
 SYMATTR Value LPNP
 SYMATTR Prefix QP
-SYMATTR Description Transistor bipolar PNP lateral con sustrato
+SYMATTR Description Lateral PNP bipolar transistor with substrate
 PIN 64 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

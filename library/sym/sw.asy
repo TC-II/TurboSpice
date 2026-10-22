@@ -8,7 +8,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 96 Left 2
 SYMATTR Value SW
 SYMATTR Prefix S
-SYMATTR Description Llave controlada por tensión
+SYMATTR Description Voltage-controlled switch
 PIN 0 16 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

@@ -9,7 +9,7 @@ WINDOW 0 36 40 Left 2
 WINDOW 3 36 76 Left 2
 SYMATTR Value varistor
 SYMATTR Prefix X
-SYMATTR Description Varistor: el modelo lo provee el usuario
+SYMATTR Description Varistor: user-supplied model
 PIN 16 16 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

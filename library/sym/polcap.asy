@@ -10,7 +10,7 @@ WINDOW 0 24 8 Left 2
 WINDOW 3 24 57 Left 2
 SYMATTR Value C
 SYMATTR Prefix C
-SYMATTR Description Capacitor polarizado
+SYMATTR Description Polarized capacitor
 PIN 16 0 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

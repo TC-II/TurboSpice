@@ -9,7 +9,7 @@ WINDOW 0 36 16 Left 2
 WINDOW 3 36 56 Left 2
 SYMATTR Value URC
 SYMATTR Prefix U
-SYMATTR Description Línea RC distribuida (URC)
+SYMATTR Description Uniform distributed RC line (URC)
 PIN 16 0 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

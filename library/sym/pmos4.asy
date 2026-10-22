@@ -14,7 +14,7 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 SYMATTR Value PMOS
 SYMATTR Prefix MP
-SYMATTR Description MOSFET canal P con sustrato explícito
+SYMATTR Description P-channel MOSFET with explicit substrate (bulk) connection
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

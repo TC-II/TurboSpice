@@ -8,7 +8,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 88 Left 2
 SYMATTR Value CSW
 SYMATTR Prefix W
-SYMATTR Description Llave controlada por corriente
+SYMATTR Description Current-controlled switch
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

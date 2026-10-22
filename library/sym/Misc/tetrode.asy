@@ -15,7 +15,7 @@ WINDOW 0 8 -64 Left 2
 WINDOW 3 -24 80 Left 2
 SYMATTR Value Tetrode
 SYMATTR Prefix X
-SYMATTR Description Tetrodo: el modelo lo provee el usuario
+SYMATTR Description Tetrode: user-supplied model
 PIN 0 -48 NONE 0
 PINATTR PinName Anode
 PINATTR SpiceOrder 1

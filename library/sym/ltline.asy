@@ -18,7 +18,7 @@ WINDOW 0 0 -16 Bottom 2
 WINDOW 3 0 16 Top 2
 SYMATTR Value LTRA
 SYMATTR Prefix O
-SYMATTR Description Línea de transmisión con pérdidas (LTRA)
+SYMATTR Description Lossy transmission line (LTRA)
 PIN -48 -16 NONE 0
 PINATTR PinName I1
 PINATTR SpiceOrder 1

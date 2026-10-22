@@ -10,7 +10,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 80 Left 2
 SYMATTR Value F
 SYMATTR Prefix F
-SYMATTR Description Fuente de corriente controlada por corriente
+SYMATTR Description Current-controlled current source
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

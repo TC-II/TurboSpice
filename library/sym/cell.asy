@@ -10,7 +10,7 @@ WINDOW 0 24 8 Left 2
 WINDOW 3 24 56 Left 2
 SYMATTR Value V
 SYMATTR Prefix V
-SYMATTR Description Pila: fuente de tensión DC, AC, PULSE, SINE, PWL, EXP o SFFM
+SYMATTR Description Cell: DC, AC, PULSE, SINE, PWL, EXP or SFFM voltage source
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

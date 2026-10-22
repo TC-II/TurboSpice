@@ -10,7 +10,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 64 Left 2
 SYMATTR Value D
 SYMATTR Prefix D
-SYMATTR Description Diodo
+SYMATTR Description Diode
 PIN 16 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

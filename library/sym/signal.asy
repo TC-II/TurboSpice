@@ -9,7 +9,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 104 Left 2
 SYMATTR Value SINE(0 1 1K)
 SYMATTR Prefix V
-SYMATTR Description Fuente de señal: DC, AC, PULSE, SINE, PWL, EXP o SFFM
+SYMATTR Description Signal source: DC, AC, PULSE, SINE, PWL, EXP or SFFM
 PIN 0 16 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

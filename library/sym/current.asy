@@ -10,7 +10,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 80 Left 2
 SYMATTR Value I
 SYMATTR Prefix I
-SYMATTR Description Fuente de corriente: DC, AC, PULSE, SINE, PWL, EXP o SFFM
+SYMATTR Description Current source: DC, AC, PULSE, SINE, PWL, EXP or SFFM
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

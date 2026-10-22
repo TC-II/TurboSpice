@@ -12,7 +12,7 @@ WINDOW 0 17 -16 Left 2
 WINDOW 3 25 84 Left 2
 SYMATTR Value I
 SYMATTR Prefix I
-SYMATTR Description Carga: fuente de corriente (consume I de + a -)
+SYMATTR Description Load: current source (draws I from + to -)
 PIN 0 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

@@ -14,7 +14,7 @@ SYMATTR SpiceModel level1
 SYMATTR Value2 Avol=1Meg GBW=10Meg Vos=0
 SYMATTR SpiceLine En=0 Enk=0 In=0 Ink=0 Rin=500Meg
 SYMATTR ModelFile UniversalOpAmp1.lib
-SYMATTR Description Amp. op. universal de un polo (Avol, GBW, Vos), salida sin límites
+SYMATTR Description Universal single-pole op amp (Avol, GBW, Vos), unlimited output
 PIN -32 16 NONE 0
 PINATTR PinName In+
 PINATTR SpiceOrder 1

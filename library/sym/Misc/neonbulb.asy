@@ -17,7 +17,7 @@ SYMATTR ModelFile neonbulb.sub
 SYMATTR SpiceModel neonbulb
 SYMATTR SpiceLine Zon=2K Ihold=200u
 SYMATTR SpiceLine2 Tau=100u
-SYMATTR Description Lámpara de neón
+SYMATTR Description Neon bulb
 PIN 0 -48 NONE 0
 PINATTR PinName V+
 PINATTR SpiceOrder 1

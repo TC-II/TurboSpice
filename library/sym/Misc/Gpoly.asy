@@ -14,7 +14,7 @@ WINDOW 0 24 16 Left 2
 WINDOW 3 24 104 Left 2
 SYMATTR Value POLY()
 SYMATTR Prefix G
-SYMATTR Description Fuente de corriente controlada por un polinomio
+SYMATTR Description Polynomial voltage-controlled current source
 PIN 0 96 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

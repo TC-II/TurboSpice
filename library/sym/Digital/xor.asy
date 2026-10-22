@@ -18,7 +18,7 @@ WINDOW 0 16 24 Left 2
 WINDOW 3 16 112 Left 2
 SYMATTR Prefix A
 SYMATTR SpiceModel XOR
-SYMATTR Description Compuerta XOR: alta si exactamente una entrada está alta
+SYMATTR Description XOR gate: high when exactly one input is high
 PIN -48 32 NONE 0
 PINATTR PinName a
 PINATTR SpiceOrder 1

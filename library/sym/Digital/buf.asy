@@ -13,7 +13,7 @@ WINDOW 0 8 16 Left 2
 WINDOW 3 8 120 Left 2
 SYMATTR Prefix A
 SYMATTR SpiceModel BUF
-SYMATTR Description Buffer digital con salida complementaria
+SYMATTR Description Digital buffer with complementary output
 PIN 0 64 NONE 0
 PINATTR PinName in
 PINATTR SpiceOrder 1

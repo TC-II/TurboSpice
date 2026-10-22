@@ -9,7 +9,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 72 Left 2
 SYMATTR Value C
 SYMATTR Prefix C
-SYMATTR Description Cristal piezoeléctrico: C, Lser y Cpar fijan las resonancias serie y paralelo (es un capacitor)
+SYMATTR Description Piezoelectric crystal: C, Lser and Cpar set the series and parallel resonances (it is a capacitor)
 PIN 16 0 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

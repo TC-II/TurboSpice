@@ -7,7 +7,7 @@ WINDOW 0 31 40 Left 2
 WINDOW 3 31 76 Left 2
 SYMATTR Value R
 SYMATTR Prefix R
-SYMATTR Description Resistencia (gráfico europeo)
+SYMATTR Description Resistor (European symbol)
 PIN 16 16 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

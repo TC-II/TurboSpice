@@ -15,7 +15,7 @@ WINDOW 0 72 32 Left 2
 WINDOW 3 72 68 Left 2
 SYMATTR Value NPN
 SYMATTR Prefix QN
-SYMATTR Description Transistor bipolar NPN con sustrato
+SYMATTR Description NPN bipolar transistor with substrate
 PIN 64 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

@@ -12,7 +12,7 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 72 Left 2
 SYMATTR Value SCR
 SYMATTR Prefix X
-SYMATTR Description Tiristor (SCR): el modelo lo provee el usuario
+SYMATTR Description Thyristor (SCR): user-supplied model
 PIN 16 0 NONE 0
 PINATTR PinName A
 PINATTR SpiceOrder 1

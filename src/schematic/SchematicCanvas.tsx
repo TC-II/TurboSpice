@@ -164,13 +164,15 @@ export interface CanvasProps {
   highlightNet?: string;
   /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
   hoverSymbol?: number;
+  /** color de los cables de las redes con traza (nombre en minúsculas) */
+  netColors?: Map<string, string>;
   /** marcas de pines sueltos (Ctrl+U) */
   showLoose?: boolean;
   /** Ver › Mostrar el comando de simulación */
   showSimCommand?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, showLoose = true, showSimCommand = true }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
@@ -186,6 +188,12 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
     });
   });
 
+  const wireColor = new Map<number, string>();
+  if (netColors?.size) for (const n of conn.nets) {
+    const c = netColors.get(n.name.toLowerCase());
+    if (c) n.wires.forEach((wi) => wireColor.set(wi, c));
+  }
+
   const hl = highlightNet ? conn.nets.find((n) => n.name === highlightNet) : undefined;
 
   return (
@@ -193,7 +201,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="shapes">{doc.shapes.map((s, i) => <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
         {doc.wires.map((w, i) => (
-          <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} className={isSel({ kind: 'wire', index: i }) ? 'sel' : undefined} />
+          <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} className={isSel({ kind: 'wire', index: i }) ? 'sel' : undefined} style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined} />
         ))}
       </g>
       {hl && (

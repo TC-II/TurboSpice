@@ -68,7 +68,7 @@ import { displayName, sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from '
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace } from './waveform/expr.ts';
-import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
 import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
@@ -932,6 +932,16 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
+  // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la traza)
+  const netColors = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of panes) p.traces.forEach((t, i) => {
+      const n = /^V\(([^()]+)\)$/i.exec(t.expr.trim());
+      if (n && !t.hidden && !m.has(n[1].toLowerCase())) m.set(n[1].toLowerCase(), traceColor(t, i));
+    });
+    return m;
+  }, [panes]);
+
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
@@ -1771,7 +1781,7 @@ ${ltNetlistText(sim.built.lt)}
               aria-label="Medir"
               title={sim ? 'Punta de prueba: click en un cable (tensión) o componente (corriente)' : 'Punta de prueba: simulá primero'}
               disabled={!sim}
-              onClick={() => setTool({ kind: 'probe' })}
+              onClick={() => setTool(tool.kind === 'probe' ? { kind: 'select' } : { kind: 'probe' })}
             >
               <Icon name="probe" />
             </button>
@@ -1833,6 +1843,7 @@ ${ltNetlistText(sim.built.lt)}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             highlightNet={traceNet}
+            netColors={netColors}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
             describe={describe}

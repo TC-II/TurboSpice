@@ -88,6 +88,8 @@ interface Props {
   onEditLabel?(sym: number, win: number): void;
   onProbe?(ref: { net?: string; symbol?: number; pin?: number }): void;
   highlightNet?: string;
+  /** color de los cables de cada red (nombre en minúsculas) con una traza en el gráfico */
+  netColors?: Map<string, string>;
   /** etiquetas temporales con los nombres de las redes */
   netNames?: NetName[];
   /** click en una etiqueta temporal de una red sin nombre */
@@ -223,7 +225,7 @@ export function shapeFromClicks(kind: ShapeKind, pts: Point[], style?: string): 
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -968,6 +970,7 @@ export function SchematicEditor(props: Props) {
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverLabel}
+        netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}
       />

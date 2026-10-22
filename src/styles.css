@@ -193,7 +193,7 @@ svg.editor.tool-move { cursor: move; }
 .grid-dot { fill: var(--sch-grid); }
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
-.wires line { stroke: var(--sch-wire); stroke-width: 1.6; }
+.wires line { stroke: var(--sch-sym); stroke-width: 1.6; }
 .shapes > * { stroke: var(--sch-sym); stroke-width: 1.4; }
 .shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }

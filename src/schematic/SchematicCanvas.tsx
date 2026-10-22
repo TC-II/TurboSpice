@@ -1,5 +1,6 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
 import { memo, type ReactNode } from 'react';
+import type { CircuitDiff, Mark } from '../project/diff.ts';
 import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
@@ -71,7 +72,7 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, hideLabels }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, hideLabels, mark }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
@@ -80,9 +81,11 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
   hover?: boolean;
   /** sin rótulos (miniaturas) */
   hideLabels?: boolean;
+  /** cambio contra la corrida anterior (historial, #153) */
+  mark?: Mark | 'removed';
 }) {
   const skin = lib.skin(inst.type);
-  const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}`;
+  const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}${mark ? ` diff-${mark}` : ''}`;
   if (!def) {
     return (
       <g className={cls}>
@@ -149,9 +152,9 @@ const FLAG_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
   right: { align: 'Right', dx: -8, dy: 0 },
 };
 
-export function FlagView({ flag, doc, lib, selected }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean }) {
+export function FlagView({ flag, doc, lib, selected, mark }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean; mark?: Mark }) {
   const dir = flagDirection(doc, flag);
-  const cls = `flag${selected ? ' sel' : ''}`;
+  const cls = `flag${selected ? ' sel' : ''}${mark ? ` diff-${mark}` : ''}`;
   if (flag.name === '0') {
     const gnd = lib.skin('GND');
     return (
@@ -186,9 +189,11 @@ export interface CanvasProps {
   showLoose?: boolean;
   /** Ver › Mostrar el comando de simulación */
   showSimCommand?: boolean;
+  /** cambios contra la corrida anterior (historial, #153): colores y fantasmas de lo quitado */
+  diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const isSel = (r: ItemRef) => selection.some((s) => sameRef(s, r));
 
   // Puntos de unión, como los marca LTspice (spec §8.3)
@@ -217,7 +222,15 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="shapes">{doc.shapes.map((s, i) => <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
         {doc.wires.map((w, i) => (
-          <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} className={isSel({ kind: 'wire', index: i }) ? 'sel' : undefined} style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined} />
+          <line
+            key={i}
+            x1={w.x1}
+            y1={w.y1}
+            x2={w.x2}
+            y2={w.y2}
+            className={isSel({ kind: 'wire', index: i }) ? 'sel' : diff?.wires.has(i) ? `diff-${diff.wires.get(i)}` : undefined}
+            style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined}
+          />
         ))}
       </g>
       {hl && (
@@ -232,9 +245,15 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} />
+          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} mark={diff?.symbols.get(i)} />
         ))}
       </g>
+      {diff && (diff.removed.symbols.length > 0 || diff.removed.wires.length > 0) && (
+        <g className="diff-ghost">
+          {diff.removed.wires.map((w, i) => <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />)}
+          {diff.removed.symbols.map((s, i) => <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} mark="removed" />)}
+        </g>
+      )}
       <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
       <g className="texts">
         {doc.texts.map((full, i) => {
@@ -242,7 +261,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
           return !t ? null : (
           <g
             key={i}
-            className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}`}
+            className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}${diff?.texts.has(i) ? ' diff-changed' : ''}`}
           >
             {t.text.split('\\n').map((line, j) => (
               <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
@@ -254,7 +273,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
         })}
       </g>
       <g className="flags">
-        {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} />)}
+        {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} mark={diff?.flags.get(i)} />)}
       </g>
     </g>
   );

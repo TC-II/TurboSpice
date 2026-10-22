@@ -60,6 +60,8 @@ import {
 import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
+import { HistoryPanel } from './project/HistoryPanel.tsx';
+import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
@@ -263,9 +265,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   onNetlist(): void;
 }) {
   const history = useHistory<AscDoc>(emptyDoc());
-  const doc = history.value;
-  const docRef = useRef(doc);
-  docRef.current = doc;
+  // el circuito que se edita; `doc` es el que se ve (otro mientras se mira una corrida vieja)
+  const liveDoc = history.value;
+  const docRef = useRef(liveDoc);
+  docRef.current = liveDoc;
   const [file, setFile] = useState<FileState>({ name: `Sin título${EXT}` });
   // proyecto (.turbo, #149): variantes y simulaciones, cada una con su circuito. El que se está
   // editando vive en `history` y pasa al proyecto al cambiar de simulación o al guardar (snapshot)
@@ -296,6 +299,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // lista de simulaciones de la variante (#39, #151) y resultados en memoria de las que no se
   // están viendo. El comando de la activa es el del esquemático
   const variant = variantOf(project);
+  // Historial de corridas (#152): con una elegida, el esquemático la muestra en sólo lectura
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [viewRun, setViewRun] = useState('');
+  const curRuns = useMemo(() => simOf(variant)?.runs ?? [], [variant]);
+  const viewed = historyOpen && viewRun ? curRuns.find((r) => r.id === viewRun && !r.damaged) : undefined;
+  const viewedDoc = useMemo(() => (viewed ? parseAsc(viewed.asc) : null), [viewed]);
+  const doc = viewedDoc ?? liveDoc;
+  const viewingRef = useRef(false);
+  viewingRef.current = !!viewedDoc;
+  /** la corrida anterior a la que se ve (o la última, para el actual) */
+  const prevRun = (r?: (typeof curRuns)[number]) => curRuns.slice(0, r ? curRuns.indexOf(r) : curRuns.length).reverse().find((x) => !x.damaged);
+  // cambios contra la corrida anterior (#153): resaltados en el esquemático
+  const historyDiff = useMemo(() => {
+    const prev = historyOpen ? prevRun(viewed) : undefined;
+    return prev ? diffCircuits(parseAsc(prev.asc), doc) : undefined;
+  }, [historyOpen, viewed, curRuns, doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const currentChanges = useMemo(() => {
+    const last = historyOpen ? prevRun() : undefined;
+    return last ? diffCircuits(parseAsc(last.asc), liveDoc).summary : undefined;
+  }, [historyOpen, curRuns, liveDoc]); // eslint-disable-line react-hooks/exhaustive-deps
   const docLine = findAnalysis(doc)?.value ?? '';
   const sims = useMemo(
     (): SimList => ({
@@ -423,6 +446,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const commit = useCallback(
     (next: AscDoc) => {
+      if (viewingRef.current) return setMessage('Es una corrida anterior (sólo lectura): Restore la trae al presente');
       offerValues.current?.(docRef.current, next);
       history.commit(next);
     },
@@ -478,6 +502,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     showView(s?.view);
     setOfferView(null);
     setValueOffer(null);
+    setHistoryOpen(false);
+    setViewRun('');
     setTool({ kind: 'select' });
     setDocKey((k) => k + 1);
     if (s) restoreCached(s.id, s.asc);
@@ -777,6 +803,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   const run = async () => {
+    // se simula el circuito actual (aunque se esté mirando una corrida vieja)
+    const doc = liveDoc;
+    setViewRun('');
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
@@ -784,7 +813,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const id = sims.active;
     // el circuito exacto que se simula queda en el historial de la simulación (#152)
     const simAsc = ascText(doc);
-    if (id) editProject(recordRun(snapshot(), id, simAsc).project);
+    if (id) {
+      const last = prevRun();
+      editProject(recordRun(snapshot(), id, simAsc, Date.now(), last ? diffCircuits(parseAsc(last.asc), doc).summary : undefined).project);
+    }
     try {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
       const built = await buildSimulation(doc, lib, ascName());
@@ -923,6 +955,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     showView(s?.view);
     setSelection([]);
     setValueOffer(null);
+    setViewRun('');
     if (refit) setDocKey((k) => k + 1);
     if (s && !r) restoreCached(s.id, s.asc);
   };
@@ -1004,6 +1037,32 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setFile({ ...file, name: newName, handle: undefined });
     if (file.handle) setMessage(`Al guardar (Ctrl+S) se crea «${newName}»`);
   };
+
+  /** Restore: la corrida pasa a ser el circuito actual (un paso más de deshacer) */
+  const restoreRun = (id: string) => {
+    const r = curRuns.find((x) => x.id === id);
+    if (!r) return;
+    setViewRun('');
+    viewingRef.current = false;
+    setValueOffer(null);
+    history.commit(parseAsc(r.asc));
+    setMessage(`Se trajo al presente la corrida del ${new Date(r.time).toLocaleString()} (Ctrl+Z la deshace)`);
+  };
+  /** Clonar: una simulación nueva con el circuito de esa corrida */
+  const cloneRun = (id: string) => {
+    const r = curRuns.find((x) => x.id === id);
+    if (!r || !curSim) return;
+    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || 'Sin análisis'} (${new Date(r.time).toLocaleString()})`);
+    if (!res) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    enter(res.project);
+    setDirty(true);
+  };
+  const openHistory = (id: string) => {
+    goSim(id);
+    setViewRun('');
+    setHistoryOpen(true);
+  };
+  useEffect(() => setSelection([]), [viewRun]);
 
   /** «Aplicar»: el valor nuevo va a las otras simulaciones, cada una con su paso de deshacer */
   const applyValueOffer = () => {
@@ -1621,6 +1680,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         onClick: () => goSim(x.id),
         rename: { taken: sims.items.filter((y) => y.id !== x.id).map((y) => simName(y)), onRename: (n) => editProject(renameProjectSim(projectRef.current, x.id, n)) },
         actions: [
+          ...(variant.sims.find((y) => y.id === x.id)?.runs.length ? [{ icon: 'clock' as const, label: 'Historial', onClick: () => openHistory(x.id) }] : []),
           { icon: 'copy', label: 'Duplicar', onClick: () => duplicateSim(x.id) },
           { icon: 'trash', label: 'Borrar', onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) },
         ],
@@ -2031,7 +2091,7 @@ ${ltNetlistText(sim.built.lt)}
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div
-          className="canvas-wrap"
+          className={`canvas-wrap${historyOpen && curSim ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
@@ -2063,7 +2123,30 @@ ${ltNetlistText(sim.built.lt)}
             showLoose={showLoose}
             showSimCommand={showSimCommand}
             onHover={setHover}
+            diff={historyDiff}
           />
+          {historyOpen && curSim && (
+            <HistoryPanel
+              sim={simName(curSim) || 'Sin análisis'}
+              runs={curRuns}
+              picked={viewed?.id ?? ''}
+              currentChanges={currentChanges}
+              onPick={setViewRun}
+              onRestore={restoreRun}
+              onClone={cloneRun}
+              onClose={() => {
+                setHistoryOpen(false);
+                setViewRun('');
+              }}
+            />
+          )}
+          {viewed && (
+            <div className="pick-banner history-banner">
+              Corrida del {new Date(viewed.time).toLocaleString()} · sólo lectura
+              <button onClick={() => restoreRun(viewed.id)}>Restore</button>
+              <button onClick={() => setViewRun('')}>Volver al actual</button>
+            </div>
+          )}
           {picking && (
             <div className="pick-banner">
               {picking.what === 'net' ? 'Elegí una red en el esquemático' : picking.what === 'source' ? 'Elegí una fuente (V o I) en el esquemático' : 'Elegí un componente en el esquemático'}

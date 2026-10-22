@@ -1,6 +1,7 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type ShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
@@ -117,6 +118,8 @@ interface Props {
   showSimCommand?: boolean;
   /** elemento bajo el mouse (con la herramienta de selección) y punto de la grilla más cercano; null al salir */
   onHover?(h: { ref: ItemRef | null; at: Point } | null): void;
+  /** cambios contra la corrida anterior (historial, #153) */
+  diff?: CircuitDiff;
 }
 
 interface View {
@@ -230,7 +233,7 @@ export function shapeFromClicks(kind: ShapeKind, pts: Point[], style?: string): 
 
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
-  const { showGrid = true, showLoose = true, showSimCommand = false, onHover } = props;
+  const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -970,6 +973,7 @@ export function SchematicEditor(props: Props) {
         netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}
+        diff={diff}
       />
       <g className="schematic placing">{ghost}</g>
       {tool.kind === 'wire' && tool.start && (

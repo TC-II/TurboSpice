@@ -842,3 +842,41 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .capsule-row-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capsule-row .sc { color: var(--fg-muted); font-size: 12px; }
 .capsule-row .icon-btn:disabled { opacity: 0.3; }
+
+/* ---------- Cambios contra la corrida anterior (#153) ---------- */
+:root { --diff-add: #2b8a3e; --diff-chg: #d9822b; --diff-del: #c92a2a; }
+:root[data-theme='dark'] { --diff-add: #51cf66; --diff-chg: #ffa94d; --diff-del: #ff6b6b; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { --diff-add: #51cf66; --diff-chg: #ffa94d; --diff-del: #ff6b6b; } }
+.sym.diff-added, .flag.diff-added { color: var(--diff-add); }
+.sym.diff-added text.win { fill: var(--diff-add); }
+.sym.diff-changed, .flag.diff-changed { color: var(--diff-chg); }
+.sym.diff-changed text.win { fill: var(--diff-chg); }
+.wires line.diff-added { stroke: var(--diff-add); stroke-width: 2.4; }
+.texts .diff-changed text { fill: var(--diff-chg); }
+.diff-ghost { opacity: 0.55; pointer-events: none; }
+.diff-ghost line { stroke: var(--diff-del); stroke-width: 2; stroke-dasharray: 6 4; }
+.diff-ghost .sym { color: var(--diff-del); stroke-dasharray: 4 3; }
+.diff-ghost .sym text.win { fill: var(--diff-del); }
+
+/* ---------- Historial de corridas (#152) ---------- */
+.canvas-wrap.with-history { padding-right: 280px; }
+.canvas-wrap.with-history .hint-bar { right: 280px; }
+.history-panel { position: absolute; top: 0; right: 0; bottom: 0; width: 280px; display: flex; flex-direction: column; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 4; }
+.history-panel header { display: flex; align-items: center; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); color: var(--fg-muted); }
+.history-title { flex: 1; color: var(--fg); font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-panel header .close { display: inline-flex; padding: 3px; border: 0; background: transparent; color: var(--fg-muted); }
+.history-panel header .close:hover { color: var(--fg); }
+.history-list { flex: 1; overflow-y: auto; padding: 6px; outline: none; }
+.history-list:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent); }
+.history-item { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; }
+.history-item:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.history-item.picked { background: color-mix(in srgb, var(--accent) 18%, var(--bg)); border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.history-item.current .history-when { font-weight: 600; }
+.history-item.damaged { opacity: 0.5; cursor: not-allowed; }
+.history-when { font-size: 13px; font-variant-numeric: tabular-nums; }
+.history-sum { font-size: 12px; color: var(--fg-muted); overflow-wrap: anywhere; }
+.history-actions { display: flex; gap: 6px; margin-top: 4px; }
+.history-actions button { font-size: 12px; padding: 2px 10px; }
+.history-hint { margin: 0; padding: 6px 12px; font-size: 11px; color: var(--fg-muted); border-top: 1px solid var(--border); }
+.history-banner { background: var(--diff-chg); }
+@media (max-width: 700px) { .canvas-wrap.with-history { padding-right: 0; } .history-panel { width: min(280px, 85%); box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }

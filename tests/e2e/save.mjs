@@ -6,7 +6,7 @@
 // VITE_GOOGLE_CLIENT_ID, cualquiera sirve: no se habla con Google)
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
+import { menu, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
@@ -24,6 +24,8 @@ const FOLDER = 'application/vnd.google-apps.folder';
 class FakeDrive {
   files = new Map(); // id → { id, name, mimeType, parents, version, modifiedTime, trashed, data, appProperties }
   log = []; // { method, path, kind }
+  sessions = new Map(); // subidas por partes en curso
+  offline = false;
   failNext = []; // códigos HTTP a devolver en las próximas llamadas que cambian archivos
   delay = 0;
   inflight = 0;
@@ -114,7 +116,8 @@ async function attachDrive(context, fake) {
     const json = (status, body) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     const isUpload = path.startsWith('/upload/');
     const mutating = method !== 'GET';
-    fake.log.push({ method, path, kind: isUpload ? 'upload' : mutating ? 'write' : 'read' });
+    fake.log.push({ method, path, kind: isUpload ? 'upload' : mutating ? 'write' : 'read', resumable: url.searchParams.get('uploadType') === 'resumable' || url.searchParams.has('upload_id') });
+    if (fake.offline) return route.abort('internetdisconnected');
     if (req.headers()['authorization'] === 'Bearer expired') return json(401, { error: { message: 'Invalid Credentials' } });
     if (mutating && fake.failNext.length) {
       const status = fake.failNext.shift();
@@ -147,6 +150,29 @@ async function attachDrive(context, fake) {
           Object.assign(f, JSON.parse(req.postData() ?? '{}'), { version: String(Number(f.version) + 1) });
           return json(200, meta(f));
         }
+      }
+      if ((m = path.match(/^\/drive\/v3\/files\/([^/]+)\/copy$/)) && method === 'POST') {
+        const src = fake.files.get(decodeURIComponent(m[1]));
+        if (!src) return json(404, { error: { message: 'File not found' } });
+        const mm = JSON.parse(req.postData() ?? '{}');
+        const f = fake.add({ name: mm.name ?? `Copy of ${src.name}`, mimeType: src.mimeType, parents: mm.parents ?? src.parents, appProperties: src.appProperties, data: Buffer.from(src.data) });
+        return json(200, meta(f));
+      }
+      // subida por partes (desde 5 MB): 1) metadatos → Location; 2) PUT del contenido a Location
+      if (url.searchParams.has('upload_id') && method === 'PUT') {
+        const up = fake.sessions.get(url.searchParams.get('upload_id'));
+        if (!up) return json(404, { error: { message: 'upload session not found' } });
+        fake.sessions.delete(url.searchParams.get('upload_id'));
+        const data = req.postDataBuffer() ?? Buffer.alloc(0);
+        if (!up.id) return json(200, meta(fake.add({ name: up.meta.name, mimeType: up.meta.mimeType, parents: up.meta.parents ?? [], appProperties: up.meta.appProperties, data })));
+        const f = fake.files.get(up.id);
+        fake.touch(f, { name: up.meta.name, data });
+        return json(200, meta(f));
+      }
+      if ((m = path.match(/^\/upload\/drive\/v3\/files(?:\/([^/]+))?$/)) && url.searchParams.get('uploadType') === 'resumable') {
+        const key = `up${fake.sessions.size + 1}x${Date.now()}`;
+        fake.sessions.set(key, { meta: JSON.parse(req.postData() ?? '{}'), id: m[1] && decodeURIComponent(m[1]) });
+        return route.fulfill({ status: 200, headers: { 'Access-Control-Expose-Headers': 'Location', Location: `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=${key}` }, body: '' });
       }
       if ((m = path.match(/^\/upload\/drive\/v3\/files(?:\/([^/]+))?$/))) {
         const { meta: mm, data } = parseMultipart(req.postDataBuffer(), req.headers()['content-type']);
@@ -387,6 +413,241 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   check(menuItems.some((x) => /Mis simulaciones|My simulations/.test(x)) || true, 'Drive: hay acceso a Mis simulaciones');
   await reopened.keyboard.press('Escape');
   check(!reopened.errors.length && !page.errors.length, `Drive: sin errores en la página${[...page.errors, ...reopened.errors].length ? `: ${[...page.errors, ...reopened.errors].join(' | ')}` : ''}`);
+  await context.close();
+}
+
+// =============================================================================================
+// 1b. «Mis simulaciones»: abrir, renombrar, duplicar, papelera; subida por partes (≥ 5 MB);
+//     dos pestañas con el guardado automático al simular; sin conexión
+// =============================================================================================
+/** contexto con la sesión de Google iniciada y un Drive falso propio */
+async function driveContext(fake) {
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+  await skipWelcome(context);
+  await signedIn(context);
+  await attachDrive(context, fake);
+  return context;
+}
+const openMySims = async (page) => {
+  await menu(page, 'Archivo', 'Mis simulaciones (Google Drive)…');
+  const d = page.getByRole('dialog').filter({ has: page.locator('.drive-browser') });
+  await d.waitFor();
+  await page.waitForFunction(() => !!document.querySelector('.drive-list, .drive-browser .hint + .hint'), null, { timeout: 10000 }).catch(() => {});
+  await page.waitForTimeout(200);
+  return d;
+};
+const listed = (d) => d.locator('.drive-open > span:first-child').allTextContents();
+/** espera a que termine la acción del diálogo (el «Renombrando…», «Duplicando…») */
+const idle = async (d) => {
+  await d.page().waitForTimeout(150);
+  await d.page().waitForFunction(() => !document.querySelector('.drive-browser')?.closest('.modal, [role=dialog]')?.querySelector('.buttons .hint'), null, { timeout: 10000 }).catch(() => {});
+  await d.page().waitForTimeout(150);
+};
+const simulate = async (p) => {
+  await p.locator('[aria-label="Simular"]:enabled').click();
+  await p.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 60000 });
+  await p.waitForTimeout(1500);
+};
+const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Google Drive' });
+
+{
+  const fake = new FakeDrive();
+  const context = await driveContext(fake);
+  const page = await newPage(context);
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  const f = fake.byName('Sample Project.turbo');
+
+  // -- la lista
+  let d = await openMySims(page);
+  check((await listed(d)).join() === 'Sample Project.turbo', `Mis simulaciones: lista el proyecto guardado y no «My symbols and models.json» (${await listed(d)})`);
+  check((await d.locator('li.current').count()) === 1, 'Mis simulaciones: marca el abierto');
+
+  // -- duplicar
+  await d.getByRole('button', { name: 'Duplicar Sample Project.turbo' }).click();
+  await idle(d);
+  const dup = fake.projects().find((x) => x.id !== f.id);
+  check(dup?.name === 'Sample Project (copia).turbo' && dup.data.equals(f.data), `Mis simulaciones: duplicar crea «Sample Project (copia).turbo» con el mismo contenido (${dup?.name})`);
+  check((await listed(d)).length === 2, 'Mis simulaciones: y aparece en la lista');
+  await d.getByRole('button', { name: 'Duplicar Sample Project.turbo' }).click();
+  await idle(d);
+  check(!!fake.byName('Sample Project (copia) (2).turbo'), `Mis simulaciones: duplicar otra vez no pisa la copia (${fake.projects().map((x) => x.name)})`);
+
+  // -- renombrar: el abierto (el nombre del proyecto cambia también) y a un nombre que ya existe
+  page.answers.push('Filtro final');
+  await d.getByRole('button', { name: 'Renombrar Sample Project.turbo' }).click();
+  await idle(d);
+  check(f.name === 'Filtro final.turbo', `Mis simulaciones: renombrar cambia el nombre en Drive (${f.name})`);
+  check((await page.locator('.capsule-project').textContent()) === 'Filtro final', `Mis simulaciones: renombrar el abierto cambia el nombre del proyecto (${await page.locator('.capsule-project').textContent()})`);
+  page.answers.push('Filtro final');
+  await d.getByRole('button', { name: 'Renombrar Sample Project (copia).turbo' }).click();
+  await idle(d);
+  check(/Ya hay un «Filtro final\.turbo»/.test(await d.textContent()) && !!fake.byName('Sample Project (copia).turbo'), 'Mis simulaciones: renombrar a un nombre que ya existe avisa y no cambia nada');
+  // guardar después de renombrar: el mismo archivo, con el nombre nuevo
+  await page.keyboard.press('Escape');
+  await edit(page);
+  const ups = fake.uploads().length;
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await page.waitForTimeout(300);
+  check(fake.uploads().length === ups + 1 && f.name === 'Filtro final.turbo' && project(f.data)?.name === 'Filtro final' && !fake.byName('Sample Project.turbo'), `Mis simulaciones: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`);
+
+  // -- abrir otro desde la lista
+  d = await openMySims(page);
+  await d.getByRole('button', { name: /^Sample Project \(copia\) \(2\)\.turbo/ }).click();
+  await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Sample Project (copia) (2)', null, { timeout: 10000 }).catch(() => {});
+  check((await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)', `Mis simulaciones: abrir carga ese proyecto (${await page.locator('.capsule-project').textContent()}; ${await toast(page)}; ${page.dialogs.slice(-2)})`);
+  const opened = fake.byName('Sample Project (copia) (2).turbo');
+  const openedRev = opened.rev;
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await page.waitForTimeout(300);
+  check(opened.rev !== openedRev && project(fake.byName('Filtro final.turbo').data)?.name === 'Filtro final', 'Mis simulaciones: y guardar va a ese archivo, no al anterior');
+
+  // -- abrir con cambios sin guardar: pregunta; cancelar no abre
+  await edit(page);
+  d = await openMySims(page);
+  page.answers.push(false);
+  await d.getByRole('button', { name: /^Filtro final\.turbo/ }).click();
+  await page.waitForTimeout(500);
+  check((await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'), 'Mis simulaciones: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)');
+
+  // -- papelera, sobre el abierto: cancelar no borra; aceptar sí
+  page.answers.push(false);
+  await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
+  await page.waitForTimeout(300);
+  check(!opened.trashed, 'Mis simulaciones: cancelar la papelera no borra');
+  page.answers.push(true);
+  await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
+  await idle(d);
+  check(opened.trashed && !(await listed(d)).includes('Sample Project (copia) (2).turbo'), 'Mis simulaciones: «a la papelera» la manda a la papelera de Drive y sale de la lista');
+  await page.keyboard.press('Escape');
+  // el que se mandó a la papelera seguía abierto: guardar crea uno nuevo (no escribe en la papelera)
+  const ups2 = fake.uploads().length;
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await page.waitForTimeout(300);
+  const again = fake.byName('Sample Project (copia) (2).turbo');
+  check(fake.uploads().length === ups2 + 1 && fake.uploads().at(-1).method === 'POST' && !!again && again.id !== opened.id, 'Mis simulaciones: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)');
+  check(!page.errors.length, `Mis simulaciones: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
+  await context.close();
+}
+
+// -- subida por partes: un proyecto de más de 5 MB (con un .lib grande en los archivos del proyecto)
+{
+  const fake = new FakeDrive();
+  const context = await driveContext(fake);
+  const page = await newPage(context);
+  const lines = ['* modelos de relleno, con acentos y comillas: ñ «» "x"\n'];
+  for (let i = 0, n = 0; n < 6.5 * 1024 * 1024; i++) {
+    const l = `.model DBIG${i} D(Is=${i}e-15 Rs=0.1 N=1.8 Cjo=2p M=0.33 Vj=0.7 Bv=100 Ibv=1u)\n`;
+    lines.push(l);
+    n += l.length;
+  }
+  const lib = lines.join('');
+  await page.locator('input[type=file][accept*=".lib"]').setInputFiles({ name: 'grande.lib', mimeType: 'text/plain', buffer: Buffer.from(lib, 'utf8') });
+  await page.waitForTimeout(1500);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await page.waitForTimeout(500);
+  const f = fake.byName('Sample Project.turbo');
+  const res = fake.log.filter((l) => l.resumable);
+  check(res.length === 2 && res[0].method === 'POST' && res[1].method === 'PUT', `≥ 5 MB: sube por partes (metadatos + contenido: ${res.map((l) => l.method)}; ${await toast(page)})`);
+  check(f?.data.length > 6 * 1024 * 1024, `≥ 5 MB: el archivo en Drive pesa ${((f?.data.length ?? 0) / 1048576).toFixed(1)} MB`);
+  const p = project(f?.data ?? Buffer.alloc(0));
+  const got = p?.files?.find((x) => x.name === 'grande.lib')?.text ?? '';
+  check(got === lib, '≥ 5 MB: el .lib llega entero y sin cambios (acentos y comillas incluidos)');
+  check(p?.name === 'Sample Project' && f?.mimeType === 'application/json' && f?.appProperties?.turbospice === '1', '≥ 5 MB: con los mismos metadatos que la subida normal');
+  // el segundo guardado, también por partes y sobre el mismo archivo
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await page.waitForTimeout(500);
+  const res2 = fake.log.filter((l) => l.resumable).slice(2);
+  check(res2.length === 2 && res2[0].method === 'PATCH' && res2[0].path.endsWith(`/${f?.id}`) && fake.projects().length === 1, `≥ 5 MB: el segundo guardado reemplaza el mismo archivo por partes (${res2.map((l) => `${l.method} ${l.path}`)})`);
+  // abrirlo de nuevo desde Drive, en otra pestaña
+  const other = await newPage(context);
+  const d = await openMySims(other);
+  await d.getByRole('button', { name: /^Sample Project\.turbo/ }).click();
+  await other.waitForTimeout(2500);
+  check((await other.locator('.capsule-project').textContent()) === 'Sample Project' && !(await dirty(other)) && !other.errors.length, '≥ 5 MB: se vuelve a abrir desde Drive sin errores');
+  check(!page.errors.length, `≥ 5 MB: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
+  await context.close();
+}
+
+// -- dos pestañas sobre el mismo proyecto, con el guardado automático al simular
+{
+  const fake = new FakeDrive();
+  const context = await driveContext(fake);
+  const a = await newPage(context);
+  await edit(a);
+  await save(a);
+  await waitToast(a, /Google Drive/);
+  const f = fake.byName('Sample Project.turbo');
+  // la otra pestaña abre el mismo archivo
+  const b = await newPage(context);
+  const d = await openMySims(b);
+  await d.getByRole('button', { name: /^Sample Project\.turbo/ }).click();
+  await b.waitForTimeout(1500);
+  // A cambia y simula: se guarda solo
+  await edit(a);
+  const ups = fake.uploads().length;
+  await simulate(a);
+  check(fake.uploads().length === ups + 1 && !(await dirty(a)), `Dos pestañas: al simular en A se guarda solo en Drive (${fake.uploads().length - ups} subida)`);
+  const afterA = f.data;
+  // B (con la versión vieja) cambia y simula: el guardado automático NO pisa lo de A
+  await edit(b);
+  await simulate(b);
+  check((await conflictOf(b).count()) === 1, 'Dos pestañas: al simular en B, el guardado automático ve que A lo cambió y pregunta');
+  check(f.data.equals(afterA) && fake.uploads().length === ups + 1, 'Dos pestañas: y no pisa lo que guardó A');
+  check(await dirty(b), 'Dos pestañas: B sigue marcado sin guardar');
+  // B recarga la versión de Drive (la de A)
+  await conflictOf(b).getByRole('button', { name: 'Recargar la de Drive' }).click();
+  await b.waitForTimeout(1500);
+  check(!(await dirty(b)) && (await conflictOf(b).count()) === 0, 'Dos pestañas: «Recargar la de Drive» trae la versión de A');
+  // ahora B, al día, simula y se guarda solo; A, que quedó vieja, pregunta
+  await edit(b);
+  await simulate(b);
+  check(fake.uploads().length === ups + 2 && (await conflictOf(b).count()) === 0, 'Dos pestañas: con la versión al día, B se guarda solo');
+  const afterB = f.data;
+  await edit(a);
+  await simulate(a);
+  check((await conflictOf(a).count()) === 1 && f.data.equals(afterB), 'Dos pestañas: y ahora es A la que pregunta, sin pisar a B');
+  check(!a.errors.length && !b.errors.length, `Dos pestañas: sin errores en la página${[...a.errors, ...b.errors].length ? `: ${[...a.errors, ...b.errors].join(' | ')}` : ''}`);
+  await context.close();
+}
+
+// -- sin conexión: guardar falla con aviso y no se pierde nada; al volver, guarda
+{
+  const fake = new FakeDrive();
+  const context = await driveContext(fake);
+  const page = await newPage(context);
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  const f = fake.byName('Sample Project.turbo');
+  fake.offline = true;
+  await edit(page);
+  const before = f.data;
+  await save(page);
+  check(await waitToast(page, /No se pudo guardar/), `Sin conexión: Ctrl+S avisa que no pudo guardar (${await toast(page)})`);
+  check((await dirty(page)) && f.data.equals(before), 'Sin conexión: queda marcado sin guardar');
+  // simular sin conexión: el motor es local; el guardado automático falla sin romper nada
+  await simulate(page);
+  check(await dirty(page), 'Sin conexión: simular funciona y sigue sin guardar');
+  // la copia local (la sesión, en el navegador) tiene el trabajo: al recargar se recupera
+  const syms = await page.locator('svg.editor .sym').count();
+  fake.offline = false;
+  await page.reload();
+  await page.locator('svg.editor .sym').first().waitFor();
+  await page.waitForTimeout(800);
+  check((await page.locator('svg.editor .sym').count()) === syms && (await dirty(page)), `Sin conexión: al recargar se recupera el trabajo sin guardar (${syms} símbolos; ${await toast(page)})`);
+  await save(page);
+  check(await waitToast(page, /Google Drive/), `Sin conexión: al volver la conexión, Ctrl+S guarda (${await toast(page)})`);
+  await page.waitForTimeout(300);
+  check(!(await dirty(page)) && !f.data.equals(before), 'Sin conexión: y queda guardado');
   await context.close();
 }
 

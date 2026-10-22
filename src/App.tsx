@@ -93,7 +93,7 @@ import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
-import { decode } from './asc/encoding.ts';
+import { decode, decodeText } from './asc/encoding.ts';
 import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
@@ -602,7 +602,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const utf8 = new TextDecoder().decode(bytes);
     if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
       const { project: parsed, warnings } = await parseTurbo(utf8);
-      const p = selectVariant(parsed, parsed.variants.find((v) => v.name === variant)?.id ?? parsed.activeVariant);
+      // el nombre del proyecto es el del archivo (un .turbo duplicado o renombrado en Drive, o
+      // copiado en el disco, todavía tiene adentro el nombre de antes)
+      const named = /\.turbo$/i.test(name) ? { ...parsed, name: projectName(name) } : parsed;
+      const p = selectVariant(named, named.variants.find((v) => v.name === variant)?.id ?? named.activeVariant);
       const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
       loadProject(p, f);
       remember(p, f);
@@ -947,7 +950,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (bytes) return await openBytes(bytes, r.name, at);
       // la copia guardada en recientes
       if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
-      const { project: p, warnings } = await parseTurbo(r.asc);
+      const { project: parsed, warnings } = await parseTurbo(r.asc);
+      const p = { ...parsed, name: projectName(r.name) };
       loadProject(p, { name: r.name, ...at });
       if (r.unsaved) markDirty();
       else remember(p, { name: r.name, ...at });
@@ -1500,7 +1504,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     for (const f of files) {
       const kind = userFileKind(f.name);
       if (!kind) continue;
-      const uf: UserFile = { name: f.name, kind, text: decode(new Uint8Array(await f.arrayBuffer())).text, time: Date.now() };
+      const uf: UserFile = { name: f.name, kind, text: decodeText(new Uint8Array(await f.arrayBuffer())), time: Date.now() };
       const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
       if (i >= 0) next[i] = uf;
       else next.push(uf);
@@ -2735,7 +2739,7 @@ ${ltNetlistText(sim.built.lt)}
           project={project.name}
           files={project.files.map((f) => ({ name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : [] }))}
           hasSymbol={(n) => !!lib.symbol(n)}
-          onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decode(new Uint8Array(await x.arrayBuffer())).text }))))}
+          onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decodeText(new Uint8Array(await x.arrayBuffer())) }))))}
           onRemove={removeProjectFile}
           onMakeSymbol={makeProjectSymbol}
           onClose={() => setDialog(null)}

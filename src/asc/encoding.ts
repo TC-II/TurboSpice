@@ -15,6 +15,23 @@ export function decode(bytes: Uint8Array): { text: string; encoding: AscEncoding
   return { text: new TextDecoder(encoding).decode(bytes), encoding };
 }
 
+/**
+ * Modelos y símbolos (.lib, .sub, .asy…) traídos de afuera: los de LTspice son windows-1252 o
+ * UTF-16LE, pero los de los fabricantes hoy suelen venir en UTF-8. Si los bytes son UTF-8 válido
+ * (con algo fuera de ASCII), se leen así; si no, como LTspice. Un windows-1252 con acentos casi
+ * nunca es UTF-8 válido.
+ */
+export function decodeText(bytes: Uint8Array): string {
+  if (detectEncoding(bytes) === 'windows-1252' && bytes.some((b) => b >= 0x80)) {
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    } catch {
+      // no es UTF-8
+    }
+  }
+  return decode(bytes).text;
+}
+
 // windows-1252: 0x80–0x9F difieren de latin-1
 const CP1252_HIGH = '€\u0081‚ƒ„…†‡ˆ‰Š‹Œ\u008dŽ\u008f\u0090‘’“”•–—˜™š›œ\u009džŸ';
 const CP1252_REVERSE = new Map([...CP1252_HIGH].map((ch, i) => [ch, 0x80 + i]));

@@ -1147,4 +1147,6 @@ export const es: Record<string, string> = {
   's-plane': 'Plano s',
   'Carrier': 'Portadora',
   'Modulating': 'Moduladora',
+  'Up one folder': 'Subir una carpeta',
+  'Folder': 'Carpeta',
 };

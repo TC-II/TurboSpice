@@ -274,7 +274,11 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .picker { grid-template-columns: minmax(0, 1fr) 280px; }
 .picker-list li { align-items: center; }
 .picker-list .thumb { width: 36px; height: 36px; flex: none; }
-.picker-list .path { min-width: 9ch; }
+.picker-list .folder-icon { display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+.picker-list li.folder .path { font-weight: 600; }
+.picker-dir { font: 12px var(--mono); color: var(--fg-muted); }
+.picker-list .path { min-width: 9ch; flex: none; }
+.picker-list .desc { min-width: 0; }
 .picker-preview .big { width: 260px; height: 260px; background: var(--sch-bg); border: 1px solid var(--border); border-radius: 8px; }
 .picker-preview strong { font: 13px var(--mono); color: var(--fg); }
 .picker-preview p { margin: 0; text-align: center; }

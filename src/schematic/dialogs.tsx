@@ -1,6 +1,7 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
+import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
 import { cmpApply, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
@@ -117,21 +118,50 @@ function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Li
   );
 }
 
-/** F2: buscar y elegir un componente de la librería */
+/** Carpetas que no aparecen en la búsqueda ni en el listado (sólo entrando a mano) */
+const HIDDEN_DIRS = ['TCLib/Special/Characters'];
+const hiddenIn = (path: string, dir: string) => HIDDEN_DIRS.some((h) => (path === h || path.startsWith(`${h}/`)) && !(dir === h || dir.startsWith(`${h}/`)));
+
+export type PickerItem = { kind: 'up' } | { kind: 'dir'; path: string } | { kind: 'sym'; path: string; desc: string };
+
+/**
+ * Lo que muestra el explorador de componentes (F2) en la carpeta `dir` ('' = la raíz). Sin
+ * búsqueda: las subcarpetas primero (se abren), después los componentes sueltos de la carpeta y,
+ * más abajo, todo el contenido de sus subcarpetas. Con búsqueda: los componentes de toda la
+ * librería que coinciden. Las carpetas ocultas (Characters) sólo se ven entrando a ellas.
+ */
+export function pickerItems(paths: string[], dir: string, query: string, descOf: (path: string) => string): PickerItem[] {
+  const prefix = dir ? `${dir}/` : '';
+  const visible = paths.filter((p) => !hiddenIn(p, dir));
+  const sym = (p: string): PickerItem => ({ kind: 'sym', path: p, desc: descOf(p) });
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length) return visible.map(sym).filter((it) => it.kind === 'sym' && words.every((w) => `${it.path} ${it.desc}`.toLowerCase().includes(w)));
+  const inside = paths.filter((p) => p.startsWith(prefix));
+  const dirs = [...new Set(inside.map((p) => p.slice(prefix.length)).filter((r) => r.includes('/')).map((r) => prefix + r.split('/')[0]))];
+  const loose = inside.filter((p) => !p.slice(prefix.length).includes('/'));
+  const nested = visible.filter((p) => p.startsWith(prefix) && p.slice(prefix.length).includes('/'));
+  return [...(dir ? [{ kind: 'up' } as const] : []), ...dirs.map((d): PickerItem => ({ kind: 'dir', path: d })), ...loose.map(sym), ...nested.map(sym)];
+}
+
+/** F2: buscar y elegir un componente de la librería, o recorrerla por carpetas */
 export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick(path: string): void; onClose(): void }) {
   const [q, setQ] = useState('');
+  const [dir, setDir] = useState('');
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLUListElement>(null);
   useEffect(() => input.current?.focus(), []);
-  const items = useMemo(() => {
-    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-    return lib
-      .symbolPaths()
-      .map((p) => ({ path: p, desc: lib.symbol(p)?.attrs.get('Description') ?? '' }))
-      .filter((it) => words.every((w) => `${it.path} ${it.desc}`.toLowerCase().includes(w)))
-      .slice(0, 300);
-  }, [q, lib]);
+  const items = useMemo(() => pickerItems(lib.symbolPaths(), dir, q, (p) => lib.symbol(p)?.attrs.get('Description') ?? '').slice(0, 500), [q, dir, lib]);
   const current = items[Math.min(sel, items.length - 1)];
+  const go = (d: string) => {
+    setDir(d);
+    setSel(0);
+    list.current?.scrollTo(0, 0);
+    input.current?.focus();
+  };
+  const up = () => go(dir.split('/').slice(0, -1).join('/'));
+  const choose = (it: PickerItem) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : onPick(it.path));
+  const name = (p: string) => p.split('/').pop() ?? p;
   return (
     // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
     <Modal title={t('Component')} onClose={onClose} wide>
@@ -148,32 +178,47 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') setSel((s) => Math.min(s + 1, items.length - 1));
               if (e.key === 'ArrowUp') setSel((s) => Math.max(s - 1, 0));
-              if (e.key === 'Enter' && current) onPick(current.path);
+              if (e.key === 'Enter' && current) choose(current);
+              if (e.key === 'Backspace' && !q && dir) up();
             }}
           />
-          <ul>
+          {dir && !q && <div className="picker-dir">{dir}</div>}
+          <ul ref={list}>
             {items.map((it, i) => (
               <li
-                key={it.path}
-                className={it === current ? 'active' : undefined}
+                key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`}
+                className={`${it === current ? 'active' : ''}${it.kind !== 'sym' ? ' folder' : ''}`}
                 onPointerEnter={() => setSel(i)}
-                onClick={() => onPick(it.path)}
+                onClick={() => choose(it)}
               >
-                <SymbolPreview path={it.path} lib={lib} className="thumb" />
-                <span className="path">{it.path.split('/').pop()}</span>
-                <span className="desc">{it.path.includes('/') ? `${it.path.split('/').slice(0, -1).join('/')} · ` : ''}{it.desc}</span>
+                {it.kind === 'sym' ? (
+                  <>
+                    <SymbolPreview path={it.path} lib={lib} className="thumb" />
+                    <span className="path">{name(it.path)}</span>
+                    <span className="desc">{it.path.slice(dir ? dir.length + 1 : 0).includes('/') ? `${it.path.slice(dir ? dir.length + 1 : 0).split('/').slice(0, -1).join('/')} · ` : ''}{it.desc}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="thumb folder-icon"><Icon name="open" size={22} /></span>
+                    <span className="path">{it.kind === 'up' ? '..' : name(it.path)}</span>
+                    <span className="desc">{it.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
+                  </>
+                )}
               </li>
             ))}
           </ul>
         </div>
         <div className="picker-preview">
-          {current && <SymbolPreview path={current.path} lib={lib} className="big" labels />}
-          {current && <strong>{current.path}</strong>}
-          {current && <p>{current.desc}</p>}
-          {current && (
-            <p className="pins">
-              {t('Pins:')}{' '}{lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
-            </p>
+          {current?.kind !== 'sym' && <div className="big" />}
+          {current?.kind === 'sym' && (
+            <>
+              <SymbolPreview path={current.path} lib={lib} className="big" />
+              <strong>{current.path}</strong>
+              <p>{current.desc}</p>
+              <p className="pins">
+                {t('Pins:')}{' '}{lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
+              </p>
+            </>
           )}
         </div>
       </div>

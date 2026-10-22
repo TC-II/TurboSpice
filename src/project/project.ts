@@ -97,7 +97,8 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
 export function removeSim(p: Project, simId: string): Project {
   const v = variantOf(p);
   const i = v.sims.findIndex((s) => s.id === simId);
-  if (i < 0) return p;
+  // un proyecto tiene siempre al menos un testbench
+  if (i < 0 || v.sims.length === 1) return p;
   const sims = v.sims.filter((s) => s.id !== simId);
   // la base se queda con el circuito de la última simulación borrada (sin su comando), para no perderlo
   const base = sims.length ? v.base : serializeAsc(removeAnalysis(parseAsc(v.sims[i].asc)));
@@ -107,7 +108,10 @@ export function removeSim(p: Project, simId: string): Project {
 
 /** Nombre propio (vacío: vuelve al automático) */
 export const renameSim = (p: Project, simId: string, name: string): Project =>
-  mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ name: _, ...s }) => (name.trim() ? { ...s, name: name.trim() } : s)));
+  name.trim() ? mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, (s) => ({ ...s, name: name.trim() }))) : p;
+
+/** Nombre libre para un testbench nuevo: «Testbench N» */
+export const freeBenchName = (p: Project) => uniqueLabel(t('Testbench {n}', { n: variantOf(p).sims.length + 1 }), variantOf(p).sims.map((s) => simLabel(s)));
 
 /**
  * Agrega una corrida con el circuito simulado. Si es igual al de la última, sólo se actualiza

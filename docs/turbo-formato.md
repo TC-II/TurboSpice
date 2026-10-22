@@ -1,4 +1,26 @@
-# Formato `.turbo`: proyectos, variantes, simulaciones e historial
+# Formato `.turbo`: proyectos, testbenches, subcircuitos e historial
+
+> **Versión 2 (#180, 22/10/2026).** Un proyecto tiene **testbenches** (cada uno con su propio
+> esquemático y su configuración de simulación) y **archivos comunes** (subcircuitos, símbolos y
+> modelos). Reemplaza a las variantes con varias simulaciones de la versión 1: al abrir un `.turbo`
+> de la versión 1, cada simulación de cada variante pasa a ser un testbench («Variante · Simulación»
+> si había varias variantes; el nombre de la variante si tenía una sola), y una variante sin
+> simulaciones, un testbench con su circuito base.
+>
+> ```
+> Proyecto.turbo
+> ├─ files/          subcircuitos (.asc + su .asy BLOCK), símbolos (.asy) y modelos (.lib/.sub)
+> └─ Testbench       «Bode», «Respuesta al escalón»: su esquemático + su simulación (análisis,
+>    │               estudio, vista del visor) — puede usar los subcircuitos del proyecto
+>    └─ Corridas     historial: el circuito exacto de cada vez que se simuló
+> ```
+>
+> JSON de la versión 2: `"version": 2`, `"activeTestbench": "s1"` y `"testbenches": [{ "id",
+> "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con nombre
+> obligatorio). `files[].kind` puede ser `"symbol"`, `"model"` o `"schematic"` (subcircuito). No hay
+> `variants` ni circuito base. Un proyecto siempre tiene al menos un testbench.
+>
+> El resto de este documento describe la versión 1 (variantes), que se sigue pudiendo abrir.
 
 > Especificación acordada el 22/10/2026. Reemplaza al `.asc` suelto como archivo de trabajo de
 > TurboSpice; el `.asc` sigue siendo el formato de intercambio con LTspice (importar / exportar).

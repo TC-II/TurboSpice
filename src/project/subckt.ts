@@ -128,7 +128,7 @@ export function usages(p: Project, name: string, simLabel: (asc: string, name?: 
   };
   for (const v of p.variants) {
     if (!v.sims.length) scan(v.base, { kind: 'base', variant: v.id, label: v.name });
-    for (const s of v.sims) scan(s.asc, { kind: 'sim', variant: v.id, sim: s.id, label: `${v.name} · ${simLabel(s.asc, s.name)}` });
+    for (const s of v.sims) scan(s.asc, { kind: 'sim', variant: v.id, sim: s.id, label: simLabel(s.asc, s.name) });
   }
   for (const f of subckts(p)) if (key(f.name) !== key(name)) scan(f.text, { kind: 'subckt', name: subName(f.name), label: subName(f.name) });
   return out;

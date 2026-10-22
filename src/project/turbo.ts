@@ -1,16 +1,20 @@
 // Formato .turbo (#149, docs/turbo-formato.md): un JSON con el proyecto entero. Proyecto →
-// variantes → simulaciones (cada una con su .asc completo) → corridas (historial). En el archivo
+// testbenches (cada uno con su esquemático y su configuración de simulación: un .asc completo)
+// → corridas (historial), y los archivos comunes (subcircuitos, símbolos, modelos). La versión 1
+// tenía variantes con varias simulaciones: al leerla, cada simulación pasa a ser un testbench.
+// En memoria el proyecto tiene una sola variante (la de los testbenches) y sus simulaciones son
+// los testbenches (asBenches). En el archivo
 // cada .asc está una sola vez, en `blobs`, con su sha256 como clave; el resto lo nombra por el
 // hash. En memoria no hay hashes: cada simulación y corrida tiene su texto.
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { emptyDoc, type AscDoc } from '../asc/model.ts';
 import { findAnalysis, setAnalysisLine } from '../schematic/directivesEdit.ts';
-import { takeSims, type SimView } from '../sim/simList.ts';
+import { analysisLabel, takeSims, type SimView } from '../sim/simList.ts';
 import { t } from '../i18n/i18n.ts';
 
 export const FORMAT = 'turbospice';
-export const VERSION = 1;
+export const VERSION = 2;
 export const EXT = '.turbo';
 
 /** Símbolo, archivo de modelos o subcircuito (esquemático .asc) del proyecto (común a todas las variantes) */
@@ -71,11 +75,51 @@ export const EMPTY_ASC = serializeAsc(emptyDoc());
 
 export const activeVariant = (p: Project): Variant => p.variants.find((v) => v.id === p.activeVariant) ?? p.variants[0];
 
-/** Proyecto nuevo con una variante vacía */
-export function newProject(name: string, variantName = t('Variant 1')): Project {
+/** Id de la única variante en memoria: la que tiene los testbenches */
+export const BENCHES = 'tb';
+
+/** Testbench nuevo (con un circuito, vacío si no se da) */
+export const newBench = (name: string, asc = EMPTY_ASC): Sim => ({ id: newId('s'), name, asc, runs: [] });
+
+/** Proyecto nuevo con un testbench vacío */
+export function newProject(name: string, benchName = t('Testbench 1')): Project {
   const now = Date.now();
-  const v: Variant = { id: newId('v'), name: variantName, base: EMPTY_ASC, activeSim: '', sims: [] };
-  return { name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] };
+  const b = newBench(benchName);
+  return { name, created: now, modified: now, files: [], activeVariant: BENCHES, variants: [{ id: BENCHES, name, base: EMPTY_ASC, activeSim: b.id, sims: [b] }] };
+}
+
+/**
+ * El proyecto en forma de testbenches: una sola variante cuyas simulaciones son los testbenches,
+ * todos con nombre y uno activo. Un proyecto con variantes (versión 1, o un .asc importado) se
+ * aplana: cada simulación es un testbench («Variante · Simulación» si había varias variantes) y
+ * una variante sin simulaciones, uno con su circuito base.
+ */
+export function asBenches(p: Project): Project {
+  const v0 = p.variants[0];
+  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => s.name) && v0.sims.some((s) => s.id === v0.activeSim)) return p;
+  const several = p.variants.length > 1;
+  const sims: Sim[] = [];
+  const taken = new Set<string>();
+  const unique = (n: string) => {
+    let name = n;
+    for (let i = 2; taken.has(name.toLowerCase()); i++) name = `${n} (${i})`;
+    taken.add(name.toLowerCase());
+    return name;
+  };
+  let active = '';
+  for (const v of p.variants) {
+    const list = v.sims.length ? v.sims : [{ id: newId('s'), asc: v.base, runs: [] } as Sim];
+    for (const s of list) {
+      const line = findAnalysis(parseAsc(s.asc))?.value;
+      const own = s.name || (line ? analysisLabel(line) : t('No analysis'));
+      // los testbenches ya existentes conservan su nombre; de una variante (versión 1 o un .asc
+      // importado) con una sola simulación, el nombre es el de la variante
+      const name = unique(v.id === BENCHES ? own : !v.sims.length || (several && v.sims.length === 1) ? v.name : several ? `${v.name} · ${own}` : own);
+      sims.push({ ...s, name });
+      if (v.id === p.activeVariant && (s.id === v.activeSim || !active)) active = s.id;
+    }
+  }
+  return { ...p, activeVariant: BENCHES, variants: [{ id: BENCHES, name: p.name, base: EMPTY_ASC, activeSim: active || sims[0].id, sims }] };
 }
 
 /** Nombre del proyecto a partir del archivo: sin .turbo ni .asc */
@@ -99,12 +143,12 @@ export function variantFromAsc(doc: AscDoc, name: string): Variant {
   return { id: newId('v'), name, base: serializeAsc(clean), activeSim: list[Math.max(0, active)]?.id ?? '', sims: list };
 }
 
-/** Proyecto con una sola variante, «Variante 1»: la del .asc (al abrir un .asc de LTspice) */
+/** Proyecto a partir de un .asc de LTspice: un testbench por simulación de su lista (o uno solo) */
 export function projectFromAsc(doc: AscDoc, fileName: string): Project {
   const name = projectName(fileName);
-  const v = variantFromAsc(doc, t('Variant 1'));
+  const v = variantFromAsc(doc, name);
   const now = Date.now();
-  return { name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] };
+  return asBenches({ name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] });
 }
 
 // --- archivo -------------------------------------------------------------------------------------
@@ -123,13 +167,6 @@ interface FileSim {
   view?: SimView;
   runs: FileRun[];
 }
-interface FileVariant {
-  id: string;
-  name: string;
-  base: Hash;
-  activeSim: string;
-  sims: FileSim[];
-}
 interface TurboJson {
   format: typeof FORMAT;
   version: number;
@@ -137,8 +174,8 @@ interface TurboJson {
   created: string;
   modified: string;
   files: ProjectFile[];
-  activeVariant: string;
-  variants: FileVariant[];
+  activeTestbench: string;
+  testbenches: FileSim[];
   blobs: Record<Hash, string>;
 }
 
@@ -169,16 +206,13 @@ export async function serializeTurbo(p: Project): Promise<string> {
     }
     return h;
   };
-  const variants: FileVariant[] = [];
-  for (const v of p.variants) {
-    const sims: FileSim[] = [];
-    for (const s of v.sims) {
-      const runs: FileRun[] = [];
-      // una corrida dañada no tiene texto que guardar: se pierde (ya avisó al abrir)
-      for (const r of s.runs) if (!r.damaged) runs.push({ id: r.id, time: new Date(r.time).toISOString(), asc: await blob(r.asc), ...(r.summary ? { summary: r.summary } : {}) });
-      sims.push({ id: s.id, ...(s.name ? { name: s.name } : {}), current: await blob(s.asc), ...(s.view ? { view: s.view } : {}), runs });
-    }
-    variants.push({ id: v.id, name: v.name, base: await blob(v.base), activeSim: v.activeSim, sims });
+  const v = asBenches(p).variants[0];
+  const testbenches: FileSim[] = [];
+  for (const s of v.sims) {
+    const runs: FileRun[] = [];
+    // una corrida dañada no tiene texto que guardar: se pierde (ya avisó al abrir)
+    for (const r of s.runs) if (!r.damaged) runs.push({ id: r.id, time: new Date(r.time).toISOString(), asc: await blob(r.asc), ...(r.summary ? { summary: r.summary } : {}) });
+    testbenches.push({ id: s.id, ...(s.name ? { name: s.name } : {}), current: await blob(s.asc), ...(s.view ? { view: s.view } : {}), runs });
   }
   const json: TurboJson = {
     format: FORMAT,
@@ -187,8 +221,8 @@ export async function serializeTurbo(p: Project): Promise<string> {
     created: new Date(p.created).toISOString(),
     modified: new Date(p.modified).toISOString(),
     files: p.files,
-    activeVariant: p.activeVariant,
-    variants,
+    activeTestbench: v.activeSim,
+    testbenches,
     blobs,
   };
   return JSON.stringify(json, null, 1);
@@ -227,6 +261,12 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   }
   if (!isObj(raw) || raw.format !== FORMAT) throw new Error(t('Not a TurboSpice file'));
   if (typeof raw.version !== 'number' || raw.version > VERSION) throw new Error(t('.turbo from a newer version ({p0}): update TurboSpice', { p0: String(raw.version) }));
+  // versión 2: testbenches; se leen como una variante cuyas simulaciones son los testbenches
+  const v2 = raw.version >= 2;
+  if (v2) {
+    if (!Array.isArray(raw.testbenches) || !raw.testbenches.length) throw new Error(t('invalid .turbo: it has no testbenches'));
+    raw.variants = [{ id: BENCHES, name: raw.name, activeSim: raw.activeTestbench, sims: raw.testbenches }];
+  }
   if (!Array.isArray(raw.variants) || !raw.variants.length) throw new Error(t('invalid .turbo: it has no variants'));
   const blobsIn = isObj(raw.blobs) ? raw.blobs : {};
   const warnings: string[] = [];
@@ -256,7 +296,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
       });
       const damagedRuns = runs.filter((r) => r.damaged).length;
       const name = typeof sr.name === 'string' && sr.name ? sr.name : undefined;
-      const label = `«${vname}${name ? ` · ${name}` : ''}»`;
+      const label = v2 ? `«${name ?? vname}»` : `«${vname}${name ? ` · ${name}` : ''}»`;
       if (damagedRuns) warnings.push(`${label}: ${damagedRuns === 1 ? t('one run in the history is damaged') : t('{damagedRuns} runs in the history are damaged', { damagedRuns })}`);
       let asc = get(sr.current);
       if (asc === null) {
@@ -265,7 +305,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
       }
       return { id, ...(name ? { name } : {}), asc, ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}), runs };
     });
-    let base = get(vr.base);
+    let base = v2 ? EMPTY_ASC : get(vr.base);
     if (base === null) {
       base = sims[0]?.asc ?? EMPTY_ASC;
       warnings.push(t('«{vname}»: the base circuit is damaged; recovered {p1}', { vname, p1: sims.length ? t('the one from its first simulation') : t('empty') }));
@@ -275,7 +315,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   });
   const activeVariant = typeof raw.activeVariant === 'string' && variants.some((v) => v.id === raw.activeVariant) ? raw.activeVariant : variants[0].id;
   return {
-    project: { name: str(raw.name, t('the project name')), created: time(raw.created), modified: time(raw.modified), files, activeVariant, variants },
+    project: asBenches({ name: str(raw.name, t('the project name')), created: time(raw.created), modified: time(raw.modified), files, activeVariant, variants }),
     warnings,
   };
 }

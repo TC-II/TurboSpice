@@ -961,3 +961,4 @@ button.hier-tab { padding-right: 10px; }
 .quick-open li > button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .quick-open li.tree-meta { padding: 6px 10px; }
 @media (max-width: 700px) { .canvas-wrap.with-tree { padding-left: 0; } .canvas-wrap.with-tree .hint-bar { left: 0; } .project-tree { box-shadow: 4px 0 16px rgb(0 0 0 / 20%); } }
+.err-text { color: var(--err); font-size: 12px; margin: 0; }

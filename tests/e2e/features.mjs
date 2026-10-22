@@ -52,7 +52,7 @@ check(toolbarNames.includes('Medir') && toolbarNames.includes('Anotar OP'), 'la 
 const views = page.getByRole('navigation', { name: 'Vistas' });
 check((await views.getByRole('button').allTextContents()).join() === 'Esquemático,Resultados' && (await views.getByRole('button', { name: 'Resultados' }).isDisabled()), 'arriba, Esquemático y Resultados (deshabilitado sin resultados)');
 await page.getByRole('button', { name: 'Tipo de simulación', exact: true }).click();
-const simMenu = await page.getByRole('menu').getByRole('menuitem').allTextContents();
+const simMenu = await page.getByRole('menu').locator('[role^=menuitem]').allTextContents();
 await page.keyboard.press('Escape');
 check(
   simMenu.includes('Barrido DC') && simMenu.includes('Comando de simulación…A') && simMenu.includes('Directiva SPICE….') && simMenu.includes('Estudio…Alt+E') && !simMenu.some((x) => /Nueva|Duplicar|Renombrar/.test(x)),

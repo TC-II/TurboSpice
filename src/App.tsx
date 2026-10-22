@@ -38,14 +38,11 @@ import {
   activeAsc,
   addSim as addProjectSim,
   applyValues,
-  blankVariant,
-  cloneVariant,
+  freeBenchName,
   mergeFiles,
   projectFileKind,
   duplicateSim as duplicateProjectSim,
   removeVariant,
-  renameVariant,
-  selectVariant,
   lineOf,
   recordRun,
   removeSim as removeProjectSim,
@@ -63,7 +60,7 @@ import {
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { exportAllZip, exportVariantZip, importEntries } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
-import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
+import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
@@ -75,7 +72,7 @@ import { addFlag, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteIte
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { HierBar, ProjectTree, QuickOpen, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { HierBar, NameDialog, ProjectTree, QuickOpen, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { extractSubckt } from './project/extract.ts';
 import { addSubckt, childSubckts, freeSubcktName, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
@@ -136,6 +133,10 @@ type Dialog =
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }
   | { kind: 'projectfiles' }
+  /** pedir un nombre (testbench o subcircuito, #180) */
+  | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
+  /** confirmar con el control deslizante */
+  | { kind: 'slide'; title: string; message: string; onConfirm(): void }
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
   | { kind: 'lineStyle'; shapes: number[] };
 
@@ -540,8 +541,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // que está igual en otras simulaciones de la variante
   const [valueOffer, setValueOffer] = useState<{ changes: ValueChange[]; sims: string[] } | null>(null);
   const offerValues = useRef<(prev: AscDoc, next: AscDoc) => void>();
+  // (con testbenches, #180, cada uno es un circuito propio: no se ofrece; la lógica queda por si
+  // vuelven las simulaciones que comparten circuito)
+  const OFFER_VALUES = false;
   offerValues.current = (prev, next) => {
-    const changes = sims.active ? valueChanges(prev, next) : [];
+    const changes = OFFER_VALUES && sims.active ? valueChanges(prev, next) : [];
     const v = variantOf(projectRef.current);
     const ids = [...new Set(changes.flatMap((c) => simsWithValue(v, c)))];
     setValueOffer(ids.length ? { changes, sims: ids } : null);
@@ -589,7 +593,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   /** Abre un proyecto: se ve el circuito de la simulación activa de su variante activa */
-  const loadProject = (p: Project, f: FileState) => {
+  const loadProject = (p0: Project, f: FileState) => {
+    const p = asBenches(p0);
     stacks.current.clear();
     kept.current.clear();
     const v = variantOf(p);
@@ -631,7 +636,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const utf8 = new TextDecoder().decode(bytes);
     if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
       const { project: parsed, warnings } = await parseTurbo(utf8);
-      const p = selectVariant(parsed, parsed.variants.find((v) => v.name === variant)?.id ?? parsed.activeVariant);
+      // (los ejemplos se abren en el testbench con ese nombre)
+      const bench = variant ? parsed.variants[0].sims.find((x) => x.name === variant)?.id : undefined;
+      const p = bench ? selectProjectSim(parsed, bench) : parsed;
       const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
       loadProject(p, f);
       remember(p, f);
@@ -1234,11 +1241,27 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     go([...pathRef.current, { sub: subName(f.name), inst: s.attrs.get('InstName') ?? el?.name ?? '?', prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`, ports: parent && !parent.inst ? new Map() : ports }]);
     return true;
   };
-  const newSubckt = () => {
-    const name = prompt(t('Name of the new subcircuit'), freeSubcktName(projectRef.current));
-    if (!name) return;
-    if (!validSubcktName(name)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
-    if (subcktFile(projectRef.current, name) || projectRef.current.files.some((f) => f.name.toLowerCase() === `${name}.asy`.toLowerCase())) return setMessage(t('There is already a file called {name}', { name }));
+  /** Nombre de subcircuito: válido y libre (salvo `except`, el que se renombra) */
+  const checkSubName = (except?: string) => (n: string) =>
+    !validSubcktName(n)
+      ? t('Invalid name: use letters, digits, _ or -')
+      : n.toLowerCase() !== except?.toLowerCase() && projectRef.current.files.some((f) => f.name.replace(/\.[^.]*$/, '').toLowerCase() === n.toLowerCase())
+        ? t('There is already a file called {name}', { name: n })
+        : null;
+  const askSubName = (title: string, initial: string, onOk: (name: string) => void, except?: string) =>
+    setDialog({
+      kind: 'name',
+      title,
+      label: t('Name'),
+      initial,
+      check: checkSubName(except),
+      onOk: (n) => {
+        setDialog(null);
+        onOk(n);
+      },
+    });
+  const newSubckt = () => askSubName(t('New subcircuit'), freeSubcktName(projectRef.current), createSubckt);
+  const createSubckt = (name: string) => {
     editProject(addSubckt(projectRef.current, name));
     // el proyecto nuevo tiene que estar antes de abrirlo
     projectRef.current = addSubckt(projectRef.current, name);
@@ -1247,10 +1270,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** La selección pasa a un subcircuito nuevo y queda su instancia en su lugar */
   const subFromSelection = () => {
     if (!selection.length) return setMessage(t('Select the part of the circuit to turn into a subcircuit'));
-    const name = prompt(t('Name of the new subcircuit'), freeSubcktName(projectRef.current));
-    if (!name) return;
-    if (!validSubcktName(name)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
-    if (subcktFile(projectRef.current, name) || projectRef.current.files.some((f) => f.name.toLowerCase() === `${name}.asy`.toLowerCase())) return setMessage(t('There is already a file called {name}', { name }));
+    const refs = selection;
+    askSubName(t('Subcircuit from the selection'), freeSubcktName(projectRef.current), (name) => extractTo(name, refs));
+  };
+  const extractTo = (name: string, selection: ItemRef[]) => {
     const r = extractSubckt(doc, selection, conn, lib, name);
     if (typeof r === 'string') return setMessage(r);
     const p0 = snapshot();
@@ -1263,11 +1286,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setSelection([{ kind: 'symbol', index: r.parent.symbols.length - 1 }]);
     setMessage(t('Subcircuit {name} created with the ports {ports}: double-click {inst} (or E) to enter it', { name, ports: r.ports.join(', '), inst: r.inst }));
   };
-  const renameSub = (from: string) => {
-    const to = prompt(t('New name for {name}', { name: from }), from);
-    if (!to || to === from) return;
-    if (!validSubcktName(to)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
-    if (subcktFile(projectRef.current, to)) return setMessage(t('There is already a file called {name}', { name: to }));
+  const renameSub = (from: string) => askSubName(t('Rename subcircuit'), from, (to) => to !== from && doRenameSub(from, to), from);
+  const doRenameSub = (from: string, to: string) => {
     // guardar lo que se edita, renombrar en todo el proyecto y volver a mostrar el nivel actual
     const cur = pathRef.current;
     const p = renameSubckt(snapshot(), from, to);
@@ -1282,7 +1302,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const deleteSub = (name: string) => {
     const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
-    if (!confirm(n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Delete subcircuit {name}?', { name }))) return;
+    setDialog({
+      kind: 'slide',
+      title: t('Delete subcircuit {name}?', { name }),
+      message: n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Its schematic and its symbol will be deleted.'),
+      onConfirm: () => {
+        setDialog(null);
+        doDeleteSub(name);
+      },
+    });
+  };
+  const doDeleteSub = (name: string) => {
     if (pathRef.current.some((l) => l.sub.toLowerCase() === name.toLowerCase())) go([]);
     stacks.current.delete(subKey(name));
     setSubTabs((ts) => ts.filter((x) => x.toLowerCase() !== name.toLowerCase()));
@@ -1298,7 +1328,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       return f && openSub(u.where.name, find(f.text));
     }
     const w = u.where;
-    if (w.variant !== variantOf(projectRef.current).id) goVariant(w.variant);
     if (w.kind === 'sim' && w.sim !== variantOf(projectRef.current).activeSim) goSim(w.sim);
     else if (pathRef.current.length) go([]);
     requestAnimationFrame(() => {
@@ -1320,18 +1349,55 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (r) editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
+  // Cada testbench tiene una configuración de simulación: elegir un análisis la cambia
   const newSim = (kind: AnalysisKind) => {
-    // del mismo tipo que otra: se parte de sus parámetros
+    if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
+    // si ya es de ese tipo queda como está; si otro testbench usa ese tipo, se parte de sus parámetros
+    if (ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === kind) return;
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
-    const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo()))));
-    if (!r) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
-    enter(r.project);
-    markDirty();
+    commit(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo())));
   };
+  /** Testbench nuevo: vacío o copia del actual */
+  const askBenchName = (title: string, initial: string, onOk: (name: string) => void) =>
+    setDialog({
+      kind: 'name',
+      title,
+      label: t('Name'),
+      initial,
+      check: (n) => (sims.items.some((x) => (simName(x) || '').toLowerCase() === n.toLowerCase()) ? t('There is already a testbench called {name}', { name: n }) : null),
+      onOk: (n) => {
+        setDialog(null);
+        onOk(n);
+      },
+    });
+  const newEmptyBench = () =>
+    askBenchName(t('New testbench'), freeBenchName(projectRef.current), (name) => {
+      const r = addProjectSim(leave(), EMPTY_ASC, name);
+      if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
+      enter(r.project, true);
+      markDirty();
+    });
+  const renameBench = (id: string) => {
+    const cur = sims.items.find((x) => x.id === id);
+    if (!cur) return;
+    setDialog({
+      kind: 'name',
+      title: t('Rename testbench'),
+      label: t('Name'),
+      initial: simName(cur) || '',
+      check: (n) => (sims.items.some((x) => x.id !== id && (simName(x) || '').toLowerCase() === n.toLowerCase()) ? t('There is already a testbench called {name}', { name: n }) : null),
+      onOk: (n) => {
+        setDialog(null);
+        editProject(renameProjectSim(projectRef.current, id, n));
+      },
+    });
+  };
+  const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
+    action === 'rename' ? renameBench(id) : action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
   // nombre propio desde la barra (vacío: vuelve al automático)
   const renameActive = (name: string) => editProject(renameProjectSim(projectRef.current, sims.active, name));
   // borrar la elegida (con el control deslizante): pasa a la siguiente, o a la base si era la única
-  const deleteActive = () => sims.active && setDialog({ kind: 'deleteSim', id: sims.active });
+  const deleteActive = () => sims.active && sims.items.length > 1 && setDialog({ kind: 'deleteSim', id: sims.active });
   const deleteSim = (id: string) => {
     const p0 = leave();
     stacks.current.delete(`${variantOf(p0).id}/${id}`);
@@ -1348,15 +1414,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   // --- Variantes (#150): la cápsula Proyecto · Variante ---
-  const goVariant = (id: string) => id !== variant.id && enter(selectVariant(leave(), id), true);
-  const cloneOf = (id: string) => {
-    enter(cloneVariant(leave(), id).project, true);
-    markDirty();
-  };
-  const newBlankVariant = () => {
-    enter(blankVariant(leave()).project, true);
-    markDirty();
-  };
   const deleteVariant = (id: string) => {
     const p0 = leave();
     for (const s of variantOf(p0, id).sims) {
@@ -2050,10 +2107,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         files.push(...r.files);
       }
       const merged = await mergeFiles(p.files, files, askConflict);
-      enter({ ...p, files: merged.files }, true);
+      enter(asBenches({ ...p, files: merged.files }), true);
       markDirty();
       const parts = [
-        ...(variants.length ? [`${variants.length === 1 ? t('the variant') : t('{length} variants:', { length: variants.length })} ${variants.join(', ')}`] : []),
+        ...(variants.length ? [`${variants.length === 1 ? t('the testbench') : t('{length} testbenches:', { length: variants.length })} ${variants.join(', ')}`] : []),
         ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
       setMessage(parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)'));
@@ -2131,15 +2188,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         actions: [
           ...(variant.sims.find((y) => y.id === x.id)?.runs.length ? [{ icon: 'clock' as const, label: t('History'), onClick: () => openHistory(x.id) }] : []),
           { icon: 'copy', label: t('Duplicate'), onClick: () => duplicateSim(x.id) },
-          { icon: 'trash', label: t('Delete'), onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) },
+          ...(sims.items.length > 1 ? [{ icon: 'trash' as const, label: t('Delete'), onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) }] : []),
         ],
       }),
     ),
-    ...(sims.items.length
-      ? [{ label: t('Base circuit (no simulation)'), title: t('The variant\'s circuit outside the simulations'), checked: !sims.active, onClick: () => goSim('') }]
-      : []),
+    { label: t('New testbench…'), onClick: newEmptyBench },
     'sep',
-    ...ANALYSES.map((x) => ({ label: x.label, title: t('New simulation: {help}', { help: x.help }), onClick: () => newSim(x.kind), disabled: sims.items.length >= MAX_SIMS })),
+    ...ANALYSES.map((x) => ({ label: x.label, title: t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
@@ -2160,11 +2215,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
         { label: t('Export to PDF'), title: t('The current view of the schematic'), onClick: doExportPdf },
         'sep',
-        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a variant), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
-        { label: t('Export project'), title: t('A .zip for LTspice: one folder per variant, with an .asc per simulation and the project files they use'), onClick: () => exportZip(true) },
+        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a testbench), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
+        { label: t('Export project'), title: t('A .zip for LTspice: an .asc per testbench and the project files they use'), onClick: () => exportZip(true) },
         'sep',
         { label: t('Share link…'), onClick: doShare },
-        { label: t('Project files…'), title: t('Symbols and models saved in the .turbo, for all variants'), onClick: () => setDialog({ kind: 'projectfiles' }) },
+        { label: t('Project files…'), title: t('Subcircuits, symbols and models saved in the .turbo, for all testbenches'), onClick: () => setDialog({ kind: 'projectfiles' }) },
         { label: t('My symbols and models…'), onClick: () => setDialog({ kind: 'userfiles' }) },
         {
           label: ltIndex ? t('LTspice library') : t('Import LTspice library…'),
@@ -2184,7 +2239,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           items: [
             { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
             'sep',
-            ...EXAMPLES.map((x) => ({ label: x, title: t('Variant of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
+            ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
           ],
         },
         {
@@ -2419,16 +2474,16 @@ ${ltNetlistText(sim.built.lt)}
           <>
             <ProjectCapsule
               project={project.name}
-              variants={project.variants.map((v) => ({ id: v.id, name: v.name, sims: v.sims.length }))}
-              active={variant.id}
+              variants={sims.items.map((x) => ({ id: x.id, name: simName(x) || t('No analysis'), detail: x.line ? analysisLabel(x.line) : t('No analysis') }))}
+              active={sims.active}
               dirty={dirty}
               onRenameProject={renameProject}
-              onRenameVariant={(id, name) => editProject(renameVariant(projectRef.current, id, name))}
-              onSelect={goVariant}
-              onClone={() => cloneOf(variant.id)}
-              onBlank={newBlankVariant}
-              onDuplicate={cloneOf}
-              onDelete={(id) => setDialog({ kind: 'deleteVariant', id })}
+              onRenameVariant={(id, name) => editProject(renameProjectSim(projectRef.current, id, name))}
+              onSelect={goSim}
+              onClone={() => duplicateSim(sims.active)}
+              onBlank={newEmptyBench}
+              onDuplicate={duplicateSim}
+              onDelete={(id) => setDialog({ kind: 'deleteSim', id })}
             />
             <button
               className="theme-btn"
@@ -2567,7 +2622,7 @@ ${ltNetlistText(sim.built.lt)}
         >
           {hierOn && (
           <HierBar
-            testbench={variant.name}
+            testbench={(curSim && simName(curSim)) || variant.name}
             tabs={subTabs}
             current={curSub}
             path={path}
@@ -2586,12 +2641,14 @@ ${ltNetlistText(sim.built.lt)}
           {treeOpen && (
             <ProjectTree
               project={project.name}
-              variants={project.variants.map((v) => ({ id: v.id, name: v.name, sims: v.sims.map((x) => x.id) }))}
-              activeVariant={variant.id}
+              benches={sims.items.map((x) => ({ id: x.id, name: simName(x) || t('No analysis'), detail: x.line ? analysisLabel(x.line) : t('No analysis') }))}
+              activeBench={sims.active}
               subs={treeSubs}
               current={curSub}
-              onVariant={goVariant}
+              onBench={goSim}
               onTestbench={() => path.length && go([])}
+              onNewBench={newEmptyBench}
+              onBenchAction={benchAction}
               onOpen={(n) => openSub(n)}
               onNew={newSubckt}
               onFromSelection={selection.length ? subFromSelection : undefined}
@@ -2609,13 +2666,13 @@ ${ltNetlistText(sim.built.lt)}
             createPortal(
             <QuickOpen
               items={[
-                ...project.variants.map((v) => ({ key: `v:${v.id}`, label: v.name, hint: t('testbench') })),
+                ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
                 ...subckts(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: t('subcircuit') })),
               ]}
               onPick={(k) => {
                 const id = k.slice(2);
                 if (k.startsWith('s:')) return openSub(id);
-                if (id !== variant.id) return goVariant(id);
+                if (id !== sims.active) return goSim(id);
                 if (path.length) go([]);
               }}
               onClose={() => setQuickOpen(false)}
@@ -3078,10 +3135,12 @@ ${ltNetlistText(sim.built.lt)}
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog?.kind === 'name' && <NameDialog title={dialog.title} label={dialog.label} initial={dialog.initial} check={dialog.check} onOk={dialog.onOk} onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'slide' && <SlideConfirm title={dialog.title} message={dialog.message} onConfirm={dialog.onConfirm} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'deleteSim' && (
         <SlideConfirm
-          title={t('Delete the simulation')}
-          message={t('«{p0}» will be deleted with its circuit and its run history.', { p0: simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || t('No analysis') })}
+          title={t('Delete the testbench')}
+          message={t('«{p0}» will be deleted with its schematic, its simulation and its run history.', { p0: simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || t('No analysis') })}
           onClose={() => setDialog(null)}
           onConfirm={() => {
             setDialog(null);

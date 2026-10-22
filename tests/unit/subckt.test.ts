@@ -40,7 +40,7 @@ TEXT 0 100 Left 2 !.op
 
 const withSub = () => {
   const p = addSubckt(newProject('P'), 'BUF', BUF);
-  return { ...p, variants: p.variants.map((v) => ({ ...v, base: tb() })) };
+  return { ...p, variants: p.variants.map((v) => ({ ...v, sims: v.sims.map((s) => ({ ...s, asc: tb() })) })) };
 };
 
 describe('subcircuitos del proyecto (#180)', () => {
@@ -81,7 +81,7 @@ describe('subcircuitos del proyecto (#180)', () => {
     expect(subcktFile(p, 'BUF')).toBeUndefined();
     expect(subcktFile(p, 'AMP')).toBeDefined();
     expect(p.files.some((f) => f.name === 'AMP.asy')).toBe(true);
-    expect(parseAsc(p.variants[0].base).symbols[0].type).toBe('AMP');
+    expect(parseAsc(p.variants[0].sims[0].asc).symbols[0].type).toBe('AMP');
     expect(usages(p, 'AMP', label)).toHaveLength(1);
     p = removeSubckt(p, 'AMP');
     expect(p.files).toHaveLength(0);

@@ -1,6 +1,7 @@
 // Navegación entre el testbench y los subcircuitos (#180): panel de proyecto (árbol), barra con
 // pestañas y migas de pan, y buscador rápido (Ctrl+P).
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Modal } from '../schematic/dialogs.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { t } from '../i18n/i18n.ts';
 
@@ -20,15 +21,19 @@ export interface TreeSub {
 }
 
 /** Panel lateral: testbenches (variantes) y subcircuitos */
-export function ProjectTree({ project, variants, activeVariant, subs, current, onVariant, onTestbench, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onClose }: {
+export function ProjectTree({ project, benches, activeBench, subs, current, onBench, onTestbench, onNewBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onClose }: {
   project: string;
-  variants: { id: string; name: string; sims: string[] }[];
-  activeVariant: string;
+  /** testbenches: cada uno con su esquemático y su simulación (detail: el análisis) */
+  benches: { id: string; name: string; detail: string }[];
+  activeBench: string;
   subs: TreeSub[];
   /** subcircuito abierto ('' = testbench) */
   current: string;
-  onVariant(id: string): void;
+  onBench(id: string): void;
+  /** volver al testbench activo (desde un subcircuito) */
   onTestbench(): void;
+  onNewBench(): void;
+  onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
   /** convertir la selección (sin selección: undefined) */
@@ -54,8 +59,8 @@ export function ProjectTree({ project, variants, activeVariant, subs, current, o
           {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
         </button>
         <span className="tree-actions">
-          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename')}>✎</button>
-          <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete')}>
+          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
+          <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
         </span>
@@ -100,15 +105,31 @@ export function ProjectTree({ project, variants, activeVariant, subs, current, o
           <Icon name="close" size={14} />
         </button>
       </header>
-      <h4>{t('Testbenches')}</h4>
+      <h4>
+        {t('Testbenches')}
+        <span className="tree-adds">
+          <button className="tree-add" onClick={onNewBench} title={t('New empty testbench')} aria-label={t('Add an empty testbench')}>
+            + {t('New')}
+          </button>
+        </span>
+      </h4>
       <ul>
-        {variants.map((v) => (
-          <li key={v.id}>
-            <div className={`tree-row${!current && v.id === activeVariant ? ' active' : ''}`}>
-              <button className="tree-name" onClick={() => (v.id === activeVariant ? onTestbench() : onVariant(v.id))}>
-                <span className="tree-glyph">{v.id === activeVariant ? '●' : '○'}</span> {v.name}
+        {benches.map((b) => (
+          <li key={b.id}>
+            <div className={`tree-row${!current && b.id === activeBench ? ' active' : ''}`}>
+              <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={b.detail}>
+                <span className="tree-glyph">{b.id === activeBench ? '●' : '○'}</span> {b.name}
               </button>
-              <span className="tree-meta">{v.sims.length === 1 ? t('1 simulation') : t('{n} simulations', { n: v.sims.length })}</span>
+              <span className="tree-meta">{b.detail}</span>
+              <span className="tree-actions">
+                <button onClick={() => onBenchAction(b.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
+                <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
+                  <Icon name="copy" size={13} />
+                </button>
+                <button onClick={() => onBenchAction(b.id, 'delete')} disabled={benches.length === 1} title={benches.length > 1 ? t('Delete') : t('It\'s the only testbench')} aria-label={t('Delete {name}', { name: b.name })}>
+                  <Icon name="trash" size={13} />
+                </button>
+              </span>
             </div>
           </li>
         ))}
@@ -250,5 +271,45 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
         </ul>
       </div>
     </div>
+  );
+}
+
+/** Pide un nombre (reemplaza a prompt(), que no existe en todos los navegadores) */
+export function NameDialog({ title, label, initial, check, onOk, onClose }: {
+  title: string;
+  label: string;
+  initial: string;
+  /** mensaje de error, o null si el nombre sirve */
+  check(name: string): string | null;
+  onOk(name: string): void;
+  onClose(): void;
+}) {
+  const [name, setName] = useState(initial);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    input.current?.focus();
+    input.current?.select();
+  }, []);
+  const err = name.trim() ? check(name.trim()) : null;
+  return (
+    <Modal title={title} onClose={onClose}>
+      <form
+        className="attrs"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (name.trim() && !err) onOk(name.trim());
+        }}
+      >
+        <label>
+          <span>{label}</span>
+          <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value)} />
+        </label>
+        {err && <p className="err-text">{err}</p>}
+        <div className="buttons">
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="submit" className="primary" disabled={!name.trim() || !!err}>{t('OK')}</button>
+        </div>
+      </form>
+    </Modal>
   );
 }

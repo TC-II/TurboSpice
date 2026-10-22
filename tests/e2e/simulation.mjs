@@ -93,7 +93,7 @@ check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
 
-// --- #39: varias simulaciones; cada una conserva su gráfico ---
+// --- #180: testbenches, cada uno con su esquemático y su simulación; cada uno conserva su gráfico ---
 await openExample(page, 'RC Filter');
 const directive = () => page.locator('.texts .directive').first().textContent();
 const chipNames = () => page.locator('.trace-chip .name').allTextContents();
@@ -107,17 +107,20 @@ const probe = async (x, y) => {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(200);
 };
+const benchName = () => page.locator('.simbar .sb-name').textContent();
 await simType(page, 'Barrido DC');
 check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálogo: los parámetros van en la barra');
-check((await directive()) === '.dc V1 0 5 0.1', `nueva simulación DC con la fuente del circuito (${await directive()})`);
-check((await page.locator('.simbar .sb-name').textContent()) === 'Barrido DC V1 0–5 V', 'la barra muestra su nombre');
+check((await directive()) === '.dc V1 0 5 0.1', `elegir un tipo configura la simulación del testbench, con la fuente del circuito (${await directive()})`);
+check((await benchName()) === 'RC Filter', `la barra muestra el nombre del testbench (${await benchName()})`);
 check((await page.locator('.simbar .sim-state.idle').count()) === 1, 'el cuadrado de estado arranca sin correr');
 await simulate();
 check((await page.locator('.simbar .sim-state.ok').count()) === 1, 'y al simular queda listo');
 await probe(272, -32); // red out
-check((await chipNames()).join() === 'V(out)', `primera DC: V(out) (${(await chipNames()).join()})`);
-// otra del mismo tipo con otros parámetros, desde la barra
-await menu(page, 'Simular', 'Barrido DC');
+check((await chipNames()).join() === 'V(out)', `primer testbench: V(out) (${(await chipNames()).join()})`);
+// otro testbench: copia del actual, con otros parámetros desde la barra
+await page.getByRole('button', { name: 'Testbenches', exact: true }).click();
+await page.getByRole('button', { name: 'Duplicar el actual' }).click();
+check((await benchName()) === 'RC Filter (copia)', `la copia es otro testbench (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)
 const directiveIs = (t) =>
@@ -129,26 +132,27 @@ await page.getByLabel('Incremento 1').fill('0.01');
 await page.getByLabel('Incremento 1').press('Enter');
 await directiveIs('.dc V1 0 2 0.01');
 check((await directive()) === '.dc V1 0 2 0.01', `los parámetros de la barra van al esquemático (${await directive()})`);
-check((await page.locator('.results-panel').count()) === 0, 'la nueva simulación arranca sin resultados');
+check((await page.locator('.results-panel').count()) === 0, 'el testbench nuevo arranca sin resultados');
 await simulate();
 await probe(0, -16); // red N001 (V1–R1)
-check((await chipNames()).join() === 'V(N001)', `segunda DC: V(N001) (${(await chipNames()).join()})`);
-// simulaciones listadas en el menú Simular (✓ la activa)
+// (la copia trae la vista del original: V(out), y se le suma V(N001))
+check((await chipNames()).join() === 'V(out),V(N001)', `segundo testbench: V(out) de la copia y V(N001) (${(await chipNames()).join()})`);
+// testbenches listados en el menú Simular (✓ el activo)
 const items = async () => {
   await page.getByRole('button', { name: 'Menú', exact: true }).click();
   await page.getByRole('menu').getByRole('menuitem', { name: 'Simular', exact: true }).hover();
-  const t = (await page.getByRole('menu').getByRole('menuitemcheckbox').allTextContents()).filter((x) => /Barrido DC/.test(x));
+  const t = (await page.getByRole('menu').getByRole('menuitemcheckbox').allTextContents()).filter((x) => /RC Filter/.test(x));
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   return t;
 };
 const listed = await items();
-check(listed.length === 2 && listed[1].startsWith('✓'), `el menú lista las dos y marca la activa (${listed.join(' | ')})`);
-// alternar: cada una conserva sus trazas y sus resultados (sin volver a simular)
-await menu(page, 'Simular', 'Barrido DC V1 0–5 V');
-check((await directive()) === '.dc V1 0 5 0.1', 'al elegir la primera, su comando vuelve al esquemático');
-check((await chipNames()).join() === 'V(out)', `la primera conserva su gráfico (${(await chipNames()).join()})`);
-// máximo de la traza (tabla de Medidas): 5 V en la primera, 2 V en la segunda
+check(listed.length === 2 && listed[1].startsWith('✓'), `el menú lista los dos y marca el activo (${listed.join(' | ')})`);
+// alternar: cada uno conserva sus trazas y sus resultados (sin volver a simular)
+await menu(page, 'Simular', 'RC Filter');
+check((await directive()) === '.dc V1 0 5 0.1', 'al elegir el primero, su comando vuelve al esquemático');
+check((await chipNames()).join() === 'V(out)', `el primero conserva su gráfico (${(await chipNames()).join()})`);
+// máximo de la traza (tabla de Medidas): 5 V en el primero, 2 V en el segundo
 const maxOf = async () => {
   await page.getByRole('button', { name: 'Medidas' }).click();
   const t = await page.locator('.readout tbody tr td').nth(2).textContent();
@@ -157,41 +161,41 @@ const maxOf = async () => {
 };
 check((await maxOf()).startsWith('5 @'), `con sus resultados en memoria, sin volver a simular (máximo ${await maxOf()})`);
 // (también desde la flecha del botón Simular)
-await simType(page, 'Barrido DC V1 0–2 V');
-check((await chipNames()).join() === 'V(N001)', `la segunda conserva el suyo (${(await chipNames()).join()})`);
+await simType(page, 'RC Filter (copia)');
+check((await chipNames()).join() === 'V(out),V(N001)', `el segundo conserva el suyo (${(await chipNames()).join()})`);
 check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxOf()})`);
-// el proyecto guardado (.turbo, #149) tiene las tres simulaciones, la activa y la vista de cada una
+// el proyecto guardado (.turbo, #149) tiene los testbenches, el activo y la vista de cada uno
 await page.evaluate(() => delete window.showSaveFilePicker);
 const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
 check(download.suggestedFilename() === 'Examples.turbo', `se guarda como proyecto (${download.suggestedFilename()})`);
 const saved = variantOf((await parseTurbo(readFileSync(await download.path(), 'utf8'))).project);
-check(saved.sims.length === 3 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .turbo guardado tiene las tres simulaciones y la activa');
-const views = saved.sims.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');
-// (la primera es el .tran del ejemplo, sin trazas)
-check(views.join(' | ') === ' | V(out) | V(N001)', `la lista del archivo conserva la vista de cada una (${views.join(' | ')})`);
+const rc = saved.sims.filter((s) => /^RC Filter/.test(s.name ?? ''));
+check(rc.length === 2 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .turbo guardado tiene los dos testbenches y el activo');
+const views = rc.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');
+check(views.join(' | ') === 'V(out) | V(out),V(N001)', `el archivo conserva la vista de cada uno (${views.join(' | ')})`);
 // y el autoguardado también: al recargar sigue la lista
 await page.waitForTimeout(1000); // autoguardado
 await page.reload();
 await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
-check((await items()).length === 2, 'al recargar se recupera la lista');
+check((await items()).length === 2, 'al recargar se recuperan los testbenches');
 // renombrar: click en el nombre de la barra
 await page.locator('.simbar .sb-name').click();
 await page.getByLabel('Nombre de la simulación').fill('Curva corta');
 await page.getByLabel('Nombre de la simulación').press('Enter');
-check((await page.locator('.simbar .sb-name').textContent()) === 'Curva corta', 'click en el nombre la renombra');
+check((await benchName()) === 'Curva corta', 'click en el nombre lo renombra');
 await page.getByRole('button', { name: 'Borrar simulación' }).click();
 await slideToDelete(page);
-check((await directive()) === '.dc V1 0 5 0.1', 'la × borra la activa (deslizando) y pasa a la otra');
+check((await benchName()) !== 'Curva corta' && (await items()).length === 1, 'la × borra el activo (deslizando) y pasa a otro');
+await menu(page, 'Simular', 'RC Filter');
+check((await directive()) === '.dc V1 0 5 0.1', 'el otro testbench sigue con su simulación');
 // al lado de la fuente, elegirla en el esquemático (como en el menú completo)
 await page.getByRole('button', { name: 'Elegir Fuente 1 en el esquemático' }).click();
 check(await page.locator('.pick-banner').isVisible(), 'el botón de la fuente pide elegirla en el esquemático');
 await page.locator('.pick-banner').getByRole('button', { name: 'Cancelar' }).click();
-// borrar hasta la última: la barra queda vacía y Simular despliega el menú para elegir
-while (await page.getByRole('button', { name: 'Borrar simulación' }).count()) {
-  await page.getByRole('button', { name: 'Borrar simulación' }).click();
-  await slideToDelete(page);
-}
-check((await page.locator('.simbar .sb-name').count()) === 0 && (await page.locator('.simbar').textContent()).includes('Seleccionar tipo de simulación') && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'se puede borrar la única: la barra pide elegir un tipo y sale su comando del esquemático');
+// un testbench nuevo está vacío y sin simulación: Simular despliega el menú para elegir el tipo
+await simType(page, 'Testbench nuevo…');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+check((await page.locator('svg.editor .symbols > g').count()) === 0 && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'el testbench nuevo arranca vacío y sin simulación');
 await page.getByRole('button', { name: 'Simular', exact: true }).click();
 check(await page.getByRole('menu', { name: 'Tipo de simulación' }).isVisible(), 'sin simulación, Simular despliega el menú');
 await page.keyboard.press('Escape');

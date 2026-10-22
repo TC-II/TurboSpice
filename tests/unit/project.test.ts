@@ -10,22 +10,19 @@ import {
   simsWithValue,
   valueChanges,
   addSim,
-  blankVariant,
-  cloneVariant,
   duplicateSim,
+  freeBenchName,
   lineOf,
   recordRun,
   removeSim,
-  removeVariant,
   renameSim,
-  renameVariant,
   selectSim,
   simLabel,
   storeActive,
   uniqueLabel,
   variantOf,
 } from '../../src/project/project.ts';
-import { newProject, type Project } from '../../src/project/turbo.ts';
+import { asBenches, BENCHES, EMPTY_ASC, newProject, type Project } from '../../src/project/turbo.ts';
 
 const asc = (line: string, wires = 1): string => {
   const d: AscDoc = {
@@ -36,12 +33,36 @@ const asc = (line: string, wires = 1): string => {
   return serializeAsc(d);
 };
 
+// dos testbenches: «Testbench 1» con .tran y uno sin nombre con .ac (el activo)
 function twoSims(): Project {
-  let p = newProject('P');
-  p = addSim(p, asc('.tran 10m'))!.project;
+  let p = storeActive(newProject('P'), asc('.tran 10m'));
   p = addSim(p, asc('.ac dec 10 1 1meg'))!.project;
   return p;
 }
+
+describe('testbenches (#180)', () => {
+  it('un proyecto nuevo tiene un testbench vacío', () => {
+    const p = newProject('P');
+    expect(p.variants).toHaveLength(1);
+    expect(p.variants[0].sims.map((s) => [s.name, s.asc])).toEqual([['Testbench 1', EMPTY_ASC]]);
+    expect(variantOf(p).activeSim).toBe(p.variants[0].sims[0].id);
+    expect(freeBenchName(p)).toBe('Testbench 2');
+  });
+
+  it('las variantes (versión 1) se aplanan: cada simulación es un testbench', () => {
+    const v = (id: string, name: string, sims: string[]) => ({ id, name, base: asc(''), activeSim: sims.length ? `${id}s1` : '', sims: sims.map((l, i) => ({ id: `${id}s${i}`, asc: asc(l), runs: [] })) });
+    const old: Project = { name: 'P', created: 0, modified: 0, files: [], activeVariant: 'b', variants: [v('a', 'Pasabajos', ['.tran 10m', '.ac dec 10 1 1meg']), v('b', 'Pasaaltos', ['.op']), v('c', 'Vacía', [])] };
+    const p = asBenches(old);
+    expect(p.variants).toHaveLength(1);
+    expect(p.variants[0].id).toBe(BENCHES);
+    expect(p.variants[0].sims.map((s) => s.name)).toEqual(['Pasabajos · Transitorio 0–10 ms', 'Pasabajos · AC 1 Hz–1 MHz', 'Pasaaltos', 'Vacía']);
+    // el activo es el de la variante activa
+    expect(simOfActive(p)).toBe('bs0');
+    expect(asBenches(p)).toBe(p);
+  });
+});
+
+const simOfActive = (p: Project) => variantOf(p).activeSim;
 
 describe('simulaciones', () => {
   it('cada una tiene su circuito; la nueva va después de la activa y queda activa', () => {
@@ -65,26 +86,25 @@ describe('simulaciones', () => {
 
   it('nombre automático, propio y copia', () => {
     let p = twoSims();
-    const [a] = variantOf(p).sims;
-    expect(simLabel(a)).toBe('Transitorio 0–10 ms');
+    const [a, b] = variantOf(p).sims;
+    expect(simLabel(a)).toBe('Testbench 1');
+    expect(simLabel(b)).toBe('AC 1 Hz–1 MHz');
     p = renameSim(p, a.id, '  Arranque ');
     expect(simLabel(variantOf(p).sims[0])).toBe('Arranque');
     const d = duplicateSim(p, a.id)!;
     expect(variantOf(d.project).sims.map((s) => simLabel(s))).toEqual(['Arranque', 'Arranque (copia)', 'AC 1 Hz–1 MHz']);
     expect(simLabel(variantOf(duplicateSim(d.project, a.id)!.project).sims[1])).toBe('Arranque (copia) (2)');
-    p = renameSim(p, a.id, '');
-    expect(variantOf(p).sims[0].name).toBeUndefined();
+    // sin nombre no: un testbench siempre tiene nombre
+    expect(renameSim(p, a.id, '')).toBe(p);
   });
 
-  it('borrar pasa a la siguiente; la última deja su circuito en la base', () => {
+  it('borrar pasa al siguiente; el último no se borra', () => {
     let p = twoSims();
     const [a, b] = variantOf(p).sims;
     p = removeSim(selectSim(p, a.id), a.id);
     expect(variantOf(p).activeSim).toBe(b.id);
-    p = removeSim(p, b.id);
-    expect(variantOf(p).activeSim).toBe('');
-    expect(variantOf(p).base).toContain('WIRE');
-    expect(lineOf(variantOf(p).base)).toBe('');
+    expect(removeSim(p, b.id)).toBe(p);
+    expect(lineOf(activeAsc(variantOf(p)))).toBe('.ac dec 10 1 1meg');
   });
 });
 
@@ -100,37 +120,7 @@ describe('corridas', () => {
   });
 });
 
-describe('variantes', () => {
-  it('clonar copia todo con ids nuevos; vacía no trae nada', () => {
-    let p = twoSims();
-    p = recordRun(p, variantOf(p).activeSim, asc('.ac dec 10 1 1meg'), 1).project;
-    const src = variantOf(p);
-    const c = cloneVariant(p, src.id);
-    const v = variantOf(c.project);
-    expect(v.name).toBe('Variante 1 (copia)');
-    expect(v.sims.map((s) => s.asc)).toEqual(src.sims.map((s) => s.asc));
-    expect(v.sims[1].runs).toHaveLength(1);
-    expect(v.sims.some((s) => src.sims.some((x) => x.id === s.id))).toBe(false);
-    expect(v.activeSim).toBe(v.sims[1].id);
-    const b = blankVariant(c.project);
-    expect(variantOf(b.project).sims).toEqual([]);
-    expect(variantOf(b.project).name).toBe('Variante 1 (2)');
-  });
-
-  it('renombrar y borrar (nunca la última)', () => {
-    let p = cloneVariant(twoSims(), twoSims().variants[0].id).project;
-    p = cloneVariant(p, p.variants[0].id).project;
-    p = renameVariant(p, p.variants[0].id, 'Pasabajos');
-    expect(p.variants[0].name).toBe('Pasabajos');
-    expect(renameVariant(p, p.variants[0].id, '  ')).toBe(p);
-    const only = newProject('x');
-    expect(removeVariant(only, only.variants[0].id)).toBe(only);
-    const active = p.activeVariant;
-    p = removeVariant(p, active);
-    expect(p.variants.some((v) => v.id === active)).toBe(false);
-    expect(p.variants.some((v) => v.id === p.activeVariant)).toBe(true);
-  });
-
+describe('nombres', () => {
   it('nombres únicos', () => {
     expect(uniqueLabel('A', ['a'])).toBe('A (2)');
     expect(uniqueLabel('A (2)', ['A', 'a (2)'])).toBe('A (3)');
@@ -146,8 +136,7 @@ describe('aviso de valores', () => {
       texts: [{ x: 0, y: 200, align: 'Left', size: 2, kind: 'directive', text: line }],
     });
   it('detecta el cambio, encuentra las otras simulaciones y lo aplica', () => {
-    let p = newProject('P');
-    p = addSim(p, withR('1k'))!.project;
+    let p = storeActive(newProject('P'), withR('1k'));
     p = addSim(p, withR('1k', '.ac dec 10 1 1meg'))!.project;
     p = addSim(p, withR('4k7', '.op'))!.project;
     const [a, b] = variantOf(p).sims;

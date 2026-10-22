@@ -63,10 +63,14 @@ export function variantEntries(p: Project, v: Variant, lib: SymbolSource, dir = 
 
 export function exportVariantZip(p: Project, variantId: string, lib: SymbolSource): { name: string; bytes: Uint8Array } {
   const v = variantOf(p, variantId);
-  return { name: `${safeName(p.name)} - ${safeName(v.name)}.zip`, bytes: makeZip(variantEntries(p, v, lib)) };
+  // con testbenches (una sola variante) el .zip es el del proyecto
+  const name = p.variants.length === 1 ? `${safeName(p.name)}.zip` : `${safeName(p.name)} - ${safeName(v.name)}.zip`;
+  return { name, bytes: makeZip(variantEntries(p, v, lib)) };
 }
 
 export function exportAllZip(p: Project, lib: SymbolSource): { name: string; bytes: Uint8Array } {
+  // testbenches: un .asc por testbench, sin carpetas
+  if (p.variants.length === 1) return { name: `${safeName(p.name)}.zip`, bytes: makeZip(variantEntries(p, p.variants[0], lib)) };
   const taken: string[] = [];
   const entries = p.variants.flatMap((v) => {
     const dir = uniqueFileName(safeName(v.name), taken);

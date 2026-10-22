@@ -5,8 +5,8 @@ import { decode } from '../../src/asc/encoding.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { Library } from '../../src/library/library.ts';
 import { exportAllZip, exportVariantZip, importEntries, safeName, usedFiles } from '../../src/project/exchange.ts';
-import { addSim, lineOf, renameSim, variantOf } from '../../src/project/project.ts';
-import { newProject, type Project } from '../../src/project/turbo.ts';
+import { addSim, lineOf, renameSim, storeActive, variantOf } from '../../src/project/project.ts';
+import { asBenches, newProject, type Project } from '../../src/project/turbo.ts';
 import { crc32, makeZip, readZip } from '../../src/project/zip.ts';
 
 const lib = new Library(buildBundle());
@@ -20,8 +20,7 @@ const asc = (line: string, type = 'res'): string => {
 };
 
 function sample(): Project {
-  let p = newProject('Filtro: RC');
-  p = addSim(p, asc('.tran 10m'))!.project;
+  let p = storeActive(newProject('Filtro: RC'), asc('.tran 10m'));
   p = addSim(p, asc('.ac dec 10 1 1meg\n.lib miop.sub', 'miop'))!.project;
   p = renameSim(p, variantOf(p).activeSim, 'Bode/fino');
   return {
@@ -64,37 +63,28 @@ describe('zip', () => {
 });
 
 describe('exportar e importar (#157)', () => {
-  it('una variante: un .asc por simulación y sólo los archivos que usan', async () => {
+  it('un .asc por testbench y sólo los archivos que usan', async () => {
     const p = sample();
     const z = exportVariantZip(p, p.activeVariant, lib);
-    expect(z.name).toBe('Filtro_ RC - Variante 1.zip');
+    expect(z.name).toBe('Filtro_ RC.zip');
+    expect(exportAllZip(p, lib).name).toBe('Filtro_ RC.zip');
     const entries = await readZip(z.bytes);
-    expect(entries.map((e) => e.path)).toEqual(['Transitorio 0–10 ms.asc', 'Bode_fino.asc', 'miop.asy', 'miop.sub']);
+    expect(entries.map((e) => e.path)).toEqual(['Testbench 1.asc', 'Bode_fino.asc', 'miop.asy', 'miop.sub']);
     expect(decode(entries[1].data).text).toContain('.ac dec 10 1 1meg');
   });
 
-  it('todo: una carpeta por variante; importar el zip lo reconstruye', async () => {
+  it('importar el zip exportado agrega sus testbenches', async () => {
     const p = sample();
-    const z = exportAllZip({ ...p, variants: [...p.variants, { ...variantOf(p), id: 'v2', name: 'Con buffer' }] }, lib);
+    const z = exportAllZip(p, lib);
     const entries = await readZip(z.bytes);
-    expect(entries.map((e) => e.path)).toEqual([
-      'Variante 1/Transitorio 0–10 ms.asc',
-      'Variante 1/Bode_fino.asc',
-      'Variante 1/miop.asy',
-      'Variante 1/miop.sub',
-      'Con buffer/Transitorio 0–10 ms.asc',
-      'Con buffer/Bode_fino.asc',
-      'Con buffer/miop.asy',
-      'Con buffer/miop.sub',
-    ]);
     const r = importEntries(newProject('Otro'), entries, z.name);
-    expect(r.variants).toEqual(['Variante 1 (2)', 'Con buffer']);
-    const v = r.project.variants.find((x) => x.name === 'Con buffer')!;
-    expect(v.sims.map((s) => [s.name, lineOf(s.asc)])).toEqual([
-      ['Transitorio 0–10 ms', '.tran 10m'],
-      ['Bode_fino', '.ac dec 10 1 1meg'],
+    const benches = asBenches(r.project).variants[0].sims;
+    expect(benches.map((s) => [s.name, lineOf(s.asc)])).toEqual([
+      ['Testbench 1', ''],
+      ['Filtro_ RC · Testbench 1', '.tran 10m'],
+      ['Filtro_ RC · Bode_fino', '.ac dec 10 1 1meg'],
     ]);
-    expect(r.files.map((f) => f.name)).toEqual(['miop.asy', 'miop.sub', 'miop.asy', 'miop.sub']);
+    expect(r.files.map((f) => f.name)).toEqual(['miop.asy', 'miop.sub']);
   });
 
   it('archivos sueltos: cada .asc es una variante', () => {
@@ -106,7 +96,7 @@ describe('exportar e importar (#157)', () => {
       { path: 'leeme.pdf', data: new Uint8Array(3) },
     ]);
     expect(r.variants).toEqual(['a', 'b']);
-    expect(r.project.variants.map((v) => v.sims.length)).toEqual([0, 1, 1]);
+    expect(asBenches(r.project).variants[0].sims.map((s) => s.name)).toEqual(['Testbench 1', 'a', 'b']);
     expect(r.files.map((f) => f.name)).toEqual(['m.lib']);
   });
 

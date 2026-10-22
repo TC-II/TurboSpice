@@ -750,12 +750,12 @@ export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onCl
         <p>{t('Everything you import is added to the open project; nothing is replaced.')}</p>
         <ul>
           <li><strong>.turbo</strong> — {t('a TurboSpice project: it opens in place of the current one.')}</li>
-          <li><strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each folder becomes a variant (the root too), and each')}{' '}<code>.asc</code>{' '}{t('in it, one of its simulations. The')}{' '}<code>.asy</code>, <code>.lib</code>, <code>.sub</code>{' '}{t('anywhere in the .zip go to the project files.')}</li>
-          <li><strong>.asc</strong> — {t('loose schematics: each one becomes a variant.')}</li>
-          <li><strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its variants.')}</li>
+          <li><strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each')}{' '}<code>.asc</code>{' '}{t('in it becomes a testbench. The')}{' '}<code>.asy</code>, <code>.lib</code>, <code>.sub</code>{' '}{t('anywhere in the .zip go to the project files.')}</li>
+          <li><strong>.asc</strong> — {t('loose schematics: each one becomes a testbench.')}</li>
+          <li><strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its testbenches.')}</li>
         </ul>
         <p className="hint">
-          {t('To build the .zip: put each version of the circuit in its own folder (the folder name becomes the variant name), with one .asc per simulation, and add the symbols and models the circuits use that are not in the standard library. Then compress the whole folder.')}
+          {t('To build the .zip: put one .asc per testbench, and add the symbols and models the circuits use that are not in the standard library. Then compress the whole folder.')}
         </p>
       </div>
       <div className="buttons">

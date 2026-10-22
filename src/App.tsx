@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -484,8 +484,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
-  // elemento bajo el mouse: la barra de estado muestra sus propiedades
-  const [hover, setHover] = useState<{ ref: ItemRef | null; at: Point } | null>(null);
+  // elemento bajo el mouse: la barra de estado muestra sus propiedades (el estado vive en
+  // HintBar: guardarlo acá re-renderizaba toda la vista al mover el mouse, #187)
+  const hoverSink = useRef<((h: Hover) => void) | undefined>(undefined);
+  const onHover = useCallback((h: Hover) => hoverSink.current?.(h), []);
   const [showLoose, setShowLoose] = useState(true);
   // Ver › Mostrar el comando de simulación (oculto por defecto: se configura en la barra de Simular)
   const [showSimCommand, setShowSimCommand] = useState(() => lsGet('turbospice.showSimCommand') === '1');
@@ -1619,14 +1621,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
-  const circuitInfo = (): CircuitInfo => ({
-    nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    sources: doc.symbols
-      .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
-      .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
-      .map((a) => a.get('InstName') ?? '')
-      .filter(Boolean),
-  });
+  // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
+  const info = useMemo(
+    (): CircuitInfo => ({
+      nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      sources: doc.symbols
+        .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
+        .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
+        .map((a) => a.get('InstName') ?? '')
+        .filter(Boolean),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conn, doc, lib, libVersion],
+  );
+  const circuitInfo = () => info;
 
   // Atajos de teclado: los de la configuración de LTspice que usamos (LTspice.ini,
   // [SchKeyBoardShortCut] y [RawKeyBoardShortCut]); los del visor, con el mouse sobre los gráficos
@@ -2361,7 +2369,7 @@ ${ltNetlistText(sim.built.lt)}
             showGrid={showGrid}
             showLoose={showLoose}
             showSimCommand={showSimCommand}
-            onHover={setHover}
+            onHover={onHover}
             diff={historyDiff}
           />
           {historyOpen && curSim && (
@@ -2439,7 +2447,7 @@ ${ltNetlistText(sim.built.lt)}
               {message}
             </div>
           )}
-          <div className="hint-bar">{tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool)}</div>
+          <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} />
         </div>
 
         {sim && (
@@ -2845,6 +2853,20 @@ ${ltNetlistText(sim.built.lt)}
       )}
     </div>
   );
+}
+
+type Hover = { ref: ItemRef | null; at: Point } | null;
+
+/** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
+function HintBar({ sink, text }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string }) {
+  const [hover, setHover] = useState<Hover>(null);
+  useEffect(() => {
+    sink.current = setHover;
+    return () => {
+      sink.current = undefined;
+    };
+  }, [sink]);
+  return <div className="hint-bar">{text(hover)}</div>;
 }
 
 function toolHint(tt: Tool): string {

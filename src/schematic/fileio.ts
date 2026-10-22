@@ -121,7 +121,8 @@ export function ascBytes(doc: AscDoc, lib: SymbolSource, encoding?: AscEncoding)
  * Devuelve el handle/nombre usados, o null si el usuario canceló.
  */
 export async function saveFile(
-  bytes: Uint8Array,
+  /** el contenido, o cómo armarlo con el nombre que se eligió (un .turbo lleva el nombre adentro) */
+  content: Uint8Array | ((name: string) => Promise<Uint8Array>),
   name: string,
   handle?: FileHandle,
   saveAs = false,
@@ -130,6 +131,7 @@ export async function saveFile(
     try {
       const types = [/\.turbo$/i.test(name) ? TURBO_TYPE : ASC_TYPE];
       const h = !saveAs && handle ? handle : await window.showSaveFilePicker({ types, suggestedName: name });
+      const bytes = typeof content === 'function' ? await content(h.name) : content;
       const w = await h.createWritable();
       await w.write(bytes as BlobPart);
       await w.close();
@@ -139,6 +141,7 @@ export async function saveFile(
       throw e;
     }
   }
+  const bytes = typeof content === 'function' ? await content(name) : content;
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/octet-stream' }));
   const a = document.createElement('a');
   a.href = url;

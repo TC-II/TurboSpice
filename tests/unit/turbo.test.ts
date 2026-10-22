@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
 import { emptyDoc, type AscDoc } from '../../src/asc/model.ts';
 import { parseAsc as parseAscText } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
@@ -115,5 +116,45 @@ describe('proyecto desde un .asc', () => {
     const p = newProject('Sin título');
     expect(p.variants).toHaveLength(1);
     expect(p.activeVariant).toBe(p.variants[0].id);
+  });
+});
+
+// Guardado riguroso: lo que se guarda y se vuelve a abrir es exactamente lo mismo, y guardar dos
+// veces seguidas da el mismo archivo (si no, Drive y el disco verían cambios donde no los hay)
+describe('.turbo: ida y vuelta de todos los ejemplos', () => {
+  const dir = 'public/examples';
+  const turbos = readdirSync(dir).filter((f) => f.endsWith('.turbo'));
+  const ascs = readdirSync('examples').filter((f) => f.endsWith('.asc'));
+
+  it.each(turbos)('%s: abrir → guardar → abrir da el mismo proyecto, y guardar es estable', async (f) => {
+    const { project, warnings } = await parseTurbo(readFileSync(`${dir}/${f}`, 'utf8'));
+    expect(warnings).toEqual([]);
+    const once = await serializeTurbo(project);
+    const back = await parseTurbo(once);
+    expect(back.warnings).toEqual([]);
+    expect(back.project).toEqual(project);
+    expect(await serializeTurbo(back.project)).toBe(once);
+  });
+
+  it.each(ascs)('%s como proyecto: ida y vuelta sin pérdidas', async (f) => {
+    const p = projectFromAsc(parseAscText(readFileSync(`examples/${f}`, 'latin1')), f);
+    const { project } = await parseTurbo(await serializeTurbo(p));
+    expect(project).toEqual(p);
+  });
+
+  it('nombres con acentos, comillas, emojis y caracteres de control en el texto', async () => {
+    const p = sample();
+    p.name = 'Filtro d\'O «ñ» "x" 🎛️ \ /';
+    p.variants[0].name = 'Variante — 2 <a>&';
+    p.files.push({ name: 'ü.lib', kind: 'model', text: '* línea con \t tab y \u0000 nulo\n.model D1 D(Is=1e-14)\n' });
+    const { project } = await parseTurbo(await serializeTurbo(p));
+    expect(project).toEqual(p);
+  });
+
+  it('un archivo cortado a la mitad (subida interrumpida) no se abre como si estuviera bien', async () => {
+    const text = await serializeTurbo(sample());
+    for (const cut of [1, 0.5, 0.9, 0.99].map((x) => Math.floor(text.length * x) - 1)) {
+      await expect(parseTurbo(text.slice(0, cut))).rejects.toThrow();
+    }
   });
 });

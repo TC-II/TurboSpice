@@ -75,6 +75,7 @@ jobs:
           node tests/e2e/editor.mjs http://localhost:4173/TurboSpice/ test-results
           node tests/e2e/simulation.mjs http://localhost:4173/TurboSpice/ test-results
           node tests/e2e/features.mjs http://localhost:4173/TurboSpice/ test-results
+          node tests/e2e/save.mjs http://localhost:4173/TurboSpice/
 
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'

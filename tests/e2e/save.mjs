@@ -32,12 +32,20 @@ class FakeDrive {
   #n = 0;
   add(f) {
     const id = `id${++this.#n}`;
-    const file = { id, version: '1', modifiedTime: new Date().toISOString(), trashed: false, parents: [], data: Buffer.alloc(0), ...f };
+    const file = { id, version: '1', rev: `rev${++this.#n}`, modifiedTime: new Date().toISOString(), trashed: false, parents: [], data: Buffer.alloc(0), ...f };
     this.files.set(id, file);
+    this.later(file);
     return file;
   }
+  /** como Drive real: `version` sube sola un rato después de escribir (Drive procesa el
+   * archivo); la revisión del contenido (headRevisionId) no (#176) */
+  later(f) {
+    setTimeout(() => (f.version = String(Number(f.version) + 1)), 300);
+  }
+  /** cambio de contenido (desde la app u «otra pestaña») */
   touch(f, patch = {}) {
-    Object.assign(f, patch, { version: String(Number(f.version) + 1), modifiedTime: new Date(Date.now() + 1000 * Number(f.version)).toISOString() });
+    Object.assign(f, patch, { version: String(Number(f.version) + 1), rev: `rev${++this.#n}`, modifiedTime: new Date(Date.now() + 1000 * Number(f.version)).toISOString() });
+    this.later(f);
   }
   folderId() {
     return [...this.files.values()].find((f) => f.mimeType === FOLDER && f.name === 'TurboSpice')?.id;
@@ -58,7 +66,7 @@ class FakeDrive {
     return this.log.filter((l) => l.kind === 'upload');
   }
 }
-const meta = ({ id, name, modifiedTime, version }) => ({ id, name, modifiedTime, version });
+const meta = ({ id, name, modifiedTime, version, rev }) => ({ id, name, modifiedTime, version, headRevisionId: rev });
 
 /** Evalúa (lo justo) las consultas `q` que usa la app */
 function matches(f, q) {
@@ -136,7 +144,7 @@ async function attachDrive(context, fake) {
           return json(200, meta(f));
         }
         if (method === 'PATCH') {
-          fake.touch(f, JSON.parse(req.postData() ?? '{}'));
+          Object.assign(f, JSON.parse(req.postData() ?? '{}'), { version: String(Number(f.version) + 1) });
           return json(200, meta(f));
         }
       }
@@ -261,16 +269,20 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
 
   // -- guardar de nuevo: el mismo archivo (PATCH), con el cambio adentro
   const before = flags(p1);
+  const rev0 = f.rev;
+  // Drive real sube `version` solo, después de escribir: el segundo guardado no es un conflicto (#176)
+  await settle(page, 800);
   await edit(page);
   const up0 = fake.uploads().length;
   await save(page);
   await waitToast(page, /Google Drive/);
   await settle(page);
   const ups = fake.uploads().slice(up0);
+  check((await page.getByRole('dialog').filter({ hasText: /cambió en Google Drive|changed in Google Drive/ }).count()) === 0, 'Drive: el segundo guardado no ve un conflicto que no existe (#176)');
   check(ups.length === 1 && ups[0].method === 'PATCH' && ups[0].path.endsWith(`/${f.id}`), `Drive: el segundo guardado reemplaza el mismo archivo (${ups.map((u) => `${u.method} ${u.path}`)})`);
   check(fake.projects().length === 1, 'Drive: no se duplica el archivo');
   check(flags(project(f.data)) === before + 1, `Drive: el contenido tiene el cambio (tierras ${before} → ${flags(project(f.data))})`);
-  check(f.version === '2', `Drive: la versión sube (${f.version})`);
+  check(f.rev !== rev0, 'Drive: cambia la revisión del contenido');
 
   // -- Ctrl+S repetido mientras sube: nunca dos subidas a la vez, y queda el último estado
   fake.delay = 400;
@@ -329,13 +341,14 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
 
   // -- conflicto otra vez, ahora sobre la copia, y «Sobrescribir»
   fake.touch(copy);
+  const copyRev = copy.rev;
   await edit(page);
   await save(page);
   await conflict.waitFor({ timeout: 5000 });
   await conflict.getByRole('button', { name: /Sobrescribir|Overwrite/ }).click();
   await waitToast(page, /Google Drive/);
   await settle(page);
-  check(project(copy.data)?.name !== 'otra pestaña' && Number(copy.version) >= 3, `Drive: «Sobrescribir» sube igual (versión ${copy.version})`);
+  check(project(copy.data)?.name !== 'otra pestaña' && copy.rev !== copyRev, '«Sobrescribir» sube igual');
 
   // -- Guardar como, con un nombre que ya existe: si no se confirma, no se toca nada
   const count = fake.projects().length;

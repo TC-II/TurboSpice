@@ -1,15 +1,18 @@
 import { t } from '../i18n/i18n.ts';
 // Google Drive (API REST v3) con el scope `drive.file`: la app sólo ve los archivos que creó
 // ella misma. Los proyectos (.turbo, JSON) y los .asc se guardan en una carpeta "TurboSpice" en
-// la raíz del Drive del usuario. Cada archivo trae su `version` (sube con cada cambio): así se
-// detecta que otra pestaña u otra máquina lo cambió antes de pisarlo (#156).
+// la raíz del Drive del usuario. Cada archivo trae su `version` (la revisión del contenido): así se
+// detecta que otra pestaña u otra máquina lo cambió antes de pisarlo (#156). No es el campo
+// `version` de Drive: ése sube solo ~1 s después de cada escritura (Drive procesa el archivo), y
+// el segundo guardado veía un conflicto que no existía (#176). `headRevisionId` cambia sólo con
+// el contenido.
 // No depende de React ni de Google Identity Services: recibe una función que da el token.
 
 export const FOLDER_NAME = 'TurboSpice';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const ASC_MIME = 'application/octet-stream';
 const TURBO_MIME = 'application/json';
-const FIELDS = 'id,name,modifiedTime,version';
+const FIELDS = 'id,name,modifiedTime,headRevisionId';
 /** Desde este tamaño se sube por partes (la subida multipart admite hasta 5 MB) */
 export const RESUMABLE_MIN = 5 * 1024 * 1024;
 const mimeOf = (name: string) => (/\.(turbo|json)$/i.test(name) ? TURBO_MIME : ASC_MIME);
@@ -20,9 +23,13 @@ export interface DriveFile {
   id: string;
   name: string;
   modifiedTime?: string;
-  /** número de versión de Drive (cambia con cada modificación) */
+  /** revisión del contenido (`headRevisionId`): cambia sólo cuando cambia el contenido */
   version?: string;
 }
+
+/** Lo que devuelve la API, con la revisión del contenido como `version` */
+type ApiFile = Omit<DriveFile, 'version'> & { headRevisionId?: string };
+const fromApi = ({ headRevisionId, ...f }: ApiFile): DriveFile => (headRevisionId ? { ...f, version: headRevisionId } : f);
 
 export interface DriveUser {
   displayName: string;
@@ -66,6 +73,10 @@ export class DriveClient {
     return (await this.call(url, init)).json() as Promise<T>;
   }
 
+  private async file(url: string, init?: RequestInit): Promise<DriveFile> {
+    return fromApi(await this.json<ApiFile>(url, init));
+  }
+
   /** Datos de la cuenta (nombre, mail, foto); `about` acepta el scope drive.file */
   user(): Promise<DriveUser> {
     return this.json<{ user: DriveUser }>(`${API}/about?fields=user(displayName,emailAddress,photoLink)`).then((r) => r.user);
@@ -92,20 +103,20 @@ export class DriveClient {
   async list(): Promise<DriveFile[]> {
     const q = `${qString(await this.folderId())} in parents and trashed = false and mimeType != '${FOLDER_MIME}'`;
     const params = new URLSearchParams({ q, fields: `files(${FIELDS})`, orderBy: 'modifiedTime desc', pageSize: '200', spaces: 'drive' });
-    const r = await this.json<{ files: DriveFile[] }>(`${API}/files?${params}`);
-    return r.files.filter((f) => /\.(turbo|asc)$/i.test(f.name));
+    const r = await this.json<{ files: ApiFile[] }>(`${API}/files?${params}`);
+    return r.files.map(fromApi).filter((f) => /\.(turbo|asc)$/i.test(f.name));
   }
 
   /** Archivos de la carpeta con este nombre exacto (el más reciente primero) */
   async find(name: string): Promise<DriveFile[]> {
     const q = `${qString(await this.folderId())} in parents and trashed = false and name = ${qString(name)}`;
     const params = new URLSearchParams({ q, fields: `files(${FIELDS})`, orderBy: 'modifiedTime desc', spaces: 'drive' });
-    return (await this.json<{ files: DriveFile[] }>(`${API}/files?${params}`)).files;
+    return (await this.json<{ files: ApiFile[] }>(`${API}/files?${params}`)).files.map(fromApi);
   }
 
   /** Nombre, fecha y versión actuales de un archivo */
   meta(id: string): Promise<DriveFile> {
-    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`);
+    return this.file(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`);
   }
 
   async download(id: string): Promise<Uint8Array> {
@@ -114,7 +125,7 @@ export class DriveClient {
   }
 
   private patchMeta(id: string, meta: object): Promise<DriveFile> {
-    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`, {
+    return this.file(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(meta),
@@ -127,7 +138,7 @@ export class DriveClient {
 
   /** Copia en la misma carpeta, con otro nombre */
   async copy(id: string, name: string): Promise<DriveFile> {
-    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}/copy?fields=${FIELDS}`, {
+    return this.file(`${API}/files/${encodeURIComponent(id)}/copy?fields=${FIELDS}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, parents: [await this.folderId()] }),
@@ -157,10 +168,10 @@ export class DriveClient {
       });
       const at = start.headers.get('Location');
       if (!at) throw new Error(t('Google Drive: didn\'t say where to upload the file'));
-      return this.json<DriveFile>(at, { method: 'PUT', headers: { 'Content-Type': mime }, body: bytes as BlobPart });
+      return this.file(at, { method: 'PUT', headers: { 'Content-Type': mime }, body: bytes as BlobPart });
     }
     const { body, contentType } = multipart(meta, bytes, undefined, mime);
-    return this.json<DriveFile>(`${target}?uploadType=multipart&fields=${FIELDS}`, { method, headers: { 'Content-Type': contentType }, body: body as BlobPart });
+    return this.file(`${target}?uploadType=multipart&fields=${FIELDS}`, { method, headers: { 'Content-Type': contentType }, body: body as BlobPart });
   }
 
 }

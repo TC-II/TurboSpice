@@ -111,16 +111,17 @@ describe('Google Drive', () => {
 
   it('un .turbo va como JSON marcado de TurboSpice, y se pide su versión (#156)', async () => {
     const { fn, calls } = fakeFetch([
-      (c) => (c.method === 'PATCH' ? json({ id: 'A1', name: 'p.turbo', version: '7' }) : undefined),
-      (c) => (c.method === 'GET' && c.url.includes('/files/A1?') ? json({ id: 'A1', name: 'p.turbo', version: '8' }) : undefined),
+      (c) => (c.method === 'PATCH' ? json({ id: 'A1', name: 'p.turbo', headRevisionId: 'r7' }) : undefined),
+      (c) => (c.method === 'GET' && c.url.includes('/files/A1?') ? json({ id: 'A1', name: 'p.turbo', headRevisionId: 'r8' }) : undefined),
     ]);
     const d = new DriveClient(async () => 'tok', fn);
-    expect((await d.save('p.turbo', new TextEncoder().encode('{}'), 'A1')).version).toBe('7');
+    expect((await d.save('p.turbo', new TextEncoder().encode('{}'), 'A1')).version).toBe('r7');
     const body = new TextDecoder().decode(calls[0].body as Uint8Array);
     expect(body).toContain('"mimeType":"application/json","appProperties":{"turbospice":"1"}');
     expect(body).toMatch(/Content-Type: application\/json\s+\{\}/);
-    expect(calls[0].url).toContain('fields=id%2Cname%2CmodifiedTime%2Cversion'.replace(/%2C/g, ','));
-    expect((await d.meta('A1')).version).toBe('8');
+    // la revisión del contenido, no `version` de Drive (que sube sola después de escribir, #176)
+    expect(calls[0].url).toContain('fields=id,name,modifiedTime,headRevisionId');
+    expect((await d.meta('A1')).version).toBe('r8');
   });
 
   it('desde 5 MB sube por partes', async () => {

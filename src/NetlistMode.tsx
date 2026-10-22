@@ -160,7 +160,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
         <section className="results">
           {result && (
             <div className="toolbar">
-              <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label="Plot">
+              <select value={plotName} onChange={(e) => setPlotName(e.target.value)} aria-label={t('Plot')}>
                 {result.plots.map((p) => (
                   <option key={p.name}>{p.name}</option>
                 ))}
@@ -170,7 +170,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
                   <option value="db">{t('Magnitude (dB)')}</option>
                   <option value="phase">{t('Phase (°)')}</option>
                   <option value="mag">{t('Magnitude')}</option>
-                  <option value="re">Real</option>
+                  <option value="re">{t('Real')}</option>
                   <option value="im">{t('Imaginary')}</option>
                 </select>
               )}

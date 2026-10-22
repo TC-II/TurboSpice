@@ -66,7 +66,7 @@ const LAYOUT: Record<Exclude<SourceKind, 'pwl'>, FieldDef[][]> = {
     [f(2, t('Rise start'), 's', 'td1', true), f(4, t('Fall start'), 's', 'td2')],
   ],
   sffm: [
-    [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, 'Portadora', 'Hz', 'fc'), f(4, 'Moduladora', 'Hz', 'fs')],
+    [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, t('Carrier'), 'Hz', 'fc'), f(4, t('Modulating'), 'Hz', 'fs')],
     [f(3, t('Modulation index'), '', 'mdi')],
   ],
 };
@@ -315,7 +315,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
             >
               {t('Form')}
             </button>
-            <button type="button" onClick={onAttributes}>Atributos…</button>
+            <button type="button" onClick={onAttributes}>{t('Attributes…')}</button>
             <span className="spacer" />
             <button type="button" onClick={onClose}>{t('Cancel')}</button>
             <button type="submit" className="primary">{t('OK')}</button>
@@ -413,7 +413,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
             <code className="src-line">{fullLine(full)}</code>
             <div className="buttons left">
               <button type="button" onClick={() => setText(fullLine(full))}>{t('Edit as text')}</button>
-              <button type="button" onClick={onAttributes}>Atributos…</button>
+              <button type="button" onClick={onAttributes}>{t('Attributes…')}</button>
             </div>
           </details>
           {warn && <p className="hint warn">{warn}</p>}
@@ -620,7 +620,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
         <path className="wave" d={d} />
         <Level y={74} label="Offset" to={505} on={on('off')} />
         <Level y={34} label="+A" to={70} on={on('amp')} />
-        <Dim x1={70} x2={285} y={142} label="1 / moduladora" on={on('fs')} />
+        <Dim x1={70} x2={285} y={142} label={t('1 / modulating')} on={on('fs')} />
       </>
     );
   }

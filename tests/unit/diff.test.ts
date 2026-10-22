@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc, type SymbolInst } from '../../src/asc/model.ts';
 import { diffCircuits } from '../../src/project/diff.ts';
+import { getLang, setLang } from '../../src/i18n/i18n.ts';
 
 const sym = (inst: string, value: string, x = 0, type = 'res'): SymbolInst => ({ type, x, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', inst], ['Value', value]]) });
 const doc = (symbols: SymbolInst[], wires = [{ x1: 0, y1: 0, x2: 64, y2: 0 }], text = '.tran 10m'): AscDoc => ({
@@ -24,6 +25,16 @@ describe('cambios entre corridas', () => {
   it('renombrar es quitar y agregar; mover se marca', () => {
     expect(diffCircuits(doc([sym('R1', '1k')]), doc([sym('R5', '1k')])).summary).toBe('+R5, −R1');
     expect(diffCircuits(doc([sym('R1', '1k')]), doc([sym('R1', '1k', 32)])).summary).toBe('R1 movido');
+  });
+
+  it('el resumen sigue al idioma de la interfaz', () => {
+    const before = getLang();
+    setLang('en', false);
+    try {
+      expect(diffCircuits(doc([sym('R1', '1k')]), doc([sym('R1', '1k', 32)])).summary).toBe('R1 moved');
+    } finally {
+      setLang(before, false);
+    }
   });
 
   it('cables por segmento, sin importar el sentido', () => {

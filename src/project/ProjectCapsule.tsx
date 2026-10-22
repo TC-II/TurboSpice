@@ -78,10 +78,10 @@ export function ProjectCapsule({ project, variants, active, dirty, onRenameProje
         <div className="capsule-pop" role="menu" aria-label={t('Variants')}>
           <div className="capsule-split" role="group" aria-label={t('New variant')}>
             <button onClick={act(onClone)} title={t('Copy of this variant (circuit, simulations and history) with another name')}>
-              Clone Current
+              {t('Clone current')}
             </button>
             <button onClick={act(onBlank)} title={t('Empty variant: no circuit or simulations')}>
-              Blank
+              {t('Blank')}
             </button>
           </div>
           <ul className="capsule-list">

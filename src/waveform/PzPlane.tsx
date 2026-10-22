@@ -203,7 +203,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
             <option value="">{t('Export…')}</option>
             <option value="png">{t('Map to PNG')}</option>
             <option value="svg">{t('Map to SVG')}</option>
-            <option value="csv">Tabla a CSV</option>
+            <option value="csv">{t('Table to CSV')}</option>
           </select>
         </div>
         <div className="pz-map" ref={box} style={{ width: side }}>
@@ -212,7 +212,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
             className={`pz-plane${drag?.mode === 'pan' ? ' panning' : ''}`}
             viewBox={`0 0 ${W} ${W}`}
             role="img"
-            aria-label="Plano s"
+            aria-label={t('s-plane')}
             onPointerDown={onDown}
             onPointerMove={onMove}
             onPointerUp={onUp}

@@ -865,7 +865,7 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
         <button disabled={b === undefined} onClick={() => setCursors((c) => ({ ...c, b: undefined, sel: 'a' }))}>
           {t('Clear B')}
         </button>
-        <button onClick={() => setCursors((c) => ({ ...c, a: c.b, b: c.a, ta: c.tb, tb: c.ta }))} title="Intercambiar A y B">
+        <button onClick={() => setCursors((c) => ({ ...c, a: c.b, b: c.a, ta: c.tb, tb: c.ta }))} title={t('Swap A and B')}>
           A ⇄ B
         </button>
       </div>

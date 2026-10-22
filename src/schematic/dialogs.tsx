@@ -35,7 +35,7 @@ export function checkValue(prefix: string, value: string): { value: string; info
   return { value: v, info: `= ${si(x, 4)}${unit}${milli}` };
 }
 import { SymbolView } from './SchematicCanvas.tsx';
-import { getLang, t } from '../i18n/i18n.ts';
+import { getLang, locale, t } from '../i18n/i18n.ts';
 
 /** margen mínimo de los diálogos contra los bordes de la ventana */
 const MODAL_MARGIN = 16;
@@ -474,8 +474,8 @@ export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) 
   return (
     <Modal title={t('Share circuit')} onClose={onClose}>
       <div className="textdlg">
-        <input ref={input} readOnly value={url} aria-label="Link" onFocus={(e) => e.target.select()} />
-        <p className="hint">{t('The link holds the whole circuit compressed in')}{' '}{bytes.toLocaleString('es')} bytes.</p>
+        <input ref={input} readOnly value={url} aria-label={t('Link')} onFocus={(e) => e.target.select()} />
+        <p className="hint">{t('The link holds the whole circuit compressed in')}{' '}{t('{n} bytes.', { n: bytes.toLocaleString(locale()) })}</p>
         {copied ? (
           <p className="hint ok"><span aria-hidden="true">✓</span> {t('Link copied to the clipboard')}</p>
         ) : copied === false ? (

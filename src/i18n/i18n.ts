@@ -22,6 +22,9 @@ if (typeof document !== 'undefined') document.documentElement.lang = lang;
 
 export const getLang = () => lang;
 
+/** Idioma para fechas y números (toLocaleString): el de la interfaz, no el del navegador */
+export const locale = () => (lang === 'es' ? 'es-AR' : 'en-US');
+
 /** Cambia el idioma (y lo recuerda, salvo `persist: false`, que usan los tests) */
 export function setLang(l: Lang, persist = true) {
   lang = l;

@@ -101,7 +101,7 @@ import { drive, useGoogle } from './cloud/google.ts';
 import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
-import { getLang, setLang, t } from './i18n/i18n.ts';
+import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -627,7 +627,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           if (touched.current) return;
           loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
           setDirty(session.dirty);
-          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: new Date(session.time).toLocaleString() })] : []), ...warnings];
+          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: new Date(session.time).toLocaleString(locale()) })] : []), ...warnings];
           if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {
@@ -1182,13 +1182,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     viewingRef.current = false;
     setValueOffer(null);
     history.commit(parseAsc(r.asc));
-    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: new Date(r.time).toLocaleString() }));
+    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: new Date(r.time).toLocaleString(locale()) }));
   };
   /** Clonar: una simulación nueva con el circuito de esa corrida */
   const cloneRun = (id: string) => {
     const r = curRuns.find((x) => x.id === id);
     if (!r || !curSim) return;
-    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString()})`);
+    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString(locale())})`);
     if (!res) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
     enter(res.project);
     markDirty();
@@ -1902,7 +1902,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             { label: ltIndex ? t('Import again…') : t('Choose the lib folder…'), onClick: () => ltInput.current?.click() },
             ...(ltIndex
               ? [
-                  { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString() }), disabled: true, onClick: () => {} },
+                  { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString(locale()) }), disabled: true, onClick: () => {} },
                   { label: t('Remove'), onClick: doRemoveLtspice },
                 ]
               : []),
@@ -1914,7 +1914,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           label: t('Recent'),
           items: recent.map((r, i) => ({
             label: `${r.name.replace(/\.asc$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
-            title: new Date(r.time).toLocaleString(),
+            title: new Date(r.time).toLocaleString(locale()),
             onClick: () => doRecent(i),
           })),
         },
@@ -2335,8 +2335,8 @@ ${ltNetlistText(sim.built.lt)}
           )}
           {viewed && (
             <div className="pick-banner history-banner">
-              {t('Run from')}{' '}{new Date(viewed.time).toLocaleString()} {t('· read-only')}
-              <button onClick={() => restoreRun(viewed.id)}>Restore</button>
+              {t('Run from')}{' '}{new Date(viewed.time).toLocaleString(locale())} {t('· read-only')}
+              <button onClick={() => restoreRun(viewed.id)}>{t('Restore')}</button>
               <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
             </div>
           )}
@@ -2439,7 +2439,7 @@ ${ltNetlistText(sim.built.lt)}
                 <>
                   {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}
                   {sim.result.plots.length > 1 && (
-                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label="Plot" title={t('Result to view (the simulation returned several)')}>
+                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label={t('Plot')} title={t('Result to view (the simulation returned several)')}>
                       {sim.result.plots.map((p) => (
                         <option key={p.name} value={p.name}>
                           {p.name}

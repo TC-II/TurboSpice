@@ -512,7 +512,7 @@ function PlotCard({ view, set, remove, picker, preferred }: {
                 value={traceColor(tt, ti)}
                 onChange={(e) => setTrace(pi, ti, { ...tt, color: e.target.value })}
               />
-              <PickInput value={tt.expr} onChange={(expr) => setTrace(pi, ti, { ...tt, expr })} picker={picker} what="net" list="sim-nets-v" label={t('Signal {p0} of pane {p1}', { p0: ti + 1, p1: pi + 1 })} placeholder="V(out) o V(out)/V(in)" />
+              <PickInput value={tt.expr} onChange={(expr) => setTrace(pi, ti, { ...tt, expr })} picker={picker} what="net" list="sim-nets-v" label={t('Signal {p0} of pane {p1}', { p0: ti + 1, p1: pi + 1 })} placeholder={t('V(out) or V(out)/V(in)')} />
               <button className="x" aria-label={t('Remove {p0}', { p0: tt.expr || t('the signal') })} title={t('Remove')} onClick={() => setTrace(pi, ti, null)}>
                 ✕
               </button>

@@ -5,7 +5,7 @@ import { pickAscFiles } from '../schematic/fileio.ts';
 import type { DriveFile } from './drive.ts';
 import { FOLDER_NAME, uniqueName } from './drive.ts';
 import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
-import { t } from '../i18n/i18n.ts';
+import { locale, t } from '../i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -198,7 +198,7 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
               <li key={f.id} className={f.id === currentId ? 'current' : ''}>
                 <button className="drive-open" onClick={() => onOpen(f)} title={t('Open')} disabled={!!busy}>
                   <span>{f.name}</span>
-                  {f.modifiedTime && <span className="hint">{new Date(f.modifiedTime).toLocaleString()}</span>}
+                  {f.modifiedTime && <span className="hint">{new Date(f.modifiedTime).toLocaleString(locale())}</span>}
                 </button>
                 <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>✎</button>
                 <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>⧉</button>

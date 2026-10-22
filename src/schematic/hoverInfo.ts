@@ -39,7 +39,7 @@ export function hoverInfo(doc: AscDoc, lib: Library, conn: Connectivity, ref: It
     case 'flag': {
       const f = doc.flags[ref.index];
       if (!f) return [];
-      return [f.name === '0' ? t('Ground') : t('Net label'), `nombre: ${f.name}`, t('at ({x}, {y})', { x: f.x, y: f.y })];
+      return [f.name === '0' ? t('Ground') : t('Net label'), t('name: {name}', { name: f.name }), t('at ({x}, {y})', { x: f.x, y: f.y })];
     }
     case 'text': {
       const tt = doc.texts[ref.index];

@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import type { Run } from './turbo.ts';
-import { t } from '../i18n/i18n.ts';
+import { locale, t } from '../i18n/i18n.ts';
 
 /** '' = el circuito actual */
 export type HistoryPick = string;
@@ -14,8 +14,8 @@ const when = (tt: number) => {
   const d = new Date(tt);
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
-  const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  return sameDay ? `Hoy ${time}` : `${d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: '2-digit' })} ${time}`;
+  const time = d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return sameDay ? t('Today {time}', { time }) : `${d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: '2-digit' })} ${time}`;
 };
 
 export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRestore, onClone, onClose }: {
@@ -91,7 +91,7 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
               aria-selected={picked === r.id}
               aria-disabled={r.damaged}
               className={`history-item${picked === r.id ? ' picked' : ''}${r.damaged ? ' damaged' : ''}`}
-              title={r.damaged ? t('This run is damaged in the file: it can\'t be shown') : new Date(r.time).toLocaleString()}
+              title={r.damaged ? t('This run is damaged in the file: it can\'t be shown') : new Date(r.time).toLocaleString(locale())}
               onClick={() => !r.damaged && onPick(r.id)}
             >
               <span className="history-when">{when(r.time)}</span>
@@ -99,7 +99,7 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
               {picked === r.id && (
                 <span className="history-actions">
                   <button className="primary" onClick={(e) => (e.stopPropagation(), onRestore(r.id))} title={t('Bring this circuit to the present: it becomes the current one (Ctrl+Z undoes it)')}>
-                    Restore
+                    {t('Restore')}
                   </button>
                   <button onClick={(e) => (e.stopPropagation(), onClone(r.id))} title={t('A new simulation with this circuit')}>
                     {t('Clone')}

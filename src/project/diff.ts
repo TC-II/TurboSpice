@@ -66,8 +66,8 @@ export function diffCircuits(prev: AscDoc, next: AscDoc): CircuitDiff {
     const v1 = s.attrs.get('Value');
     if (old.type !== s.type) changed.push(`${name} → ${s.type.split(/[\\/]/).pop()}`);
     else if (v0 !== v1 && v0 !== undefined && v1 !== undefined) changed.push(`${name} ${v0}→${v1}`);
-    else if (attrsKey(old) !== attrsKey(s)) changed.push(`${name} modificado`);
-    else if (old.x !== s.x || old.y !== s.y || old.orient !== s.orient) changed.push(`${name} movido`);
+    else if (attrsKey(old) !== attrsKey(s)) changed.push(t('{name} modified', { name }));
+    else if (old.x !== s.x || old.y !== s.y || old.orient !== s.orient) changed.push(t('{name} moved', { name }));
     else return;
     symbols.set(i, 'changed');
   });

@@ -144,14 +144,15 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
   };
   const names = (files ?? []).map((f) => f.name);
   const rename = (f: DriveFile) => {
-    const n = window.prompt('Nuevo nombre', f.name.replace(/\.asc$/i, ''))?.trim();
+    const ext = /\.turbo$/i.test(f.name) ? '.turbo' : '.asc';
+    const n = window.prompt('Nuevo nombre', f.name.replace(/\.(asc|turbo)$/i, ''))?.trim();
     if (!n) return;
-    const name = /\.asc$/i.test(n) ? n : `${n}.asc`;
+    const name = `${n.replace(/\.(asc|turbo)$/i, '')}${ext}`;
     if (name === f.name) return;
     if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(`Ya hay un «${name}» en la carpeta`);
     run('Renombrando…', async () => onRenamed?.(await drive.rename(f.id, name)));
   };
-  const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(`${f.name.replace(/\.asc$/i, '')} (copia)`, names)));
+  const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(f.name.replace(/(\.(asc|turbo))?$/i, ' (copia)$1'), names)));
   const trash = (f: DriveFile) => {
     if (!window.confirm(`¿Mandar «${f.name}» a la papelera de Google Drive?`)) return;
     run('Borrando…', async () => (await drive.trash(f.id), onTrashed?.(f.id)));
@@ -187,7 +188,7 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
         {!files ? (
           !error && <p className="hint">Cargando…</p>
         ) : !files.length ? (
-          <p className="hint">Todavía no hay simulaciones. Guardá con Ctrl+S o importá un .asc de tu computadora.</p>
+          <p className="hint">Todavía no hay proyectos. Guardá con Ctrl+S o importá un .asc de tu computadora.</p>
         ) : !shown.length ? (
           <p className="hint">Nada coincide con «{query}».</p>
         ) : (

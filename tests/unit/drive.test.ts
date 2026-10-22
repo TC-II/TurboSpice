@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DriveClient, multipart, qString, uniqueName } from '../../src/cloud/drive.ts';
+import { DriveClient, multipart, qString, RESUMABLE_MIN, uniqueName } from '../../src/cloud/drive.ts';
 
 type Call = { url: string; method: string; auth: string | null; body?: unknown; contentType: string | null };
 
@@ -107,5 +107,35 @@ describe('Google Drive', () => {
     expect(uniqueName('a.asc', [])).toBe('a.asc');
     expect(uniqueName('a', ['A.asc'])).toBe('a (2).asc');
     expect(uniqueName('a.asc', ['a.asc', 'a (2).asc'])).toBe('a (3).asc');
+  });
+
+  it('un .turbo va como JSON marcado de TurboSpice, y se pide su versión (#156)', async () => {
+    const { fn, calls } = fakeFetch([
+      (c) => (c.method === 'PATCH' ? json({ id: 'A1', name: 'p.turbo', version: '7' }) : undefined),
+      (c) => (c.method === 'GET' && c.url.includes('/files/A1?') ? json({ id: 'A1', name: 'p.turbo', version: '8' }) : undefined),
+    ]);
+    const d = new DriveClient(async () => 'tok', fn);
+    expect((await d.save('p.turbo', new TextEncoder().encode('{}'), 'A1')).version).toBe('7');
+    const body = new TextDecoder().decode(calls[0].body as Uint8Array);
+    expect(body).toContain('"mimeType":"application/json","appProperties":{"turbospice":"1"}');
+    expect(body).toMatch(/Content-Type: application\/json\s+\{\}/);
+    expect(calls[0].url).toContain('fields=id%2Cname%2CmodifiedTime%2Cversion'.replace(/%2C/g, ','));
+    expect((await d.meta('A1')).version).toBe('8');
+  });
+
+  it('desde 5 MB sube por partes', async () => {
+    const { fn, calls } = fakeFetch([
+      (c) => (c.url.includes('uploadType=resumable') ? new Response('', { status: 200, headers: { Location: 'https://upload.example/s1' } }) : undefined),
+      (c) => (c.method === 'PUT' && c.url === 'https://upload.example/s1' ? json({ id: 'A1', name: 'p.turbo', version: '2' }) : undefined),
+    ]);
+    const r = await new DriveClient(async () => 'tok', fn).save('p.turbo', new Uint8Array(RESUMABLE_MIN), 'A1');
+    expect(r.version).toBe('2');
+    expect(calls.map((c) => c.method)).toEqual(['PATCH', 'PUT']);
+    expect(JSON.parse(calls[0].body as string).name).toBe('p.turbo');
+    expect((calls[1].body as Uint8Array).length).toBe(RESUMABLE_MIN);
+  });
+
+  it('nombres únicos que respetan .turbo', () => {
+    expect(uniqueName('p.turbo', ['p.turbo'])).toBe('p (2).turbo');
   });
 });

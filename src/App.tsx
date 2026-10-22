@@ -16,7 +16,7 @@ import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.t
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
@@ -98,7 +98,7 @@ import { download, exportSchematic } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
-import type { DriveFile } from './cloud/drive.ts';
+import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 
@@ -143,6 +143,8 @@ interface FileState {
   handle?: Parameters<typeof saveFile>[2];
   /** id del archivo en Google Drive (si se abrió o guardó ahí) */
   driveId?: string;
+  /** versión del archivo en Drive cuando se abrió o guardó: si cambió, otro lo modificó (#156) */
+  driveVersion?: string;
 }
 
 // Serialización cacheada por documento (el autoguardado y el cambio de simulación la usan seguido)
@@ -283,9 +285,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const projectRef = useRef(project);
   projectRef.current = project;
   const [dirty, setDirty] = useState(false);
+  // cuenta los cambios: un guardado en Drive limpia el «sin guardar» sólo si no hubo otros mientras
+  const editRev = useRef(0);
+  const markDirty = () => {
+    editRev.current++;
+    setDirty(true);
+  };
   const editProject = (p: Project) => {
     setProjectState(p);
-    setDirty(true);
+    markDirty();
   };
   // deshacer por simulación (#154): la pila de cada una mientras no se la ve
   const stacks = useRef(new Map<string, History<AscDoc>>());
@@ -293,7 +301,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const quietDoc = useRef(true);
   useEffect(() => {
     if (quietDoc.current) quietDoc.current = false;
-    else setDirty(true);
+    else markDirty();
   }, [history.state]);
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
@@ -562,7 +570,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, []);
 
   /** Abre los bytes de un .turbo o de un .asc (`at`: dónde está el archivo, si es un .turbo) */
-  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId'> = {}) => {
+  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'> = {}) => {
     const utf8 = new TextDecoder().decode(bytes);
     if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
       const { project: p, warnings } = await parseTurbo(utf8);
@@ -616,7 +624,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         try {
           const { project: p, warnings } = await parseTurbo(session.turbo);
           if (touched.current) return;
-          loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId });
+          loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
           setDirty(session.dirty);
           const notes = [...(session.dirty ? [`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`] : []), ...warnings];
           if (notes.length) setMessage(notes.join(' · '));
@@ -639,7 +647,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!restored) return;
     const t = setTimeout(() => {
       serializeTurbo(snapshot()).then((turbo) =>
-        saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, turbo, dirty, time: Date.now() }),
+        saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }),
       );
     }, 600);
     return () => clearTimeout(t);
@@ -734,10 +742,83 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
-  /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo, o uno nuevo */
+  // --- Google Drive (#156) ---
+  // Sobre el mismo archivo los guardados van en cola: nunca dos subidas a la vez, y si llegan
+  // varios mientras se sube, después se manda sólo el último. Antes de subir se compara la versión
+  // del archivo en Drive con la que se abrió: si cambió, no se pisa y se pregunta.
+  const fileRef = useRef(file);
+  fileRef.current = file;
+  const snapshotRef = useRef(snapshot);
+  snapshotRef.current = snapshot;
+  const driveBusy = useRef(false);
+  const drivePending = useRef<{ auto: boolean } | null>(null);
+  const [driveConflict, setDriveConflict] = useState<{ name: string } | null>(null);
+  const saveToDrive = async (auto: boolean, force = false) => {
+    const f = fileRef.current;
+    if (!f.driveId) return;
+    const name = turboName(f.name);
+    if (!force && f.driveVersion) {
+      const m = await drive.meta(f.driveId);
+      if (m.version && m.version !== f.driveVersion) return setDriveConflict({ name: m.name });
+    }
+    const rev = editRev.current;
+    const p = { ...snapshotRef.current(), name: projectName(name) };
+    const r = await drive.save(name, new TextEncoder().encode(await serializeTurbo(p)), f.driveId);
+    const saved = { ...fileRef.current, name: r.name, driveId: r.id, driveVersion: r.version };
+    fileRef.current = saved;
+    setFile(saved);
+    if (editRev.current === rev) setDirty(false);
+    if (!auto) {
+      remember(p, saved);
+      setMessage(`Guardado en Google Drive: ${r.name}`);
+    }
+  };
+  const queueDriveSave = (auto: boolean, force = false) => {
+    if (driveBusy.current) {
+      drivePending.current = { auto: (drivePending.current?.auto ?? true) && auto };
+      return;
+    }
+    driveBusy.current = true;
+    saveToDrive(auto, force)
+      .catch((e: Error) => setMessage(`No se pudo guardar en Google Drive: ${e.message}`))
+      .finally(() => {
+        driveBusy.current = false;
+        const next = drivePending.current;
+        drivePending.current = null;
+        if (next) queueDriveSave(next.auto);
+      });
+  };
+  // al simular se guarda solo en Drive (después de que la corrida entró al proyecto)
+  const [autoDrive, setAutoDrive] = useState(0);
+  useEffect(() => {
+    if (autoDrive && google.account && fileRef.current.driveId) queueDriveSave(true);
+  }, [autoDrive]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Conflicto: recargar la versión de Drive, guardar la mía como copia o sobrescribir */
+  const resolveDriveConflict = async (how: 'reload' | 'copy' | 'overwrite') => {
+    setDriveConflict(null);
+    const f = fileRef.current;
+    if (!f.driveId) return;
+    try {
+      if (how === 'overwrite') return queueDriveSave(false, true);
+      if (how === 'reload') {
+        // lo de acá queda en recientes, por las dudas
+        remember(snapshotRef.current(), f, true);
+        return await openBytes(await drive.download(f.driveId), f.name, { driveId: f.driveId, driveVersion: (await drive.meta(f.driveId)).version });
+      }
+      const name = uniqueName(`${projectName(f.name)} (copia)${EXT}`, (await drive.list()).map((x) => x.name));
+      const { p, bytes } = await turboBytes(name);
+      const r = await drive.save(name, bytes);
+      savedAs({ ...f, name: r.name, driveId: r.id, driveVersion: r.version }, p, ' en Google Drive');
+    } catch (e) {
+      setMessage(`Google Drive: ${(e as Error).message}`);
+    }
+  };
+
+  /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo (en cola), o uno nuevo */
   const doSaveDrive = async (saveAs = false) => {
+    if (!saveAs && file.driveId) return queueDriveSave(false);
     let name = turboName(file.name);
-    let id = saveAs ? undefined : file.driveId;
+    let id: string | undefined;
     if (!id && saveAs) {
       const n = window.prompt('Nombre del proyecto en Google Drive', projectName(name))?.trim();
       if (!n) return;
@@ -753,7 +834,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         }
       }
       const r = await drive.save(name, bytes, id);
-      savedAs({ ...file, name: r.name, driveId: r.id }, p, ' en Google Drive');
+      savedAs({ ...file, name: r.name, driveId: r.id, driveVersion: r.version }, p, ' en Google Drive');
     } catch (e) {
       setMessage(`No se pudo guardar en Google Drive: ${(e as Error).message}`);
     }
@@ -767,7 +848,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     try {
       const bytes = await drive.download(d.id);
       setDialog(null);
-      await openBytes(bytes, d.name, /\.turbo$/i.test(d.name) ? { driveId: d.id } : {});
+      await openBytes(bytes, d.name, /\.turbo$/i.test(d.name) ? { driveId: d.id, driveVersion: d.version ?? (await drive.meta(d.id)).version } : {});
     } catch (e) {
       setMessage(`No se pudo abrir de Google Drive: ${(e as Error).message}`);
     }
@@ -816,14 +897,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!r || !confirmDiscard()) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
     const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
-    const at = { handle: r.handle as FileState['handle'], driveId: r.driveId };
+    const driveVersion = bytes && r.driveId && google.account ? await drive.meta(r.driveId).then((m) => m.version, () => undefined) : undefined;
+    const at = { handle: r.handle as FileState['handle'], driveId: r.driveId, driveVersion };
     try {
       if (bytes) return await openBytes(bytes, r.name, at);
       // la copia guardada en recientes
       if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
       const { project: p, warnings } = await parseTurbo(r.asc);
       loadProject(p, { name: r.name, ...at });
-      if (r.unsaved) setDirty(true);
+      if (r.unsaved) markDirty();
       else remember(p, { name: r.name, ...at });
       if (warnings.length) setMessage(warnings.join(' · '));
     } catch (e) {
@@ -853,6 +935,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (id) {
       const last = prevRun();
       editProject(recordRun(snapshot(), id, simAsc, Date.now(), last ? diffCircuits(parseAsc(last.asc), doc).summary : undefined).project);
+      setAutoDrive((n) => n + 1);
     }
     try {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
@@ -1014,7 +1097,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo()))));
     if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
     enter(r.project);
-    setDirty(true);
+    markDirty();
   };
   // nombre propio desde la barra (vacío: vuelve al automático)
   const renameActive = (name: string) => editProject(renameProjectSim(projectRef.current, sims.active, name));
@@ -1026,24 +1109,24 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     kept.current.delete(id);
     dropResult(id);
     enter(removeProjectSim(p0, id));
-    setDirty(true);
+    markDirty();
   };
   const duplicateSim = (id: string) => {
     const r = duplicateProjectSim(leave(), id);
     if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
     enter(r.project);
-    setDirty(true);
+    markDirty();
   };
 
   // --- Variantes (#150): la cápsula Proyecto · Variante ---
   const goVariant = (id: string) => id !== variant.id && enter(selectVariant(leave(), id), true);
   const cloneOf = (id: string) => {
     enter(cloneVariant(leave(), id).project, true);
-    setDirty(true);
+    markDirty();
   };
   const newBlankVariant = () => {
     enter(blankVariant(leave()).project, true);
-    setDirty(true);
+    markDirty();
   };
   const deleteVariant = (id: string) => {
     const p0 = leave();
@@ -1055,7 +1138,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const p = removeVariant(p0, id);
     if (p.activeVariant !== p0.activeVariant) enter(p, true);
     else setProjectState(p);
-    setDirty(true);
+    markDirty();
   };
   /** El nombre del proyecto es el del archivo: en Drive se renombra ya; en el equipo, al guardar */
   const renameProject = async (name: string) => {
@@ -1092,7 +1175,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const res = addProjectSim(leave(), r.asc, `${simName(curSim) || 'Sin análisis'} (${new Date(r.time).toLocaleString()})`);
     if (!res) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
     enter(res.project);
-    setDirty(true);
+    markDirty();
   };
   const openHistory = (id: string) => {
     goSim(id);
@@ -1682,7 +1765,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       }
       const merged = await mergeFiles(p.files, files, askConflict);
       enter({ ...p, files: merged.files }, true);
-      setDirty(true);
+      markDirty();
       const parts = [
         ...(variants.length ? [`${variants.length === 1 ? 'la variante' : `${variants.length} variantes:`} ${variants.join(', ')}`] : []),
         ...(merged.added.length ? [`${merged.added.length === 1 ? 'el archivo' : `${merged.added.length} archivos:`} ${merged.added.join(', ')}`] : []),
@@ -2591,6 +2674,19 @@ ${ltNetlistText(sim.built.lt)}
           onMakeSymbol={makeProjectSymbol}
           onClose={() => setDialog(null)}
         />
+      )}
+      {driveConflict && (
+        <Modal title="El archivo cambió en Google Drive" onClose={() => setDriveConflict(null)}>
+          <p>
+            «{driveConflict.name}» se modificó en Google Drive (en otra pestaña u otra computadora) después de que lo abriste.
+            No se guardó nada para no pisar esos cambios.
+          </p>
+          <div className="buttons">
+            <button onClick={() => resolveDriveConflict('reload')} title="Abre la versión de Drive; lo de acá queda en Recientes">Recargar la de Drive</button>
+            <button onClick={() => resolveDriveConflict('copy')}>Guardar la mía como copia</button>
+            <button className="danger" onClick={() => resolveDriveConflict('overwrite')}>Sobrescribir</button>
+          </div>
+        </Modal>
       )}
       {conflict && (
         <FileConflictDialog

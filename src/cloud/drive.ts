@@ -1,10 +1,17 @@
 // Google Drive (API REST v3) con el scope `drive.file`: la app sólo ve los archivos que creó
-// ella misma. Los .asc se guardan en una carpeta "TurboSpice" en la raíz del Drive del usuario.
+// ella misma. Los proyectos (.turbo, JSON) y los .asc se guardan en una carpeta "TurboSpice" en
+// la raíz del Drive del usuario. Cada archivo trae su `version` (sube con cada cambio): así se
+// detecta que otra pestaña u otra máquina lo cambió antes de pisarlo (#156).
 // No depende de React ni de Google Identity Services: recibe una función que da el token.
 
 export const FOLDER_NAME = 'TurboSpice';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const ASC_MIME = 'application/octet-stream';
+const TURBO_MIME = 'application/json';
+const FIELDS = 'id,name,modifiedTime,version';
+/** Desde este tamaño se sube por partes (la subida multipart admite hasta 5 MB) */
+export const RESUMABLE_MIN = 5 * 1024 * 1024;
+const mimeOf = (name: string) => (/\.turbo$/i.test(name) ? TURBO_MIME : ASC_MIME);
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 
@@ -12,6 +19,8 @@ export interface DriveFile {
   id: string;
   name: string;
   modifiedTime?: string;
+  /** número de versión de Drive (cambia con cada modificación) */
+  version?: string;
 }
 
 export interface DriveUser {
@@ -81,9 +90,14 @@ export class DriveClient {
   /** Esquemáticos de la carpeta, el más reciente primero */
   async list(): Promise<DriveFile[]> {
     const q = `${qString(await this.folderId())} in parents and trashed = false and mimeType != '${FOLDER_MIME}'`;
-    const params = new URLSearchParams({ q, fields: 'files(id,name,modifiedTime)', orderBy: 'modifiedTime desc', pageSize: '200', spaces: 'drive' });
+    const params = new URLSearchParams({ q, fields: `files(${FIELDS})`, orderBy: 'modifiedTime desc', pageSize: '200', spaces: 'drive' });
     const r = await this.json<{ files: DriveFile[] }>(`${API}/files?${params}`);
     return r.files.filter((f) => /\.(turbo|asc)$/i.test(f.name));
+  }
+
+  /** Nombre, fecha y versión actuales de un archivo */
+  meta(id: string): Promise<DriveFile> {
+    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`);
   }
 
   async download(id: string): Promise<Uint8Array> {
@@ -92,7 +106,7 @@ export class DriveClient {
   }
 
   private patchMeta(id: string, meta: object): Promise<DriveFile> {
-    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=id,name,modifiedTime`, {
+    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}?fields=${FIELDS}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(meta),
@@ -105,7 +119,7 @@ export class DriveClient {
 
   /** Copia en la misma carpeta, con otro nombre */
   async copy(id: string, name: string): Promise<DriveFile> {
-    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}/copy?fields=id,name,modifiedTime`, {
+    return this.json<DriveFile>(`${API}/files/${encodeURIComponent(id)}/copy?fields=${FIELDS}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, parents: [await this.folderId()] }),
@@ -119,31 +133,46 @@ export class DriveClient {
 
   /** Crea el archivo en la carpeta (sin `id`) o reemplaza su contenido (con `id`) */
   async save(name: string, bytes: Uint8Array, id?: string): Promise<DriveFile> {
-    const meta: Record<string, unknown> = { name };
+    const mime = mimeOf(name);
+    const meta: Record<string, unknown> = { name, mimeType: mime };
+    // los proyectos se marcan como de TurboSpice
+    if (mime === TURBO_MIME) meta.appProperties = { turbospice: '1' };
     if (!id) meta.parents = [await this.folderId()];
-    const { body, contentType } = multipart(meta, bytes);
-    const url = id
-      ? `${UPLOAD}/files/${encodeURIComponent(id)}?uploadType=multipart&fields=id,name,modifiedTime`
-      : `${UPLOAD}/files?uploadType=multipart&fields=id,name,modifiedTime`;
-    return this.json<DriveFile>(url, { method: id ? 'PATCH' : 'POST', headers: { 'Content-Type': contentType }, body: body as BlobPart });
+    const target = `${UPLOAD}/files${id ? `/${encodeURIComponent(id)}` : ''}`;
+    const method = id ? 'PATCH' : 'POST';
+    if (bytes.length >= RESUMABLE_MIN) {
+      // subida por partes: primero los metadatos (devuelve dónde subir), después el contenido
+      const start = await this.call(`${target}?uploadType=resumable&fields=${FIELDS}`, {
+        method,
+        headers: { 'Content-Type': 'application/json; charset=UTF-8', 'X-Upload-Content-Type': mime },
+        body: JSON.stringify(meta),
+      });
+      const at = start.headers.get('Location');
+      if (!at) throw new Error('Google Drive: no devolvió dónde subir el archivo');
+      return this.json<DriveFile>(at, { method: 'PUT', headers: { 'Content-Type': mime }, body: bytes as BlobPart });
+    }
+    const { body, contentType } = multipart(meta, bytes, undefined, mime);
+    return this.json<DriveFile>(`${target}?uploadType=multipart&fields=${FIELDS}`, { method, headers: { 'Content-Type': contentType }, body: body as BlobPart });
   }
+
 }
 
-/** Nombre .asc que no choca con los de la carpeta: «x.asc», «x (2).asc», «x (3).asc»… */
+/** Nombre que no choca con los de la carpeta: «x.asc», «x (2).asc»… (.turbo se respeta; sin extensión, .asc) */
 export function uniqueName(name: string, taken: string[]): string {
-  const base = name.replace(/\.asc$/i, '');
+  const ext = /\.turbo$/i.test(name) ? '.turbo' : '.asc';
+  const base = name.replace(/\.(asc|turbo)$/i, '');
   const used = new Set(taken.map((t) => t.toLowerCase()));
-  let n = `${base}.asc`;
-  for (let i = 2; used.has(n.toLowerCase()); i++) n = `${base} (${i}).asc`;
+  let n = `${base}${ext}`;
+  for (let i = 2; used.has(n.toLowerCase()); i++) n = `${base} (${i})${ext}`;
   return n;
 }
 
 /** Cuerpo multipart/related (metadatos JSON + contenido) para las subidas de Drive */
-export function multipart(meta: object, bytes: Uint8Array, boundary = `turbospice${Math.random().toString(36).slice(2)}`) {
+export function multipart(meta: object, bytes: Uint8Array, boundary = `turbospice${Math.random().toString(36).slice(2)}`, mime = ASC_MIME) {
   const enc = new TextEncoder();
   const head = enc.encode(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
-      `--${boundary}\r\nContent-Type: ${ASC_MIME}\r\n\r\n`,
+      `--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`,
   );
   const tail = enc.encode(`\r\n--${boundary}--\r\n`);
   const body = new Uint8Array(head.length + bytes.length + tail.length);

@@ -135,8 +135,9 @@ export async function saveUserFiles(files: UserFile[]): Promise<void> {
 export interface ProjectSession {
   name: string;
   handle?: unknown;
-  /** id en Google Drive */
+  /** id en Google Drive y su versión al abrirlo o guardarlo (#156) */
   driveId?: string;
+  driveVersion?: string;
   turbo: string;
   /** hay cambios sin guardar en el archivo */
   dirty: boolean;

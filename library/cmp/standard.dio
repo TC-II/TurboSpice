@@ -86,3 +86,8 @@
 .model LED_AZUL D(Is=1.00e-22 Rs=0 N=2.4 Cjo=50p M=.4 Vj=2.9 Eg=2.7 Xti=3 Iave=20m Vpk=5 mfg=generico type=LED)
 .model SMAJ5.0A D(Is=1n Rs=100m N=1.1 Cjo=1.5n M=.33 Vj=.75 Bv=6.4 Ibv=1m mfg=Littelfuse type=TVS)
 .model P6KE6.8A D(Is=1n Rs=50m N=1.1 Cjo=3n M=.33 Vj=.75 Bv=6.45 Ibv=10m mfg=Littelfuse type=TVS)
+* 1N4002/3/5/6: alias de 1N4007 con la tensión inversa de cada uno
+.model 1N4002 ako:1N4007 D(Vpk=100 mfg=Diodes_Inc.)
+.model 1N4003 ako:1N4007 D(Vpk=200 mfg=Diodes_Inc.)
+.model 1N4005 ako:1N4007 D(Vpk=600 mfg=Diodes_Inc.)
+.model 1N4006 ako:1N4007 D(Vpk=800 mfg=Diodes_Inc.)

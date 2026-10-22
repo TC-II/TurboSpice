@@ -57,6 +57,7 @@ export function normalizeSkin(svg) {
 
 export { scanModels } from '../src/library/library.ts';
 import { scanModels } from '../src/library/library.ts';
+import { PASSIVE_KINDS, kindOfFile } from '../src/library/cmp.ts';
 
 export function buildBundle() {
   const symbols = {};
@@ -91,7 +92,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const out = process.argv[2] ?? join(ROOT, 'public', 'library', 'bundle.json');
   const bundle = buildBundle();
   mkdirSync(dirname(out), { recursive: true });
-  writeFileSync(out, JSON.stringify(bundle));
+  // las listas de pasivos (1,7 MB) van aparte: la app las baja después de mostrar el esquemático (#189)
+  const passives = Object.fromEntries(Object.entries(bundle.cmp).filter(([f]) => PASSIVE_KINDS.includes(kindOfFile(f))));
+  const cmp = Object.fromEntries(Object.entries(bundle.cmp).filter(([f]) => !(f in passives)));
+  writeFileSync(out, JSON.stringify({ ...bundle, cmp }));
+  writeFileSync(join(dirname(out), 'cmp-passives.json'), JSON.stringify(passives));
   // Los archivos de modelos se sirven completos: la simulación descarga los que usa
   const subOut = join(dirname(out), 'sub');
   rmSync(subOut, { recursive: true, force: true });

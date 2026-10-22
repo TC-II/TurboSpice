@@ -24,13 +24,27 @@ export class EngineClient {
   onOutput?: (line: string) => void;
   onStatus?: (status: string, percent: number) => void;
 
-  private worker!: Worker;
+  private worker?: Worker;
   private nextId = 1;
   private pending = new Map<number, Pending>();
-  ready!: Promise<void>;
+  private readyP!: Promise<void>;
 
-  constructor() {
-    this.spawn();
+  /**
+   * @param autoStart levantar el Worker ya; si no, con start() o al primer uso (la app lo
+   * arranca cuando llegó la librería: si no, los 2 MB del motor le compiten la red, #190)
+   */
+  constructor(autoStart = true) {
+    if (autoStart) this.spawn();
+  }
+
+  /** Motor cargado (lo arranca si todavía no) */
+  get ready(): Promise<void> {
+    this.start();
+    return this.readyP;
+  }
+
+  start(): void {
+    if (!this.worker) this.spawn();
   }
 
   private spawn(): void {
@@ -59,14 +73,14 @@ export class EngineClient {
       // (el Worker se cae, p. ej., si el navegador le niega memoria): uno nuevo para la próxima
       if (sim) this.restart();
     };
-    this.ready = this.request({ type: 'init' }) as Promise<void>;
+    this.readyP = this.request({ type: 'init' }) as Promise<void>;
   }
 
   private request(req: Req): Promise<SimOutcome | void> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject, sim: req.type === 'simulate' });
-      this.worker.postMessage({ ...req, id } as WorkerRequest);
+      this.worker!.postMessage({ ...req, id } as WorkerRequest);
     });
   }
 
@@ -77,7 +91,7 @@ export class EngineClient {
 
   /** Corta la simulación en curso: termina el Worker y levanta uno nuevo. */
   abort(): void {
-    this.worker.terminate();
+    this.worker?.terminate();
     for (const p of this.pending.values()) p.reject(new Error(t('Simulation aborted')));
     this.pending.clear();
     this.spawn();
@@ -85,7 +99,7 @@ export class EngineClient {
 
   /** Worker nuevo (tras un error fatal de ngspice o una caída del Worker) */
   private restart(): void {
-    this.worker.terminate();
+    this.worker?.terminate();
     this.spawn();
   }
 }

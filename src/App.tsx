@@ -220,7 +220,8 @@ let clipboardFallback = '';
 const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Problems'), meas: t('Measurements') };
 
 export function App() {
-  const engine = useMemo(() => new EngineClient(), []);
+  // (el motor arranca cuando llegó la librería, #190)
+  const engine = useMemo(() => new EngineClient(false), []);
   const [mode, setMode] = useState<'schematic' | 'netlist'>('schematic');
   const [lib, setLib] = useState<Library | null>(null);
   const [libError, setLibError] = useState<string>();
@@ -231,9 +232,18 @@ export function App() {
       .then(async (b: LibraryBundle) => {
         const l = new Library(b);
         for (const f of await loadUserFiles()) registerUserFile(l, f);
+        engine.start();
         setLib(l);
+        // las listas de pasivos (para elegir el valor) llegan después, sin demorar el esquemático (#189)
+        fetch(`${BASE}library/cmp-passives.json`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+          .then((files: Record<string, string>) => l.addCmp(files))
+          .catch(() => {});
       })
-      .catch((e: Error) => setLibError(t('Could not load the library: {message}', { message: e.message })));
+      .catch((e: Error) => {
+        engine.start();
+        setLibError(t('Could not load the library: {message}', { message: e.message }));
+      });
     return () => engine.abort();
   }, [engine]);
 

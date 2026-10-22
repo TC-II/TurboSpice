@@ -20,6 +20,9 @@ export interface CmpPart {
   flags: Set<string>;
 }
 
+/** Pasivos: listas grandes (standard.cap e .ind ~900 kB cada una) que la app baja aparte (#189) */
+export const PASSIVE_KINDS: CmpKind[] = ['cap', 'ind', 'res', 'bead'];
+
 export const CMP_FILES: Record<CmpKind, string> = {
   bjt: 'standard.bjt',
   dio: 'standard.dio',
@@ -31,7 +34,8 @@ export const CMP_FILES: Record<CmpKind, string> = {
   bead: 'standard.bead',
 };
 
-const kindOfFile = (file: string): CmpKind | undefined =>
+/** Tipo de componentes de un archivo de library/cmp (por su nombre: standard.bjt → bjt) */
+export const kindOfFile = (file: string): CmpKind | undefined =>
   (Object.entries(CMP_FILES) as [CmpKind, string][]).find(([, f]) => f.toLowerCase() === file.toLowerCase().split('/').pop())?.[0];
 
 /** "a=1 b = 2 pchan" → parámetros y banderas */

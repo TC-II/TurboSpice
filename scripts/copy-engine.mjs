@@ -1,6 +1,7 @@
 // Copia el motor compilado (engine/dist-engine) a public/engine y genera un manifest
-// con los code models, que el Worker carga al iniciar.
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+// con los code models y el hash de cada archivo, que el Worker carga al iniciar.
+import { createHash } from 'node:crypto';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,5 +17,10 @@ rmSync(DST, { recursive: true, force: true });
 mkdirSync(DST, { recursive: true });
 cpSync(SRC, DST, { recursive: true });
 const codemodels = readdirSync(SRC).filter((f) => f.endsWith('.cm')).sort();
-writeFileSync(join(DST, 'manifest.json'), JSON.stringify({ codemodels }, null, 2));
+// hash del contenido de cada archivo: el Worker guarda el motor en Cache Storage y sólo lo vuelve
+// a bajar si cambió (GitHub Pages cambia el ETag de todo en cada deploy, #191)
+const hashes = Object.fromEntries(
+  ['ngspice.mjs', 'ngspice.wasm', ...codemodels].map((f) => [f, createHash('sha256').update(readFileSync(join(SRC, f))).digest('hex').slice(0, 16)]),
+);
+writeFileSync(join(DST, 'manifest.json'), JSON.stringify({ codemodels, hashes }, null, 2));
 console.log(`motor copiado a public/engine (${codemodels.length} code models)`);

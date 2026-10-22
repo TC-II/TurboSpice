@@ -145,7 +145,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   // --- pulso: campos vinculados ---
   const pulse = kind === 'pulse';
   const duty = pulse && !fixed.includes('duty') ? pulseDutyText(args) : dutyText;
-  // el DC calculado se muestra con 3 cifras; al fijarlo se parte del valor exacto para que Ton no se corra
+  // el DC calculado se muestra con 3 cifras
   function pulseDutyText(a: string[], digits = 3) {
     const d = pulseDuty(n(a[5]) || 0, n(a[6]), n(a[3]) || 0, n(a[4]) || 0);
     return isFinite(d) ? String(Number((d * 100).toPrecision(digits))) : '';
@@ -187,7 +187,8 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
     if (pulse) {
       let a = [...args];
       let fx = fixed;
-      let d = fixed.includes('duty') ? dutyText : pulseDutyText(args, 12);
+      // al cambiar la frecuencia, el DC que se conserva es el que se ve (3 cifras), no el exacto
+      let d = fixed.includes('duty') ? dutyText : pulseDutyText(args);
       if (key === 5) (a[5] = v), (fx = pulseFixedAfter('ton'));
       else if (key === 'per') (a[6] = v), (fx = pulseFixedAfter('per'));
       else if (key === 'frq') (a[6] = isFinite(n(v)) && n(v) ? engNumber(1 / n(v), 12) : a[6]), (fx = pulseFixedAfter('frq'));
@@ -228,7 +229,8 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
       next.dc = spec.dc || dcStash.current || '1';
       if (!spec.dc && !dcStash.current) autoFilled.current.dc = '1';
     }
-    if (k === 'pwl' && !next.points.length) next.points = [['0', '0'], ['1m', '1'], ['2m', '1'], ['3m', '0']];
+    // PWL nuevo: un período de 1 kHz que se repite
+    if (k === 'pwl' && !next.points.length) (next.points = [['0', '0'], ['250u', '1'], ['750u', '1'], ['1m', '0']]), (next.repeat = true);
     setSpec(next);
   };
 
@@ -448,11 +450,25 @@ function Dim({ x1, x2, y, label, on }: { x1: number; x2: number; y: number; labe
   );
 }
 
-function Level({ y, label, to, on }: { y: number; label: string; to: number; on: boolean }) {
+function VDim({ x, y1, y2, label, on }: { x: number; y1: number; y2: number; label: string; on: boolean }) {
   return (
     <g className={`dim${on ? ' on' : ''}`}>
-      <line x1={62} y1={y} x2={to} y2={y} strokeDasharray="3 3" />
-      <text x={56} y={y + 4} textAnchor="end">
+      <line x1={x} y1={y1} x2={x} y2={y2} />
+      <line x1={x - 4} y1={y1} x2={x + 4} y2={y1} />
+      <line x1={x - 4} y1={y2} x2={x + 4} y2={y2} />
+      <text x={x + 6} y={(y1 + y2) / 2 + 4}>
+        {label}
+      </text>
+    </g>
+  );
+}
+
+/** Nivel con línea punteada hasta `to` (sin línea si `to` no pasa del rótulo); `x` es donde termina el rótulo */
+function Level({ y, label, to, on, x = 56 }: { y: number; label: string; to: number; on: boolean; x?: number }) {
+  return (
+    <g className={`dim${on ? ' on' : ''}`}>
+      {to > x + 6 && <line x1={x + 6} y1={y} x2={to} y2={y} strokeDasharray="3 3" />}
+      <text x={x} y={y + 4} textAnchor="end">
         {label}
       </text>
     </g>
@@ -502,9 +518,10 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
       </>
     );
   } else if (spec.kind === 'sine') {
-    const yc = 74;
-    const A = 42;
-    const x0 = 70;
+    // la señal arranca más a la derecha para que entren la cota de A y el rótulo del offset
+    const yc = 64;
+    const A = 40;
+    const x0 = 110;
     const fr = z(2) || 1;
     const td = z(3);
     const th = z(4);
@@ -515,17 +532,21 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     for (let i = 0; i <= 240; i++) {
       const tt = (span * i) / 240;
       const y = tt < td ? Math.sin(ph) : Math.exp(-th * (tt - td)) * Math.sin(2 * Math.PI * fr * (tt - td) + ph);
-      d += `L${(x0 + (tt / span) * 430).toFixed(1)} ${(yc - A * y).toFixed(1)}`;
+      d += `L${(x0 + (tt / span) * 390).toFixed(1)} ${(yc - A * y).toFixed(1)}`;
     }
-    const xs = x0 + (td / span) * 430;
-    const xp = xs + (T / span) * 430;
+    const xs = x0 + (td / span) * 390;
+    const xp = xs + (T / span) * 390;
+    const xa = xs + (T / span) * 97.5;
     body = (
       <>
         <path className="wave" d={d} />
-        <Level y={yc} label="Offset" to={505} on={on('off')} />
-        <Level y={yc - A} label="+A" to={xs + (T / span) * 107} on={on('amp')} />
+        <Level y={yc} label="Offset" to={505} on={on('off')} x={44} />
+        <g className={`dim${on('amp') ? ' on' : ''}`}>
+          <line x1={xa} y1={yc - A} x2={92} y2={yc - A} strokeDasharray="3 3" />
+        </g>
+        <VDim x={92} y1={yc} y2={yc - A} label="A" on={on('amp')} />
         {td > 0 && <Dim x1={x0} x2={xs} y={138} label="Td" on={on('td')} />}
-        <Dim x1={xs} x2={xp} y={18} label={t('Period = 1/f')} on={on('per')} />
+        <Dim x1={xs} x2={xp} y={138} label={t('Period = 1/f')} on={on('per')} />
       </>
     );
   } else if (spec.kind === 'ac') {
@@ -587,7 +608,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
       <>
         <path className="wave" d={d} />
         <Level y={yh} label="V2" to={X(t2)} on={on('v2')} />
-        <Level y={yl} label="V1" to={x0} on={on('v1')} />
+        <Level y={yl} label="V1" to={505} on={on('v1')} />
         {t1 > 0 && <Dim x1={x0} x2={X(t1)} y={130} label={t('start')} on={on('td1')} />}
         <Dim x1={X(t1)} x2={X(t1) + Math.max(30, a1 * sc)} y={20} label="τ↑" on={on('tau1')} />
         <Dim x1={x0} x2={X(t2)} y={144} label={t('fall start')} on={on('td2')} />
@@ -598,7 +619,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     body = (
       <>
         <path className="wave" d="M70 64H500" />
-        <Level y={64} label={t('Value')} to={70} on={on('dc')} />
+        <Level y={64} label={t('Value')} to={0} on={on('dc')} />
         <g className="axis">
           <line x1={70} y1={112} x2={500} y2={112} />
           <text x={500} y={128} textAnchor="end">t</text>
@@ -644,16 +665,25 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
   type Geo = ReturnType<typeof geometry>;
   function geometry(p: [string, string][]) {
     const nums = p.map(([tt, v]) => [spiceNumber(tt), spiceNumber(v)]).filter(([tt, v]) => isFinite(tt) && isFinite(v));
-    const T = Math.max(...nums.map(([tt]) => tt), 1e-3) * 1.15;
+    const T = Math.max(...nums.map(([tt]) => tt), 1e-9) * 1.15;
     const lo = Math.min(0, ...nums.map(([, v]) => v));
     const hi = Math.max(1, ...nums.map(([, v]) => v)) * 1.1;
     return {
+      T, lo, hi,
       X: (tt: number) => 66 + (tt / T) * 430,
       Y: (v: number) => 124 - ((v - lo) / (hi - lo)) * 104,
       iX: (x: number) => ((x - 66) / 430) * T,
       iY: (y: number) => lo + ((124 - y) / 104) * (hi - lo),
     };
   }
+  // período = tiempo del último punto (con Repeat, LTspice repite desde ahí); al cambiar el período
+  // o la frecuencia se reescalan todos los tiempos
+  const period = Math.max(0, ...pts.map(([tt]) => spiceNumber(tt)).filter(isFinite));
+  const rescale = (p: number) => {
+    if (!(p > 0) || !(period > 0)) return;
+    const k = p / period;
+    setPts(pts.map(([tt, v]) => (isFinite(spiceNumber(tt)) ? [engNumber(spiceNumber(tt) * k, 12), v] : [tt, v])) as [string, string][]);
+  };
   const geo = drag.current?.geo ?? geometry(pts);
   const toSvg = (e: { clientX: number; clientY: number }) => {
     const b = svg.current!.getBoundingClientRect();
@@ -725,6 +755,7 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
               setSel(s.i);
             }}
           />
+          <PwlGrid geo={geo} />
           {path && <path className="wave" d={path} />}
           {valid.map((q) => (
             <circle
@@ -742,7 +773,7 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
               }}
             />
           ))}
-          <text className="src-pwl-tip" x={505} y={144} textAnchor="end">
+          <text className="src-pwl-tip" x={505} y={12} textAnchor="end">
             {t('click: add · drag: move')}
           </text>
         </svg>
@@ -756,6 +787,16 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
             </button>
           </div>
         )}
+      </div>
+      <div className="src-row">
+        <label>
+          {t('Frequency')} [Hz]
+          <LiveInput label={t('Frequency')} value={period > 0 ? engNumber(1 / period) : ''} onChange={(v) => rescale(1 / spiceNumber(v))} />
+        </label>
+        <label>
+          {t('Period')} [s]
+          <LiveInput label={t('Period')} value={period > 0 ? engNumber(period) : ''} onChange={(v) => rescale(spiceNumber(v))} />
+        </label>
       </div>
       <div className="src-pts" ref={table}>
         <table>
@@ -796,6 +837,39 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
       </div>
     </>
   );
+}
+
+/** Paso "lindo" (1, 2 o 5 × 10^n) para unas `n` divisiones de `span` */
+function niceStep(span: number, n: number) {
+  const raw = span / n;
+  const p = 10 ** Math.floor(Math.log10(raw));
+  const m = raw / p;
+  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+}
+
+/** Grilla gruesa (con escala numérica) y fina del gráfico del PWL */
+function PwlGrid({ geo }: { geo: { T: number; lo: number; hi: number; X(t: number): number; Y(v: number): number } }) {
+  const lines: ReactNode[] = [];
+  const axis = (from: number, to: number, step: number, major: boolean, draw: (v: number, major: boolean, key: string) => void) => {
+    for (let i = Math.ceil(from / step - 1e-9); i * step <= to + step * 1e-9; i++) draw(i * step, major, `${major ? 'M' : 'm'}${i}`);
+  };
+  const ts = niceStep(geo.T, 6);
+  const vs = niceStep(geo.hi - geo.lo, 4);
+  const vLine = (tt: number, major: boolean, key: string) => {
+    const x = geo.X(tt);
+    lines.push(<line key={`t${key}`} className={major ? 'major' : 'minor'} x1={x} y1={20} x2={x} y2={124} />);
+    if (major) lines.push(<text key={`tl${key}`} x={x} y={138} textAnchor="middle">{engNumber(tt)}</text>);
+  };
+  const hLine = (v: number, major: boolean, key: string) => {
+    const y = geo.Y(v);
+    lines.push(<line key={`v${key}`} className={major ? 'major' : 'minor'} x1={66} y1={y} x2={496} y2={y} />);
+    if (major) lines.push(<text key={`vl${key}`} x={60} y={y + 4} textAnchor="end">{engNumber(v)}</text>);
+  };
+  axis(0, geo.T, ts / 5, false, vLine);
+  axis(geo.lo, geo.hi, vs / 5, false, hLine);
+  axis(0, geo.T, ts, true, vLine);
+  axis(geo.lo, geo.hi, vs, true, hLine);
+  return <g className="src-grid">{lines}</g>;
 }
 
 /** Importar puntos de un CSV (tiempo, valor por línea; separador coma, punto y coma o tab) */

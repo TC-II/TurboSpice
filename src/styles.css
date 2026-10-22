@@ -753,6 +753,11 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .src-line { display: block; font: 12px var(--mono); background: var(--bg-alt); padding: 6px 10px; border-radius: 6px; overflow-wrap: anywhere; }
 .src-pwl-graph { position: relative; }
 .src-pwl-hit { cursor: crosshair; }
+.src-grid { pointer-events: none; }
+.src-grid line { stroke: var(--fg-muted); fill: none; }
+.src-grid line.major { stroke-width: 0.6; opacity: 0.45; }
+.src-grid line.minor { stroke-width: 0.5; opacity: 0.15; }
+.src-draw .src-grid text { font-size: 10px; }
 .src-pt { fill: var(--accent); cursor: grab; }
 .src-pt.on { stroke: var(--bg); stroke-width: 1.5; }
 .src-draw text.src-pwl-tip { font-size: 11px; }

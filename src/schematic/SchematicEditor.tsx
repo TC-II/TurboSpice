@@ -1,6 +1,7 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
-import { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
+import { flushSync } from 'react-dom';
 import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type ShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
@@ -36,6 +37,12 @@ import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
 import { shapeBox, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
+
+/**
+ * Nodos del SVG desde los que paneo y zoom mueven el dibujo ya pintado (#186): con la CPU frenada
+ * 4×, ~9.000 nodos costaban ~105 ms por cuadro; con menos de esto cabe en un cuadro.
+ */
+const HEAVY_NODES = 1500;
 
 /** Fin de un tramo horizontal o vertical desde `a`, según de qué lado de los 45° quede `b` */
 const orthoEnd = (a: Point, b: Point): Point =>
@@ -253,6 +260,56 @@ export function SchematicEditor(props: Props) {
     pushView();
     setView(v);
   };
+
+  // Paneo, rueda y pellizco en un esquemático pesado (#186): cambiar el viewBox rehace el layout
+  // y el pintado de todo el SVG en cada cuadro. Durante el gesto se mueve y escala el dibujo ya
+  // pintado con un transform CSS (lo hace el compositor) y la vista se aplica al terminar.
+  const gesture = useRef<{ v: View; tx: number; ty: number; k: number } | null>(null);
+  const wheelTimer = useRef<number | undefined>(undefined);
+  /** la vista que se ve (la del gesto en curso, si hay) */
+  const liveView = () => gesture.current?.v ?? view;
+  /** Rectángulo del svg sin el transform del gesto */
+  const svgRect = () => {
+    const r = svgRef.current!.getBoundingClientRect();
+    const g = gesture.current;
+    return g ? { left: r.left - g.tx, top: r.top - g.ty, width: r.width / g.k, height: r.height / g.k } : r;
+  };
+  const clearGesture = () => {
+    const el = svgRef.current;
+    gesture.current = null;
+    clearTimeout(wheelTimer.current);
+    if (el) el.style.transform = el.style.transformOrigin = el.style.willChange = '';
+  };
+  const heavy = () => (svgRef.current?.getElementsByTagName('*').length ?? 0) > HEAVY_NODES;
+  /** Vista nueva durante un gesto */
+  const moveView = (v: View) => {
+    const el = svgRef.current;
+    if (!el || (!gesture.current && !heavy())) return setView(v);
+    const c = viewRef.current;
+    const k = v.scale / c.scale;
+    const tx = (c.cx - size.w / 2 / c.scale - (v.cx - size.w / 2 / v.scale)) * v.scale;
+    const ty = (c.cy - size.h / 2 / c.scale - (v.cy - size.h / 2 / v.scale)) * v.scale;
+    gesture.current = { v, tx, ty, k };
+    el.style.willChange = 'transform';
+    el.style.transformOrigin = '0 0';
+    el.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+    // en un gesto largo se aplica cada tanto: lo que entra por los bordes no está pintado (la
+    // franja vacía más ancha) y, al acercar mucho, el dibujo escalado se ve borroso
+    const gapX = Math.max(tx, size.w - tx - k * size.w);
+    const gapY = Math.max(ty, size.h - ty - k * size.h);
+    if (gapX > size.w * 0.35 || gapY > size.h * 0.35 || k > 2.5) commitView();
+  };
+  /** Fin del gesto: la vista de verdad (en el mismo cuadro en que se saca el transform) */
+  const commitView = () => {
+    const g = gesture.current;
+    if (!g) return;
+    if (g.v === viewRef.current) return clearGesture();
+    flushSync(() => setView(g.v));
+  };
+  // la vista cambió (por el gesto o por otra cosa, p. ej. Ajustar): fuera el transform
+  useLayoutEffect(() => {
+    if (gesture.current) clearGesture();
+  }, [view]);
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   // punta de prueba: sobre una red mide tensión (punta), sobre un componente corriente (pinza)
   const [probeKind, setProbeKind] = useState<'' | 'v' | 'i'>('');
@@ -362,19 +419,34 @@ export function SchematicEditor(props: Props) {
   const tol = 6 / view.scale;
 
   const toDoc = (e: { clientX: number; clientY: number }): Point => {
-    const r = svgRef.current!.getBoundingClientRect();
-    return { x: vb.x + (e.clientX - r.left) / view.scale, y: vb.y + (e.clientY - r.top) / view.scale };
+    const r = svgRect();
+    const v = liveView();
+    return { x: v.cx - size.w / 2 / v.scale + (e.clientX - r.left) / v.scale, y: v.cy - size.h / 2 / v.scale + (e.clientY - r.top) / v.scale };
   };
 
-  const onWheel = (e: React.WheelEvent) => {
+  const onWheel = (e: { clientX: number; clientY: number; deltaY: number; timeStamp: number }) => {
     const p = toDoc(e);
+    const v = liveView();
     const k = Math.exp(-e.deltaY * 0.0015);
-    const scale = Math.min(8, Math.max(0.03, view.scale * k));
+    const scale = Math.min(8, Math.max(0.03, v.scale * k));
     if (e.timeStamp - lastWheel.current > 500) pushView();
     lastWheel.current = e.timeStamp;
     // mantener fijo el punto bajo el cursor
-    setView({ scale, cx: p.x - (p.x - view.cx) * (view.scale / scale), cy: p.y - (p.y - view.cy) * (view.scale / scale) });
+    moveView({ scale, cx: p.x - (p.x - v.cx) * (v.scale / scale), cy: p.y - (p.y - v.cy) * (v.scale / scale) });
+    clearTimeout(wheelTimer.current);
+    if (gesture.current) wheelTimer.current = window.setTimeout(commitView, 150);
   };
+  // durante el gesto el svg escalado puede no cubrir el lienzo: la rueda sobre ese borde vacío
+  // (que es el contenedor) sigue haciendo zoom
+  const wheelRef = useRef(onWheel);
+  wheelRef.current = onWheel;
+  useEffect(() => {
+    const parent = svgRef.current?.parentElement;
+    if (!parent) return;
+    const h = (e: WheelEvent) => e.target === parent && gesture.current && wheelRef.current(e);
+    parent.addEventListener('wheel', h);
+    return () => parent.removeEventListener('wheel', h);
+  }, []);
 
   /**
    * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
@@ -682,13 +754,13 @@ export function SchematicEditor(props: Props) {
         const [a, b] = [...touches.current.values()];
         const pc = pinch.current;
         const scale = Math.min(8, Math.max(0.03, pc.view.scale * (Math.hypot(a.x - b.x, a.y - b.y) / pc.d)));
-        const r = svgRef.current!.getBoundingClientRect();
+        const r = svgRect();
         // el punto del esquemático bajo el centro inicial queda bajo el centro actual
         const docX = pc.view.cx + (pc.cx - r.left - r.width / 2) / pc.view.scale;
         const docY = pc.view.cy + (pc.cy - r.top - r.height / 2) / pc.view.scale;
         const cx = (a.x + b.x) / 2 - r.left - r.width / 2;
         const cy = (a.y + b.y) / 2 - r.top - r.height / 2;
-        setView({ scale, cx: docX - cx / scale, cy: docY - cy / scale });
+        moveView({ scale, cx: docX - cx / scale, cy: docY - cy / scale });
         return;
       }
     }
@@ -721,7 +793,7 @@ export function SchematicEditor(props: Props) {
     }
     const info = target && describe ? describe(target) : null;
     if (info) {
-      const r = svgRef.current!.getBoundingClientRect();
+      const r = svgRect();
       setTip({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height, info });
     } else if (tip) setTip(null);
     if (tool.kind === 'move' && tool.refs && tool.start && !drag) {
@@ -735,7 +807,7 @@ export function SchematicEditor(props: Props) {
         pushView();
         setDrag({ ...drag, moved: true });
       }
-      setView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
+      moveView({ ...drag.view, cx: drag.view.cx - (e.clientX - drag.sx) / drag.view.scale, cy: drag.view.cy - (e.clientY - drag.sy) / drag.view.scale });
     } else if (drag.mode === 'label') {
       // de a 8 (desde donde estaba); Shift: libre
       const dx = p.x - drag.start.x;
@@ -769,11 +841,15 @@ export function SchematicEditor(props: Props) {
       touches.current.delete(e.pointerId);
       clearTimeout(longPress.current);
       if (pinch.current) {
-        if (touches.current.size < 2) pinch.current = null;
+        if (touches.current.size < 2) {
+          pinch.current = null;
+          commitView();
+        }
         return;
       }
     }
     if (!drag) return;
+    if (drag.mode === 'pan') commitView();
     if (drag.mode === 'pan' && drag.right && !drag.moved) {
       // en Windows el menú contextual llega después de soltar, cuando ya puede haber un diálogo
       // bajo el cursor (fuera del svg): ese menú del navegador no se muestra
@@ -958,7 +1034,6 @@ export function SchematicEditor(props: Props) {
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
-      style={{ ['--px' as string]: `${1 / view.scale}` }}
     >
       <defs>
         <pattern id="grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">

@@ -89,12 +89,12 @@ await setValue(56, -32, '1k');
 await setValue(96, 0, '1µ');
 const p = await at(0, 56);
 // doble click en la fuente: ventana de configuración (#47). Una fuente nueva arranca en
-// Valor DC = 1: con Enter ya queda con ese valor
+// Seno: con Enter ya queda una fuente válida
 await page.mouse.dblclick(p.x, p.y);
 const src = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
-check((await src.getByRole('tab', { selected: true }).textContent()) === 'Valor DC' && (await src.getByLabel('Valor DC', { exact: true }).inputValue()) === '1', 'una fuente nueva abre en Valor DC = 1');
+check((await src.getByRole('tab', { selected: true }).textContent()) === 'Seno', 'una fuente nueva abre en Seno');
 await page.keyboard.press('Enter');
-check((await page.locator('svg.editor .sym text', { hasText: /^1$/ }).count()) === 1, 'Enter deja la fuente en 1');
+check((await page.locator('svg.editor .sym text', { hasText: /^SINE\(/ }).count()) === 1, 'Enter deja la fuente en SINE(…)');
 // …y al pasarla a Pulso el DC no queda como DC para .op
 await page.mouse.dblclick(p.x, p.y);
 await src.getByRole('tab', { name: 'Pulso' }).click();
@@ -109,7 +109,8 @@ check((await page.locator('.status.ok').count()) === 1, `simulación: ${await pa
 await page.waitForTimeout(300);
 await click(96, -32);
 const chips = await page.locator('.trace-chip .name').allTextContents();
-check(chips.some((c) => /^V\(n\d+\)/i.test(c)), `punta de prueba en el nodo de salida: ${chips.join(', ')}`);
+// los pines se tocan sin cable: como en LTspice, la red se llama P001 (#109)
+check(chips.some((c) => /^V\([np]\d+\)/i.test(c)), `punta de prueba en el nodo de salida: ${chips.join(', ')}`);
 await page.screenshot({ path: `${OUT}/editor-2.png` });
 await page.keyboard.press('Escape');
 
@@ -129,7 +130,7 @@ const lib = new Library(buildBundle());
 const net = ltNetlistText(ltNetlist(doc, lib));
 check(doc.symbols.length === 3 && doc.flags.length === 2 && doc.texts.length === 1, 'archivo guardado con 3 símbolos, 2 tierras y 1 directiva');
 check(doc.symbols.every((s) => s.windows.has(0) && s.windows.has(3) && s.attrs.has('Value') && s.attrs.has('Prefix')), 'todo explícito (WINDOW 0/3, Value, Prefix)');
-check(/^R1 N\d+ N\d+ 1k$/m.test(net) && /^C1 N\d+ 0 1u$/m.test(net) && /^V1 N\d+ 0 PULSE/m.test(net), `netlist del archivo guardado:\n${net.replace(/^/gm, '    ')}`);
+check(/^R1 [NP]\d+ [NP]\d+ 1k$/m.test(net) && /^C1 [NP]\d+ 0 1u$/m.test(net) && /^V1 [NP]\d+ 0 PULSE/m.test(net), `netlist del archivo guardado:\n${net.replace(/^/gm, '    ')}`);
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

@@ -917,7 +917,8 @@ await page.locator('svg.editor .sym').first().waitFor();
   const pulseVals = [await field('Ton').inputValue(), await field('Período').inputValue(), await field('Frecuencia').inputValue(), await field('DC').inputValue()];
   check(pulseVals.join() === '5m,10m,100,50', `cada parámetro en su campo; frecuencia y DC calculados (${pulseVals})`);
   await field('DC').fill('25');
-  check((await field('Ton').inputValue()) === '2.5m', `con período y DC fijos, el DC recalcula Ton (${await field('Ton').inputValue()})`);
+  // el DC cuenta las rampas (Trise = Tfall = 1µ): 25 % de 10 ms es Ton + 1µ (9ec9945)
+  check((await field('Ton').inputValue()) === '2.499m', `con período y DC fijos, el DC recalcula Ton (${await field('Ton').inputValue()})`);
   await sd.getByRole('tab', { name: 'Seno' }).click();
   await field('Amplitud').fill('2');
   await field('Frecuencia').fill('2k');

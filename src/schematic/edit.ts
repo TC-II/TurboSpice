@@ -208,14 +208,22 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   // cable no seleccionado (y nada más lo mueve), no se traslada entero: se estira como si no
   // estuviera seleccionado, así el codo queda en su lugar y el cable no sobresale (igual que al
   // mover sólo el componente). Si se mueve de costado se traslada entero y su extremo se desliza
-  // por los cables que llegan ahí.
+  // por los cables que llegan ahí; en diagonal, el codo se desliza con la parte de costado del
+  // movimiento y el cable se estira con la otra.
   const otherSelEnds = (i: number, p: Point) => doc.wires.some((o, j) => j !== i && w.has(j) && ends(o).some((e) => samePt(e, p)));
   const unselEnd = (p: Point) => doc.wires.some((o, j) => !w.has(j) && ends(o).some((e) => samePt(e, p)));
   const pinned = (i: number, p: Point) => unselEnd(p) && !moving.has(key(p)) && !otherSelEnds(i, p);
   const stretchedSel = new Set<number>();
+  const slide = new Map<string, Point>();
   doc.wires.forEach((wr, i) => {
     const along = (wr.y1 === wr.y2 && dx !== 0) || (wr.x1 === wr.x2 && dy !== 0);
-    if (w.has(i) && along && ends(wr).some((p) => pinned(i, p))) w.delete(i), stretchedSel.add(i);
+    if (!w.has(i) || !along) return;
+    const pins = ends(wr).filter((p) => pinned(i, p));
+    if (!pins.length) return;
+    w.delete(i);
+    stretchedSel.add(i);
+    const perp = wr.y1 === wr.y2 ? { x: 0, y: dy } : { x: dx, y: 0 };
+    if (perp.x || perp.y) for (const p of pins) slide.set(key(p), perp);
   });
   doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.set(key(p), p)));
   // …y lo fijo que se apoya en el interior de un cable seleccionado (una T) también lo sigue
@@ -239,15 +247,21 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   doc.wires.forEach((wr, i) => {
     if (w.has(i)) return wires.push(moveWire(wr));
     const [a, b] = ends(wr);
-    const [sa, sb] = [stretches(a), stretches(b)];
+    // un codo que se desliza se corre sólo de costado; lo demás que se mueve, entero
+    const to = (p: Point) => {
+      const d = slide.get(key(p));
+      return d ? { x: p.x + d.x, y: p.y + d.y } : stretches(p) ? mv(p) : p;
+    };
+    const [ta, tb] = [to(a), to(b)];
+    const [sa, sb] = [!samePt(ta, a), !samePt(tb, b)];
     if (!sa && !sb) return wires.push(wr);
-    if (sa && sb) return wires.push(shift(wr));
-    // un extremo fijo (q) y otro que se mueve: el tramo conserva su dirección desde q
-    const q = sa ? b : a;
-    const m = mv(sa ? a : b);
+    if (sa && sb && ta.x - a.x === tb.x - b.x && ta.y - a.y === tb.y - b.y) return wires.push(seg(ta, tb));
+    // un extremo (q) queda o se mueve menos que el otro (m): el tramo conserva su dirección desde q
+    const q = sa && !sb ? b : ta;
+    const m = sa && !sb ? ta : tb;
     const c = wr.y1 === wr.y2 ? { x: m.x, y: q.y } : wr.x1 === wr.x2 ? { x: q.x, y: m.y } : m;
     const from = wires.length;
-    pushPath(wires, sa ? [m, c, q] : [q, c, m]);
+    pushPath(wires, sa && !sb ? [m, c, q] : [q, c, m]);
     if (stretchedSel.has(i)) selOut?.push(...wires.slice(from));
   });
   for (const p of anchored) {

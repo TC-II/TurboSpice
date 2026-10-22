@@ -277,6 +277,24 @@ SYMBOL res 0 0 R0
     expect(net(m)).toBe(net(d));
   });
 
+  it('arrastrar en diagonal un componente con sus cables hasta una T desliza la T', () => {
+    const d = asc(`WIRE -64 -32 16 -32
+WIRE 16 -32 96 -32
+WIRE 16 -32 16 16
+WIRE -64 144 16 144
+WIRE 16 144 96 144
+WIRE 16 96 16 144
+SYMBOL res 0 0 R0
+`);
+    const out: Wire[] = [];
+    const m = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 2 }, { kind: 'wire', index: 5 }], -32, 16, true, lib, out);
+    expect(ws(m)).toContainEqual([-16, -32, -16, 32]);
+    expect(ws(m)).toContainEqual([-16, 112, -16, 144]);
+    expect(ortho(m)).toBe(true);
+    expect(net(m)).toBe(net(d));
+    expect(wiresOn(m, out).map((i) => ws(m)[i]).sort()).toEqual([[-16, -32, -16, 32], [-16, 112, -16, 144]]);
+  });
+
   it('Ctrl+mover (sin estirar) no deja nodos', () => {
     const d = asc('WIRE 16 96 16 160\nWIRE 16 160 96 160\nSYMBOL res 0 0 R0\n');
     const m = moveItems(d, [{ kind: 'symbol', index: 0 }], 64, 0, false, lib);

@@ -102,8 +102,8 @@ check((await svg.getAttribute('class')).includes('tool-shape'), 'elegir Círculo
 await page.keyboard.press('Escape');
 const count = () => page.evaluate(() => document.querySelectorAll('svg.editor .symbols .sym').length + document.querySelectorAll('svg.editor .wires line').length);
 const n0 = await count();
-await page.keyboard.press('F5');
-check((await svg.getAttribute('class')).includes('tool-delete'), 'F5 sin selección: modo borrar');
+await page.keyboard.press('Delete');
+check((await svg.getAttribute('class')).includes('tool-delete'), 'Supr sin selección: modo borrar');
 const sb = await page.locator('svg.editor .symbols .sym .body').first().boundingBox();
 await page.mouse.click(sb.x + sb.width / 2, sb.y + sb.height / 2);
 const n1 = await count();

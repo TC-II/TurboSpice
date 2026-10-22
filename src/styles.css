@@ -197,7 +197,7 @@ svg.editor.tool-move { cursor: move; }
 .shapes > * { stroke: var(--sch-sym); stroke-width: 1.4; }
 .shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
-.junctions circle { fill: var(--sch-wire); stroke: none; }
+.junctions circle { fill: var(--sch-sym); stroke: none; }
 .wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
 .sym { color: var(--sch-sym); stroke: currentColor; }
 .sym .body { stroke-width: 1.4; }

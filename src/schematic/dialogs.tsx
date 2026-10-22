@@ -504,7 +504,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['J · K · O · U', 'Línea · rectángulo · círculo · arco (decorativos)'],
       ['M', 'Mover: click en un elemento (o recuadro), sigue al cursor hasta el próximo click; los cables no se estiran'],
       ['S', 'Arrastrar: igual que M, pero los cables se estiran'],
-      ['Backspace · F5', 'Borrar la selección (sin selección: modo borrar, con click o recuadro)'],
+      ['Supr · Backspace', 'Borrar la selección (sin selección: modo borrar, con click o recuadro)'],
       ['F6', 'Duplicar la selección'],
       ['Ctrl+C · Ctrl+X · Ctrl+V', 'Copiar · cortar · pegar (también entre pestañas)'],
       ['Ctrl+A', 'Seleccionar todo'],

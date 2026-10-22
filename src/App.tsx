@@ -1335,7 +1335,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case 'F4':
         case 'n':
           return handled(), setDialog({ kind: 'flag' });
-        case 'F5':
         case 'Delete':
         case 'Backspace':
           return handled(), deleteSelection();
@@ -1662,7 +1661,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'rotate', label: 'Rotar', title: 'Rotar', shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: 'Espejar', title: 'Espejar', shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
-        { icon: 'delete', label: 'Borrar', title: 'Borrar', shortcut: 'F5 / Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
+        { icon: 'delete', label: 'Borrar', title: 'Borrar', shortcut: 'Supr', onClick: deleteSelection, active: tool.kind === 'delete' },
       ],
     },
     {

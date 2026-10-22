@@ -26,6 +26,10 @@ export const USER_PREFIX = 'user/';
 export const USER_DIR = 'Mis símbolos';
 /** Prefijo de los archivos de modelos tomados de la librería de LTspice del usuario (ltspiceLib.ts) */
 export const LTSPICE_PREFIX = 'ltspice/';
+/** Archivos de modelos del proyecto abierto (#155): ganan a los del usuario y a la librería */
+export const PROJECT_PREFIX = 'project/';
+/** Carpeta del buscador (F2) con los símbolos del proyecto */
+export const PROJECT_DIR = 'Proyecto';
 
 /** Nombres de .subckt y .model definidos en un archivo de modelos */
 export function scanModels(text: string): { subckts: string[]; models: string[] } {
@@ -48,6 +52,9 @@ export class Library implements SymbolSource {
   private extra = new Map<string, string>();
   /** Archivos de modelos del usuario: nombre de archivo (minúsculas) → texto */
   private userModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
+  // los del proyecto abierto (se reemplazan todos juntos al abrir otro, setProjectFiles)
+  private projSymbols = new Map<string, string>();
+  private projModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
   /** Esquemáticos del usuario usados como bloques jerárquicos: nombre sin .asc (minúsculas) → texto */
   private userSchematics = new Map<string, { name: string; text: string }>();
   private schCache = new Map<string, AscDoc>();
@@ -82,9 +89,10 @@ export class Library implements SymbolSource {
 
   symbol(type: string): SymbolDef | undefined {
     const name = baseName(type).toLowerCase();
-    const extra = this.extra.get(name);
+    const proj = this.projSymbols.get(name);
+    const extra = proj ?? this.extra.get(name);
     const lt = extra || this.resolvePath(type) ? undefined : this.ltSymbol(type);
-    const path = extra ? `extra:${name}` : lt ? `ltspice:${lt.key}` : this.resolvePath(type);
+    const path = proj ? `project:${name}` : extra ? `extra:${name}` : lt ? `ltspice:${lt.key}` : this.resolvePath(type);
     if (!path) return undefined;
     let def = this.cache.get(path);
     if (!def) {
@@ -135,6 +143,22 @@ export class Library implements SymbolSource {
     this.cache.delete(`extra:${name.toLowerCase()}`);
   }
 
+  /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
+  setProjectFiles(files: { name: string; kind: 'symbol' | 'model'; text: string }[]): void {
+    for (const k of this.projSymbols.keys()) this.cache.delete(`project:${k}`);
+    this.projSymbols.clear();
+    this.projModels.clear();
+    for (const f of files) {
+      if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
+      else this.projModels.set(f.name.toLowerCase(), { name: f.name, text: f.text, ...scanModels(f.text) });
+    }
+  }
+
+  /** Nombres de los símbolos del proyecto */
+  projectSymbols(): string[] {
+    return [...this.projSymbols.keys()];
+  }
+
   /** Nombres de los símbolos del usuario */
   userSymbols(): string[] {
     return [...this.extra.keys()];
@@ -179,6 +203,7 @@ export class Library implements SymbolSource {
   /** Contenido de un archivo de modelos del usuario resuelto con resolveModelFile ("user/x.lib") */
   userFile(rel: string): string | undefined {
     if (rel.startsWith(LTSPICE_PREFIX)) return this.ltModels.get(rel.slice(LTSPICE_PREFIX.length).toLowerCase())?.text;
+    if (rel.startsWith(PROJECT_PREFIX)) return this.projModels.get(rel.slice(PROJECT_PREFIX.length).toLowerCase())?.text;
     return rel.startsWith(USER_PREFIX) ? this.userModels.get(rel.slice(USER_PREFIX.length).toLowerCase())?.text : undefined;
   }
 
@@ -194,7 +219,9 @@ export class Library implements SymbolSource {
   resolveModelFile(path: string): string | undefined {
     const norm = path.replace(/\\/g, '/').replace(/^"|"$/g, '');
     const lower = norm.toLowerCase();
-    // los archivos del usuario ganan (como los que están junto al .asc en LTspice)
+    // los del proyecto y los del usuario ganan (como los que están junto al .asc en LTspice)
+    const proj = this.projModels.get(lower.split('/').pop()!);
+    if (proj) return PROJECT_PREFIX + proj.name.toLowerCase();
     const user = this.userModels.get(lower.split('/').pop()!);
     if (user) return USER_PREFIX + user.name.toLowerCase();
     const files = Object.keys(this.bundle.subs);
@@ -211,7 +238,7 @@ export class Library implements SymbolSource {
   /** ¿Algún archivo de modelos de la librería define este .model/.subckt? */
   definesModel(name: string, withLtspice = true): boolean {
     const n = name.toLowerCase();
-    return [...Object.values(this.bundle.subs), ...this.userModels.values(), ...(withLtspice ? this.ltModels.values() : [])].some(
+    return [...Object.values(this.bundle.subs), ...this.projModels.values(), ...this.userModels.values(), ...(withLtspice ? this.ltModels.values() : [])].some(
       (s) => s.subckts.some((x) => x.toLowerCase() === n) || s.models.some((x) => x.toLowerCase() === n),
     );
   }
@@ -234,7 +261,8 @@ export class Library implements SymbolSource {
 
   /** Todas las rutas de símbolos, para el buscador (F2) */
   symbolPaths(): string[] {
+    const proj = [...this.projSymbols.keys()].map((n) => `${PROJECT_DIR}/${n}`);
     const user = [...this.extra.keys()].map((n) => `${USER_DIR}/${n}`);
-    return [...user, ...Object.keys(this.bundle.symbols).sort((a, b) => a.localeCompare(b))];
+    return [...proj, ...user, ...Object.keys(this.bundle.symbols).sort((a, b) => a.localeCompare(b))];
   }
 }

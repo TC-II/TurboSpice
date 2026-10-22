@@ -4,6 +4,8 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import {
   activeAsc,
+  mergeFiles,
+  projectFileKind,
   applyValues,
   simsWithValue,
   valueChanges,
@@ -157,5 +159,26 @@ describe('aviso de valores', () => {
     expect(simsWithValue(variantOf(p), ch[0])).toEqual([b.id]);
     expect(applyValues(parseAsc(b.asc), ch).symbols[0].attrs.get('Value')).toBe('2k2');
     expect(valueChanges(prev, prev)).toEqual([]);
+  });
+});
+
+describe('archivos del proyecto', () => {
+  const f = (name: string, text: string) => ({ name, kind: 'model' as const, text });
+  it('igual no pregunta; distinto pregunta y respeta la respuesta', async () => {
+    const files = [f('a.lib', 'x')];
+    const asked: string[] = [];
+    const ask = (c: 'replace' | 'keep' | 'rename') => async (n: string) => (asked.push(n), c);
+    expect((await mergeFiles(files, [f('A.lib', 'x')], ask('keep'))).added).toEqual([]);
+    expect(asked).toEqual([]);
+    expect((await mergeFiles(files, [f('a.lib', 'y')], ask('replace'))).files).toEqual([f('a.lib', 'y')]);
+    expect((await mergeFiles(files, [f('a.lib', 'y')], ask('keep'))).files).toEqual(files);
+    const r = await mergeFiles(files, [f('a.lib', 'y'), f('b.sub', 'z')], ask('rename'));
+    expect(r.files.map((x) => x.name)).toEqual(['a.lib', 'a (2).lib', 'b.sub']);
+    expect(r.added).toEqual(['a (2).lib', 'b.sub']);
+  });
+  it('tipo por extensión', () => {
+    expect(projectFileKind('x.ASY')).toBe('symbol');
+    expect(projectFileKind('x.sub')).toBe('model');
+    expect(projectFileKind('x.asc')).toBeNull();
   });
 });

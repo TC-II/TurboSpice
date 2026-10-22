@@ -5,7 +5,7 @@ import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { findAnalysis, removeAnalysis } from '../schematic/directivesEdit.ts';
 import { analysisLabel, MAX_SIMS, type SimView } from '../sim/simList.ts';
-import { EMPTY_ASC, newId, type Project, type Run, type Sim, type Variant } from './turbo.ts';
+import { EMPTY_ASC, newId, type Project, type ProjectFile, type Run, type Sim, type Variant } from './turbo.ts';
 
 // --- lectura ----------------------------------------------------------------------------------
 
@@ -209,4 +209,51 @@ export function applyValues(d: AscDoc, changes: ValueChange[]): AscDoc {
     return { ...s, attrs };
   });
   return touched ? { ...d, symbols } : d;
+}
+
+// --- archivos del proyecto (#155) ---------------------------------------------------------------
+
+export type FileConflict = 'replace' | 'keep' | 'rename';
+
+/** Tipo de archivo del proyecto según la extensión (null: no va al proyecto) */
+export const projectFileKind = (name: string): ProjectFile['kind'] | null =>
+  /\.asy$/i.test(name) ? 'symbol' : /\.(lib|sub|mod|inc|cir|txt|lb|bjt|dio|mos|jft)$/i.test(name) ? 'model' : null;
+
+/** «x (2).lib», «x (3).lib»… que no esté entre `taken` */
+export function uniqueFileName(name: string, taken: string[]): string {
+  const used = new Set(taken.map((t) => t.toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  const m = /^(.*?)(\.[^.]*)?$/.exec(name)!;
+  for (let i = 2; ; i++) {
+    const n = `${m[1]} (${i})${m[2] ?? ''}`;
+    if (!used.has(n.toLowerCase())) return n;
+  }
+}
+
+/**
+ * Agrega archivos a los del proyecto. Uno con el mismo nombre y el mismo contenido no hace nada;
+ * con otro contenido se pregunta (`ask`): reemplazar, mantener el existente o renombrar el nuevo.
+ */
+export async function mergeFiles(files: ProjectFile[], incoming: ProjectFile[], ask: (name: string) => Promise<FileConflict>): Promise<{ files: ProjectFile[]; added: string[] }> {
+  const out = [...files];
+  const added: string[] = [];
+  for (const f of incoming) {
+    const i = out.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
+    if (i < 0) {
+      out.push(f);
+      added.push(f.name);
+      continue;
+    }
+    if (out[i].text === f.text) continue;
+    const choice = await ask(f.name);
+    if (choice === 'replace') {
+      out[i] = f;
+      added.push(f.name);
+    } else if (choice === 'rename') {
+      const name = uniqueFileName(f.name, out.map((x) => x.name));
+      out.push({ ...f, name });
+      added.push(name);
+    }
+  }
+  return { files: out, added };
 }

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
-import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
+import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
@@ -40,6 +40,8 @@ import {
   applyValues,
   blankVariant,
   cloneVariant,
+  mergeFiles,
+  projectFileKind,
   duplicateSim as duplicateProjectSim,
   removeVariant,
   renameVariant,
@@ -55,8 +57,10 @@ import {
   storeActive,
   valueChanges,
   variantOf,
+  type FileConflict,
   type ValueChange,
 } from './project/project.ts';
+import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
@@ -120,6 +124,7 @@ type Dialog =
   /** borrar una simulación (con el control deslizante) */
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }
+  | { kind: 'projectfiles' }
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
   | { kind: 'lineStyle'; shapes: number[] };
 
@@ -375,6 +380,36 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     loadUserFiles().then(setUserFiles);
   }, []);
+  // archivos del proyecto (#155): se registran en la librería antes que los del usuario
+  useEffect(() => {
+    lib.setProjectFiles(project.files);
+    setLibVersion((v) => v + 1);
+  }, [lib, project.files]);
+  // archivo repetido con otro contenido: se pregunta qué hacer
+  const [conflict, setConflict] = useState<{ name: string; resolve(c: FileConflict): void } | null>(null);
+  const askConflict = (name: string) => new Promise<FileConflict>((resolve) => setConflict({ name, resolve }));
+  /** Agrega símbolos y modelos al proyecto (los demás tipos se ignoran) */
+  const addProjectFiles = async (list: { name: string; text: string }[]) => {
+    const incoming = list.flatMap((f) => {
+      const kind = projectFileKind(f.name);
+      return kind ? [{ name: f.name, kind, text: f.text }] : [];
+    });
+    if (!incoming.length) return;
+    const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
+    if (r.added.length) editProject({ ...projectRef.current, files: r.files });
+    setMessage(r.added.length ? `Agregados al proyecto: ${r.added.join(', ')}` : 'No se agregó nada (ya estaban)');
+  };
+  const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
+  /** Símbolo para un .subckt de un archivo de modelos del proyecto */
+  const makeProjectSymbol = (file: string, name: string) => {
+    const f = projectRef.current.files.find((x) => x.name === file);
+    const pins = f && subcktPins(f.text, name);
+    if (!pins) return setMessage(`No se encontró .subckt ${name} en ${file}`);
+    const sym = { name: `${name}.asy`, kind: 'symbol' as const, text: makeSymbol({ name, pins, block: false, modelFile: file }) };
+    editProject({ ...projectRef.current, files: [...projectRef.current.files.filter((x) => x.name.toLowerCase() !== sym.name.toLowerCase()), sym] });
+    setMessage(`Símbolo ${name} creado: está en el buscador de componentes (F2) en "${PROJECT_DIR}"`);
+  };
+
   // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
   // cada esquemático trae de ahí sólo los símbolos y modelos que le faltan
   const [ltIndex, setLtIndex] = useState<LtspiceIndex>();
@@ -1625,9 +1660,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const all = [...(e.dataTransfer?.files ?? [])];
       const f = all[0];
       if (f?.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
-      // símbolos y modelos propios (un .asc suelto se abre; junto con otros archivos, es un bloque)
-      const own = all.filter((x) => userFileKind(x.name) && (!/\.asc$/i.test(x.name) || all.length > 1));
-      if (own.length && !(all.length === 1 && /\.asc$/i.test(f.name))) return addUserFiles(own);
+      // símbolos y modelos: al proyecto (#155); un .asc junto con otros archivos es un bloque del usuario
+      const forProject = all.filter((x) => projectFileKind(x.name));
+      if (forProject.length) await addProjectFiles(await Promise.all(forProject.map(async (x) => ({ name: x.name, text: decode(new Uint8Array(await x.arrayBuffer())).text }))));
+      const blocks = all.length > 1 ? all.filter((x) => /\.asc$/i.test(x.name)) : [];
+      if (blocks.length) return addUserFiles(blocks);
+      if (forProject.length) return;
       if (f && /\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
       if (!f || !f.name.toLowerCase().endsWith('.asc')) return;
       // con la sesión de Google, soltar un .asc lo importa a "Mis simulaciones" y lo abre
@@ -1711,6 +1749,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Exportar a PDF', title: 'Abre ASC-Parser con este circuito; no se sube a ningún servidor', onClick: doExportPdf },
         'sep',
         { label: 'Compartir link…', onClick: doShare },
+        { label: 'Archivos del proyecto…', title: 'Símbolos y modelos guardados en el .turbo, para todas las variantes', onClick: () => setDialog({ kind: 'projectfiles' }) },
         { label: 'Mis símbolos y modelos…', onClick: () => setDialog({ kind: 'userfiles' }) },
         {
           label: ltIndex ? 'Librería de LTspice' : 'Importar librería de LTspice…',
@@ -2353,7 +2392,8 @@ ${ltNetlistText(sim.built.lt)}
           onPick={(type) => {
             setDialog(null);
             // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
-            setTool({ kind: 'place', type: type.startsWith(`${USER_DIR}/`) ? type.slice(USER_DIR.length + 1) : type, orient: 'R0' });
+            const dir = [USER_DIR, PROJECT_DIR].find((d) => type.startsWith(`${d}/`));
+            setTool({ kind: 'place', type: dir ? type.slice(dir.length + 1) : type, orient: 'R0' });
           }}
         />
       )}
@@ -2480,6 +2520,26 @@ ${ltNetlistText(sim.built.lt)}
           onRemove={removeUserFile}
           onMakeSymbol={makeUserSymbol}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'projectfiles' && (
+        <UserFilesDialog
+          project={project.name}
+          files={project.files.map((f) => ({ name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : [] }))}
+          hasSymbol={(n) => !!lib.symbol(n)}
+          onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decode(new Uint8Array(await x.arrayBuffer())).text }))))}
+          onRemove={removeProjectFile}
+          onMakeSymbol={makeProjectSymbol}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {conflict && (
+        <FileConflictDialog
+          name={conflict.name}
+          onChoose={(c) => {
+            setConflict(null);
+            conflict.resolve(c);
+          }}
         />
       )}
       {dialog?.kind === 'about' && <AboutDialog repo={REPO} onClose={() => setDialog(null)} />}

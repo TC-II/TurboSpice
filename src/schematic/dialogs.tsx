@@ -658,8 +658,10 @@ export interface UserFileInfo {
 }
 
 /** Símbolos, modelos y bloques propios del usuario (guardados en el navegador) */
-export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose }: {
+export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose, project }: {
   files: UserFileInfo[];
+  /** los del proyecto (#155): se guardan en el .turbo, sin bloques .asc */
+  project?: string;
   hasSymbol(name: string): boolean;
   onAdd(files: File[]): void;
   onRemove(name: string): void;
@@ -713,12 +715,20 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
     );
   };
   return (
-    <Modal title="Mis símbolos y modelos" onClose={onClose} wide>
+    <Modal title={project ? `Archivos del proyecto «${project}»` : 'Mis símbolos y modelos'} onClose={onClose} wide>
+      {project ? (
+        <p className="hint">
+          Se guardan dentro del proyecto (.turbo) y valen para todas sus variantes; ganan a los de «Mis símbolos y modelos» y a
+          los de la librería. Los símbolos (<code>.asy</code>) aparecen en el buscador (F2) en «Proyecto»; los modelos (
+          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>) se usan al simular como si estuvieran junto al <code>.asc</code>.
+        </p>
+      ) : (
       <p className="hint">
         Se guardan en este navegador. Los símbolos (<code>.asy</code>) aparecen en el buscador (F2); los modelos (<code>.lib</code>,{' '}
         <code>.sub</code>, <code>.mod</code>) se usan al simular como si estuvieran junto al <code>.asc</code>; un <code>.asc</code> con
         su símbolo de bloque se usa como subcircuito (jerarquía, como en LTspice).
       </p>
+      )}
       <div className="buttons left">
         <button className="primary" onClick={() => input.current?.click()}>Agregar archivos…</button>
         <input
@@ -726,7 +736,7 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
           type="file"
           multiple
           hidden
-          accept=".asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb,.asc"
+          accept={project ? '.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb' : '.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb,.asc'}
           aria-label="Archivos de símbolos y modelos"
           onChange={(e) => {
             if (e.target.files?.length) onAdd([...e.target.files]);
@@ -736,7 +746,7 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
       </div>
       {section('symbol', 'Símbolos', 'Ninguno todavía.')}
       {section('model', 'Modelos y subcircuitos', 'Ninguno todavía.')}
-      {section('schematic', 'Bloques jerárquicos (.asc)', 'Ninguno todavía.')}
+      {!project && section('schematic', 'Bloques jerárquicos (.asc)', 'Ninguno todavía.')}
       <div className="buttons">
         <button className="primary" onClick={onClose}>Cerrar</button>
       </div>

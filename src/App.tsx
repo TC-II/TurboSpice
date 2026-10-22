@@ -8,7 +8,7 @@ import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from '
 import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
-import { biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
+import { biasCommand, biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { Point, ShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
@@ -1035,7 +1035,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const tooBig = built.tooBig.map((p) => p.text);
       const { result, ms } = tooBig.length
         ? { result: { plots: [], log: tooBig, errors: tooBig, aborted: false }, ms: 0 }
-        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built) });
+        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
@@ -2580,7 +2580,7 @@ ${ltNetlistText(sim.built.lt)}
             <button
               className={showOp && bias ? 'active' : ''}
               aria-label={t('Annotate OP')}
-              title={bias ? t('Annotate the operating point on the schematic (without changing it)') : sim ? t('Operating point: the circuit changed since the last simulation') : t('Operating point: simulate first')}
+              title={bias ? (/^\.tran\b/i.test(docLine) ? t('Annotate the values at t = 0 on the schematic: the bias with the initial conditions (with uic, the initial state)') : t('Annotate the operating point on the schematic (without changing it)')) : sim ? t('Operating point: the circuit changed since the last simulation') : t('Operating point: simulate first')}
               disabled={!bias}
               onClick={() => setShowOp((v) => !v)}
             >

@@ -20,6 +20,17 @@ const PARAMS: Record<string, string[]> = {
 };
 
 /** Parámetros de dispositivo (`@q1[gm]`…) a leer en el punto de operación */
+/**
+ * Con qué se calcula el punto de operación que se anota: en un .tran, el estado en t = 0 (sin uic
+ * es el bias con las condiciones iniciales de capacitores e inductores, como en LTspice; con uic,
+ * el estado inicial); en el resto, el "op" de continua.
+ */
+export function biasCommand(netlist: string): { cmd: string; atZero: boolean } {
+  const tran = /^\s*\.tran\b(.*)$/im.exec(netlist);
+  if (!tran) return { cmd: 'op', atZero: false };
+  return { cmd: `tran 1p 1p${/\buic\b/i.test(tran[1]) ? ' uic' : ''}`, atZero: true };
+}
+
 export function biasParams(sim: BuiltSimulation): string[] {
   const out: string[] = [];
   for (const ng of sim.ng.names.values()) {

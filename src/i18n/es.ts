@@ -1250,4 +1250,5 @@ export const es: Record<string, string> = {
   'the testbench': 'el testbench',
   'To build the .zip: put one .asc per testbench, and add the symbols and models the circuits use that are not in the standard library. Then compress the whole folder.': 'Para armar el .zip: poné un .asc por testbench y agregá los símbolos y modelos que usen los circuitos y no estén en la librería estándar. Después comprimí la carpeta entera.',
   '.zip, .asc (each one, a testbench), .asy, .lib, .sub': '.zip, .asc (cada uno, un testbench), .asy, .lib, .sub',
+  'Annotate the values at t = 0 on the schematic: the bias with the initial conditions (with uic, the initial state)': 'Anotar en el esquemático los valores en t = 0: el bias con las condiciones iniciales (con uic, el estado inicial)',
 };

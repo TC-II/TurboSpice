@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc, type SchText } from '../../src/asc/model.ts';
 import { setAnalysisLine } from '../../src/schematic/directivesEdit.ts';
-import { sameCircuit } from '../../src/sim/bias.ts';
+import { biasCommand, sameCircuit } from '../../src/sim/bias.ts';
 
 const text = (kind: SchText['kind'], t: string, y = 0): SchText => ({ x: 0, y, align: 'Left', size: 2, kind, text: t });
 // mismos componentes y cables (se comparan por referencia, como en el historial)
@@ -29,5 +29,13 @@ describe('sameCircuit (punto de operación)', () => {
   it('cambia con componentes o cables', () => {
     expect(sameCircuit(base, { ...base, symbols: [] })).toBe(false);
     expect(sameCircuit(base, { ...base, wires: [] })).toBe(false);
+  });
+});
+
+describe('punto de operación que se anota (t = 0 en un .tran)', () => {
+  it('op en continua; en un .tran, su primer punto (con o sin uic)', () => {
+    expect(biasCommand('* x\nR1 a 0 1k\n.ac dec 10 1 1k\n.end')).toEqual({ cmd: 'op', atZero: false });
+    expect(biasCommand('* x\n.tran 0 5m\n.end')).toEqual({ cmd: 'tran 1p 1p', atZero: true });
+    expect(biasCommand('* x\n.TRAN 1u 5m 0 UIC\n.end')).toEqual({ cmd: 'tran 1p 1p uic', atZero: true });
   });
 });

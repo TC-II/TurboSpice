@@ -42,6 +42,12 @@ export interface SimResult {
 export interface SimulateOptions {
   /** Calcular además el punto de operación y leer estos parámetros de dispositivo */
   bias?: string[];
+  /**
+   * Análisis con el que se calcula (por defecto "op"). Para un .tran, un transitorio mínimo: su
+   * primer punto es el estado en t = 0 (sin uic, el bias con las condiciones iniciales; con uic,
+   * el estado inicial), que es lo que se anota en el esquemático.
+   */
+  biasCommand?: string;
 }
 
 export interface NgspiceOptions {
@@ -203,7 +209,7 @@ export class Ngspice {
       this.command('run');
     }
     const plots = this.aborted ? [] : this.readPlots();
-    const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias) : undefined;
+    const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias, opts.biasCommand) : undefined;
 
     return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias };
   }
@@ -213,9 +219,9 @@ export class Ngspice {
    * el del final del último). Sus errores van al log pero no cuentan como errores de la
    * simulación pedida; el plot que genera no se devuelve entre los resultados.
    */
-  private operatingPoint(params: string[]): Record<string, number> | undefined {
+  private operatingPoint(params: string[], cmd = 'op'): Record<string, number> | undefined {
     const errors = this.errors.length;
-    this.command('op');
+    this.command(cmd);
     if (this.errors.length > errors || this.aborted) {
       this.errors.length = errors;
       return undefined;
@@ -225,6 +231,7 @@ export class Ngspice {
     const p = this.m.stringToNewUTF8(plot);
     const names = this.readStringArray(this.m._ngSpice_AllVecs(p));
     this.m._free(p);
+    // (en un transitorio, el primer punto: t = 0)
     for (const n of names) {
       const v = this.readVector(`${plot}.${n}`, n);
       if (v?.real.length) out[n.toLowerCase()] = v.real[0];

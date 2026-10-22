@@ -795,7 +795,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const f = fileRef.current;
     if (!f.driveId) return;
     const name = turboName(f.name);
-    if (!force && f.driveVersion) {
+    // un número es el `version` de Drive que guardaban las versiones anteriores (sube solo, #176):
+    // no sirve para comparar con la revisión del contenido
+    if (!force && f.driveVersion && !/^\d+$/.test(f.driveVersion)) {
       const m = await drive.meta(f.driveId);
       if (m.version && m.version !== f.driveVersion) return setDriveConflict({ name: m.name });
     }

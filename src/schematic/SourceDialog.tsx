@@ -20,37 +20,7 @@ import {
   type SourceSpec,
 } from '../sim/sources.ts';
 import { labelRows, Modal } from './dialogs.tsx';
-
-const KINDS: { kind: SourceKind; label: string; icon: ReactNode }[] = [
-  { kind: 'sine', label: 'Seno', icon: <path d="M3 10C9 -2 15 -2 21 10S33 22 39 10" /> },
-  { kind: 'ac', label: 'AC', icon: <path d="M12 16H36M16 16L33 5M28 5H33V10" strokeLinecap="round" strokeLinejoin="round" /> },
-  { kind: 'pulse', label: 'Pulso', icon: <path d="M3 16H9L11 4H19L21 16H27L29 4H37L39 16H43" /> },
-  { kind: 'dc', label: 'Valor DC', icon: <path d="M23 1V7M13 7H33M17 12H29M23 12V19" strokeLinecap="round" /> },
-  { kind: 'exp', label: 'Exponencial', icon: <path d="M3 17H8C12 5 18 4 24 4C28 4 29 4 30 5C33 15 38 17 43 17" /> },
-  { kind: 'sffm', label: 'FM (SFFM)', icon: <path d={fmIcon()} strokeWidth="1.3" /> },
-  {
-    kind: 'pwl',
-    label: 'Por puntos',
-    icon: (
-      <>
-        <path d="M3 16L12 6L20 12L30 3L43 15" />
-        <circle cx="12" cy="6" r="1.8" fill="currentColor" stroke="none" />
-        <circle cx="20" cy="12" r="1.8" fill="currentColor" stroke="none" />
-        <circle cx="30" cy="3" r="1.8" fill="currentColor" stroke="none" />
-      </>
-    ),
-  },
-];
-
-/** Ícono de FM: una senoidal que se comprime y se estira */
-function fmIcon(): string {
-  let d = 'M2 10';
-  for (let i = 0; i <= 120; i++) {
-    const x = i / 120;
-    d += `L${(2 + x * 42).toFixed(1)} ${(10 - 7 * Math.sin(2 * Math.PI * 5 * x + 2.2 * Math.sin(2 * Math.PI * x))).toFixed(1)}`;
-  }
-  return d;
-}
+import { KINDS } from './sourceIcons.tsx';
 
 /** Valores por defecto de cada forma de onda al elegirla por primera vez */
 const DEFAULT_ARGS: Partial<Record<SourceKind, string[]>> = {
@@ -271,14 +241,29 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
 
   // rótulos del nombre y del valor: si se ven en el esquemático (#71)
   const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
-  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, r.visible])));
+  // el valor se ve por defecto sólo en DC (en las formas de onda el dibujito del símbolo ya dice
+  // qué es); si el usuario ya movió u ocultó el rótulo, o tocó la casilla, se respeta
+  const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && !r.moved && !current;
+  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, valueAuto(r) ? kind === 'dc' : r.visible])));
+  const valueTouched = useRef(false);
+  useEffect(() => {
+    if (valueTouched.current) return;
+    setVisible((v) => {
+      const out = new Map(v);
+      for (const r of shown) if (valueAuto(r)) out.set(r.win, kind === 'dc');
+      return out;
+    });
+  }, [kind]);
   const labels = () => new Map(shown.filter((r) => visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
   const showToggles = shown.length > 0 && (
     <span className="src-show" role="group" aria-label="Mostrar en el esquemático">
       Mostrar:
       {shown.map((r) => (
         <label key={r.win} title={`${r.attr === 'InstName' ? 'El nombre' : 'El valor'} se ve en el esquemático`}>
-          <input type="checkbox" checked={!!visible.get(r.win)} onChange={(e) => setVisible(new Map(visible).set(r.win, e.target.checked))} />
+          <input type="checkbox" checked={!!visible.get(r.win)} onChange={(e) => {
+              if (r.attr === 'Value') valueTouched.current = true;
+              setVisible(new Map(visible).set(r.win, e.target.checked));
+            }} />
           {r.attr === 'InstName' ? 'Nombre' : 'Valor'}
         </label>
       ))}

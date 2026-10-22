@@ -141,10 +141,18 @@ interface TurboJson {
   blobs: Record<Hash, string>;
 }
 
+// el autoguardado serializa el proyecto seguido y casi todos los textos se repiten
+const hashCache = new Map<string, Hash>();
+
 /** sha256 del texto, como "sha256:<hex>" */
 export async function hashText(text: string): Promise<Hash> {
+  const hit = hashCache.get(text);
+  if (hit) return hit;
   const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return `sha256:${[...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  const h = `sha256:${[...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  if (hashCache.size > 2000) hashCache.clear();
+  hashCache.set(text, h);
+  return h;
 }
 
 /** El proyecto como JSON (con `modified` actualizado afuera, si corresponde) */

@@ -83,7 +83,7 @@ export class DriveClient {
     const q = `${qString(await this.folderId())} in parents and trashed = false and mimeType != '${FOLDER_MIME}'`;
     const params = new URLSearchParams({ q, fields: 'files(id,name,modifiedTime)', orderBy: 'modifiedTime desc', pageSize: '200', spaces: 'drive' });
     const r = await this.json<{ files: DriveFile[] }>(`${API}/files?${params}`);
-    return r.files.filter((f) => /\.asc$/i.test(f.name));
+    return r.files.filter((f) => /\.(turbo|asc)$/i.test(f.name));
   }
 
   async download(id: string): Promise<Uint8Array> {

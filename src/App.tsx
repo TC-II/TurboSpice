@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
-import type { AscEncoding } from './asc/encoding.ts';
 import { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { Library, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
@@ -27,39 +26,41 @@ import { Icon } from './ui/icons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
-import { addRecent, loadRecent, loadSession, loadUserFiles, readHandle, saveSession, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
+import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
+import { activeSim, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
 import {
-  activeSim,
-  addSim,
-  defaultLine,
-  emptySims,
-  followLine,
-  keepResult,
-  MAX_SIMS,
-  removeSim,
-  renameSim,
-  selectSim,
-  setSimView,
-  simName,
-  takeSims,
-  withSims,
-  type SimList,
-  type SimView,
-} from './sim/simList.ts';
+  activeAsc,
+  addSim as addProjectSim,
+  applyValues,
+  lineOf,
+  recordRun,
+  removeSim as removeProjectSim,
+  renameSim as renameProjectSim,
+  selectSim as selectProjectSim,
+  setSimAsc,
+  simOf,
+  simsWithValue,
+  storeActive,
+  valueChanges,
+  variantOf,
+  type ValueChange,
+} from './project/project.ts';
+import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
+import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, dcSourcesAsCell, deleteItems, duplicateItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
-import { ascBytes, openFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { ascBytes, openProjectFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
-import { useHistory } from './schematic/useHistory.ts';
+import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import { PlotPanel, type PlotAction, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
@@ -107,6 +108,8 @@ type Dialog =
   | { kind: 'runs' }
   | { kind: 'about' }
   | { kind: 'drive' }
+  /** borrar una simulación (con el control deslizante) */
+  | { kind: 'deleteSim'; id: string }
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
   | { kind: 'lineStyle'; shapes: number[] };
 
@@ -120,21 +123,18 @@ interface SimRun {
 
 interface FileState {
   name: string;
-  encoding?: AscEncoding;
   handle?: Parameters<typeof saveFile>[2];
   /** id del archivo en Google Drive (si se abrió o guardó ahí) */
   driveId?: string;
 }
 
-// Serialización cacheada por documento (el autoguardado guarda todo el historial)
+// Serialización cacheada por documento (el autoguardado y el cambio de simulación la usan seguido)
 const ascCache = new WeakMap<AscDoc, string>();
 const ascText = (d: AscDoc) => {
   let t = ascCache.get(d);
   if (t === undefined) ascCache.set(d, (t = serializeAsc(d)));
   return t;
 };
-/** Pasos de deshacer que se conservan en el autoguardado */
-const SAVED_UNDO = 50;
 
 const isTyping = (e: KeyboardEvent) =>
   e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
@@ -256,8 +256,27 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 }) {
   const history = useHistory<AscDoc>(emptyDoc());
   const doc = history.value;
-  const [file, setFile] = useState<FileState>({ name: 'Sin título.asc' });
-  const [savedVersion, setSavedVersion] = useState(0);
+  const docRef = useRef(doc);
+  docRef.current = doc;
+  const [file, setFile] = useState<FileState>({ name: `Sin título${EXT}` });
+  // proyecto (.turbo, #149): variantes y simulaciones, cada una con su circuito. El que se está
+  // editando vive en `history` y pasa al proyecto al cambiar de simulación o al guardar (snapshot)
+  const [project, setProjectState] = useState<Project>(() => newProject('Sin título'));
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  const [dirty, setDirty] = useState(false);
+  const editProject = (p: Project) => {
+    setProjectState(p);
+    setDirty(true);
+  };
+  // deshacer por simulación (#154): la pila de cada una mientras no se la ve
+  const stacks = useRef(new Map<string, History<AscDoc>>());
+  // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
+  const quietDoc = useRef(true);
+  useEffect(() => {
+    if (quietDoc.current) quietDoc.current = false;
+    else setDirty(true);
+  }, [history.state]);
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -266,8 +285,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [message, setMessage] = useState<string>();
   // resultados de la simulación que se está viendo
   const [sim, setSim] = useState<SimRun | null>(null);
-  // lista de simulaciones (#39) y resultados en memoria de las que no se están viendo
-  const [sims, setSimsState] = useState<SimList>(emptySims);
+  // lista de simulaciones de la variante (#39, #151) y resultados en memoria de las que no se
+  // están viendo. El comando de la activa es el del esquemático
+  const variant = variantOf(project);
+  const docLine = findAnalysis(doc)?.value ?? '';
+  const sims = useMemo(
+    (): SimList => ({
+      items: variant.sims.map((s) => ({ id: s.id, ...(s.name ? { name: s.name } : {}), line: s.id === variant.activeSim ? docLine : lineOf(s.asc), ...(s.view ? { view: s.view } : {}) })),
+      active: variant.activeSim,
+    }),
+    [variant, docLine],
+  );
   const simsRef = useRef(sims);
   simsRef.current = sims;
   const kept = useRef(new Map<string, SimRun>());
@@ -309,7 +337,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [pzSide, setPzSide] = useState(true);
   const editor = useRef<EditorHandle>(null);
   const [docKey, setDocKey] = useState(0);
-  const dirty = history.version !== savedVersion;
 
   // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
   const [userFiles, setUserFiles] = useState<UserFile[]>([]);
@@ -376,7 +403,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     window.addEventListener('pointermove', h);
     return () => window.removeEventListener('pointermove', h);
   }, []);
-  const commit = history.commit;
+  // «R1 = 1k también en 3 simulaciones · Aplicar» (#151): al cambiar el valor de un componente
+  // que está igual en otras simulaciones de la variante
+  const [valueOffer, setValueOffer] = useState<{ changes: ValueChange[]; sims: string[] } | null>(null);
+  const offerValues = useRef<(prev: AscDoc, next: AscDoc) => void>();
+  offerValues.current = (prev, next) => {
+    const changes = sims.active ? valueChanges(prev, next) : [];
+    const v = variantOf(projectRef.current);
+    const ids = [...new Set(changes.flatMap((c) => simsWithValue(v, c)))];
+    setValueOffer(ids.length ? { changes, sims: ids } : null);
+  };
+  const commit = useCallback(
+    (next: AscDoc) => {
+      offerValues.current?.(docRef.current, next);
+      history.commit(next);
+    },
+    [history.commit],
+  );
 
   useEffect(() => {
     engine.ready.then(
@@ -395,31 +438,74 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     panesByKind.current.clear();
   };
 
-  const loadDoc = useCallback(
-    (d0: AscDoc, f: FileState) => {
-      // las fuentes V con valor DC se muestran como Cell (#121)
-      const d = dcSourcesAsCell(d0, lib);
-      // la lista de simulaciones guardada en el archivo sale del documento
-      const { doc: clean, sims: list } = takeSims(d, findAnalysis(d)?.value ?? null);
-      history.reset(clean);
-      setSavedVersion(0);
-      setFile(f);
-      setSelection([]);
-      setSim(null);
-      kept.current.clear();
-      setSimsState(list);
-      showView(activeSim(list)?.view);
-      setOfferView(null);
-      setTool({ kind: 'select' });
-      setDocKey((k) => k + 1);
-    },
-    [history, setTool, lib],
-  );
+  /**
+   * Resultados de la última corrida guardados en el navegador (no van en el .turbo): se
+   * muestran si son del circuito que se está viendo
+   */
+  const restoreCached = (simId: string, asc: string) => {
+    loadResult<{ result: SimResult; meas: MeasTable | null }>(simId)
+      .then(async (c) => {
+        const d = docRef.current;
+        if (!c || c.asc !== asc || simsRef.current.active !== simId || ascText(d) !== asc) return;
+        const built = await buildSimulation(d, lib, `${projectRef.current.name}.asc`);
+        if (simsRef.current.active !== simId || docRef.current !== d) return;
+        setSim({ built, result: c.result.result, doc: d, meas: c.result.meas });
+      })
+      .catch(() => {});
+  };
+
+  /** Abre un proyecto: se ve el circuito de la simulación activa de su variante activa */
+  const loadProject = (p: Project, f: FileState) => {
+    stacks.current.clear();
+    kept.current.clear();
+    const v = variantOf(p);
+    const s = simOf(v);
+    quietDoc.current = true;
+    history.reset(parseAsc(activeAsc(v)));
+    setProjectState(p);
+    setDirty(false);
+    setFile(f);
+    setSelection([]);
+    setSim(null);
+    showView(s?.view);
+    setOfferView(null);
+    setValueOffer(null);
+    setTool({ kind: 'select' });
+    setDocKey((k) => k + 1);
+    if (s) restoreCached(s.id, s.asc);
+  };
+
+  /** Un .asc pasa a ser un proyecto nuevo (se guarda aparte, como .turbo) */
+  const loadDoc = (d0: AscDoc, ascName: string): Project => {
+    // las fuentes V con valor DC se muestran como Cell (#121)
+    const p = projectFromAsc(dcSourcesAsCell(d0, lib), ascName);
+    loadProject(p, { name: `${projectName(ascName)}${EXT}` });
+    return p;
+  };
 
   const [recent, setRecent] = useState<RecentFile[]>([]);
-  const remember = useCallback((d: AscDoc, f: FileState, unsaved = false) => {
-    addRecent({ name: f.name, asc: ascText(d), encoding: f.encoding, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }).then(setRecent);
+  const remember = useCallback((p: Project, f: FileState, unsaved = false) => {
+    serializeTurbo(p)
+      .then((turbo) => addRecent({ name: f.name, asc: turbo, turbo: true, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }))
+      .then(setRecent);
   }, []);
+
+  /** Abre los bytes de un .turbo o de un .asc (`at`: dónde está el archivo, si es un .turbo) */
+  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId'> = {}) => {
+    const utf8 = new TextDecoder().decode(bytes);
+    if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
+      const { project: p, warnings } = await parseTurbo(utf8);
+      const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
+      loadProject(p, f);
+      remember(p, f);
+      if (warnings.length) setMessage(warnings.join(' · '));
+      return;
+    }
+    const r = readAsc(bytes, name);
+    const p = loadDoc(r.doc, name);
+    remember(p, { name: `${projectName(name)}${EXT}` });
+    warnMissing(r.doc);
+  };
 
   // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
   const openShared = useCallback(async (): Promise<boolean> => {
@@ -436,8 +522,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // links viejos: la vista venía aparte (&v=…); ahora va dentro del .asc
     const view = asPlotView(shared.view);
     const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
-    loadDoc(d, { name: f.name, encoding: f.encoding });
-    remember(d, { name: f.name, encoding: f.encoding });
+    remember(loadDoc(d, f.name), { name: `${projectName(f.name)}${EXT}` });
     return true;
   }, [loadDoc]);
 
@@ -449,28 +534,21 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     (async () => {
       setRecent(await loadRecent());
-      const session = await loadSession();
-      const sessionDirty = !!session && session.past.length !== session.savedVersion;
+      const session = await loadProjectSession();
       if (await openShared()) {
         // el trabajo sin guardar anterior queda en recientes
-        if (session && sessionDirty) remember(parseAsc(session.present), { name: session.name, encoding: session.encoding }, true);
+        if (session?.dirty) addRecent({ name: session.name, asc: session.turbo, turbo: true, time: session.time, unsaved: true }).then(setRecent);
         return;
       }
       if (touched.current) return;
       if (session) {
         try {
-          history.restore({ past: session.past.map(parseAsc), present: parseAsc(session.present), future: session.future.map(parseAsc) });
-          setFile({ name: session.name, encoding: session.encoding, handle: session.handle as FileState['handle'], driveId: session.driveId });
-          setSavedVersion(session.savedVersion);
-          // sesiones anteriores: la vista estaba aparte del documento
-          const old = asPlotView(session.view);
-          if (old && !viewFromDoc(parseAsc(session.present))) setOfferView(old);
-          if (session.sims) {
-            setSimsState(session.sims);
-            showView(activeSim(session.sims)?.view);
-          }
-          setDocKey((k) => k + 1);
-          if (sessionDirty) setMessage(`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`);
+          const { project: p, warnings } = await parseTurbo(session.turbo);
+          if (touched.current) return;
+          loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId });
+          setDirty(session.dirty);
+          const notes = [...(session.dirty ? [`Se recuperó el trabajo sin guardar (${new Date(session.time).toLocaleString()})`] : []), ...warnings];
+          if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {
           // sesión ilegible: seguir con el ejemplo
@@ -478,34 +556,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       }
       const b = await (await fetch(`${BASE}examples/${encodeURIComponent(EXAMPLES[0])}`)).arrayBuffer();
       if (touched.current) return;
-      const f = readAsc(new Uint8Array(b), EXAMPLES[0]);
-      loadDoc(f.doc, { name: f.name, encoding: f.encoding });
+      loadDoc(readAsc(new Uint8Array(b), EXAMPLES[0]).doc, EXAMPLES[0]);
     })()
       .catch(() => {})
       .finally(() => setRestored(true));
   }, []); // sólo al montar
 
-  // Autoguardado (con el historial de deshacer), un momento después de cada cambio
+  // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
+  // pilas de deshacer no se guardan, #154)
   useEffect(() => {
     if (!restored) return;
     const t = setTimeout(() => {
-      const h = history.state;
-      const drop = Math.max(0, h.past.length - SAVED_UNDO);
-      saveSession({
-        name: file.name,
-        encoding: file.encoding,
-        handle: file.handle,
-        driveId: file.driveId,
-        past: h.past.slice(drop).map(ascText),
-        present: ascText(h.present),
-        future: h.future.slice(0, SAVED_UNDO).map(ascText),
-        savedVersion: savedVersion - drop,
-        time: Date.now(),
-        sims: currentSims(),
-      });
+      serializeTurbo(snapshot()).then((turbo) =>
+        saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, turbo, dirty, time: Date.now() }),
+      );
     }, 600);
     return () => clearTimeout(t);
-  }, [restored, history.state, file, savedVersion, sims, panes, activePane, plotName, mode]);
+  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
 
   // Migración: vista guardada en el navegador para este nombre de archivo (versiones
   // anteriores) y el .asc no trae la suya: se ofrece incorporarla
@@ -558,37 +625,39 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const doOpenLocal = async () => {
     if (!confirmDiscard()) return;
     try {
-      const f = await openFile();
-      if (f) {
-        loadDoc(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
-        remember(f.doc, { name: f.name, encoding: f.encoding, handle: f.handle });
-        warnMissing(f.doc);
-      }
+      const f = await openProjectFile();
+      // el handle de un .asc no sirve para guardar el proyecto: se guarda aparte
+      if (f) await openBytes(f.bytes, f.name, /\.turbo$/i.test(f.name) ? { handle: f.handle } : {});
     } catch (e) {
       setMessage(`No se pudo abrir: ${(e as Error).message}`);
     }
   };
 
-  /** El documento tal como va al archivo: con la lista de simulaciones (comentario ";.sims") */
-  const fileDoc = () => withSims(doc, currentSims());
+  /** El proyecto con el circuito (y la vista) que se están editando: para el archivo o la sesión */
+  const snapshot = (): Project => storeActive(projectRef.current, ascText(docRef.current), sims.active ? liveView() : undefined);
 
-  const savedAs = (saved: FileState, missing: string[], where = '') => {
+  /** El .turbo a guardar con ese nombre de archivo (el nombre del proyecto es el del archivo) */
+  const turboBytes = async (name: string) => {
+    const p = { ...snapshot(), name: projectName(name) };
+    return { p, bytes: new TextEncoder().encode(await serializeTurbo(p)) };
+  };
+  const turboName = (name: string) => (/\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`);
+
+  const savedAs = (saved: FileState, p: Project, where = '') => {
     setFile(saved);
-    setSavedVersion(history.version);
-    remember(fileDoc(), saved);
-    setMessage(
-      missing.length
-        ? `Guardado${where}. Símbolos fuera de la librería (sin hacer explícitos): ${missing.join(', ')}`
-        : `Guardado${where}: ${saved.name}`,
-    );
+    setProjectState({ ...p, name: projectName(saved.name) });
+    setDirty(false);
+    remember(p, saved);
+    setMessage(`Guardado${where}: ${saved.name}`);
   };
 
-  /** Guardar en el equipo (como siempre) */
+  /** Guardar en el equipo */
   const doSaveLocal = async (saveAs = false) => {
-    const { bytes, missing } = ascBytes(fileDoc(), lib, file.encoding);
+    const name = turboName(file.name);
     try {
-      const r = await saveFile(bytes, file.name, file.handle, saveAs);
-      if (r) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, missing);
+      const { p, bytes } = await turboBytes(name);
+      const r = await saveFile(bytes, name, file.handle, saveAs);
+      if (r) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, p);
     } catch (e) {
       setMessage(`No se pudo guardar: ${(e as Error).message}`);
     }
@@ -596,15 +665,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo, o uno nuevo */
   const doSaveDrive = async (saveAs = false) => {
-    let name = file.name;
+    let name = turboName(file.name);
     let id = saveAs ? undefined : file.driveId;
     if (!id && saveAs) {
-      const n = window.prompt('Nombre del archivo en Google Drive', name)?.trim();
+      const n = window.prompt('Nombre del proyecto en Google Drive', projectName(name))?.trim();
       if (!n) return;
-      name = /\.asc$/i.test(n) ? n : `${n}.asc`;
+      name = turboName(n);
     }
-    const { bytes, missing } = ascBytes(fileDoc(), lib, file.encoding);
     try {
+      const { p, bytes } = await turboBytes(name);
       if (!id) {
         const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
         if (same) {
@@ -613,7 +682,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         }
       }
       const r = await drive.save(name, bytes, id);
-      savedAs({ ...file, name: r.name, driveId: r.id }, missing, ' en Google Drive');
+      savedAs({ ...file, name: r.name, driveId: r.id }, p, ' en Google Drive');
     } catch (e) {
       setMessage(`No se pudo guardar en Google Drive: ${(e as Error).message}`);
     }
@@ -625,12 +694,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const openDriveFile = async (d: DriveFile) => {
     if (!confirmDiscard()) return;
     try {
-      const f = readAsc(await drive.download(d.id), d.name);
-      const state = { name: f.name, encoding: f.encoding, driveId: d.id };
+      const bytes = await drive.download(d.id);
       setDialog(null);
-      loadDoc(f.doc, state);
-      remember(f.doc, state);
-      warnMissing(f.doc);
+      await openBytes(bytes, d.name, /\.turbo$/i.test(d.name) ? { driveId: d.id } : {});
     } catch (e) {
       setMessage(`No se pudo abrir de Google Drive: ${(e as Error).message}`);
     }
@@ -654,9 +720,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setMessage('Se quitó la librería de LTspice de este navegador (lo ya cargado se va al recargar la página)');
   };
 
+  // el link y el PDF llevan el circuito que se está viendo, como .asc
+  const ascName = () => `${project.name}.asc`;
   const doShare = async () => {
-    const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
-    const hash = await shareHash(bytes, file.name);
+    const { bytes } = ascBytes(doc, lib);
+    const hash = await shareHash(bytes, ascName());
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
@@ -665,8 +733,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // la pestaña se abre ya, dentro del click, para que no la bloquee el navegador
     const tab = window.open('', '_blank');
     if (tab) tab.opener = null;
-    const { bytes } = ascBytes(fileDoc(), lib, file.encoding);
-    const hash = await shareHash(bytes, file.name);
+    const { bytes } = ascBytes(doc, lib);
+    const hash = await shareHash(bytes, ascName());
     const url = `${PDF_TOOL}#${hash}`;
     if (tab) tab.location.href = url;
     else setMessage('El navegador bloqueó la pestaña nueva: permitila para exportar a PDF.');
@@ -677,19 +745,27 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!r || !confirmDiscard()) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
     const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
-    const f = bytes ? readAsc(bytes, r.name) : { doc: parseAsc(r.asc), name: r.name, encoding: r.encoding };
-    const state = { name: f.name, encoding: f.encoding, handle: r.handle as FileState['handle'], driveId: r.driveId };
-    loadDoc(f.doc, state);
-    if (!r.unsaved) remember(f.doc, state);
+    const at = { handle: r.handle as FileState['handle'], driveId: r.driveId };
+    try {
+      if (bytes) return await openBytes(bytes, r.name, at);
+      // la copia guardada en recientes
+      if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
+      const { project: p, warnings } = await parseTurbo(r.asc);
+      loadProject(p, { name: r.name, ...at });
+      if (r.unsaved) setDirty(true);
+      else remember(p, { name: r.name, ...at });
+      if (warnings.length) setMessage(warnings.join(' · '));
+    } catch (e) {
+      setMessage(`No se pudo abrir: ${(e as Error).message}`);
+    }
   };
 
-  const doNew = () => confirmDiscard() && loadDoc(emptyDoc(), { name: 'Sin título.asc' });
+  const doNew = () => confirmDiscard() && loadProject(newProject('Sin título'), { name: `Sin título${EXT}` });
 
   const doExample = async (name: string) => {
     if (!confirmDiscard()) return;
     const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
-    const f = readAsc(new Uint8Array(b), name);
-    loadDoc(f.doc, { name, encoding: f.encoding });
+    loadDoc(readAsc(new Uint8Array(b), name).doc, name);
   };
 
   const run = async () => {
@@ -698,9 +774,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
     // simulación de la lista a la que van los resultados
     const id = sims.active;
+    // el circuito exacto que se simula queda en el historial de la simulación (#152)
+    const simAsc = ascText(doc);
+    if (id) editProject(recordRun(snapshot(), id, simAsc).project);
     try {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
-      const built = await buildSimulation(doc, lib, file.name);
+      const built = await buildSimulation(doc, lib, ascName());
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       const tooBig = built.tooBig.map((p) => p.text);
       const { result, ms } = tooBig.length
@@ -715,6 +794,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // gráficos x-y de un programa de bloques
       const xy = xyPlotsFromLog(result.log, built.ng.xyPlots);
       result.plots.push(...xy);
+      // los resultados de la última corrida quedan en el navegador (no van en el .turbo)
+      if (id) saveResult(id, { asc: simAsc, result: { result, meas }, time: Date.now() });
       // si mientras tanto se eligió otra simulación, los resultados quedan guardados para ésta
       if (simsRef.current.active !== id) {
         if (simsRef.current.items.some((s) => s.id === id)) keepResult(kept.current, id, { built, result, doc, meas });
@@ -806,56 +887,95 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // --- Lista de simulaciones (#39) ---
   /** Lo que se está viendo de la simulación activa */
   const liveView = (): SimView => ({ panes, active: activePane, plot: plotName, mode, plotState: plotState.current });
-  /** La lista con la vista actual guardada en la activa (para guardar el archivo o la sesión) */
-  const currentSims = () => (activeSim(sims) ? setSimView(sims, sims.active, liveView()) : sims);
-  /**
-   * Cambia la lista. Si cambia la activa, la anterior se lleva su vista y sus resultados (los de
-   * las últimas MAX_KEPT quedan en memoria) y se muestra lo que se veía de la nueva. Con
-   * `toDoc`, su comando pasa al esquemático.
-   */
-  const changeSims = (next: SimList, toDoc = false) => {
-    // (la primera simulación de la lista se queda con lo que se estaba viendo)
-    if (next.active !== sims.active && activeSim(sims)) {
-      if (next.items.some((s) => s.id === sims.active)) {
-        next = setSimView(next, sims.active, liveView());
-        if (sim) keepResult(kept.current, sims.active, sim);
-      }
-      const r = kept.current.get(next.active);
-      kept.current.delete(next.active);
-      setSim(r ?? null);
-      showView(activeSim(next)?.view);
-    }
-    const line = activeSim(next)?.line;
-    if (toDoc && line && next.active !== sims.active) commit(setAnalysisLine(doc, line));
-    // resultados de las que se borraron
-    for (const id of [...kept.current.keys()]) if (!next.items.some((s) => s.id === id)) kept.current.delete(id);
-    setSimsState(next);
+  // Cada simulación tiene su circuito (#151) y su pila de deshacer (#154): cambiar de simulación
+  // guarda lo que se está editando (circuito, vista, pila y resultados) y trae lo de la otra
+  const keyOf = (p: Project) => {
+    const v = variantOf(p);
+    return `${v.id}/${v.activeSim || 'base'}`;
   };
-  // El comando del esquemático manda: si se edita (a mano, con el diálogo o deshaciendo), la
-  // lista lo sigue
+  /** Deja la simulación que se está viendo: devuelve el proyecto con su estado guardado */
+  const leave = (): Project => {
+    const p = snapshot();
+    stacks.current.set(keyOf(p), history.state);
+    if (sim && sims.active) keepResult(kept.current, sims.active, sim);
+    return p;
+  };
+  /** Muestra la simulación activa del proyecto (o la base): su circuito, pila, vista y resultados */
+  const enter = (p: Project, refit = false) => {
+    const v = variantOf(p);
+    const s = simOf(v);
+    const h = stacks.current.get(keyOf(p));
+    quietDoc.current = true;
+    if (h && ascText(h.present) === activeAsc(v)) history.restore(h);
+    else history.reset(parseAsc(activeAsc(v)));
+    setProjectState(p);
+    const r = s ? kept.current.get(s.id) : undefined;
+    if (s) kept.current.delete(s.id);
+    setSim(r ?? null);
+    showView(s?.view);
+    setSelection([]);
+    setValueOffer(null);
+    if (refit) setDocKey((k) => k + 1);
+    if (s && !r) restoreCached(s.id, s.asc);
+  };
+  /** Pasa a otra simulación de la variante ('' = el circuito base) */
+  const goSim = (id: string) => id !== sims.active && enter(selectProjectSim(leave(), id));
+  // En la base, escribir un comando de análisis (a mano o con el diálogo) crea la primera
+  // simulación con ese circuito; la base se queda sin el comando
   useEffect(() => {
-    const next = followLine(sims, findAnalysis(doc)?.value ?? null);
-    if (next !== sims) changeSims(next);
-  }, [doc]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (sims.active || !docLine) return;
+    const p0 = projectRef.current;
+    const v = variantOf(p0);
+    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
+    if (r) editProject(r.project);
+  }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
   const newSim = (kind: AnalysisKind) => {
     // del mismo tipo que otra: se parte de sus parámetros
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
-    changeSims(addSim(sims, same?.line ?? defaultLine(kind, circuitInfo())), true);
+    const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo()))));
+    if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    enter(r.project);
+    setDirty(true);
   };
   // nombre propio desde la barra (vacío: vuelve al automático)
-  const renameActive = (name: string) => changeSims(renameSim(sims, sims.active, name));
-  // borrar la elegida: pasa a otra; si era la única, se saca su comando del esquemático y la
-  // barra queda vacía hasta elegir un tipo
-  const deleteActive = () => {
-    const next = removeSim(sims, sims.active);
-    if (next.items.length) return changeSims(next, true);
-    changeSims(next);
-    commit(removeAnalysis(doc));
+  const renameActive = (name: string) => editProject(renameProjectSim(projectRef.current, sims.active, name));
+  // borrar la elegida (con el control deslizante): pasa a la siguiente, o a la base si era la única
+  const deleteActive = () => sims.active && setDialog({ kind: 'deleteSim', id: sims.active });
+  const deleteSim = (id: string) => {
+    const p0 = leave();
+    stacks.current.delete(`${variantOf(p0).id}/${id}`);
+    kept.current.delete(id);
+    dropResult(id);
+    enter(removeProjectSim(p0, id));
+    setDirty(true);
+  };
+  /** «Aplicar»: el valor nuevo va a las otras simulaciones, cada una con su paso de deshacer */
+  const applyValueOffer = () => {
+    if (!valueOffer) return;
+    let p = projectRef.current;
+    const v = variantOf(p);
+    let n = 0;
+    for (const id of valueOffer.sims) {
+      const s = simOf(v, id);
+      if (!s) continue;
+      const key = `${v.id}/${id}`;
+      const h = stacks.current.get(key);
+      const cur = h?.present ?? parseAsc(s.asc);
+      const next = applyValues(cur, valueOffer.changes);
+      if (next === cur) continue;
+      stacks.current.set(key, { past: [...(h?.past ?? []), cur], present: next, future: [] });
+      p = setSimAsc(p, id, ascText(next));
+      n++;
+    }
+    editProject(p);
+    setValueOffer(null);
+    setMessage(`Aplicado en ${n === 1 ? '1 simulación' : `${n} simulaciones`}`);
   };
   const curSim = activeSim(sims);
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
   const simMenu = useRef<(() => void) | null>(null);
-  const canRun = !!curSim || findControl(doc) >= 0;
+  const canRun = !!curSim?.line || findControl(doc) >= 0;
   const simulate = () => (canRun ? run() : simMenu.current?.());
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
@@ -1014,7 +1134,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const exportPlt = () => {
     const v = plot ? { ...plotView, [plotKind(plot.name)]: panes } : plotView;
-    download(file.name.replace(/\.asc$/i, '') + '.plt', new Blob([serializePlt(v)], { type: 'text/plain' }));
+    download(`${project.name}.plt`, new Blob([serializePlt(v)], { type: 'text/plain' }));
   };
 
   const rotateOrMirror = (op: 'rotate' | 'mirror') => {
@@ -1177,15 +1297,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     } else setTool({ kind: 'delete' });
   };
   const exportNetlist = async (which: 'net' | 'cir') => {
-    const base = file.name.replace(/\.asc$/i, '');
-    if (which === 'net') return download(`${base}.net`, new Blob([`* ${file.name}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
-    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, file.name);
+    const base = project.name;
+    if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
+    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName());
     download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
   };
   const exportImage = (f: 'svg' | 'png') => {
     const svg = editor.current?.svg();
     const box = editor.current?.contentBox();
-    if (svg && box) exportSchematic(svg, box, file.name.replace(/\.asc$/i, ''), f);
+    if (svg && box) exportSchematic(svg, box, project.name, f);
   };
 
   const openStudy = () => setDialog({ kind: 'study' });
@@ -1394,14 +1514,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // símbolos y modelos propios (un .asc suelto se abre; junto con otros archivos, es un bloque)
       const own = all.filter((x) => userFileKind(x.name) && (!/\.asc$/i.test(x.name) || all.length > 1));
       if (own.length && !(all.length === 1 && /\.asc$/i.test(f.name))) return addUserFiles(own);
+      if (f && /\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
       if (!f || !f.name.toLowerCase().endsWith('.asc')) return;
       // con la sesión de Google, soltar un .asc lo importa a "Mis simulaciones" y lo abre
       if (google.account) return doImport([{ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }]);
       if (!confirmDiscard()) return;
-      const r = readAsc(new Uint8Array(await f.arrayBuffer()), f.name);
-      loadDoc(r.doc, { name: r.name, encoding: r.encoding });
-      remember(r.doc, { name: r.name, encoding: r.encoding });
-      warnMissing(r.doc);
+      await openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
     };
     window.addEventListener('dragover', over);
     window.addEventListener('drop', drop);
@@ -1441,11 +1559,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // y los análisis programados
   const simItems: MenuItem[] = [
     ...sims.items.map((x) => ({
-      label: simName(x),
+      label: simName(x) || 'Sin análisis',
       title: x.line,
       checked: x.id === sims.active,
-      onClick: () => changeSims(selectSim(sims, x.id), true),
+      onClick: () => goSim(x.id),
     })),
+    ...(sims.items.length
+      ? [{ label: 'Circuito base (sin simulación)', title: 'El circuito de la variante fuera de las simulaciones', checked: !sims.active, onClick: () => goSim('') }]
+      : []),
     'sep',
     ...ANALYSES.map((x) => ({ label: x.label, title: `Nueva simulación: ${x.help}`, onClick: () => newSim(x.kind), disabled: sims.items.length >= MAX_SIMS })),
     'sep',
@@ -1675,7 +1796,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   ];
 
   // Flecha de Resultados: exportar y las otras vistas (netlist, log, problemas, mediciones)
-  const exportBase = () => file.name.replace(/\.asc$/i, '');
+  const exportBase = () => project.name;
   const canExportPlot = panel === 'plot' && !!plot && !!scaleOf(plot);
   const resultsItems: MenuItem[] = !sim
     ? []
@@ -1696,7 +1817,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             { label: 'Importar vista .plt…', shortcut: 'O', onClick: () => pltInput.current?.click() },
             'sep',
             { label: 'Netlist .cir (ngspice)', onClick: () => download(`${exportBase()}.cir`, new Blob([sim.built.netlist], { type: 'text/plain' })) },
-            { label: 'Netlist .net (LTspice)', onClick: () => download(`${exportBase()}.net`, new Blob([`* ${file.name}
+            { label: 'Netlist .net (LTspice)', onClick: () => download(`${exportBase()}.net`, new Blob([`* ${ascName()}
 ${ltNetlistText(sim.built.lt)}
 `], { type: 'text/plain' })) },
           ],
@@ -1875,6 +1996,16 @@ ${ltNetlistText(sim.built.lt)}
               <button onClick={() => endPick(null)}>Cancelar</button>
             </div>
           )}
+          {valueOffer && !picking && (
+            <div className="pick-banner">
+              {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} también en{' '}
+              {valueOffer.sims.length === 1 ? '1 simulación' : `${valueOffer.sims.length} simulaciones`}
+              <button onClick={applyValueOffer} title={`Cambiar a ${valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ')} en las otras simulaciones`}>
+                Aplicar
+              </button>
+              <button onClick={() => setValueOffer(null)}>No</button>
+            </div>
+          )}
           {offerView && !picking && (
             <div className="pick-banner">
               Hay una vista de resultados de {file.name} guardada en este navegador. ¿Incorporarla al .asc?
@@ -2017,10 +2148,10 @@ ${ltNetlistText(sim.built.lt)}
                 />
               )}
               {panel === 'plot' && plot && scale && withPz && pzSide && mode !== 'smith' && (
-                <PzPlane runs={pzAll} labels={labels} name={file.name.replace(/\.asc$/i, '')} compact />
+                <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
               )}
               {panel === 'plot' && plot && !scale &&
-                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={file.name.replace(/\.asc$/i, '')} /> : <ResultTable plot={plot} />)}
+                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} />)}
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
               {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}
@@ -2199,9 +2330,24 @@ ${ltNetlistText(sim.built.lt)}
         <DriveDialog
           currentId={file.driveId}
           onOpen={openDriveFile}
-          onRenamed={(f) => f.id === file.driveId && setFile({ ...file, name: f.name })}
+          onRenamed={(f) => {
+            if (f.id !== file.driveId) return;
+            setFile({ ...file, name: f.name });
+            setProjectState({ ...projectRef.current, name: projectName(f.name) });
+          }}
           onTrashed={(id) => id === file.driveId && setFile({ ...file, driveId: undefined })}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'deleteSim' && (
+        <SlideConfirm
+          title="Borrar la simulación"
+          message={`Se borra «${simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || 'Sin análisis'}» con su circuito y su historial de corridas.`}
+          onClose={() => setDialog(null)}
+          onConfirm={() => {
+            setDialog(null);
+            deleteSim(dialog.id);
+          }}
         />
       )}
       {dialog?.kind === 'share' && (

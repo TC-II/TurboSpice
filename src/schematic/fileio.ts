@@ -21,7 +21,9 @@ declare global {
   }
 }
 
-const TYPES = [{ description: 'Esquemático de LTspice', accept: { 'application/octet-stream': ['.asc'] } }];
+const ASC_TYPE = { description: 'Esquemático de LTspice', accept: { 'application/octet-stream': ['.asc'] } };
+const TURBO_TYPE = { description: 'Proyecto de TurboSpice', accept: { 'application/json': ['.turbo'] } };
+const TYPES = [ASC_TYPE];
 
 export interface OpenedFile {
   doc: AscDoc;
@@ -74,6 +76,38 @@ export async function openFile(): Promise<OpenedFile | null> {
   });
 }
 
+/** Un archivo abierto tal cual (un .turbo o un .asc: lo decide quien lo lee) */
+export interface PickedFile {
+  name: string;
+  bytes: Uint8Array;
+  handle?: FileHandle;
+}
+
+/** Elegir un .turbo o un .asc del equipo */
+export async function openProjectFile(): Promise<PickedFile | null> {
+  if (window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({ types: [{ description: 'Proyecto de TurboSpice o esquemático de LTspice', accept: { 'application/octet-stream': ['.turbo', '.asc'] } }] });
+      const file = await handle.getFile();
+      return { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()), handle };
+    } catch (e) {
+      if ((e as DOMException).name === 'AbortError') return null;
+      throw e;
+    }
+  }
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.turbo,.asc';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      resolve(file ? { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) } : null);
+    };
+    input.oncancel = () => resolve(null);
+    input.click();
+  });
+}
+
 /** Bytes del .asc tal como se guardan: todo explícito, en la codificación original si se puede */
 export function ascBytes(doc: AscDoc, lib: SymbolSource, encoding?: AscEncoding): { bytes: Uint8Array; missing: string[] } {
   const { doc: explicit, missing } = makeExplicit(doc, lib);
@@ -93,7 +127,8 @@ export async function saveFile(
 ): Promise<{ name: string; handle?: FileHandle } | null> {
   if (window.showSaveFilePicker) {
     try {
-      const h = !saveAs && handle ? handle : await window.showSaveFilePicker({ types: TYPES, suggestedName: name });
+      const types = [/\.turbo$/i.test(name) ? TURBO_TYPE : ASC_TYPE];
+      const h = !saveAs && handle ? handle : await window.showSaveFilePicker({ types, suggestedName: name });
       const w = await h.createWritable();
       await w.write(bytes as BlobPart);
       await w.close();

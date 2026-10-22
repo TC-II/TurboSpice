@@ -33,7 +33,10 @@ export interface Session {
 
 export interface RecentFile {
   name: string;
+  /** copia del contenido: el .asc o, en un proyecto, el .turbo */
   asc: string;
+  /** `asc` es un .turbo */
+  turbo?: boolean;
   encoding?: AscEncoding;
   handle?: unknown;
   /** id en Google Drive */
@@ -126,4 +129,46 @@ export const loadUserFiles = async () => (await quiet(get<UserFile[]>('userfiles
 
 export async function saveUserFiles(files: UserFile[]): Promise<void> {
   await quiet(put('userfiles', files), undefined);
+}
+
+/** Proyecto en el que se está trabajando (#149): el .turbo entero, sin las pilas de deshacer */
+export interface ProjectSession {
+  name: string;
+  handle?: unknown;
+  /** id en Google Drive */
+  driveId?: string;
+  turbo: string;
+  /** hay cambios sin guardar en el archivo */
+  dirty: boolean;
+  time: number;
+}
+
+export const loadProjectSession = () => quiet(get<ProjectSession>('project'), undefined);
+
+export function saveProjectSession(s: ProjectSession): Promise<void> {
+  return quiet(put('project', s).catch(() => put('project', { ...s, handle: undefined })), undefined);
+}
+
+/**
+ * Resultados de la última corrida de cada simulación (no van en el .turbo, pueden pesar MB).
+ * `asc` es el circuito simulado: si ya no es el de la simulación, no sirven.
+ */
+export interface CachedResult<T> {
+  asc: string;
+  result: T;
+  time: number;
+}
+
+export const loadResult = <T>(simId: string) => quiet(get<CachedResult<T>>(`res:${simId}`), undefined);
+export const saveResult = <T>(simId: string, r: CachedResult<T>) => quiet(put(`res:${simId}`, r), undefined);
+export const dropResult = (simId: string) => quiet(del(`res:${simId}`), undefined);
+
+async function del(key: string): Promise<void> {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
 }

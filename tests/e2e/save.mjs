@@ -2,14 +2,16 @@
 // Google Identity Services falso) y el equipo (showSaveFilePicker falso, y la descarga cuando el
 // navegador no tiene esa API). Verifica qué se sube, a qué archivo, cuántas veces, que el contenido
 // es el proyecto entero y que los errores no lo marcan como guardado.
-// Uso: node tests/e2e/save.mjs [url]   (con `npm run preview` corriendo; el build necesita
+// Uso: [BROWSER=firefox] node tests/e2e/save.mjs [url]   (con `npm run preview` corriendo; el build necesita
 // VITE_GOOGLE_CLIENT_ID, cualquiera sirve: no se habla con Google)
 import { readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
+import { chromium, firefox } from 'playwright-core';
 import { menu, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+// BROWSER=firefox: el Firefox de Playwright (`npx playwright@<versión de playwright-core> install firefox`)
+const FIREFOX = process.env.BROWSER === 'firefox';
+const browser = FIREFOX ? await firefox.launch() : await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
 
 let failed = 0;
 const check = (ok, msg) => {
@@ -200,7 +202,12 @@ const signedIn = (context) =>
     window.google = {
       accounts: {
         oauth2: {
-          initTokenClient: (o) => ({ requestAccessToken: () => setTimeout(() => o.callback({ access_token: `tok${++n}`, expires_in: 3600 })) }),
+          initTokenClient: (o) => ({
+            requestAccessToken: () => {
+              window.__tokenRequests = (window.__tokenRequests ?? 0) + 1;
+              setTimeout(() => o.callback({ access_token: `tok${++n}`, expires_in: 3600 }));
+            },
+          }),
           hasGrantedAllScopes: () => true,
           revoke: () => {},
         },
@@ -648,6 +655,56 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   check(await waitToast(page, /Google Drive/), `Sin conexión: al volver la conexión, Ctrl+S guarda (${await toast(page)})`);
   await page.waitForTimeout(300);
   check(!(await dirty(page)) && !f.data.equals(before), 'Sin conexión: y queda guardado');
+  await context.close();
+}
+
+
+// -- la sesión se renueva en un gesto, antes de que venza (#192)
+{
+  const fake = new FakeDrive();
+  const context = await driveContext(fake);
+  const page = await newPage(context);
+  const setToken = (ms) => page.evaluate((ms) => sessionStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'tokOld', expires: Date.now() + ms })), ms);
+  const requests = () => page.evaluate(() => window.__tokenRequests ?? 0);
+  const tokenNow = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('turbospice.google.token') ?? 'null'));
+  // token con tiempo de sobra: un click no pide otro
+  await setToken(50 * 60_000);
+  await page.reload();
+  await page.locator('svg.editor .sym').first().waitFor();
+  const r0 = await requests();
+  await page.mouse.click(400, 700);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(500);
+  check((await requests()) === r0, 'Sesión: con el token al día, un click no pide otro');
+  // por vencer (5 min): el primer click lo renueva, sin aviso, y el guardado usa el nuevo
+  await setToken(5 * 60_000);
+  await page.reload();
+  await page.locator('svg.editor .sym').first().waitFor();
+  const r1 = await requests();
+  await page.mouse.click(400, 700);
+  await page.waitForTimeout(500);
+  const t = await tokenNow();
+  check((await requests()) === r1 + 1 && t?.value !== 'tokOld' && t.expires - Date.now() > 50 * 60_000, `Sesión: con el token por vencer, el primer click lo renueva (${t?.value})`);
+  await page.mouse.click(400, 700);
+  await page.keyboard.press('a');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+  check((await requests()) === r1 + 1, 'Sesión: y no lo vuelve a pedir en cada click');
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  check(fake.tokens.at(-1) === `Bearer ${t.value}` && !(await dirty(page)), 'Sesión: el guardado usa el token renovado');
+  // vencido: una tecla también lo renueva
+  await setToken(-60_000);
+  await page.reload();
+  await page.locator('svg.editor .sym').first().waitFor();
+  const r2 = await requests();
+  await page.locator('svg.editor').click({ position: { x: 300, y: 600 } });
+  await page.waitForTimeout(500);
+  // (al cargar, la sincronización de «My symbols and models» ya puede haberlo pedido)
+  const t2 = await tokenNow();
+  check((await requests()) >= r2 && t2?.value !== 'tokOld' && t2.expires > Date.now() + 50 * 60_000, 'Sesión: con el token vencido, después del primer gesto hay uno válido');
+  check(!page.errors.length, `Sesión: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
   await context.close();
 }
 

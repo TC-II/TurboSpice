@@ -142,6 +142,36 @@ export async function getToken(force = false): Promise<string> {
 
 export const drive = new DriveClient(getToken);
 
+// --- Mantener la sesión mientras se usa la app (#192) ---
+// El token de Google para una página sin servidor dura 1 h. Pedir otro cuando ya venció falla si
+// no hay un gesto del usuario: el navegador bloquea la ventanita de Google (p.ej. en el guardado
+// automático al simular). Por eso se renueva antes, en un click o una tecla, cuando faltan menos de
+// RENEW_BEFORE; con el permiso ya dado, Google lo da sin preguntar (la ventanita se cierra sola).
+export const RENEW_BEFORE = 10 * 60_000;
+const RETRY_AFTER = 60_000;
+let lastTry = 0;
+
+/** ¿Hay que renovar ahora? (con sesión, token por vencer o vencido, sin pedido en curso ni intento reciente) */
+export function shouldRenew(t: { expires: number } | null, now: number, o: { signedIn: boolean; pending: boolean; lastTry: number }): boolean {
+  if (!o.signedIn || o.pending || now - o.lastTry < RETRY_AFTER) return false;
+  return !t || t.expires - now < RENEW_BEFORE;
+}
+
+function renewOnGesture() {
+  const now = Date.now();
+  if (!CLIENT_ID || !shouldRenew(token, now, { signedIn: !!state.account, pending: !!pending, lastTry })) return;
+  lastTry = now;
+  // sin aviso si falla: el próximo guardado lo intenta de nuevo y ahí sí avisa
+  requestToken('').catch(() => {});
+}
+
+if (typeof window !== 'undefined' && CLIENT_ID) {
+  window.addEventListener('pointerdown', renewOnGesture, true);
+  window.addEventListener('keydown', renewOnGesture, true);
+  // con la sesión iniciada, GIS se carga de antemano: así la ventanita sale dentro del gesto
+  if (state.account) loadGis().catch(() => {});
+}
+
 export async function signIn(): Promise<void> {
   set({ busy: true });
   try {

@@ -201,6 +201,7 @@ svg.editor.tool-move { cursor: move; }
 .wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
 .sym { color: var(--sch-sym); stroke: currentColor; }
 .sym .body { stroke-width: 1.4; }
+.sym .body .wave-icon { stroke-width: 2; }
 .sym .body text { fill: currentColor; stroke: none; }
 /* skins (SVG de ASC-Parser): los valores por defecto de SVG, como los dibuja ASC-Parser: lo que no
    dice fill va relleno (flechas, signos) y lo que no dice stroke va sin trazo; en currentColor (#76) */

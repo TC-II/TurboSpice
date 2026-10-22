@@ -8,6 +8,8 @@ import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { displayValue, flagDirection, fontSize, junctionPoints, pinPoints, sameRef, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
+import { parseSource } from '../sim/sources.ts';
+import { KINDS } from './sourceIcons.tsx';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
@@ -91,6 +93,9 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
   }
   const attrs = effectiveAttrs(inst, def);
   const prefix = attrs.get('Prefix') ?? '';
+  // fuente de tensión: en el medio, el dibujito de su forma de onda (DC usa el símbolo cell)
+  const waveKind = inst.type.toLowerCase() === 'voltage' ? parseSource({ Value: attrs.get('Value'), Value2: attrs.get('Value2'), SpiceLine: attrs.get('SpiceLine') })?.kind : undefined;
+  const waveIcon = waveKind && waveKind !== 'dc' ? KINDS.find((k) => k.kind === waveKind)?.icon : undefined;
   const labels: ReactNode[] = [];
   for (const [idx, w] of hideLabels ? [] : effectiveWindows(inst, def, lib.windowDefaults)) {
     const key = WINDOW_ATTR[idx];
@@ -110,7 +115,18 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     <g className={cls}>
       <g transform={matrix(inst.orient, inst.x, inst.y)} className="body">
         {skin ? (
-          <g className="skin" dangerouslySetInnerHTML={{ __html: skin.body }} />
+          <>
+            <g className="skin" dangerouslySetInnerHTML={{ __html: skin.body }} />
+            {waveIcon && <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">{waveIcon}</g>}
+          </>
+        ) : waveIcon ? (
+          <>
+            <line x1={0} y1={16} x2={0} y2={32} />
+            <line x1={0} y1={80} x2={0} y2={96} />
+            <circle cx={0} cy={56} r={24} fill="none" />
+            <path d="M-4 41H4M0 37V45M-4 71H4" fill="none" />
+            <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">{waveIcon}</g>
+          </>
         ) : (
           <>
             {def.shapes.map((s, i) => <ShapeView key={i} s={s} />)}

@@ -5,7 +5,7 @@ Simulador de circuitos tipo LTspice que corre **100% en el navegador**: el motor
 
 Editor de esquemáticos con `.asc` de LTspice como formato nativo (ida y vuelta), todos los análisis de
 ngspice, visor de resultados, Estudio (barridos, tolerancias, mediciones, bloques) y links para
-compartir. Ver [docs/PLAN.md](docs/PLAN.md) y [docs/compatibilidad-ltspice.md](docs/compatibilidad-ltspice.md).
+compartir. Ver [docs/PLAN.md](docs/PLAN.md), [docs/compatibilidad-ltspice.md](docs/compatibilidad-ltspice.md) y el manual de ngspice-47 en [docs/ngspice/](docs/ngspice/README.md).
 
 ## Desarrollo
 

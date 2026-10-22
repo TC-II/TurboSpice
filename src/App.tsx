@@ -61,6 +61,8 @@ import {
   type ValueChange,
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
+import { exportAllZip, exportVariantZip, importEntries } from './project/exchange.ts';
+import { readZip, type ZipEntry } from './project/zip.ts';
 import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
@@ -1652,22 +1654,62 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     };
   });
 
-  // Arrastrar y soltar un .asc
+  // Importar a este proyecto (#157): un .zip (cada carpeta, y la raíz, es una variante) o archivos
+  // sueltos (cada .asc, una variante); los símbolos y modelos van a los archivos del proyecto
+  const importInput = useRef<HTMLInputElement>(null);
+  const importFiles = async (list: File[]) => {
+    try {
+      let p = leave();
+      const variants: string[] = [];
+      const files: Project['files'] = [];
+      const loose: ZipEntry[] = [];
+      for (const f of list) {
+        const data = new Uint8Array(await f.arrayBuffer());
+        if (!/\.zip$/i.test(f.name)) {
+          loose.push({ path: f.name, data });
+          continue;
+        }
+        const r = importEntries(p, await readZip(data), f.name);
+        p = r.project;
+        variants.push(...r.variants);
+        files.push(...r.files);
+      }
+      if (loose.length) {
+        const r = importEntries(p, loose);
+        p = r.project;
+        variants.push(...r.variants);
+        files.push(...r.files);
+      }
+      const merged = await mergeFiles(p.files, files, askConflict);
+      enter({ ...p, files: merged.files }, true);
+      setDirty(true);
+      const parts = [
+        ...(variants.length ? [`${variants.length === 1 ? 'la variante' : `${variants.length} variantes:`} ${variants.join(', ')}`] : []),
+        ...(merged.added.length ? [`${merged.added.length === 1 ? 'el archivo' : `${merged.added.length} archivos:`} ${merged.added.join(', ')}`] : []),
+      ];
+      setMessage(parts.length ? `Se importó ${parts.join(' y ')}` : 'No había nada para importar (.asc, .asy, .lib, .sub o .zip)');
+    } catch (e) {
+      setMessage(`No se pudo importar: ${(e as Error).message}`);
+    }
+  };
+  const exportZip = (all: boolean) => {
+    const p = snapshot();
+    const z = all ? exportAllZip(p, lib) : exportVariantZip(p, p.activeVariant, lib);
+    download(z.name, new Blob([z.bytes as BlobPart], { type: 'application/zip' }));
+  };
+
+  // Arrastrar y soltar: un .turbo o un .asc se abre; un .plt es una vista; lo demás (varios
+  // archivos, un .zip, símbolos y modelos) se importa al proyecto
   useEffect(() => {
     const over = (e: DragEvent) => e.preventDefault();
     const drop = async (e: DragEvent) => {
       e.preventDefault();
       const all = [...(e.dataTransfer?.files ?? [])];
       const f = all[0];
-      if (f?.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
-      // símbolos y modelos: al proyecto (#155); un .asc junto con otros archivos es un bloque del usuario
-      const forProject = all.filter((x) => projectFileKind(x.name));
-      if (forProject.length) await addProjectFiles(await Promise.all(forProject.map(async (x) => ({ name: x.name, text: decode(new Uint8Array(await x.arrayBuffer())).text }))));
-      const blocks = all.length > 1 ? all.filter((x) => /\.asc$/i.test(x.name)) : [];
-      if (blocks.length) return addUserFiles(blocks);
-      if (forProject.length) return;
-      if (f && /\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
-      if (!f || !f.name.toLowerCase().endsWith('.asc')) return;
+      if (!f) return;
+      if (f.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
+      if (all.length > 1 || !/\.(turbo|asc)$/i.test(f.name)) return importFiles(all);
+      if (/\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
       // con la sesión de Google, soltar un .asc lo importa a "Mis simulaciones" y lo abre
       if (google.account) return doImport([{ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }]);
       if (!confirmDiscard()) return;
@@ -1747,6 +1789,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Guardar como…', shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
         ...(google.account ? [{ label: 'Exportar a la PC…', onClick: () => doSaveLocal(true) }] : []),
         { label: 'Exportar a PDF', title: 'Abre ASC-Parser con este circuito; no se sube a ningún servidor', onClick: doExportPdf },
+        'sep',
+        { label: 'Importar a este proyecto…', title: '.zip, .asc (cada uno, una variante), .asy, .lib, .sub', onClick: () => importInput.current?.click() },
+        { label: 'Exportar la variante a LTspice (.zip)', title: 'Un .asc por simulación y los archivos del proyecto que usan', onClick: () => exportZip(false) },
+        { label: 'Exportar todo a LTspice (.zip)', title: 'Una carpeta por variante', onClick: () => exportZip(true) },
         'sep',
         { label: 'Compartir link…', onClick: doShare },
         { label: 'Archivos del proyecto…', title: 'Símbolos y modelos guardados en el .turbo, para todas las variantes', onClick: () => setDialog({ kind: 'projectfiles' }) },
@@ -2209,6 +2255,19 @@ ${ltNetlistText(sim.built.lt)}
               <button onClick={() => setOfferView(null)}>No</button>
             </div>
           )}
+          {/* Archivo › Importar a este proyecto */}
+          <input
+            ref={importInput}
+            type="file"
+            hidden
+            multiple
+            accept=".zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb"
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = '';
+              if (files.length) importFiles(files);
+            }}
+          />
           {/* carpeta lib de LTspice (Archivo → Importar librería de LTspice) */}
           <input
             ref={ltInput}

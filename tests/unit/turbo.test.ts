@@ -57,7 +57,7 @@ describe('.turbo', () => {
     expect(runs.map((r) => !!r.damaged)).toEqual([false, true, false]);
     expect(runs[0].asc).toContain('.tran 10m');
     expect(project.variants[0].sims[1].asc).toContain('.ac dec');
-    expect(warnings).toEqual(['«Filtro RC»: una corrida del historial está dañada']);
+    expect(warnings).toEqual(['«Variante 1»: una corrida del historial está dañada']);
     // al volver a guardar, la dañada no se escribe
     const again = JSON.parse(await serializeTurbo(project));
     expect(again.variants[0].sims[0].runs.map((r: { id: string }) => r.id)).toEqual(['r1', 'r3']);

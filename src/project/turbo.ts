@@ -98,10 +98,10 @@ export function variantFromAsc(doc: AscDoc, name: string): Variant {
   return { id: newId('v'), name, base: serializeAsc(clean), activeSim: list[Math.max(0, active)]?.id ?? '', sims: list };
 }
 
-/** Proyecto con una sola variante: la del .asc (al abrir un .asc de LTspice) */
+/** Proyecto con una sola variante, «Variante 1»: la del .asc (al abrir un .asc de LTspice) */
 export function projectFromAsc(doc: AscDoc, fileName: string): Project {
   const name = projectName(fileName);
-  const v = variantFromAsc(doc, name);
+  const v = variantFromAsc(doc, 'Variante 1');
   const now = Date.now();
   return { name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] };
 }

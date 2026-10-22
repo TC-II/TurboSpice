@@ -38,6 +38,12 @@ import {
   activeAsc,
   addSim as addProjectSim,
   applyValues,
+  blankVariant,
+  cloneVariant,
+  duplicateSim as duplicateProjectSim,
+  removeVariant,
+  renameVariant,
+  selectVariant,
   lineOf,
   recordRun,
   removeSim as removeProjectSim,
@@ -53,6 +59,7 @@ import {
 } from './project/project.ts';
 import { EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
+import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
@@ -110,6 +117,7 @@ type Dialog =
   | { kind: 'drive' }
   /** borrar una simulación (con el control deslizante) */
   | { kind: 'deleteSim'; id: string }
+  | { kind: 'deleteVariant'; id: string }
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
   | { kind: 'lineStyle'; shapes: number[] };
 
@@ -950,6 +958,53 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     enter(removeProjectSim(p0, id));
     setDirty(true);
   };
+  const duplicateSim = (id: string) => {
+    const r = duplicateProjectSim(leave(), id);
+    if (!r) return setMessage(`Ya hay ${MAX_SIMS} simulaciones: borrá alguna para agregar otra`);
+    enter(r.project);
+    setDirty(true);
+  };
+
+  // --- Variantes (#150): la cápsula Proyecto · Variante ---
+  const goVariant = (id: string) => id !== variant.id && enter(selectVariant(leave(), id), true);
+  const cloneOf = (id: string) => {
+    enter(cloneVariant(leave(), id).project, true);
+    setDirty(true);
+  };
+  const newBlankVariant = () => {
+    enter(blankVariant(leave()).project, true);
+    setDirty(true);
+  };
+  const deleteVariant = (id: string) => {
+    const p0 = leave();
+    for (const s of variantOf(p0, id).sims) {
+      kept.current.delete(s.id);
+      dropResult(s.id);
+    }
+    for (const k of [...stacks.current.keys()]) if (k.startsWith(`${id}/`)) stacks.current.delete(k);
+    const p = removeVariant(p0, id);
+    if (p.activeVariant !== p0.activeVariant) enter(p, true);
+    else setProjectState(p);
+    setDirty(true);
+  };
+  /** El nombre del proyecto es el del archivo: en Drive se renombra ya; en el equipo, al guardar */
+  const renameProject = async (name: string) => {
+    const newName = `${name}${EXT}`;
+    editProject({ ...projectRef.current, name });
+    if (file.driveId && google.account) {
+      setFile({ ...file, name: newName });
+      try {
+        await drive.rename(file.driveId, newName);
+      } catch (e) {
+        setMessage(`No se pudo renombrar en Google Drive: ${(e as Error).message}`);
+      }
+      return;
+    }
+    // el archivo del equipo no se puede renombrar desde el navegador: Guardar pide dónde
+    setFile({ ...file, name: newName, handle: undefined });
+    if (file.handle) setMessage(`Al guardar (Ctrl+S) se crea «${newName}»`);
+  };
+
   /** «Aplicar»: el valor nuevo va a las otras simulaciones, cada una con su paso de deshacer */
   const applyValueOffer = () => {
     if (!valueOffer) return;
@@ -1558,12 +1613,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // análisis, que crean una simulación nueva con sus parámetros en la barra; los comandos a mano
   // y los análisis programados
   const simItems: MenuItem[] = [
-    ...sims.items.map((x) => ({
-      label: simName(x) || 'Sin análisis',
-      title: x.line,
-      checked: x.id === sims.active,
-      onClick: () => goSim(x.id),
-    })),
+    ...sims.items.map(
+      (x): MenuItem => ({
+        label: simName(x) || 'Sin análisis',
+        title: `${x.line} (doble clic para renombrar)`,
+        checked: x.id === sims.active,
+        onClick: () => goSim(x.id),
+        rename: { taken: sims.items.filter((y) => y.id !== x.id).map((y) => simName(y)), onRename: (n) => editProject(renameProjectSim(projectRef.current, x.id, n)) },
+        actions: [
+          { icon: 'copy', label: 'Duplicar', onClick: () => duplicateSim(x.id) },
+          { icon: 'trash', label: 'Borrar', onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) },
+        ],
+      }),
+    ),
     ...(sims.items.length
       ? [{ label: 'Circuito base (sin simulación)', title: 'El circuito de la variante fuera de las simulaciones', checked: !sims.active, onClick: () => goSim('') }]
       : []),
@@ -1835,7 +1897,19 @@ ${ltNetlistText(sim.built.lt)}
       {slots.right &&
         createPortal(
           <>
-            <span className="filename" title={file.name}>{file.name}{dirty ? ' •' : ''}</span>
+            <ProjectCapsule
+              project={project.name}
+              variants={project.variants.map((v) => ({ id: v.id, name: v.name, sims: v.sims.length }))}
+              active={variant.id}
+              dirty={dirty}
+              onRenameProject={renameProject}
+              onRenameVariant={(id, name) => editProject(renameVariant(projectRef.current, id, name))}
+              onSelect={goVariant}
+              onClone={() => cloneOf(variant.id)}
+              onBlank={newBlankVariant}
+              onDuplicate={cloneOf}
+              onDelete={(id) => setDialog({ kind: 'deleteVariant', id })}
+            />
             <button
               className="theme-btn"
               aria-label="Cambiar tema"
@@ -2347,6 +2421,17 @@ ${ltNetlistText(sim.built.lt)}
           onConfirm={() => {
             setDialog(null);
             deleteSim(dialog.id);
+          }}
+        />
+      )}
+      {dialog?.kind === 'deleteVariant' && (
+        <SlideConfirm
+          title="Borrar la variante"
+          message={`Se borra «${variantOf(project, dialog.id).name}» con todas sus simulaciones y su historial.`}
+          onClose={() => setDialog(null)}
+          onConfirm={() => {
+            setDialog(null);
+            deleteVariant(dialog.id);
           }}
         />
       )}

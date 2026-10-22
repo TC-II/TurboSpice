@@ -1,10 +1,28 @@
 // Menús desplegables (el menú principal colapsado, la flecha de Simular, …) con submenús,
 // atajos visibles y manejo de teclado.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Icon } from './icons.tsx';
+import { NameInput } from './EditableName.tsx';
+import { Icon, type IconName } from './icons.tsx';
+
+/** Botón chico a la derecha de un ítem (duplicar, borrar, historial…) */
+export interface MenuAction {
+  icon: IconName;
+  label: string;
+  onClick(): void;
+}
 
 export type MenuItem =
-  | { label: string; shortcut?: string; onClick(): void; disabled?: boolean; checked?: boolean; title?: string }
+  | {
+      label: string;
+      shortcut?: string;
+      onClick(): void;
+      disabled?: boolean;
+      checked?: boolean;
+      title?: string;
+      /** doble clic en el ítem: renombrarlo (sin repetir los `taken`) */
+      rename?: { taken: string[]; onRename(name: string): void };
+      actions?: MenuAction[];
+    }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | 'sep';
 
@@ -126,6 +144,10 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
   // sólo con mouse: en pantallas táctiles el submenú se abre y se cierra tocando el ítem
   const mouse = (e: React.PointerEvent) => e.pointerType === 'mouse';
   const lastPointer = useRef('mouse');
+  // con doble clic para renombrar, el clic espera un momento por si viene el segundo
+  const [editing, setEditing] = useState<number | null>(null);
+  const clickTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(clickTimer.current), []);
   return (
     <div
       className="menu-list"
@@ -188,25 +210,73 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
             )}
           </div>
         ) : (
-          <div key={i} data-i={i} className="menu-item">
-            <button
-              role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
-              aria-checked={it.checked}
-              aria-label={it.label}
-              aria-keyshortcuts={it.shortcut}
-              disabled={it.disabled}
-              title={it.title}
-              onClick={() => {
-                close();
-                it.onClick();
-              }}
-            >
-              <span>
+          <div key={i} data-i={i} className={`menu-item${it.actions?.length ? ' with-actions' : ''}`}>
+            {editing === i && it.rename ? (
+              <div className="menu-rename">
                 {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
-                {it.label}
+                <NameInput
+                  value={it.label}
+                  taken={it.rename.taken}
+                  label={`Nombre de ${it.label}`}
+                  onDone={(n) => {
+                    setEditing(null);
+                    if (n) it.rename!.onRename(n);
+                  }}
+                />
+              </div>
+            ) : (
+              <button
+                role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                aria-checked={it.checked}
+                aria-label={it.label}
+                aria-keyshortcuts={it.shortcut}
+                disabled={it.disabled}
+                title={it.title ?? (it.rename ? 'Doble clic para renombrar' : undefined)}
+                onClick={() => {
+                  clearTimeout(clickTimer.current);
+                  const go = () => {
+                    close();
+                    it.onClick();
+                  };
+                  if (it.rename) clickTimer.current = setTimeout(go, 250);
+                  else go();
+                }}
+                onDoubleClick={
+                  it.rename
+                    ? () => {
+                        clearTimeout(clickTimer.current);
+                        setEditing(i);
+                      }
+                    : undefined
+                }
+              >
+                <span>
+                  {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
+                  {it.label}
+                </span>
+                {it.shortcut && <span className="sc">{it.shortcut}</span>}
+              </button>
+            )}
+            {!!it.actions?.length && (
+              <span className="menu-actions">
+                {it.actions.map((a) => (
+                  <button
+                    key={a.label}
+                    className="icon-btn"
+                    aria-label={a.label}
+                    title={a.label}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearTimeout(clickTimer.current);
+                      close();
+                      a.onClick();
+                    }}
+                  >
+                    <Icon name={a.icon} size={14} />
+                  </button>
+                ))}
               </span>
-              {it.shortcut && <span className="sc">{it.shortcut}</span>}
-            </button>
+            )}
           </div>
         ),
       )}

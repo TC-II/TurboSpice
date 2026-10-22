@@ -5,8 +5,8 @@
 * Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
 * reales van debajo.
 
-TS_R_1k_1%    R=1k   tol=1% P=0.25 mfg=TurboSpice_ejemplo
-TS_R_4k7_5%   R=4.7k tol=5% P=0.5  mfg=TurboSpice_ejemplo
+TS_R_1k_1%    R=1k   tol=1% P=0.25 mfg=TurboSpice_example
+TS_R_4k7_5%   R=4.7k tol=5% P=0.5  mfg=TurboSpice_example
 
 * Modelos importados de LTspice lib/cmp/standard.res (cmp1): 481 piezas
 * Serie E96 de 10 a 1M: el 3er campo binario es la tolerancia (1 %) y el 2do la potencia.

@@ -6,8 +6,8 @@
 * Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
 * reales van debajo.
 
-TS_L_10u_2A   L=10u  Ipk=2   Rser=40m  Rpar=2k  Cpar=3p mfg=TurboSpice_ejemplo
-TS_L_100u_05A L=100u Ipk=500m Rser=350m Rpar=20k Cpar=5p mfg=TurboSpice_ejemplo
+TS_L_10u_2A   L=10u  Ipk=2   Rser=40m  Rpar=2k  Cpar=3p mfg=TurboSpice_example
+TS_L_100u_05A L=100u Ipk=500m Rser=350m Rpar=20k Cpar=5p mfg=TurboSpice_example
 
 * Modelos importados de LTspice lib/cmp/standard.ind (cmp1): 13368 piezas
 SDE0403A-100M L=10u Ipk=1.4 Rser=0.127 Rpar=16.97k Cpar=1.698p mfg=Bourns_Inc.

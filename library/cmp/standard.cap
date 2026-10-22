@@ -6,8 +6,8 @@
 * Los dos primeros son ejemplos inventados con valores típicos (placeholders); las piezas
 * reales van debajo.
 
-TS_C_100n_X7R  C=100n V=50 Irms=1 Rser=20m Lser=0.6n type=X7R mfg=TurboSpice_ejemplo
-TS_C_100u_ELEC C=100u V=25 Irms=350m Rser=150m Lser=5n Rpar=1Meg type=Electrolítico mfg=TurboSpice_ejemplo
+TS_C_100n_X7R  C=100n V=50 Irms=1 Rser=20m Lser=0.6n type=X7R mfg=TurboSpice_example
+TS_C_100u_ELEC C=100u V=25 Irms=350m Rser=150m Lser=5n Rpar=1Meg type=Al_electrolytic mfg=TurboSpice_example
 
 * Modelos importados de LTspice lib/cmp/standard.cap (cmp1): 10804 piezas
 * LTspice guarda ESR y ESL; los campos Rpar/Cpar del binario son siempre 0.

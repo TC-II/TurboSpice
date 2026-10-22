@@ -15,7 +15,7 @@ const arrowsOf = (body: string) => {
 describe('flechas de sentido positivo de corriente', () => {
   it('R: sólo la flecha que entra, por el primer nodo', () => {
     const a = arrowsOf('SYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k');
-    expect(a).toEqual([{ at: { x: 16, y: 16 }, inward: { x: 0, y: 1 }, enters: true }]);
+    expect(a).toEqual([{ at: { x: 16, y: 16 }, inward: { x: 0, y: 1 }, enters: true, sym: 0, pin: 1 }]);
   });
 
   it('respeta rotación y espejado', () => {

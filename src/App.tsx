@@ -927,20 +927,34 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
     if (!sim || sim.doc !== doc || !(showOp || tool.kind === 'probe')) return undefined;
-    return currentArrows(doc, lib, sim.built.lt.elements);
-  }, [sim, doc, lib, showOp, tool.kind]);
+    const traces = panes.flatMap((p) => p.traces.map((t, i) => ({ t, color: traceColor(t, i) }))).filter((x) => !x.t.hidden);
+    // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
+    const colorOf = (target: { symbol: number; pin?: number }) => {
+      const expr = probeExpr(sim.built, target);
+      return expr ? traces.find((x) => sameExpr(x.t.expr, expr))?.color : undefined;
+    };
+    return currentArrows(doc, lib, sim.built.lt.elements).map((a) => {
+      const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? colorOf({ symbol: a.sym });
+      return color ? { ...a, color } : a;
+    });
+  }, [sim, doc, lib, showOp, tool.kind, panes]);
 
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
-  // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la traza)
+  // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
+  // traza); sólo con la punta de prueba
   const netColors = useMemo(() => {
     const m = new Map<string, string>();
+    if (tool.kind !== 'probe') return m;
     for (const p of panes) p.traces.forEach((t, i) => {
       const n = /^V\(([^()]+)\)$/i.exec(t.expr.trim());
       if (n && !t.hidden && !m.has(n[1].toLowerCase())) m.set(n[1].toLowerCase(), traceColor(t, i));
     });
     return m;
-  }, [panes]);
+  }, [panes, tool.kind]);
+  // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla
+  // no llega el pointerleave)
+  const traceNetShown = traceNet && panes.some((p) => p.traces.some((t) => sameExpr(t.expr, `V(${traceNet})`))) ? traceNet : undefined;
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
@@ -1842,7 +1856,7 @@ ${ltNetlistText(sim.built.lt)}
             onEdit={editItem}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
-            highlightNet={traceNet}
+            highlightNet={traceNetShown}
             netColors={netColors}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}

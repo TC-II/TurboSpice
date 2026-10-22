@@ -15,6 +15,11 @@ export interface CurrentArrow {
   inward: Point;
   /** la corriente positiva entra al componente por este pin (si no, sale) */
   enters: boolean;
+  /** símbolo y pin (desde 1, como la punta de prueba) */
+  sym: number;
+  pin: number;
+  /** color de la traza de esa corriente, si está graficada */
+  color?: string;
 }
 
 const TWO_TERMINAL = /^[RCLVIDB]/i;
@@ -64,7 +69,7 @@ export function currentArrows(doc: AscDoc, lib: Library, elements: { sym: number
       const d = transformOffset(inward.x, inward.y, s.orient);
       // dos terminales: entra por el primer nodo, sale por el otro (sólo se dibuja la que entra)
       const enters = !two || orders[k] === first;
-      if (enters) out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters });
+      if (enters) out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters, sym: el.sym, pin: k + 1 });
     });
   }
   return out;
@@ -84,7 +89,7 @@ export function CurrentArrowsLayer({ items }: { items: CurrentArrow[] }) {
         const uy = Math.sign(to.y - from.y);
         const head = `${to.x - 4 * ux - 2.5 * uy},${to.y - 4 * uy - 2.5 * ux} ${to.x},${to.y} ${to.x - 4 * ux + 2.5 * uy},${to.y - 4 * uy + 2.5 * ux}`;
         return (
-          <g key={i} className="current-arrow">
+          <g key={i} className="current-arrow" style={a.color ? { color: a.color } : undefined}>
             <line x1={from.x} y1={from.y} x2={to.x - 2 * ux} y2={to.y - 2 * uy} />
             <polygon points={head} />
           </g>

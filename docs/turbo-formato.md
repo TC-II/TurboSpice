@@ -104,10 +104,10 @@ deshacer (§5).
   componentes o cables no ofrece nada.
 
 ### Al simular
-1. Si el circuito o los parámetros cambiaron desde la última corrida, se agrega una corrida nueva con
+1. Si el circuito o los parámetros cambiaron desde la última corrida, se agrega una corrida nueva con (#149)
    su resumen de cambios. Si no cambió nada, sólo se actualiza la fecha de la última.
-2. Autoguardado local (IndexedDB) del proyecto entero.
-3. Autoguardado en Drive (ver §6).
+2. Autoguardado local (IndexedDB) del proyecto entero. (#150)
+3. Autoguardado en Drive (ver §6). (#151)
 
 ### Historial
 - El reloj aparece alineado a la derecha del nombre de la simulación, **sólo si tiene corridas**.
@@ -167,13 +167,13 @@ por variante, corridas con cambios entre ellas y un `.asy`/`.sub` tomados de `TC
 modificados.
 
 ## 9. Partes (un issue cada una)
-1. Formato `.turbo`: tipos, lectura y escritura, blobs y verificación de hashes.
-2. Cápsula y lista de variantes: Clone Current/Blank, renombrar, duplicar, borrar con slider.
-3. Simulaciones con esquemático propio y aviso *Aplicar a N simulaciones*.
-4. Historial de corridas: columna, ↑/↓, Restore y clonar.
-5. Cambios entre corridas: resaltado en el esquemático y resumen.
-6. Ctrl+Z por simulación.
-7. Archivos del proyecto: resolución de símbolos y modelos, y conflictos al importar.
-8. Drive: `.turbo`, cola de guardado, detección de conflictos y subida resumable.
-9. Importar y exportar: `.asc`, `.zip` por variante y Exportar todo.
-10. `examples/prueba.turbo` de prueba.
+1. Formato `.turbo`: tipos, lectura y escritura, blobs y verificación de hashes. (#149)
+2. Cápsula y lista de variantes: Clone Current/Blank, renombrar, duplicar, borrar con slider. (#150)
+3. Simulaciones con esquemático propio y aviso *Aplicar a N simulaciones*. (#151)
+4. Historial de corridas: columna, ↑/↓, Restore y clonar. (#152)
+5. Cambios entre corridas: resaltado en el esquemático y resumen. (#153)
+6. Ctrl+Z por simulación. (#154)
+7. Archivos del proyecto: resolución de símbolos y modelos, y conflictos al importar. (#155)
+8. Drive: `.turbo`, cola de guardado, detección de conflictos y subida resumable. (#156)
+9. Importar y exportar: `.asc`, `.zip` por variante y Exportar todo. (#157)
+10. `examples/prueba.turbo` de prueba. (#158)

@@ -106,7 +106,7 @@ const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
 /** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
 const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
-const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc', 'Barrido RC (.step).asc'];
+const EXAMPLES = ['Filtro RC.asc', 'Bode RLC.asc', 'Inversor OA_Ideal.asc', 'Rectificador.asc', 'Emisor común.asc', 'Barrido RC (.step).asc', 'prueba.turbo'];
 
 type Dialog =
   | { kind: 'picker' }
@@ -918,6 +918,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const doExample = async (name: string) => {
     if (!confirmDiscard()) return;
     const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
+    if (/\.turbo$/i.test(name)) return openBytes(new Uint8Array(b), name);
     loadDoc(readAsc(new Uint8Array(b), name).doc, name);
   };
 
@@ -1893,7 +1894,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           ],
         },
         'sep',
-        { label: 'Ejemplos', items: EXAMPLES.map((x) => ({ label: x.replace('.asc', ''), onClick: () => doExample(x) })) },
+        { label: 'Ejemplos', items: EXAMPLES.map((x) => ({ label: /\.turbo$/i.test(x) ? 'Proyecto de prueba (.turbo)' : x.replace('.asc', ''), onClick: () => doExample(x) })) },
         {
           label: 'Recientes',
           items: recent.map((r, i) => ({

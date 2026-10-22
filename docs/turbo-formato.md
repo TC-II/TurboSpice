@@ -177,3 +177,24 @@ modificados.
 8. Drive: `.turbo`, cola de guardado, detección de conflictos y subida resumable. (#156)
 9. Importar y exportar: `.asc`, `.zip` por variante y Exportar todo. (#157)
 10. `examples/prueba.turbo` de prueba. (#158)
+
+## 10. Implementación (22/10/2026)
+
+Las diez partes están hechas (#149–#158). Detalles que se decidieron al implementar:
+
+- **Un `.asc` abierto** queda como «Variante 1» del proyecto (no con el nombre del archivo, que ya es
+  el del proyecto).
+- **Importar un `.zip`**: cada carpeta es una variante y los `.asc` de la raíz forman una sola variante
+  con el nombre del zip, con una simulación por `.asc`. Así un zip exportado vuelve igual. Los `.asc`
+  sueltos (sin zip) son una variante cada uno.
+- **Soltar archivos**: un `.turbo` o un `.asc` solo se abre; varios archivos, un `.zip`, o símbolos y
+  modelos se importan al proyecto.
+- **Base de la variante**: se elige en Simular › «Circuito base (sin simulación)». Al borrar la última
+  simulación, su circuito (sin el comando de análisis) pasa a ser la base.
+- **Renombrar el proyecto** con un archivo del equipo: el navegador no puede renombrarlo; el próximo
+  Ctrl+S pide dónde guardarlo con el nombre nuevo. En Drive se renombra en el momento.
+- **Exportar a LTspice**: verificado con `LTspice -netlist` sobre los ejemplos exportados.
+- **Drive**: la cola, la versión y la subida por partes están probadas con un `fetch` falso
+  (`tests/unit/drive.test.ts`); falta probarlas con una cuenta real.
+- **Proyecto de prueba**: `public/examples/prueba.turbo` (Archivo › Ejemplos › Proyecto de prueba),
+  generado con `npx vite-node scripts/make-prueba-turbo.ts`.

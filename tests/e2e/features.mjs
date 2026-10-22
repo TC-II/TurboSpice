@@ -904,10 +904,16 @@ await page.locator('svg.editor .sym').first().waitFor();
 {
   // cuerpo de V1 (se recalcula: al simular se abre el panel de resultados y cambia la vista)
   // (Esc: después de simular queda la herramienta de medir y el doble click sólo edita al seleccionar)
+  // después de simular se abre el panel de resultados y la vista se reajusta un instante después:
+  // si el doble click cae antes, se reintenta con las coordenadas ya reajustadas
   const openV1 = async () => {
-    await page.keyboard.press('Escape');
-    const p = await at(0, 56);
-    await page.mouse.dblclick(p.x, p.y);
+    for (let i = 0; i < 3; i++) {
+      await page.keyboard.press('Escape');
+      const p = await at(0, 56);
+      await page.mouse.dblclick(p.x, p.y);
+      if (await page.getByRole('dialog', { name: 'Fuente de tensión V1' }).waitFor({ timeout: 2000 }).then(() => true, () => false)) return;
+      await page.waitForTimeout(500);
+    }
   };
   await openV1();
   const sd = page.getByRole('dialog', { name: 'Fuente de tensión V1' });

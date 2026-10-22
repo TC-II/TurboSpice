@@ -65,3 +65,12 @@ export async function slideToDelete(page) {
   await slider.press('End');
   await page.locator('.slide-confirm').waitFor({ state: 'detached', timeout: 5000 });
 }
+
+/** El navegador de los e2e: Chrome/Chromium (CHROMIUM=ruta) o, con BROWSER=firefox, el Firefox de
+ * Playwright (`npx playwright@<versión de playwright-core> install firefox`) */
+// (también `npm run e2e --browser=firefox`, que es lo que hace `npm run e2e:firefox`)
+export const FIREFOX = (process.env.BROWSER ?? process.env.npm_config_browser) === 'firefox';
+export async function launchBrowser() {
+  const { chromium, firefox } = await import('playwright-core');
+  return FIREFOX ? firefox.launch() : chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+}

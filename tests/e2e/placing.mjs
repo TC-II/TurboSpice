@@ -2,12 +2,12 @@
 // (con InstName), el botón derecho arrastra la vista, el buscador (P) no se mueve, el botón de
 // figuras de la barra y los atajos O, U, I.
 // Uso: node tests/e2e/placing.mjs [url]   (con `npm run preview` corriendo)
-import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
+
+import { skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await skipWelcome(page);
 const errors = [];

@@ -2,14 +2,13 @@
 // Uso: node tests/e2e/examples.mjs [url] [carpeta-capturas]
 // Requiere un Chromium instalado (CHROMIUM o /usr/bin/chromium) y `npm run preview` corriendo.
 import { mkdirSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { menu, skipWelcome } from './lib.mjs';
+import { menu, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 let failed = 0;
 for (const scheme of ['light', 'dark']) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, colorScheme: scheme });

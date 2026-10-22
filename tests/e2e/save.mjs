@@ -5,13 +5,10 @@
 // Uso: [BROWSER=firefox] node tests/e2e/save.mjs [url]   (con `npm run preview` corriendo; el build necesita
 // VITE_GOOGLE_CLIENT_ID, cualquiera sirve: no se habla con Google)
 import { readFileSync } from 'node:fs';
-import { chromium, firefox } from 'playwright-core';
-import { menu, skipWelcome } from './lib.mjs';
+import { launchBrowser, menu, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
-// BROWSER=firefox: el Firefox de Playwright (`npx playwright@<versión de playwright-core> install firefox`)
-const FIREFOX = process.env.BROWSER === 'firefox';
-const browser = FIREFOX ? await firefox.launch() : await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 
 let failed = 0;
 const check = (ok, msg) => {

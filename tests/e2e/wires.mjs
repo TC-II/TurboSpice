@@ -2,11 +2,11 @@
 // arrastrar un tramo, Alt+click, deshacer; la netlist del archivo guardado no cambia.
 // Uso: node tests/e2e/wires.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
+import { skipWelcome, launchBrowser } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
-import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
+import { activeAsc, variantOf } from '../../src/project/project.ts';
+import { parseTurbo } from '../../src/project/turbo.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 
@@ -14,7 +14,7 @@ const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
 await skipWelcome(page);
 const errors = [];
@@ -57,9 +57,10 @@ const lib = new Library(buildBundle());
 let saves = 0;
 const saved = async () => {
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
-  const path = `${OUT}/wires-${saves++}.asc`;
+  const path = `${OUT}/wires-${saves++}.turbo`;
   await download.saveAs(path);
-  const doc = parseAsc(decode(new Uint8Array(readFileSync(path))).text);
+  // Ctrl+S guarda el proyecto (.turbo): el circuito es el de la variante activa
+  const doc = parseAsc(activeAsc(variantOf((await parseTurbo(readFileSync(path, 'utf8'))).project)));
   return { doc, net: ltNetlistText(ltNetlist(doc, lib)), wires: doc.wires.map((w) => [w.x1, w.y1, w.x2, w.y2].join(' ')) };
 };
 const ortho = (d) => d.wires.every((w) => w.x1 === w.x2 || w.y1 === w.y2);

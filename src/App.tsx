@@ -936,7 +936,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     tab.document.write(`<!doctype html><title>${title}</title><style>@page{size:${vb[2] >= vb[3] ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0;height:100%}svg{width:100%;height:100%;display:block}</style>${text}`);
     tab.document.close();
     tab.focus();
-    tab.print();
+    // después del click: en Firefox print() bloquea hasta cerrar el diálogo de impresión
+    tab.setTimeout(() => tab.print(), 50);
   };
 
   const doRecent = async (i: number) => {

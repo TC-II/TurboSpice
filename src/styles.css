@@ -503,7 +503,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .menu-item > button:hover:not(:disabled), .menu-item > button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
 .menu-item .sc { color: var(--fg-muted); font-size: 12px; }
 .menu-item .check-mark { display: inline-block; width: 16px; }
-.menu-item > button .icon { color: var(--accent); margin-right: 6px; vertical-align: -3px; }
+.menu-item .menu-icon { display: inline-flex; align-items: center; color: var(--accent); }
 .menu-item.has-sub > .menu-list { top: -5px; left: 100%; }
 .menu-item.has-sub > .menu-list.flip { left: auto; right: 100%; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }

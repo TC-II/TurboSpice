@@ -72,7 +72,7 @@ import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
-import { ascBytes, openProjectFile, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
 import { useHistory, type History } from './schematic/useHistory.ts';
@@ -94,7 +94,7 @@ import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
-import { download, exportSchematic } from './schematic/exportSchematic.ts';
+import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
@@ -107,7 +107,6 @@ import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
 /** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
-const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
@@ -729,9 +728,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const confirmDiscard = () => !dirty || window.confirm(t('There are unsaved changes. Discard them?'));
 
-  // Con la sesión de Google iniciada, Abrir muestra "Mis simulaciones" (la carpeta del Drive);
-  // los archivos del equipo entran con Importar. Sin sesión, abre un .asc del equipo.
-  const doOpen = () => (google.account ? setDialog({ kind: 'drive' }) : doOpenLocal());
+  // Ya no hay "abrir" un .asc: Abrir lleva a Importar (que explica qué entra y cómo)
+  const doOpen = () => setDialog({ kind: 'importinfo' });
 
   /** Importar .asc del equipo a la carpeta del Drive; uno solo se abre */
   const doImport = async (picked?: { name: string; bytes: Uint8Array }[]) => {
@@ -744,17 +742,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       else setMessage(t('Imported {length} files to «My simulations»', { length: saved.length }));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
-    }
-  };
-
-  const doOpenLocal = async () => {
-    if (!confirmDiscard()) return;
-    try {
-      const f = await openProjectFile();
-      // el handle de un .asc no sirve para guardar el proyecto: se guarda aparte
-      if (f) await openBytes(f.bytes, f.name, /\.turbo$/i.test(f.name) ? { handle: f.handle } : {});
-    } catch (e) {
-      setMessage(t('Could not open: {p0}', { p0: (e as Error).message }));
     }
   };
 
@@ -926,16 +913,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
-  // Exportar a PDF: abre ASC-Parser con el circuito en el hash (nunca viaja a un servidor)
-  const doExportPdf = async () => {
-    // la pestaña se abre ya, dentro del click, para que no la bloquee el navegador
+  // Exportar a PDF: la vista actual del esquemático (lo que se ve en pantalla), en una pestaña
+  // que abre el diálogo de impresión (Guardar como PDF); nada viaja a un servidor
+  const doExportPdf = () => {
+    const svg = editor.current?.svg();
+    const vb = svg?.getAttribute('viewBox')?.split(/\s+/).map(Number);
+    if (!svg || !vb || vb.length !== 4) return;
+    const text = schematicSvg(svg, { x1: vb[0], y1: vb[1], x2: vb[0] + vb[2], y2: vb[1] + vb[3] }).replace(/^<\?xml[^>]*>\s*/, '');
     const tab = window.open('', '_blank');
-    if (tab) tab.opener = null;
-    const { bytes } = ascBytes(doc, lib);
-    const hash = await shareHash(bytes, ascName());
-    const url = `${PDF_TOOL}#${hash}`;
-    if (tab) tab.location.href = url;
-    else setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
+    if (!tab) return setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
+    const title = project.name.replace(/[<&]/g, '');
+    tab.document.write(`<!doctype html><title>${title}</title><style>@page{size:${vb[2] >= vb[3] ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0;height:100%}svg{width:100%;height:100%;display:block}</style>${text}`);
+    tab.document.close();
+    tab.focus();
+    tab.print();
   };
 
   const doRecent = async (i: number) => {
@@ -1785,6 +1776,16 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // sueltos (cada .asc, una variante); los símbolos y modelos van a los archivos del proyecto
   const importInput = useRef<HTMLInputElement>(null);
   const importFiles = async (list: File[]) => {
+    // un .turbo es un proyecto entero: se abre (Abrir lleva a Importar)
+    const turbo = list.find((f) => /\.turbo$/i.test(f.name));
+    if (turbo) {
+      if (!confirmDiscard()) return;
+      try {
+        return void (await openBytes(new Uint8Array(await turbo.arrayBuffer()), turbo.name, {}));
+      } catch (e) {
+        return setMessage(t('Could not open: {p0}', { p0: (e as Error).message }));
+      }
+    }
     try {
       let p = leave();
       const variants: string[] = [];
@@ -1909,13 +1910,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     {
       label: t('File'),
       items: [
-        { label: t('New'), onClick: doNew },
-        { label: google.account ? t('Open (My simulations)…') : t('Open…'), shortcut: 'Ctrl+O', onClick: doOpen },
+        { label: t('New project'), onClick: doNew },
+        { label: t('Open…'), title: t('Import: .turbo, .zip, .asc, .asy, .lib, .sub'), shortcut: 'Ctrl+O', onClick: doOpen },
+        ...(google.account ? [{ label: t('My simulations (Google Drive)…'), onClick: () => setDialog({ kind: 'drive' }) }] : []),
         ...(google.account ? [{ label: t('Import from computer…'), onClick: () => doImport() }] : []),
         { label: t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { label: t('Save as…'), shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
         ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
-        { label: t('Export to PDF'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdf },
+        { label: t('Export to PDF'), title: t('The current view of the schematic'), onClick: doExportPdf },
         'sep',
         { label: t('Import into this project…'), title: t('.zip, .asc (each one, a variant), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
         { label: t('Export project'), title: t('A .zip for LTspice: one folder per variant, with an .asc per simulation and the project files they use'), onClick: () => exportZip(true) },
@@ -2086,10 +2088,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       id: 'file',
       label: t('File'),
       tools: [
-        { icon: 'new', label: t('New'), title: t('New schematic'), onClick: doNew },
+        { icon: 'new', label: t('New'), title: t('New project'), onClick: doNew },
         { icon: 'save', label: t('Save'), title: google.account ? t('Save to Google Drive') : t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { icon: 'pdf', label: t('Export to PDF'), title: t('Export to PDF (opens ASC-Parser with this circuit)'), onClick: doExportPdf },
-        { icon: 'open', label: t('Open'), title: google.account ? t('My simulations (Google Drive)') : t('Open .asc'), shortcut: 'Ctrl+O', onClick: doOpen },
+        { icon: 'pdf', label: t('Export to PDF'), title: t('Export the current view to PDF'), onClick: doExportPdf },
+        { icon: 'open', label: t('Open'), title: t('Open (import .turbo, .zip, .asc…)'), shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },
     {
@@ -2401,7 +2403,7 @@ ${ltNetlistText(sim.built.lt)}
             type="file"
             hidden
             multiple
-            accept=".zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb"
+            accept=".turbo,.zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb"
             onChange={(e) => {
               const files = [...(e.target.files ?? [])];
               e.target.value = '';

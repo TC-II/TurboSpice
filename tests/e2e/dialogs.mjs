@@ -62,12 +62,12 @@ await edit('V1');
 const show = dialog.getByRole('group', { name: 'Mostrar en el esquemático' });
 check((await show.count()) === 1, `V: «Mostrar: Nombre · Valor» en el pie (${await show.textContent()})`);
 await page.screenshot({ path: `${OUT}/dialogs-source.png` });
-check(await show.getByLabel('Nombre').isChecked() && (await show.getByLabel('Valor').isChecked()), 'V: los dos marcados (se ven)');
-await show.getByLabel('Valor').uncheck();
+// los ejemplos no muestran el valor de las fuentes con forma de onda (el dibujito ya dice qué es)
+check(await show.getByLabel('Nombre').isChecked() && !(await show.getByLabel('Valor').isChecked()), 'V: Nombre marcado y Valor no (el ejemplo no muestra el valor)');
+await show.getByLabel('Valor').check();
 await dialog.getByRole('button', { name: 'Aceptar' }).click();
 const after = await labels();
-check(after.length === before.length - 1 && after.includes('V1') && !after.some((t) => t.startsWith('PULSE')), `V: al aceptar se oculta el valor (${before.join(' | ')} → ${after.join(' | ')})`);
-// (con el valor oculto, se abre desde el cuerpo de la fuente: el de abajo a la izquierda)
+check(after.length === before.length + 1 && after.includes('V1') && after.some((t) => t.startsWith('PULSE')), `V: al aceptar se muestra el valor (${before.join(' | ')} → ${after.join(' | ')})`);
 const v1 = page.locator('svg.editor .symbols .sym').filter({ has: page.locator('text.win', { hasText: /^V1$/ }) });
 const v1Box = await v1.locator('.body').boundingBox();
 const openV1 = async () => {
@@ -75,12 +75,12 @@ const openV1 = async () => {
   await dialog.waitFor();
 };
 await openV1();
-check(!(await show.getByLabel('Valor').isChecked()), 'V: al reabrir, Valor queda desmarcado');
-await show.getByLabel('Valor').check();
+check(await show.getByLabel('Valor').isChecked(), 'V: al reabrir, Valor queda marcado');
+await show.getByLabel('Valor').uncheck();
 await show.getByLabel('Nombre').uncheck();
 await dialog.getByRole('button', { name: 'Aceptar' }).click();
 const after2 = await labels();
-check(!after2.includes('V1') && after2.some((t) => t.startsWith('PULSE')) && after2.length === before.length - 1, `V: se puede ocultar el nombre y volver a mostrar el valor (${after2.join(' | ')})`);
+check(!after2.includes('V1') && !after2.some((t) => t.startsWith('PULSE')) && after2.length === before.length - 1, `V: se pueden ocultar el nombre y el valor (${after2.join(' | ')})`);
 await page.keyboard.press('Control+z');
 check((await labels()).join() === after.join(), 'Ctrl+Z deshace en un paso');
 

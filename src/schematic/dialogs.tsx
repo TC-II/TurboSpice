@@ -745,10 +745,11 @@ export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }
 /** Archivo › Importar en este proyecto: qué se puede traer y cómo armar el .zip, antes de elegir */
 export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onClose(): void }) {
   return (
-    <Modal title={t('Import into this project')} onClose={onClose} wide>
+    <Modal title={t('Open / Import')} onClose={onClose} wide>
       <div className="import-info">
         <p>{t('Everything you import is added to the open project; nothing is replaced.')}</p>
         <ul>
+          <li><strong>.turbo</strong> — {t('a TurboSpice project: it opens in place of the current one.')}</li>
           <li><strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each folder becomes a variant (the root too), and each')}{' '}<code>.asc</code>{' '}{t('in it, one of its simulations. The')}{' '}<code>.asy</code>, <code>.lib</code>, <code>.sub</code>{' '}{t('anywhere in the .zip go to the project files.')}</li>
           <li><strong>.asc</strong> — {t('loose schematics: each one becomes a variant.')}</li>
           <li><strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its variants.')}</li>

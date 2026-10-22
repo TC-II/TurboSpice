@@ -253,10 +253,9 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
               >
                 <span>
                   {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
-                  {it.icon && <Icon name={it.icon} size={14} />}
                   {it.label}
                 </span>
-                {it.shortcut && <span className="sc">{it.shortcut}</span>}
+                {it.shortcut ? <span className="sc">{it.shortcut}</span> : it.icon && <span className="sc menu-icon"><Icon name={it.icon} size={14} /></span>}
               </button>
             )}
             {!!it.actions?.length && (

@@ -245,12 +245,15 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   // rótulos del nombre y del valor: si se ven en el esquemático (#71)
   const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
   // el valor se ve por defecto sólo en DC (en las formas de onda el dibujito del símbolo ya dice
-  // qué es); si el usuario ya movió u ocultó el rótulo, o tocó la casilla, se respeta
+  // qué es) al cambiar el tipo; al abrir se respeta lo que hay, y si el usuario movió el rótulo
+  // o tocó la casilla, también
   const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && !r.moved && !current;
-  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, valueAuto(r) ? kind === 'dc' : r.visible])));
+  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, r.visible])));
   const valueTouched = useRef(false);
+  const firstKind = useRef<SourceKind | ''>(kind);
   useEffect(() => {
-    if (valueTouched.current) return;
+    if (valueTouched.current || kind === firstKind.current) return;
+    firstKind.current = '';
     setVisible((v) => {
       const out = new Map(v);
       for (const r of shown) if (valueAuto(r)) out.set(r.win, kind === 'dc');

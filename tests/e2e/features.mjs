@@ -102,12 +102,10 @@ check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ by
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
 check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
-// #44: Exportar a PDF abre ASC-Parser con el circuito en el hash
+// Exportar a PDF: la vista actual del esquemático, en una pestaña para imprimir
 const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Exportar a PDF' }).click()]);
-await pdfTab.waitForURL(/ASC-Parser\/#c=[\w-]+&n=Examples\.asc$/, { waitUntil: 'commit', timeout: 15000 }).then(
-  () => check(true, 'Exportar a PDF abre ASC-Parser con el circuito en el hash'),
-  () => check(false, `Exportar a PDF abre ASC-Parser con el circuito (${pdfTab.url().slice(0, 80)})`),
-);
+const pdfSyms = await pdfTab.locator('svg g').count().catch(() => 0);
+check(pdfSyms > 0, `Exportar a PDF abre la vista actual del esquemático para imprimir (${pdfSyms} grupos)`);
 await pdfTab.close();
 const other = await context.newPage();
 watch(other);

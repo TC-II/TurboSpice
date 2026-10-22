@@ -14,6 +14,20 @@ import { setAnalysisLine } from '../src/schematic/directivesEdit.ts';
 import { diffCircuits } from '../src/project/diff.ts';
 import { addSim, recordRun, renameSim, selectSim, variantOf } from '../src/project/project.ts';
 import { newProject, serializeTurbo, variantFromAsc, type Project } from '../src/project/turbo.ts';
+import { patchLabels } from '../src/schematic/edit.ts';
+import { Library } from '../src/library/library.ts';
+import { buildBundle } from './build-library.mjs';
+
+const lib = new Library(buildBundle());
+/** Fuentes con forma de onda: el rótulo del valor oculto, como las deja la ventana de la fuente
+ * (el dibujito del símbolo ya dice qué es) */
+const hideWaveValues = (d: AscDoc): AscDoc =>
+  patchLabels(
+    d,
+    d.symbols.flatMap((s, i) => (/^(voltage|current)$/i.test(s.type) && /^\s*(pulse|sine?|pwl|exp|sffm)\b/i.test(s.attrs.get('Value') ?? '') ? [i] : [])),
+    new Map([[3, { visible: false }]]),
+    lib,
+  );
 
 // Los comentarios de los .asc, en inglés (los originales se escribieron en castellano)
 const COMMENTS: Record<string, string> = {
@@ -29,7 +43,7 @@ const EXAMPLES = ['RC Filter.asc', 'RLC Bode.asc', 'RC Sweep (.step).asc', 'Half
 
 const example = (name: string): AscDoc => {
   const d = readAsc(readFileSync(`examples/${name}`), name).doc;
-  return { ...d, texts: d.texts.map((x) => (x.kind === 'comment' && COMMENTS[name] ? { ...x, text: COMMENTS[name] } : x)) };
+  return hideWaveValues({ ...d, texts: d.texts.map((x) => (x.kind === 'comment' && COMMENTS[name] ? { ...x, text: COMMENTS[name] } : x)) });
 };
 const setVal = (d: AscDoc, inst: string, value: string): AscDoc => ({
   ...d,

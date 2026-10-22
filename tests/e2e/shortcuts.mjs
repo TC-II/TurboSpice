@@ -117,7 +117,7 @@ const nWires = await wires();
 await page.keyboard.press('m');
 const r2 = await at(320, 8); // la R nueva queda centrada en el click: origen (304,-48)
 await page.mouse.click(r2.x, r2.y);
-const dst = await at(384, 8);
+const dst = await at(256, 8); // a la izquierda: a la derecha puede quedar fuera de la ventana
 await page.mouse.move(dst.x, dst.y, { steps: 4 });
 await page.mouse.click(dst.x, dst.y);
 await page.keyboard.press('Escape');

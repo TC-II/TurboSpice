@@ -13,10 +13,10 @@ export const FORMAT = 'turbospice';
 export const VERSION = 1;
 export const EXT = '.turbo';
 
-/** Símbolo o archivo de modelos del proyecto (común a todas las variantes) */
+/** Símbolo, archivo de modelos o subcircuito (esquemático .asc) del proyecto (común a todas las variantes) */
 export interface ProjectFile {
   name: string;
-  kind: 'symbol' | 'model';
+  kind: 'symbol' | 'model' | 'schematic';
   text: string;
 }
 
@@ -236,7 +236,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   const get = (h: unknown): string | null => (typeof h === 'string' ? (ok.get(h) ?? null) : null);
 
   const files: ProjectFile[] = Array.isArray(raw.files)
-    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model'))
+    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic'))
     : [];
   const variants: Variant[] = raw.variants.map((vr: unknown, vi: number): Variant => {
     if (!isObj(vr)) throw new Error(t('invalid .turbo: malformed variant'));

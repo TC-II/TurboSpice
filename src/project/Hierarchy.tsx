@@ -1,0 +1,254 @@
+// Navegación entre el testbench y los subcircuitos (#180): panel de proyecto (árbol), barra con
+// pestañas y migas de pan, y buscador rápido (Ctrl+P).
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Icon } from '../ui/icons.tsx';
+import { t } from '../i18n/i18n.ts';
+
+/** Un nivel de la jerarquía abierta: el subcircuito y la instancia por la que se bajó (si se bajó) */
+export interface Level {
+  sub: string;
+  inst?: string;
+}
+
+export interface TreeSub {
+  name: string;
+  ports: number;
+  uses: { label: string; inst: string; go(): void }[];
+  children: string[];
+  outdated: boolean;
+  text: boolean;
+}
+
+/** Panel lateral: testbenches (variantes) y subcircuitos */
+export function ProjectTree({ project, variants, activeVariant, subs, current, onVariant, onTestbench, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onClose }: {
+  project: string;
+  variants: { id: string; name: string; sims: string[] }[];
+  activeVariant: string;
+  subs: TreeSub[];
+  /** subcircuito abierto ('' = testbench) */
+  current: string;
+  onVariant(id: string): void;
+  onTestbench(): void;
+  onOpen(name: string): void;
+  onNew(): void;
+  /** convertir la selección (sin selección: undefined) */
+  onFromSelection?(): void;
+  onRename(name: string): void;
+  onDelete(name: string): void;
+  onUpdateSymbol(name: string): void;
+  onClose(): void;
+}) {
+  const [usesOf, setUsesOf] = useState('');
+  const byName = new Map(subs.map((s) => [s.name.toLowerCase(), s]));
+  // raíces: los que no usa ningún otro subcircuito
+  const nested = new Set(subs.flatMap((s) => s.children.map((c) => c.toLowerCase())));
+  const roots = subs.filter((s) => !nested.has(s.name.toLowerCase()));
+  const node = (s: TreeSub, depth: number, seen: string[]): JSX.Element => (
+    <li key={`${seen.join('/')}/${s.name}`}>
+      <div className={`tree-row${current.toLowerCase() === s.name.toLowerCase() ? ' active' : ''}`} style={{ paddingLeft: 8 + depth * 14 }}>
+        <button className="tree-name" onClick={() => onOpen(s.name)} title={t('Open {name}', { name: s.name })}>
+          <span className="tree-glyph">▭</span> {s.name}
+        </button>
+        <span className="tree-meta">{t('{n} pins', { n: s.ports })}</span>
+        <button className={`tree-uses${s.uses.length ? '' : ' none'}`} onClick={() => setUsesOf(usesOf === s.name ? '' : s.name)} title={t('Where it is used')}>
+          {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
+        </button>
+        <span className="tree-actions">
+          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename')}>✎</button>
+          <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete')}>
+            <Icon name="trash" size={13} />
+          </button>
+        </span>
+      </div>
+      {s.outdated && (
+        <div className="tree-warn" style={{ paddingLeft: 24 + depth * 14 }}>
+          {t('The ports changed.')} <button className="link" onClick={() => onUpdateSymbol(s.name)}>{t('Update symbol')}</button>
+        </div>
+      )}
+      {usesOf === s.name && (
+        <ul className="tree-usages" style={{ paddingLeft: 24 + depth * 14 }}>
+          {s.uses.length ? (
+            s.uses.map((u, i) => (
+              <li key={i}>
+                <button className="link" onClick={u.go}>
+                  {u.inst}
+                </button>{' '}
+                <span className="tree-meta">{u.label}</span>
+              </li>
+            ))
+          ) : (
+            <li className="tree-meta">{t('Not used yet: place it with F2 (Project folder)')}</li>
+          )}
+        </ul>
+      )}
+      {!!s.children.length && (
+        <ul>
+          {s.children
+            .filter((c) => !seen.includes(c.toLowerCase()))
+            .map((c) => byName.get(c.toLowerCase()))
+            .filter((c): c is TreeSub => !!c)
+            .map((c) => node(c, depth + 1, [...seen, s.name.toLowerCase()]))}
+        </ul>
+      )}
+    </li>
+  );
+  return (
+    <aside className="project-tree" aria-label={t('Project')}>
+      <header>
+        <strong title={project}>{project}</strong>
+        <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
+          <Icon name="close" size={14} />
+        </button>
+      </header>
+      <h4>{t('Testbenches')}</h4>
+      <ul>
+        {variants.map((v) => (
+          <li key={v.id}>
+            <div className={`tree-row${!current && v.id === activeVariant ? ' active' : ''}`}>
+              <button className="tree-name" onClick={() => (v.id === activeVariant ? onTestbench() : onVariant(v.id))}>
+                <span className="tree-glyph">{v.id === activeVariant ? '●' : '○'}</span> {v.name}
+              </button>
+              <span className="tree-meta">{v.sims.length === 1 ? t('1 simulation') : t('{n} simulations', { n: v.sims.length })}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <h4>
+        {t('Subcircuits')}
+        <span className="tree-adds">
+          <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
+            {t('From selection')}
+          </button>
+          <button className="tree-add" onClick={onNew} title={t('New empty subcircuit')} aria-label={t('Add an empty subcircuit')}>
+            + {t('New')}
+          </button>
+        </span>
+      </h4>
+      {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}
+    </aside>
+  );
+}
+
+/** Barra arriba del lienzo: pestañas abiertas y migas de pan */
+export function HierBar({ testbench, tabs, current, path, panelOpen, onPanel, onTab, onCloseTab, onCrumb, onUp, onQuick }: {
+  testbench: string;
+  /** subcircuitos abiertos en pestañas */
+  tabs: string[];
+  /** subcircuito que se ve ('' = testbench) */
+  current: string;
+  path: Level[];
+  panelOpen: boolean;
+  onPanel(): void;
+  onTab(name: string): void;
+  onCloseTab(name: string): void;
+  /** -1 = testbench */
+  onCrumb(i: number): void;
+  onUp(): void;
+  onQuick(): void;
+}) {
+  return (
+    <div className={`hier-bar${path.length ? ' with-crumbs' : ''}`}>
+      <div className="hier-row">
+      <button className={`icon-btn${panelOpen ? ' on' : ''}`} onClick={onPanel} title={t('Project panel')} aria-label={t('Project panel')} aria-pressed={panelOpen}>
+        <Icon name="menu" size={15} />
+      </button>
+      <div className="hier-tabs" role="tablist">
+        <button role="tab" aria-selected={!current} className={`hier-tab${current ? '' : ' active'}`} onClick={() => onTab('')} title={t('Testbench')}>
+          <span className="tree-glyph">●</span> {testbench}
+        </button>
+        {tabs.map((n) => (
+          <span key={n} role="tab" aria-selected={current === n} className={`hier-tab${current === n ? ' active' : ''}`}>
+            <button onClick={() => onTab(n)}>
+              <span className="tree-glyph">▭</span> {n}
+            </button>
+            <button className="hier-x" onClick={() => onCloseTab(n)} title={t('Close tab')} aria-label={t('Close tab')}>
+              ×
+            </button>
+          </span>
+        ))}
+      </div>
+      <button className="hier-quick" onClick={onQuick} title={t('Go to a testbench or subcircuit (Ctrl+P)')}>
+        {t('Go to…')} <kbd>{'Ctrl+P'}</kbd>
+      </button>
+      </div>
+      {!!path.length && (
+        <nav className="hier-crumbs" aria-label={t('Hierarchy')}>
+          {path[0].inst ? (
+            <button className="link" onClick={() => onCrumb(-1)}>
+              {testbench}
+            </button>
+          ) : (
+            <span className="tree-meta" title={t('Opened from the panel: to see the values of an instance, enter it from the testbench (double-click or E)')}>
+              {t('standalone')}
+            </span>
+          )}
+          {path.map((l, i) => (
+            <span key={i}>
+              <span className="hier-sep">›</span>
+              {i === path.length - 1 ? (
+                <strong>{l.inst ? `${l.inst} (${l.sub})` : l.sub}</strong>
+              ) : (
+                <button className="link" onClick={() => onCrumb(i)}>
+                  {l.inst ? `${l.inst} (${l.sub})` : l.sub}
+                </button>
+              )}
+            </span>
+          ))}
+          <button className="hier-up" onClick={onUp} title={t('Go up one level (Alt+↑)')}>
+            ↑ {t('Up')}
+          </button>
+        </nav>
+      )}
+    </div>
+  );
+}
+
+/** Buscador rápido de testbenches y subcircuitos */
+export function QuickOpen({ items, onPick, onClose }: { items: { key: string; label: string; hint: string }[]; onPick(key: string): void; onClose(): void }) {
+  const [q, setQ] = useState('');
+  const [i, setI] = useState(0);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => input.current?.focus(), []);
+  const list = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? items.filter((x) => x.label.toLowerCase().includes(s)) : items;
+  }, [items, q]);
+  const pick = (k?: string) => {
+    if (k) onPick(k);
+    onClose();
+  };
+  return (
+    <div className="quick-open-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="quick-open" role="dialog" aria-label={t('Go to')}>
+        <input
+          ref={input}
+          value={q}
+          placeholder={t('Testbench or subcircuit…')}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setI(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') setI((x) => Math.min(x + 1, list.length - 1));
+            else if (e.key === 'ArrowUp') setI((x) => Math.max(x - 1, 0));
+            else if (e.key === 'Enter') pick(list[i]?.key);
+            else if (e.key === 'Escape') onClose();
+            else return;
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+        />
+        <ul>
+          {list.map((x, k) => (
+            <li key={x.key}>
+              <button className={k === i ? 'active' : ''} onPointerEnter={() => setI(k)} onClick={() => pick(x.key)}>
+                {x.label} <span className="tree-meta">{x.hint}</span>
+              </button>
+            </li>
+          ))}
+          {!list.length && <li className="tree-meta">{t('Nothing found')}</li>}
+        </ul>
+      </div>
+    </div>
+  );
+}

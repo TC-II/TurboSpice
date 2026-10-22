@@ -1,0 +1,157 @@
+// Subcircuitos del proyecto (#180): esquemáticos .asc con su símbolo BLOCK, comunes a todas las
+// variantes (como los demás archivos del proyecto). El netlister los usa como bloques
+// jerárquicos (Library.schematic), igual que LTspice con un X.asc junto a X.asy.
+import { baseName, emptyDoc, type AscDoc } from '../asc/model.ts';
+import { parseAsc } from '../asc/parse.ts';
+import { serializeAsc } from '../asc/serialize.ts';
+import { makeSymbol, schematicPorts } from '../library/makeSymbol.ts';
+import { variantOf } from './project.ts';
+import type { Project, ProjectFile } from './turbo.ts';
+import { t } from '../i18n/i18n.ts';
+
+export const subName = (file: string) => file.replace(/\.asc$/i, '');
+const key = (name: string) => subName(baseName(name)).toLowerCase();
+
+/** Subcircuitos (esquemáticos) del proyecto */
+export const subckts = (p: Project): ProjectFile[] => p.files.filter((f) => f.kind === 'schematic');
+
+export const subcktFile = (p: Project, name: string): ProjectFile | undefined => subckts(p).find((f) => key(f.name) === key(name));
+
+/** ¿El símbolo de esta instancia es un subcircuito del proyecto? */
+export const isSubcktType = (p: Project, type: string) => !!subcktFile(p, type);
+
+/** Puertos del subcircuito: sus etiquetas con IOPIN */
+export const subcktPorts = (doc: AscDoc) => schematicPorts(doc.flags);
+
+/** Símbolo generado (rectángulo con los puertos) */
+export const subcktSymbol = (name: string, doc: AscDoc): ProjectFile => ({
+  name: `${name}.asy`,
+  kind: 'symbol',
+  text: makeSymbol({ name, pins: subcktPorts(doc), block: true }),
+});
+
+/** Pines del símbolo .asy (en orden) */
+function symbolPins(text: string): string[] {
+  return [...text.matchAll(/^PINATTR PinName (.+)$/gm)].map((m) => m[1].trim());
+}
+
+/** ¿Los puertos del esquemático ya no coinciden con los pines de su símbolo? */
+export function symbolOutdated(p: Project, name: string): boolean {
+  const sch = subcktFile(p, name);
+  const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(name));
+  if (!sch || !sym) return !!sch;
+  const ports = subcktPorts(parseAsc(sch.text));
+  const pins = symbolPins(sym.text);
+  return ports.length !== pins.length || ports.some((x) => !pins.some((y) => y.toLowerCase() === x.toLowerCase()));
+}
+
+const replaceFile = (files: ProjectFile[], f: ProjectFile) => {
+  const i = files.findIndex((x) => x.kind === f.kind && x.name.toLowerCase() === f.name.toLowerCase());
+  return i < 0 ? [...files, f] : files.map((x, k) => (k === i ? f : x));
+};
+
+/** Guarda el texto de un subcircuito (mismo proyecto si no cambió) */
+export function storeSubckt(p: Project, name: string, asc: string): Project {
+  const f = subcktFile(p, name);
+  if (!f || f.text === asc) return p;
+  return { ...p, modified: Date.now(), files: replaceFile(p.files, { ...f, text: asc }) };
+}
+
+/** Regenera el símbolo con los puertos actuales */
+export const updateSymbol = (p: Project, name: string): Project => {
+  const f = subcktFile(p, name);
+  return f ? { ...p, modified: Date.now(), files: replaceFile(p.files, subcktSymbol(subName(f.name), parseAsc(f.text))) } : p;
+};
+
+/** Esquemático inicial: un puerto de entrada y uno de salida */
+export function subcktTemplate(name: string): string {
+  const doc = emptyDoc();
+  doc.flags.push({ x: -128, y: 0, name: 'in', ioPin: 'In' }, { x: 128, y: 0, name: 'out', ioPin: 'Out' });
+  doc.texts.push({ x: -128, y: -96, align: 'Left', size: 2, kind: 'comment', text: t('{name}: draw the circuit between the ports (net labels with a port, F4)', { name }) });
+  return serializeAsc(doc);
+}
+
+/** Agrega un subcircuito nuevo (esquemático + símbolo) */
+export function addSubckt(p: Project, name: string, asc = subcktTemplate(name)): Project {
+  const sch: ProjectFile = { name: `${name}.asc`, kind: 'schematic', text: asc };
+  return { ...p, modified: Date.now(), files: replaceFile(replaceFile(p.files, sch), subcktSymbol(name, parseAsc(asc))) };
+}
+
+/** Renombra el subcircuito, su símbolo y todas sus instancias */
+export function renameSubckt(p: Project, from: string, to: string): Project {
+  const f = subcktFile(p, from);
+  if (!f) return p;
+  const retype = (asc: string) => {
+    const doc = parseAsc(asc);
+    let changed = false;
+    for (const s of doc.symbols)
+      if (key(s.type) === key(from)) {
+        s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
+        changed = true;
+      }
+    return changed ? serializeAsc(doc) : asc;
+  };
+  const files = p.files.map((x) => {
+    if (x === f) return { ...x, name: `${to}.asc`, text: retype(x.text) };
+    if (x.kind === 'symbol' && key(x.name) === key(from)) return { ...x, name: `${to}.asy`, text: x.text.replace(/(SYMATTR Description .*?)\b\S+$/m, `$1${to}`) };
+    if (x.kind === 'schematic') return { ...x, text: retype(x.text) };
+    return x;
+  });
+  const variants = p.variants.map((v) => ({
+    ...v,
+    base: retype(v.base),
+    sims: v.sims.map((s) => ({ ...s, asc: retype(s.asc) })),
+  }));
+  return { ...p, modified: Date.now(), files, variants };
+}
+
+/** Saca el subcircuito y su símbolo (las instancias quedan sin símbolo) */
+export const removeSubckt = (p: Project, name: string): Project => ({
+  ...p,
+  modified: Date.now(),
+  files: p.files.filter((f) => !((f.kind === 'schematic' || f.kind === 'symbol') && key(f.name) === key(name))),
+});
+
+export interface Usage {
+  /** dónde: una simulación de una variante, la base de una variante o otro subcircuito */
+  where: { kind: 'sim'; variant: string; sim: string; label: string } | { kind: 'base'; variant: string; label: string } | { kind: 'subckt'; name: string; label: string };
+  inst: string;
+}
+
+const instName = (attrs: Map<string, string>) => attrs.get('InstName') ?? '?';
+
+/** Instancias del subcircuito en todo el proyecto */
+export function usages(p: Project, name: string, simLabel: (asc: string, name?: string) => string): Usage[] {
+  const out: Usage[] = [];
+  const scan = (asc: string, where: Usage['where']) => {
+    for (const s of parseAsc(asc).symbols) if (key(s.type) === key(name)) out.push({ where, inst: instName(s.attrs) });
+  };
+  for (const v of p.variants) {
+    if (!v.sims.length) scan(v.base, { kind: 'base', variant: v.id, label: v.name });
+    for (const s of v.sims) scan(s.asc, { kind: 'sim', variant: v.id, sim: s.id, label: `${v.name} · ${simLabel(s.asc, s.name)}` });
+  }
+  for (const f of subckts(p)) if (key(f.name) !== key(name)) scan(f.text, { kind: 'subckt', name: subName(f.name), label: subName(f.name) });
+  return out;
+}
+
+/** Subcircuitos que se usan dentro de un circuito (para el árbol) */
+export function childSubckts(p: Project, asc: string): string[] {
+  const names = new Set(subckts(p).map((f) => key(f.name)));
+  const out: string[] = [];
+  for (const s of parseAsc(asc).symbols) {
+    const k = key(s.type);
+    if (names.has(k) && !out.some((x) => x.toLowerCase() === k)) out.push(subName(subcktFile(p, k)!.name));
+  }
+  return out;
+}
+
+/** Variante activa (para la raíz del árbol) */
+export const testbenchName = (p: Project) => variantOf(p).name;
+
+/** Nombre válido y libre para un subcircuito nuevo */
+export function freeSubcktName(p: Project, base = 'SUB'): string {
+  const taken = new Set(p.files.map((f) => key(f.name)));
+  for (let i = 1; ; i++) if (!taken.has(`${base}${i}`.toLowerCase())) return `${base}${i}`;
+}
+
+export const validSubcktName = (s: string) => /^[A-Za-z_][\w-]*$/.test(s);

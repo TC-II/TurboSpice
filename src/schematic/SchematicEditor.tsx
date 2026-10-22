@@ -77,6 +77,9 @@ export interface EditorHandle {
   zoomPrev(): void;
   /** ¿Se desplazó con Espacio+arrastrar desde que se apretó Espacio? (si no, Espacio = ajustar) */
   spacePanned(): boolean;
+  /** Zoom y posición (para volver al mismo lugar al subir por la jerarquía, #180) */
+  view(): View;
+  setView(v: View): void;
 }
 
 interface Props {
@@ -89,6 +92,8 @@ interface Props {
   selection: ItemRef[];
   setSelection(s: ItemRef[]): void;
   onEdit(ref: ItemRef): void;
+  /** doble clic en un componente: true si lo abrió como subcircuito (#180) */
+  onDescend?(symbol: number): boolean;
   /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
   onEditLabel?(sym: number, win: number): void;
   onProbe?(ref: { net?: string; symbol?: number; pin?: number }): void;
@@ -122,7 +127,7 @@ interface Props {
   diff?: CircuitDiff;
 }
 
-interface View {
+export interface View {
   cx: number;
   cy: number;
   /** píxeles por unidad de LTspice */
@@ -322,6 +327,8 @@ export function SchematicEditor(props: Props) {
         if (v) setView(v);
       },
       spacePanned: () => spaceUsed.current,
+      view: () => viewRef.current,
+      setView: (v: View) => setView(v),
     }),
     [fit, cursor, doc, lib, size.w],
   );
@@ -862,6 +869,8 @@ export function SchematicEditor(props: Props) {
     if (label && onEditLabel) return onEditLabel(label.sym, label.win);
     if (wireGesture(p, tol)) return;
     const hit = hitTest(doc, p, lib, tol, showSimCommand);
+    // doble clic en un subcircuito del proyecto: bajar a su esquemático (#180)
+    if (hit?.kind === 'symbol' && props.onDescend?.(hit.index)) return;
     if (hit) onEdit(hit);
   };
 

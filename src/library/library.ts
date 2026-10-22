@@ -58,6 +58,8 @@ export class Library implements SymbolSource {
   private projModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
   /** Esquemáticos del usuario usados como bloques jerárquicos: nombre sin .asc (minúsculas) → texto */
   private userSchematics = new Map<string, { name: string; text: string }>();
+  /** Subcircuitos del proyecto (#180): ganan a los esquemáticos del usuario */
+  private projSchematics = new Map<string, { name: string; text: string }>();
   private schCache = new Map<string, AscDoc>();
   /**
    * Librería de la instalación de LTspice del usuario (importada a su navegador, no se publica):
@@ -145,12 +147,15 @@ export class Library implements SymbolSource {
   }
 
   /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
-  setProjectFiles(files: { name: string; kind: 'symbol' | 'model'; text: string }[]): void {
+  setProjectFiles(files: { name: string; kind: 'symbol' | 'model' | 'schematic'; text: string }[]): void {
     for (const k of this.projSymbols.keys()) this.cache.delete(`project:${k}`);
     this.projSymbols.clear();
     this.projModels.clear();
+    this.projSchematics.clear();
+    this.schCache.clear();
     for (const f of files) {
       if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
+      else if (f.kind === 'schematic') this.projSchematics.set(f.name.replace(/\.asc$/i, '').toLowerCase(), { name: f.name, text: f.text });
       else this.projModels.set(f.name.toLowerCase(), { name: f.name, text: f.text, ...scanModels(f.text) });
     }
   }
@@ -189,7 +194,7 @@ export class Library implements SymbolSource {
 
   schematic(name: string): AscDoc | undefined {
     const key = baseName(name).replace(/\.asc$/i, '').toLowerCase();
-    const f = this.userSchematics.get(key);
+    const f = this.projSchematics.get(key) ?? this.userSchematics.get(key);
     if (!f) return undefined;
     let doc = this.schCache.get(key);
     if (!doc) this.schCache.set(key, (doc = parseAsc(f.text)));

@@ -901,3 +901,63 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .lang-btn { display: inline-flex; gap: 2px; border: 0; background: transparent; padding: 4px 6px; font: 600 11px system-ui, sans-serif; color: var(--fg-muted); }
 .lang-btn .on { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
 .lang-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* Jerarquía (#180): barra con pestañas y migas, panel de proyecto, buscador rápido */
+.canvas-wrap.with-hier { padding-top: 34px; overflow: hidden; isolation: isolate; }
+.canvas-wrap.with-tree { padding-left: 260px; }
+.canvas-wrap.with-tree .hint-bar { left: 260px; }
+.canvas-wrap.with-hier > .toast, .canvas-wrap.with-hier > .pick-banner { top: 44px; z-index: 6; }
+.canvas-wrap.with-crumbs > .toast, .canvas-wrap.with-crumbs > .pick-banner { top: 74px; }
+.hier-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-direction: column; background: var(--bg-alt); border-bottom: 1px solid var(--border); z-index: 5; font-size: 13px; }
+.hier-row { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+.canvas-wrap.with-crumbs { padding-top: 64px; }
+.canvas-wrap.with-crumbs > .project-tree { top: 64px; }
+.hier-bar .icon-btn, .project-tree .icon-btn { display: inline-flex; padding: 4px; border: 0; border-radius: 6px; background: transparent; color: var(--fg-muted); }
+.hier-bar .icon-btn.on, .hier-bar .icon-btn:hover, .project-tree .icon-btn:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.hier-tabs { display: flex; align-items: flex-end; gap: 2px; height: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; min-width: 0; flex: 0 1 auto; }
+.hier-tab { display: inline-flex; align-items: center; height: 28px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; color: var(--fg-muted); white-space: nowrap; background: transparent; font: inherit; }
+button.hier-tab { padding-right: 10px; }
+.hier-tab button { border: 0; background: transparent; color: inherit; font: inherit; padding: 0; }
+.hier-tab.active { background: var(--bg); color: var(--fg); border-color: var(--border); margin-bottom: -1px; height: 29px; }
+.hier-tab:hover { color: var(--fg); }
+.hier-x { margin-left: 6px; width: 18px; height: 18px; border-radius: 4px; line-height: 1; opacity: .6; }
+.hier-x:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 10%, transparent); }
+.tree-glyph { color: var(--accent); font-size: 11px; }
+.hier-quick { margin-left: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg-muted); font: inherit; font-size: 12px; padding: 2px 8px; white-space: nowrap; }
+.hier-quick kbd { font: 11px var(--mono); opacity: .7; margin-left: 4px; }
+.hier-crumbs { height: 30px; display: flex; align-items: center; gap: 2px; padding: 0 8px 0 12px; border-top: 1px solid var(--border); background: var(--bg); white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
+.hier-sep { color: var(--fg-muted); margin: 0 6px; }
+.hier-crumbs button.link, .project-tree button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; cursor: pointer; }
+.hier-crumbs button.link:hover, .project-tree button.link:hover { text-decoration: underline; }
+.hier-up { margin-left: 8px; border: 0; border-radius: 999px; padding: 2px 10px; background: var(--accent); color: #fff; font: inherit; font-size: 12px; }
+.project-tree { position: absolute; top: 34px; left: 0; bottom: 0; width: 260px; overflow-y: auto; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
+.project-tree header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
+.project-tree header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-tree h4 { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; padding: 0 8px 0 12px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.project-tree ul { list-style: none; margin: 0; padding: 0; }
+.tree-row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; margin: 0 4px; }
+.tree-row:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.tree-row.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.tree-name { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; color: var(--fg); font: inherit; padding: 2px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-meta { color: var(--fg-muted); font-size: 11px; white-space: nowrap; }
+.tree-uses { border: 0; background: transparent; color: var(--accent); font-size: 11px; padding: 0; white-space: nowrap; }
+.tree-uses.none { color: var(--fg-muted); }
+.tree-actions { display: none; gap: 2px; }
+.tree-row:hover .tree-actions { display: inline-flex; }
+.tree-actions button { display: inline-flex; border: 0; background: transparent; color: var(--fg-muted); padding: 2px; font-size: 12px; }
+.tree-actions button:hover { color: var(--fg); }
+.tree-add { border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; font-size: 11px; text-transform: none; letter-spacing: 0; padding: 1px 8px; }
+.tree-adds { display: inline-flex; gap: 4px; }
+.tree-add:disabled { opacity: .45; }
+.tree-usages { padding: 2px 8px 6px; font-size: 12px; }
+.tree-usages li { padding: 1px 0; }
+.tree-warn { font-size: 11px; color: #e67700; padding: 0 8px 4px; }
+.tree-empty { padding: 0 12px; line-height: 1.4; white-space: normal; }
+.quick-open-backdrop { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 18%); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; }
+.quick-open { width: min(480px, calc(100vw - 32px)); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 40px rgb(0 0 0 / 25%); overflow: hidden; }
+.quick-open input { width: 100%; box-sizing: border-box; border: 0; border-bottom: 1px solid var(--border); padding: 12px 14px; font: inherit; font-size: 15px; background: transparent; color: var(--fg); outline: none; }
+.quick-open ul { list-style: none; margin: 0; padding: 6px; max-height: 50vh; overflow-y: auto; }
+.quick-open li > button { width: 100%; display: flex; justify-content: space-between; text-align: left; border: 0; border-radius: 6px; background: transparent; color: var(--fg); font: inherit; padding: 6px 10px; }
+.quick-open li > button.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.quick-open li.tree-meta { padding: 6px 10px; }
+@media (max-width: 700px) { .canvas-wrap.with-tree { padding-left: 0; } .canvas-wrap.with-tree .hint-bar { left: 0; } .project-tree { box-shadow: 4px 0 16px rgb(0 0 0 / 20%); } }

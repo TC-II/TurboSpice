@@ -22,9 +22,21 @@ export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '_').replace(
 /** Archivos del proyecto que usan estos circuitos: símbolos por nombre, modelos nombrados en el texto */
 export function usedFiles(files: ProjectFile[], ascTexts: string[]): ProjectFile[] {
   const types = new Set(ascTexts.flatMap((tt) => parseAsc(tt).symbols.map((s) => baseName(s.type).toLowerCase())));
+  // subcircuitos (#180): los que se usan y, adentro, los suyos
+  const schs: ProjectFile[] = [];
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of files) {
+      if (f.kind !== 'schematic' || schs.includes(f) || !types.has(f.name.replace(/\.asc$/i, '').toLowerCase())) continue;
+      schs.push(f);
+      for (const s of parseAsc(f.text).symbols) types.add(baseName(s.type).toLowerCase());
+      grew = true;
+    }
+  }
+  ascTexts = [...ascTexts, ...schs.map((f) => f.text)];
   const syms = files.filter((f) => f.kind === 'symbol' && types.has(f.name.replace(/\.asy$/i, '').toLowerCase()));
   const hay = [...ascTexts, ...syms.map((s) => s.text)].join('\n').toLowerCase();
-  return [...syms, ...files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()))];
+  return [...schs, ...syms, ...files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()))];
 }
 
 /** Los .asc de una variante: uno por simulación (la base, si no tiene ninguna) */

@@ -33,7 +33,7 @@ import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type Pi
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisLabel, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
@@ -74,7 +74,10 @@ import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
-import { SchematicEditor, type EditorHandle, type Tool } from './schematic/SchematicEditor.tsx';
+import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
+import { HierBar, ProjectTree, QuickOpen, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { extractSubckt } from './project/extract.ts';
+import { addSubckt, childSubckts, freeSubcktName, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -137,6 +140,12 @@ type Dialog =
   | { kind: 'lineStyle'; shapes: number[] };
 
 /** Resultados de una simulación */
+/** Nivel de la jerarquía abierto (#180): prefijo de sus vectores en ngspice y red de arriba de cada puerto */
+interface HierLevel extends Level {
+  prefix: string;
+  ports: Map<string, string>;
+}
+
 interface SimRun {
   built: BuiltSimulation;
   result: SimResult;
@@ -303,6 +312,24 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   // deshacer por simulación (#154): la pila de cada una mientras no se la ve
   const stacks = useRef(new Map<string, History<AscDoc>>());
+  // Jerarquía (#180): niveles abiertos (vacío = el testbench). Cada nivel recuerda la instancia por
+  // la que se bajó, el prefijo de sus vectores en ngspice (x_u1.) y a qué red de arriba va cada puerto
+  const [path, setPath] = useState<HierLevel[]>([]);
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  const curSub = path.length ? path[path.length - 1].sub : '';
+  const [subTabs, setSubTabs] = useState<string[]>([]);
+  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos
+  const [treePref, setTreePref] = useState<boolean | null>(() => {
+    const v = lsGet('turbospice.tree');
+    return v === '1' ? true : v === '0' ? false : null;
+  });
+  const hasSubs = project.files.some((f) => f.kind === 'schematic');
+  const treeOpen = treePref ?? hasSubs;
+  // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
+  const hierOn = treeOpen || hasSubs || path.length > 0;
+  const [quickOpen, setQuickOpen] = useState(false);
+  const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
   const quietDoc = useRef(true);
   useEffect(() => {
@@ -340,7 +367,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const last = historyOpen ? prevRun() : undefined;
     return last ? diffCircuits(parseAsc(last.asc), liveDoc).summary : undefined;
   }, [historyOpen, curRuns, liveDoc]); // eslint-disable-line react-hooks/exhaustive-deps
-  const docLine = findAnalysis(doc)?.value ?? '';
+  // adentro de un subcircuito (#180) el comando es el del testbench (lo que se simula)
+  const tbDoc = useMemo(() => (curSub ? parseAsc(activeAsc(variant)) : null), [curSub, variant]);
+  const docLine = findAnalysis(tbDoc ?? doc)?.value ?? '';
   const sims = useMemo(
     (): SimList => ({
       items: variant.sims.map((s) => ({ id: s.id, ...(s.name ? { name: s.name } : {}), line: s.id === variant.activeSim ? docLine : lineOf(s.asc), ...(s.view ? { view: s.view } : {}) })),
@@ -746,7 +775,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   /** El proyecto con el circuito (y la vista) que se están editando: para el archivo o la sesión */
-  const snapshot = (): Project => storeActive(projectRef.current, ascText(docRef.current), sims.active ? liveView() : undefined);
+  const snapshot = (): Project => {
+    const lv = pathRef.current[pathRef.current.length - 1];
+    return lv ? storeSubckt(projectRef.current, lv.sub, ascText(docRef.current)) : storeActive(projectRef.current, ascText(docRef.current), sims.active ? liveView() : undefined);
+  };
 
   /** El .turbo a guardar con ese nombre de archivo (el nombre del proyecto es el del archivo) */
   const turboBytes = async (name: string) => {
@@ -968,7 +1000,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const run = async () => {
     // se simula el circuito actual (aunque se esté mirando una corrida vieja)
-    const doc = liveDoc;
+    let doc = liveDoc;
+    if (pathRef.current.length) {
+      const p = snapshot();
+      setProjectState(p);
+      projectRef.current = p;
+      lib.setProjectFiles(p.files);
+      doc = parseAsc(activeAsc(variantOf(p)));
+    }
     setViewRun('');
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
@@ -1101,13 +1140,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   /** Deja la simulación que se está viendo: devuelve el proyecto con su estado guardado */
   const leave = (): Project => {
-    const p = snapshot();
-    stacks.current.set(keyOf(p), history.state);
+    let p = snapshot();
+    const lv = pathRef.current[pathRef.current.length - 1];
+    stacks.current.set(lv ? subKey(lv.sub) : keyOf(p), history.state);
+    if (lv) p = syncSymbol(p, lv.sub);
     if (sim && sims.active) keepResult(kept.current, sims.active, sim);
     return p;
   };
   /** Muestra la simulación activa del proyecto (o la base): su circuito, pila, vista y resultados */
   const enter = (p: Project, refit = false) => {
+    pathRef.current = [];
+    setPath([]);
     const v = variantOf(p);
     const s = simOf(v);
     const h = stacks.current.get(keyOf(p));
@@ -1127,6 +1170,146 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   /** Pasa a otra simulación de la variante ('' = el circuito base) */
   const goSim = (id: string) => id !== sims.active && enter(selectProjectSim(leave(), id));
+
+  // --- Jerarquía (#180) ---------------------------------------------------------------------
+  const subKey = (name: string) => `sub:${name.toLowerCase()}`;
+  const levelKey = (ls: HierLevel[]) => (ls.length ? ls.map((l) => `${l.inst ?? ''}:${l.sub}`.toLowerCase()).join('/') : `tb:${keyOf(projectRef.current)}`);
+  /** Si cambiaron los puertos del subcircuito, regenera su símbolo (y avisa) */
+  const syncSymbol = (p: Project, name: string): Project => {
+    if (!symbolOutdated(p, name)) return p;
+    const f = subcktFile(p, name);
+    setMessage(t('Symbol {name} updated with the ports: {ports}', { name, ports: f ? subcktPorts(parseAsc(f.text)).join(', ') : '' }));
+    return updateSymbol(p, name);
+  };
+  /** Pasa a otro nivel de la jerarquía (vacío = el testbench), guardando lo que se edita */
+  const go = (next: HierLevel[], select?: number) => {
+    const cur = pathRef.current;
+    const v = editor.current?.view();
+    if (v) levelViews.current.set(levelKey(cur), v);
+    let p = snapshot();
+    const lv = cur[cur.length - 1];
+    stacks.current.set(lv ? subKey(lv.sub) : keyOf(p), history.state);
+    if (lv && !next.some((l) => l.sub.toLowerCase() === lv.sub.toLowerCase())) p = syncSymbol(p, lv.sub);
+    const target = next[next.length - 1];
+    const text = target ? subcktFile(p, target.sub)?.text : activeAsc(variantOf(p));
+    if (text === undefined) return;
+    const h = stacks.current.get(target ? subKey(target.sub) : keyOf(p));
+    quietDoc.current = true;
+    if (h && ascText(h.present) === text) history.restore(h);
+    else history.reset(parseAsc(text));
+    if (p !== projectRef.current) {
+      setProjectState(p);
+      projectRef.current = p;
+    }
+    if (target) setSubTabs((ts) => (ts.some((x) => x.toLowerCase() === target.sub.toLowerCase()) ? ts : [...ts, target.sub]));
+    pathRef.current = next;
+    setPath(next);
+    setSelection(select === undefined ? [] : [{ kind: 'symbol', index: select }]);
+    setTool({ kind: 'select' });
+    setViewRun('');
+    setValueOffer(null);
+    // misma posición y zoom que la última vez en ese nivel (si no, ajustar)
+    setDocKey((k) => k + 1);
+    const saved = levelViews.current.get(levelKey(next));
+    if (saved) requestAnimationFrame(() => requestAnimationFrame(() => editor.current?.setView(saved)));
+  };
+  const goUp = () => pathRef.current.length && go(pathRef.current.slice(0, -1));
+  /** Abre un subcircuito sin instancia (desde el panel, una pestaña o Ctrl+P) */
+  const openSub = (name: string, select?: number) => {
+    const cur = pathRef.current;
+    const i = cur.findIndex((l) => l.sub.toLowerCase() === name.toLowerCase());
+    go(i >= 0 ? cur.slice(0, i + 1) : [{ sub: name, prefix: '', ports: new Map() }], select);
+  };
+  /** Doble clic / E / Enter sobre una instancia de un subcircuito del proyecto: bajar */
+  const descend = (si: number): boolean => {
+    const s = docRef.current.symbols[si];
+    const f = s && subcktFile(projectRef.current, s.type);
+    if (!f) return false;
+    const parent = pathRef.current[pathRef.current.length - 1];
+    const el = lt.elements.find((e) => e.sym === si);
+    const ng = el ? el.name.replace(/§/g, '_').toLowerCase() : '';
+    const up = (node: string) => (node === '0' ? '0' : (parent?.ports.get(node.toLowerCase()) ?? `${parent?.prefix ?? ''}${node}`));
+    const ports = new Map<string, string>();
+    el?.pinNames.forEach((pn, i) => pn && ports.set(pn.toLowerCase(), up(el.nodes[i])));
+    go([...pathRef.current, { sub: subName(f.name), inst: s.attrs.get('InstName') ?? el?.name ?? '?', prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`, ports: parent && !parent.inst ? new Map() : ports }]);
+    return true;
+  };
+  const newSubckt = () => {
+    const name = prompt(t('Name of the new subcircuit'), freeSubcktName(projectRef.current));
+    if (!name) return;
+    if (!validSubcktName(name)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
+    if (subcktFile(projectRef.current, name) || projectRef.current.files.some((f) => f.name.toLowerCase() === `${name}.asy`.toLowerCase())) return setMessage(t('There is already a file called {name}', { name }));
+    editProject(addSubckt(projectRef.current, name));
+    // el proyecto nuevo tiene que estar antes de abrirlo
+    projectRef.current = addSubckt(projectRef.current, name);
+    openSub(name);
+  };
+  /** La selección pasa a un subcircuito nuevo y queda su instancia en su lugar */
+  const subFromSelection = () => {
+    if (!selection.length) return setMessage(t('Select the part of the circuit to turn into a subcircuit'));
+    const name = prompt(t('Name of the new subcircuit'), freeSubcktName(projectRef.current));
+    if (!name) return;
+    if (!validSubcktName(name)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
+    if (subcktFile(projectRef.current, name) || projectRef.current.files.some((f) => f.name.toLowerCase() === `${name}.asy`.toLowerCase())) return setMessage(t('There is already a file called {name}', { name }));
+    const r = extractSubckt(doc, selection, conn, lib, name);
+    if (typeof r === 'string') return setMessage(r);
+    const p0 = snapshot();
+    const p: Project = { ...p0, modified: Date.now(), files: [...p0.files, { name: `${name}.asc`, kind: 'schematic', text: serializeAsc(r.sub) }, { name: `${name}.asy`, kind: 'symbol', text: r.symbol }] };
+    projectRef.current = p;
+    editProject(p);
+    lib.setProjectFiles(p.files);
+    setLibVersion((v) => v + 1);
+    commit(r.parent);
+    setSelection([{ kind: 'symbol', index: r.parent.symbols.length - 1 }]);
+    setMessage(t('Subcircuit {name} created with the ports {ports}: double-click {inst} (or E) to enter it', { name, ports: r.ports.join(', '), inst: r.inst }));
+  };
+  const renameSub = (from: string) => {
+    const to = prompt(t('New name for {name}', { name: from }), from);
+    if (!to || to === from) return;
+    if (!validSubcktName(to)) return setMessage(t('Invalid name: use letters, digits, _ or -'));
+    if (subcktFile(projectRef.current, to)) return setMessage(t('There is already a file called {name}', { name: to }));
+    // guardar lo que se edita, renombrar en todo el proyecto y volver a mostrar el nivel actual
+    const cur = pathRef.current;
+    const p = renameSubckt(snapshot(), from, to);
+    const re = (n: string) => (n.toLowerCase() === from.toLowerCase() ? to : n);
+    for (const k of [...stacks.current.keys()]) if (k === subKey(from) || !k.startsWith('sub:')) stacks.current.delete(k);
+    setSubTabs((ts) => ts.map(re));
+    editProject(p);
+    projectRef.current = p;
+    const next = cur.map((l) => ({ ...l, sub: re(l.sub) }));
+    pathRef.current = [];
+    go(next);
+  };
+  const deleteSub = (name: string) => {
+    const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
+    if (!confirm(n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Delete subcircuit {name}?', { name }))) return;
+    if (pathRef.current.some((l) => l.sub.toLowerCase() === name.toLowerCase())) go([]);
+    stacks.current.delete(subKey(name));
+    setSubTabs((ts) => ts.filter((x) => x.toLowerCase() !== name.toLowerCase()));
+    const p = removeSubckt(projectRef.current, name);
+    projectRef.current = p;
+    editProject(p);
+  };
+  /** Ir a una instancia de un subcircuito (desde «usado en») */
+  const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
+    const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
+    if (u.where.kind === 'subckt') {
+      const f = subcktFile(projectRef.current, u.where.name);
+      return f && openSub(u.where.name, find(f.text));
+    }
+    const w = u.where;
+    if (w.variant !== variantOf(projectRef.current).id) goVariant(w.variant);
+    if (w.kind === 'sim' && w.sim !== variantOf(projectRef.current).activeSim) goSim(w.sim);
+    else if (pathRef.current.length) go([]);
+    requestAnimationFrame(() => {
+      const i = find(ascText(docRef.current));
+      if (i >= 0) {
+        setSelection([{ kind: 'symbol', index: i }]);
+        const s = docRef.current.symbols[i];
+        editor.current?.centerOn(symbolBox(s, lib.symbol(s.type), lib));
+      }
+    });
+  };
   // En la base, escribir un comando de análisis (a mano o con el diálogo) crea la primera
   // simulación con ese circuito; la base se queda sin el comando
   useEffect(() => {
@@ -1255,7 +1438,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const curSim = activeSim(sims);
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
   const simMenu = useRef<(() => void) | null>(null);
-  const canRun = !!curSim?.line || findControl(doc) >= 0;
+  const canRun = !!curSim?.line || findControl(tbDoc ?? doc) >= 0;
   const simulate = () => (canRun ? run() : simMenu.current?.());
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
@@ -1346,21 +1529,62 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const netColors = useMemo(() => {
     const m = new Map<string, string>();
     if (tool.kind !== 'probe') return m;
+    // adentro de una instancia (#180): V(x_u1.red) colorea «red» y la red de arriba, su puerto
+    const lv = path[path.length - 1];
+    const local = (n: string) => {
+      if (!lv) return n;
+      if (!lv.inst) return undefined;
+      if (n.startsWith(lv.prefix)) return n.slice(lv.prefix.length);
+      return [...lv.ports].find(([, up]) => up.toLowerCase() === n)?.[0];
+    };
     for (const p of panes) p.traces.forEach((tt, i) => {
       const n = /^V\(([^()]+)\)$/i.exec(tt.expr.trim());
-      if (n && !tt.hidden && !m.has(n[1].toLowerCase())) m.set(n[1].toLowerCase(), traceColor(tt, i));
+      const name = n && local(n[1].toLowerCase());
+      if (name && !tt.hidden && !m.has(name)) m.set(name, traceColor(tt, i));
     });
     return m;
-  }, [panes, tool.kind]);
+  }, [panes, tool.kind, path]);
   // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla
   // no llega el pointerleave)
   const traceNetShown = traceNet && panes.some((p) => p.traces.some((tt) => sameExpr(tt.expr, `V(${traceNet})`))) ? traceNet : undefined;
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
+  // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
+  // editando, con su texto actual)
+  const treeSubs = useMemo((): TreeSub[] => {
+    if (!treeOpen) return [];
+    const p = curSub ? storeSubckt(project, curSub, ascText(liveDoc)) : storeActive(project, ascText(liveDoc));
+    return subckts(p).map((f) => {
+      const name = subName(f.name);
+      return {
+        name,
+        ports: subcktPorts(parseAsc(f.text)).length,
+        uses: usages(p, name, (asc, nm) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'))).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+        children: childSubckts(p, f.text),
+        outdated: symbolOutdated(p, name),
+        text: false,
+      };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [treeOpen, project, curSub, curSub && liveDoc]);
+  const toggleTree = () => {
+    lsSet('turbospice.tree', treeOpen ? '0' : '1');
+    setTreePref(!treeOpen);
+  };
+
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot) return;
-    const expr = probeExpr(sim.built, target);
+    let expr = probeExpr(sim.built, target);
+    // adentro de un subcircuito (#180): la red de esta instancia en la netlist del testbench
+    const lv = pathRef.current[pathRef.current.length - 1];
+    if (lv) {
+      if (!lv.inst) return setMessage(t('To probe inside a subcircuit, enter it from an instance (double-click it in the testbench)'));
+      if (!target.net || target.net === '0') return setMessage(t('Inside a subcircuit the probe measures voltages (click a wire)'));
+      const up = lv.ports.get(target.net.toLowerCase());
+      if (up === '0') return;
+      expr = `V(${up ?? lv.prefix + target.net})`;
+    }
     if (!expr) return;
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
     if (traceBox.current?.focused()) return traceBox.current.insert(expr);
@@ -1645,6 +1869,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (ctrl && k === 'Enter') return handled(), simulate();
       if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
       if (ctrl && lk === 'o') return handled(), doOpen();
+      if (ctrl && lk === 'p') return handled(), setQuickOpen(true);
+      if (e.altKey && k === 'ArrowUp') return handled(), goUp();
       if (k === ' ' && !e.altKey) {
         // Espacio tocado = ajustar (al soltarlo); mantenido + arrastrar desplaza
         handled();
@@ -1703,6 +1929,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (e.altKey && lk === 'c') return handled(), openControl();
       if (e.altKey && lk === 'n') return handled(), setShowNets((v) => !v);
       if (e.altKey && lk === 'e') return handled(), openStudy();
+      if (e.altKey && lk === 'b') return handled(), subFromSelection();
       if (e.altKey) return;
       if (ctrl) return;
       if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
@@ -1712,6 +1939,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           setTool({ kind: 'select' });
           setSelection([]);
           return;
+        case 'e':
+        case 'Enter': {
+          const sel = selection.length === 1 && selection[0].kind === 'symbol' ? selection[0].index : -1;
+          if (sel >= 0 && descend(sel)) return handled();
+          if (k === 'Enter') return;
+          return handled(), setMessage(t('Select an instance of a project subcircuit to enter it (E or double-click)'));
+        }
         case 'a':
           return handled(), openSimulation();
         case 'F2':
@@ -2031,6 +2265,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Show the simulation command'), title: t('Draw .tran, .ac… on the schematic, like LTspice'), onClick: toggleSimCommand, checked: showSimCommand },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
+        { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },
         { label: t('Results panel'), shortcut: 'Ctrl+1 / Ctrl+0', onClick: toggleResultsPanel, disabled: !sim, checked: resultsShown },
         'sep',
         { label: t('Netlist editor (SPICE)'), onClick: onNetlist },
@@ -2315,7 +2550,7 @@ ${ltNetlistText(sim.built.lt)}
             stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
             running={running}
             picker={picker}
-            onApply={(line) => commit(setAnalysisLine(doc, line))}
+            onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}
             onRename={renameActive}
             onDelete={deleteActive}
@@ -2325,13 +2560,71 @@ ${ltNetlistText(sim.built.lt)}
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div
-          className={`canvas-wrap${historyOpen && curSim ? ' with-history' : ''}`}
+          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${path.length ? ' with-crumbs' : ''}${treeOpen ? ' with-tree' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
+          {hierOn && (
+          <HierBar
+            testbench={variant.name}
+            tabs={subTabs}
+            current={curSub}
+            path={path}
+            panelOpen={treeOpen}
+            onPanel={toggleTree}
+            onTab={(n) => (n ? openSub(n) : path.length && go([]))}
+            onCloseTab={(n) => {
+              if (curSub.toLowerCase() === n.toLowerCase()) go([]);
+              setSubTabs((ts) => ts.filter((x) => x !== n));
+            }}
+            onCrumb={(i) => go(path.slice(0, i + 1))}
+            onUp={goUp}
+            onQuick={() => setQuickOpen(true)}
+          />
+          )}
+          {treeOpen && (
+            <ProjectTree
+              project={project.name}
+              variants={project.variants.map((v) => ({ id: v.id, name: v.name, sims: v.sims.map((x) => x.id) }))}
+              activeVariant={variant.id}
+              subs={treeSubs}
+              current={curSub}
+              onVariant={goVariant}
+              onTestbench={() => path.length && go([])}
+              onOpen={(n) => openSub(n)}
+              onNew={newSubckt}
+              onFromSelection={selection.length ? subFromSelection : undefined}
+              onRename={renameSub}
+              onDelete={deleteSub}
+              onUpdateSymbol={(n) => {
+                const p = updateSymbol(snapshot(), n);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onClose={toggleTree}
+            />
+          )}
+          {quickOpen &&
+            createPortal(
+            <QuickOpen
+              items={[
+                ...project.variants.map((v) => ({ key: `v:${v.id}`, label: v.name, hint: t('testbench') })),
+                ...subckts(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: t('subcircuit') })),
+              ]}
+              onPick={(k) => {
+                const id = k.slice(2);
+                if (k.startsWith('s:')) return openSub(id);
+                if (id !== variant.id) return goVariant(id);
+                if (path.length) go([]);
+              }}
+              onClose={() => setQuickOpen(false)}
+            />,
+              document.body,
+            )}
           <SchematicEditor
             handle={editor}
+            onDescend={descend}
             docKey={docKey}
             doc={doc}
             lib={lib}
@@ -2359,7 +2652,7 @@ ${ltNetlistText(sim.built.lt)}
             onHover={setHover}
             diff={historyDiff}
           />
-          {historyOpen && curSim && (
+          {historyOpen && curSim && !curSub && (
             <HistoryPanel
               sim={simName(curSim) || t('No analysis')}
               runs={curRuns}

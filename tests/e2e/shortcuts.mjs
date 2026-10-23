@@ -249,7 +249,7 @@ const dr = page.locator('.iconbar button[aria-label="Arrastrar"]');
 const act = async (l) => (await l.getAttribute('class'))?.includes('active') ?? false;
 await mv.waitFor();
 check((await mv.count()) === 1 && (await dr.count()) === 1, 'la barra tiene los botones Mover y Arrastrar');
-check(/\(M \/ F7\)/.test((await mv.getAttribute('title')) ?? '') && /\(S \/ F8\)/.test((await dr.getAttribute('title')) ?? ''), 'los tooltips de Mover/Arrastrar traen el atajo');
+check(/\(M\)/.test((await mv.getAttribute('title')) ?? '') && /\(S\)/.test((await dr.getAttribute('title')) ?? ''), 'los tooltips de Mover/Arrastrar traen el atajo');
 await mv.click();
 check((await act(mv)) && !(await act(dr)), 'click en Mover lo marca activo');
 await dr.click();

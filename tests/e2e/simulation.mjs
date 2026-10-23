@@ -39,7 +39,7 @@ const at = async (x, y) => {
 };
 
 // --- Selector de componentes con miniaturas ---
-await page.keyboard.press('F2');
+await page.keyboard.press('p');
 await page.locator('.modal input').fill('npn');
 check((await page.locator('.picker-list svg.thumb .sym').count()) >= 3, 'el selector muestra miniaturas de los símbolos');
 check((await page.locator('.picker-preview svg.big .sym').count()) === 1, 'y una vista previa grande');

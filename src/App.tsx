@@ -516,7 +516,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!pins) return setMessage(t('No .subckt {name} found in {file}', { name, file }));
     const sym = { name: `${name}.asy`, kind: 'symbol' as const, text: makeSymbol({ name, pins, block: false, modelFile: file }) };
     editProject({ ...projectRef.current, files: [...projectRef.current.files.filter((x) => x.name.toLowerCase() !== sym.name.toLowerCase()), sym] });
-    setMessage(t('Symbol {name} created: it\'s in the component browser (F2) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
+    setMessage(t('Symbol {name} created: it\'s in the component browser (P) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
   };
 
   // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
@@ -2033,7 +2033,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const uf: UserFile = { name: `${name}.asy`, kind: 'symbol', text: makeSymbol({ name, pins, block: f.kind === 'schematic', modelFile: f.kind === 'model' ? file : undefined }), time: Date.now() };
     registerUserFile(lib, uf);
     storeUserFiles([...userFiles.filter((x) => x.name.toLowerCase() !== uf.name.toLowerCase()), uf]);
-    setMessage(t('Symbol {name} created: it\'s in the component browser (F2) under "{USER_DIR}"', { name, USER_DIR }));
+    setMessage(t('Symbol {name} created: it\'s in the component browser (P) under "{USER_DIR}"', { name, USER_DIR }));
   };
   const userFileInfo = (): UserFileInfo[] =>
     userFiles.map((f) => ({
@@ -2271,7 +2271,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         }
         case 'a':
           return handled(), openSimulation();
-        case 'F2':
         case 'p':
           return handled(), setDialog({ kind: 'picker' });
         case 'm':
@@ -2284,10 +2283,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           return handled(), shapeTool('CIRCLE')();
         case 'u':
           return handled(), shapeTool('ARC')();
-        case 'F3':
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
-        case 'F4':
         case 'n':
           return handled(), setDialog({ kind: 'flag' });
         case 'Delete':
@@ -2295,9 +2292,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           return handled(), deleteSelection();
         case '?':
           return handled(), setDialog({ kind: 'help' });
-        case 'F7':
-        case 'F8':
-          return handled(), setTool({ kind: 'select' });
         case 'r':
           return setTool({ kind: 'place', type: 'res', orient: 'R0' });
         case 'c':
@@ -2715,10 +2709,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Drawing'),
       tools: [
         { icon: 'select', label: t('Select'), title: t('Select and move'), shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
-        { icon: 'wire', label: t('Wire'), title: t('Wire'), shortcut: 'F3 / W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
-        { icon: 'component', label: t('Component'), title: t('Component'), shortcut: 'P / F2', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
+        { icon: 'wire', label: t('Wire'), title: t('Wire'), shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
+        { icon: 'component', label: t('Component'), title: t('Component'), shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
         { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
-        { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'F4 / N', onClick: () => setDialog({ kind: 'flag' }) },
+        { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
         { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' },
         { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
@@ -2728,8 +2722,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       id: 'edit',
       label: t('Editing'),
       tools: [
-        { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M / F7', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
-        { icon: 'drag', label: t('Drag'), title: t('Drag (stretching wires)'), shortcut: 'S / F8', onClick: () => startMove(true), active: tool.kind === 'move' && tool.stretch },
+        { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
+        { icon: 'drag', label: t('Drag'), title: t('Drag (stretching wires)'), shortcut: 'S', onClick: () => startMove(true), active: tool.kind === 'move' && tool.stretch },
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Del', onClick: deleteSelection, active: tool.kind === 'delete' },

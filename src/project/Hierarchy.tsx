@@ -263,7 +263,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
               </li>
             ))
           ) : (
-            <li className="tree-meta">{t('Not used yet: place it with F2 (Project folder)')}</li>
+            <li className="tree-meta">{t('Not used yet: place it with P (Project folder)')}</li>
           )}
         </ul>
       )}

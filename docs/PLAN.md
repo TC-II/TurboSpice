@@ -64,8 +64,8 @@ src/library/     catálogo, buscador, modelos del usuario
 ## Editor de esquemáticos
 
 - Componentes, cables en grilla, etiquetas de red, tierra, puertos, textos, directivas. Undo/redo.
-- Atajos tipo LTspice: `R` `C` `L` `D` `G`, `F3`/`W` cable, `F4` etiqueta, `Ctrl+R` rotar,
-  `Ctrl+E` espejar, `F2` componente, `F7` mover, `F8` arrastrar.
+- Atajos tipo LTspice: `R` `C` `L` `D` `G`, `W` cable, `N` etiqueta, `Ctrl+R` rotar,
+  `Ctrl+E` espejar, `P` componente, `M` mover.
 - Símbolos: `.asy` de LTspice (TCLib + base propios) con el skin SVG de ASC-Parser.
 - Netlister: union-find → redes; nombres desde etiquetas; `.include` de modelos usados;
   avisos de pines flotantes / nodos sin camino DC a tierra; expansión de `Rser`/`Rpar`/`Cpar` estilo LTspice.

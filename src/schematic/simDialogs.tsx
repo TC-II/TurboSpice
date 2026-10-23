@@ -65,7 +65,7 @@ function Field({ label, value, onChange, placeholder, hint, required, number, li
         input
       )}
       {auto ? (
-        <small>{t('Automatic name: it may change when you edit the circuit. Better give the net a label (F4).')}</small>
+        <small>{t('Automatic name: it may change when you edit the circuit. Better give the net a label (N).')}</small>
       ) : (
         hint && <small>{hint}</small>
       )}

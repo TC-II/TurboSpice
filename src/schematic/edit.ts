@@ -162,7 +162,7 @@ export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc
 }
 
 /**
- * Mueve los elementos. Con `drag` (F8 de LTspice) se conservan las uniones con lo que no se
+ * Mueve los elementos. Con `drag` (arrastrar) se conservan las uniones con lo que no se
  * mueve: los cables no seleccionados que llegan a un punto movido se estiran (en L si eran
  * horizontales o verticales) y donde algo fijo (pin, etiqueta, cable que pasa) tocaba algo
  * movido se agrega un cable en L que los une. Al final se limpian los cables (mergeCollinear).
@@ -701,7 +701,7 @@ export function setShapeStyle(doc: AscDoc, indices: number[], style: string): As
 }
 
 
-/** Copia de los elementos seleccionados desplazada (F6 duplicar / pegar) */
+/** Copia de los elementos seleccionados desplazada (duplicar / pegar) */
 export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
   let out = doc;
   const newRefs: ItemRef[] = [];

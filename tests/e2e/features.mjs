@@ -787,7 +787,7 @@ await page.getByRole('button', { name: 'Crear símbolo de amp3' }).click();
 const ufText = await page.locator('.modal').textContent();
 check(/✓ símbolo de bloque/.test(ufText) && /✓ amp3/.test(ufText) && /div\.asy/.test(ufText) && /amp3\.asy/.test(ufText), 'agregar un bloque .asc y un .lib, y crear sus símbolos');
 await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
-await page.keyboard.press('F2');
+await page.keyboard.press('p');
 await page.locator('.modal input').fill('amp3');
 check((await page.locator('.picker-list li', { hasText: 'Mis símbolos' }).filter({ hasText: 'amp3' }).count()) === 1, 'los símbolos propios aparecen en el buscador');
 await page.keyboard.press('Escape');

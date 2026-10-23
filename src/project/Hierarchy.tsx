@@ -235,10 +235,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           <Icon name="close" size={14} />
         </button>
       </header>
-      <label className="tree-hover">
-        <input type="checkbox" checked={hoverReveal} onChange={(e) => onHoverReveal(e.target.checked)} />
-        {t('Show when the mouse approaches the edge (in select mode)')}
-      </label>
       <h4>
         {t('Testbenches')}
         <span className="tree-adds">
@@ -296,6 +292,10 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         </span>
       </h4>
       {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}
+      <label className="tree-hover">
+        <input type="checkbox" checked={hoverReveal} onChange={(e) => onHoverReveal(e.target.checked)} />
+        {t('Show when the mouse approaches the edge (in select mode)')}
+      </label>
     </aside>
   );
 }

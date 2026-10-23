@@ -430,7 +430,12 @@ function PaneView(props: {
     const fg = css.getPropertyValue('--fg').trim();
     const bg = css.getPropertyValue('--bg').trim() || '#fff';
     const markColor = { pole: css.getPropertyValue('--err').trim(), zero: css.getPropertyValue('--accent').trim() };
-    const ticks = (_u: uPlot, tt: number[]) => axisTicks(tt);
+    // (las etiquetas quedan también en data-ticks-<escala> de la raíz de uPlot: el canvas no se puede leer en los e2e)
+    const ticks = (scale: string) => (u: uPlot, tt: number[]) => {
+      const out = axisTicks(tt);
+      u.root.dataset[`ticks${scale}`] = out.join('|');
+      return out;
+    };
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
@@ -452,9 +457,9 @@ function PaneView(props: {
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
         },
-        { scale: 'y', values: ticks, stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
+        { scale: 'y', values: ticks('Y'), stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
         ...(hasRight
-          ? [{ scale: data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i', side: 1, values: ticks, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
+          ? [{ scale: data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i', side: 1, values: ticks('R'), stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
           : []),
       ],
       series: [

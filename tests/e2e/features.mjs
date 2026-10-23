@@ -192,6 +192,19 @@ check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y
 check((await page.getByRole('combobox', { name: 'Plot' }).inputValue()).startsWith('fft V(out)'), 'la FFT queda como un plot más');
 await page.getByRole('combobox', { name: 'Plot' }).selectOption('tran1');
 check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al volver al transitorio se recuperan sus trazas');
+// #193: con zoom en un tramo chico las marcas del eje Y no se repiten
+{
+  const cb = await page.locator('.pane-chart').first().boundingBox();
+  const y = cb.y + cb.height / 2;
+  await page.mouse.move(cb.x + cb.width * 0.5, y);
+  await page.mouse.down();
+  await page.mouse.move(cb.x + cb.width * 0.5 + 30, y, { steps: 5 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const yt = (await page.locator('.pane-chart .uplot').first().getAttribute('data-ticks-y'))?.split('|') ?? [];
+  check(yt.length >= 2 && new Set(yt).size === yt.length, `con zoom las marcas del eje Y son todas distintas (${yt.join(' ')})`);
+  await page.getByRole('button', { name: /Zoom|Ver todo|Fit/i }).first().click().catch(() => {});
+}
 await page.getByRole('button', { name: 'Anotar OP' }).click();
 const ann = await page.locator('.op-annotation').allTextContents();
 check(ann.includes('1.415mA') && ann.includes('12V'), `anota el punto de operación (${ann.length} valores)`);

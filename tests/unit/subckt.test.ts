@@ -4,8 +4,10 @@ import { Library } from '../../src/library/library.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { connectivity } from '../../src/netlist/connectivity.ts';
-import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
-import { changedFiles, exportSubcktNetlist, runFilesOf, runSummary, subcktFilesFor, usedFiles } from '../../src/project/exchange.ts';
+import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
+import { decode } from '../../src/asc/encoding.ts';
+import { readZip } from '../../src/project/zip.ts';
+import { changedFiles, exportAllZip, exportSubcktNetlist, runFilesOf, runSummary, subcktFilesFor, usedFiles } from '../../src/project/exchange.ts';
 import { recordRun } from '../../src/project/project.ts';
 import { t } from '../../src/i18n/i18n.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
@@ -335,5 +337,24 @@ describe('un .asy existente como símbolo del subcircuito (#199)', () => {
     lib.setProjectFiles([]);
     expect(lt.blocks.map((b) => [b.name, b.ports])).toEqual([['BUF', ['in', 'out']]]);
     expect(lt.elements[0].value).toBe('BUF');
+  });
+});
+
+describe('exportar a .zip para LTspice (#199)', () => {
+  it('el testbench y sus subcircuitos (.asc + .asy juntos) dan la misma netlist al abrirlos', async () => {
+    let p = withSub();
+    p = addSubckt(p, 'TOP', tb('BUF'));
+    p = { ...p, variants: p.variants.map((v) => ({ ...v, sims: v.sims.map((s) => ({ ...s, asc: tb('TOP') })) })) };
+    lib.setProjectFiles(p.files);
+    const before = ltNetlistText(ltNetlist(parseAsc(tb('TOP')), lib));
+    const entries = await readZip(exportAllZip(p, lib).bytes);
+    lib.setProjectFiles([]);
+    const names = entries.map((e) => e.path).sort();
+    expect(names).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy', 'Testbench 1.asc']);
+    // como LTspice: los bloques se buscan junto al .asc, por el nombre del símbolo
+    const other = new Library(buildBundle());
+    other.setProjectFiles(entries.filter((e) => e.path !== 'Testbench 1.asc').map((e) => ({ name: e.path, kind: e.path.endsWith('.asy') ? 'symbol' : 'schematic', text: decode(e.data).text })));
+    const tbText = decode(entries.find((e) => e.path === 'Testbench 1.asc')!.data).text;
+    expect(ltNetlistText(ltNetlist(parseAsc(tbText), other))).toBe(before);
   });
 });

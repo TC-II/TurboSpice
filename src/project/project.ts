@@ -139,14 +139,22 @@ export const freeBenchName = (p: Project) => uniqueLabel(t('Testbench {n}', { n:
  * Agrega una corrida con el circuito simulado. Si es igual al de la última, sólo se actualiza
  * su fecha (no se llena el historial de entradas iguales).
  */
-export function recordRun(p: Project, simId: string, asc: string, time = Date.now(), summary?: string): { project: Project; run: Run } {
+export function recordRun(p: Project, simId: string, asc: string, time = Date.now(), summary?: string, files?: Record<string, string>): { project: Project; run: Run } {
   const v = variantOf(p);
   const s = simOf(v, simId);
   if (!s) throw new Error(t('Simulation {simId} doesn\'t exist', { simId }));
   const last = s.runs[s.runs.length - 1];
-  const run: Run = last && !last.damaged && last.asc === asc ? { ...last, time } : { id: newId('r'), time, asc, ...(summary ? { summary } : {}) };
+  // misma corrida si no cambió el circuito ni los subcircuitos/modelos que usa (#199)
+  // (una corrida de antes de guardar archivos no se repite: se le agregan)
+  const same = last && !last.damaged && last.asc === asc && (!last.files || sameFiles(last.files, files));
+  const run: Run = same ? { ...last, time, ...(files && !last.files ? { files } : {}) } : { id: newId('r'), time, asc, ...(summary ? { summary } : {}), ...(files ? { files } : {}) };
   const runs = last && run.id === last.id ? [...s.runs.slice(0, -1), run] : [...s.runs, run];
   return { project: mapVariant(p, v.id, (x) => mapSim(x, simId, (y) => ({ ...y, runs }))), run };
+}
+
+function sameFiles(a: Record<string, string> | undefined, b: Record<string, string> | undefined): boolean {
+  const ka = Object.keys(a ?? {});
+  return ka.length === Object.keys(b ?? {}).length && ka.every((k) => a![k] === b?.[k]);
 }
 
 // --- variantes ---------------------------------------------------------------------------------

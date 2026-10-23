@@ -1462,4 +1462,5 @@ export const es: Record<string, string> = {
   "pins {pins} not connected": "los pines {pins} no están conectados",
   "a wire ends on the symbol without a pin (was a port removed?)": "un cable termina sobre el símbolo sin un pin (¿se quitó un puerto?)",
   "The ports of {name} changed: {insts} must be rewired (marked in the project panel)": "Cambiaron los puertos de {name}: hay que recablear {insts} (marcadas en el panel del proyecto)",
+  "{name} changed": "cambió {name}",
 };

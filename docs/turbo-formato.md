@@ -73,7 +73,9 @@ Filtro RC.turbo          Proyecto   — el archivo: se abre, se guarda en Drive,
           "current": "sha256:…",       // el circuito actual (puede tener cambios sin simular)
           "runs": [                    // la más nueva al final
             { "id": "r1", "time": "2026-10-22T15:01:44Z", "asc": "sha256:…",
-              "summary": "+C3, −R2, R1 1k→2k2" }
+              "summary": "+C3, −R2, R1 1k→2k2, cambió OPAMP_TC2",
+              // opcional (#199): archivos del proyecto que usó (subcircuitos y modelos)
+              "files": { "OPAMP_TC2.asc": "sha256:…", "OPAMP_TC2.asy": "sha256:…" } }
           ]
         }
       ]
@@ -98,6 +100,10 @@ porque no hay diferencias que reconstruir: cada hash apunta a un `.asc` completo
 - Al abrir se verifica cada hash. Un blob corrupto invalida sólo las corridas que lo usan (se
   marcan como dañadas), nunca el resto del proyecto.
 - Sin límite de corridas por ahora.
+- Cada corrida puede guardar en `files` la versión de los subcircuitos (`.asc` + `.asy`) y modelos
+  del proyecto que usó (también como hashes en `blobs`, así que una versión que no cambió no se
+  repite). Sirve para mostrar «cambió OPAMP_TC2» entre corridas. Si uno de esos blobs no verifica,
+  sólo se pierde ese dato; la corrida sigue sana. Es opcional: los `.turbo` sin `files` se abren igual.
 
 **Qué no va en el `.turbo`.** Las curvas y los resultados (pueden pesar MB). Los de la última corrida
 de cada simulación van a un cache en IndexedDB, con la corrida como clave. Si no están (otra máquina,

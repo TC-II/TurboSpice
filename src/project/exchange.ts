@@ -40,6 +40,35 @@ export function usedFiles(files: ProjectFile[], ascTexts: string[]): ProjectFile
   return [...schs, ...syms, ...files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()))];
 }
 
+/** Archivos del proyecto que usa un circuito, con su texto (para guardarlos en la corrida, #199) */
+export function runFilesOf(p: Project, asc: string): Record<string, string> | undefined {
+  const used = usedFiles(p.files, [asc]);
+  return used.length ? Object.fromEntries(used.map((f) => [f.name, f.text])) : undefined;
+}
+
+/**
+ * Qué archivos del proyecto cambiaron entre dos corridas («cambió OPAMP_TC2», #199): subcircuitos
+ * por su nombre (su .asc o su .asy) y modelos por el archivo. Los que se dejaron de usar o se
+ * empezaron a usar ya se ven en el resumen del circuito (la instancia), no se repiten.
+ */
+export function changedFiles(before: Record<string, string> | undefined, after: Record<string, string> | undefined): string[] {
+  const out: string[] = [];
+  for (const [k, text] of Object.entries(after ?? {})) {
+    const old = before?.[k];
+    if (old === undefined || old === text) continue;
+    const name = /\.(asc|asy)$/i.test(k) ? k.replace(/\.[^.]*$/, '') : k;
+    if (!out.some((x) => x.toLowerCase() === name.toLowerCase())) out.push(name);
+  }
+  return out;
+}
+
+/** Resumen de una corrida: cambios del circuito y de los subcircuitos/modelos que usa */
+export function runSummary(circuit: string | undefined, before: Record<string, string> | undefined, after: Record<string, string> | undefined): string | undefined {
+  const changed = changedFiles(before, after).map((name) => t('{name} changed', { name }));
+  if (!changed.length) return circuit;
+  return [...(circuit && circuit !== t('no changes') ? [circuit] : []), ...changed].join(', ');
+}
+
 /** Los .asc de una variante: uno por simulación (la base, si no tiene ninguna) */
 export function variantAscs(v: Variant): { name: string; asc: string }[] {
   const list = v.sims.length ? v.sims.map((s) => ({ label: simLabel(s), asc: s.asc })) : [{ label: v.name, asc: v.base }];

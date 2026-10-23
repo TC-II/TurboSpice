@@ -32,6 +32,11 @@ export interface Run {
   asc: string;
   /** cambios contra la corrida anterior: "+C3, −R2, R1 1k→2k2" */
   summary?: string;
+  /**
+   * archivos del proyecto que usó (subcircuitos .asc/.asy y modelos, #199): nombre → texto, para
+   * saber qué cambió entre corridas («cambió OPAMP_TC2»)
+   */
+  files?: Record<string, string>;
   /** su blob no pasó la verificación al abrir: no se puede ver ni restaurar */
   damaged?: boolean;
 }
@@ -178,6 +183,8 @@ interface FileRun {
   time: string;
   asc: Hash;
   summary?: string;
+  /** nombre de archivo del proyecto → hash de su texto en blobs (#199) */
+  files?: Record<string, Hash>;
 }
 interface FileSim {
   id: string;
@@ -232,7 +239,12 @@ export async function serializeTurbo(p: Project): Promise<string> {
   for (const s of v.sims) {
     const runs: FileRun[] = [];
     // una corrida dañada no tiene texto que guardar: se pierde (ya avisó al abrir)
-    for (const r of s.runs) if (!r.damaged) runs.push({ id: r.id, time: new Date(r.time).toISOString(), asc: await blob(r.asc), ...(r.summary ? { summary: r.summary } : {}) });
+    for (const r of s.runs) {
+      if (r.damaged) continue;
+      const files: Record<string, Hash> = {};
+      for (const [k, text] of Object.entries(r.files ?? {})) files[k] = await blob(text);
+      runs.push({ id: r.id, time: new Date(r.time).toISOString(), asc: await blob(r.asc), ...(r.summary ? { summary: r.summary } : {}), ...(r.files ? { files } : {}) });
+    }
     testbenches.push({ id: s.id, ...(s.name ? { name: s.name } : {}), ...(s.group ? { group: s.group } : {}), current: await blob(s.asc), ...(s.view ? { view: s.view } : {}), runs });
   }
   const json: TurboJson = {
@@ -296,6 +308,12 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   const ok = new Map<string, string | null>();
   for (const [h, tt] of Object.entries(blobsIn)) ok.set(h, typeof tt === 'string' && (await hashText(tt)) === h ? tt : null);
   const get = (h: unknown): string | null => (typeof h === 'string' ? (ok.get(h) ?? null) : null);
+  // archivos de una corrida (#199): los que no verifican se omiten (sólo se pierde el «cambió X»)
+  const runFiles = (o: Record<string, unknown>): Record<string, string> =>
+    Object.fromEntries(Object.entries(o).flatMap(([k, h]) => {
+      const text = get(h);
+      return text === null ? [] : [[k, text]];
+    }));
 
   const files: ProjectFile[] = Array.isArray(raw.files)
     ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic'))
@@ -313,6 +331,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
           time: time(rr.time),
           asc: asc ?? '',
           ...(typeof rr.summary === 'string' && rr.summary ? { summary: rr.summary } : {}),
+          ...(isObj(rr.files) ? { files: runFiles(rr.files) } : {}),
           ...(asc === null ? { damaged: true } : {}),
         };
       });

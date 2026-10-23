@@ -66,7 +66,7 @@ import {
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { staleInstances } from './project/staleInstances.ts';
-import { exportAllZip, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
+import { exportAllZip, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -406,8 +406,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [historyOpen, viewed, curRuns, doc]); // eslint-disable-line react-hooks/exhaustive-deps
   const currentChanges = useMemo(() => {
     const last = historyOpen ? prevRun() : undefined;
-    return last ? diffCircuits(parseAsc(last.asc), liveDoc).summary : undefined;
-  }, [historyOpen, curRuns, liveDoc]); // eslint-disable-line react-hooks/exhaustive-deps
+    return last ? runSummary(diffCircuits(parseAsc(last.asc), liveDoc).summary, last.files, runFilesOf(project, ascText(liveDoc))) : undefined;
+  }, [historyOpen, curRuns, liveDoc, project.files]); // eslint-disable-line react-hooks/exhaustive-deps
   // adentro de un subcircuito (#180) el comando es el del testbench (lo que se simula)
   const tbDoc = useMemo(() => (curSub ? parseAsc(activeAsc(variant)) : null), [curSub, variant]);
   const docLine = findAnalysis(tbDoc ?? doc)?.value ?? '';
@@ -1070,7 +1070,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const simAsc = ascText(doc);
     if (id) {
       const last = prevRun();
-      editProject(recordRun(snapshot(), id, simAsc, Date.now(), last ? diffCircuits(parseAsc(last.asc), doc).summary : undefined).project);
+      const p0 = snapshot();
+      const files = runFilesOf(p0, simAsc);
+      editProject(recordRun(p0, id, simAsc, Date.now(), last ? runSummary(diffCircuits(parseAsc(last.asc), doc).summary, last.files, files) : undefined, files).project);
       setAutoDrive((n) => n + 1);
     }
     try {

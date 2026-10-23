@@ -5,10 +5,12 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
-import { exportSubcktNetlist, usedFiles } from '../../src/project/exchange.ts';
+import { changedFiles, exportSubcktNetlist, runFilesOf, runSummary, usedFiles } from '../../src/project/exchange.ts';
+import { recordRun } from '../../src/project/project.ts';
+import { t } from '../../src/i18n/i18n.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
 import { addSubckt, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
-import { newProject } from '../../src/project/turbo.ts';
+import { newProject, parseTurbo, serializeTurbo } from '../../src/project/turbo.ts';
 
 const lib = new Library(buildBundle());
 
@@ -256,5 +258,31 @@ describe('exportar un subcircuito como .sub (#199)', () => {
     expect(r.text).toMatch(/^XU1 \S+ \S+ BUF$/m);
     expect(r.text).not.toMatch(/^\.op/m);
     expect(exportSubcktNetlist(p, 'nope', lib)).toBeNull();
+  });
+});
+
+describe('historial de corridas con la versión de cada subcircuito (#199)', () => {
+  it('cada corrida guarda los subcircuitos que usó y el resumen dice cuál cambió', async () => {
+    let p = withSub();
+    const sim = p.variants[0].sims[0];
+    const f1 = runFilesOf(p, sim.asc)!;
+    expect(Object.keys(f1).sort()).toEqual(['BUF.asc', 'BUF.asy']);
+    p = recordRun(p, sim.id, sim.asc, 1, undefined, f1).project;
+    // mismo circuito y mismos subcircuitos: la misma corrida
+    p = recordRun(p, sim.id, sim.asc, 2, undefined, runFilesOf(p, sim.asc)).project;
+    expect(p.variants[0].sims[0].runs).toHaveLength(1);
+    // cambia BUF (otro valor de R1): corrida nueva, con «cambió BUF»
+    p = storeSubckt(p, 'BUF', BUF.replace('SYMATTR Value 1k', 'SYMATTR Value 2k'));
+    const f2 = runFilesOf(p, sim.asc);
+    const sum = runSummary(t('no changes'), f1, f2);
+    expect(sum).toBe(t('{name} changed', { name: 'BUF' }));
+    p = recordRun(p, sim.id, sim.asc, 3, sum, f2).project;
+    const runs = p.variants[0].sims[0].runs;
+    expect(runs).toHaveLength(2);
+    expect(runs[1].summary).toBe(sum);
+    // se guardan y se leen del .turbo
+    const back = (await parseTurbo(await serializeTurbo(p))).project.variants[0].sims[0].runs;
+    expect(back.map((r) => r.files?.['BUF.asc'])).toEqual(runs.map((r) => r.files?.['BUF.asc']));
+    expect(changedFiles(back[0].files, back[1].files)).toEqual(['BUF']);
   });
 });

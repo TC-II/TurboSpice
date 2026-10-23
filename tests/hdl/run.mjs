@@ -40,7 +40,7 @@ let failed = 0;
 for (const c of CASES) {
   const t0 = Date.now();
   const problems = [];
-  const syn = await synthesize(runYosys, { [c.file]: c.verilog }, c.file);
+  const syn = await synthesize(runYosys, { [c.file]: c.verilog }, c.file, c.top);
   if (c.expectError) {
     if (!syn.error || !c.expectError.test(syn.error)) problems.push(`esperaba error ${c.expectError}, dio ${syn.error ?? 'ok'}`);
   } else if (syn.error) {
@@ -70,7 +70,8 @@ for (const c of CASES) {
       const want = nativeAt(netlist, node, times);
       times.forEach((tt, i) => {
         const got = at(node, tt);
-        if (Math.abs(got - want[i]) > 1e-6 * Math.max(1, Math.abs(want[i]))) problems.push(`V(${node}) en ${tt}: wasm ${got}, nativo ${want[i]}`);
+        // (el nativo se lee de "meas", con 6 cifras)
+        if (Math.abs(got - want[i]) > 1e-5 * Math.max(1, Math.abs(want[i]))) problems.push(`V(${node}) en ${tt}: wasm ${got}, nativo ${want[i]}`);
       });
     }
   }

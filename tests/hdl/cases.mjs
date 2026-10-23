@@ -79,6 +79,55 @@ X1 d g q t lat
     },
   },
   {
+    name: 'PWM de 4 bits: ciclo de trabajo d/16 y salida filtrada',
+    file: 'pwm.v',
+    verilog: `module pwm (input clk, input rst, input [3:0] d, output reg out, output wrap);
+  reg [3:0] cnt;
+  always @(posedge clk or posedge rst)
+    if (rst) begin cnt <= 0; out <= 0; end
+    else begin cnt <= cnt + 1; out <= (cnt < d); end
+  assign wrap = &cnt;
+endmodule`,
+    circuit: `${CLK}
+Vr rst 0 PWL(0 5 20n 5 21n 0)
+V3 d3 0 5
+V2 d2 0 0
+V1b d1 0 5
+V0 d0 0 0
+X1 clk rst d3 d2 d1 d0 out wrap pwm
+R1 out f 10k
+C1 f 0 1n
+.tran 1n 40u`,
+    check: (at) => {
+      // d = 1010 = 10: 10 de cada 16 ciclos en alto; el RC (τ = 10 µs) promedia ≈ 5·10/16·(1020/…)
+      let high = 0;
+      for (let k = 0; k < 160; k++) if (at('out', 20e-6 + k * 10e-9 + 5e-9) > 2.5) high++;
+      if (Math.abs(high - 100) > 2) return `out alto ${high}/160 muestras (esperaba ~100)`;
+      const vf = at('f', 39e-6);
+      if (Math.abs(vf - 3.1) > 0.15) return `V(f) = ${vf} (esperaba ~3.1)`;
+    },
+    compare: ['f', [10e-6, 30e-6]],
+  },
+  {
+    name: 'dos módulos en el archivo y constantes',
+    file: 'two.v',
+    verilog: `module inv(input a, output y); assign y = ~a; endmodule
+module top(input a, output y, output one, output zero);
+  inv u1(.a(a), .y(y));
+  assign one = 1'b1;
+  assign zero = 1'b0;
+endmodule`,
+    top: 'top',
+    circuit: `Va a 0 PULSE(0 5 0 1n 1n 49n 100n)
+X1 a y one zero top
+.tran 1n 200n`,
+    check: (at, block) => {
+      if (block.name !== 'top') return `módulo ${block.name}`;
+      if (at('one', 50e-9) < 4.9 || at('zero', 50e-9) > 0.1) return 'constantes mal';
+      if ((at('y', 30e-9) > 2.5) === (at('a', 28e-9) > 2.5)) return 'y no es ~a';
+    },
+  },
+  {
     name: 'error: puerto inout',
     file: 'bidi.v',
     verilog: `module bidi(inout x, input e, output y); assign x = e ? 1'b1 : 1'bz; assign y = x; endmodule`,

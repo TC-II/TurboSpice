@@ -65,6 +65,12 @@ export function parseExpr(src: string): Node {
       i += num[0].length;
       return { t: 'num', v: parseFloat(num[1] + (num[2] ?? '')) * (num[3] ? SUFFIX[num[3].toLowerCase()] : 1) };
     }
+    // parámetro de un dispositivo (#202): @Q1[gm], @x_u1.q1[ic], con corrida @Q1[gm]@2
+    const dev = /^@([A-Za-z_§$][\w.§$]*)\[(\w+)\](?:\s*@(\d+))?/.exec(src.slice(i));
+    if (dev) {
+      i += dev[0].length;
+      return dev[3] ? { t: 'ref', fn: '@', args: [dev[1], dev[2]], run: Number(dev[3]) } : { t: 'ref', fn: '@', args: [dev[1], dev[2]] };
+    }
     const id = /^[A-Za-z_][\w.#@:[\]§$]*/.exec(src.slice(i));
     if (!id) throw new ExprError(t('invalid expression at position {p0}', { p0: i + 1 }));
     const name = id[0];
@@ -258,6 +264,7 @@ function ev(n: Node, ctx: EvalContext): C {
     }
     case 'ref': {
       const w = ctx.resolve(n.fn, n.args, n.run);
+      if (!w && n.fn === '@') throw new ExprError(t('{name}{p1} doesn\'t exist', { name: `@${n.args[0]}[${n.args[1]}]`, p1: n.run ? `@${n.run}` : '' }));
       if (!w) throw new ExprError(t('{fn}({p1}){p2} doesn\'t exist', { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
       return { re: w.re, im: w.im ?? null };
     }

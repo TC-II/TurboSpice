@@ -1,5 +1,6 @@
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
 import type { StepRuns } from '../netlist/step.ts';
+import { deviceTraceName, parseDeviceVector } from '../sim/deviceParams.ts';
 
 /** Tipo de vector propio (no de ngspice) para el eje X de los barridos de .step */
 export const STEP_SCALE = 1000;
@@ -55,11 +56,9 @@ export function displayName(v: SimVector): string {
   const br = /^(.*)#branch(.*)$/i.exec(n);
   if (br) return `I(${br[1].toUpperCase()}${br[2]})`;
   // corrientes de dispositivos (.options savecurrents): @r1[i], @q1[ic], @d1[id]
-  const dev = /^@([^[]+)\[(\w+)\]$/.exec(n);
-  if (dev) {
-    const name = dev[1].toUpperCase();
-    return ['i', 'id', 'current'].includes(dev[2]) ? `I(${name})` : `I${dev[2].slice(1)}(${name})`;
-  }
+  // y los demás parámetros de dispositivo (#202): @q1[gm] → @Q1[gm]
+  const dev = parseDeviceVector(n);
+  if (dev) return deviceTraceName(dev.device, dev.param, true);
   if (v.type === 3 && !/[(@]/.test(n)) return `V(${n})`;
   return n;
 }

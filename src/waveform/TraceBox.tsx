@@ -14,9 +14,11 @@ export interface TraceBoxHandle {
   input(): HTMLInputElement | null;
 }
 
-export function TraceBox({ names, onAdd, handle }: {
+export function TraceBox({ names, hints, onAdd, handle }: {
   /** nombres para autocompletar */
   names: string[];
+  /** más nombres con su descripción (parámetros de dispositivo, #202) */
+  hints?: Map<string, string>;
   /** agrega la traza; devuelve el error si no se puede graficar */
   onAdd(expr: string): string | undefined;
   handle?: Ref<TraceBoxHandle>;
@@ -65,7 +67,7 @@ export function TraceBox({ names, onAdd, handle }: {
           list="trace-names"
           value={expr}
           spellCheck={false}
-          placeholder={t('Add trace: V(out)/V(in), I(R1)…')}
+          placeholder={t('Add trace: V(out)/V(in), I(R1), @Q1[gm]…')}
           aria-label={t('Expression')}
           title={t('Enter or + adds the trace (A: go to the box). With the focus here, clicking a node or component on the schematic types its name')}
           onChange={(e) => {
@@ -80,6 +82,9 @@ export function TraceBox({ names, onAdd, handle }: {
       <datalist id="trace-names">
         {names.map((n) => (
           <option key={n} value={n} />
+        ))}
+        {[...(hints ?? [])].filter(([n]) => !names.includes(n)).map(([n, label]) => (
+          <option key={n} value={n} label={label} />
         ))}
       </datalist>
       {error && <span className="hint warn">{error}</span>}

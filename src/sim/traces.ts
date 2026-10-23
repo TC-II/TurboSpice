@@ -2,7 +2,8 @@
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
 import type { Resolver, Wave } from '../waveform/expr.ts';
 import { deviceVector, elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
-import { hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
+import { blockInstances, hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
+import { deviceParams, deviceTraceName, parseDeviceVector } from './deviceParams.ts';
 
 /** Parámetro de dispositivo de ngspice para Ic, Ib, Id… */
 const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id', ig: 'ig', is: 'is' };
@@ -34,6 +35,12 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     return wave(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`));
   };
   const element = (name: string) => sim?.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
+  /** Nombre de ngspice de un dispositivo escrito en una traza ("Q1", "x_u1.q1") */
+  const deviceNgName = (name: string): string | null => {
+    const el = element(name);
+    if (el && sim) return sim.ng.names.get(el.name)?.toLowerCase() ?? null;
+    return name.includes('.') ? hierDevice(name) : name.toLowerCase();
+  };
   return (fn, args) => {
     const f = fn.toLowerCase();
     if (f === 'v') {
@@ -44,6 +51,13 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       const re = a.re.map((x, k) => x - b.re[k]);
       if (!a.im && !b.im) return { re };
       return { re, im: (a.im ?? new Float64Array(re.length)).map((x, k) => x - (b.im?.[k] ?? 0)) };
+    }
+    // parámetro de un dispositivo (#202): @Q1[gm] con el nombre del esquemático, @x_u1.q1[gm]
+    // adentro de una instancia o el nombre de ngspice tal cual (@q.x_u1.q1[gm])
+    if (f === '@') {
+      const [name, param] = args;
+      const devName = deviceNgName(name);
+      return wave([devName, name.toLowerCase()].map((d) => d && findVector(plot, `@${d}[${param}]`)).find((x) => x) || undefined);
     }
     // adentro de una instancia (#199): I(x_u1.r1) → @r.x_u1.r1[i], Ic(x_u1.q1) → @q.x_u1.q1[ic]
     const dev = !element(args[0]) && args[0].includes('.') ? hierDevice(args[0]) : null;
@@ -103,7 +117,31 @@ export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?:
 export function vectorExpr(v: SimVector): string {
   const br = /^(.*)#branch$/i.exec(v.name);
   if (br) return `I(${br[1].toUpperCase()})`;
-  const dev = /^@([^[]+)\[(\w+)\]$/.exec(v.name);
-  if (dev) return ['i', 'current'].includes(dev[2]) ? `I(${dev[1].toUpperCase()})` : `I${dev[2].slice(1)}(${dev[1].toUpperCase()})`;
+  const dev = parseDeviceVector(v.name);
+  if (dev) return deviceTraceName(dev.device, dev.param);
   return v.type === 3 && !/[(@#]/.test(v.name) ? `V(${v.name})` : v.name;
+}
+
+/**
+ * Parámetros de salida de cada dispositivo de la simulación, para elegirlos en la caja de trazas
+ * (#202): nombre de traza ("@Q1[gm]", "@X_U1.Q1[gm]") → descripción con su unidad
+ */
+export function deviceParamTraces(sim: BuiltSimulation): Map<string, string> {
+  const out = new Map<string, string>();
+  const add = (name: string, letter: string) => {
+    for (const p of deviceParams(letter)) {
+      const tr = deviceTraceName(name, p.name);
+      // las corrientes ya están como I(R1), Ic(Q1)… (savecurrents)
+      if (!tr.startsWith('@')) continue;
+      out.set(tr, `${name.toUpperCase()}: ${p.label}${p.unit ? ` (${p.unit})` : ''}`);
+    }
+  };
+  for (const e of sim.lt.elements) add(e.name.replace(/§/g, ''), e.prefix);
+  for (const b of blockInstances(sim)) {
+    for (const e of b.block.lt.elements) {
+      const ng = b.names.get(e.name);
+      if (ng) add(`${b.prefix}${ng}`, e.prefix);
+    }
+  }
+  return out;
 }

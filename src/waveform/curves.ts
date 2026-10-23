@@ -1,6 +1,7 @@
 // Curvas de un panel: evalúa cada traza en cada corrida, la proyecta (Bode, dB, fase…) y la
 // lleva al eje X del plot mostrado. Separado del componente para poder testearlo.
 import type { SimPlot } from '../engine/ngspice.ts';
+import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
 import { isLogScale, resample, scaleOf } from './series.ts';
 import { PALETTE, traceColor, type Pane } from './view.ts';
@@ -55,7 +56,12 @@ export function shade(hex: string, k: number, n: number): string {
   return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-const isCurrentExpr = (e: string) => /^\s*I[bcdegsx]?\([^)]*\)\s*$/i.test(e);
+const isCurrentExpr = (e: string) => /^\s*I[bcdegsx]?\([^)]*\)\s*$/i.test(e) || deviceExprUnit(e) === 'A';
+/** Unidad de una traza simple: V(…), I(…) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
+const exprUnit = (e: string) => (/^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? ''));
+
+/** La unidad común de las trazas, o "" si no la hay */
+const sameUnit = (units: string[]) => (units.length && units.every((u) => u === units[0]) ? units[0] : '');
 
 /** Tramos de un eje X que retrocede (barrido .dc anidado): [inicio, fin) de cada uno */
 export function sweepSegments(x: Float64Array): [number, number][] {
@@ -129,6 +135,6 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
     });
   });
 
-  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? (visible.every((tt) => /^\s*V\(/i.test(tt.expr)) ? 'V' : '') : hasI ? 'A' : '';
+  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? sameUnit(visible.map((tt) => exprUnit(tt.expr))) : hasI ? 'A' : '';
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
 }

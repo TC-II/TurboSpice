@@ -96,10 +96,11 @@ import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { displayName, sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
-import { evalTrace } from './waveform/expr.ts';
+import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
-import { probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceRefs } from './sim/deviceParams.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -1055,6 +1056,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return openBytes(new Uint8Array(b), name, {}, variant);
   };
 
+  /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
+   *  con .save los parámetros de dispositivo que usen (#202) */
+  const allTraces = () => [panes, ...Object.values(plotView), ...panesByKind.current.values()].flatMap((ps) => ps.flatMap((p) => p.traces.map((tt) => tt.expr)));
   const run = async () => {
     // se simula el circuito actual (aunque se esté mirando una corrida vieja)
     // los subcircuitos no se simulan solos (#180): se simula desde un testbench
@@ -1077,7 +1081,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     try {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
-      const built = await buildSimulation(doc, lib, ascName());
+      const built = await buildSimulation(doc, lib, ascName(), allTraces());
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       const tooBig = built.tooBig.map((p) => p.text);
       const { result, ms } = tooBig.length
@@ -1875,11 +1879,24 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const sc = plot && scaleOf(plot);
     return plot ? [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))] : [];
   }, [plot]);
+  // parámetros de los dispositivos para elegir en la caja de trazas (#202)
+  const traceHints = useMemo(() => (sim ? deviceParamTraces(sim.built) : undefined), [sim]);
   /** agrega la expresión al panel activo; devuelve el error si no se puede graficar */
   const addExpr = (expr: string): string | undefined => {
     if (!plot) return;
     const test = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver, mode });
-    if (test.errors.size) return test.errors.get(0);
+    if (test.errors.size) {
+      // un parámetro de dispositivo que no se guardó (#202): queda la traza y se guarda al simular de nuevo
+      if (!deviceRefs(expr).length) return test.errors.get(0);
+      const len = scaleOf(plot)?.real.length ?? 0;
+      const missingOk = (p: SimPlot): Resolver => {
+        const r = resolver(p);
+        return (fn, args, run) => r(fn, args, run) ?? (fn === '@' ? { re: new Float64Array(len) } : null);
+      };
+      const again = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver: missingOk, mode });
+      if (again.errors.size) return again.errors.get(0);
+      setMessage(t('{expr} wasn\'t saved in this simulation: it will be saved when you simulate again', { expr }));
+    }
     const next = addTraceTo(panes, activePane, expr);
     if (next !== panes) editPanes(next);
   };
@@ -2074,7 +2091,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = project.name;
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
-    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName());
+    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName(), allTraces());
     download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
   };
   const exportImage = (f: 'svg' | 'png') => {
@@ -3168,7 +3185,7 @@ ${ltNetlistText(sim.built.lt)}
               )}
               {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
               {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
-              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} onAdd={addExpr} />}
+              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={traceHints} onAdd={addExpr} />}
               {panel === 'plot' && (
                 <>
                   {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}

@@ -10,6 +10,8 @@ import { controlPlots, type Pane } from '../waveform/view.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
 import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
+import { hierDevice } from './context.ts';
+import { deviceRefs } from './deviceParams.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -40,7 +42,11 @@ export interface BuiltSimulation {
   missingSymbols: string[];
 }
 
-export async function buildSimulation(doc: AscDoc, lib: Library, title: string): Promise<BuiltSimulation> {
+/**
+ * `traces`: expresiones de las trazas que se van a mirar; los parámetros de dispositivo que usen
+ * (@Q1[gm], #202) se piden con ".save" porque ngspice no los guarda solo.
+ */
+export async function buildSimulation(doc: AscDoc, lib: Library, title: string, traces: string[] = []): Promise<BuiltSimulation> {
   const lt = ltNetlist(doc, lib);
   const ng = toNgspice(lt, title, {
     resolve: (p) => lib.resolveModelFile(p),
@@ -54,7 +60,8 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   );
   const prep = prepareSimulation(ng, (rel) => texts[rel]);
   // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba
-  const netlist = prep.netlist.replace(/\n\.end\s*$/i, '\n.options savecurrents\n.end');
+  const saves = saveLine(prep.netlist, deviceSaves(traces, lt, ng));
+  const netlist = prep.netlist.replace(/\n\.end\s*$/i, `\n${saves}.options savecurrents\n.end`);
   const control = lt.texts.find((tt) => isControlBlock(tt.text));
   const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
   // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
@@ -67,6 +74,27 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string):
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
   return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols };
+}
+
+/** Vectores de ngspice "@dev[param]" de los parámetros de dispositivo que usan unas trazas (#202) */
+export function deviceSaves(traces: string[], lt: LtNetlist, ng: NgspiceNetlist): string[] {
+  const out = new Set<string>();
+  for (const r of traces.flatMap(deviceRefs)) {
+    const el = lt.elements.find((e) => e.name.toLowerCase() === r.device.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === r.device.toLowerCase());
+    const dev = el ? ng.names.get(el.name)?.toLowerCase() : r.device.includes('.') && !/^[a-z]\./i.test(r.device) ? hierDevice(r.device) : r.device.toLowerCase();
+    if (dev) out.add(`@${dev}[${r.param.toLowerCase()}]`);
+  }
+  return [...out];
+}
+
+/**
+ * Línea ".save" que se agrega a la netlist: los parámetros pedidos y "all", para que un .save del
+ * usuario (o los parámetros) no dejen afuera las tensiones y corrientes de siempre (#202). "" si
+ * no hace falta.
+ */
+export function saveLine(netlist: string, vectors: string[]): string {
+  const userSave = /^\s*\.save\b(?!\s+none\b)/im.test(netlist);
+  return userSave || vectors.length ? `.save all${vectors.map((v) => ` ${v}`).join('')}\n` : '';
 }
 
 /** Vector de ngspice con la tensión de una red */

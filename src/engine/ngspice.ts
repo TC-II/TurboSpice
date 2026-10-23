@@ -208,6 +208,9 @@ export class Ngspice {
     if (this.hasCircuit) this.command('remcirc');
     this.hasCircuit = true;
 
+    // semilla fija: los Monte Carlo (mc, gauss, unif…) dan lo mismo en cada simulación, como al
+    // arrancar ngspice (y como LTspice); si no, la secuencia sigue de la simulación anterior
+    this.command('setseed 1');
     this.writeFiles({ 'circuit.cir': netlist });
     this.command(`source ${WORK_DIR}/circuit.cir`);
     const control = /^\s*\.control\b/im.test(netlist);

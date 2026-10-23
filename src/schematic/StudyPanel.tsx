@@ -5,6 +5,7 @@ import { compileBlocks, studyToBlocks, type WorkspaceJson } from '../sim/studyBl
 import { parseStep } from '../netlist/step.ts';
 import type { MeasAnalysis } from '../sim/meas.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
+import { appendBlocks, applyTemplate, defaultOptions, STUDY_TEMPLATES, templateBlocks, templateById, type TemplateOptions } from '../sim/studyTemplates.ts';
 import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, validateAnalysis, type AnalysisKind } from '../sim/analyses.ts';
 import { traceColor, type Pane, type PlotView, type Trace } from '../waveform/view.ts';
 import {
@@ -539,6 +540,77 @@ function PlotCard({ view, set, remove, picker, preferred }: {
   );
 }
 
+/** Botón "Plantillas ▾" y el asistente corto de la plantilla elegida (#178) */
+function TemplatePicker({ info, blocks, onInsert }: { info: StudyInfo; blocks: boolean; onInsert(id: string, o: TemplateOptions): void }) {
+  const [id, setId] = useState('');
+  const [o, setO] = useState<TemplateOptions>(() => defaultOptions(info));
+  const tpl = templateById(id);
+  const field = (k: keyof TemplateOptions, label: string, list?: string, placeholder?: string) => (
+    <Row label={label}>
+      <input value={o[k]} list={list} placeholder={placeholder} spellCheck={false} aria-label={label} onChange={(e) => setO({ ...o, [k]: e.target.value.trim() })} />
+    </Row>
+  );
+  return (
+    <div className="study-templates">
+      <select
+        value={id}
+        aria-label={t('Templates')}
+        onChange={(e) => {
+          setId(e.target.value);
+          setO(defaultOptions(info));
+        }}
+      >
+        <option value="">{t('Templates ▾')}</option>
+        {STUDY_TEMPLATES.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.label}
+            {x.blocksOnly && !blocks ? t(' (blocks)') : ''}
+          </option>
+        ))}
+      </select>
+      {tpl && (
+        <fieldset className="study-card study-template">
+          <legend>{tpl.label}</legend>
+          <p className="hint">{tpl.help}</p>
+          {tpl.fields.includes('target') && field('target', t('What to vary'), 'study-components', 'R1')}
+          {tpl.fields.includes('target2') && field('target2', t('Second one to vary'), 'study-components', 'C1')}
+          {tpl.fields.includes('source') && field('source', t('Source'), 'study-sources', 'V1')}
+          {tpl.fields.includes('signal') && field('signal', t('Signal to measure'), 'sim-nets-v', 'V(out)')}
+          {tpl.fields.includes('analysis') && (
+            <Row label={t('Analysis')}>
+              <select value={o.analysis} aria-label={t('Template analysis')} onChange={(e) => setO({ ...o, analysis: e.target.value as TemplateOptions['analysis'] })}>
+                <option value="tran">{t('Transient')}</option>
+                <option value="ac">{ANALYSES.find((a) => a.kind === 'ac')!.label}</option>
+                <option value="dc">{t('DC sweep')}</option>
+              </select>
+            </Row>
+          )}
+          {tpl.fields.includes('spec') && (
+            <div className="study-triple">
+              {field('specMin', t('Specification: minimum'))}
+              {field('specMax', t('Specification: maximum'))}
+            </div>
+          )}
+          {tpl.fields.includes('goal') && field('goal', t('Target value of the measurement'), undefined, o.analysis === 'ac' ? '1k' : '1')}
+          {tpl.fields.includes('freq') && field('freq', t('Fundamental frequency'), undefined, '1k')}
+          <div className="buttons">
+            <button onClick={() => setId('')}>{t('Cancel')}</button>
+            <button
+              className="primary"
+              onClick={() => {
+                onInsert(id, o);
+                setId('');
+              }}
+            >
+              {t('Insert')}
+            </button>
+          </div>
+        </fieldset>
+      )}
+    </div>
+  );
+}
+
 export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode, onClose }: {
   initial: Study;
   info: StudyInfo;
@@ -553,6 +625,8 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
   const [tab, setTab] = useState<'cards' | 'blocks' | 'code'>(initial.blocks ? 'blocks' : 'cards');
   const [blocks, setBlocks] = useState<WorkspaceJson | null>((initial.blocks as WorkspaceJson | undefined) ?? null);
   const blocksTouched = useRef(false);
+  /** se incrementa para recargar el editor de bloques con un programa nuevo (plantillas) */
+  const [blocksKey, setBlocksKey] = useState(0);
   const cardsTouched = useRef(false);
   const set = (x: Study) => {
     cardsTouched.current = true;
@@ -606,6 +680,31 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       setPlotOpen(true);
       set({ ...st, plot: st.plot ?? {} });
     },
+  };
+  /** Inserta una plantilla: como tarjetas, o como bloques si se está en esa pestaña (o si sólo existe así) */
+  const insertTemplate = (id: string, o: TemplateOptions) => {
+    const tpl = templateById(id);
+    if (!tpl) return;
+    const inBlocks = tab === 'blocks' || !!tpl.blocksOnly;
+    // en bloques, la base son las tarjetas que salen del programa actual (si es "barrer → simular → medir")
+    const base = tab === 'blocks' && compiled?.ltspice ? { ...st, sweeps: compiled.study.sweeps, measures: compiled.study.measures, plot: compiled.study.plot ?? st.plot } : st;
+    const next = tpl.build ? applyTemplate(base, id, info, o) : base;
+    const ws = inBlocks ? templateBlocks(base, id, info, o) : null;
+    if (ws) {
+      // las plantillas de bloques se agregan al programa; las de tarjetas lo reemplazan por el equivalente
+      const program = tpl.blocksOnly ? appendBlocks(tab === 'blocks' ? blocks : null, ws) : ws;
+      setStudy({ ...st, analyses: next.analyses, plot: next.plot });
+      setBlocks(program);
+      blocksTouched.current = true;
+      cardsTouched.current = false;
+      setBlocksKey((k) => k + 1);
+      setTab('blocks');
+      return;
+    }
+    // lo que los bloques no expresan (tolerancias, pasos personalizados): tarjetas
+    set(next);
+    if (next.plot) setPlotOpen(true);
+    setTab('cards');
   };
   const problems = [
     ...analyses.flatMap((a, i) => {
@@ -761,6 +860,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
             <button onClick={add.custom} disabled={!!st.custom}>{t('+ Custom step')}</button>
             <button onClick={add.plot} disabled={plotOpen}>{t('+ Plot')}</button>
           </div>
+          <TemplatePicker info={info} blocks={false} onInsert={insertTemplate} />
           {!analyses.length && !st.sweeps.length && !st.tolerance && !st.measures.length && !st.custom && !plotOpen && (
             <p className="empty pad">
               {t('Add simulations (.tran, .ac…), what to plot, a sweep (vary a component, a source, the temperature…), tolerances (Monte Carlo or worst case) or measurements (rise time, f at −3 dB…). They\'re saved as .step and .meas, so the .asc still simulates the same in LTspice.')}
@@ -770,8 +870,10 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       )}
       {tab === 'blocks' && blocks && (
         <>
+          <TemplatePicker info={info} blocks onInsert={insertTemplate} />
           <Suspense fallback={<p className="empty pad">{t('Loading the block editor…')}</p>}>
             <StudyBlocks
+              key={blocksKey}
               initial={blocks}
               info={info}
               onChange={(ws) => {

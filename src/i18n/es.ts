@@ -1457,4 +1457,9 @@ export const es: Record<string, string> = {
   "Export {name} as .sub": "Exportar {name} como .sub",
   "{name} has no ports: there is nothing to export as .sub": "{name} no tiene puertos: no hay nada para exportar como .sub",
   "Open {name} (drag it onto the schematic to place it)": "Abrir {name} (arrastralo al esquemático para colocarlo)",
+  "Go to {inst}": "Ir a {inst}",
+  "pin {pins} not connected": "el pin {pins} no está conectado",
+  "pins {pins} not connected": "los pines {pins} no están conectados",
+  "a wire ends on the symbol without a pin (was a port removed?)": "un cable termina sobre el símbolo sin un pin (¿se quitó un puerto?)",
+  "The ports of {name} changed: {insts} must be rewired (marked in the project panel)": "Cambiaron los puertos de {name}: hay que recablear {insts} (marcadas en el panel del proyecto)",
 };

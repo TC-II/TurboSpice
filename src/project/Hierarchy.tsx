@@ -19,6 +19,8 @@ export interface TreeSub {
   children: string[];
   outdated: boolean;
   text: boolean;
+  /** instancias desactualizadas (#199): pines sin conectar o cables sueltos sobre el símbolo */
+  stale?: { label: string; inst: string; detail: string; go(): void }[];
 }
 
 /** Panel lateral: testbenches (variantes) y subcircuitos */
@@ -230,6 +232,15 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           </button>
         </span>
       </div>
+      {s.stale?.map((x, i) => (
+        <div key={i} className="tree-warn" style={{ paddingLeft: 24 + depth * 14 }}>
+          ⚠{' '}
+          <button className="link" onClick={x.go} title={t('Go to {inst}', { inst: x.inst })}>
+            {x.inst}
+          </button>{' '}
+          <span className="tree-meta">({x.label})</span>: {x.detail}
+        </div>
+      ))}
       {s.outdated && (
         <div className="tree-warn" style={{ paddingLeft: 24 + depth * 14 }}>
           {t('The ports changed.')} <button className="link" onClick={() => onUpdateSymbol(s.name)}>{t('Update symbol')}</button>

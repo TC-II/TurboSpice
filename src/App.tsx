@@ -65,6 +65,7 @@ import {
   type ValueChange,
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
+import { staleInstances } from './project/staleInstances.ts';
 import { exportAllZip, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
@@ -1765,6 +1766,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const next = updateSymbol(p, curSub);
     projectRef.current = next;
     setProjectState(next);
+    // las instancias ya colocadas no se recablean solas: avisar cuáles quedaron mal (#199)
+    lib.setProjectFiles(next.files);
+    const stale = staleInstances(next, curSub, lib, (_, nm) => nm ?? '');
+    if (stale.length) setMessage(t('The ports of {name} changed: {insts} must be rewired (marked in the project panel)', { name: curSub, insts: stale.map((u) => u.inst).join(', ') }));
   }, [curSub, subPortsKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const editSymbol = (text: string) => {
     if (!curSub) return;
@@ -1789,9 +1794,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const treeSubs = useMemo((): TreeSub[] => {
     if (!treeOpen) return [];
     const p = curSub ? storeSubckt(project, curSub, ascText(liveDoc)) : storeActive(project, ascText(liveDoc));
+    const label = (asc: string, nm?: string) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'));
     return subckts(p).map((f) => {
       const name = subName(f.name);
+      const stale = staleInstances(p, name, lib, label).map((u) => ({
+        label: u.where.label,
+        inst: u.inst,
+        go: () => goUsage(u, name),
+        detail: [
+          ...(u.unconnected.length ? [u.unconnected.length === 1 ? t('pin {pins} not connected', { pins: u.unconnected[0] }) : t('pins {pins} not connected', { pins: u.unconnected.join(', ') })] : []),
+          ...(u.dangling ? [t('a wire ends on the symbol without a pin (was a port removed?)')] : []),
+        ].join('; '),
+      }));
       return {
+        ...(stale.length ? { stale } : {}),
         name,
         ports: subcktPorts(parseAsc(f.text)).length,
         uses: usages(p, name, (asc, nm) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'))).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
@@ -1801,7 +1817,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treeOpen, project, curSub, curSub && liveDoc]);
+  }, [treeOpen, project, curSub, liveDoc, libVersion]);
   const toggleTree = () => {
     lsSet('turbospice.tree', treeOpen ? '0' : '1');
     setTreePref(!treeOpen);

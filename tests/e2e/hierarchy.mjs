@@ -141,6 +141,12 @@ await page.waitForTimeout(600);
 check((await crumbs()) === '' || !/DIV/.test(await crumbs()), 'Alt+↑ vuelve al testbench');
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
 
+// --- instancias desactualizadas o sin cablear (#199): X9 quedó con su pin suelto ---
+{
+  const w = await page.locator('.project-tree .tree-warn', { hasText: 'X9' }).allTextContents();
+  check(w.length === 1 && /el pin in no está conectado/.test(w[0]) && !(await page.locator('.project-tree .tree-warn', { hasText: 'U1' }).count()), `el panel marca la instancia sin cablear (${w.join(' | ')})`);
+}
+
 // --- arrastrar el subcircuito desde el panel al esquemático (#199) ---
 {
   const n0 = await page.locator('svg.editor .sym').count();

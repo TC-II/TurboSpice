@@ -205,6 +205,83 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check(yt.length >= 2 && new Set(yt).size === yt.length, `con zoom las marcas del eje Y son todas distintas (${yt.join(' ')})`);
   await page.getByRole('button', { name: /Zoom|Ver todo|Fit/i }).first().click().catch(() => {});
 }
+// #200 y #201: recuadro en X e Y, zoom sólo en X o sólo en Y, y el Y no se reajusta con el zoom en X
+{
+  const plot = page.locator('.pane-chart .uplot').first();
+  const over = plot.locator('.u-over');
+  await page.getByRole('button', { name: 'Ajustar', exact: true }).last().click();
+  await page.waitForTimeout(200);
+  const rng = async () => {
+    const [x, y] = await Promise.all([plot.getAttribute('data-range-x'), plot.getAttribute('data-range-y')]);
+    const [x0, x1] = x.split('|').map(Number);
+    const [y0, y1] = y.split('|').map(Number);
+    return { x: [x0, x1], y: [y0, y1], key: `${x}#${y}` };
+  };
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  const drag = async (fx0, fy0, fx1, fy1) => {
+    const b = await over.boundingBox();
+    await page.mouse.move(b.x + b.width * fx0, b.y + b.height * fy0);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width * fx1, b.y + b.height * fy1, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+  };
+  const full = await rng();
+  // recuadro: el rango de X e Y pasa a ser el recuadro (ocupa todo el gráfico)
+  const b = await over.boundingBox();
+  const at = async (fx, fy) => {
+    // valor bajo un punto del gráfico, por la escala lineal de los rangos visibles
+    const r = await rng();
+    return [r.x[0] + (r.x[1] - r.x[0]) * fx, r.y[1] - (r.y[1] - r.y[0]) * fy];
+  };
+  const [bx0, by0] = await at(0.3, 0.2);
+  const [bx1, by1] = await at(0.6, 0.7);
+  await drag(0.3, 0.2, 0.6, 0.7);
+  const box = await rng();
+  const near = (a, b, ref) => Math.abs(a - b) < Math.abs(ref) * 0.02 + 1e-12;
+  check(near(box.x[0], bx0, full.x[1] - full.x[0]) && near(box.x[1], bx1, full.x[1] - full.x[0]), `arrastrar un recuadro: X pasa al recuadro (${full.x} → ${box.x})`);
+  check(near(box.y[0], by1, full.y[1] - full.y[0]) && near(box.y[1], by0, full.y[1] - full.y[0]), `arrastrar un recuadro: Y pasa al recuadro (${full.y} → ${box.y})`);
+  // rueda: sólo X; el Y fijado por el recuadro queda
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(300);
+  const w = await rng();
+  check(!same(w.x, box.x) && same(w.y, box.y), `la rueda cambia sólo X y el Y fijado no se reajusta (${box.y} = ${w.y})`);
+  // vuelta a ver todo: doble click; luego zoom en X sin recuadro previo: el Y tampoco se reajusta
+  await page.mouse.dblclick(b.x + b.width / 2, b.y + b.height / 2);
+  await page.waitForTimeout(300);
+  const back = await rng();
+  check(back.key === full.key, 'doble click: vuelve a ver todo (X e Y)');
+  await drag(0.4, 0.4, 0.5, 0.4 + 5 / b.height);
+  const hx = await rng();
+  check(!same(hx.x, full.x) && same(hx.y, full.y), `arrastre casi horizontal: zoom sólo en X, el Y sigue (${full.y} = ${hx.y})`);
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, -200);
+  await page.waitForTimeout(300);
+  check(same((await rng()).y, full.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(300);
+  check((await rng()).key === full.key, 'Espacio: vuelve a ver todo');
+  await drag(0.5, 0.2, 0.5 + 5 / b.width, 0.7);
+  const vy = await rng();
+  check(same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: zoom sólo en Y, el X sigue (${full.y} → ${vy.y})`);
+  await page.keyboard.press('Shift+Z');
+  await page.waitForTimeout(300);
+  check((await rng()).key === full.key, 'Shift+Z deshace el zoom en Y');
+  await page.keyboard.down('Shift');
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.wheel(0, -300);
+  await page.keyboard.up('Shift');
+  await page.waitForTimeout(300);
+  const sw = await rng();
+  check(same(sw.x, full.x) && !same(sw.y, full.y), `Shift+rueda: zoom sólo en Y (${full.y} → ${sw.y})`);
+  await page.mouse.move(b.x - 25, b.y + b.height / 2);
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(300);
+  check(same((await rng()).x, full.x) && !same((await rng()).y, sw.y), 'rueda sobre el eje Y: zoom sólo en Y');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(200);
+}
 await page.getByRole('button', { name: 'Anotar OP' }).click();
 const ann = await page.locator('.op-annotation').allTextContents();
 check(ann.includes('1.415mA') && ann.includes('12V'), `anota el punto de operación (${ann.length} valores)`);

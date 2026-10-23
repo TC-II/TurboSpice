@@ -805,7 +805,7 @@ export const es: Record<string, string> = {
   'Search the library': 'Buscar en la librería',
   'Second source (optional, makes a family of curves)': 'Segunda fuente (opcional, genera una familia de curvas)',
   'See all poles and zeros (double-click on the map)': 'Ver todos los polos y ceros (doble click en el mapa)',
-  'See everything (Space or double-click on the plot; Z: zoom to a box, Shift+Z: previous zoom)': 'Ver todo (Espacio o doble click en el gráfico; Z: zoom a un recuadro, Shift+Z: zoom anterior)',
+  'See everything (Space or double-click on the plot). Drag a box to zoom (a nearly horizontal or vertical drag zooms only time or only amplitude); wheel: time, Shift+wheel or wheel over the Y axis: amplitude; Ctrl+Y: fit Y to the visible part; Shift+Z: previous zoom': 'Ver todo (Espacio o doble click en el gráfico). Arrastrá un recuadro para hacer zoom (un arrastre casi horizontal o vertical acerca sólo el tiempo o sólo la amplitud); rueda: tiempo, Shift+rueda o rueda sobre el eje Y: amplitud; Ctrl+Y: ajusta Y a lo visible; Shift+Z: zoom anterior',
   'Select': 'Seleccionar',
   'Select all': 'Seleccionar todo',
   'Select and move': 'Seleccionar y mover',

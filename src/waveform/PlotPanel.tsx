@@ -8,6 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
+import { boxAxes, extent, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
@@ -75,6 +76,8 @@ export interface PzMark {
 type Range = [number, number];
 /** distancia (px) a la línea de un cursor para tomarlo y arrastrarlo */
 const GRAB = 6;
+/** px que debe moverse un arrastre en el eje menos movido para contar como recuadro en X e Y */
+const DRAG_UNI = 20;
 
 const MAX_ROWS = 16;
 
@@ -189,8 +192,16 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           }
           return;
         }
-        case 'autoY':
-          return zoomTo(xRange, {});
+        case 'autoY': {
+          // Y a lo que se ve ahora (con el zoom en X), fijo hasta el próximo cambio
+          if (!xRange) return zoomTo(null, {});
+          const ys: Record<number, Range> = {};
+          charts.current.forEach((u, k) => {
+            const e = extent(data[k].x, data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => c.y), xRange[0], xRange[1]);
+            if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
+          });
+          return zoomTo(xRange, ys);
+        }
         case 'grid':
           return setShowGrid((v) => !v);
         case 'addTrace':
@@ -251,7 +262,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title={t('Maximum, minimum, peak-to-peak, average, RMS and frequency in the visible range')}>
         {t('Stats')}
       </button>
-      <button onClick={() => zoomTo(null, {})} title={t('See everything (Space or double-click on the plot; Z: zoom to a box, Shift+Z: previous zoom)')}>
+      <button onClick={() => zoomTo(null, {})} title={t('See everything (Space or double-click on the plot). Drag a box to zoom (a nearly horizontal or vertical drag zooms only time or only amplitude); wheel: time, Shift+wheel or wheel over the Y axis: amplitude; Ctrl+Y: fit Y to the visible part; Shift+Z: previous zoom')}>
         {t('Fit')}
       </button>
     </>
@@ -309,14 +320,18 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onDropTrace={(from, ti) => moveTrace(from, ti, i)}
             xRange={range}
             yRange={yRanges[i] ?? null}
-            onZoom={(r) => zoomTo(r)}
+            onZoom={(r) => (r ? zoomTo(r) : zoomTo(null, {}))}
             onWheelZoom={(r) => {
               zoomNow.current = { ...zoomNow.current, x: r };
               setXRange(r);
             }}
+            onWheelY={(r) => {
+              zoomNow.current = { ...zoomNow.current, y: { ...zoomNow.current.y, [i]: r } };
+              setYRanges(zoomNow.current.y);
+            }}
             onBoxZoom={(x, y) => {
               setZoomMode(false);
-              zoomTo(x, { ...zoomNow.current.y, [i]: y });
+              zoomTo(x ?? zoomNow.current.x, y ? { ...zoomNow.current.y, [i]: y } : zoomNow.current.y);
             }}
             zoomMode={zoomMode}
             removing={removing}
@@ -373,11 +388,14 @@ function PaneView(props: {
   onChange(f: (p: Pane) => Pane): void;
   onDropTrace(fromPane: number, trace: number): void;
   xRange: Range | null;
-  /** eje Y fijo (zoom a recuadro); null = autoescala */
+  /** eje Y fijo (zoom a recuadro); null = todo el rango de los datos (no se reajusta con el zoom en X, #200) */
   yRange: Range | null;
   onZoom(r: Range | null): void;
   onWheelZoom(r: Range | null): void;
-  onBoxZoom(x: Range, y: Range): void;
+  /** Y de este panel por la rueda sobre el eje (o con Shift) */
+  onWheelY(r: Range): void;
+  /** recuadro arrastrado: null en el eje que no se acerca (arrastre casi horizontal o vertical) */
+  onBoxZoom(x: Range | null, y: Range | null): void;
   zoomMode: boolean;
   removing: boolean;
   showGrid: boolean;
@@ -407,6 +425,8 @@ function PaneView(props: {
   const yRef = useRef(yRange);
   yRef.current = yRange;
   const programmatic = useRef(false);
+  /** el arrastre en curso empezó en este gráfico */
+  const pressed = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
@@ -439,6 +459,13 @@ function PaneView(props: {
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
+    // Y sin zoom fijado: el rango de todos los datos (no el de lo visible), así el zoom en X no
+    // cambia la escala de amplitud (#200); Ctrl+Y la ajusta a lo visible
+    const fullY = (scale: string) => extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y));
+    const whole = (scale: string): uPlot.Range.Function => (u, min, max) => {
+      const e = fullY(scale);
+      return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
+    };
     let raf = 0;
     const opts: uPlot.Options = {
       width: Math.max(100, el.clientWidth),
@@ -446,9 +473,9 @@ function PaneView(props: {
       legend: { show: false },
       scales: {
         x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : {}) },
-        y: { range: (u, min, max) => yRef.current ?? safeRange(u, min, max, 'y') },
-        i: { range: safeRange },
-        ph: { range: safeRange },
+        y: { range: (u, min, max) => yRef.current ?? whole('y')(u, min, max, 'y') },
+        i: { range: whole('i') },
+        ph: { range: whole('ph') },
       },
       axes: [
         {
@@ -478,7 +505,10 @@ function PaneView(props: {
         sync: { key: 'turbospice' },
         // con los cursores activos no hay zoom por arrastre; Z: recuadro en X e Y (lo aplica setSelect).
         // Se cambia en vivo, sin recrear el gráfico.
-        drag: live.current.zoomMode ? { x: true, y: true, setScale: false } : { x: !live.current.cursorMode, y: false, setScale: !live.current.cursorMode },
+        // Arrastrar = recuadro en X e Y (lo aplica setSelect); casi horizontal o casi vertical (menos de
+        // `uni` px en el otro eje) = zoom sólo en X o sólo en Y. Con los cursores activos no hay zoom
+        // por arrastre (Z lo fuerza). Se cambia en vivo, sin recrear el gráfico.
+        drag: live.current.zoomMode ? { x: true, y: true, setScale: false } : { x: !live.current.cursorMode, y: !live.current.cursorMode, uni: DRAG_UNI, setScale: false },
         points: { size: 6 },
         bind: {
           // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
@@ -491,13 +521,18 @@ function PaneView(props: {
       hooks: {
         setSelect: [
           (u) => {
-            if (!live.current.zoomMode) return;
+            if (live.current.cursorMode && !live.current.zoomMode) return;
+            // (los demás paneles reciben el mismo arrastre por la sincronización: lo aplica sólo el que lo empezó)
+            if (!pressed.current) return;
             const s = u.select;
-            if (s.width < 4 || s.height < 4) return;
+            const ax = live.current.zoomMode ? { x: s.width >= 4, y: s.height >= 4 } : boxAxes(s, u.over.clientWidth, u.over.clientHeight);
+            if (!ax.x && !ax.y) return;
+            // (con el zoom forzado por Z hacen falta los dos ejes, como siempre)
+            if (live.current.zoomMode && !(ax.x && ax.y)) return;
             const x: Range = [u.posToVal(s.left, 'x'), u.posToVal(s.left + s.width, 'x')];
             const y: Range = [u.posToVal(s.top + s.height, 'y'), u.posToVal(s.top, 'y')];
             u.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false);
-            live.current.onBoxZoom(x, y);
+            live.current.onBoxZoom(ax.x ? x : null, ax.y ? y : null);
           },
         ],
         setCursor: [
@@ -522,6 +557,9 @@ function PaneView(props: {
         ],
         draw: [
           (u) => {
+            // (rangos visibles de X e Y, para leerlos en los e2e: el canvas no se puede leer)
+            u.root.dataset.rangeX = `${u.scales.x.min}|${u.scales.x.max}`;
+            u.root.dataset.rangeY = `${u.scales.y?.min}|${u.scales.y?.max}`;
             const c = cursorsRef.current;
             const ctx = u.ctx;
             // f₀ de polos (×) y ceros (○): líneas verticales punteadas
@@ -659,17 +697,24 @@ function PaneView(props: {
       if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
     };
     const context = (e: MouseEvent) => live.current.cursorMode && e.preventDefault();
-    // rueda: zoom en X alrededor del cursor
+    // rueda: zoom en X alrededor del cursor; sobre el eje Y (o con Shift), zoom en Y de este panel
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      const r = over.getBoundingClientRect();
+      const k = Math.exp(e.deltaY * 0.0015);
+      const onYAxis = e.clientX < r.left;
+      if (e.clientX > r.right && e.clientY <= r.bottom) return; // eje derecho: sin zoom
+      if (onYAxis || e.shiftKey) {
+        const { min, max } = u.scales.y;
+        if (min == null || max == null) return;
+        const [lo, hi] = zoomAbout(min, max, u.posToVal(Math.min(Math.max(e.clientY - r.top, 0), r.height), 'y'), k);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
+        return;
+      }
       const { min, max } = u.scales.x;
       if (min == null || max == null) return;
-      const k = Math.exp(e.deltaY * 0.0015);
-      const at = u.posToVal(e.offsetX, 'x');
-      const [a, b, c] = data.log ? [Math.log10(min), Math.log10(max), Math.log10(at)] : [min, max, at];
-      let lo = c - (c - a) * k;
-      let hi = c + (b - c) * k;
-      if (data.log) [lo, hi] = [10 ** lo, 10 ** hi];
+      const at = u.posToVal(Math.min(Math.max(e.clientX - r.left, 0), r.width), 'x');
+      const [lo, hi] = zoomAbout(min, max, at, k, data.log);
       const x0 = data.x[0];
       const x1 = data.x[data.x.length - 1];
       live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
@@ -677,9 +722,16 @@ function PaneView(props: {
     // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece
     // (uPlot deja el recuadro vacío al terminar: la sombra va sólo durante el arrastre)
     const selStart = (e: PointerEvent) => {
-      if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode)) el.classList.add('selecting');
+      if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode)) {
+        el.classList.add('selecting');
+        pressed.current = true;
+      }
     };
-    const selEnd = () => el.classList.remove('selecting');
+    const selEnd = () => {
+      el.classList.remove('selecting');
+      // (uPlot cierra el arrastre en el mouseup, que llega después del pointerup)
+      setTimeout(() => (pressed.current = false), 0);
+    };
     root.addEventListener('pointerdown', selStart);
     window.addEventListener('pointerup', selEnd);
     window.addEventListener('pointercancel', selEnd);
@@ -688,7 +740,7 @@ function PaneView(props: {
     root.addEventListener('pointerup', up);
     root.addEventListener('pointercancel', up);
     root.addEventListener('contextmenu', context);
-    over.addEventListener('wheel', wheel, { passive: false });
+    root.addEventListener('wheel', wheel, { passive: false });
     const ro = new ResizeObserver(() => u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) }));
     ro.observe(el);
     const reg = live.current.register;
@@ -703,7 +755,7 @@ function PaneView(props: {
       root.removeEventListener('pointerup', up);
       root.removeEventListener('pointercancel', up);
       root.removeEventListener('contextmenu', context);
-      over.removeEventListener('wheel', wheel);
+      root.removeEventListener('wheel', wheel);
       reg(null);
       chart.current = null;
       u.destroy();
@@ -718,7 +770,7 @@ function PaneView(props: {
     if (!u) return;
     if (zoomMode) return;
     u.cursor.drag!.x = !cursorMode;
-    u.cursor.drag!.setScale = !cursorMode;
+    u.cursor.drag!.y = !cursorMode;
     if (!cursorMode) u.over.style.cursor = '';
     u.redraw(false);
   }, [cursorMode, zoomMode]);

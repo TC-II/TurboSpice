@@ -55,6 +55,11 @@ export interface NgspiceOptions {
   /** porcentaje 0-100 y texto de estado, p.ej. "tran: 42.1%" */
   onStatus?: (status: string, percent: number) => void;
   locateFile?: (path: string) => string;
+  /**
+   * Instanciar el wasm a mano (hook de Emscripten): el Worker lo saca de Cache Storage (#191).
+   * Llama a done(instance, module) y devuelve {}.
+   */
+  instantiateWasm?: (imports: WebAssembly.Imports, done: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void) => object;
 }
 
 // Subconjunto del módulo de Emscripten que usamos
@@ -116,6 +121,7 @@ export class Ngspice {
   ): Promise<Ngspice> {
     const m = (await factory({
       locateFile: opts.locateFile,
+      ...(opts.instantiateWasm ? { instantiateWasm: opts.instantiateWasm } : {}),
       print: () => {},
       printErr: () => {},
     })) as EmModule;

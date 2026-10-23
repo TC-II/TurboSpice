@@ -59,8 +59,22 @@ const boxOf = (pts: Point[]): Box => ({
   y2: Math.max(...pts.map((p) => p.y)),
 });
 
+// Cachés de geometría por objeto (#188): los AscDoc, sus elementos y los SymbolDef de la librería
+// no se modifican (cada edición arma objetos nuevos), y hitTest/labelAt corren en cada
+// movimiento del mouse sobre todo el esquemático
+const localBoxes = new WeakMap<SymbolDef, { vb?: string; box: Box }>();
+const symbolBoxes = new WeakMap<SymbolInst, { def: SymbolDef; vb?: string; box: Box }>();
+
 /** Caja local (sin orientar) del cuerpo de un símbolo: gráficos del .asy, pines y skin */
 export function localBox(def: SymbolDef, skinViewBox?: string): Box {
+  const c = localBoxes.get(def);
+  if (c && c.vb === skinViewBox) return c.box;
+  const box = computeLocalBox(def, skinViewBox);
+  localBoxes.set(def, { vb: skinViewBox, box });
+  return box;
+}
+
+function computeLocalBox(def: SymbolDef, skinViewBox?: string): Box {
   const pts: Point[] = [];
   for (const s of def.shapes) {
     const c = s.coords;
@@ -77,13 +91,18 @@ export function localBox(def: SymbolDef, skinViewBox?: string): Box {
 /** Caja del símbolo ubicado en el esquemático */
 export function symbolBox(inst: SymbolInst, def: SymbolDef | undefined, lib: Library): Box {
   if (!def) return { x1: inst.x - 16, y1: inst.y - 16, x2: inst.x + 16, y2: inst.y + 16 };
-  const b = localBox(def, lib.skin(inst.type)?.viewBox);
-  return boxOf([
+  const vb = lib.skin(inst.type)?.viewBox;
+  const c = symbolBoxes.get(inst);
+  if (c && c.def === def && c.vb === vb) return c.box;
+  const b = localBox(def, vb);
+  const box = boxOf([
     toWorld(inst, b.x1, b.y1),
     toWorld(inst, b.x2, b.y1),
     toWorld(inst, b.x1, b.y2),
     toWorld(inst, b.x2, b.y2),
   ]);
+  symbolBoxes.set(inst, { def, vb, box });
+  return box;
 }
 
 /**
@@ -194,13 +213,27 @@ export function junctionPoints(doc: AscDoc, lib: Library): Point[] {
   return out;
 }
 
+const fixedCache = new WeakMap<AscDoc, { lib: Library; rev: number; set: Set<string> }>();
+
+/**
+ * Pines y etiquetas ("x,y"): los extremos de cable ahí no son codos. Una vez por documento (los
+ * AscDoc no se modifican): con todo seleccionado se consulta por cada extremo de cable (#183).
+ */
+export function fixedPoints(doc: AscDoc, lib: Library): Set<string> {
+  const c = fixedCache.get(doc);
+  if (c && c.lib === lib && c.rev === lib.rev) return c.set;
+  const set = new Set(doc.flags.map((f) => `${f.x},${f.y}`));
+  for (const s of doc.symbols) for (const q of pinPoints(s, lib.symbol(s.type))) set.add(`${q.x},${q.y}`);
+  fixedCache.set(doc, { lib, rev: lib.rev, set });
+  return set;
+}
+
 /**
  * Codo de cable bajo el cursor: extremo de cable a menos de `tol` que no está sobre un pin
  * ni una etiqueta (esos se mueven arrastrando el tramo).
  */
 export function wireVertexAt(doc: AscDoc, p: Point, lib: Library, tol: number): Point | null {
-  const fixed = new Set(doc.flags.map((f) => `${f.x},${f.y}`));
-  for (const s of doc.symbols) for (const q of pinPoints(s, lib.symbol(s.type))) fixed.add(`${q.x},${q.y}`);
+  const fixed = fixedPoints(doc, lib);
   let best: Point | null = null;
   let bd = tol;
   for (const w of doc.wires) {
@@ -275,21 +308,33 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, sho
   return out;
 }
 
-/** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
-export function flagDirection(doc: AscDoc, f: Point): FlagDir {
-  const dirs = new Set<string>();
-  for (const w of doc.wires) {
+const wireEndIndex = new WeakMap<Wire[], Map<string, Set<string>>>();
+
+/** Extremo de cable ("x,y") → hacia dónde sale cada cable desde ahí (una vez por lista de cables) */
+function wireEnds(wires: Wire[]): Map<string, Set<string>> {
+  let m = wireEndIndex.get(wires);
+  if (m) return m;
+  m = new Map();
+  for (const w of wires) {
     for (const [a, b] of [
       [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }],
       [{ x: w.x2, y: w.y2 }, { x: w.x1, y: w.y1 }],
     ]) {
-      if (a.x !== f.x || a.y !== f.y) continue;
-      if (b.y < a.y) dirs.add('top');
-      else if (b.y > a.y) dirs.add('bottom');
-      else if (b.x < a.x) dirs.add('left');
-      else if (b.x > a.x) dirs.add('right');
+      const dir = b.y < a.y ? 'top' : b.y > a.y ? 'bottom' : b.x < a.x ? 'left' : b.x > a.x ? 'right' : '';
+      if (!dir) continue;
+      const k = `${a.x},${a.y}`;
+      let set = m.get(k);
+      if (!set) m.set(k, (set = new Set()));
+      set.add(dir);
     }
   }
+  wireEndIndex.set(wires, m);
+  return m;
+}
+
+/** Dirección desde la que llega el cable a un FLAG (para orientar tierra y rótulo, spec §8.7) */
+export function flagDirection(doc: AscDoc, f: Point): FlagDir {
+  const dirs = wireEnds(doc.wires).get(`${f.x},${f.y}`) ?? new Set<string>();
   if (dirs.size <= 1) return (dirs.values().next().value as FlagDir) ?? 'top';
   if (!dirs.has('top')) return 'bottom';
   if (!dirs.has('bottom')) return 'top';
@@ -384,16 +429,28 @@ export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number): { sym
     const inst = doc.symbols[i];
     const def = lib.symbol(inst.type);
     if (!def) continue;
-    const attrs = effectiveAttrs(inst, def);
-    for (const [idx, w] of effectiveWindows(inst, def, lib.windowDefaults)) {
-      const key = WINDOW_ATTR[idx];
-      const raw = key && attrs.get(key);
-      if (!raw || w.align === 'Invisible') continue;
-      const text = idx === 3 ? displayValue(attrs.get('Prefix') ?? '', raw) : raw;
-      if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(attrs.get('Prefix') ?? '')) continue;
-      const at = toWorld(inst, w.x, w.y);
-      if (inBox(p, alignedBox(at.x, at.y, transformAlign(w.align, inst.orient), w.size, text.length), tol / 2)) return { sym: i, win: idx, w };
-    }
+    for (const l of labelBoxes(inst, def, lib)) if (inBox(p, l.box, tol / 2)) return { sym: i, win: l.win, w: l.w };
   }
   return null;
+}
+
+const labelCache = new WeakMap<SymbolInst, { def: SymbolDef; wd: Library['windowDefaults']; labels: { win: number; w: TextWindow; box: Box }[] }>();
+
+/** Cajas de los rótulos visibles de un símbolo (una vez por instancia, #188) */
+function labelBoxes(inst: SymbolInst, def: SymbolDef, lib: Library) {
+  const c = labelCache.get(inst);
+  if (c && c.def === def && c.wd === lib.windowDefaults) return c.labels;
+  const labels: { win: number; w: TextWindow; box: Box }[] = [];
+  const attrs = effectiveAttrs(inst, def);
+  for (const [idx, w] of effectiveWindows(inst, def, lib.windowDefaults)) {
+    const key = WINDOW_ATTR[idx];
+    const raw = key && attrs.get(key);
+    if (!raw || w.align === 'Invisible') continue;
+    const text = idx === 3 ? displayValue(attrs.get('Prefix') ?? '', raw) : raw;
+    if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(attrs.get('Prefix') ?? '')) continue;
+    const at = toWorld(inst, w.x, w.y);
+    labels.push({ win: idx, w, box: alignedBox(at.x, at.y, transformAlign(w.align, inst.orient), w.size, text.length) });
+  }
+  labelCache.set(inst, { def, wd: lib.windowDefaults, labels });
+  return labels;
 }

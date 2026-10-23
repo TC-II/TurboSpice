@@ -3,8 +3,7 @@
 // simulaciones (#39).
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome, slideToDelete } from './lib.mjs';
+import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
 import { lineOf, simOf, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
 
@@ -12,7 +11,7 @@ const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 await skipWelcome(page);
 // los checks comparan la barra de Simular con el comando dibujado en el esquemático

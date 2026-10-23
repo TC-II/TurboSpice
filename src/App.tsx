@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -104,7 +104,7 @@ import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
-import { decode } from './asc/encoding.ts';
+import { decode, decodeText } from './asc/encoding.ts';
 import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
@@ -243,7 +243,8 @@ let clipboardFallback = '';
 const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Problems'), meas: t('Measurements') };
 
 export function App() {
-  const engine = useMemo(() => new EngineClient(), []);
+  // (el motor arranca cuando llegó la librería, #190)
+  const engine = useMemo(() => new EngineClient(false), []);
   const [mode, setMode] = useState<'schematic' | 'netlist'>('schematic');
   const [lib, setLib] = useState<Library | null>(null);
   const [libError, setLibError] = useState<string>();
@@ -254,9 +255,18 @@ export function App() {
       .then(async (b: LibraryBundle) => {
         const l = new Library(b);
         for (const f of await loadUserFiles()) registerUserFile(l, f);
+        engine.start();
         setLib(l);
+        // las listas de pasivos (para elegir el valor) llegan después, sin demorar el esquemático (#189)
+        fetch(`${BASE}library/cmp-passives.json`)
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+          .then((files: Record<string, string>) => l.addCmp(files))
+          .catch(() => {});
       })
-      .catch((e: Error) => setLibError(t('Could not load the library: {message}', { message: e.message })));
+      .catch((e: Error) => {
+        engine.start();
+        setLibError(t('Could not load the library: {message}', { message: e.message }));
+      });
     return () => engine.abort();
   }, [engine]);
 
@@ -532,8 +542,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
-  // elemento bajo el mouse: la barra de estado muestra sus propiedades
-  const [hover, setHover] = useState<{ ref: ItemRef | null; at: Point } | null>(null);
+  // elemento bajo el mouse: la barra de estado muestra sus propiedades (el estado vive en
+  // HintBar: guardarlo acá re-renderizaba toda la vista al mover el mouse, #187)
+  const hoverSink = useRef<((h: Hover) => void) | undefined>(undefined);
+  const onHover = useCallback((h: Hover) => hoverSink.current?.(h), []);
   const [showLoose, setShowLoose] = useState(true);
   // Ver › Mostrar el comando de simulación (oculto por defecto: se configura en la barra de Simular)
   const [showSimCommand, setShowSimCommand] = useState(() => lsGet('turbospice.showSimCommand') === '1');
@@ -654,9 +666,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const utf8 = new TextDecoder().decode(bytes);
     if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
       const { project: parsed, warnings } = await parseTurbo(utf8);
+      // el nombre del proyecto es el del archivo (un .turbo duplicado o renombrado en Drive, o
+      // copiado en el disco, todavía tiene adentro el nombre de antes)
+      const named = /\.turbo$/i.test(name) ? { ...parsed, name: projectName(name) } : parsed;
       // (los ejemplos se abren en el testbench con ese nombre)
-      const bench = variant ? parsed.variants[0].sims.find((x) => x.name === variant)?.id : undefined;
-      const p = bench ? selectProjectSim(parsed, bench) : parsed;
+      const bench = variant ? named.variants[0].sims.find((x) => x.name === variant)?.id : undefined;
+      const p = bench ? selectProjectSim(named, bench) : named;
       const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
       loadProject(p, f);
       remember(p, f);
@@ -990,7 +1005,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     tab.document.write(`<!doctype html><title>${title}</title><style>@page{size:${vb[2] >= vb[3] ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0;height:100%}svg{width:100%;height:100%;display:block}</style>${text}`);
     tab.document.close();
     tab.focus();
-    tab.print();
+    // después del click: en Firefox print() bloquea hasta cerrar el diálogo de impresión
+    tab.setTimeout(() => tab.print(), 50);
   };
 
   const doRecent = async (i: number) => {
@@ -1004,7 +1020,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (bytes) return await openBytes(bytes, r.name, at);
       // la copia guardada en recientes
       if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
-      const { project: p, warnings } = await parseTurbo(r.asc);
+      const { project: parsed, warnings } = await parseTurbo(r.asc);
+      const p = { ...parsed, name: projectName(r.name) };
       loadProject(p, { name: r.name, ...at });
       if (r.unsaved) markDirty();
       else remember(p, { name: r.name, ...at });
@@ -1906,7 +1923,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     for (const f of files) {
       const kind = userFileKind(f.name);
       if (!kind) continue;
-      const uf: UserFile = { name: f.name, kind, text: decode(new Uint8Array(await f.arrayBuffer())).text, time: Date.now() };
+      const uf: UserFile = { name: f.name, kind, text: decodeText(new Uint8Array(await f.arrayBuffer())), time: Date.now() };
       const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
       if (i >= 0) next[i] = uf;
       else next.push(uf);
@@ -2047,14 +2064,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
-  const circuitInfo = (): CircuitInfo => ({
-    nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    sources: doc.symbols
-      .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
-      .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
-      .map((a) => a.get('InstName') ?? '')
-      .filter(Boolean),
-  });
+  // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
+  const info = useMemo(
+    (): CircuitInfo => ({
+      nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+      sources: doc.symbols
+        .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
+        .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
+        .map((a) => a.get('InstName') ?? '')
+        .filter(Boolean),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [conn, doc, lib, libVersion],
+  );
+  const circuitInfo = () => info;
 
   // Atajos de teclado: los de la configuración de LTspice que usamos (LTspice.ini,
   // [SchKeyBoardShortCut] y [RawKeyBoardShortCut]); los del visor, con el mouse sobre los gráficos
@@ -2913,7 +2936,7 @@ ${ltNetlistText(sim.built.lt)}
             showGrid={showGrid}
             showLoose={showLoose}
             showSimCommand={showSimCommand}
-            onHover={setHover}
+            onHover={onHover}
             diff={historyDiff}
           />
           {historyOpen && curSim && !curSub && (
@@ -2991,7 +3014,7 @@ ${ltNetlistText(sim.built.lt)}
               {message}
             </div>
           )}
-          <div className="hint-bar">{tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool)}</div>
+          <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} />
         </div>
 
         {sim && (
@@ -3293,7 +3316,7 @@ ${ltNetlistText(sim.built.lt)}
           project={project.name}
           files={project.files.map((f) => ({ name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : [] }))}
           hasSymbol={(n) => !!lib.symbol(n)}
-          onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decode(new Uint8Array(await x.arrayBuffer())).text }))))}
+          onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decodeText(new Uint8Array(await x.arrayBuffer())) }))))}
           onRemove={removeProjectFile}
           onMakeSymbol={makeProjectSymbol}
           onClose={() => setDialog(null)}
@@ -3414,6 +3437,20 @@ ${ltNetlistText(sim.built.lt)}
       )}
     </div>
   );
+}
+
+type Hover = { ref: ItemRef | null; at: Point } | null;
+
+/** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
+function HintBar({ sink, text }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string }) {
+  const [hover, setHover] = useState<Hover>(null);
+  useEffect(() => {
+    sink.current = setHover;
+    return () => {
+      sink.current = undefined;
+    };
+  }, [sink]);
+  return <div className="hint-bar">{text(hover)}</div>;
 }
 
 function toolHint(tt: Tool): string {

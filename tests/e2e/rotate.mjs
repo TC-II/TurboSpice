@@ -2,16 +2,16 @@
 // "viajar" y, mientras se lo arrastra, el fantasma gira en el acto sin mover el mouse.
 // Uso: node tests/e2e/rotate.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { skipWelcome } from './lib.mjs';
-import { decode } from '../../src/asc/encoding.ts';
+import { skipWelcome, launchBrowser } from './lib.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
+import { activeAsc, variantOf } from '../../src/project/project.ts';
+import { parseTurbo } from '../../src/project/turbo.ts';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
 await skipWelcome(page);
 const errors = [];
@@ -43,9 +43,10 @@ const click = async (x, y) => {
 let saves = 0;
 const saved = async () => {
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
-  const path = `${OUT}/rotate-${saves++}.asc`;
+  const path = `${OUT}/rotate-${saves++}.turbo`;
   await download.saveAs(path);
-  return parseAsc(decode(new Uint8Array(readFileSync(path))).text).symbols.map((s) => `${s.type} ${s.x} ${s.y} ${s.orient}`);
+  // Ctrl+S guarda el proyecto (.turbo): el circuito es el de la variante activa
+  return parseAsc(activeAsc(variantOf((await parseTurbo(readFileSync(path, 'utf8'))).project))).symbols.map((s) => `${s.type} ${s.x} ${s.y} ${s.orient}`);
 };
 const body = (i) => page.locator('svg.editor .symbols > g .body').nth(i).getAttribute('transform');
 const keys = async (k, n) => {

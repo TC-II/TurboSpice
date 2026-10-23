@@ -2,8 +2,7 @@
 // deshace/rehace, guarda el .asc y verifica el archivo.
 // Uso: node tests/e2e/editor.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { menu, openExample, skipWelcome } from './lib.mjs';
+import { menu, openExample, skipWelcome, launchBrowser } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -17,7 +16,7 @@ const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, acceptDownloads: true });
 await skipWelcome(page);
 const errors = [];

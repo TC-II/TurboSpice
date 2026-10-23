@@ -3,7 +3,7 @@
 // una carpeta por variante. Importar: un .zip (cada carpeta, y la raíz, es una variante con una
 // simulación por .asc) o varios archivos sueltos (cada .asc, una variante); los .asy/.lib/.sub
 // van a los archivos del proyecto.
-import { decode } from '../asc/encoding.ts';
+import { decode, decodeText } from '../asc/encoding.ts';
 import { baseName, type AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
@@ -129,7 +129,7 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
       continue;
     }
     const kind = projectFileKind(file);
-    if (kind) files.push({ name: file, kind, text: decode(e.data).text });
+    if (kind) files.push({ name: file, kind, text: decodeText(e.data) });
   }
   const taken = p.variants.map((v) => v.name);
   const added: Variant[] = [];

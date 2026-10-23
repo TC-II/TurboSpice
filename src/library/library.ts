@@ -3,7 +3,7 @@
 import { parseAsc, parseAsy } from '../asc/parse.ts';
 import { baseName, symbolPath, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import type { SymbolSource, WindowDefaults } from '../asc/resolve.ts';
-import { parseCmp, type CmpKind, type CmpPart } from './cmp.ts';
+import { kindOfFile, parseCmp, type CmpKind, type CmpPart } from './cmp.ts';
 import { t } from '../i18n/i18n.ts';
 
 export interface LibraryBundle {
@@ -48,7 +48,13 @@ export class Library implements SymbolSource {
   private byPath = new Map<string, string>();
   private byName = new Map<string, string>();
   private cache = new Map<string, SymbolDef>();
+  /** type tal como viene del .asc → su símbolo (se pide miles de veces por render, #182) */
+  private resolved = new Map<string, SymbolDef | undefined>();
+  /** Sube cada vez que cambia qué símbolo resuelve un tipo (para cachés por documento, #183) */
+  rev = 0;
   private cmpCache = new Map<CmpKind, CmpPart[]>();
+  /** library/cmp: archivo → texto (los pasivos llegan después, addCmp) */
+  private cmpFiles: Record<string, string>;
   /** Símbolos agregados por el usuario o importados de su LTspice (ganan a los del bundle) */
   private extra = new Map<string, string>();
   /** Archivos de modelos del usuario: nombre de archivo (minúsculas) → texto */
@@ -74,6 +80,7 @@ export class Library implements SymbolSource {
 
   constructor(bundle: LibraryBundle) {
     this.bundle = bundle;
+    this.cmpFiles = { ...(bundle.cmp ?? {}) };
     // (un bundle viejo, de antes de #74, traía sólo la tabla de LTspice)
     const wd = bundle.windowDefaults as WindowDefaults | WindowDefaults['ltspice'];
     this.windowDefaults = 'ltspice' in wd && 'preferred' in wd ? (wd as WindowDefaults) : { ltspice: wd as WindowDefaults['ltspice'], preferred: {} };
@@ -91,6 +98,18 @@ export class Library implements SymbolSource {
   }
 
   symbol(type: string): SymbolDef | undefined {
+    if (this.resolved.has(type)) return this.resolved.get(type);
+    const def = this.lookup(type);
+    this.resolved.set(type, def);
+    return def;
+  }
+
+  private symbolsChanged(): void {
+    this.resolved.clear();
+    this.rev++;
+  }
+
+  private lookup(type: string): SymbolDef | undefined {
     const name = baseName(type).toLowerCase();
     const proj = this.projSymbols.get(name);
     const extra = proj ?? this.extra.get(name);
@@ -118,6 +137,7 @@ export class Library implements SymbolSource {
     const p = path.toLowerCase();
     this.ltSymbols.set(p, asyText);
     if (!this.ltSymbols.has(baseName(p))) this.ltSymbols.set(baseName(p), asyText);
+    this.symbolsChanged();
   }
 
   /** Archivo de modelos de la librería de LTspice del usuario */
@@ -139,11 +159,13 @@ export class Library implements SymbolSource {
   addSymbol(name: string, asyText: string): void {
     this.extra.set(name.toLowerCase(), asyText);
     this.cache.delete(`extra:${name.toLowerCase()}`);
+    this.symbolsChanged();
   }
 
   removeSymbol(name: string): void {
     this.extra.delete(name.toLowerCase());
     this.cache.delete(`extra:${name.toLowerCase()}`);
+    this.symbolsChanged();
   }
 
   /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
@@ -153,6 +175,7 @@ export class Library implements SymbolSource {
     this.projModels.clear();
     this.projSchematics.clear();
     this.schCache.clear();
+    this.symbolsChanged();
     for (const f of files) {
       if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
       else if (f.kind === 'schematic') this.projSchematics.set(f.name.replace(/\.asc$/i, '').toLowerCase(), { name: f.name, text: f.text });
@@ -253,10 +276,20 @@ export class Library implements SymbolSource {
   parts(kind: CmpKind): CmpPart[] {
     let p = this.cmpCache.get(kind);
     if (!p) {
-      p = Object.entries(this.bundle.cmp ?? {}).flatMap(([file, text]) => parseCmp(file, text)).filter((x) => x.kind === kind);
+      // (sólo el archivo de ese tipo: standard.cap e .ind son grandes)
+      p = Object.entries(this.cmpFiles).filter(([file]) => kindOfFile(file) === kind).flatMap(([file, text]) => parseCmp(file, text));
       this.cmpCache.set(kind, p);
     }
     return p;
+  }
+
+  /** Listas de library/cmp que llegan después del bundle (los pasivos, #189) */
+  addCmp(files: Record<string, string>): void {
+    Object.assign(this.cmpFiles, files);
+    for (const f of Object.keys(files)) {
+      const k = kindOfFile(f);
+      if (k) this.cmpCache.delete(k);
+    }
   }
 
   /** Archivo de library/cmp que define este .model (como la standard.bjt que incluye LTspice) */

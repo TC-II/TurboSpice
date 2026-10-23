@@ -4,16 +4,16 @@
 // colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome, spanishUi } from './lib.mjs';
+import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome, spanishUi, launchBrowser, FIREFOX } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const context = await browser.newContext({ viewport: { width: 1600, height: 800 }, acceptDownloads: true });
-await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+// (Firefox no tiene esos permisos: el portapapeles anda sin pedirlos)
+if (!FIREFOX) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 await skipWelcome(context);
 const page = await context.newPage();
 const errors = [];
@@ -880,8 +880,9 @@ check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición
   const log = page.locator('.results-body pre');
   const p = await log.boundingBox();
   await page.mouse.move(p.x + 40, p.y + 20);
-  await page.mouse.wheel(0, 100000);
-  await page.waitForTimeout(300);
+  // varias ruedas: Firefox anima el scroll y acota cada evento
+  for (let i = 0; i < 30; i++) await page.mouse.wheel(0, 5000);
+  await page.waitForTimeout(1000);
   const s = await log.evaluate((el) => {
     const body = el.parentElement.getBoundingClientRect();
     const r = el.getBoundingClientRect();

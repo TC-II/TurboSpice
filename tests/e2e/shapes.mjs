@@ -2,14 +2,13 @@
 // mueven, rotan, borran, se les cambia el estilo de línea, y se dibujan círculos y arcos.
 // Uso: node tests/e2e/shapes.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { chromium } from 'playwright-core';
-import { menu, skipWelcome } from './lib.mjs';
+import { menu, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
 mkdirSync(OUT, { recursive: true });
 
-const browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await skipWelcome(page);
 const errors = [];

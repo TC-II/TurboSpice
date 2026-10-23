@@ -5,7 +5,7 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
-import { changedFiles, exportSubcktNetlist, runFilesOf, runSummary, usedFiles } from '../../src/project/exchange.ts';
+import { changedFiles, exportSubcktNetlist, runFilesOf, runSummary, subcktFilesFor, usedFiles } from '../../src/project/exchange.ts';
 import { recordRun } from '../../src/project/project.ts';
 import { t } from '../../src/i18n/i18n.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
@@ -284,5 +284,14 @@ describe('historial de corridas con la versión de cada subcircuito (#199)', () 
     const back = (await parseTurbo(await serializeTurbo(p))).project.variants[0].sims[0].runs;
     expect(back.map((r) => r.files?.['BUF.asc'])).toEqual(runs.map((r) => r.files?.['BUF.asc']));
     expect(changedFiles(back[0].files, back[1].files)).toEqual(['BUF']);
+  });
+});
+
+describe('copiar a Mis símbolos y modelos (#199)', () => {
+  it('el subcircuito con su símbolo y los que usa adentro', () => {
+    let p = withSub();
+    p = addSubckt(p, 'TOP', tb('BUF'));
+    expect(subcktFilesFor(p, 'top').map((f) => f.name).sort()).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
+    expect(subcktFilesFor(p, 'nope')).toEqual([]);
   });
 });

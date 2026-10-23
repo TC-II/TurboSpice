@@ -179,15 +179,22 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
  * Un subcircuito como .zip para LTspice u otro proyecto: su .asc y su .asy (un bloque jerárquico
  * de LTspice), los subcircuitos que usa adentro y los modelos que nombra.
  */
-export function exportSubcktZip(p: Project, name: string, lib: SymbolSource): { name: string; bytes: Uint8Array } | null {
+/** El subcircuito, su símbolo y lo que usa adentro (otros subcircuitos y modelos); vacío si no existe */
+export function subcktFilesFor(p: Project, name: string): ProjectFile[] {
   const key = name.toLowerCase();
   const sch = p.files.find((f) => f.kind === 'schematic' && f.name.replace(/\.asc$/i, '').toLowerCase() === key);
-  if (!sch) return null;
+  if (!sch) return [];
   const sym = p.files.filter((f) => f.kind === 'symbol' && f.name.replace(/\.asy$/i, '').toLowerCase() === key);
   const rest = usedFiles(p.files, [sch.text]).filter((f) => f !== sch && !sym.includes(f));
+  return [sch, ...sym, ...rest];
+}
+
+export function exportSubcktZip(p: Project, name: string, lib: SymbolSource): { name: string; bytes: Uint8Array } | null {
+  const files = subcktFilesFor(p, name);
+  if (!files.length) return null;
   const enc = new TextEncoder();
   const entry = (f: ProjectFile): ZipEntry => ({ path: f.name, data: f.kind === 'schematic' ? ascBytes(parseAsc(f.text), lib).bytes : enc.encode(f.text) });
-  return { name: `${safeName(name)}.zip`, bytes: makeZip([sch, ...sym, ...rest].map(entry)) };
+  return { name: `${safeName(name)}.zip`, bytes: makeZip(files.map(entry)) };
 }
 
 /**

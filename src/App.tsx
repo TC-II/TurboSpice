@@ -66,7 +66,7 @@ import {
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { staleInstances } from './project/staleInstances.ts';
-import { exportAllZip, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
+import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -2364,6 +2364,34 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const z = exportSubcktZip(snapshot(), name, lib);
     if (z) download(z.name, new Blob([z.bytes as BlobPart], { type: 'application/zip' }));
   };
+  /** Copia el subcircuito (con su símbolo, los subcircuitos y modelos que usa) a My symbols and models (#199) */
+  const subToUser = (name: string) => {
+    const files = subcktFilesFor(snapshot(), name);
+    if (!files.length) return;
+    const next = [...userFiles];
+    const added: string[] = [];
+    const kept: string[] = [];
+    for (const f of files) {
+      const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
+      // uno distinto con el mismo nombre no se pisa (lo más conservador): se avisa
+      if (i >= 0 && next[i].text !== f.text) {
+        kept.push(f.name);
+        continue;
+      }
+      const uf: UserFile = { name: f.name, kind: f.kind, text: f.text, time: Date.now() };
+      if (i >= 0) next[i] = uf;
+      else next.push(uf);
+      registerUserFile(lib, uf);
+      added.push(f.name);
+    }
+    storeUserFiles(next);
+    setMessage(
+      [
+        ...(added.length ? [t('Copied to My symbols and models: {p0}', { p0: added.join(', ') })] : []),
+        ...(kept.length ? [t('Not replaced (My symbols and models already has a different one): {p0}', { p0: kept.join(', ') })] : []),
+      ].join(' · '),
+    );
+  };
   const exportSubNetlist = (name: string) => {
     const r = exportSubcktNetlist(snapshot(), name, lib);
     if (!r) return setMessage(t('{name} has no ports: there is nothing to export as .sub', { name }));
@@ -2928,6 +2956,7 @@ ${ltNetlistText(sim.built.lt)}
               onDelete={deleteSub}
               onExport={exportSub}
               onExportNetlist={exportSubNetlist}
+              onToUser={subToUser}
               onImport={() => subImport.current?.click()}
               onUpdateSymbol={(n) => {
                 const p = updateSymbol(snapshot(), n);

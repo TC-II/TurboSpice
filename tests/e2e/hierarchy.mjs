@@ -3,7 +3,7 @@
 // adentro (tensiones, corrientes, punto de operación y flechas de corriente).
 // Uso: node tests/e2e/hierarchy.mjs [url]   (con `npm run preview` corriendo)
 import { readFileSync } from 'node:fs';
-import { skipWelcome, launchBrowser, FIREFOX } from './lib.mjs';
+import { menu, skipWelcome, launchBrowser, FIREFOX } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -168,6 +168,15 @@ await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover(
 const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.getByRole('button', { name: 'Exportar DIV como .sub' }).click()]);
 const subText = readFileSync(await dl.path(), 'utf8');
 check(dl.suggestedFilename() === 'DIV.sub' && /^\.subckt DIV in\b/m.test(subText) && /^\.ends DIV$/m.test(subText) && /^R1 /m.test(subText), `exportar DIV como .sub (${subText.split('\n').filter((l) => l.startsWith('.subckt')).join(' | ')})`);
+
+// --- copiar a Mis símbolos y modelos (#199, #171) ---
+await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();
+await page.getByRole('button', { name: 'Copiar DIV a Mis símbolos y modelos' }).click();
+check((await page.getByText('Copiado a Mis símbolos y modelos: DIV.asc, DIV.asy').count()) > 0, 'copiar DIV a Mis símbolos y modelos');
+await menu(page, 'Archivo', 'Mis símbolos y modelos…');
+const mine = await page.locator('.modal').textContent();
+check(/DIV\.asc/.test(mine) && /DIV\.asy/.test(mine), 'y aparece en Mis símbolos y modelos');
+await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
 
 // --- aviso al editar un subcircuito usado en varios testbenches (#199) ---
 await page.locator('.project-tree .tree-row', { hasText: 'Testbench 1' }).first().hover();

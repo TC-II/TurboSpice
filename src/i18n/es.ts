@@ -1463,4 +1463,8 @@ export const es: Record<string, string> = {
   "a wire ends on the symbol without a pin (was a port removed?)": "un cable termina sobre el símbolo sin un pin (¿se quitó un puerto?)",
   "The ports of {name} changed: {insts} must be rewired (marked in the project panel)": "Cambiaron los puertos de {name}: hay que recablear {insts} (marcadas en el panel del proyecto)",
   "{name} changed": "cambió {name}",
+  "Copy to My symbols and models (to use it in other projects)": "Copiar a Mis símbolos y modelos (para usarlo en otros proyectos)",
+  "Copy {name} to My symbols and models": "Copiar {name} a Mis símbolos y modelos",
+  "Copied to My symbols and models: {p0}": "Copiado a Mis símbolos y modelos: {p0}",
+  "Not replaced (My symbols and models already has a different one): {p0}": "No se reemplazó (Mis símbolos y modelos ya tiene otro distinto): {p0}",
 };

@@ -49,7 +49,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -78,6 +78,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onExport(name: string): void;
   /** exportar como netlist .sub (#199) */
   onExportNetlist(name: string): void;
+  /** copiar a My symbols and models (#199, #171) */
+  onToUser(name: string): void;
   onImport(): void;
   /** convertir la selección (sin selección: undefined) */
   onFromSelection?(): void;
@@ -226,6 +228,9 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
           <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
             .sub
+          </button>
+          <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
+            ☆
           </button>
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />

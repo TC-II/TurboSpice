@@ -60,6 +60,7 @@ import {
   simsWithValue,
   storeActive,
   valueChanges,
+  withGroups,
   variantOf,
   type FileConflict,
   type ValueChange,
@@ -280,11 +281,11 @@ export function App() {
   const [menuSlot, setMenuSlot] = useState<HTMLElement | null>(null);
   const [tabsSlot, setTabsSlot] = useState<HTMLElement | null>(null);
   const [rightSlot, setRightSlot] = useState<HTMLElement | null>(null);
+  const [toolsSlot, setToolsSlot] = useState<HTMLElement | null>(null);
 
   return (
     <div className="app">
       <header className="appbar">
-        <div className="appbar-slot" ref={setMenuSlot} />
         <h1><Logo /> <span><span className="logo">Turbo</span>Spice</span></h1>
         {mode === 'netlist' ? (
           <nav className="tabs">
@@ -294,6 +295,9 @@ export function App() {
         ) : (
           <div className="appbar-slot" ref={setTabsSlot} />
         )}
+        {/* el menú, junto a las herramientas (que llenan la primera línea) */}
+        <div className="appbar-slot" ref={setMenuSlot} />
+        <div className="appbar-slot appbar-tools" ref={setToolsSlot} />
         <div className="appbar-slot appbar-right" ref={setRightSlot} />
         {/* el usuario / login (#35), al final, después de Compartir */}
         <AccountButton />
@@ -301,7 +305,7 @@ export function App() {
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
         (lib ? (
-          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot }} onNetlist={() => setMode('netlist')} />
+          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot, tools: toolsSlot }} onNetlist={() => setMode('netlist')} />
         ) : (
           <p className="empty pad">{libError ?? t('Loading library…')}</p>
         ))}
@@ -312,7 +316,7 @@ export function App() {
 function SchematicMode({ engine, lib, slots, onNetlist }: {
   engine: EngineClient;
   lib: Library;
-  slots: { menu: HTMLElement | null; tabs: HTMLElement | null; right: HTMLElement | null };
+  slots: { menu: HTMLElement | null; tabs: HTMLElement | null; right: HTMLElement | null; tools: HTMLElement | null };
   /** pasar al editor de netlist */
   onNetlist(): void;
 }) {
@@ -324,7 +328,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [file, setFile] = useState<FileState>({ name: t('Untitled{EXT}', { EXT }) });
   // proyecto (.turbo, #149): variantes y simulaciones, cada una con su circuito. El que se está
   // editando vive en `history` y pasa al proyecto al cambiar de simulación o al guardar (snapshot)
-  const [project, setProjectState] = useState<Project>(() => newProject(t('Untitled')));
+  const [project, setProjectRaw] = useState<Project>(() => withGroups(newProject(t('Untitled'))));
+  // los testbenches viven siempre en un grupo (proyectos viejos: pasan a «Group 1»)
+  const setProjectState = (p: Project) => setProjectRaw(withGroups(p));
   const projectRef = useRef(project);
   projectRef.current = project;
   const [dirty, setDirty] = useState(false);
@@ -1406,9 +1412,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const newSim = (kind: AnalysisKind) => {
     if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
     // si ya es de ese tipo queda como está; si otro testbench usa ese tipo, se parte de sus parámetros
-    if (ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === kind) return;
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
-    commit(setAnalysisLine(doc, same?.line ?? defaultLine(kind, circuitInfo())));
+    const line = same?.line ?? defaultLine(kind, circuitInfo());
+    // un testbench tiene una sola simulación: sin análisis se la pone; si ya tiene, se crea otro
+    // testbench (en el mismo grupo) con el mismo circuito y ésta
+    if (!docLine) return commit(setAnalysisLine(doc, line));
+    const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, line)));
+    if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
+    enter(r.project);
+    markDirty();
   };
   /** Testbench nuevo: vacío o copia del actual */
   const askBenchName = (title: string, initial: string, onOk: (name: string) => void) =>
@@ -1465,6 +1477,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const groupAction = (id: string, action: 'rename' | 'delete') => {
     const g = projectRef.current.groups.find((x) => x.id === id);
     if (!g) return;
+    if (action === 'delete' && projectRef.current.groups.length < 2) return setMessage(t('A project always has at least one group'));
     if (action === 'rename')
       return setDialog({
         kind: 'name',
@@ -1480,7 +1493,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setDialog({
       kind: 'slide',
       title: t('Delete the group {name}?', { name: g.name }),
-      message: t('Its testbenches are not deleted: they stay outside any group.'),
+      message: t('Its testbenches are not deleted: they move to {name}.', { name: projectRef.current.groups.find((x) => x.id !== id)?.name ?? '' }),
       onConfirm: () => {
         setDialog(null);
         editProject(removeGroup(snapshot(), id));
@@ -2499,7 +2512,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...ANALYSES.map((x) => ({ label: x.label, title: t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    ...ANALYSES.map((x) => ({ label: x.label, title: docLine ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
@@ -2722,19 +2735,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       id: 'edit',
       label: t('Editing'),
       tools: [
+        { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
         { icon: 'drag', label: t('Drag'), title: t('Drag (stretching wires)'), shortcut: 'S', onClick: () => startMove(true), active: tool.kind === 'move' && tool.stretch },
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Del', onClick: deleteSelection, active: tool.kind === 'delete' },
-      ],
-    },
-    {
-      id: 'view',
-      label: t('Display'),
-      tools: [
-        { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
-        { icon: 'nets', label: t('Nets'), title: t('Show the names of all the nets, without changing the schematic'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), active: showNets },
       ],
     },
   ];
@@ -2779,23 +2785,13 @@ ${ltNetlistText(sim.built.lt)}
         createPortal(
           <>
             <AppMenu menus={menus} />
-            <button className={`proj-toggle${treeOpen ? ' on' : ''}`} onClick={toggleTree} aria-pressed={treeOpen} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
-              <Icon name="tree" />
-            </button>
           </>,
           slots.menu,
         )}
+      {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} />, slots.tools)}
       {slots.right &&
         createPortal(
           <>
-            <ProjectCapsule
-              project={project.name}
-              bench={(curSim && simName(curSim)) || t('No analysis')}
-              taken={sims.items.filter((x) => x.id !== sims.active).map((x) => simName(x))}
-              dirty={dirty}
-              onRenameProject={renameProject}
-              onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
-            />
             <button
               className="theme-btn"
               aria-label={t('Change theme')}
@@ -2850,33 +2846,41 @@ ${ltNetlistText(sim.built.lt)}
           </>,
           slots.tabs,
         )}
-      <Toolbar
-        label={t('Tools')}
-        groups={toolGroups}
-        fixed={
-          <>
-            {/* Simular partido: la acción principal simula y la flecha despliega las simulaciones */}
-            <div className="split" role="group" aria-label={t('Simulation')}>
-              {running ? (
-                <button className="labeled" onClick={abort} aria-label={t('Abort')} title={t('Abort the simulation (Alt+S)')}>
-                  <Icon name="stop" /> {t('Abort')}
-                </button>
-              ) : (
-                <button
-                  className="primary"
-                  onClick={simulate}
-                  disabled={status.kind === 'loading' || !!curSub}
-                  aria-label={t('Simulate')}
-                  aria-keyshortcuts="Alt+R Control+Enter"
-                  title={curSub ? t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate') : canRun ? t('Simulate (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
-                >
-                  <Icon name="run" /> {t('Simulate')}
-                </button>
-              )}
-              <MenuButton items={simItems} label={t('Simulation type')} title={t('Simulations and analysis types')} className={running ? 'labeled' : 'primary'} openRef={simMenu}>
-                <Icon name="caret" size={14} />
-              </MenuButton>
-            </div>
+      {/* segunda barra: el proyecto (árbol y cápsula) y la simulación */}
+      <div className="iconbar sim-row" role="toolbar" aria-label={t('Simulation')}>
+        <div className="group fixed">
+            <button className={`proj-toggle${treeOpen ? ' on' : ''}`} onClick={toggleTree} aria-pressed={treeOpen} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
+              <Icon name="tree" />
+            </button>
+            <ProjectCapsule
+              project={project.name}
+              bench={(curSim && simName(curSim)) || t('No analysis')}
+              taken={sims.items.filter((x) => x.id !== sims.active).map((x) => simName(x))}
+              dirty={dirty}
+              onRenameProject={renameProject}
+              onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
+            />
+            <span className="tb-sep" />
+            {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
+            <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className="labeled" openRef={simMenu}>
+              {t('New simulation')} <Icon name="caret" size={14} />
+            </MenuButton>
+            {running ? (
+              <button className="labeled" onClick={abort} aria-label={t('Abort')} title={t('Abort the simulation (Alt+S)')}>
+                <Icon name="stop" /> {t('Abort')}
+              </button>
+            ) : (
+              <button
+                className="primary"
+                onClick={simulate}
+                disabled={status.kind === 'loading' || !!curSub}
+                aria-label={t('Run|verb')}
+                aria-keyshortcuts="Alt+R Control+Enter"
+                title={curSub ? t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate') : canRun ? t('Run the simulation with these parameters (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
+              >
+                <Icon name="run" /> {t('Run|verb')}
+              </button>
+            )}
             {/* siempre a la vista, separados de Simular; se habilitan cuando hay resultados (y punto de operación) */}
             <span className="tb-sep" />
             <button
@@ -2888,6 +2892,9 @@ ${ltNetlistText(sim.built.lt)}
             >
               <Icon name="probe" />
             </button>
+            <button className={showNets ? 'active' : ''} aria-label={t('Nets')} aria-keyshortcuts="Alt+N" title={t('Show the names of all the nets, without changing the schematic') + ' (Alt+N)'} onClick={() => setShowNets((v) => !v)}>
+              <Icon name="nets" />
+            </button>
             <button
               className={showOp && bias ? 'active' : ''}
               aria-label={t('Annotate OP')}
@@ -2897,10 +2904,9 @@ ${ltNetlistText(sim.built.lt)}
             >
               <Icon name="op" />
             </button>
-          </>
-        }
-        after={
-          curSub ? (
+        </div>
+        <div className="bar-after">
+          {curSub ? (
             <span className="sub-simbar">{t('Subcircuit {name}: it is simulated from the testbenches that use it', { name: curSub })}</span>
           ) : (
           <SimBar
@@ -2924,9 +2930,9 @@ ${ltNetlistText(sim.built.lt)}
             onRename={renameActive}
             onDelete={deleteActive}
           />
-          )
-        }
-      />
+          )}
+        </div>
+      </div>
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div

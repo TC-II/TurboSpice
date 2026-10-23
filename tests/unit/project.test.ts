@@ -195,9 +195,23 @@ describe('grupos y propagar valores (#180)', () => {
     p = propagateAttrs(p, [b.id], 'R1', 'res', new Map([['InstName', 'R1'], ['Value', '2k2']]));
     const val = (id: string) => parseAsc(variantOf(p).sims.find((s) => s.id === id)!.asc).symbols[0].attrs.get('Value');
     expect([val(b.id), val(c.id)]).toEqual(['2k2', '1k']);
-    p = removeGroup(p, g.id);
-    expect(variantOf(p).sims.every((s) => !s.group)).toBe(true);
-    expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([]);
+    // el último grupo no se saca; con otro, sus testbenches pasan a ése
+    expect(removeGroup(p, g.id)).toBe(p);
+    const h = addGroup(p, 'Otro');
+    p = removeGroup(h.project, g.id);
+    expect(variantOf(p).sims.filter((s) => s.group === h.id).map((s) => s.id)).toEqual([a, b.id]);
+    expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([b.id]);
+  });
+  it('withGroups: todo testbench queda en un grupo (crea «Group 1» si no hay)', async () => {
+    const { withGroups, addGroup } = await import('../../src/project/project.ts');
+    const p = withGroups(newProject('P'));
+    expect(p.groups.map((g) => g.name)).toHaveLength(1);
+    expect(variantOf(p).sims.every((s) => s.group === p.groups[0].id)).toBe(true);
+    expect(withGroups(p)).toBe(p);
+    // los nuevos caen en el grupo del activo
+    const g = addGroup(p, 'B');
+    const q = addSim(g.project, EMPTY_ASC)!.project;
+    expect(variantOf(q).sims.at(-1)!.group).toBe(p.groups[0].id);
   });
 
   it('parámetros y variables del testbench', async () => {

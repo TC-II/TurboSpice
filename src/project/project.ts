@@ -76,8 +76,10 @@ export const selectSim = (p: Project, simId: string): Project => {
 export function addSim(p: Project, asc: string, name?: string): { project: Project; id: string } | null {
   const v = variantOf(p);
   if (v.sims.length >= MAX_SIMS) return null;
-  const s: Sim = { id: newId('s'), ...(name ? { name } : {}), asc, runs: [] };
   const i = v.sims.findIndex((x) => x.id === v.activeSim);
+  // cae en el grupo del testbench activo
+  const group = v.sims[i]?.group ?? p.groups[0]?.id;
+  const s: Sim = { id: newId('s'), ...(name ? { name } : {}), asc, ...(group ? { group } : {}), runs: [] };
   const sims = i < 0 ? [...v.sims, s] : [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)];
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims, activeSim: s.id })), id: s.id };
 }
@@ -120,15 +122,30 @@ export function addGroup(p: Project, name: string): { project: Project; id: stri
 export const renameGroup = (p: Project, id: string, name: string): Project =>
   name.trim() ? touch({ ...p, groups: p.groups.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)) }) : p;
 
-/** Saca el grupo: sus testbenches quedan sin grupo */
-export const removeGroup = (p: Project, id: string): Project =>
-  touch({
+/** Saca el grupo: sus testbenches pasan al primero de los que quedan (el último no se saca) */
+export function removeGroup(p: Project, id: string): Project {
+  const rest = p.groups.filter((g) => g.id !== id);
+  if (!rest.length || rest.length === p.groups.length) return p;
+  return touch({
     ...p,
-    groups: p.groups.filter((g) => g.id !== id),
-    variants: p.variants.map((v) => ({ ...v, sims: v.sims.map(({ group, ...s }) => (group === id ? s : { ...s, ...(group ? { group } : {}) })) })),
+    groups: rest,
+    variants: p.variants.map((v) => ({ ...v, sims: v.sims.map((s) => (s.group === id ? { ...s, group: rest[0].id } : s)) })),
   });
+}
 
-/** Mueve un testbench a un grupo (undefined: sin grupo) */
+/**
+ * Los testbenches pertenecen siempre a un grupo: si el proyecto no tiene, se crea «Group 1», y
+ * los que no tienen grupo (o uno que ya no existe) pasan al primero. Sin cambios devuelve el mismo.
+ */
+export function withGroups(p: Project): Project {
+  const groups = p.groups.length ? p.groups : [{ id: newId('g'), name: t('Group {n}', { n: 1 }) }];
+  const ids = new Set(groups.map((g) => g.id));
+  const loose = (s: Sim) => !s.group || !ids.has(s.group);
+  if (groups === p.groups && !p.variants.some((v) => v.sims.some(loose))) return p;
+  return { ...p, groups, variants: p.variants.map((v) => ({ ...v, sims: v.sims.map((s) => (loose(s) ? { ...s, group: groups[0].id } : s)) })) };
+}
+
+/** Mueve un testbench a un grupo */
 export const setBenchGroup = (p: Project, simId: string, group?: string): Project =>
   mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
 

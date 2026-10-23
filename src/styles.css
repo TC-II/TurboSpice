@@ -1034,3 +1034,22 @@ button.hier-tab { padding-right: 10px; }
 .tree-row.tree-var .tree-name { font-size: 12px; }
 .tree-row.tree-var code { font: 11.5px var(--mono); color: var(--fg); }
 .tree-row.tree-var .tree-meta { font-family: var(--mono); }
+
+/* Barras (#GUI): la primera línea lleva las herramientas; la segunda, proyecto y simulación */
+.appbar-tools { flex: 1 1 0; min-width: 0; }
+.appbar .iconbar { flex: 1 1 0; border-bottom: 0; padding: 0; }
+.sim-row .capsule { margin: 0 4px; }
+.sim-row .proj-toggle { margin-left: 0; }
+
+/* Panel de proyecto: proyecto › grupos › testbenches unidos con líneas de árbol */
+.project-tree header .tree-add { margin-left: auto; }
+.project-tree ul.tree-branch { margin-left: 12px; border-left: 1px solid color-mix(in srgb, var(--fg) 22%, transparent); }
+.project-tree ul.tree-groups { margin: 6px 0 4px 14px; }
+.tree-branch > li { position: relative; }
+.tree-branch > li::before { content: ''; position: absolute; left: 0; top: 14px; width: 8px; border-top: 1px solid color-mix(in srgb, var(--fg) 22%, transparent); }
+.tree-branch .tree-row { margin-left: 8px; padding-left: 2px; }
+.tree-branch > li.tree-empty { padding-left: 14px; }
+.tree-runs { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; border: 0; background: transparent; color: var(--fg-muted); padding: 2px; font-size: 11px; flex: none; }
+.tree-runs:hover:not(:disabled) { color: var(--accent); }
+.tree-runs.none { opacity: .35; }
+.tree-row .tree-add { flex: none; }

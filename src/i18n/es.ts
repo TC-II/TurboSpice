@@ -1509,4 +1509,13 @@ export const es: Record<string, string> = {
   'B-C charge': 'Carga B-C',
   'Diode charge': 'Carga del diodo',
   '{expr} wasn\'t saved in this simulation: it will be saved when you simulate again': '{expr} no se guardó en esta simulación: se va a guardar cuando simules de nuevo',
+  'New simulation': 'Nueva simulación',
+  'Run the simulation with these parameters (Alt+R / Ctrl+Enter)': 'Correr la simulación con estos parámetros (Alt+R / Ctrl+Enter)',
+  'New testbench with this simulation: {help}': 'Testbench nuevo con esta simulación: {help}',
+  'Its testbenches are not deleted: they move to {name}.': 'Sus testbenches no se borran: pasan a {name}.',
+  'A project always has at least one group': 'Un proyecto tiene siempre al menos un grupo',
+  'No runs yet': 'Todavía no se corrió',
+  'Run history of {name}': 'Historial de corridas de {name}',
+  '↑ ↓ to go through the testbenches': '↑ ↓ para recorrer los testbenches',
+  'Run|verb': 'Correr',
 };

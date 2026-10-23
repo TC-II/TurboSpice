@@ -70,7 +70,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onNewBench(group?: string): void;
   onNewGroup(): void;
   onGroupAction(id: string, action: 'rename' | 'delete'): void;
-  onMoveBench(id: string, group?: string): void;
+  onMoveBench(id: string, group: string): void;
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
@@ -90,10 +90,10 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   /** el mouse salió del panel (para esconderlo si se mostró al acercarlo) */
   onLeave(): void;
 }) {
-  // grupos y testbenches plegados (los testbenches arrancan plegados salvo el activo)
+  // grupos, testbenches y sus parámetros plegados (los testbenches arrancan plegados: una línea)
   const [collapsed, setCollapsed] = useState(loadCollapsed);
-  const [openBench, setOpenBench] = useState<Set<string>>(() => new Set([activeBench]));
-  useEffect(() => setOpenBench((s) => (s.has(activeBench) ? s : new Set([...s, activeBench]))), [activeBench]);
+  const [openBench, setOpenBench] = useState<Set<string>>(() => new Set());
+  const [openParams, setOpenParams] = useState<Set<string>>(() => new Set());
   const toggleGroup = (id: string) =>
     setCollapsed((s) => {
       const n = new Set(s);
@@ -105,19 +105,20 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
       }
       return n;
     });
-  const toggleBench = (id: string) =>
-    setOpenBench((s) => {
+  const toggleIn = (set: (f: (s: Set<string>) => Set<string>) => void, id: string, on?: boolean) =>
+    set((s) => {
       const n = new Set(s);
-      if (!n.delete(id)) n.add(id);
+      if (on ?? !n.has(id)) n.add(id);
+      else n.delete(id);
       return n;
     });
   const [dragging, setDragging] = useState('');
   const [dropOn, setDropOn] = useState<string | null>(null);
-  const drop = (group?: string) => ({
+  const drop = (group: string) => ({
     onDragOver: (e: React.DragEvent) => {
       if (!dragging) return;
       e.preventDefault();
-      setDropOn(group ?? '');
+      setDropOn(group);
     },
     onDragLeave: () => setDropOn(null),
     onDrop: (e: React.DragEvent) => {
@@ -127,24 +128,35 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
       setDropOn(null);
     },
   });
-  const bench = (b: TreeBench, depth: number) => {
+  // los testbenches a la vista, en orden: las flechas ↑ ↓ pasan de uno a otro (como en el historial)
+  const visible = groups.filter((g) => !collapsed.has(g.id)).flatMap((g) => benches.filter((b) => b.group === g.id));
+  const treeRef = useRef<HTMLElement>(null);
+  const onKey = (e: React.KeyboardEvent) => {
+    if ((e.target as HTMLElement).closest('input, textarea') || e.altKey || e.ctrlKey || e.metaKey) return;
+    const i = visible.findIndex((b) => b.id === activeBench);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const next = visible[Math.max(0, Math.min(visible.length - 1, i < 0 ? 0 : i + (e.key === 'ArrowDown' ? 1 : -1)))];
+      if (next && next.id !== activeBench) onBench(next.id);
+    } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && i >= 0) toggleIn(setOpenBench, activeBench, e.key === 'ArrowRight');
+    else return;
+    e.preventDefault();
+  };
+  // el foco sigue al testbench activo (para seguir con las flechas)
+  useEffect(() => {
+    const tree = treeRef.current;
+    if (!tree?.contains(document.activeElement)) return;
+    tree.querySelector<HTMLElement>(`[data-bench="${activeBench}"] .tree-name`)?.focus();
+  }, [activeBench]);
+  const bench = (b: TreeBench) => {
     const open = openBench.has(b.id);
+    const pOpen = openParams.has(b.id);
     const active = !current && b.id === activeBench;
-    const item = (it: BenchItem, glyph: string, label: string, meta?: string) => (
-      <li key={it}>
-        <div className="tree-row tree-sub" style={{ paddingLeft: 26 + depth * 14 }}>
-          <button className="tree-name" onClick={() => onBenchItem(b.id, it)}>
-            <span className="tree-glyph">{glyph}</span> {label}
-          </button>
-          {meta && <span className="tree-meta">{meta}</span>}
-        </div>
-      </li>
-    );
+    const nVars = b.params.length + b.steps.length;
     return (
       <li key={b.id}>
         <div
           className={`tree-row${active ? ' active' : ''}${dragging === b.id ? ' dragging' : ''}`}
-          style={{ paddingLeft: 4 + depth * 14 }}
+          data-bench={b.id}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
@@ -154,11 +166,11 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           onDragEnd={() => (setDragging(''), setDropOn(null))}
           title={t('Drag it onto a group to move it')}
         >
-          <button className="tree-caret" onClick={() => toggleBench(b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
+          <button className="tree-caret" onClick={() => toggleIn(setOpenBench, b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
             {open ? '▾' : '▸'}
           </button>
-          <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={b.detail}>
-            <span className="tree-glyph">{b.id === activeBench ? '●' : '○'}</span> {b.name}
+          <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={`${b.detail} — ${t('↑ ↓ to go through the testbenches')}`}>
+            {b.name}
           </button>
           <span className="tree-actions">
             <button onClick={() => onBenchAction(b.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
@@ -169,36 +181,59 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
               <Icon name="trash" size={13} />
             </button>
           </span>
+          <button className={`tree-runs${b.runs ? '' : ' none'}`} onClick={() => onBenchItem(b.id, 'history')} disabled={!b.runs} title={b.runs ? t('Run history') : t('No runs yet')} aria-label={t('Run history of {name}', { name: b.name })}>
+            <Icon name="clock" size={13} />
+            {b.runs > 0 && <span>{b.runs}</span>}
+          </button>
         </div>
         {open && (
-          <ul>
-            {item('sim', '⚙', t('Simulation settings'), b.detail)}
-            {item('params', '{}', t('Parameters and variables'), b.params.length + b.steps.length ? String(b.params.length + b.steps.length) : undefined)}
-            {b.params.map(([k, v]) => (
-              <li key={`p:${k}`}>
-                <div className="tree-row tree-sub tree-var" style={{ paddingLeft: 44 + depth * 14 }}>
-                  <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')} title={t('Parameter (.param): click to edit')}>
-                    <code>{k}</code> = <code>{v}</code>
-                  </button>
-                </div>
-              </li>
-            ))}
-            {b.steps.map((x) => (
-              <li key={`s:${x.line}`}>
-                <div className="tree-row tree-sub tree-var" style={{ paddingLeft: 44 + depth * 14 }}>
-                  <button className="tree-name" onClick={() => onBenchItem(b.id, 'study')} title={`${x.line} — ${t('swept: click to edit it in the Study')}`}>
-                    <span className="tree-glyph">↻</span> <code>{x.name}</code> <span className="tree-meta">{x.line.replace(/^\s*\.step\s+(param\s+)?\S+\s*/i, '')}</span>
-                  </button>
-                </div>
-              </li>
-            ))}
-            {b.runs > 0 && item('history', '◷', t('Run history'), String(b.runs))}
+          <ul className="tree-branch">
+            <li>
+              <div className="tree-row tree-sub">
+                <button className="tree-name" onClick={() => onBenchItem(b.id, 'sim')} title={t('Simulation settings')}>
+                  <span className="tree-glyph">⚙</span> {b.detail}
+                </button>
+              </div>
+            </li>
+            <li>
+              <div className="tree-row tree-sub">
+                <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
+                  {pOpen ? '▾' : '▸'}
+                </button>
+                <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')}>
+                  {t('Parameters and variables')}
+                </button>
+                {nVars > 0 && <span className="tree-meta">{nVars}</span>}
+              </div>
+              {pOpen && (
+                <ul className="tree-branch">
+                  {b.params.map(([k, v]) => (
+                    <li key={`p:${k}`}>
+                      <div className="tree-row tree-sub tree-var">
+                        <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')} title={t('Parameter (.param): click to edit')}>
+                          <code>{k}</code> = <code>{v}</code>
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                  {b.steps.map((x) => (
+                    <li key={`s:${x.line}`}>
+                      <div className="tree-row tree-sub tree-var">
+                        <button className="tree-name" onClick={() => onBenchItem(b.id, 'study')} title={`${x.line} — ${t('swept: click to edit it in the Study')}`}>
+                          <span className="tree-glyph">↻</span> <code>{x.name}</code> <span className="tree-meta">{x.line.replace(/^\s*\.step\s+(param\s+)?\S+\s*/i, '')}</span>
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                  {!nVars && <li className="tree-meta tree-empty">{t('None.')}</li>}
+                </ul>
+              )}
+            </li>
           </ul>
         )}
       </li>
     );
   };
-  const loose = benches.filter((b) => !b.group || !groups.some((g) => g.id === b.group));
   const [usesOf, setUsesOf] = useState('');
   const byName = new Map(subs.map((s) => [s.name.toLowerCase(), s]));
   // raíces: los que no usa ningún otro subcircuito
@@ -279,25 +314,17 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
     </li>
   );
   return (
-    <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave}>
+    <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
       <header>
         <strong title={project}>{project}</strong>
+        <button className="tree-add" onClick={onNewGroup} title={t('New group of testbenches')}>
+          + {t('Group')}
+        </button>
         <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
           <Icon name="close" size={14} />
         </button>
       </header>
-      <h4>
-        {t('Testbenches')}
-        <span className="tree-adds">
-          <button className="tree-add" onClick={onNewGroup} title={t('New group of testbenches')}>
-            + {t('Group')}
-          </button>
-          <button className="tree-add" onClick={() => onNewBench()} title={t('New empty testbench')} aria-label={t('Add an empty testbench')}>
-            + {t('New')}
-          </button>
-        </span>
-      </h4>
-      <ul>
+      <ul className="tree-branch tree-groups">
         {groups.map((g) => {
           const fold = collapsed.has(g.id);
           const inGroup = benches.filter((b) => b.group === g.id);
@@ -310,23 +337,20 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                 <button className="tree-name" onClick={() => toggleGroup(g.id)}>
                   <span className="tree-glyph">▤</span> {g.name}
                 </button>
-                <span className="tree-meta">{inGroup.length}</span>
                 <span className="tree-actions">
-                  <button onClick={() => onNewBench(g.id)} title={t('New testbench in this group')} aria-label={t('New testbench in {name}', { name: g.name })}>+</button>
                   <button onClick={() => onGroupAction(g.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
-                  <button onClick={() => onGroupAction(g.id, 'delete')} title={t('Delete the group (its testbenches stay)')} aria-label={t('Delete {name}', { name: g.name })}>
+                  <button onClick={() => onGroupAction(g.id, 'delete')} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the group (its testbenches stay)') : t('A project always has at least one group')} aria-label={t('Delete {name}', { name: g.name })}>
                     <Icon name="trash" size={13} />
                   </button>
                 </span>
+                <button className="tree-add" onClick={() => onNewBench(g.id)} title={t('New testbench in this group')} aria-label={t('New testbench in {name}', { name: g.name })}>
+                  + {t('New')}
+                </button>
               </div>
-              {!fold && <ul>{inGroup.length ? inGroup.map((b) => bench(b, 1)) : <li className="tree-meta tree-empty tree-indent">{t('Empty: drag testbenches here')}</li>}</ul>}
+              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b) => bench(b)) : <li className="tree-meta tree-empty">{t('Empty: drag testbenches here')}</li>}</ul>}
             </li>
           );
         })}
-      </ul>
-      <ul className={`tree-loose${dropOn === '' ? ' drop' : ''}`} {...drop(undefined)}>
-        {loose.map((b) => bench(b, 0))}
-        {dragging && !loose.some((b) => b.id === dragging) && <li className="tree-meta tree-empty">{t('Drop here to take it out of the group')}</li>}
       </ul>
       <h4>
         {t('Subcircuits')}

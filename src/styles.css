@@ -261,6 +261,12 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .textdlg { display: flex; flex-direction: column; gap: 8px; }
 .textdlg .seg { display: flex; gap: 16px; font-size: 13px; }
 .textdlg .seg input { width: auto; }
+.verilogdlg textarea { min-height: 300px; resize: vertical; line-height: 1.5; tab-size: 2; }
+.verilogdlg .row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.verilogdlg .row input { width: 24ch; }
+.verilogdlg .err { color: var(--err); font-size: 13px; margin: 0; white-space: pre-wrap; }
+.verilogdlg .ok { color: var(--ok); font-size: 13px; margin: 0; }
+.verilogdlg pre.log { max-height: 160px; border: 1px solid var(--border); border-radius: 6px; }
 .picker { display: grid; grid-template-columns: 1fr 260px; gap: 16px; min-height: 360px; }
 .picker-list { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .picker-list ul { list-style: none; margin: 0; padding: 0; overflow: auto; height: 52vh; border: 1px solid var(--border); border-radius: 6px; }

@@ -1,4 +1,4 @@
-import type { SimPlot, SimVector } from '../engine/ngspice.ts';
+import { DIGITAL_TYPE, type SimPlot, type SimVector } from '../engine/ngspice.ts';
 import type { StepRuns } from '../netlist/step.ts';
 import { deviceTraceName, parseDeviceVector } from '../sim/deviceParams.ts';
 
@@ -60,6 +60,7 @@ export function displayName(v: SimVector): string {
   const dev = parseDeviceVector(n);
   if (dev) return deviceTraceName(dev.device, dev.param, true);
   if (v.type === 3 && !/[(@]/.test(n)) return `V(${n})`;
+  if (v.type === DIGITAL_TYPE) return `Dig(${n})`;
   return n;
 }
 

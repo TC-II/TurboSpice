@@ -1,0 +1,111 @@
+diff --git a/openvaf/linker/src/lib.rs b/openvaf/linker/src/lib.rs
+index 9d2302b..17c27ae 100644
+--- a/openvaf/linker/src/lib.rs
++++ b/openvaf/linker/src/lib.rs
+@@ -153,7 +153,9 @@ fn get_linker<'a>(
+         }
+         LinkerFlavor::Ld | LinkerFlavor::Ld64 => {
+             let path = path.unwrap_or_else(|| {
+-                if is_msys2_environment() {
++                if target.arch == "wasm32" {
++                    "wasm-ld".into()
++                } else if is_msys2_environment() {
+                     "gcc".into()
+                 } else if cfg!(target_os = "macos") {
+                     "clang".into()
+diff --git a/openvaf/osdi/src/lib.rs b/openvaf/osdi/src/lib.rs
+index 80ac86e..6c518f1 100644
+--- a/openvaf/osdi/src/lib.rs
++++ b/openvaf/osdi/src/lib.rs
+@@ -67,6 +67,11 @@ fn initialize_llvm() {
+         if LLVM_InitializeNativeAsmPrinter() != 0 {
+             panic!("Failed to initialize native ASM printer");
+         }
++        // wasm32 (side modules de Emscripten para ngspice en el navegador)
++        llvm_sys::target::LLVMInitializeWebAssemblyTargetInfo();
++        llvm_sys::target::LLVMInitializeWebAssemblyTarget();
++        llvm_sys::target::LLVMInitializeWebAssemblyTargetMC();
++        llvm_sys::target::LLVMInitializeWebAssemblyAsmPrinter();
+     });
+ }
+ 
+diff --git a/openvaf/osdi/src/metadata.rs b/openvaf/osdi/src/metadata.rs
+index 7cf7514..2ffae4c 100644
+--- a/openvaf/osdi/src/metadata.rs
++++ b/openvaf/osdi/src/metadata.rs
+@@ -270,6 +270,8 @@ impl<'ll> OsdiCompilationUnit<'_, '_, 'll> {
+                 JACOBIAN_PTR_REACT,
+             )
+         } as u32;
++        // punteros del destino (4 bytes en wasm32, no siempre 8)
++        let ptr_size = unsafe { llvm_sys::target::LLVMPointerSize(*target_data) };
+ 
+         module
+             .dae_system
+@@ -294,7 +296,7 @@ impl<'ll> OsdiCompilationUnit<'_, '_, 'll> {
+                 if entry.react != F_ZERO {
+                     flags |= JACOBIAN_ENTRY_REACT;
+                     react_ptr_off = jacobian_ptr_react_offset;
+-                    jacobian_ptr_react_offset += 8;
++                    jacobian_ptr_react_offset += ptr_size;
+                 }
+                 OsdiJacobianEntry {
+                     nodes: OsdiNodePair { node_1: entry.row.into(), node_2: entry.col.into() },
+diff --git a/openvaf/osdi/src/metadata/osdi_0_4.rs b/openvaf/osdi/src/metadata/osdi_0_4.rs
+index e7aae96..cd37041 100644
+--- a/openvaf/osdi/src/metadata/osdi_0_4.rs
++++ b/openvaf/osdi/src/metadata/osdi_0_4.rs
+@@ -18,6 +18,8 @@ const STDLIB_BITCODE_X86_64_PC_WINDOWS_GNU: &[u8] =
+     include_bytes!(concat!(env!("OUT_DIR"), "/stdlib_0_4_x86_64-pc-windows-gnu.bc"));
+ const STDLIB_BITCODE_RISCV64_UNKNOWN_LINUX_GNU: &[u8] =
+     include_bytes!(concat!(env!("OUT_DIR"), "/stdlib_0_4_riscv64-unknown-linux-gnu.bc"));
++const STDLIB_BITCODE_WASM32_UNKNOWN_EMSCRIPTEN: &[u8] =
++    include_bytes!(concat!(env!("OUT_DIR"), "/stdlib_0_4_wasm32-unknown-emscripten.bc"));
+ pub fn stdlib_bitcode(target: &target::spec::Target) -> &'static [u8] {
+     match &*target.llvm_target {
+         "x86_64-unknown-linux-gnu" => STDLIB_BITCODE_X86_64_UNKNOWN_LINUX_GNU,
+@@ -28,6 +30,7 @@ pub fn stdlib_bitcode(target: &target::spec::Target) -> &'static [u8] {
+         "arm64-apple-macosx11.0.0" => STDLIB_BITCODE_ARM64_APPLE_MACOSX11_0_0,
+         "x86_64-pc-windows-gnu" => STDLIB_BITCODE_X86_64_PC_WINDOWS_GNU,
+         "riscv64-unknown-linux-gnu" => STDLIB_BITCODE_RISCV64_UNKNOWN_LINUX_GNU,
++        "wasm32-unknown-emscripten" => STDLIB_BITCODE_WASM32_UNKNOWN_EMSCRIPTEN,
+         triple => unreachable!("unknown target triple {triple}"),
+     }
+ }
+diff --git a/openvaf/target/src/spec.rs b/openvaf/target/src/spec.rs
+index 720342a..c8d87ee 100644
+--- a/openvaf/target/src/spec.rs
++++ b/openvaf/target/src/spec.rs
+@@ -159,6 +159,7 @@ supported_targets!(
+     ("aarch64-apple-darwin", aarch64_apple_darwin),
+     ("x86_64-pc-windows-gnu", x86_64_pc_windows_gnu),
+     ("riscv64-unknown-linux", riscv64_unknown_linux),
++    ("wasm32-unknown-emscripten", wasm32_unknown_emscripten),
+ );
+ 
+ impl Target {
+diff --git a/openvaf/target/src/spec/wasm32_unknown_emscripten.rs b/openvaf/target/src/spec/wasm32_unknown_emscripten.rs
+new file mode 100644
+index 0000000..d465983
+--- /dev/null
++++ b/openvaf/target/src/spec/wasm32_unknown_emscripten.rs
+@@ -0,0 +1,19 @@
++use crate::spec::{LinkerFlavor, Target, TargetOptions};
++
++// Side module de Emscripten (TurboSpice #209): ngspice compilado con MAIN_MODULE lo carga con dlopen.
++// Se enlaza con wasm-ld como lo hace `emcc -sSIDE_MODULE=1` (build_dylib agrega -shared).
++pub fn target() -> Target {
++    let mut base = TargetOptions::default();
++    base.cpu = "generic".to_string();
++    let link_args = base.pre_link_args.entry(LinkerFlavor::Ld).or_default();
++    for arg in "--import-memory --strip-debug --export-dynamic -Bsymbolic --experimental-pic --unresolved-symbols=import-dynamic --stack-first".split(' ') {
++        link_args.push(arg.to_owned())
++    }
++    Target {
++        llvm_target: "wasm32-unknown-emscripten".to_string(),
++        arch: "wasm32".to_string(),
++        data_layout: "e-m:e-p:32:32-p10:8:8-p20:8:8-i64:64-i128:128-f128:64-n32:64-S128-ni:1:10:20".to_string(),
++        options: base,
++        pointer_width: 32,
++    }
++}

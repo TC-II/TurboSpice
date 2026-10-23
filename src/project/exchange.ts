@@ -37,7 +37,10 @@ export function usedFiles(files: ProjectFile[], ascTexts: string[]): ProjectFile
   ascTexts = [...ascTexts, ...schs.map((f) => f.text)];
   const syms = files.filter((f) => f.kind === 'symbol' && types.has(f.name.replace(/\.asy$/i, '').toLowerCase()));
   const hay = [...ascTexts, ...syms.map((s) => s.text)].join('\n').toLowerCase();
-  return [...schs, ...syms, ...files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()))];
+  const models = files.filter((f) => f.kind === 'model' && hay.includes(f.name.toLowerCase()));
+  // el Verilog de los .sub generados (#209): lo nombran en su primera línea
+  const generated = models.map((m) => m.text.toLowerCase()).join('\n');
+  return [...schs, ...syms, ...models, ...files.filter((f) => f.kind === 'verilog' && generated.includes(f.name.toLowerCase()))];
 }
 
 /** Archivos del proyecto que usa un circuito, con su texto (para guardarlos en la corrida, #199) */

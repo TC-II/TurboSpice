@@ -48,6 +48,7 @@ import {
   propagateAttrs,
   mergeFiles,
   projectFileKind,
+  uniqueFileName,
   duplicateSim as duplicateProjectSim,
   removeVariant,
   lineOf,
@@ -118,6 +119,10 @@ import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
+import { synthesizeVerilog } from './hdl/client.ts';
+import { applySynthesis, topModuleOf, generatedPins, generatedSub } from './hdl/project.ts';
+import { VerilogDialog, verilogTemplate } from './hdl/VerilogDialog.tsx';
+import type { SynthResult } from './hdl/yosys.ts';
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
@@ -148,6 +153,8 @@ type Dialog =
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }
   | { kind: 'projectfiles' }
+  /** editar un archivo Verilog del proyecto (#209); sin name, uno nuevo */
+  | { kind: 'verilog'; name?: string }
   /** pedir un nombre (testbench o subcircuito, #180) */
   | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
   /** parámetros y variables del testbench (#180) */
@@ -507,6 +514,38 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
     if (r.added.length) editProject({ ...projectRef.current, files: r.files });
     setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
+    // el Verilog agregado se sintetiza enseguida: genera su .sub y su símbolo
+    for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthProjectVerilog(name);
+  };
+  /** Todos los Verilog del proyecto (un módulo puede usar los de otro archivo), con `name` = `text` */
+  const verilogSources = (name: string, text: string) => ({
+    ...Object.fromEntries(projectRef.current.files.filter((f) => f.kind === 'verilog').map((f) => [f.name, f.text])),
+    [name]: text,
+  });
+  /** Guarda el .sub y el .asy que generó un Verilog del proyecto */
+  const saveSynthesis = (name: string, text: string, r: SynthResult): boolean => {
+    if (!r.block) return false;
+    const files = [...projectRef.current.files.filter((f) => f.name.toLowerCase() !== name.toLowerCase()), { name, kind: 'verilog' as const, text }];
+    const out = applySynthesis(files, name, r.block);
+    if (out.clash) {
+      setMessage(t('{file} already exists in the project and wasn\'t generated from {name}: rename the module', { file: out.clash, name }));
+      return false;
+    }
+    editProject({ ...projectRef.current, files: out.files });
+    setMessage(t('{name}: symbol {sym} ready in the component browser (F2) under "{PROJECT_DIR}"', { name, sym: r.block.name, PROJECT_DIR }));
+    return true;
+  };
+  const synthProjectVerilog = async (name: string) => {
+    const f = projectRef.current.files.find((x) => x.name === name);
+    if (!f) return;
+    setMessage(t('Synthesizing {name}…', { name }));
+    try {
+      const r = await synthesizeVerilog(verilogSources(name, f.text), name, topModuleOf(f.text));
+      if (r.error) setMessage(t('{name}: {error}', { name, error: r.error }));
+      else saveSynthesis(name, f.text, r);
+    } catch (e) {
+      setMessage(t('Yosys could not run: {msg}', { msg: (e as Error).message }));
+    }
   };
   const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
   /** Símbolo para un .subckt de un archivo de modelos del proyecto */
@@ -2398,6 +2437,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const added: string[] = [];
     const kept: string[] = [];
     for (const f of files) {
+      if (f.kind === 'verilog') continue;
       const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
       // uno distinto con el mismo nombre no se pisa (lo más conservador): se avisa
       if (i >= 0 && next[i].text !== f.text) {
@@ -3448,12 +3488,28 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'projectfiles' && (
         <UserFilesDialog
           project={project.name}
-          files={project.files.map((f) => ({ name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : [] }))}
+          files={project.files.map((f) => {
+            const sub = f.kind === 'verilog' ? generatedSub(project.files, f.name) : undefined;
+            return { name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : sub ? generatedPins(sub) : [] };
+          })}
+          onEditVerilog={(name) => setDialog({ kind: 'verilog', name })}
+          onNewVerilog={() => setDialog({ kind: 'verilog' })}
           hasSymbol={(n) => !!lib.symbol(n)}
           onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decodeText(new Uint8Array(await x.arrayBuffer())) }))))}
           onRemove={removeProjectFile}
           onMakeSymbol={makeProjectSymbol}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'verilog' && (
+        <VerilogDialog
+          name={dialog.name ?? uniqueFileName('counter.v', project.files.map((f) => f.name))}
+          initial={(dialog.name && project.files.find((f) => f.name === dialog.name)?.text) || verilogTemplate('counter')}
+          isNew={!dialog.name}
+          taken={project.files.map((f) => f.name)}
+          synth={(name, text) => synthesizeVerilog(verilogSources(name, text), name, topModuleOf(text))}
+          onSave={(name, text, r) => saveSynthesis(name, text, r) && setDialog({ kind: 'projectfiles' })}
+          onClose={() => setDialog({ kind: 'projectfiles' })}
         />
       )}
       {driveConflict && (

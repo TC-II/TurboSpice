@@ -26,7 +26,8 @@ type Node =
 const SUFFIX: Record<string, number> = { t: 1e12, g: 1e9, meg: 1e6, k: 1e3, m: 1e-3, u: 1e-6, µ: 1e-6, n: 1e-9, p: 1e-12, f: 1e-15 };
 
 /** Funciones que reciben nombres de nodos/elementos y no expresiones */
-const isRefFn = (fn: string) => /^(v|i[bcdegsx]?)$/i.test(fn);
+// Dig(q): nodo digital de XSPICE (#209); D() es la derivada, como en LTspice
+const isRefFn = (fn: string) => /^(v|i[bcdegsx]?|dig)$/i.test(fn);
 
 export const FUNCTIONS = [
   'db', 'mag', 'abs', 'ph', 'phase', 're', 'real', 'im', 'imag', 'sqrt', 'exp', 'ln', 'log', 'log10',

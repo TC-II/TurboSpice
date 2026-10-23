@@ -179,7 +179,7 @@ export class Library implements SymbolSource {
   }
 
   /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
-  setProjectFiles(files: { name: string; kind: 'symbol' | 'model' | 'schematic'; text: string }[]): void {
+  setProjectFiles(files: { name: string; kind: 'symbol' | 'model' | 'schematic' | 'verilog'; text: string }[]): void {
     for (const k of this.projSymbols.keys()) this.cache.delete(`project:${k}`);
     this.projSymbols.clear();
     this.projModels.clear();
@@ -189,6 +189,8 @@ export class Library implements SymbolSource {
     for (const f of files) {
       if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
       else if (f.kind === 'schematic') this.projSchematics.set(f.name.replace(/\.asc$/i, '').toLowerCase(), { name: f.name, text: f.text });
+      // el Verilog (#209) se simula por el .sub que genera
+      else if (f.kind === 'verilog') continue;
       else this.projModels.set(f.name.toLowerCase(), { name: f.name, text: f.text, ...scanModels(f.text) });
     }
   }

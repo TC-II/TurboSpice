@@ -69,6 +69,9 @@ for cm in "${CODEMODELS[@]}"; do
   cp "$OBJ/src/xspice/icm/$cm/$cm.cm" "$DIST/"
 done
 
+# las funciones de libc/libm que importan los modelos de OpenVAF (#209), con el mismo truco
+emcc -O2 -fPIC -sSIDE_MODULE=1 -o "$SO/osdi_imports.so" "$HERE/osdi/imports.c"
+
 emcc -O2 "$OBJ/src/.libs/libngspice.a" "$SO"/*.so -lm -o "$DIST/ngspice.mjs" \
   -sMAIN_MODULE=2 -sAUTOLOAD_DYLIBS=0 \
   -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=web,worker,node \
@@ -76,5 +79,10 @@ emcc -O2 "$OBJ/src/.libs/libngspice.a" "$SO"/*.so -lm -o "$DIST/ngspice.mjs" \
   -sEXPORTED_FUNCTIONS="$EXPORTS" -sEXPORTED_RUNTIME_METHODS="$RUNTIME"
 
 cp "$HERE/spinit" "$DIST/spinit"
+
+# 6. Prueba de OSDI (#209): un modelo compilado como side module wasm32 que ngspice carga con
+#    pre_osdi (lo usa engine/smoke; no va al sitio)
+mkdir -p "$BUILD/osdi"
+emcc -O2 -fPIC -sSIDE_MODULE=1 -I "$SRC/src/osdi" -o "$BUILD/osdi/vres.osdi" "$HERE/osdi/vres.c"
 
 ls -la "$DIST"

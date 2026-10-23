@@ -140,6 +140,24 @@ await page.waitForTimeout(600);
 check((await crumbs()) === '' || !/DIV/.test(await crumbs()), 'Alt+↑ vuelve al testbench');
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
 
+// --- aviso al editar un subcircuito usado en varios testbenches (#199) ---
+await page.locator('.project-tree .tree-row', { hasText: 'Testbench 1' }).first().hover();
+await page.getByRole('button', { name: 'Duplicar Testbench 1' }).click();
+await page.waitForTimeout(500);
+if (await page.locator('.modal input').count()) await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+await page.keyboard.press('Escape');
+const inst2 = await page.locator('svg.editor .sym').nth(1).boundingBox();
+await page.mouse.dblclick(inst2.x + inst2.width / 2, inst2.y + inst2.height / 2);
+await page.waitForTimeout(600);
+const r2 = await page.locator('svg.editor .sym').nth(1).locator('.body').first().boundingBox();
+await page.mouse.click(r2.x + r2.width / 2, r2.y + r2.height / 2);
+await page.keyboard.press('Control+r');
+await page.waitForTimeout(300);
+check((await page.getByText('DIV se usa en 2 testbenches').count()) > 0, 'la primera edición de un subcircuito usado en 2 testbenches avisa');
+await page.keyboard.press('Control+z');
+await page.keyboard.press('Alt+ArrowUp');
+
 check(!errors.length, `sin errores en la página${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E jerarquía OK');

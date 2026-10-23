@@ -1452,4 +1452,5 @@ export const es: Record<string, string> = {
   "Write the variables of \"Add a row to the table\"": "Escribí las variables de \"Agregar una fila a la tabla\"",
   "{name} can't contain itself": "{name} no puede contenerse a sí mismo",
   "{name} can't go inside {host}: {name} already contains {host}": "{name} no puede ir adentro de {host}: {name} ya contiene a {host}",
+  "{name} is used in {n} testbenches: the changes apply to all of them": "{name} se usa en {n} testbenches: los cambios valen para todos",
 };

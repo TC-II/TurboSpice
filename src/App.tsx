@@ -85,7 +85,7 @@ import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
-import { addSubckt, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
+import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -365,8 +365,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const quietDoc = useRef(true);
   useEffect(() => {
     if (quietDoc.current) quietDoc.current = false;
-    else markDirty();
+    else markDirty(), warnShared();
   }, [history.state]);
+  // la primera vez que se edita un subcircuito usado en varios testbenches, avisarlo (#199)
+  const warnedSubs = useRef(new Set<string>());
+  const warnShared = () => {
+    const sub = pathRef.current[pathRef.current.length - 1]?.sub;
+    if (!sub || warnedSubs.current.has(sub.toLowerCase())) return;
+    warnedSubs.current.add(sub.toLowerCase());
+    const n = benchesUsing(projectRef.current, sub);
+    if (n > 1) setMessage(t('{name} is used in {n} testbenches: the changes apply to all of them', { name: sub, n }));
+  };
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
@@ -1762,6 +1771,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const p = storeSymbol(projectRef.current, curSub, text);
     projectRef.current = p;
     editProject(p);
+    warnShared();
   };
   const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
   // testbenches del panel, con sus .param y .step (el activo, con lo que se está editando)

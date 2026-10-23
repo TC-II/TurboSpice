@@ -184,6 +184,25 @@ export function placingCycle(p: Project, host: string, types: string[]): string 
   return null;
 }
 
+/** Testbenches que usan el subcircuito, directamente o a través de otros subcircuitos (#199) */
+export function benchesUsing(p: Project, name: string): number {
+  const inside = new Set([key(name)]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const f of subckts(p)) {
+      const k = key(f.name);
+      if (!inside.has(k) && parseAsc(f.text).symbols.some((s) => inside.has(key(s.type)))) inside.add(k), (grew = true);
+    }
+  }
+  const uses = (asc: string) => parseAsc(asc).symbols.some((s) => inside.has(key(s.type)));
+  let n = 0;
+  for (const v of p.variants) {
+    if (!v.sims.length) n += uses(v.base) ? 1 : 0;
+    for (const s of v.sims) n += uses(s.asc) ? 1 : 0;
+  }
+  return n;
+}
+
 /** Variante activa (para la raíz del árbol) */
 export const testbenchName = (p: Project) => variantOf(p).name;
 

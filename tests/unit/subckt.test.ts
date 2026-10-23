@@ -7,7 +7,7 @@ import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
 import { usedFiles } from '../../src/project/exchange.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
-import { addSubckt, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
+import { addSubckt, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
 
 const lib = new Library(buildBundle());
@@ -93,6 +93,18 @@ describe('subcircuitos del proyecto (#180)', () => {
     expect(childSubckts(p, subcktFile(p, 'TOP')!.text)).toEqual(['BUF']);
     const names = usedFiles(p.files, [tb('TOP')]).map((f) => f.name).sort();
     expect(names).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
+  });
+});
+
+describe('aviso al editar (#199)', () => {
+  it('cuenta los testbenches que lo usan, también a través de otro subcircuito', () => {
+    let p = withSub();
+    expect(benchesUsing(p, 'BUF')).toBe(1);
+    p = addSubckt(p, 'TOP', tb('BUF'));
+    const v = p.variants[0];
+    p = { ...p, variants: [{ ...v, sims: [...v.sims, { ...v.sims[0], id: 'b2', asc: tb('TOP') }] }] };
+    expect(benchesUsing(p, 'BUF')).toBe(2);
+    expect(benchesUsing(p, 'TOP')).toBe(1);
   });
 });
 

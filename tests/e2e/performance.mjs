@@ -4,7 +4,7 @@
 // y la segunda carga no lo vuelve a bajar.
 // Uso: node tests/e2e/performance.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { FIREFOX, launchBrowser, skipWelcome } from './lib.mjs';
+import { launchBrowser, skipWelcome } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -117,8 +117,7 @@ const vw2 = Number((await svg.getAttribute('viewBox')).split(' ')[2]);
 check(vw2 > vw1 * 2 && (await transform()) === '', `alejó (ancho ${vw1.toFixed(0)} → ${vw2.toFixed(0)}) y quedó sin transform`);
 
 // --- Barra de estado (#187): sigue lo que hay bajo el mouse ---
-// (el medio del cuerpo de R5, en (0, 448): entre sus pines (16, 464) y (16, 544), lejos de los cables;
-// el centro de la caja del <g> cae sobre el cable de arriba en Firefox)
+// (el medio del cuerpo de R5, en (0, 448): entre sus pines (16, 464) y (16, 544), lejos de los cables)
 const screenAt = async (d) => {
   const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
   return { x: box.x + ((d.x - vx) / vw) * box.width, y: box.y + ((d.y - vy) / vh) * box.height };
@@ -127,9 +126,9 @@ const r5 = await screenAt({ x: 16, y: 504 });
 await page.mouse.move(r5.x, r5.y);
 await page.waitForTimeout(100);
 const hint = await page.locator('.hint-bar').textContent();
-// (en Firefox el punto se detecta corrido y da el cable de arriba, también antes de estos cambios: #196)
-if (!FIREFOX) check(/R5/.test(hint), `la barra de estado muestra el componente bajo el mouse (${hint})`);
-else check(/\S/.test(hint), `la barra de estado sigue al mouse (${hint}; el componente exacto, #196)`);
+// (#196: en Firefox el esquemático queda más alejado, la tolerancia de 6 px abarca ~50 unidades y el
+// cable vecino le ganaba al cuerpo; ahora el componente bajo el cursor tiene prioridad)
+check(/R5/.test(hint), `la barra de estado muestra el componente bajo el mouse (${hint})`);
 
 // --- Mover todo y deshacer en el esquemático pesado (#183, #184) ---
 await page.keyboard.press('Control+a');

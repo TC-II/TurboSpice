@@ -279,6 +279,9 @@ export function textBox(t: { x: number; y: number; size: number; text: string; a
   return { x1, y1: t.y - fs / 2, x2: x1 + w, y2: t.y - fs / 2 + h };
 }
 
+/** Distancia (unidades) hasta la que un cable le gana a un símbolo bajo el cursor (#196) */
+const WIRE_NEAR = 4;
+
 /**
  * Elemento bajo el cursor, en orden de prioridad: textos, etiquetas, cables, símbolos, figuras.
  * `tol` es la tolerancia en unidades del esquemático (depende del zoom).
@@ -299,15 +302,24 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, sho
     if (t && inBox(p, textBox(t), tol / 2)) out.push({ kind: 'text', index: i });
   }
   for (let i = doc.flags.length - 1; i >= 0; i--) if (inBox(p, flagBox(doc, doc.flags[i]), tol)) out.push({ kind: 'flag', index: i });
-  doc.wires
+  const wires = doc.wires
     .map((w, i) => ({ i, d: distToSegment(p, w) }))
     .filter((x) => x.d <= tol)
-    .sort((a, b) => a.d - b.d)
-    .forEach((x) => out.push({ kind: 'wire', index: x.i }));
+    .sort((a, b) => a.d - b.d);
+  // Alejado, la tolerancia (6 px en unidades del esquemático) abarca decenas de unidades: un cable
+  // a esa distancia no le gana a un componente que está justo debajo del cursor (#196). Los
+  // cables realmente cerca (hasta WIRE_NEAR) siguen primero, para poder agarrarlos sobre el símbolo.
+  const wireOf = (x: { i: number }): ItemRef => ({ kind: 'wire', index: x.i });
+  for (const x of wires) if (x.d <= WIRE_NEAR) out.push(wireOf(x));
+  const under: ItemRef[] = [];
   for (let i = doc.symbols.length - 1; i >= 0; i--) {
     const s = doc.symbols[i];
-    if (inBox(p, symbolBox(s, lib.symbol(s.type), lib), tol / 2)) out.push({ kind: 'symbol', index: i });
+    const box = symbolBox(s, lib.symbol(s.type), lib);
+    if (inBox(p, box, 0)) under.push({ kind: 'symbol', index: i });
+    else if (inBox(p, box, tol / 2)) out.push({ kind: 'symbol', index: i });
   }
+  out.push(...under);
+  for (const x of wires) if (x.d > WIRE_NEAR) out.push(wireOf(x));
   // las figuras, al final: sólo por su trazo, la última dibujada primero
   for (let i = doc.shapes.length - 1; i >= 0; i--) if (shapeDist(doc.shapes[i], p) <= tol) out.push({ kind: 'shape', index: i });
   return out;
@@ -429,12 +441,13 @@ export function displayValue(prefix: string, value: string): string {
 }
 
 /** Rótulo visible (InstName, Value…) de un símbolo bajo el cursor: índice de WINDOW y su ventana local */
-export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number): { sym: number; win: number; w: TextWindow } | null {
+export function labelAt(doc: AscDoc, p: Point, lib: Library, tol: number, hidden = 0): { sym: number; win: number; w: TextWindow } | null {
   for (let i = doc.symbols.length - 1; i >= 0; i--) {
     const inst = doc.symbols[i];
     const def = lib.symbol(inst.type);
     if (!def) continue;
-    for (const l of labelBoxes(inst, def, lib)) if (inBox(p, l.box, tol / 2)) return { sym: i, win: l.win, w: l.w };
+    // (`hidden`: los rótulos de los primeros tamaños no se dibujan por ilegibles, no se agarran: #196)
+    for (const l of labelBoxes(inst, def, lib)) if (fontIndex(l.w.size) >= hidden && inBox(p, l.box, tol / 2)) return { sym: i, win: l.win, w: l.w };
   }
   return null;
 }

@@ -449,6 +449,8 @@ export function SchematicEditor(props: Props) {
     h: size.h / view.scale,
   };
   const tol = 6 / view.scale;
+  /** tamaños de letra que no se dibujan por ilegibles (lod-N) */
+  const lod = illegibleSizes(view.scale);
 
   const toDoc = (e: { clientX: number; clientY: number }): Point => {
     const r = svgRect();
@@ -531,7 +533,7 @@ export function SchematicEditor(props: Props) {
     } else if (tool.kind === 'zoom') setTool(tool.prev);
     else if (tool.kind !== 'select') setTool({ kind: 'select' });
     else {
-      const label = labelAt(doc, p, lib, tol);
+      const label = labelAt(doc, p, lib, tol, lod);
       if (label && onEditLabel) return onEditLabel(label.sym, label.win);
       const hit = hitTest(doc, p, lib, tol, showSimCommand);
       // un componente con menú propio (#180: propagar al grupo): lo muestra quien lo pide
@@ -588,7 +590,7 @@ export function SchematicEditor(props: Props) {
       case 'select': {
         // un rótulo se arrastra directamente; con su componente seleccionado junto a otros, se
         // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
-        const label = labelAt(doc, p, lib, tol);
+        const label = labelAt(doc, p, lib, tol, lod);
         if (label) {
           const selSyms = selection.filter((r) => r.kind === 'symbol' && doc.symbols[r.index]).map((r) => r.index);
           const syms = selSyms.includes(label.sym) ? selSyms : [label.sym];
@@ -809,7 +811,7 @@ export function SchematicEditor(props: Props) {
         onHover({ ref, at });
       }
     }
-    const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
+    const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol, lod)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
     // la punta de prueba mide la corriente por pin en los transistores; la información del punto
     // de operación (describe) sigue saliendo sobre el cuerpo
@@ -970,7 +972,7 @@ export function SchematicEditor(props: Props) {
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool.kind !== 'select') return;
     const p = toDoc(e);
-    const label = labelAt(doc, p, lib, tol);
+    const label = labelAt(doc, p, lib, tol, lod);
     if (label && onEditLabel) return onEditLabel(label.sym, label.win);
     if (wireGesture(p, tol)) return;
     const hit = hitTest(doc, p, lib, tol, showSimCommand);
@@ -1048,7 +1050,6 @@ export function SchematicEditor(props: Props) {
   const gridR = Math.min(1.5, 1.1 / view.scale);
   // Nivel de detalle (#195): los textos ilegibles se ocultan con una clase en el svg, que cambia
   // sólo con la escala (en un gesto pesado, al aplicar la vista), así el estilo se recalcula una vez
-  const lod = illegibleSizes(view.scale);
   const cursorClass =
     drag?.mode === 'pan' && (!drag.right || drag.moved)
       ? 'grabbing'

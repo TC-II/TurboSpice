@@ -7,7 +7,7 @@ import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { displayValue, flagDirection, fontSize, junctionPoints, pinPoints, visibleText, type ItemRef } from './geometry.ts';
+import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
@@ -38,7 +38,7 @@ export function AlignedText({ x, y, align, size, children, className }: {
       textAnchor={anchor}
       dominantBaseline={baseline}
       transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
-      className={className}
+      className={`fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
     >
       {children}
     </text>

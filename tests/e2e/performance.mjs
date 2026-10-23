@@ -1,4 +1,4 @@
-// E2E de los cambios de rendimiento (#186, #187, #189, #191): en un esquemático pesado el paneo y
+// E2E de los cambios de rendimiento (#186, #187, #189, #191, #195): en un esquemático pesado el paneo y
 // la rueda mueven el dibujo con un transform CSS y al terminar la vista queda donde debe; la barra
 // de estado sigue al mouse; las listas de pasivos llegan aparte; el motor queda en Cache Storage
 // y la segunda carga no lo vuelve a bajar.
@@ -137,10 +137,35 @@ const t0 = Date.now();
 await page.mouse.move(r5.x, r5.y);
 await page.mouse.down();
 await page.mouse.move(r5.x + 64, r5.y + 32, { steps: 4 });
+// todo seleccionado: se traslada el dibujo ya armado y el documento se arma al soltar (#195)
+const shifted = await page.evaluate(() => document.querySelector('svg.editor g.schematic').getAttribute('transform'));
+check(/translate/.test(shifted ?? ''), `mover todo traslada el dibujo (${shifted})`);
 await page.mouse.up();
+await page.waitForTimeout(50);
+const moved = await page.evaluate(() => ({
+  t: document.querySelector('svg.editor g.schematic').getAttribute('transform'),
+  x: document.querySelector('svg.editor .symbols > .sym .body')?.getAttribute('transform'),
+}));
+check(moved.t === null && !/^matrix\(1 0 0 1 0 0\)$/.test(moved.x ?? ''), `al soltar queda el documento movido, sin traslación (${moved.x})`);
 await page.keyboard.press('Control+z');
 await page.waitForTimeout(50);
 check(Date.now() - t0 < 5000, `seleccionar todo, mover y deshacer en ${Date.now() - t0} ms`);
+
+// --- Nivel de detalle (#195): al alejar, los textos de menos de ~3 px no se dibujan ---
+const textShown = () => page.evaluate(() => getComputedStyle(document.querySelector('svg.editor .symbols text.win')).display !== 'none');
+const pxPerUnit = async () => box.width / Number((await svg.getAttribute('viewBox')).split(' ')[2]);
+const C = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+await page.mouse.move(C.x, C.y);
+for (let i = 0; i < 20 && (await pxPerUnit()) > 0.1; i++) {
+  await page.mouse.wheel(0, 300);
+  await page.waitForTimeout(250);
+}
+check(!(await textShown()), `alejado (${(await pxPerUnit()).toFixed(3)} px por unidad) no se dibujan los rótulos`);
+for (let i = 0; i < 20 && (await pxPerUnit()) < 1; i++) {
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(250);
+}
+check(await textShown(), `de cerca (${(await pxPerUnit()).toFixed(2)} px por unidad) sí`);
 
 await page.screenshot({ path: `${OUT}/performance.png` });
 check(!errors.length, `sin errores en la página${errors.length ? `: ${errors.join(' | ')}` : ''}`);

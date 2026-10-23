@@ -1,9 +1,9 @@
 // Modo netlist: escribir una netlist SPICE a mano → simular → ver resultados.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { EngineClient } from './engine/client.ts';
 import type { SimPlot, SimResult } from './engine/ngspice.ts';
 import { EXAMPLES } from './examples.ts';
-import { Plot } from './waveform/Plot.tsx';
+import { Plot } from './waveform/lazy.ts';
 import { displayName, scaleOf, si, type ComplexView } from './waveform/series.ts';
 import { t } from './i18n/i18n.ts';
 
@@ -186,7 +186,9 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
                   </label>
                 ))}
               </div>
-              <Plot plot={plot} vectors={chosen} view={view} />
+              <Suspense fallback={null}>
+                <Plot plot={plot} vectors={chosen} view={view} />
+              </Suspense>
             </>
           )}
           {plot && !scale && <ScalarTable plot={plot} />}

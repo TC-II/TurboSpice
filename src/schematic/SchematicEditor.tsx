@@ -26,6 +26,7 @@ import {
   visibleText,
   wireVertexAt,
   fixedPoints,
+  illegibleSizes,
   sameRef,
   type Box,
   type ItemRef,
@@ -147,7 +148,7 @@ export interface View {
 type Drag =
   /** `right`: con el botón derecho; si no se movió, al soltar es un click derecho */
   | { mode: 'pan'; sx: number; sy: number; view: View; right?: boolean; moved?: boolean }
-  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean }
+  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean }
   /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
@@ -317,6 +318,24 @@ export function SchematicEditor(props: Props) {
   useLayoutEffect(() => {
     if (gesture.current) clearGesture();
   }, [view]);
+  // Mover todo en un esquemático pesado (#195): si se mueve todo lo que se ve, nada se estira y el
+  // resultado es una traslación: se desplaza el dibujo ya armado y el documento se arma al soltar
+  const selectsWhole = (refs: ItemRef[]) => {
+    const n = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
+    const texts = n('text');
+    return (
+      n('symbol').size === doc.symbols.length &&
+      n('wire').size === doc.wires.length &&
+      n('flag').size === doc.flags.length &&
+      n('shape').size === doc.shapes.length &&
+      doc.texts.every((t, i) => texts.has(i) || !visibleText(t, showSimCommand))
+    );
+  };
+  const shiftWhole = (dx: number, dy: number) => {
+    const g = svgRef.current?.querySelector('g.schematic');
+    if (dx || dy) g?.setAttribute('transform', `translate(${dx} ${dy})`);
+    else g?.removeAttribute('transform');
+  };
   const [cursor, setCursor] = useState<Point>({ x: 0, y: 0 });
   // punta de prueba: sobre una red mide tensión (punta), sobre un componente corriente (pinza)
   const [probeKind, setProbeKind] = useState<'' | 'v' | 'i'>('');
@@ -324,6 +343,10 @@ export function SchematicEditor(props: Props) {
   cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
   const [preview, setPreview] = useState<AscDoc | null>(null);
+  // fuera la traslación de mover todo en el mismo cuadro en que llega el documento movido
+  useLayoutEffect(() => {
+    if (!(drag?.mode === 'move' && drag.whole)) shiftWhole(0, 0);
+  }, [doc, drag]);
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
@@ -624,7 +647,7 @@ export function SchematicEditor(props: Props) {
         }
         const sel = e.shiftKey ? (already ? selection.filter((s) => !(s.kind === hit.kind && s.index === hit.index)) : [...selection, hit]) : already ? selection : [hit];
         setSelection(sel);
-        setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false });
+        setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false, whole: heavy() && selectsWhole(sel) });
         return;
       }
       case 'wire': {
@@ -838,8 +861,9 @@ export function SchematicEditor(props: Props) {
       const g = snapPoint(p);
       const dx = g.x - drag.start.x;
       const dy = g.y - drag.start.y;
-      if (dx || dy) setDrag({ ...drag, moved: true });
-      setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
+      if ((dx || dy) && !drag.moved) setDrag({ ...drag, moved: true });
+      if (drag.whole) shiftWhole(dx, dy);
+      else setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
     } else if (drag.mode === 'vertex' || drag.mode === 'segment') {
       wirePreview(drag, snapPoint(p), e.ctrlKey || e.metaKey);
     } else {
@@ -876,14 +900,14 @@ export function SchematicEditor(props: Props) {
       const already = selection.some((r) => sameRef(r, ref));
       setSelection(drag.shift ? (already ? selection.filter((r) => !sameRef(r, ref)) : [...selection, ref]) : already ? selection : [ref]);
     }
-    if (drag.mode === 'move' && preview && drag.moved) {
-      commit(preview);
+    if (drag.mode === 'move' && drag.moved && (preview || drag.whole)) {
       // al mover se limpian los cables (pueden cambiar de índice): reubicar la selección donde
       // terminaron los cables seleccionados (trasladados o estirados)
       const g = snapPoint(toDoc(e));
       const moved: Wire[] = [];
-      moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib, moved);
-      if (moved.length) setSelection([...drag.refs.filter((r) => r.kind !== 'wire'), ...wiresOn(preview, moved).map((index) => ({ kind: 'wire' as const, index }))]);
+      const next = moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib, moved);
+      commit(drag.whole ? next : preview!);
+      if (moved.length) setSelection([...drag.refs.filter((r) => r.kind !== 'wire'), ...wiresOn(drag.whole ? next : preview!, moved).map((index) => ({ kind: 'wire' as const, index }))]);
     }
     if (drag.mode === 'vertex' || drag.mode === 'segment') {
       const next = preview ?? (drag.mode === 'vertex' && drag.commitBase ? drag.base : null);
@@ -1022,6 +1046,9 @@ export function SchematicEditor(props: Props) {
   }, [selection, doc, lib]);
 
   const gridR = Math.min(1.5, 1.1 / view.scale);
+  // Nivel de detalle (#195): los textos ilegibles se ocultan con una clase en el svg, que cambia
+  // sólo con la escala (en un gesto pesado, al aplicar la vista), así el estilo se recalcula una vez
+  const lod = illegibleSizes(view.scale);
   const cursorClass =
     drag?.mode === 'pan' && (!drag.right || drag.moved)
       ? 'grabbing'
@@ -1033,7 +1060,7 @@ export function SchematicEditor(props: Props) {
     <>
     <svg
       ref={svgRef}
-      className={`editor tool-${cursorClass}`}
+      className={`editor tool-${cursorClass}${lod ? ` lod-${lod}` : ''}`}
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       onWheel={onWheel}
       onPointerDown={onPointerDown}

@@ -262,7 +262,12 @@ export const sameRef = (a: ItemRef, b: ItemRef) => a.kind === b.kind && a.index 
 
 /** Tamaño de letra (unidades del esquemático) para el índice de tamaño de LTspice */
 export const FONT_SIZE = [8, 13, 20, 26, 32, 46, 65, 92];
-export const fontSize = (i: number) => FONT_SIZE[Math.max(0, Math.min(7, Math.round(i)))] * 0.8;
+export const fontIndex = (i: number) => Math.max(0, Math.min(7, Math.round(i)));
+export const fontSize = (i: number) => FONT_SIZE[fontIndex(i)] * 0.8;
+/** Textos de menos de esto (px en pantalla) no se dibujan al alejar (#195) */
+export const MIN_TEXT_PX = 3;
+/** Cuántos tamaños de letra (desde el más chico) quedan ilegibles a esta escala: la clase lod-N del editor */
+export const illegibleSizes = (scale: number) => FONT_SIZE.filter((_, i) => fontSize(i) * scale < MIN_TEXT_PX).length;
 
 /** Caja aproximada de un texto libre (TEXT) */
 export function textBox(t: { x: number; y: number; size: number; text: string; align: string }): Box {

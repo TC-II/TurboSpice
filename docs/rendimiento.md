@@ -61,13 +61,38 @@ soltar. En el esquemático chico (el Sample Project) todo ya cabía en un cuadro
 - El motor se guarda en Cache Storage con el hash de cada archivo (`public/engine/manifest.json`):
   GitHub Pages cambia el ETag de todo en cada deploy y si no se volvería a bajar entero (#191).
 
+## Segunda tanda (#195)
+
+Medido con `tests/perf/bench.mjs` (CPU 4×, Chromium headless sin GPU) sobre la grilla de 800
+resistencias (TC017 no estaba en esta máquina; 7.252 nodos SVG):
+
+| Acción | antes | después |
+|---|---|---|
+| mover todo (por evento) | 66 ms (p95 136) | 17 ms (p95 33) |
+| panear (por evento) | 17 ms (p95 67) | 17 ms (p95 25) |
+| pasar el mouse (por evento) | 69 ms | 53 ms |
+| abrir el esquemático grande | 662 ms | 578 ms |
+| JS de arranque | 860 kB (303 kB gzip) | 783 kB (270 kB gzip) |
+
+- **Nivel de detalle**: cada `<text>` del esquemático lleva la clase `fsN` de su tamaño y el `<svg>`
+  la clase `lod-N` con cuántos tamaños quedan por debajo de `MIN_TEXT_PX` (3 px) en pantalla; el
+  CSS los oculta. La clase cambia sólo con la escala (en un gesto pesado, al aplicar la vista). No
+  afecta la exportación (`schematicSvg` no copia `display`).
+- **uPlot diferido**: `PlotPanel` y `Plot` se cargan con `lazy()` (`waveform/lazy.ts`) y se
+  precargan en `requestIdleCallback` cuando el motor está listo.
+- **Mover todo**: si la selección abarca todo lo que se ve (símbolos, cables, etiquetas, figuras y
+  los textos visibles) en un esquemático pesado, nada se estira: durante el arrastre se traslada el
+  `<g class="schematic">` con un atributo `transform` y el documento se arma una sola vez al soltar.
+  Mover una parte sigue armando la vista previa en cada movimiento.
+
 ## Lo que queda (medido, sin arreglar)
 
 - **El costo de fondo del SVG son los textos**: con los 1.634 textos ocultos, cambiar el `viewBox`
-  baja de 105 a 39 ms por cuadro. Ocultar rótulos ilegibles al alejar (tamaño en pantalla < ~3 px)
-  o dibujar con canvas son las opciones si hiciera falta más.
+  baja de 105 a 39 ms por cuadro. Al alejar ya se ocultan (#195); a escala legible siguen pesando.
 - Aun moviendo sólo el `transform`, Blink recorre el pintado del SVG en cada cuadro (~5 ms sin
   frenar la CPU, ~33 ms a 4×, medido en Chrome headless): por eso el paneo queda en ~50 ms y no en
   un cuadro.
-- JS principal: 754 kB (266 kB gzip). Blockly (868 kB) ya se carga aparte, al abrir el Estudio;
-  uPlot y el panel de resultados (~180 kB) podrían cargarse recién al simular.
+- Imagen del esquemático durante el gesto (#195, punto 2): no se hizo. Depende de medir con GPU
+  real (las mediciones son en headless sin GPU) y con el nivel de detalle el paneo ya bajó.
+- Mover una parte de un esquemático pesado (con cables que se estiran) sigue en un documento nuevo
+  por movimiento.

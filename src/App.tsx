@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -89,7 +89,8 @@ import { addSubckt, childSubckts, freeSubcktName, storeSymbol, subcktSymbol, sub
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
-import { PlotPanel, type PlotAction, type PlotPanelHandle } from './waveform/PlotPanel.tsx';
+import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
+import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
 import { displayName, sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
@@ -591,7 +592,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   useEffect(() => {
     engine.ready.then(
-      () => setStatus({ kind: 'idle' }),
+      () => {
+        setStatus({ kind: 'idle' });
+        preloadPlots(); // uPlot y el visor, cuando la app quede ociosa (#195)
+      },
       (e: Error) => setStatus({ kind: 'error', message: e.message }),
     );
   }, [engine]);
@@ -3104,6 +3108,7 @@ ${ltNetlistText(sim.built.lt)}
             <div className="results-body">
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
               {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
+                <Suspense fallback={null}>
                 <PlotPanel
                   key={sims.active}
                   initial={plotState.current}
@@ -3128,6 +3133,7 @@ ${ltNetlistText(sim.built.lt)}
                     setTraceNet(net ? conn.nets.find((n) => n.name.toLowerCase() === net.toLowerCase())?.name : undefined);
                   }}
                 />
+                </Suspense>
               )}
               {panel === 'plot' && plot && scale && withPz && pzSide && mode !== 'smith' && (
                 <PzPlane runs={pzAll} labels={labels} name={project.name} compact />

@@ -22,11 +22,12 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), onClose());
     // (el clic que lo abrió no lo cierra)
-    const tt = setTimeout(() => window.addEventListener('pointerdown', down), 0);
+    // (en captura: el esquemático detiene la propagación de sus clics)
+    const tt = setTimeout(() => window.addEventListener('pointerdown', down, true), 0);
     window.addEventListener('keydown', key, true);
     return () => {
       clearTimeout(tt);
-      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerdown', down, true);
       window.removeEventListener('keydown', key, true);
     };
   }, [onClose]);

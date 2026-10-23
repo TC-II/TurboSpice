@@ -2,7 +2,7 @@
 // serializado a tarjetas (si el programa es "barrer → simular → medir", así el .asc sigue
 // simulando igual en LTspice) o a un bloque .control (si usa lógica que LTspice no tiene).
 // Trabaja sobre el JSON de Blockly, sin depender de Blockly (se puede testear en Node).
-import { formatSpiceNumber } from '../netlist/spicenum.ts';
+import { formatSpiceNumber, parseSpiceNumber } from '../netlist/spicenum.ts';
 import { parseStep } from '../netlist/step.ts';
 import { PALETTE, type PlotView } from '../waveform/view.ts';
 import type { MeasAnalysis } from './meas.ts';
@@ -29,7 +29,46 @@ export interface WorkspaceJson {
 
 // --- definiciones de bloques (formato JSON de Blockly) ---------------------------------------
 
-export const COLORS = { sim: 210, circuit: 20, loop: 120, measure: 290, show: 160 };
+export const COLORS = { sim: 210, circuit: 20, loop: 120, measure: 290, show: 160, list: 260, escape: 0 };
+
+/** Análisis de los bloques "Correr análisis" y de los que eligen sobre qué resultados trabajar */
+export const RESULT_ANALYSES: [string, string][] = [
+  [t('operating point'), 'op'],
+  [t('transient'), 'tran'],
+  ['AC', 'ac'],
+  [t('dc sweep'), 'dc'],
+  [t('noise'), 'noise'],
+  [t('transfer function'), 'tf'],
+];
+
+/** Medidas de "Medir más" (block-only: se calculan en el .control, no tienen tarjeta) */
+export const EXTRA_MEASURES: [string, string][] = [
+  [t('the overshoot (%)'), 'overshoot'],
+  [t('the settling time (band A %)'), 'settle'],
+  [t('the slew rate (max |dV/dt|)'), 'slew'],
+  [t('the gain margin (dB)'), 'gainMargin'],
+];
+
+/** Funciones sobre un vector de resultados */
+export const VECTOR_FUNCTIONS: [string, string][] = [
+  [t('the value (operating point / first point)'), 'first'],
+  [t('the final value'), 'last'],
+  [t('the maximum'), 'max'],
+  [t('the minimum'), 'min'],
+  [t('the mean'), 'mean'],
+];
+
+/** Estadísticas de una lista */
+export const LIST_STATS: [string, string][] = [
+  [t('the mean'), 'mean'],
+  [t('the standard deviation'), 'stddev'],
+  [t('the minimum'), 'min'],
+  [t('the maximum'), 'max'],
+  [t('the % between A and B'), 'yield'],
+];
+
+/** Opciones del simulador del bloque "Opción" */
+export const SIM_OPTIONS = ['reltol', 'abstol', 'vntol', 'chgtol', 'gmin', 'method', 'maxord', 'itl1', 'itl4', 'temp', 'tnom'];
 
 /** Objetivos de un barrido o de "poner": "component:R1", "param:k", "source:V1", "temp" */
 export function targetOf(v: string): SweepTarget | null {
@@ -178,6 +217,222 @@ export function blockDefinitions(): object[] {
       tooltip: t('What to show in that analysis\' results (same as "Remember view"); it doesn\'t run on every run'),
       ...stmt,
     },
+    ...moreBlockDefinitions(),
+  ];
+}
+
+/** Bloques de #179: análisis, circuito, medidas, listas, tabla, control y escape */
+function moreBlockDefinitions(): object[] {
+  const stmt = { previousStatement: null, nextStatement: null };
+  const value = { output: null };
+  const inp = (name: string, text = '') => ({ type: 'field_input', name, text });
+  const v = (name: string, variable: string) => ({ type: 'field_variable', name, variable });
+  const dd = (name: string, options: [string, string][]) => ({ type: 'field_dropdown', name, options });
+  const sweepModes: [string, string][] = [[t('per decade'), 'dec'], [t('per octave'), 'oct'], [t('linear'), 'lin']];
+  return [
+    // --- simular
+    { type: 'ts_op', message0: t('Run operating point (.op)'), colour: COLORS.sim, tooltip: t('Runs a DC operating point analysis'), ...stmt },
+    {
+      type: 'ts_tran',
+      message0: t('Run transient until %1 step %2 from %3 uic %4'),
+      args0: [inp('TSTOP', '10m'), inp('TSTEP', ''), inp('TSTART', ''), { type: 'field_checkbox', name: 'UIC', checked: false }],
+      colour: COLORS.sim,
+      tooltip: t('Runs a transient analysis (empty step: automatic)'),
+      ...stmt,
+    },
+    {
+      type: 'ts_ac',
+      message0: t('Run AC %1 %2 points from %3 to %4'),
+      args0: [dd('MODE', sweepModes), inp('POINTS', '20'), inp('FSTART', '1'), inp('FSTOP', '1meg')],
+      colour: COLORS.sim,
+      tooltip: t('Runs a small-signal frequency response (the input source needs "AC 1")'),
+      ...stmt,
+    },
+    {
+      type: 'ts_dc',
+      message0: t('Run DC sweep of %1 from %2 to %3 step %4'),
+      args0: [dd('SOURCE', [[t('(choose)'), '']]), inp('START', '0'), inp('STOP', '5'), inp('STEP', '0.1')],
+      colour: COLORS.sim,
+      tooltip: t('Sweeps the DC value of a source'),
+      ...stmt,
+    },
+    {
+      type: 'ts_noise',
+      message0: t('Run noise at %1 with input %2 %3 %4 points from %5 to %6'),
+      args0: [inp('OUT', 'V(out)'), dd('SOURCE', [[t('(choose)'), '']]), dd('MODE', sweepModes), inp('POINTS', '10'), inp('FSTART', '1'), inp('FSTOP', '1meg')],
+      colour: COLORS.sim,
+      tooltip: t('Runs a noise analysis (output voltage and input source)'),
+      ...stmt,
+    },
+    {
+      type: 'ts_tf',
+      message0: t('Run transfer function of %1 from %2'),
+      args0: [inp('OUT', 'V(out)'), dd('SOURCE', [[t('(choose)'), '']])],
+      colour: COLORS.sim,
+      tooltip: t('Small-signal gain, input and output resistance (.tf)'),
+      ...stmt,
+    },
+    { type: 'ts_reset', message0: t('Restore the circuit'), colour: COLORS.sim, tooltip: t('Goes back to the original values of the circuit (reset)'), ...stmt },
+    {
+      type: 'ts_option',
+      message0: t('Simulator option %1 = %2'),
+      args0: [dd('NAME', SIM_OPTIONS.map((o): [string, string] => [o, o])), inp('VALUE', '1e-4')],
+      colour: COLORS.sim,
+      tooltip: t('Changes a simulator option (reltol, abstol, method…) for the next analyses'),
+      ...stmt,
+    },
+    {
+      type: 'ts_setplot',
+      message0: t('Use the results of %1'),
+      args0: [dd('ANALYSIS', RESULT_ANALYSES)],
+      colour: COLORS.sim,
+      tooltip: t('Chooses the last run of that analysis for the following blocks (setplot)'),
+      ...stmt,
+    },
+    // --- circuito
+    {
+      type: 'ts_temp',
+      message0: t('Set the temperature to %1 °C'),
+      args0: [{ type: 'input_value', name: 'VALUE' }],
+      colour: COLORS.circuit,
+      ...stmt,
+    },
+    {
+      type: 'ts_altermod',
+      message0: t('Set parameter %1 of model %2 to %3'),
+      args0: [inp('PARAM', 'is'), inp('MODEL', ''), { type: 'input_value', name: 'VALUE' }],
+      colour: COLORS.circuit,
+      tooltip: t('Changes a parameter of a .model (altermod)'),
+      ...stmt,
+    },
+    {
+      type: 'ts_alter_inst',
+      message0: t('Set parameter %1 of %2 to %3'),
+      args0: [inp('PARAM', 'area'), inp('INST', ''), { type: 'input_value', name: 'VALUE' }],
+      colour: COLORS.circuit,
+      tooltip: t('Changes a parameter of a component, e.g. the area of Q1 (alter @Q1[area])'),
+      ...stmt,
+    },
+    {
+      type: 'ts_source',
+      message0: t('Set %1 of source %2 to %3'),
+      args0: [dd('WHAT', [[t('the DC value'), 'dc'], [t('the AC amplitude'), 'acmag'], [t('the AC phase'), 'acphase']]), dd('SOURCE', [[t('(choose)'), '']]), { type: 'input_value', name: 'VALUE' }],
+      colour: COLORS.circuit,
+      ...stmt,
+    },
+    {
+      type: 'ts_seed',
+      message0: t('Random seed %1'),
+      args0: [{ type: 'field_number', name: 'SEED', value: 1, min: 1, precision: 1 }],
+      colour: COLORS.circuit,
+      tooltip: t('Fixes the random numbers: the same seed repeats the same runs'),
+      ...stmt,
+    },
+    {
+      type: 'ts_random',
+      message0: t('random %1 around %2 ± %3 %%'),
+      args0: [dd('DIST', [[t('uniform'), 'uniform'], [t('gaussian'), 'gauss']]), { type: 'input_value', name: 'NOM' }, { type: 'field_number', name: 'TOL', value: 5, min: 0 }],
+      inputsInline: true,
+      colour: COLORS.circuit,
+      tooltip: t('A different random value every time: uniform within the tolerance, or gaussian with 3σ = the tolerance'),
+      ...value,
+    },
+    // --- medir
+    {
+      type: 'ts_measure_more',
+      message0: t('Measure %1 of %2 A %3 → %4'),
+      args0: [dd('KIND', EXTRA_MEASURES), inp('SIGNAL', 'V(out)'), inp('A', ''), v('VAR', 'medida')],
+      colour: COLORS.measure,
+      tooltip: t('Measures on the last transient (overshoot, settling, slew rate) or AC (gain margin) run'),
+      ...stmt,
+    },
+    {
+      type: 'ts_vector',
+      message0: t('Compute %1 of %2 in %3 → %4'),
+      args0: [dd('FN', VECTOR_FUNCTIONS), inp('SIGNAL', 'V(out)'), dd('ANALYSIS', RESULT_ANALYSES), v('VAR', 'medida')],
+      colour: COLORS.measure,
+      tooltip: t('A value of a result vector, e.g. V(out) or I(V1) after the operating point'),
+      ...stmt,
+    },
+    // --- listas y estadística
+    {
+      type: 'ts_list_new',
+      message0: t('Empty the list %1'),
+      args0: [v('LIST', t('list'))],
+      colour: COLORS.list,
+      ...stmt,
+    },
+    {
+      type: 'ts_list_add',
+      message0: t('Add %1 to the list %2'),
+      args0: [{ type: 'input_value', name: 'VALUE' }, v('LIST', t('list'))],
+      colour: COLORS.list,
+      tooltip: t('Accumulates a value (e.g. one measurement per run)'),
+      ...stmt,
+    },
+    {
+      type: 'ts_list_length',
+      message0: t('length of %1'),
+      args0: [v('LIST', t('list'))],
+      colour: COLORS.list,
+      ...value,
+    },
+    {
+      type: 'ts_list_item',
+      message0: t('item %1 of %2'),
+      args0: [{ type: 'field_number', name: 'INDEX', value: 1, min: 1, precision: 1 }, v('LIST', t('list'))],
+      colour: COLORS.list,
+      ...value,
+    },
+    {
+      type: 'ts_list_stat',
+      message0: t('Compute %1 of the list %2 A %3 B %4 → %5'),
+      args0: [dd('STAT', LIST_STATS), v('LIST', t('list')), inp('A', ''), inp('B', ''), v('VAR', t('result'))],
+      colour: COLORS.list,
+      tooltip: t('Statistics of a list; "%" is the yield: the percentage of values between A and B (either can be empty)'),
+      ...stmt,
+    },
+    // --- mostrar
+    {
+      type: 'ts_table_row',
+      message0: t('Add a row to the table with %1'),
+      args0: [inp('COLS', 'medida')],
+      colour: COLORS.show,
+      tooltip: t('Variable names separated by spaces: one column each. The table, its statistics and histograms are in Measurements'),
+      ...stmt,
+    },
+    {
+      type: 'ts_histogram',
+      message0: t('Histogram of the list %1'),
+      args0: [v('LIST', t('list'))],
+      colour: COLORS.show,
+      tooltip: t('Shows the list in Measurements, with its statistics and histogram'),
+      ...stmt,
+    },
+    {
+      type: 'ts_plot_lists',
+      message0: t('Plot the list %1 against the list %2'),
+      args0: [v('Y', t('list')), v('X', t('list'))],
+      colour: COLORS.show,
+      ...stmt,
+    },
+    // --- escape
+    {
+      type: 'ts_command',
+      message0: t('ngspice command %1'),
+      args0: [inp('TEXT', 'echo hola')],
+      colour: COLORS.escape,
+      tooltip: t('A .control line as is, for what has no block'),
+      ...stmt,
+    },
+    {
+      type: 'ts_expr',
+      message0: t('expression %1'),
+      args0: [inp('TEXT', '2*pi*1k')],
+      colour: COLORS.escape,
+      tooltip: t('An ngspice expression (variables: $v_name)'),
+      ...value,
+    },
   ];
 }
 
@@ -189,14 +444,25 @@ export function toolbox(): object {
   return {
     kind: 'categoryToolbox',
     contents: [
-      cat(t('Simulate'), COLORS.sim, [b('ts_simulate')]),
-      cat(t('Circuit'), COLORS.circuit, [b('ts_set', { inputs: { VALUE: num(1000) } })]),
-      cat(t('Repeat'), COLORS.loop, [b('ts_for_list'), b('ts_for_range'), b('ts_repeat')]),
-      cat(t('Measure'), COLORS.measure, [b('ts_measure')]),
+      cat(t('Simulate'), COLORS.sim, [b('ts_simulate'), b('ts_op'), b('ts_tran'), b('ts_ac'), b('ts_dc'), b('ts_noise'), b('ts_tf'), b('ts_setplot'), b('ts_reset'), b('ts_option')]),
+      cat(t('Circuit'), COLORS.circuit, [
+        b('ts_set', { inputs: { VALUE: num(1000) } }),
+        b('ts_source', { inputs: { VALUE: num(1) } }),
+        b('ts_temp', { inputs: { VALUE: num(27) } }),
+        b('ts_altermod', { inputs: { VALUE: num(1e-14) } }),
+        b('ts_alter_inst', { inputs: { VALUE: num(1) } }),
+        b('ts_seed'),
+        b('ts_random', { inputs: { NOM: num(1000) } }),
+      ]),
+      cat(t('Repeat'), COLORS.loop, [b('ts_for_list'), b('ts_for_range'), b('ts_repeat'), b('controls_whileUntil'), b('controls_flow_statements')]),
+      cat(t('Measure'), COLORS.measure, [b('ts_measure'), b('ts_measure_more'), b('ts_vector')]),
+      cat(t('Lists'), COLORS.list, [b('ts_list_new'), b('ts_list_add'), b('ts_list_length'), b('ts_list_item'), b('ts_list_stat')]),
       cat(t('Compute'), '%{BKY_MATH_HUE}', [b('math_number'), b('math_arithmetic', { inputs: { A: num(1), B: num(1) } }), b('math_single', { inputs: { NUM: num(9) } })]),
       cat(t('Logic'), '%{BKY_LOGIC_HUE}', [b('controls_if'), b('logic_compare'), b('logic_operation'), b('logic_negate'), b('logic_boolean')]),
       cat('Variables', '%{BKY_VARIABLES_HUE}', [], { custom: 'VARIABLE' }),
-      cat(t('Show'), COLORS.show, [b('ts_plot_signal'), b('ts_plot_xy'), b('ts_print'), b('ts_message'), b('text')]),
+      cat(t('Functions'), '%{BKY_PROCEDURES_HUE}', [], { custom: 'PROCEDURE' }),
+      cat(t('Show'), COLORS.show, [b('ts_plot_signal'), b('ts_plot_xy'), b('ts_plot_lists'), b('ts_table_row'), b('ts_histogram'), b('ts_print'), b('ts_message'), b('text'), b('text_join')]),
+      cat(t('ngspice'), COLORS.escape, [b('ts_command'), b('ts_expr')]),
     ],
   };
 }
@@ -221,6 +487,15 @@ export interface CompiledBlocks {
 export const BLOCKS_MARK = '* bloques';
 /** Línea del log con un punto de un gráfico x-y */
 export const XY_PREFIX = 'TS-XY';
+/** Línea del log con una fila de la tabla ("TS-ROW a= 1 b= 2") */
+export const ROW_PREFIX = 'TS-ROW';
+/** Línea del log con los valores de una lista para su histograma ("TS-HIST nombre v1 v2…") */
+export const HIST_PREFIX = 'TS-HIST';
+/** Línea del log con dos listas a graficar ("TS-XYL y x @ x1 x2… @ y1 y2…") */
+export const XYL_PREFIX = 'TS-XYL';
+
+/** Señal escrita como en el visor (V(out), I(V1)) → vector de ngspice (v(out), i(v1)) */
+const ngSignal = (s: string) => s.trim().replace(/\bV\(/g, 'v(').replace(/\bI\(([^()]+)\)/g, (_, n: string) => `i(${n.toLowerCase()})`);
 
 const chain = (b: BlockJson | undefined): BlockJson[] => {
   const out: BlockJson[] = [];
@@ -233,6 +508,11 @@ const field = (b: BlockJson, name: string) => String(b.fields?.[name] ?? '');
 class Compiler {
   errors: string[] = [];
   plots: XyPlot[] = [];
+  /** listas usadas: se inicializan vacías al principio del programa */
+  lists = new Set<string>();
+  /** funciones propias (procedures_defnoreturn) por nombre */
+  procs = new Map<string, BlockJson>();
+  private calling: string[] = [];
   private vars: Map<string, string>;
   private analysis: MeasAnalysis;
 
@@ -240,6 +520,41 @@ class Compiler {
     this.vars = new Map((ws.variables ?? []).map((v) => [v.id, v.name]));
     this.analysis = analysis;
   }
+
+  /** Campo obligatorio (número o texto de ngspice); avisa si está vacío o no es un número */
+  required(b: BlockJson, f: string, what: string, numeric = true): string {
+    const v = field(b, f).trim();
+    if (!v) this.errors.push(t('Fill in {what}', { what }));
+    else if (numeric && !Number.isFinite(parseSpiceNumber(v))) this.errors.push(t('Invalid number in {what}: {v}', { what, v }));
+    return v;
+  }
+
+  /** Fuente elegida en un bloque (dc, noise, tf, cambiar fuente) */
+  source(b: BlockJson): string {
+    const v = field(b, 'SOURCE').trim();
+    if (!v) this.errors.push(t('Choose the source in a "{block}" block', { block: b.type.replace(/^ts_/, '') }));
+    return v.toLowerCase();
+  }
+
+  /** Lista de la variable del campo (recuerda que hay que inicializarla) */
+  list(b: BlockJson, f: string): string {
+    const n = this.shell(this.varName(b, f));
+    this.lists.add(n);
+    return n;
+  }
+
+  /** Un análisis corrido desde un bloque: queda recordado su plot para medir sobre él */
+  analysisLines(line: string, kind: string): string[] {
+    return [line.replace(/\s+/g, ' ').trim(), `set ts_plot_${kind} = $curplot`];
+  }
+
+  /** "let ts_tmp = <expr>" y su valor como variable de shell ($ts_val) */
+  value(b: BlockJson | undefined): string[] {
+    return [`let ts_tmp = ${this.expr(b)}`, 'set ts_val = "$&ts_tmp"'];
+  }
+
+  /** Guarda el vector ts_tmp en la variable de shell del bloque */
+  store = (name: string) => `set ${this.shell(name)} = "$&ts_tmp"`;
 
   varName(b: BlockJson, f: string): string {
     const v = b.fields?.[f] as { id?: string; name?: string } | string | undefined;
@@ -285,6 +600,21 @@ class Compiler {
         return `(${this.expr(input(b, 'A'))} ${field(b, 'OP') === 'OR' ? 'or' : 'and'} ${this.expr(input(b, 'B'))})`;
       case 'logic_negate':
         return `(not ${this.expr(input(b, 'BOOL'))})`;
+      case 'ts_random': {
+        const tol = Number(b.fields?.TOL ?? 0) / 100;
+        const nom = this.expr(input(b, 'NOM'));
+        // gaussiana: la tolerancia es 3σ
+        return field(b, 'DIST') === 'gauss' ? `(${nom} * (1 + ${tol / 3} * sgauss(0)))` : `(${nom} * (1 + ${tol} * sunif(0)))`;
+      }
+      case 'ts_list_length':
+        return `$#${this.list(b, 'LIST')}`;
+      case 'ts_list_item':
+        return `$${this.list(b, 'LIST')}[${Math.max(1, Math.round(Number(b.fields?.INDEX ?? 1)))}]`;
+      case 'ts_expr': {
+        const e = field(b, 'TEXT').trim();
+        if (!e) this.errors.push(t('An "expression" block is empty'));
+        return `(${e || 0})`;
+      }
       default:
         this.errors.push(t('Unsupported value block: {type}', { type: b.type }));
         return '0';
@@ -341,6 +671,39 @@ class Compiler {
     else out = lines;
     // el resultado pasa a una variable de shell: así se puede usar desde cualquier plot
     return [...out, `set ${this.shell(name)} = "$&${name}"`];
+  }
+
+  /** Sobrepico, establecimiento, slew rate y margen de ganancia (sólo bloques) */
+  measureMore(b: BlockJson): string[] {
+    const name = this.varName(b, 'VAR');
+    const sig = ngSignal(this.required(b, 'SIGNAL', t('the signal of "Measure"'), false) || 'v(out)');
+    const out = (lines: string[]) => [...lines, this.store(name)];
+    switch (field(b, 'KIND')) {
+      case 'overshoot':
+        return out(['setplot $ts_plot_tran', `let ts_y = ${sig}`, 'let ts_final = ts_y[length(ts_y)-1]', 'let ts_tmp = 100*(vecmax(ts_y)-ts_final)/ts_final']);
+      case 'settle': {
+        const band = parseSpiceNumber(field(b, 'A').trim() || '2');
+        if (!Number.isFinite(band)) this.errors.push(t('Invalid number in {what}: {v}', { what: t('the settling band'), v: field(b, 'A') }));
+        // la última vez que el error sale de la banda alrededor del valor final
+        return out([
+          'setplot $ts_plot_tran',
+          `let ts_y = ${sig}`,
+          'let ts_final = ts_y[length(ts_y)-1]',
+          'let ts_err = abs(ts_y-ts_final)',
+          `let ts_lim = ${(Number.isFinite(band) ? band : 2) / 100}*abs(ts_final)`,
+          'meas tran ts_settle when ts_err=$&ts_lim cross=last',
+          'let ts_tmp = ts_settle',
+        ]);
+      }
+      case 'slew':
+        return out(['setplot $ts_plot_tran', `let ts_tmp = vecmax(abs(deriv(${sig})))`]);
+      case 'gainMargin':
+        // donde la fase (continua) cruza −180°, cuánto le falta a la ganancia para 0 dB
+        return out(['setplot $ts_plot_ac', `let ts_ph = cph(${sig})`, 'meas ac ts_f180 when ts_ph=-3.14159265 cross=1', `let ts_gdb = db(${sig})`, 'meas ac ts_g180 find ts_gdb at=$&ts_f180', 'let ts_tmp = -ts_g180']);
+      default:
+        this.errors.push(t('Unsupported block: {type}', { type: field(b, 'KIND') }));
+        return [];
+    }
   }
 
   stmts(list: BlockJson[], scope: { t: SweepTarget; v: string }[]): string[] {
@@ -409,10 +772,171 @@ class Compiler {
           return [`echo "${n} =" $${this.shell(n)}`];
         }
         if (v?.type === 'text') return [`echo ${this.expr(v)}`];
+        if (v?.type === 'text_join') {
+          const n = Number(v.extraState?.itemCount ?? 2);
+          const parts = Array.from({ length: n }, (_, i) => input(v, `ADD${i}`)).filter((x): x is BlockJson => !!x);
+          const pre: string[] = [];
+          const words = parts.map((x, i) => {
+            if (x.type === 'text') return field(x, 'TEXT').replace(/"/g, "'");
+            if (x.type === 'variables_get') return `$${this.shell(this.varName(x, 'VAR'))}`;
+            pre.push(`let ts_j${i} = ${this.expr(x)}`);
+            return `$&ts_j${i}`;
+          });
+          return [...pre, `echo "${words.join(' ')}"`];
+        }
         return [`let ts_tmp = ${this.expr(v)}`, 'echo $&ts_tmp'];
       }
       case 'ts_message':
         return [`echo "${field(b, 'TEXT').replace(/"/g, "'")}"`];
+      // --- simular (#179)
+      case 'ts_op':
+        return this.analysisLines('op', 'op');
+      case 'ts_tran': {
+        const stop = this.required(b, 'TSTOP', t('the stop time of "Run transient"'));
+        const step = field(b, 'TSTEP').trim();
+        const start = field(b, 'TSTART').trim();
+        // sin paso: el que usa LTspice por defecto (tstop/1000 ya lo ajusta ngspice a su máximo)
+        const st = step || (Number.isFinite(parseSpiceNumber(stop)) ? formatSpiceNumber(parseSpiceNumber(stop) / 1000) : '');
+        const uic = b.fields?.UIC === true || b.fields?.UIC === 'TRUE';
+        return this.analysisLines(`tran ${st} ${stop} ${start || (uic ? '0' : '')} ${uic ? 'uic' : ''}`, 'tran');
+      }
+      case 'ts_ac': {
+        const n = this.required(b, 'POINTS', t('the points of "Run AC"'));
+        const f1 = this.required(b, 'FSTART', t('the start frequency of "Run AC"'));
+        const f2 = this.required(b, 'FSTOP', t('the stop frequency of "Run AC"'));
+        return this.analysisLines(`ac ${field(b, 'MODE') || 'dec'} ${n} ${f1} ${f2}`, 'ac');
+      }
+      case 'ts_dc': {
+        const src = this.source(b);
+        const vals = ['START', 'STOP', 'STEP'].map((f) => this.required(b, f, t('the values of "Run DC sweep"')));
+        return this.analysisLines(`dc ${src} ${vals.join(' ')}`, 'dc');
+      }
+      case 'ts_noise': {
+        const out = this.required(b, 'OUT', t('the output of "Run noise"'), false);
+        const src = this.source(b);
+        const n = this.required(b, 'POINTS', t('the points of "Run noise"'));
+        const f1 = this.required(b, 'FSTART', t('the start frequency of "Run noise"'));
+        const f2 = this.required(b, 'FSTOP', t('the stop frequency of "Run noise"'));
+        return this.analysisLines(`noise ${ngSignal(out)} ${src} ${field(b, 'MODE') || 'dec'} ${n} ${f1} ${f2}`, 'noise');
+      }
+      case 'ts_tf': {
+        const out = this.required(b, 'OUT', t('the output of "Run transfer function"'), false);
+        return this.analysisLines(`tf ${ngSignal(out)} ${this.source(b)}`, 'tf');
+      }
+      case 'ts_reset':
+        return ['reset'];
+      case 'ts_option': {
+        const name = field(b, 'NAME');
+        const v = this.required(b, 'VALUE', t('the value of option {name}', { name }), name !== 'method');
+        if (!SIM_OPTIONS.includes(name)) this.errors.push(t('Unknown simulator option: {name}', { name }));
+        return [`option ${name} = ${v}`];
+      }
+      case 'ts_setplot':
+        return [`setplot $ts_plot_${field(b, 'ANALYSIS') || 'tran'}`];
+      // --- circuito
+      case 'ts_temp':
+        return [...this.value(input(b, 'VALUE')), 'option temp = $ts_val'];
+      case 'ts_altermod': {
+        const model = this.required(b, 'MODEL', t('the model of "Set parameter of model"'), false);
+        const param = this.required(b, 'PARAM', t('the parameter of "Set parameter of model"'), false);
+        return [...this.value(input(b, 'VALUE')), `altermod ${model.toLowerCase()} ${param.toLowerCase()} = $ts_val`];
+      }
+      case 'ts_alter_inst': {
+        const inst = this.required(b, 'INST', t('the component of "Set parameter of"'), false);
+        const param = this.required(b, 'PARAM', t('the parameter of "Set parameter of"'), false);
+        return [...this.value(input(b, 'VALUE')), `alter @${inst.toLowerCase()}[${param.toLowerCase()}] = $ts_val`];
+      }
+      case 'ts_source': {
+        const src = this.source(b);
+        return [...this.value(input(b, 'VALUE')), `alter ${src} ${field(b, 'WHAT') || 'dc'} = $ts_val`];
+      }
+      case 'ts_seed':
+        return [`setseed ${Math.max(1, Math.round(Number(b.fields?.SEED ?? 1)))}`];
+      // --- medir
+      case 'ts_measure_more':
+        return this.measureMore(b);
+      case 'ts_vector': {
+        const sig = this.required(b, 'SIGNAL', t('the signal of "Compute"'), false);
+        const an = field(b, 'ANALYSIS') || 'op';
+        // AC: el módulo (los vectores son complejos)
+        const v = an === 'ac' || an === 'noise' ? `mag(${ngSignal(sig)})` : ngSignal(sig);
+        const f = { first: `${v}[0]`, last: `${v}[length(${v})-1]`, max: `vecmax(${v})`, min: `vecmin(${v})`, mean: `mean(${v})` }[field(b, 'FN')] ?? `${v}[0]`;
+        return [`setplot $ts_plot_${an}`, `let ts_tmp = ${f}`, this.store(this.varName(b, 'VAR'))];
+      }
+      // --- listas
+      case 'ts_list_new':
+        return [`set ${this.list(b, 'LIST')} = ( )`];
+      case 'ts_list_add': {
+        const l = this.list(b, 'LIST');
+        return [...this.value(input(b, 'VALUE')), `set ${l} = ( $${l} $ts_val )`];
+      }
+      case 'ts_list_stat': {
+        const l = this.list(b, 'LIST');
+        const out = this.varName(b, 'VAR');
+        const stat = field(b, 'STAT');
+        const lim = (f: string) => {
+          const v = field(b, f).trim();
+          if (v && !Number.isFinite(parseSpiceNumber(v))) this.errors.push(t('Invalid number in {what}: {v}', { what: t('the limits of the list statistics'), v }));
+          return v ? String(parseSpiceNumber(v)) : '';
+        };
+        let e: string;
+        if (stat === 'yield') {
+          const [lo, hi] = [lim('A'), lim('B')];
+          const cond = [lo && `(ts_vec ge ${lo})`, hi && `(ts_vec le ${hi})`].filter(Boolean).join(' and ') || '(ts_vec eq ts_vec)';
+          e = `100*mean(${cond})`;
+        } else e = { mean: 'mean(ts_vec)', stddev: 'stddev(ts_vec)', min: 'vecmin(ts_vec)', max: 'vecmax(ts_vec)' }[stat] ?? 'mean(ts_vec)';
+        // compose no acepta una lista vacía
+        return [`if $#${l} gt 0`, `  compose ts_vec values $${l}`, `  let ts_tmp = ${e}`, 'else', '  let ts_tmp = 0', 'end', this.store(out)];
+      }
+      // --- mostrar
+      case 'ts_table_row': {
+        const cols = field(b, 'COLS').split(/[\s,;]+/).filter(Boolean).map((c) => c.replace(/[^\w]/g, '_'));
+        if (!cols.length) {
+          this.errors.push(t('Write the variables of "Add a row to the table"'));
+          return [];
+        }
+        return [`echo ${ROW_PREFIX} ${cols.map((c) => `${c}= $${this.shell(c)}`).join(' ')}`];
+      }
+      case 'ts_histogram': {
+        const n = this.varName(b, 'LIST');
+        return [`echo ${HIST_PREFIX} ${n} $${this.list(b, 'LIST')}`];
+      }
+      case 'ts_plot_lists': {
+        const y = this.varName(b, 'Y');
+        const x = this.varName(b, 'X');
+        return [`echo ${XYL_PREFIX} ${y} ${x} @ $${this.list(b, 'X')} @ $${this.list(b, 'Y')}`];
+      }
+      // --- control
+      case 'controls_whileUntil': {
+        const cond = this.expr(input(b, 'BOOL'));
+        return [`while ${field(b, 'MODE') === 'UNTIL' ? `(not ${cond})` : cond}`, ...body('DO'), 'end'];
+      }
+      case 'controls_flow_statements':
+        return [field(b, 'FLOW') === 'CONTINUE' ? 'continue' : 'break'];
+      case 'procedures_callnoreturn': {
+        const name = String(b.extraState?.name ?? '');
+        const def = this.procs.get(name);
+        if (!def) {
+          this.errors.push(t('Function not found: {name}', { name }));
+          return [];
+        }
+        if (this.calling.includes(name)) {
+          this.errors.push(t('A function can\'t call itself: {name}', { name }));
+          return [];
+        }
+        // ngspice no tiene funciones: se copia el cuerpo; los argumentos son variables
+        const params = (def.extraState?.params as { name: string }[] | undefined) ?? [];
+        const args = params.flatMap((p, i) => [`let ts_tmp = ${this.expr(input(b, `ARG${i}`))}`, this.store(p.name.replace(/[^\w]/g, '_'))]);
+        this.calling.push(name);
+        const inner = this.stmts(chain(input(def, 'STACK')), scope);
+        this.calling.pop();
+        return [...args, ...inner];
+      }
+      case 'ts_command': {
+        const l = field(b, 'TEXT').trim();
+        if (!l) this.errors.push(t('An "ngspice command" block is empty'));
+        return l ? [l] : [];
+      }
       case 'ts_plot_xy': {
         const x = this.varName(b, 'X');
         const y = this.varName(b, 'Y');
@@ -500,12 +1024,20 @@ export function compileBlocks(ws: WorkspaceJson, analysis: MeasAnalysis): Compil
   const c = new Compiler(ws, analysis);
   const tops = [...(ws.blocks?.blocks ?? [])].sort((a, b) => (a.y ?? 0) - (b.y ?? 0) || (a.x ?? 0) - (b.x ?? 0));
   // "Graficar señal" es la vista de resultados: no cuenta para la forma del programa
-  const top = tops.flatMap((b) => chain(b)).filter((b) => b.type !== 'ts_plot_signal');
+  // las funciones propias no son pasos: se copian donde se llaman
+  for (const b of tops) if (b.type === 'procedures_defnoreturn') c.procs.set(field(b, 'NAME'), b);
+  const top = tops
+    .filter((b) => !b.type.startsWith('procedures_def'))
+    .flatMap((b) => chain(b))
+    .filter((b) => b.type !== 'ts_plot_signal');
+  if (tops.some((b) => b.type === 'procedures_defreturn')) c.errors.push(t('Functions that return a value are not supported: use one without a result and a variable'));
   const cards = asCards(top, analysis, (b, f) => c.varName(b, f));
   const plot = plotFromBlocks(allBlocks(tops));
   const empty = { sweeps: [], measures: [], tolerance: null, custom: null, blocks: ws, ...(plot ? { plot } : {}) } as Study;
   if (cards) return { study: { ...empty, ...cards }, ltspice: true, errors: [] };
-  const lines = c.stmts(top, []);
+  const body = c.stmts(top, []);
+  // las listas empiezan vacías
+  const lines = [...[...c.lists].map((l) => `set ${l} = ( )`), ...body];
   const plots = c.plots.map((p) => `* grafico ${p.id} ${p.x} ${p.y}`);
   return {
     study: { ...empty, custom: { mode: 'full', body: [BLOCKS_MARK, ...plots, ...lines].join('\n'), before: '', after: '', final: '' } },

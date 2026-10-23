@@ -1,6 +1,6 @@
 // Pestaña "Mediciones": resultados de los .meas por corrida, estadísticas e histogramas.
 import { si } from '../waveform/series.ts';
-import { columnStats, histogram, measNumber, type MeasTable } from './measResults.ts';
+import { columnStats, histogram, measCsv, measNumber, type MeasTable } from './measResults.ts';
 import type { MeasResult } from './meas.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -36,6 +36,16 @@ function Histogram({ values, label }: { values: number[]; label: string }) {
   );
 }
 
+/** Descarga la tabla como measurements.csv (se genera en el navegador) */
+function downloadCsv(table: MeasTable) {
+  const url = URL.createObjectURL(new Blob([measCsv(table)], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'measurements.csv';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export function MeasPanel({ table }: { table: MeasTable }) {
   const many = table.rows.length > 1;
   const cols = table.names.map((n) => table.rows.map((r) => measNumber(r.values.get(n))));
@@ -44,6 +54,11 @@ export function MeasPanel({ table }: { table: MeasTable }) {
       {table.errors.map((e) => (
         <p key={e} className="hint warn">{e}</p>
       ))}
+      <p>
+        <button type="button" onClick={() => downloadCsv(table)}>
+          {t('Export CSV')}
+        </button>
+      </p>
       <table className="scalars meas-table">
         <thead>
           <tr>

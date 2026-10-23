@@ -25,22 +25,32 @@ function targetOptions(): [string, string][] {
   return opts;
 }
 
+/** Fuentes independientes del circuito (bloques de análisis DC, ruido, .tf y "cambiar fuente") */
+function sourceOptions(): [string, string][] {
+  const srcs = currentInfo?.sources ?? [];
+  return srcs.length ? srcs.map((s): [string, string] => [s, s]) : [[t('(choose)'), '']];
+}
+
 let defined = false;
 function defineBlocks() {
   if (defined) return;
   defined = true;
   Blockly.common.defineBlocksWithJsonArray(blockDefinitions());
   // desplegables con los componentes, fuentes y parámetros del circuito
-  for (const type of ['ts_for_list', 'ts_for_range', 'ts_set']) {
+  const dynamic: [string, string, () => [string, string][]][] = [
+    ...['ts_for_list', 'ts_for_range', 'ts_set'].map((type): [string, string, () => [string, string][]] => [type, 'TARGET', targetOptions]),
+    ...['ts_dc', 'ts_noise', 'ts_tf', 'ts_source'].map((type): [string, string, () => [string, string][]] => [type, 'SOURCE', sourceOptions]),
+  ];
+  for (const [type, name, options] of dynamic) {
     const def = Blockly.Blocks[type];
     const init = def.init;
     def.init = function (this: Blockly.Block) {
       init.call(this);
-      const old = this.getField('TARGET')!;
+      const old = this.getField(name)!;
       const input = old.getParentInput();
       const idx = input.fieldRow.indexOf(old);
-      input.removeField('TARGET');
-      input.insertFieldAt(idx, new Blockly.FieldDropdown(targetOptions as () => [string, string][], (v) => v), 'TARGET');
+      input.removeField(name);
+      input.insertFieldAt(idx, new Blockly.FieldDropdown(options, (v) => v), name);
     };
   }
 }

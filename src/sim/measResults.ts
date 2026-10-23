@@ -120,3 +120,63 @@ export function xyPlotsFromLog(log: string[], specs: { id: number; x: string; y:
       };
     });
 }
+
+/**
+ * Tabla, histogramas y gráficos de listas de un programa de bloques (#179), impresos en el log:
+ * "TS-ROW a= 1 b= 2" (una fila), "TS-HIST lista v1 v2…" (una columna con cada valor) y
+ * "TS-XYL y x @ x1 x2… @ y1 y2…" (un gráfico lista contra lista).
+ */
+export function blockResultsFromLog(log: string[]): { table: MeasTable | null; plots: SimPlot[] } {
+  const rows: MeasRow[] = [];
+  const names: string[] = [];
+  const plots: SimPlot[] = [];
+  const add = (n: string) => names.includes(n) || names.push(n);
+  const num = (s: string) => parseSpiceNumber(s);
+  for (const raw of log) {
+    const l = raw.trim();
+    let m = /^TS-ROW\s+(.*)$/.exec(l);
+    if (m) {
+      const values = new Map<string, MeasResult>();
+      for (const [, n, v] of m[1].matchAll(/(\w+)=\s*(\S+)/g)) {
+        add(n);
+        values.set(n, Number.isFinite(num(v)) ? { value: num(v) } : { error: v });
+      }
+      rows.push({ plot: `row${rows.length + 1}`, label: String(rows.length + 1), values });
+      continue;
+    }
+    m = /^TS-HIST\s+(\w+)\s*(.*)$/.exec(l);
+    if (m) {
+      const n = m[1];
+      add(n);
+      for (const v of m[2].split(/\s+/).filter(Boolean)) rows.push({ plot: `row${rows.length + 1}`, label: String(rows.length + 1), values: new Map([[n, { value: num(v) }]]) });
+      continue;
+    }
+    m = /^TS-XYL\s+(\w+)\s+(\w+)\s*@(.*)@(.*)$/.exec(l);
+    if (m) {
+      const xs = m[3].split(/\s+/).filter(Boolean).map(num);
+      const ys = m[4].split(/\s+/).filter(Boolean).map(num);
+      const n = Math.min(xs.length, ys.length);
+      const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => xs[a] - xs[b]);
+      if (n)
+        plots.push({
+          name: `${m[1]} vs ${m[2]}`,
+          vectors: [
+            { name: m[2], type: STEP_SCALE, real: Float64Array.from(order, (i) => xs[i]) },
+            { name: m[1], type: 0, real: Float64Array.from(order, (i) => ys[i]) },
+          ],
+        });
+    }
+  }
+  return { table: rows.length ? { names, rows, errors: [] } : null, plots };
+}
+
+/** La tabla de mediciones como CSV (una fila por corrida) */
+export function measCsv(table: MeasTable): string {
+  const cell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
+  const head = ['run', ...table.names];
+  const lines = table.rows.map((r) => [r.label ?? r.plot, ...table.names.map((n) => {
+    const v = measNumber(r.values.get(n));
+    return Number.isFinite(v) ? String(v) : '';
+  })]);
+  return [head, ...lines].map((l) => l.map(cell).join(',')).join('\n') + '\n';
+}

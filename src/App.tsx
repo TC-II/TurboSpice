@@ -98,7 +98,7 @@ import { evalTrace } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
-import { measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
+import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
 import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
@@ -1069,12 +1069,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
-      const meas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
-      const mp = meas && measSweepPlot(meas, built);
+      const cardMeas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
+      const mp = cardMeas && measSweepPlot(cardMeas, built);
       if (mp) result.plots.push(mp);
-      // gráficos x-y de un programa de bloques
-      const xy = xyPlotsFromLog(result.log, built.ng.xyPlots);
+      // gráficos x-y de un programa de bloques, y sus listas y tabla (#179)
+      const blk = built.ng.blocks ? blockResultsFromLog(result.log) : { table: null, plots: [] };
+      const xy = [...xyPlotsFromLog(result.log, built.ng.xyPlots), ...blk.plots];
       result.plots.push(...xy);
+      const meas = cardMeas ?? blk.table;
       // los resultados de la última corrida quedan en el navegador (no van en el .turbo)
       if (id) saveResult(id, { asc: simAsc, result: { result, meas }, time: Date.now() });
       // si mientras tanto se eligió otra simulación, los resultados quedan guardados para ésta
@@ -1122,7 +1124,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (result.plots.length) {
         setTool({ kind: 'probe' });
         const nothingPlotted = !(remembered ?? panes).some((p) => p.traces.length) && !built.controlPanes.length;
-        setPanel(errs.length ? 'problems' : meas?.rows.length && nothingPlotted ? 'meas' : 'plot');
+        setPanel(errs.length ? 'problems' : meas?.rows.length && (nothingPlotted || (blk.table && !xy.length)) ? 'meas' : 'plot');
       } else setPanel(errs.length ? 'problems' : 'log');
     } catch (e) {
       setStatus({ kind: 'error', message: (e as Error).message });

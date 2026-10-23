@@ -898,6 +898,73 @@ check(again.some((t) => /R1 demasiado grande/.test(t)), 'al reabrir, el programa
 await page.screenshot({ path: `${OUT}/blocks.png` });
 await page.keyboard.press('Escape');
 
+// --- #179: bloques de análisis, listas, tabla e histograma ---
+{
+  const runProgram = async (json) => {
+    await openExample(page, 'RC Filter');
+    await page.locator('svg.editor .sym').first().waitFor();
+    await page.keyboard.press('Alt+e');
+    await page.getByRole('button', { name: 'Bloques' }).click();
+    await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });
+    await page.locator('.study-blocks').evaluate((el, j) => el.loadProgram(j), json);
+    await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+    await page.getByRole('button', { name: 'Simular' }).click();
+    await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
+  };
+  const v = (n) => ({ id: `v_${n}` });
+  const get = (n) => ({ type: 'variables_get', fields: { VAR: v(n) } });
+  const link = (...l) => {
+    for (let i = l.length - 2; i >= 0; i--) l[i].next = { block: l[i + 1] };
+    return { ...l[0], x: 20, y: 20 };
+  };
+  const vars = ['vop', 'fc', 'peak', 'm', 'ms', 'yield'].map((n) => ({ name: n, id: `v_${n}` }));
+  // el ejemplo no tiene "AC 1": se lo pone el programa
+  const ac1 = () => ({ type: 'ts_source', fields: { WHAT: 'acmag', SOURCE: 'V1' }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: 1 } } } } });
+  // op + ac + tran en secuencia, una medida de cada uno y una tabla
+  await runProgram({
+    blocks: { languageVersion: 0, blocks: [link(
+      ac1(),
+      { type: 'ts_op' },
+      { type: 'ts_vector', fields: { FN: 'first', SIGNAL: 'V(out)', ANALYSIS: 'op', VAR: v('vop') } },
+      { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '1', FSTOP: '1meg' } },
+      { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('fc') } },
+      { type: 'ts_tran', fields: { TSTOP: '10m', TSTEP: '', TSTART: '', UIC: false } },
+      { type: 'ts_vector', fields: { FN: 'max', SIGNAL: 'V(out)', ANALYSIS: 'tran', VAR: v('peak') } },
+      { type: 'ts_table_row', fields: { COLS: 'vop fc peak' } },
+    )] },
+    variables: vars,
+  });
+  const head = await page.locator('.meas-panel thead th').allTextContents();
+  const row = await page.locator('.meas-panel tbody tr').first().locator('td').allTextContents();
+  check(head.join() === 'vop,fc,peak' && /^15[89]/.test(row[1]) && /^9\d\d/.test(row[2]), `op + ac + tran en secuencia, con la tabla de medidas (${head} | ${row})`);
+  // Monte Carlo de 100 corridas: lista, histograma y rendimiento
+  const rnd = (nom, tol) => ({ type: 'ts_random', fields: { DIST: 'uniform', TOL: tol }, inputs: { NOM: { block: { type: 'math_number', fields: { NUM: nom } } } } });
+  await runProgram({
+    blocks: { languageVersion: 0, blocks: [link(
+      ac1(),
+      { type: 'ts_seed', fields: { SEED: 1 } },
+      { type: 'ts_repeat', fields: { TIMES: 100 }, inputs: { DO: { block: link(
+        { type: 'ts_set', fields: { TARGET: 'component:R1' }, inputs: { VALUE: { block: rnd(1000, 5) } } },
+        { type: 'ts_set', fields: { TARGET: 'component:C1' }, inputs: { VALUE: { block: rnd(1e-7, 10) } } },
+        { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '10', FSTOP: '1meg' } },
+        { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('m') } },
+        { type: 'ts_list_add', fields: { LIST: v('ms') }, inputs: { VALUE: { block: get('m') } } },
+      ) } } },
+      { type: 'ts_histogram', fields: { LIST: v('ms') } },
+      { type: 'ts_list_stat', fields: { STAT: 'yield', LIST: v('ms'), A: '1.5k', B: '1.7k', VAR: v('yield') } },
+      { type: 'ts_print', inputs: { VALUE: { block: get('yield') } } },
+    )] },
+    variables: vars,
+  });
+  const mcRows = await page.locator('.meas-panel tbody tr').count();
+  const hist = await page.locator('.meas-panel .histogram rect').count();
+  check(mcRows === 100 && hist > 0, `Monte Carlo de 100 corridas con histograma (${mcRows} filas, ${hist} barras)`);
+  await page.screenshot({ path: `${OUT}/blocks-montecarlo.png` });
+  await resultsMenu(page, 'Log');
+  const y = /yield = ([\d.]+)/.exec(await page.locator('.results-body pre').textContent());
+  check(!!y && Number(y[1]) > 0 && Number(y[1]) <= 100, `rendimiento del Monte Carlo en el Log (${y?.[1]} %)`);
+}
+
 // --- #47: ventana de configuración de fuentes ---
 await openExample(page, 'RC Filter');
 await page.locator('svg.editor .sym').first().waitFor();

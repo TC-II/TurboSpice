@@ -50,7 +50,8 @@ describe('Plantillas del Estudio (#178)', () => {
     expect(st.tolerance).toMatchObject({ mode: 'montecarlo', runs: '50' });
     expect(st.tolerance!.items.map((i) => `${i.component} ${i.tol}`)).toEqual(['R1 5', 'C1 10']);
     expect(st.measures[1].line).toBe('.meas tran yield PARAM (1+sgn(m1-0.9))/2*(1+sgn(1.1-m1))/2');
-    expect(templateBlocks(base(), 'montecarlo', RC, defaultOptions(RC))).toBeNull();
+    // con bloques: la versión de #179 (lista, histograma y rendimiento)
+    expect(templateBlocks(base(), 'montecarlo', RC, defaultOptions(RC))?.blocks?.blocks[0].type).toBe('ts_seed');
   });
 
   it('serie de simulaciones: .op, .ac y .tran', () => {

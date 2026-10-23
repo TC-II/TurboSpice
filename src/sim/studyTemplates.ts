@@ -370,6 +370,10 @@ export function templateBlocks(st: Study, id: string, c: TemplateCircuit, o: Tem
   const tpl = templateById(id);
   if (tpl?.blocks) return tpl.blocks(c, o);
   const next = applyTemplate(st, id, c, o);
+  // Monte Carlo y la serie de análisis tienen su versión en bloques (#179): lista con
+  // histograma y rendimiento, y análisis en secuencia con una tabla
+  if (id === 'montecarlo') return montecarloBlocks(c, o);
+  if (id === 'series') return seriesBlocks(next, o);
   return blocksCanExpress(next) ? studyToBlocks(next) : null;
 }
 
@@ -448,4 +452,73 @@ export function searchBlocks(c: TemplateCircuit, o: TemplateOptions): WorkspaceJ
   top.x = 20;
   top.y = 20;
   return { blocks: { languageVersion: 0, blocks: [top] }, variables: vars };
+}
+
+// --- Monte Carlo y serie de simulaciones con bloques (#179) --------------------------------
+
+const link = (list: BlockJson[]): BlockJson => {
+  for (let i = list.length - 2; i >= 0; i--) list[i].next = { block: list[i + 1] };
+  return list[0];
+};
+const program = (top: BlockJson, names: string[]): WorkspaceJson => {
+  top.x = 20;
+  top.y = 20;
+  return { blocks: { languageVersion: 0, blocks: [top] }, variables: names.map((n) => ({ name: n, id: `var_${n}` })) };
+};
+const vid = (n: string) => ({ id: `var_${n}` });
+const numBlock = (n: number): BlockJson => ({ type: 'math_number', fields: { NUM: n } });
+
+/**
+ * 100 corridas con R ±5 % y C/L ±10 % (uniforme, semilla fija): la medida de cada corrida va a
+ * una lista, con su histograma y, si hay especificación, el % que la cumple (rendimiento).
+ */
+export function montecarloBlocks(c: TemplateCircuit, o: TemplateOptions): WorkspaceJson {
+  const kind = o.analysis === 'ac' ? 'f3db' : 'max';
+  const sets: BlockJson[] = toleranceItems(c).map((it) => ({
+    type: 'ts_set',
+    fields: { TARGET: `component:${it.component}` },
+    inputs: { VALUE: { block: { type: 'ts_random', fields: { DIST: 'uniform', TOL: Number(it.tol) }, inputs: { NOM: { block: numBlock(parseSpiceNumber(it.original ?? '0')) } } } } },
+  }));
+  const body = link([
+    ...sets,
+    { type: 'ts_simulate' },
+    { type: 'ts_measure', fields: { KIND: kind, SIGNAL: o.signal, A: '', B: '', VAR: vid('m') } },
+    { type: 'ts_list_add', fields: { LIST: vid('ms') }, inputs: { VALUE: { block: { type: 'variables_get', fields: { VAR: vid('m') } } } } },
+  ]);
+  const lo = o.specMin.trim();
+  const hi = o.specMax.trim();
+  const spec: BlockJson[] =
+    lo || hi
+      ? [
+          { type: 'ts_list_stat', fields: { STAT: 'yield', LIST: vid('ms'), A: lo, B: hi, VAR: vid('yield') } },
+          { type: 'ts_print', inputs: { VALUE: { block: { type: 'variables_get', fields: { VAR: vid('yield') } } } } },
+        ]
+      : [];
+  const top = link([
+    { type: 'ts_seed', fields: { SEED: 1 } },
+    { type: 'ts_list_new', fields: { LIST: vid('ms') } },
+    { type: 'ts_repeat', fields: { TIMES: 100 }, inputs: { DO: { block: body } } },
+    { type: 'ts_reset' },
+    { type: 'ts_histogram', fields: { LIST: vid('ms') } },
+    ...spec,
+  ]);
+  return program(top, ['m', 'ms', 'yield']);
+}
+
+/** .op + .ac + .tran en secuencia, una medida de cada uno y una fila de la tabla con las tres */
+export function seriesBlocks(st: Study, o: TemplateOptions): WorkspaceJson {
+  const ac = (st.analyses ?? []).map((a) => parseAnalysis(a.line)).find((p) => p?.kind === 'ac');
+  const acp = ac?.kind === 'ac' ? ac : (defaultAnalysis('ac') as Extract<ReturnType<typeof defaultAnalysis>, { kind: 'ac' }>);
+  const top = link([
+    { type: 'ts_op' },
+    { type: 'ts_vector', fields: { FN: 'first', SIGNAL: o.signal, ANALYSIS: 'op', VAR: vid('vop') } },
+    { type: 'ts_ac', fields: { MODE: acp.sweep.type, POINTS: acp.sweep.points, FSTART: acp.sweep.start, FSTOP: acp.sweep.stop } },
+    { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: o.signal, A: '', B: '', VAR: vid('fc') } },
+    { type: 'ts_tran', fields: { TSTOP: tranStop(st), TSTEP: '', TSTART: '', UIC: false } },
+    { type: 'ts_vector', fields: { FN: 'max', SIGNAL: o.signal, ANALYSIS: 'tran', VAR: vid('peak') } },
+    { type: 'ts_table_row', fields: { COLS: 'vop fc peak' } },
+    { type: 'ts_plot_signal', fields: { SIGNAL: o.signal, PANE: 1, COLOR: 'auto', ANALYSIS: 'ac' } },
+    { type: 'ts_plot_signal', fields: { SIGNAL: o.signal, PANE: 1, COLOR: 'auto', ANALYSIS: 'tran' } },
+  ]);
+  return program(top, ['vop', 'fc', 'peak']);
 }

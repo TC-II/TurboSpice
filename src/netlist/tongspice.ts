@@ -50,6 +50,8 @@ export interface NgspiceNetlist {
   measures: string[];
   /** gráficos x-y de un programa de bloques (puntos en el log: "TS-XY id x y") */
   xyPlots: { id: number; x: string; y: string }[];
+  /** el .control lo generó un programa de bloques (tabla, listas e histogramas en el log) */
+  blocks?: boolean;
   warnings: string[];
 }
 
@@ -914,7 +916,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures, xyPlots };
+  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

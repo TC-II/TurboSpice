@@ -21,18 +21,49 @@ export interface TreeSub {
 }
 
 /** Panel lateral: testbenches (variantes) y subcircuitos */
-export function ProjectTree({ project, benches, activeBench, subs, current, onBench, onTestbench, onNewBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onImport, onClose }: {
+export interface TreeBench {
+  id: string;
+  name: string;
+  /** su simulación ("Transient 0–5 ms") */
+  detail: string;
+  group?: string;
+  /** cuántos .param tiene */
+  params: number;
+}
+
+export type BenchItem = 'sim' | 'schematic' | 'params';
+
+const COLLAPSED_KEY = 'turbospice.treeCollapsed';
+const loadCollapsed = (): Set<string> => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onImport, onClose, onLeave }: {
   project: string;
-  /** testbenches: cada uno con su esquemático y su simulación (detail: el análisis) */
-  benches: { id: string; name: string; detail: string }[];
+  benches: TreeBench[];
+  groups: { id: string; name: string }[];
   activeBench: string;
   subs: TreeSub[];
   /** subcircuito abierto ('' = testbench) */
   current: string;
+  /** mostrar el panel al acercar el mouse al borde (en modo selección) */
+  hoverReveal: boolean;
+  /** se está mostrando por acercar el mouse (encima del esquemático) */
+  peek: boolean;
+  onHoverReveal(on: boolean): void;
   onBench(id: string): void;
   /** volver al testbench activo (desde un subcircuito) */
   onTestbench(): void;
-  onNewBench(): void;
+  /** abrir una parte de un testbench: su simulación, su esquemático o sus parámetros */
+  onBenchItem(id: string, item: BenchItem): void;
+  onNewBench(group?: string): void;
+  onNewGroup(): void;
+  onGroupAction(id: string, action: 'rename' | 'delete'): void;
+  onMoveBench(id: string, group?: string): void;
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
@@ -45,7 +76,100 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
   onDelete(name: string): void;
   onUpdateSymbol(name: string): void;
   onClose(): void;
+  /** el mouse salió del panel (para esconderlo si se mostró al acercarlo) */
+  onLeave(): void;
 }) {
+  // grupos y testbenches plegados (los testbenches arrancan plegados salvo el activo)
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const [openBench, setOpenBench] = useState<Set<string>>(() => new Set([activeBench]));
+  useEffect(() => setOpenBench((s) => (s.has(activeBench) ? s : new Set([...s, activeBench]))), [activeBench]);
+  const toggleGroup = (id: string) =>
+    setCollapsed((s) => {
+      const n = new Set(s);
+      if (!n.delete(id)) n.add(id);
+      try {
+        localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...n]));
+      } catch {
+        /* sin almacenamiento */
+      }
+      return n;
+    });
+  const toggleBench = (id: string) =>
+    setOpenBench((s) => {
+      const n = new Set(s);
+      if (!n.delete(id)) n.add(id);
+      return n;
+    });
+  const [dragging, setDragging] = useState('');
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const drop = (group?: string) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragging) return;
+      e.preventDefault();
+      setDropOn(group ?? '');
+    },
+    onDragLeave: () => setDropOn(null),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragging) onMoveBench(dragging, group);
+      setDragging('');
+      setDropOn(null);
+    },
+  });
+  const bench = (b: TreeBench, depth: number) => {
+    const open = openBench.has(b.id);
+    const active = !current && b.id === activeBench;
+    const item = (it: BenchItem, glyph: string, label: string, meta?: string) => (
+      <li key={it}>
+        <div className="tree-row tree-sub" style={{ paddingLeft: 26 + depth * 14 }}>
+          <button className="tree-name" onClick={() => onBenchItem(b.id, it)}>
+            <span className="tree-glyph">{glyph}</span> {label}
+          </button>
+          {meta && <span className="tree-meta">{meta}</span>}
+        </div>
+      </li>
+    );
+    return (
+      <li key={b.id}>
+        <div
+          className={`tree-row${active ? ' active' : ''}${dragging === b.id ? ' dragging' : ''}`}
+          style={{ paddingLeft: 4 + depth * 14 }}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', b.name);
+            setDragging(b.id);
+          }}
+          onDragEnd={() => (setDragging(''), setDropOn(null))}
+          title={t('Drag it onto a group to move it')}
+        >
+          <button className="tree-caret" onClick={() => toggleBench(b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
+            {open ? '▾' : '▸'}
+          </button>
+          <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={b.detail}>
+            <span className="tree-glyph">{b.id === activeBench ? '●' : '○'}</span> {b.name}
+          </button>
+          <span className="tree-actions">
+            <button onClick={() => onBenchAction(b.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
+            <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
+              <Icon name="copy" size={13} />
+            </button>
+            <button onClick={() => onBenchAction(b.id, 'delete')} disabled={benches.length === 1} title={benches.length > 1 ? t('Delete') : t('It\'s the only testbench')} aria-label={t('Delete {name}', { name: b.name })}>
+              <Icon name="trash" size={13} />
+            </button>
+          </span>
+        </div>
+        {open && (
+          <ul>
+            {item('sim', '⚙', t('Simulation settings'), b.detail)}
+            {item('schematic', '▭', t('Schematic'))}
+            {item('params', '{}', t('Parameters and variables'), b.params ? String(b.params) : undefined)}
+          </ul>
+        )}
+      </li>
+    );
+  };
+  const loose = benches.filter((b) => !b.group || !groups.some((g) => g.id === b.group));
   const [usesOf, setUsesOf] = useState('');
   const byName = new Map(subs.map((s) => [s.name.toLowerCase(), s]));
   // raíces: los que no usa ningún otro subcircuito
@@ -102,41 +226,58 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
     </li>
   );
   return (
-    <aside className="project-tree" aria-label={t('Project')}>
+    <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave}>
       <header>
         <strong title={project}>{project}</strong>
         <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
           <Icon name="close" size={14} />
         </button>
       </header>
+      <label className="tree-hover">
+        <input type="checkbox" checked={hoverReveal} onChange={(e) => onHoverReveal(e.target.checked)} />
+        {t('Show when the mouse approaches the edge (in select mode)')}
+      </label>
       <h4>
         {t('Testbenches')}
         <span className="tree-adds">
-          <button className="tree-add" onClick={onNewBench} title={t('New empty testbench')} aria-label={t('Add an empty testbench')}>
+          <button className="tree-add" onClick={onNewGroup} title={t('New group of testbenches')}>
+            + {t('Group')}
+          </button>
+          <button className="tree-add" onClick={() => onNewBench()} title={t('New empty testbench')} aria-label={t('Add an empty testbench')}>
             + {t('New')}
           </button>
         </span>
       </h4>
       <ul>
-        {benches.map((b) => (
-          <li key={b.id}>
-            <div className={`tree-row${!current && b.id === activeBench ? ' active' : ''}`}>
-              <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={b.detail}>
-                <span className="tree-glyph">{b.id === activeBench ? '●' : '○'}</span> {b.name}
-              </button>
-              <span className="tree-meta">{b.detail}</span>
-              <span className="tree-actions">
-                <button onClick={() => onBenchAction(b.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
-                <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
-                  <Icon name="copy" size={13} />
+        {groups.map((g) => {
+          const fold = collapsed.has(g.id);
+          const inGroup = benches.filter((b) => b.group === g.id);
+          return (
+            <li key={g.id}>
+              <div className={`tree-row tree-group${dropOn === g.id ? ' drop' : ''}`} {...drop(g.id)}>
+                <button className="tree-caret" onClick={() => toggleGroup(g.id)} aria-label={fold ? t('Expand {name}', { name: g.name }) : t('Collapse {name}', { name: g.name })} aria-expanded={!fold}>
+                  {fold ? '▸' : '▾'}
                 </button>
-                <button onClick={() => onBenchAction(b.id, 'delete')} disabled={benches.length === 1} title={benches.length > 1 ? t('Delete') : t('It\'s the only testbench')} aria-label={t('Delete {name}', { name: b.name })}>
-                  <Icon name="trash" size={13} />
+                <button className="tree-name" onClick={() => toggleGroup(g.id)}>
+                  <span className="tree-glyph">▤</span> {g.name}
                 </button>
-              </span>
-            </div>
-          </li>
-        ))}
+                <span className="tree-meta">{inGroup.length}</span>
+                <span className="tree-actions">
+                  <button onClick={() => onNewBench(g.id)} title={t('New testbench in this group')} aria-label={t('New testbench in {name}', { name: g.name })}>+</button>
+                  <button onClick={() => onGroupAction(g.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
+                  <button onClick={() => onGroupAction(g.id, 'delete')} title={t('Delete the group (its testbenches stay)')} aria-label={t('Delete {name}', { name: g.name })}>
+                    <Icon name="trash" size={13} />
+                  </button>
+                </span>
+              </div>
+              {!fold && <ul>{inGroup.length ? inGroup.map((b) => bench(b, 1)) : <li className="tree-meta tree-empty tree-indent">{t('Empty: drag testbenches here')}</li>}</ul>}
+            </li>
+          );
+        })}
+      </ul>
+      <ul className={`tree-loose${dropOn === '' ? ' drop' : ''}`} {...drop(undefined)}>
+        {loose.map((b) => bench(b, 0))}
+        {dragging && !loose.some((b) => b.id === dragging) && <li className="tree-meta tree-empty">{t('Drop here to take it out of the group')}</li>}
       </ul>
       <h4>
         {t('Subcircuits')}
@@ -157,76 +298,46 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
   );
 }
 
-/** Barra arriba del lienzo: pestañas abiertas y migas de pan */
-export function HierBar({ testbench, tabs, current, path, panelOpen, onPanel, onTab, onCloseTab, onCrumb, onUp, onQuick }: {
+/** Barra arriba del lienzo, adentro de un subcircuito: migas de pan para subir */
+export function HierBar({ testbench, path, onCrumb, onUp, onQuick }: {
   testbench: string;
-  /** subcircuitos abiertos en pestañas */
-  tabs: string[];
-  /** subcircuito que se ve ('' = testbench) */
-  current: string;
   path: Level[];
-  panelOpen: boolean;
-  onPanel(): void;
-  onTab(name: string): void;
-  onCloseTab(name: string): void;
   /** -1 = testbench */
   onCrumb(i: number): void;
   onUp(): void;
   onQuick(): void;
 }) {
   return (
-    <div className={`hier-bar${path.length ? ' with-crumbs' : ''}`}>
-      <div className="hier-row">
-      <button className={`icon-btn${panelOpen ? ' on' : ''}`} onClick={onPanel} title={t('Project panel')} aria-label={t('Project panel')} aria-pressed={panelOpen}>
-        <Icon name="menu" size={15} />
-      </button>
-      <div className="hier-tabs" role="tablist">
-        <button role="tab" aria-selected={!current} className={`hier-tab${current ? '' : ' active'}`} onClick={() => onTab('')} title={t('Testbench')}>
-          <span className="tree-glyph">●</span> {testbench}
-        </button>
-        {tabs.map((n) => (
-          <span key={n} role="tab" aria-selected={current === n} className={`hier-tab${current === n ? ' active' : ''}`}>
-            <button onClick={() => onTab(n)}>
-              <span className="tree-glyph">▭</span> {n}
-            </button>
-            <button className="hier-x" onClick={() => onCloseTab(n)} title={t('Close tab')} aria-label={t('Close tab')}>
-              ×
-            </button>
+    <div className="hier-bar">
+      <nav className="hier-crumbs" aria-label={t('Hierarchy')}>
+        {path[0]?.inst ? (
+          <button className="link" onClick={() => onCrumb(-1)}>
+            {testbench}
+          </button>
+        ) : (
+          <span className="tree-meta" title={t('Opened from the panel: to see the values of an instance, enter it from the testbench (double-click or E)')}>
+            {t('standalone')}
+          </span>
+        )}
+        {path.map((l, i) => (
+          <span key={i}>
+            <span className="hier-sep">›</span>
+            {i === path.length - 1 ? (
+              <strong>{l.inst ? `${l.inst} (${l.sub})` : l.sub}</strong>
+            ) : (
+              <button className="link" onClick={() => onCrumb(i)}>
+                {l.inst ? `${l.inst} (${l.sub})` : l.sub}
+              </button>
+            )}
           </span>
         ))}
-      </div>
-      <button className="hier-quick" onClick={onQuick} title={t('Go to a testbench or subcircuit (Ctrl+P)')}>
-        {t('Go to…')} <kbd>{'Ctrl+P'}</kbd>
-      </button>
-      </div>
-      {!!path.length && (
-        <nav className="hier-crumbs" aria-label={t('Hierarchy')}>
-          {path[0].inst ? (
-            <button className="link" onClick={() => onCrumb(-1)}>
-              {testbench}
-            </button>
-          ) : (
-            <span className="tree-meta" title={t('Opened from the panel: to see the values of an instance, enter it from the testbench (double-click or E)')}>
-              {t('standalone')}
-            </span>
-          )}
-          {path.map((l, i) => (
-            <span key={i}>
-              <span className="hier-sep">›</span>
-              {i === path.length - 1 ? (
-                <strong>{l.inst ? `${l.inst} (${l.sub})` : l.sub}</strong>
-              ) : (
-                <button className="link" onClick={() => onCrumb(i)}>
-                  {l.inst ? `${l.inst} (${l.sub})` : l.sub}
-                </button>
-              )}
-            </span>
-          ))}
-          <button className="hier-up" onClick={onUp} title={t('Go up one level (Alt+↑)')}>
-            ↑ {t('Up')}
-          </button>
-        </nav>
-      )}
+        <button className="hier-up" onClick={onUp} title={t('Go up one level (Alt+↑)')}>
+          ↑ {t('Up')}
+        </button>
+        <button className="hier-quick" onClick={onQuick} title={t('Go to a testbench or subcircuit (Ctrl+P)')}>
+          {t('Go to…')} <kbd>{'Ctrl+P'}</kbd>
+        </button>
+      </nav>
     </div>
   );
 }
@@ -315,6 +426,75 @@ export function NameDialog({ title, label, initial, check, onOk, onClose }: {
         <div className="buttons">
           <button type="button" onClick={onClose}>{t('Cancel')}</button>
           <button type="submit" className="primary" disabled={!name.trim() || !!err}>{t('OK')}</button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+/** Parámetros (.param) y variables (.step) de un testbench (#180) */
+export function BenchParamsDialog({ bench, params, variables, onApply, onStudy, onClose }: {
+  bench: string;
+  params: [string, string][];
+  variables: { name: string; line: string }[];
+  onApply(ps: [string, string][]): void;
+  onStudy(): void;
+  onClose(): void;
+}) {
+  const [rows, setRows] = useState<[string, string][]>(params.length ? params : [['', '']]);
+  const bad = rows.some(([k, v]) => (k.trim() || v.trim()) && !(/^[A-Za-z_]\w*$/.test(k.trim()) && v.trim()));
+  return (
+    <Modal title={t('Parameters and variables · {bench}', { bench })} onClose={onClose}>
+      <form
+        className="attrs bench-params"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!bad) onApply(rows.filter(([k, v]) => k.trim() && v.trim()).map(([k, v]) => [k.trim(), v.trim()]));
+        }}
+      >
+        <p className="hint">{t('Parameters (.param): used in the schematic as {name}.')}</p>
+        <table>
+          <tbody>
+            {rows.map(([k, v], i) => (
+              <tr key={i}>
+                <td>
+                  <input value={k} placeholder={t('name')} aria-label={t('Parameter name')} spellCheck={false} onChange={(e) => setRows(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))} />
+                </td>
+                <td>=</td>
+                <td>
+                  <input value={v} placeholder={t('value')} aria-label={t('Value of {name}', { name: k })} spellCheck={false} onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))} />
+                </td>
+                <td>
+                  <button type="button" className="icon-x" aria-label={t('Remove {name}', { name: k })} onClick={() => setRows(rows.filter((_, j) => j !== i))}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button type="button" className="tree-add" onClick={() => setRows([...rows, ['', '']])}>
+          + {t('Add')}
+        </button>
+        <p className="hint">{t('Variables (swept with .step):')}</p>
+        {variables.length ? (
+          <ul className="bench-vars">
+            {variables.map((x) => (
+              <li key={x.line}>
+                <code>{x.name}</code> <span className="tree-meta">{x.line}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="tree-meta">{t('None.')}</p>
+        )}
+        <button type="button" className="link" onClick={onStudy}>
+          {t('Edit sweeps in the Study…')}
+        </button>
+        {bad && <p className="err-text">{t('Each parameter needs a valid name and a value')}</p>}
+        <div className="buttons">
+          <button type="button" onClick={onClose}>{t('Cancel')}</button>
+          <button type="submit" className="primary" disabled={bad}>{t('OK')}</button>
         </div>
       </form>
     </Modal>

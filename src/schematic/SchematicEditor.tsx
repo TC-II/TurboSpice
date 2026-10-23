@@ -92,6 +92,8 @@ interface Props {
   selection: ItemRef[];
   setSelection(s: ItemRef[]): void;
   onEdit(ref: ItemRef): void;
+  /** botón derecho en un componente: true si muestra un menú propio (si no, se edita) */
+  onSymbolMenu?(symbol: number, at: { x: number; y: number }): boolean;
   /** doble clic en un componente: true si lo abrió como subcircuito (#180) */
   onDescend?(symbol: number): boolean;
   /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
@@ -424,7 +426,7 @@ export function SchematicEditor(props: Props) {
   };
 
   // Botón derecho sin arrastrar: terminar cable / volver a seleccionar (como Esc en LTspice)
-  const rightClick = (p: Point) => {
+  const rightClick = (p: Point, screen?: { x: number; y: number }) => {
     if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
     else if (tool.kind === 'shape' && tool.pts.length) setTool({ ...tool, pts: [] });
     else if (tool.kind === 'move' && tool.refs) {
@@ -436,6 +438,8 @@ export function SchematicEditor(props: Props) {
       const label = labelAt(doc, p, lib, tol);
       if (label && onEditLabel) return onEditLabel(label.sym, label.win);
       const hit = hitTest(doc, p, lib, tol, showSimCommand);
+      // un componente con menú propio (#180: propagar al grupo): lo muestra quien lo pide
+      if (hit?.kind === 'symbol' && screen && props.onSymbolMenu?.(hit.index, screen)) return;
       if (hit) onEdit(hit);
     }
   };
@@ -786,7 +790,7 @@ export function SchematicEditor(props: Props) {
       const block = (ev: Event) => ev.preventDefault();
       window.addEventListener('contextmenu', block, { capture: true, once: true });
       setTimeout(() => window.removeEventListener('contextmenu', block, { capture: true }), 300);
-      rightClick(toDoc(e));
+      rightClick(toDoc(e), { x: e.clientX, y: e.clientY });
     }
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
     if (drag.mode === 'label' && !drag.moved) {

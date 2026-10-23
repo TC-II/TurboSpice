@@ -81,9 +81,10 @@ describe('exportar e importar (#157)', () => {
     const benches = asBenches(r.project).variants[0].sims;
     expect(benches.map((s) => [s.name, lineOf(s.asc)])).toEqual([
       ['Testbench 1', ''],
-      ['Filtro_ RC · Testbench 1', '.tran 10m'],
-      ['Filtro_ RC · Bode_fino', '.ac dec 10 1 1meg'],
+      ['Testbench 1 (2)', '.tran 10m'],
+      ['Bode_fino', '.ac dec 10 1 1meg'],
     ]);
+    expect(asBenches(r.project).groups.map((g) => g.name)).toEqual(['Filtro_ RC']);
     expect(r.files.map((f) => f.name)).toEqual(['miop.asy', 'miop.sub']);
   });
 

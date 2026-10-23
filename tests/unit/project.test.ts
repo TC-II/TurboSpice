@@ -55,7 +55,9 @@ describe('testbenches (#180)', () => {
     const p = asBenches(old);
     expect(p.variants).toHaveLength(1);
     expect(p.variants[0].id).toBe(BENCHES);
-    expect(p.variants[0].sims.map((s) => s.name)).toEqual(['Pasabajos · Transitorio 0–10 ms', 'Pasabajos · AC 1 Hz–1 MHz', 'Pasaaltos', 'Vacía']);
+    // una variante con varias simulaciones es un grupo
+    expect(p.variants[0].sims.map((s) => [s.name, s.group])).toEqual([['Transitorio 0–10 ms', 'g_a'], ['AC 1 Hz–1 MHz', 'g_a'], ['Pasaaltos', undefined], ['Vacía', undefined]]);
+    expect(p.groups).toEqual([{ id: 'g_a', name: 'Pasabajos' }]);
     // el activo es el de la variante activa
     expect(simOfActive(p)).toBe('bs0');
     expect(asBenches(p)).toBe(p);
@@ -169,5 +171,42 @@ describe('archivos del proyecto', () => {
     expect(projectFileKind('x.ASY')).toBe('symbol');
     expect(projectFileKind('x.sub')).toBe('model');
     expect(projectFileKind('x.asc')).toBeNull();
+  });
+});
+
+describe('grupos y propagar valores (#180)', () => {
+  const withR = (value: string, line: string): string =>
+    serializeAsc({
+      ...emptyDoc(),
+      symbols: [{ type: 'res', x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', 'R1'], ['Value', value]]) }],
+      texts: [{ x: 0, y: 200, align: 'Left', size: 2, kind: 'directive', text: line }],
+    });
+  it('propaga sólo dentro del grupo y a los que tienen el componente', async () => {
+    const { addGroup, setBenchGroup, groupPeersWith, propagateAttrs, removeGroup } = await import('../../src/project/project.ts');
+    let p = storeActive(newProject('P'), withR('1k', '.tran 1m'));
+    const a = variantOf(p).sims[0].id;
+    const b = addSim(p, withR('1k', '.ac dec 10 1 1k'))!;
+    p = b.project;
+    const c = addSim(p, withR('1k', '.op'))!;
+    p = c.project;
+    const g = addGroup(p, 'Filtro');
+    p = setBenchGroup(setBenchGroup(g.project, a, g.id), b.id, g.id);
+    expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([b.id]);
+    p = propagateAttrs(p, [b.id], 'R1', 'res', new Map([['InstName', 'R1'], ['Value', '2k2']]));
+    const val = (id: string) => parseAsc(variantOf(p).sims.find((s) => s.id === id)!.asc).symbols[0].attrs.get('Value');
+    expect([val(b.id), val(c.id)]).toEqual(['2k2', '1k']);
+    p = removeGroup(p, g.id);
+    expect(variantOf(p).sims.every((s) => !s.group)).toBe(true);
+    expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([]);
+  });
+
+  it('parámetros y variables del testbench', async () => {
+    const { benchParams, benchVariables, setBenchParams } = await import('../../src/schematic/benchParams.ts');
+    const d = parseAsc(withR('{R}', '.tran 1m\\n.param R=1k C=1n\\n.step param G list 1 2'));
+    expect(benchParams(d)).toEqual([['R', '1k'], ['C', '1n']]);
+    expect(benchVariables(d).map((v) => v.name)).toEqual(['G']);
+    const e = setBenchParams(d, [['R', '2k']]);
+    expect(benchParams(e)).toEqual([['R', '2k']]);
+    expect(e.texts.some((tt) => tt.text.includes('.tran 1m') && !tt.text.includes('.param'))).toBe(true);
   });
 });

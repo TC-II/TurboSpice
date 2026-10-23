@@ -46,6 +46,14 @@ export interface Sim {
   view?: SimView;
   /** la más vieja primero */
   runs: Run[];
+  /** grupo de testbenches al que pertenece (#180; sin grupo: en la raíz del proyecto) */
+  group?: string;
+}
+
+/** Grupo de testbenches (#180) */
+export interface BenchGroup {
+  id: string;
+  name: string;
 }
 
 export interface Variant {
@@ -65,11 +73,13 @@ export interface Project {
   files: ProjectFile[];
   activeVariant: string;
   variants: Variant[];
+  /** grupos de testbenches, en orden */
+  groups: BenchGroup[];
 }
 
 let seq = 0;
 /** Id corto y único en el proyecto (prefijo: v variante, s simulación, r corrida) */
-export const newId = (prefix: 'v' | 's' | 'r') => `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
+export const newId = (prefix: 'v' | 's' | 'r' | 'g') => `${prefix}${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 export const EMPTY_ASC = serializeAsc(emptyDoc());
 
@@ -85,7 +95,7 @@ export const newBench = (name: string, asc = EMPTY_ASC): Sim => ({ id: newId('s'
 export function newProject(name: string, benchName = t('Testbench 1')): Project {
   const now = Date.now();
   const b = newBench(benchName);
-  return { name, created: now, modified: now, files: [], activeVariant: BENCHES, variants: [{ id: BENCHES, name, base: EMPTY_ASC, activeSim: b.id, sims: [b] }] };
+  return { name, created: now, modified: now, files: [], activeVariant: BENCHES, variants: [{ id: BENCHES, name, base: EMPTY_ASC, activeSim: b.id, sims: [b] }], groups: [] };
 }
 
 /**
@@ -96,7 +106,8 @@ export function newProject(name: string, benchName = t('Testbench 1')): Project 
  */
 export function asBenches(p: Project): Project {
   const v0 = p.variants[0];
-  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => s.name) && v0.sims.some((s) => s.id === v0.activeSim)) return p;
+  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => s.name) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups) return p;
+  const groups = [...(p.groups ?? [])];
   const several = p.variants.length > 1;
   const sims: Sim[] = [];
   const taken = new Set<string>();
@@ -114,12 +125,20 @@ export function asBenches(p: Project): Project {
       const own = s.name || (line ? analysisLabel(line) : t('No analysis'));
       // los testbenches ya existentes conservan su nombre; de una variante (versión 1 o un .asc
       // importado) con una sola simulación, el nombre es el de la variante
-      const name = unique(v.id === BENCHES ? own : !v.sims.length || (several && v.sims.length === 1) ? v.name : several ? `${v.name} · ${own}` : own);
-      sims.push({ ...s, name });
+      // una variante con varias simulaciones (de la versión 1 o de un .zip importado) pasa a ser
+      // un grupo con un testbench por simulación
+      let group = s.group;
+      if (v.id !== BENCHES && several && v.sims.length > 1) {
+        let g = groups.find((x) => x.id === `g_${v.id}`);
+        if (!g) groups.push((g = { id: `g_${v.id}`, name: v.name }));
+        group = g.id;
+      }
+      const name = unique(v.id === BENCHES || group ? own : !v.sims.length || several ? v.name : own);
+      sims.push({ ...s, name, ...(group ? { group } : {}) });
       if (v.id === p.activeVariant && (s.id === v.activeSim || !active)) active = s.id;
     }
   }
-  return { ...p, activeVariant: BENCHES, variants: [{ id: BENCHES, name: p.name, base: EMPTY_ASC, activeSim: active || sims[0].id, sims }] };
+  return { ...p, activeVariant: BENCHES, variants: [{ id: BENCHES, name: p.name, base: EMPTY_ASC, activeSim: active || sims[0].id, sims }], groups };
 }
 
 /** Nombre del proyecto a partir del archivo: sin .turbo ni .asc */
@@ -148,7 +167,7 @@ export function projectFromAsc(doc: AscDoc, fileName: string): Project {
   const name = projectName(fileName);
   const v = variantFromAsc(doc, name);
   const now = Date.now();
-  return asBenches({ name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v] });
+  return asBenches({ name, created: now, modified: now, files: [], activeVariant: v.id, variants: [v], groups: [] });
 }
 
 // --- archivo -------------------------------------------------------------------------------------
@@ -163,6 +182,7 @@ interface FileRun {
 interface FileSim {
   id: string;
   name?: string;
+  group?: string;
   current: Hash;
   view?: SimView;
   runs: FileRun[];
@@ -175,6 +195,7 @@ interface TurboJson {
   modified: string;
   files: ProjectFile[];
   activeTestbench: string;
+  groups: BenchGroup[];
   testbenches: FileSim[];
   blobs: Record<Hash, string>;
 }
@@ -212,7 +233,7 @@ export async function serializeTurbo(p: Project): Promise<string> {
     const runs: FileRun[] = [];
     // una corrida dañada no tiene texto que guardar: se pierde (ya avisó al abrir)
     for (const r of s.runs) if (!r.damaged) runs.push({ id: r.id, time: new Date(r.time).toISOString(), asc: await blob(r.asc), ...(r.summary ? { summary: r.summary } : {}) });
-    testbenches.push({ id: s.id, ...(s.name ? { name: s.name } : {}), current: await blob(s.asc), ...(s.view ? { view: s.view } : {}), runs });
+    testbenches.push({ id: s.id, ...(s.name ? { name: s.name } : {}), ...(s.group ? { group: s.group } : {}), current: await blob(s.asc), ...(s.view ? { view: s.view } : {}), runs });
   }
   const json: TurboJson = {
     format: FORMAT,
@@ -222,6 +243,7 @@ export async function serializeTurbo(p: Project): Promise<string> {
     modified: new Date(p.modified).toISOString(),
     files: p.files,
     activeTestbench: v.activeSim,
+    groups: asBenches(p).groups,
     testbenches,
     blobs,
   };
@@ -303,7 +325,7 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
         asc = [...runs].reverse().find((r) => !r.damaged)?.asc ?? EMPTY_ASC;
         warnings.push(t('{label}: the current circuit is damaged; recovered {p1}', { label, p1: asc === EMPTY_ASC ? t('empty') : t('the one from the last run') }));
       }
-      return { id, ...(name ? { name } : {}), asc, ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}), runs };
+      return { id, ...(name ? { name } : {}), ...(typeof sr.group === 'string' && sr.group ? { group: sr.group } : {}), asc, ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}), runs };
     });
     let base = v2 ? EMPTY_ASC : get(vr.base);
     if (base === null) {
@@ -315,7 +337,15 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   });
   const activeVariant = typeof raw.activeVariant === 'string' && variants.some((v) => v.id === raw.activeVariant) ? raw.activeVariant : variants[0].id;
   return {
-    project: asBenches({ name: str(raw.name, t('the project name')), created: time(raw.created), modified: time(raw.modified), files, activeVariant, variants }),
+    project: asBenches({
+      name: str(raw.name, t('the project name')),
+      created: time(raw.created),
+      modified: time(raw.modified),
+      files,
+      activeVariant,
+      variants,
+      groups: Array.isArray(raw.groups) ? raw.groups.filter((g): g is BenchGroup => isObj(g) && typeof g.id === 'string' && typeof g.name === 'string').map((g) => ({ id: g.id, name: g.name })) : [],
+    }),
     warnings,
   };
 }

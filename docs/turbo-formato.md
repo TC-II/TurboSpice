@@ -17,8 +17,10 @@
 >
 > JSON de la versión 2: `"version": 2`, `"activeTestbench": "s1"` y `"testbenches": [{ "id",
 > "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con nombre
-> obligatorio). `files[].kind` puede ser `"symbol"`, `"model"` o `"schematic"` (subcircuito). No hay
-> `variants` ni circuito base. Un proyecto siempre tiene al menos un testbench.
+> obligatorio y `"group"` opcional). `"groups": [{ "id", "name" }]` agrupa testbenches (en el panel
+> del proyecto, colapsables; al abrir un `.turbo` de la versión 1, una variante con varias
+> simulaciones pasa a ser un grupo). `files[].kind` puede ser `"symbol"`, `"model"` o `"schematic"`
+> (subcircuito). No hay `variants` ni circuito base. Un proyecto siempre tiene al menos un testbench.
 >
 > El resto de este documento describe la versión 1 (variantes), que se sigue pudiendo abrir.
 

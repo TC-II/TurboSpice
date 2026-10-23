@@ -88,7 +88,7 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
   const src = simOf(v, simId);
   if (!src || v.sims.length >= MAX_SIMS) return null;
   const name = uniqueLabel(t('{p0} (copy)', { p0: simLabel(src) }), v.sims.map((s) => simLabel(s)));
-  const s: Sim = { id: newId('s'), name, asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), runs: [] };
+  const s: Sim = { id: newId('s'), name, asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };
   const i = v.sims.indexOf(src);
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims: [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)], activeSim: s.id })), id: s.id };
 }
@@ -109,6 +109,28 @@ export function removeSim(p: Project, simId: string): Project {
 /** Nombre propio (vacío: vuelve al automático) */
 export const renameSim = (p: Project, simId: string, name: string): Project =>
   name.trim() ? mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, (s) => ({ ...s, name: name.trim() }))) : p;
+
+// --- grupos de testbenches (#180) ----------------------------------------------------------------
+
+export function addGroup(p: Project, name: string): { project: Project; id: string } {
+  const id = newId('g');
+  return { project: touch({ ...p, groups: [...p.groups, { id, name: uniqueLabel(name, p.groups.map((g) => g.name)) }] }), id };
+}
+
+export const renameGroup = (p: Project, id: string, name: string): Project =>
+  name.trim() ? touch({ ...p, groups: p.groups.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)) }) : p;
+
+/** Saca el grupo: sus testbenches quedan sin grupo */
+export const removeGroup = (p: Project, id: string): Project =>
+  touch({
+    ...p,
+    groups: p.groups.filter((g) => g.id !== id),
+    variants: p.variants.map((v) => ({ ...v, sims: v.sims.map(({ group, ...s }) => (group === id ? s : { ...s, ...(group ? { group } : {}) })) })),
+  });
+
+/** Mueve un testbench a un grupo (undefined: sin grupo) */
+export const setBenchGroup = (p: Project, simId: string, group?: string): Project =>
+  mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
 
 /** Nombre libre para un testbench nuevo: «Testbench N» */
 export const freeBenchName = (p: Project) => uniqueLabel(t('Testbench {n}', { n: variantOf(p).sims.length + 1 }), variantOf(p).sims.map((s) => simLabel(s)));
@@ -261,4 +283,44 @@ export async function mergeFiles(files: ProjectFile[], incoming: ProjectFile[], 
     }
   }
   return { files: out, added };
+}
+
+// --- propagar cambios dentro de un grupo (#180) -----------------------------------------------------
+
+const ATTR_KEYS = ['Value', 'Value2', 'SpiceLine', 'SpiceLine2', 'SpiceModel'];
+
+/** Otros testbenches del mismo grupo que tienen ese componente (por InstName y tipo) */
+export function groupPeersWith(p: Project, simId: string, inst: string, type: string): string[] {
+  const v = variantOf(p);
+  const me = v.sims.find((s) => s.id === simId);
+  if (!me?.group) return [];
+  const base = (x: string) => x.replace(/^.*[\\/]/, '').toLowerCase();
+  return v.sims
+    .filter((s) => s.id !== simId && s.group === me.group)
+    .filter((s) => parseAsc(s.asc).symbols.some((x) => x.attrs.get('InstName')?.toLowerCase() === inst.toLowerCase() && base(x.type) === base(type)))
+    .map((s) => s.id);
+}
+
+/** Copia los valores de un componente (Value, SpiceLine…) a los testbenches indicados */
+export function propagateAttrs(p: Project, ids: string[], inst: string, type: string, attrs: Map<string, string>): Project {
+  const base = (x: string) => x.replace(/^.*[\\/]/, '').toLowerCase();
+  let out = p;
+  for (const id of ids) {
+    const s = simOf(variantOf(out), id);
+    if (!s) continue;
+    const d = parseAsc(s.asc);
+    let changed = false;
+    for (const x of d.symbols) {
+      if (x.attrs.get('InstName')?.toLowerCase() !== inst.toLowerCase() || base(x.type) !== base(type)) continue;
+      for (const k of ATTR_KEYS) {
+        const v = attrs.get(k);
+        if (v === undefined ? !x.attrs.has(k) : x.attrs.get(k) === v) continue;
+        if (v === undefined) x.attrs.delete(k);
+        else x.attrs.set(k, v);
+        changed = true;
+      }
+    }
+    if (changed) out = setSimAsc(out, id, serializeAsc(d));
+  }
+  return out;
 }

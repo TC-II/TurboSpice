@@ -73,6 +73,12 @@ const body = await page.locator('svg.editor .symbols .sym .body').first().boundi
 // registra cada menú contextual: dónde llegó y si se canceló el del navegador
 await page.evaluate(() => window.addEventListener('contextmenu', (e) => (window.__ctx ??= []).push([e.target.tagName, e.defaultPrevented])));
 await page.mouse.click(body.x + body.width / 2, body.y + body.height / 2, { button: 'right' });
+// en un testbench de un grupo (#180) aparece un menú: Editar… o propagar al grupo
+const ctxMenu = page.locator('.ctx-menu');
+if (await ctxMenu.count()) {
+  check((await ctxMenu.getByRole('menuitem').allTextContents()).some((x) => /^Propagar /.test(x)), 'en un grupo, el click derecho ofrece propagar el valor a los otros testbenches');
+  await ctxMenu.getByRole('menuitem').first().click();
+}
 check((await page.locator('[role=dialog]').count()) === 1, 'click derecho (sin arrastrar) sobre un componente lo edita');
 const ctx = await page.evaluate(() => (window.__ctx ?? []).map((c) => c.join(':')));
 check(ctx.length > 0 && ctx.every((c) => c.endsWith(':true')), `sin el menú del navegador al soltar el botón derecho (${ctx.join(', ')})`);

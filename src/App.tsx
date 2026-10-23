@@ -37,8 +37,15 @@ import { activeSim, analysisLabel, defaultLine, keepResult, MAX_SIMS, simName, t
 import {
   activeAsc,
   addSim as addProjectSim,
+  addGroup,
   applyValues,
   freeBenchName,
+  removeGroup,
+  renameGroup,
+  setBenchGroup,
+  simLabel,
+  groupPeersWith,
+  propagateAttrs,
   mergeFiles,
   projectFileKind,
   duplicateSim as duplicateProjectSim,
@@ -72,9 +79,11 @@ import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems,
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { HierBar, NameDialog, ProjectTree, QuickOpen, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { BenchParamsDialog, HierBar, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
 import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
+import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
 import { addSubckt, childSubckts, freeSubcktName, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
@@ -137,6 +146,8 @@ type Dialog =
   | { kind: 'projectfiles' }
   /** pedir un nombre (testbench o subcircuito, #180) */
   | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
+  /** parámetros y variables del testbench (#180) */
+  | { kind: 'benchParams' }
   /** confirmar con el control deslizante */
   | { kind: 'slide'; title: string; message: string; onConfirm(): void }
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
@@ -321,7 +332,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const pathRef = useRef(path);
   pathRef.current = path;
   const curSub = path.length ? path[path.length - 1].sub : '';
-  const [subTabs, setSubTabs] = useState<string[]>([]);
+  const [, setSubTabs] = useState<string[]>([]);
+  // el panel se muestra al acercar el mouse al borde izquierdo (si se tildó, en modo selección)
+  const [hoverReveal, setHoverRevealState] = useState(() => lsGet('turbospice.treeHover') === '1');
+  const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
+  const [treePeek, setTreePeek] = useState(false);
   // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos
   const [treePref, setTreePref] = useState<boolean | null>(() => {
     const v = lsGet('turbospice.tree');
@@ -330,7 +345,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const hasSubs = project.files.some((f) => f.kind === 'schematic');
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
-  const hierOn = treeOpen || hasSubs || path.length > 0;
+  const hierOn = path.length > 0;
+  const treeShown = treeOpen || treePeek;
   const [quickOpen, setQuickOpen] = useState(false);
   const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
@@ -1367,11 +1383,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         onOk(n);
       },
     });
-  const newEmptyBench = () =>
+  const newEmptyBench = (group?: string) =>
     askBenchName(t('New testbench'), freeBenchName(projectRef.current), (name) => {
       const r = addProjectSim(leave(), EMPTY_ASC, name);
       if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
-      enter(r.project, true);
+      enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
       markDirty();
     });
   const renameBench = (id: string) => {
@@ -1388,6 +1404,87 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         editProject(renameProjectSim(projectRef.current, id, n));
       },
     });
+  };
+  // Grupos de testbenches y partes de cada uno (#180)
+  const newGroup = () =>
+    setDialog({
+      kind: 'name',
+      title: t('New group'),
+      label: t('Name'),
+      initial: uniqueGroupName(),
+      check: () => null,
+      onOk: (n) => {
+        setDialog(null);
+        editProject(addGroup(snapshot(), n).project);
+      },
+    });
+  const uniqueGroupName = () => {
+    const names = new Set(projectRef.current.groups.map((g) => g.name.toLowerCase()));
+    for (let i = 1; ; i++) if (!names.has(t('Group {n}', { n: i }).toLowerCase())) return t('Group {n}', { n: i });
+  };
+  const groupAction = (id: string, action: 'rename' | 'delete') => {
+    const g = projectRef.current.groups.find((x) => x.id === id);
+    if (!g) return;
+    if (action === 'rename')
+      return setDialog({
+        kind: 'name',
+        title: t('Rename group'),
+        label: t('Name'),
+        initial: g.name,
+        check: () => null,
+        onOk: (n) => {
+          setDialog(null);
+          editProject(renameGroup(snapshot(), id, n));
+        },
+      });
+    setDialog({
+      kind: 'slide',
+      title: t('Delete the group {name}?', { name: g.name }),
+      message: t('Its testbenches are not deleted: they stay outside any group.'),
+      onConfirm: () => {
+        setDialog(null);
+        editProject(removeGroup(snapshot(), id));
+      },
+    });
+  };
+  // Botón derecho en un componente de un testbench de un grupo: editar o propagar sus valores a
+  // los otros testbenches del grupo que tienen el mismo componente
+  const [ctxMenu, setCtxMenu] = useState<{ at: { x: number; y: number }; items: ContextItem[] } | null>(null);
+  const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
+    if (curSub || !sims.active) return false;
+    const s = doc.symbols[index];
+    const inst = s?.attrs.get('InstName');
+    if (!s || !inst) return false;
+    const p0 = snapshot();
+    const peers = groupPeersWith(p0, sims.active, inst, s.type);
+    const me = variantOf(p0).sims.find((x) => x.id === sims.active);
+    if (!me?.group) return false;
+    const value = s.attrs.get('Value') ?? effectiveAttrs(s, lib.symbol(s.type)).get('Value') ?? '';
+    const group = p0.groups.find((g) => g.id === me.group)?.name ?? '';
+    setCtxMenu({
+      at,
+      items: [
+        { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
+        {
+          label: peers.length === 1 ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group }) : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
+          title: t('Copies its value and parameters to the component with the same name in the other testbenches of the group'),
+          disabled: !peers.length,
+          onClick: () => {
+            editProject(propagateAttrs(snapshot(), peers, inst, s.type, s.attrs));
+            setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value, n: peers.length, group }));
+          },
+        },
+      ],
+    });
+    return true;
+  };
+  const moveBench = (id: string, group?: string) => editProject(setBenchGroup(snapshot(), id, group));
+  /** Abrir una parte de un testbench: su configuración de simulación, su esquemático o sus parámetros */
+  const benchItem = (id: string, item: BenchItem) => {
+    if (id !== sims.active) goSim(id);
+    else if (pathRef.current.length) go([]);
+    // el diálogo, cuando ya se ve el testbench
+    if (item !== 'schematic') setTimeout(() => (item === 'sim' ? openSimulation() : setDialog({ kind: 'benchParams' })), 0);
   };
   const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
     action === 'rename' ? renameBench(id) : action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
@@ -2539,7 +2636,16 @@ ${ltNetlistText(sim.built.lt)}
 
   return (
     <div className="schematic-mode">
-      {slots.menu && createPortal(<AppMenu menus={menus} />, slots.menu)}
+      {slots.menu &&
+        createPortal(
+          <>
+            <AppMenu menus={menus} />
+            <button className={`proj-toggle${treeOpen ? ' on' : ''}`} onClick={toggleTree} aria-pressed={treeOpen} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
+              <Icon name="tree" />
+            </button>
+          </>,
+          slots.menu,
+        )}
       {slots.right &&
         createPortal(
           <>
@@ -2690,7 +2796,12 @@ ${ltNetlistText(sim.built.lt)}
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div
-          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${path.length ? ' with-crumbs' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+          onMouseMove={(e) => {
+            // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
+            if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
+            if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
+          }}
+          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
@@ -2698,25 +2809,28 @@ ${ltNetlistText(sim.built.lt)}
           {hierOn && (
           <HierBar
             testbench={(curSim && simName(curSim)) || variant.name}
-            tabs={subTabs}
-            current={curSub}
             path={path}
-            panelOpen={treeOpen}
-            onPanel={toggleTree}
-            onTab={(n) => (n ? openSub(n) : path.length && go([]))}
-            onCloseTab={(n) => {
-              if (curSub.toLowerCase() === n.toLowerCase()) go([]);
-              setSubTabs((ts) => ts.filter((x) => x !== n));
-            }}
             onCrumb={(i) => go(path.slice(0, i + 1))}
             onUp={goUp}
             onQuick={() => setQuickOpen(true)}
           />
           )}
-          {treeOpen && (
+          {treeShown && (
             <ProjectTree
               project={project.name}
-              benches={sims.items.map((x) => ({ id: x.id, name: simName(x) || t('No analysis'), detail: x.line ? analysisLabel(x.line) : t('No analysis') }))}
+              benches={variant.sims.map((x) => {
+                const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
+                return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), params: benchParams(x.id === sims.active ? liveDoc : parseAsc(x.asc)).length };
+              })}
+              groups={project.groups}
+              hoverReveal={hoverReveal}
+              peek={!treeOpen && treePeek}
+              onHoverReveal={setHoverReveal}
+              onBenchItem={benchItem}
+              onNewGroup={newGroup}
+              onGroupAction={groupAction}
+              onMoveBench={moveBench}
+              onLeave={() => setTreePeek(false)}
               activeBench={sims.active}
               subs={treeSubs}
               current={curSub}
@@ -2736,7 +2850,7 @@ ${ltNetlistText(sim.built.lt)}
                 projectRef.current = p;
                 editProject(p);
               }}
-              onClose={toggleTree}
+              onClose={() => (treeOpen ? toggleTree() : setTreePeek(false))}
             />
           )}
           {quickOpen &&
@@ -2778,8 +2892,10 @@ ${ltNetlistText(sim.built.lt)}
               onReset={() => editSymbol(setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))}
             />
           )}
+          {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
           <SchematicEditor
             handle={editor}
+            onSymbolMenu={symbolMenu}
             onDescend={descend}
             docKey={docKey}
             doc={doc}
@@ -3232,6 +3348,20 @@ ${ltNetlistText(sim.built.lt)}
             setProjectState({ ...projectRef.current, name: projectName(f.name) });
           }}
           onTrashed={(id) => id === file.driveId && setFile({ ...file, driveId: undefined })}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'benchParams' && (
+        <BenchParamsDialog
+          bench={(curSim && simName(curSim)) || ''}
+          params={benchParams(doc)}
+          variables={benchVariables(doc)}
+          onApply={(ps) => {
+            setDialog(null);
+            const d = setBenchParams(doc, ps);
+            if (ascText(d) !== ascText(doc)) commit(d);
+          }}
+          onStudy={() => setDialog({ kind: 'study' })}
           onClose={() => setDialog(null)}
         />
       )}

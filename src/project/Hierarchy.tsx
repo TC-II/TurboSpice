@@ -27,13 +27,15 @@ export interface TreeBench {
   /** su simulación ("Transient 0–5 ms") */
   detail: string;
   group?: string;
-  /** cuántos .param tiene */
-  params: number;
+  /** sus .param (nombre, valor) */
+  params: [string, string][];
+  /** lo que barre con .step (nombre y la línea entera) */
+  steps: { name: string; line: string }[];
   /** corridas en su historial */
   runs: number;
 }
 
-export type BenchItem = 'sim' | 'schematic' | 'params' | 'history';
+export type BenchItem = 'sim' | 'schematic' | 'params' | 'history' | 'study';
 
 const COLLAPSED_KEY = 'turbospice.treeCollapsed';
 const loadCollapsed = (): Set<string> => {
@@ -164,7 +166,25 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         {open && (
           <ul>
             {item('sim', '⚙', t('Simulation settings'), b.detail)}
-            {item('params', '{}', t('Parameters and variables'), b.params ? String(b.params) : undefined)}
+            {item('params', '{}', t('Parameters and variables'), b.params.length + b.steps.length ? String(b.params.length + b.steps.length) : undefined)}
+            {b.params.map(([k, v]) => (
+              <li key={`p:${k}`}>
+                <div className="tree-row tree-sub tree-var" style={{ paddingLeft: 44 + depth * 14 }}>
+                  <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')} title={t('Parameter (.param): click to edit')}>
+                    <code>{k}</code> = <code>{v}</code>
+                  </button>
+                </div>
+              </li>
+            ))}
+            {b.steps.map((x) => (
+              <li key={`s:${x.line}`}>
+                <div className="tree-row tree-sub tree-var" style={{ paddingLeft: 44 + depth * 14 }}>
+                  <button className="tree-name" onClick={() => onBenchItem(b.id, 'study')} title={`${x.line} — ${t('swept: click to edit it in the Study')}`}>
+                    <span className="tree-glyph">↻</span> <code>{x.name}</code> <span className="tree-meta">{x.line.replace(/^\s*\.step\s+(param\s+)?\S+\s*/i, '')}</span>
+                  </button>
+                </div>
+              </li>
+            ))}
             {b.runs > 0 && item('history', '◷', t('Run history'), String(b.runs))}
           </ul>
         )}

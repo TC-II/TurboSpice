@@ -1485,6 +1485,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     else if (pathRef.current.length) go([]);
     // el diálogo, cuando ya se ve el testbench
     if (item === 'history') return setTimeout(() => openHistory(id), 0);
+    if (item === 'study') return setTimeout(openStudy, 0);
     if (item !== 'schematic') setTimeout(() => (item === 'sim' ? openSimulation() : setDialog({ kind: 'benchParams' })), 0);
   };
   const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
@@ -1721,6 +1722,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     editProject(p);
   };
   const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
+  // testbenches del panel, con sus .param y .step (el activo, con lo que se está editando)
+  const treeBenches = useMemo(() => {
+    if (!treeOpen && !treePeek) return [];
+    return variant.sims.map((x) => {
+      const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
+      const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
+      return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+    });
+  }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
   // editando, con su texto actual)
@@ -2470,7 +2480,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: t('Show the simulation command'), title: t('Draw .tran, .ac… on the schematic, like LTspice'), onClick: toggleSimCommand, checked: showSimCommand },
+        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Study)'), onClick: toggleSimCommand, checked: showSimCommand },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },
@@ -2803,10 +2813,7 @@ ${ltNetlistText(sim.built.lt)}
           {treeShown && (
             <ProjectTree
               project={project.name}
-              benches={variant.sims.map((x) => {
-                const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
-                return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(x.id === sims.active ? liveDoc : parseAsc(x.asc)).length };
-              })}
+              benches={treeBenches}
               groups={project.groups}
               hoverReveal={hoverReveal}
               peek={!treeOpen && treePeek}

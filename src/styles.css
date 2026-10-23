@@ -1019,3 +1019,6 @@ button.hier-tab { padding-right: 10px; }
 .ctx-menu button { text-align: left; border: 0; border-radius: 5px; background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 6px 10px; }
 .ctx-menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ctx-menu button:disabled { color: var(--fg-muted); }
+.tree-row.tree-var .tree-name { font-size: 12px; }
+.tree-row.tree-var code { font: 11.5px var(--mono); color: var(--fg); }
+.tree-row.tree-var .tree-meta { font-family: var(--mono); }

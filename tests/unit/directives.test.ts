@@ -45,12 +45,15 @@ describe('comando de simulación oculto en el esquemático (#48)', () => {
     expect(visibleText(comment(`${EXTRA_ANALYSES}\\n.ac dec 10 1 1k`), false)).toBeNull();
   });
 
-  it('junto con otras directivas se oculta sólo esa línea', () => {
-    expect(visibleText(text('.param R=1k\\n.tran 20m\\n.step param R list 1k 2k'), false)?.text).toBe('.param R=1k\\n.step param R list 1k 2k');
+  it('junto con otras directivas se ocultan sólo las que tienen interfaz (#180)', () => {
+    expect(visibleText(text('.param R=1k\\n.tran 20m\\n.step param R list 1k 2k'), false)).toBeNull();
+    expect(visibleText(text('.model D1 D\\n.param R=1k\\n+ C=1n\\n.options reltol=1m'), false)?.text).toBe('.model D1 D\\n.options reltol=1m');
+    expect(visibleText(text('.control\\nrun\\n.endc'), false)).toBeNull();
   });
 
-  it('las demás directivas y los comentarios comunes se siguen viendo', () => {
-    for (const s of ['.param R=1k', '.model D1 D', '.meas tran t1 FIND V(out) AT 1m']) expect(visibleText(text(s), false)?.text).toBe(s);
+  it('las directivas sin interfaz y los comentarios comunes se siguen viendo', () => {
+    for (const s of ['.model D1 D', '.lib opamp.sub', '.ic V(out)=1', '.options plotwinsize=0', '.func f(x) x*2']) expect(visibleText(text(s), false)?.text).toBe(s);
+    for (const s of ['.param R=1k', '.meas tran t1 FIND V(out) AT 1m', '.step param R list 1 2']) expect(visibleText(text(s), true)?.text).toBe(s);
     // un comentario que menciona .tran no se ejecuta: es texto del usuario
     expect(visibleText(comment('.tran 1m es lo que usé'), false)?.text).toBe('.tran 1m es lo que usé');
   });

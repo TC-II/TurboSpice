@@ -7,7 +7,7 @@ export const skipWelcome = async (target) => {
   await spanishUi(target);
   await target.addInitScript(() => localStorage.setItem('turbospice.welcomed', '1'));
 };
-/** Ver › Mostrar el comando de simulación (#48): para los tests que leen el .tran dibujado */
+/** Ver › Mostrar las directivas en el esquemático (#48): para los tests que leen el .tran dibujado */
 export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 
 /** Recorre un desplegable ya abierto: los submenús con hover, el último ítem con click */

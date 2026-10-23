@@ -4,7 +4,7 @@ import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { toWorld, transformAlign, transformOffset } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { isDataText } from '../asc/dataText.ts';
-import { EXTRA_ANALYSES, isNgspiceComment } from '../netlist/directives.ts';
+import { EXTRA_ANALYSES, isControlBlock, isNgspiceComment } from '../netlist/directives.ts';
 import { ANALYSIS_LINE } from '../sim/analyses.ts';
 import { shapeDist } from './shapes.ts';
 import { fromRkm, parseSpiceNumber } from '../netlist/spicenum.ts';
@@ -12,15 +12,29 @@ import { si } from '../waveform/series.ts';
 
 /**
  * Lo que se dibuja de un texto, o null si no se dibuja nada. Los comentarios con datos nunca se
- * ven; el comando de simulación (.tran, .ac… y los de ngspice guardados como comentario) se
- * configura desde la barra de Simular, así que sólo se ve con `showSim` (Ver › Mostrar el
- * comando de simulación). Si comparte el texto con otras directivas, se ocultan sólo sus líneas.
+ * ven. Las directivas que se editan desde la interfaz (#48, #180) sólo se ven con `showSim`
+ * (Ver › Mostrar las directivas): el comando de simulación (.tran, .ac… y los de ngspice
+ * guardados como comentario, en la barra de Simular), .param y .step (en el panel del proyecto),
+ * .meas, el .func del Estudio y los bloques .control (en el Estudio y Alt+C). Si comparten el texto
+ * con otras directivas, se ocultan sólo sus líneas (y sus continuaciones «+»).
  */
+const MANAGED_LINE = /^\s*;?\s*\.(param|step|meas|measure)\b/i;
+const STUDY_FUNC = /^\s*;?\s*\.func\s+binary\s*\(/i;
 export function visibleText<T extends SchText>(t: T, showSim: boolean): T | null {
   if (isDataText(t)) return null;
   if (showSim || !(t.kind === 'directive' || isNgspiceComment(t.text))) return t;
+  if (isControlBlock(t.text)) return null;
   const lines = t.text.split('\\n');
-  const shown = lines.filter((l) => !ANALYSIS_LINE.test(l) && l !== EXTRA_ANALYSES);
+  const shown: string[] = [];
+  let hiding = false;
+  for (const l of lines) {
+    if (/^\s*\+/.test(l)) {
+      if (!hiding) shown.push(l);
+      continue;
+    }
+    hiding = ANALYSIS_LINE.test(l) || l === EXTRA_ANALYSES || MANAGED_LINE.test(l) || STUDY_FUNC.test(l);
+    if (!hiding) shown.push(l);
+  }
   if (shown.length === lines.length) return t;
   return shown.some((l) => l.trim()) ? { ...t, text: shown.join('\\n') } : null;
 }

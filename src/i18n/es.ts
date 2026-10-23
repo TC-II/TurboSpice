@@ -1309,4 +1309,8 @@ export const es: Record<string, string> = {
   'Value of {name}': 'Valor de {name}',
   'Variables (swept with .step):': 'Variables (barridas con .step):',
   'Run history': 'Historial de corridas',
+  'Parameter (.param): click to edit': 'Parámetro (.param): clic para editarlo',
+  'swept: click to edit it in the Study': 'barrido: clic para editarlo en el Estudio',
+  'Show the directives on the schematic': 'Mostrar las directivas en el esquemático',
+  'Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Study)': 'Dibujar .tran, .ac…, .param, .step, .meas y .control en el esquemático, como LTspice (se editan desde la barra de simulación, el panel del proyecto y el Estudio)',
 };

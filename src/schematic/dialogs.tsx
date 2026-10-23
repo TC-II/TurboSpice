@@ -1,4 +1,5 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
+import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
@@ -309,7 +310,9 @@ export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: W
 const PASSIVE_KINDS = new Set(['res', 'cap', 'ind', 'bead']);
 
 /** Atributos de un componente y, a la derecha de cada uno, si su rótulo se ve en el esquemático */
-export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, onApply, onClose }: {
+export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, onApply, onSweep, onClose }: {
+  /** barrer un parámetro de un subcircuito desde el Estudio (#180) */
+  onSweep?(param: string, value: string, attrs: Record<string, string>): void;
   inst: SymbolInst;
   def: SymbolDef | undefined;
   windowDefaults: WindowDefaults;
@@ -339,6 +342,14 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   }, []);
   const prefix = eff.get('Prefix') ?? '';
   const check = checkValue(prefix, vals.Value ?? '');
+  // parámetros de un subcircuito (bloque con SpiceLine «G=1 R=1k» en el símbolo): un campo por
+  // parámetro; el SpiceLine de la instancia se arma con los que difieren del valor por defecto
+  const defaults = def?.symbolType.toUpperCase() === 'BLOCK' ? parseParamList(def.attrs.get('SpiceLine') ?? '') : [];
+  const cur = new Map(parseParamList(vals.SpiceLine ?? '').map(([k, v]) => [k.toLowerCase(), v]));
+  const setParam = (k: string, v: string) => {
+    const next = defaults.map(([n, d]): [string, string] => [n, n === k ? v : (cur.get(n.toLowerCase()) ?? d)]).filter(([n, x], i) => x.trim() && x !== defaults[i][1] && n);
+    setVals({ ...vals, SpiceLine: formatParamList(next) });
+  };
   const setVisible = (win: number, visible: boolean) => {
     setPatches(new Map(patches).set(win, { ...patches.get(win), visible }));
     setRows(rows.map((r) => (r.win === win ? { ...r, visible, moved: true } : r)));
@@ -385,7 +396,31 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
         }}
       >
         {!passive && table}
-        {keys.map((k) => {
+        {defaults.length > 0 && (
+          <fieldset className="sub-params">
+            <legend>{t('Subcircuit parameters')}</legend>
+            {defaults.map(([k, d]) => (
+              <label key={k} className="attr-row">
+                <span>{k}</span>
+                <input value={cur.get(k.toLowerCase()) ?? d} spellCheck={false} placeholder={d} onChange={(e) => setParam(k, e.target.value)} />
+                {onSweep ? (
+                  <button
+                    type="button"
+                    className="link"
+                    title={t('Sweep {k} of this instance from the Study (.step)', { k })}
+                    onClick={() => onSweep(k, cur.get(k.toLowerCase()) ?? d, Object.fromEntries(Object.entries(vals).filter(([kk, v]) => v !== (eff.get(kk) ?? ''))))}
+                  >
+                    {t('Sweep')}
+                  </button>
+                ) : (
+                  <span className="attr-vis" />
+                )}
+              </label>
+            ))}
+            <small className="hint">{t('Default values come from the subcircuit; a value can be an expression like {G}.')}</small>
+          </fieldset>
+        )}
+        {keys.filter((k) => !(defaults.length && k === 'SpiceLine')).map((k) => {
           const row = rows.find((r) => r.attr === k);
           return (
             <label key={k} className="attr-row">

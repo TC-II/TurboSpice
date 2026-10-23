@@ -894,7 +894,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
 
   // Bloques jerárquicos: un .subckt por esquemático (sus .model/.param quedan locales)
   for (const b of lt.blocks) {
-    out.push(`.subckt ${b.name} ${b.ports.join(' ')}`);
+    out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
     out.push(...convertElements(b.lt, new Set(), new Map(), warnings, subcktParams));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;

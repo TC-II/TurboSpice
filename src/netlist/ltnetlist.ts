@@ -47,6 +47,8 @@ export interface Block {
   name: string;
   /** puertos en el orden de SpiceOrder del símbolo */
   ports: string[];
+  /** parámetros con su valor por defecto ("G=1 R=1k"): el SpiceLine del símbolo (#180) */
+  params?: string;
   lt: LtNetlist;
 }
 
@@ -91,7 +93,8 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       });
     warnings.push(...lt.warnings.map((w) => `${name}: ${w}`));
     for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
-    blocks.push({ name, ports, lt });
+    const params = (def.attrs.get('SpiceLine') ?? '').trim();
+    blocks.push({ name, ports, ...(/^[A-Za-z_]\w*\s*=/.test(params) ? { params } : {}), lt });
   };
   const conn = connectivity(doc, (tt) => lib.symbol(tt));
   let ncCounter = 0;
@@ -235,7 +238,7 @@ export function ltNetlistText(n: LtNetlist): string {
   if (n.blocks.length) {
     out.push('', '* block symbol definitions');
     for (const b of n.blocks) {
-      out.push(`.subckt ${b.name} ${b.ports.join(' ')}`);
+      out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
       out.push(...ltNetlistText({ ...b.lt, blocks: [] }).split('\n').filter((l) => !/^\.(backanno|end)$/.test(l)));
       out.push(`.ends ${b.name}`, '');
     }

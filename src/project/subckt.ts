@@ -5,6 +5,7 @@ import { baseName, emptyDoc, type AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { makeSymbol, schematicPorts } from '../library/makeSymbol.ts';
+import { syncPins } from './symbolEdit.ts';
 import { variantOf } from './project.ts';
 import type { Project, ProjectFile } from './turbo.ts';
 import { t } from '../i18n/i18n.ts';
@@ -60,8 +61,24 @@ export function storeSubckt(p: Project, name: string, asc: string): Project {
 /** Regenera el símbolo con los puertos actuales */
 export const updateSymbol = (p: Project, name: string): Project => {
   const f = subcktFile(p, name);
-  return f ? { ...p, modified: Date.now(), files: replaceFile(p.files, subcktSymbol(subName(f.name), parseAsc(f.text))) } : p;
+  if (!f) return p;
+  const doc = parseAsc(f.text);
+  const sym = p.files.find((x) => x.kind === 'symbol' && key(x.name) === key(name));
+  // con símbolo: se conservan su dibujo, la posición de los pines y los parámetros
+  const ports = subcktPorts(doc).map((n) => ({ name: n, dir: doc.flags.find((fl) => fl.name === n)?.ioPin }));
+  const next = sym ? { ...sym, text: syncPins(sym.text, ports) } : subcktSymbol(subName(f.name), doc);
+  return { ...p, modified: Date.now(), files: replaceFile(p.files, next) };
 };
+
+/** Texto del símbolo de un subcircuito */
+export const subcktSymbolText = (p: Project, name: string) => p.files.find((x) => x.kind === 'symbol' && key(x.name) === key(name))?.text;
+
+/** Cambia el texto del símbolo de un subcircuito */
+export function storeSymbol(p: Project, name: string, text: string): Project {
+  const sym = p.files.find((x) => x.kind === 'symbol' && key(x.name) === key(name));
+  if (!sym || sym.text === text) return p;
+  return { ...p, modified: Date.now(), files: replaceFile(p.files, { ...sym, text }) };
+}
 
 /** Esquemático inicial: un puerto de entrada y uno de salida */
 export function subcktTemplate(name: string): string {

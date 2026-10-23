@@ -58,7 +58,7 @@ import {
   type ValueChange,
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
-import { exportAllZip, exportVariantZip, importEntries } from './project/exchange.ts';
+import { exportAllZip, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -68,13 +68,15 @@ import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { HierBar, NameDialog, ProjectTree, QuickOpen, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { extractSubckt } from './project/extract.ts';
-import { addSubckt, childSubckts, freeSubcktName, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
+import { SymbolEditor } from './project/SymbolEditor.tsx';
+import { formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { addSubckt, childSubckts, freeSubcktName, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -1007,14 +1009,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const run = async () => {
     // se simula el circuito actual (aunque se esté mirando una corrida vieja)
-    let doc = liveDoc;
-    if (pathRef.current.length) {
-      const p = snapshot();
-      setProjectState(p);
-      projectRef.current = p;
-      lib.setProjectFiles(p.files);
-      doc = parseAsc(activeAsc(variantOf(p)));
-    }
+    // los subcircuitos no se simulan solos (#180): se simula desde un testbench
+    if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
+    const doc = liveDoc;
     setViewRun('');
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
@@ -1496,7 +1493,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
   const simMenu = useRef<(() => void) | null>(null);
   const canRun = !!curSim?.line || findControl(tbDoc ?? doc) >= 0;
-  const simulate = () => (canRun ? run() : simMenu.current?.());
+  const simulate = () => (curSub ? run() : canRun ? run() : simMenu.current?.());
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
   }, []);
@@ -1607,6 +1604,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color
+  // Vista partida del subcircuito (#180): su símbolo al lado. Los pines siguen a los puertos
+  // mientras se edita (los que quedan conservan su lugar)
+  const subPorts = useMemo(() => (curSub ? subcktPorts(liveDoc) : []), [curSub, liveDoc]);
+  const subPortsKey = subPorts.join(',');
+  useEffect(() => {
+    if (!curSub) return;
+    const p = storeSubckt(projectRef.current, curSub, ascText(docRef.current));
+    if (!symbolOutdated(p, curSub)) return;
+    const next = updateSymbol(p, curSub);
+    projectRef.current = next;
+    setProjectState(next);
+  }, [curSub, subPortsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const editSymbol = (text: string) => {
+    if (!curSub) return;
+    const p = storeSymbol(projectRef.current, curSub, text);
+    projectRef.current = p;
+    editProject(p);
+  };
+  const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
+
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
   // editando, con su texto actual)
   const treeSubs = useMemo((): TreeSub[] => {
@@ -1868,6 +1885,33 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   const openStudy = () => setDialog({ kind: 'study' });
+  /**
+   * Barrer un parámetro de un subcircuito en una instancia (#180): la instancia pasa a usar
+   * {U1_G} y se agrega «.step param U1_G list <valor>», que el Estudio muestra como un barrido
+   */
+  const sweepSubParam = (index: number, param: string, value: string, attrs: Record<string, string>) => {
+    const s = doc.symbols[index];
+    if (!s) return;
+    const def = lib.symbol(s.type);
+    const inst = s.attrs.get('InstName') ?? 'X';
+    const pname = `${inst}_${param}`.replace(/\W/g, '_');
+    const eff = attrs.SpiceLine ?? effectiveAttrs(s, def).get('SpiceLine') ?? '';
+    const defaults = parseParamList(def?.attrs.get('SpiceLine') ?? '');
+    const cur = new Map(parseParamList(eff).map(([k, v]) => [k.toLowerCase(), v]));
+    cur.set(param.toLowerCase(), `{${pname}}`);
+    const line = formatParamList(defaults.map(([k, d]): [string, string] => [k, cur.get(k.toLowerCase()) ?? d]).filter(([k, v], i) => v !== defaults[i][1] && k));
+    let d = setSymbolAttrs(doc, index, { ...attrs, SpiceLine: line });
+    const step = `.step param ${pname} list ${/^\{.*\}$/.test(value) ? '1' : value}`;
+    if (!d.texts.some((tt) => tt.kind === 'directive' && new RegExp(`\\.step\\s+param\\s+${pname}\\b`, 'i').test(tt.text))) {
+      const ys = [...d.symbols.map((x) => x.y), ...d.texts.map((x) => x.y), ...d.wires.flatMap((w) => [w.y1, w.y2]), 0];
+      const xs = [...d.symbols.map((x) => x.x), ...d.wires.flatMap((w) => [w.x1, w.x2]), 0];
+      d = addText(d, { x: Math.min(...xs), y: Math.max(...ys) + 96, align: 'Left', size: 2, kind: 'directive', text: step });
+    }
+    setDialog(null);
+    commit(d);
+    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Study.', { inst, param, pname, step }));
+    setDialog({ kind: 'study' });
+  };
   const studyInfo = (): StudyInfo => {
     const found = findAnalysis(doc);
     const kind = found ? parseAnalysis(found.value)?.kind : undefined;
@@ -2114,6 +2158,33 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
       setMessage(parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)'));
+    } catch (e) {
+      setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
+    }
+  };
+  // Exportar e importar subcircuitos (#180)
+  const subImport = useRef<HTMLInputElement>(null);
+  const exportSub = (name: string) => {
+    const z = exportSubcktZip(snapshot(), name, lib);
+    if (z) download(z.name, new Blob([z.bytes as BlobPart], { type: 'application/zip' }));
+  };
+  const importSubckts = async (list: File[]) => {
+    try {
+      const entries: ZipEntry[] = [];
+      for (const f of list) {
+        const data = new Uint8Array(await f.arrayBuffer());
+        if (/\.zip$/i.test(f.name)) entries.push(...(await readZip(data)));
+        else entries.push({ path: f.name, data });
+      }
+      const p0 = snapshot();
+      const incoming = subcktFilesFrom(entries, p0.files, (n, asc) => subcktSymbol(n, parseAsc(asc)));
+      const subs = incoming.filter((f) => f.kind === 'schematic').map((f) => f.name.replace(/\.asc$/i, ''));
+      if (!incoming.length) return setMessage(t('There was nothing to import (.zip, .asc, .asy, .lib or .sub)'));
+      const merged = await mergeFiles(p0.files, incoming, askConflict);
+      const p = { ...p0, modified: Date.now(), files: merged.files };
+      projectRef.current = p;
+      editProject(p);
+      setMessage(subs.length ? t('Imported subcircuits: {list}', { list: subs.join(', ') }) : t('Imported: {list}', { list: merged.added.join(', ') }));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }
@@ -2554,10 +2625,10 @@ ${ltNetlistText(sim.built.lt)}
                 <button
                   className="primary"
                   onClick={simulate}
-                  disabled={status.kind === 'loading'}
+                  disabled={status.kind === 'loading' || !!curSub}
                   aria-label={t('Simulate')}
                   aria-keyshortcuts="Alt+R Control+Enter"
-                  title={canRun ? t('Simulate (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
+                  title={curSub ? t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate') : canRun ? t('Simulate (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
                 >
                   <Icon name="run" /> {t('Simulate')}
                 </button>
@@ -2589,6 +2660,9 @@ ${ltNetlistText(sim.built.lt)}
           </>
         }
         after={
+          curSub ? (
+            <span className="sub-simbar">{t('Subcircuit {name}: it is simulated from the testbenches that use it', { name: curSub })}</span>
+          ) : (
           <SimBar
             sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}
             info={circuitInfo()}
@@ -2610,12 +2684,13 @@ ${ltNetlistText(sim.built.lt)}
             onRename={renameActive}
             onDelete={deleteActive}
           />
+          )
         }
       />
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div
-          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${path.length ? ' with-crumbs' : ''}${treeOpen ? ' with-tree' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${path.length ? ' with-crumbs' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
@@ -2654,6 +2729,8 @@ ${ltNetlistText(sim.built.lt)}
               onFromSelection={selection.length ? subFromSelection : undefined}
               onRename={renameSub}
               onDelete={deleteSub}
+              onExport={exportSub}
+              onImport={() => subImport.current?.click()}
               onUpdateSymbol={(n) => {
                 const p = updateSymbol(snapshot(), n);
                 projectRef.current = p;
@@ -2679,6 +2756,28 @@ ${ltNetlistText(sim.built.lt)}
             />,
               document.body,
             )}
+          <input
+            ref={subImport}
+            type="file"
+            hidden
+            multiple
+            accept=".zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt"
+            onChange={(e) => {
+              const files = [...(e.target.files ?? [])];
+              e.target.value = '';
+              if (files.length) importSubckts(files);
+            }}
+          />
+          {curSub && symText && (
+            <SymbolEditor
+              name={curSub}
+              text={symText}
+              ports={subPorts}
+              onChange={editSymbol}
+              onParams={(ps) => editSymbol(setSymParams(symText, ps))}
+              onReset={() => editSymbol(setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))}
+            />
+          )}
           <SchematicEditor
             handle={editor}
             onDescend={descend}
@@ -2980,6 +3079,7 @@ ${ltNetlistText(sim.built.lt)}
           parts={partGroups(doc.symbols[dialog.index])}
           windowDefaults={lib.windowDefaults}
           focusLabel={dialog.label}
+          onSweep={(param, value, attrs) => sweepSubParam(dialog.index, param, value, attrs)}
           onClose={() => setDialog(null)}
           onApply={(attrs, labels, toSelection) => {
             setDialog(null);

@@ -21,7 +21,7 @@ export interface TreeSub {
 }
 
 /** Panel lateral: testbenches (variantes) y subcircuitos */
-export function ProjectTree({ project, benches, activeBench, subs, current, onBench, onTestbench, onNewBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onClose }: {
+export function ProjectTree({ project, benches, activeBench, subs, current, onBench, onTestbench, onNewBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onImport, onClose }: {
   project: string;
   /** testbenches: cada uno con su esquemático y su simulación (detail: el análisis) */
   benches: { id: string; name: string; detail: string }[];
@@ -36,6 +36,9 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
+  /** exportar un subcircuito (.zip con su .asc y su .asy) e importar */
+  onExport(name: string): void;
+  onImport(): void;
   /** convertir la selección (sin selección: undefined) */
   onFromSelection?(): void;
   onRename(name: string): void;
@@ -60,6 +63,7 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
+          <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
@@ -137,6 +141,9 @@ export function ProjectTree({ project, benches, activeBench, subs, current, onBe
       <h4>
         {t('Subcircuits')}
         <span className="tree-adds">
+          <button className="tree-add" onClick={onImport} title={t('Import subcircuits: .zip, .asc (+ .asy), .lib/.sub')}>
+            {t('Import')}
+          </button>
           <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
             {t('From selection')}
           </button>

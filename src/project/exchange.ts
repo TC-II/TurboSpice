@@ -142,3 +142,44 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
   const project = added.length ? { ...p, variants: [...p.variants, ...added], activeVariant: added[0].id, modified: Date.now() } : p;
   return { project, variants: added.map((v) => v.name), files };
 }
+
+// --- subcircuitos (#180) ------------------------------------------------------------------------
+
+/**
+ * Un subcircuito como .zip para LTspice u otro proyecto: su .asc y su .asy (un bloque jerárquico
+ * de LTspice), los subcircuitos que usa adentro y los modelos que nombra.
+ */
+export function exportSubcktZip(p: Project, name: string, lib: SymbolSource): { name: string; bytes: Uint8Array } | null {
+  const key = name.toLowerCase();
+  const sch = p.files.find((f) => f.kind === 'schematic' && f.name.replace(/\.asc$/i, '').toLowerCase() === key);
+  if (!sch) return null;
+  const sym = p.files.filter((f) => f.kind === 'symbol' && f.name.replace(/\.asy$/i, '').toLowerCase() === key);
+  const rest = usedFiles(p.files, [sch.text]).filter((f) => f !== sch && !sym.includes(f));
+  const enc = new TextEncoder();
+  const entry = (f: ProjectFile): ZipEntry => ({ path: f.name, data: f.kind === 'schematic' ? ascBytes(parseAsc(f.text), lib).bytes : enc.encode(f.text) });
+  return { name: `${safeName(name)}.zip`, bytes: makeZip([sch, ...sym, ...rest].map(entry)) };
+}
+
+/**
+ * Archivos para importar como subcircuitos: cada .asc es un subcircuito (esquemático), los .asy
+ * sus símbolos y los .lib/.sub modelos. Un .asc sin su .asy recibe uno generado con sus puertos.
+ */
+export function subcktFilesFrom(entries: ZipEntry[], existing: ProjectFile[], makeSym: (name: string, asc: string) => ProjectFile): ProjectFile[] {
+  const out: ProjectFile[] = [];
+  for (const e of entries) {
+    const name = baseName(e.path.replace(/\\/g, '/'));
+    if (!name || name.startsWith('.')) continue;
+    const text = decode(e.data).text;
+    if (/\.asc$/i.test(name)) out.push({ name, kind: 'schematic', text });
+    else {
+      const kind = projectFileKind(name);
+      if (kind) out.push({ name, kind, text });
+    }
+  }
+  const hasSym = (n: string) => [...out, ...existing].some((f) => f.kind === 'symbol' && f.name.replace(/\.asy$/i, '').toLowerCase() === n.toLowerCase());
+  for (const f of [...out]) {
+    const n = f.name.replace(/\.asc$/i, '');
+    if (f.kind === 'schematic' && !hasSym(n)) out.push(makeSym(n, f.text));
+  }
+  return out;
+}

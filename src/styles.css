@@ -930,10 +930,10 @@ button.hier-tab { padding-right: 10px; }
 .hier-crumbs button.link, .project-tree button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; cursor: pointer; }
 .hier-crumbs button.link:hover, .project-tree button.link:hover { text-decoration: underline; }
 .hier-up { margin-left: 8px; border: 0; border-radius: 999px; padding: 2px 10px; background: var(--accent); color: #fff; font: inherit; font-size: 12px; }
-.project-tree { position: absolute; top: 34px; left: 0; bottom: 0; width: 260px; overflow-y: auto; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
+.project-tree { position: absolute; top: 34px; left: 0; bottom: 0; width: 260px; overflow-y: auto; overflow-x: hidden; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
 .project-tree header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
 .project-tree header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-tree h4 { display: flex; align-items: center; justify-content: space-between; margin: 12px 0 4px; padding: 0 8px 0 12px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.project-tree h4 { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: space-between; margin: 12px 0 4px; padding: 0 8px 0 12px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
 .project-tree ul { list-style: none; margin: 0; padding: 0; }
 .tree-row { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; margin: 0 4px; }
 .tree-row:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
@@ -962,3 +962,34 @@ button.hier-tab { padding-right: 10px; }
 .quick-open li.tree-meta { padding: 6px 10px; }
 @media (max-width: 700px) { .canvas-wrap.with-tree { padding-left: 0; } .canvas-wrap.with-tree .hint-bar { left: 0; } .project-tree { box-shadow: 4px 0 16px rgb(0 0 0 / 20%); } }
 .err-text { color: var(--err); font-size: 12px; margin: 0; }
+.sub-simbar { font-size: 12px; color: var(--fg-muted); padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Vista partida del subcircuito (#180): el símbolo y sus parámetros a la derecha */
+.canvas-wrap.with-sym { padding-right: min(36%, 420px); }
+.canvas-wrap.with-sym .hint-bar { right: min(36%, 420px); }
+.sym-pane { position: absolute; top: 34px; right: 0; bottom: 0; width: min(36%, 420px); display: flex; flex-direction: column; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 4; font-size: 13px; overflow-y: auto; overflow-x: hidden; }
+.canvas-wrap.with-crumbs > .sym-pane { top: 64px; }
+.sym-pane header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.sym-pane header .tree-add { margin-left: auto; }
+.sym-canvas { flex: 0 0 auto; height: 260px; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
+.sym-dot { fill: var(--grid, #888); opacity: .5; }
+.sym-shapes { fill: none; stroke: var(--fg); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.sym-shapes * { vector-effect: non-scaling-stroke; }
+.sym-title { fill: var(--fg-muted); font-size: 12px; }
+.sym-corner { fill: var(--bg); stroke: var(--accent); stroke-width: 1; cursor: nwse-resize; vector-effect: non-scaling-stroke; }
+.sym-pin { cursor: grab; }
+.sym-pin rect { fill: var(--accent); }
+.sym-pin text { fill: var(--fg); font-size: 11px; font-family: var(--mono); user-select: none; }
+.sym-pin:hover rect { fill: #e67700; }
+.sym-params { padding: 8px 12px; }
+.sym-params h4 { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.sym-params table { width: 100%; border-collapse: collapse; }
+.sym-params th { text-align: left; font-weight: 500; color: var(--fg-muted); font-size: 11px; padding: 2px 4px; }
+.sym-params td { padding: 2px 4px; }
+.sym-params input { width: 100%; box-sizing: border-box; font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
+.sym-params .icon-x { border: 0; background: transparent; color: var(--fg-muted); font-size: 16px; line-height: 1; padding: 0 4px; }
+.sym-params .icon-x:hover { color: var(--err); }
+@media (max-width: 700px) { .canvas-wrap.with-sym { padding-right: 0; } .sym-pane { width: 85%; box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
+
+.sym-params p.tree-meta { white-space: normal; line-height: 1.4; }
+.tree-adds .tree-add { white-space: nowrap; }

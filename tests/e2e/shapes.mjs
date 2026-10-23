@@ -34,7 +34,7 @@ const ASC = [
 ].join('\r\n');
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.evaluate((asc) => {
   const dt = new DataTransfer();
   dt.items.add(new File([asc], 'figuras.asc', { type: 'text/plain' }));

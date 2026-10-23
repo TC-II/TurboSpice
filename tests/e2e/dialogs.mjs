@@ -21,16 +21,24 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 // el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)
 await openExample(page, 'RC Filter');
 await page.locator('svg.editor .sym').first().waitFor();
 const sym = (name) =>
   page.locator('svg.editor .symbols .sym').filter({ has: page.locator('text.win', { hasText: new RegExp(`^${name}$`) }) }).locator('.body');
+// botón derecho: si otros testbenches del grupo tienen el componente, primero aparece
+// «Editar… / Propagar…» y se elige Editar
+const rightEdit = async (b, name) => {
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
+  const editItem = page.getByRole('menuitem', { name: new RegExp(`^Editar ${name}`) });
+  await Promise.race([page.locator('[role=dialog]').waitFor(), editItem.waitFor()]);
+  if (await editItem.count()) await editItem.click();
+  await page.locator('[role=dialog]').waitFor();
+};
 const edit = async (name) => {
   const b = await sym(name).boundingBox();
-  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-  await page.locator('[role=dialog]').waitFor();
+  await rightEdit(b, name);
 };
 const dialog = page.locator('[role=dialog]');
 
@@ -70,8 +78,7 @@ check(after.length === before.length + 1 && after.includes('V1') && after.some((
 const v1 = page.locator('svg.editor .symbols .sym').filter({ has: page.locator('text.win', { hasText: /^V1$/ }) });
 const v1Box = await v1.locator('.body').boundingBox();
 const openV1 = async () => {
-  await page.mouse.click(v1Box.x + v1Box.width / 2, v1Box.y + v1Box.height / 2, { button: 'right' });
-  await dialog.waitFor();
+  await rightEdit(v1Box, 'V1');
 };
 await openV1();
 check(await show.getByLabel('Valor').isChecked(), 'V: al reabrir, Valor queda marcado');

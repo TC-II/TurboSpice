@@ -36,7 +36,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.getByRole('button', { name: 'Nuevo' }).click();
 
 const svg = page.locator('svg.editor');
@@ -139,7 +139,7 @@ await page.keyboard.press('Enter');
 await page.screenshot({ path: `${OUT}/editor-1.png` });
 
 // Simular y medir el nodo de salida
-await page.getByRole('button', { name: 'Simular' }).click();
+await page.getByRole('button', { name: 'Correr' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await page.locator('.status.ok').count()) === 1, `simulación: ${await page.locator('.status').textContent()}`);
 await page.waitForTimeout(300);

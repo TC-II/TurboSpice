@@ -18,7 +18,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Simular' }).click();
+  await page.getByRole('button', { name: 'Correr' }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
   await page.waitForTimeout(300);
 };
@@ -30,7 +30,7 @@ const add = async (expr) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();
 await simulate();

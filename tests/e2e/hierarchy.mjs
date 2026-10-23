@@ -23,7 +23,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
 
 const svg = page.locator('svg.editor');
@@ -33,7 +33,7 @@ const at = async (x, y) => {
   return { x: b.x + ((x - vx) / vw) * b.width, y: b.y + ((y - vy) / vh) * b.height };
 };
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Simular' }).click();
+  await page.getByRole('button', { name: 'Correr' }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
   await page.waitForTimeout(400);
 };

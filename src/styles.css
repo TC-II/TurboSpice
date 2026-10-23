@@ -558,7 +558,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .share-btn:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 /* barra de la simulación elegida (#39): parámetros en una o dos líneas */
 .simbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 3px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
-.simbar .sb-name { font-weight: 600; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .simbar .sb-rows { display: flex; flex-direction: column; gap: 2px; }
 .simbar .sb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .simbar .sb-field { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
@@ -577,8 +577,8 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar .simbar .sb-row { gap: 4px 10px; }
 .iconbar .simbar .sb-field, .iconbar .simbar .sb-check, .iconbar .simbar .sb-hint { white-space: nowrap; }
 .iconbar .simbar .sb-rows { flex: 0 1 auto; min-width: 0; }
-.simbar button.sb-name { padding: 2px 6px; font: 600 12px system-ui, sans-serif; color: var(--fg); flex: none; }
-.simbar .sb-name-edit { font: 600 12px system-ui, sans-serif; padding: 1px 5px; flex: none; }
+
+
 .iconbar .simbar .sb-delete { padding: 2px; color: var(--fg-muted); flex: none; }
 .iconbar .simbar .sb-delete:hover { color: var(--err); }
 /* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
@@ -1037,6 +1037,38 @@ button.hier-tab { padding-right: 10px; }
 .ctx-menu button { text-align: left; border: 0; border-radius: 5px; background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 6px 10px; }
 .ctx-menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ctx-menu button:disabled { color: var(--fg-muted); }
+.ctx-edit { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px; }
+.ctx-edit span { font-family: var(--mono); white-space: nowrap; }
+.ctx-edit input { flex: 1; min-width: 0; font: 13px var(--mono); }
 .tree-row.tree-var .tree-name { font-size: 12px; }
 .tree-row.tree-var code { font: 11.5px var(--mono); color: var(--fg); }
 .tree-row.tree-var .tree-meta { font-family: var(--mono); }
+
+/* Barras (#GUI): la primera línea lleva las herramientas; la segunda, proyecto y simulación */
+.appbar-tools { flex: 1 1 0; min-width: 0; }
+.appbar .iconbar { flex: 1 1 0; border-bottom: 0; padding: 0; }
+.appbar-sep { flex: none; width: 1px; height: 22px; margin: 0 12px; background: var(--border); }
+.sim-row .capsule { margin: 0 4px; }
+.sim-row .proj-toggle { margin-left: 0; }
+
+/* Panel de proyecto: proyecto › grupos › testbenches unidos con líneas de árbol */
+.project-tree header .tree-add { margin-left: auto; }
+.project-tree ul.tree-branch { margin-left: 12px; border-left: 1px solid color-mix(in srgb, var(--fg) 22%, transparent); }
+.project-tree ul.tree-groups { margin: 6px 0 4px 14px; }
+.tree-branch > li { position: relative; }
+.tree-branch > li::before { content: ''; position: absolute; left: 0; top: 14px; width: 8px; border-top: 1px solid color-mix(in srgb, var(--fg) 22%, transparent); }
+.tree-branch .tree-row { margin-left: 8px; padding-left: 2px; }
+.tree-branch > li.tree-empty { padding-left: 14px; }
+.tree-runs { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; border: 0; background: transparent; color: var(--fg-muted); padding: 2px; font-size: 11px; flex: none; }
+.tree-runs:hover:not(:disabled) { color: var(--accent); }
+.tree-runs.none { opacity: .35; }
+.tree-row .tree-add { flex: none; }
+@media (max-width: 700px) {
+  .sim-row { flex-wrap: wrap; row-gap: 4px; }
+  .sim-row > .group.fixed { flex-wrap: wrap; row-gap: 4px; flex: 1 1 100%; }
+  .appbar-sep { flex: none; width: 1px; height: 22px; margin: 0 12px; background: var(--border); }
+.sim-row .capsule { max-width: 60vw; }
+  .sim-row > .bar-after { flex-basis: 100%; }
+  .sim-row .simbar .sb-row { flex-wrap: nowrap; }
+  .sim-row .simbar .sb-rows { flex: none; }
+}

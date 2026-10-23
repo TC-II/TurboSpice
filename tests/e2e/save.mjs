@@ -228,7 +228,7 @@ async function newPage(context) {
   });
   page.errors = errors;
   await page.goto(URL);
-  await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+  await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
   await page.locator('svg.editor .sym').first().waitFor();
   return page;
 }
@@ -448,8 +448,8 @@ const idle = async (d) => {
   await d.page().waitForTimeout(150);
 };
 const simulate = async (p) => {
-  await p.locator('[aria-label="Simular"]:enabled').click();
-  await p.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 60000 });
+  await p.locator('[aria-label="Correr"]:enabled').click();
+  await p.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
   await p.waitForTimeout(1500);
 };
 const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Google Drive' });

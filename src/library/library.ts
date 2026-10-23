@@ -29,7 +29,7 @@ export const USER_DIR = t('My symbols');
 export const LTSPICE_PREFIX = 'ltspice/';
 /** Archivos de modelos del proyecto abierto (#155): ganan a los del usuario y a la librería */
 export const PROJECT_PREFIX = 'project/';
-/** Carpeta del buscador (F2) con los símbolos del proyecto */
+/** Carpeta del buscador (P) con los símbolos del proyecto */
 export const PROJECT_DIR = t('Project');
 
 /** Nombres de .subckt y .model definidos en un archivo de modelos */
@@ -310,7 +310,7 @@ export class Library implements SymbolSource {
     return Object.entries(this.bundle.subs).find(([f, s]) => f.startsWith(CMP_DIR) && s.models.some((m) => m.toLowerCase() === n))?.[0];
   }
 
-  /** Todas las rutas de símbolos, para el buscador (F2) */
+  /** Todas las rutas de símbolos, para el buscador (P) */
   symbolPaths(): string[] {
     const proj = [...this.projSymbols.keys()].map((n) => `${PROJECT_DIR}/${n}`);
     const user = [...this.extra.keys()].map((n) => `${USER_DIR}/${n}`);

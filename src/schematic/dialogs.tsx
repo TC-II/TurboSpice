@@ -147,7 +147,7 @@ export function searchRank(path: string, desc: string, words: string[]): number 
 export type PickerItem = { kind: 'up' } | { kind: 'dir'; path: string } | { kind: 'sym'; path: string; desc: string };
 
 /**
- * Lo que muestra el explorador de componentes (F2) en la carpeta `dir` ('' = la raíz). Sin
+ * Lo que muestra el explorador de componentes (P) en la carpeta `dir` ('' = la raíz). Sin
  * búsqueda: las subcarpetas primero (se abren), después los componentes sueltos de la carpeta y,
  * más abajo, todo el contenido de sus subcarpetas. Con búsqueda: los componentes de toda la
  * librería que coinciden. Las carpetas ocultas (Characters) sólo se ven entrando a ellas.
@@ -202,7 +202,7 @@ const PickerRow = memo(function PickerRow({ it, index, active, dir, lib, onEnter
   );
 });
 
-/** F2: buscar y elegir un componente de la librería, o recorrerla por carpetas */
+/** P: buscar y elegir un componente de la librería, o recorrerla por carpetas */
 export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick(path: string): void; onClose(): void }) {
   const [q, setQ] = useState('');
   const [dir, setDir] = useState('');
@@ -509,7 +509,7 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
   );
 }
 
-/** F4: nombre de red (o tierra) */
+/** N: nombre de red (o tierra) */
 export function FlagDialog({ initial, onApply, onClose }: {
   initial: string;
   onApply(name: string): void;
@@ -626,11 +626,11 @@ const SHORTCUTS: [string, [string, string][]][] = [
   [
     t('Schematic'),
     [
-      ['P · F2', t('Component (browser)')],
+      ['P', t('Component (browser)')],
       ['R · C · L · D · V · I', t('Resistor, capacitor, inductor, diode, voltage source, current source')],
       ['G', t('Ground')],
-      ['W · F3', t('Wire (right-click or Esc finishes)')],
-      ['N · F4', t('Net label')],
+      ['W', t('Wire (right-click or Esc finishes)')],
+      ['N', t('Net label')],
       ['. · T', t('SPICE directive · comment')],
       ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],
       ['M', t('Move: click an element (or a box); it follows the cursor until the next click; wires don\'t stretch')],
@@ -655,7 +655,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['Ctrl+L', t('View the simulation log (or problems)')],
       ['Ctrl+S · Ctrl+Shift+S · Ctrl+O', t('Save · save as · open')],
       ['Ctrl+1 · Ctrl+0', t('Show · hide the results panel')],
-      ['F7 · F8 · Esc', t('Back to the selection tool')],
+      ['Esc', t('Back to the selection tool')],
       ['?', t('This help')],
     ],
   ],
@@ -878,12 +878,12 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
     <Modal title={project ? t('Project files «{project}»', { project }) : t('My symbols and models')} onClose={onClose} wide>
       {project ? (
         <p className="hint">
-          {t('They\'re saved inside the project (.turbo) and apply to all its variants; they take precedence over «My symbols and models» and over the library. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2) under «Project»; models (')}
+          {t('They\'re saved inside the project (.turbo) and apply to all its variants; they take precedence over «My symbols and models» and over the library. Symbols (')}<code>.asy</code>{t(') show up in the component browser (P) under «Project»; models (')}
           <code>.lib</code>, <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>.
         </p>
       ) : (
       <p className="hint">
-        {t('Shared by all your projects. Signed in with Google, they are saved in your Drive (TurboSpice › My symbols and models.json); otherwise, in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (F2); models (')}<code>.lib</code>,{' '}
+        {t('Shared by all your projects. Signed in with Google, they are saved in your Drive (TurboSpice › My symbols and models.json); otherwise, in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (P); models (')}<code>.lib</code>,{' '}
         <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>{t('; an')}{' '}<code>.asc</code> {t('with its block symbol is used as a subcircuit (hierarchy, like in LTspice).')}
       </p>
       )}

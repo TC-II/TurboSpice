@@ -59,7 +59,7 @@ export function groupsThatFit(widths: number[], avail: number, moreW = MORE_W): 
   return n;
 }
 
-export function Toolbar({ label, groups, fixed, after }: { label: string; groups: ToolGroup[]; fixed: ReactNode; after?: ReactNode }) {
+export function Toolbar({ label, groups, fixed, after }: { label: string; groups: ToolGroup[]; fixed?: ReactNode; after?: ReactNode }) {
   const bar = useRef<HTMLDivElement>(null);
   // ancho de cada grupo la última vez que se vio (los ocultos no se pueden medir)
   const widths = useRef(new Map<string, number>());
@@ -110,7 +110,7 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
           </MenuButton>
         </div>
       )}
-      <div className="group fixed">{fixed}</div>
+      {fixed && <div className="group fixed">{fixed}</div>}
       {after && <div className="bar-after">{after}</div>}
     </div>
   );

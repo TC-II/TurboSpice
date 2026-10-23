@@ -84,7 +84,7 @@ export function storeSymbol(p: Project, name: string, text: string): Project {
 export function subcktTemplate(name: string): string {
   const doc = emptyDoc();
   doc.flags.push({ x: -128, y: 0, name: 'in', ioPin: 'In' }, { x: 128, y: 0, name: 'out', ioPin: 'Out' });
-  doc.texts.push({ x: -128, y: -96, align: 'Left', size: 2, kind: 'comment', text: t('{name}: draw the circuit between the ports (net labels with a port, F4)', { name }) });
+  doc.texts.push({ x: -128, y: -96, align: 'Left', size: 2, kind: 'comment', text: t('{name}: draw the circuit between the ports (net labels with a port, N)', { name }) });
   return serializeAsc(doc);
 }
 

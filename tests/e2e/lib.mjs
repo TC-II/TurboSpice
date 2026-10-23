@@ -41,7 +41,7 @@ export const resultsView = async (page) => ((await page.locator('.results-bar .r
 /** Elige un ítem de la flecha de Simular: una simulación guardada (por su nombre) o un tipo de
  * análisis (crea una simulación nueva, con sus parámetros en la barra) */
 export async function simType(page, label) {
-  await page.getByRole('button', { name: 'Tipo de simulación', exact: true }).click();
+  await page.getByRole('button', { name: 'Nueva simulación', exact: true }).click();
   await pick(page, [label]);
 }
 

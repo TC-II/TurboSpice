@@ -24,7 +24,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 
 /** Abre el filtro RC limpio y el Estudio, y elige una plantilla */
 async function template(name) {
@@ -36,7 +36,7 @@ async function template(name) {
   check(await page.locator('.study-template legend', { hasText: title }).isVisible(), `${title}: el asistente aparece`);
 }
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Simular' }).click();
+  await page.getByRole('button', { name: 'Correr' }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
   return (await page.locator('.status.err').count()) === 0;
 };

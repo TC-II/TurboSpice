@@ -39,6 +39,7 @@ export function setLang(l: Lang, persist = true) {
 
 /** Texto en el idioma elegido; `{nombre}` se reemplaza por params.nombre (si está) */
 export function t(key: string, params?: Record<string, unknown>): string {
-  const s = lang === 'es' ? (es[key] ?? key) : key;
+  // «Run|verb»: el mismo texto en inglés con otra traducción; lo de después de | no se muestra
+  const s = lang === 'es' ? (es[key] ?? key.replace(/\|\w+$/, '')) : key.replace(/\|\w+$/, '');
   return params ? s.replace(/\{(\w+)\}/g, (m, k: string) => (k in params ? String(params[k]) : m)) : s;
 }

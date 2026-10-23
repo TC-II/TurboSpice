@@ -123,7 +123,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun, onRename, onDelete }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun, onDelete }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -144,17 +144,10 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   onApply(line: string): void;
   onRun(): void;
   /** nombre propio; vacío vuelve al automático */
-  onRename(name: string): void;
   onDelete(): void;
 }) {
   const line = sim?.line ?? '';
   const [draft, setDraft] = useState(() => parseAnalysis(line));
-  // nombre en edición (null: no se está renombrando)
-  const [naming, setNaming] = useState<string | null>(null);
-  const endNaming = (ok: boolean) => {
-    if (ok && sim && naming !== null && naming.trim() !== (sim.custom ? sim.name : '')) onRename(naming);
-    setNaming(null);
-  };
   // la línea que la barra acaba de aplicar: vuelve un render después (la lista sigue al
   // esquemático en un efecto) y no debe pisar lo que ya se está escribiendo en otro campo
   const applied = useRef<string | null>(null);
@@ -180,26 +173,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
       <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       {!sim ? (
         <span className="sb-hint">{t('Select simulation type')}</span>
-      ) : naming !== null ? (
-        <input
-          className="sb-name-edit"
-          aria-label={t('Simulation name')}
-          value={naming}
-          placeholder={sim.name}
-          size={Math.max(12, naming.length + 1)}
-          autoFocus
-          onChange={(e) => setNaming(e.target.value)}
-          onBlur={() => endNaming(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') endNaming(true);
-            if (e.key === 'Escape') endNaming(false);
-          }}
-        />
-      ) : (
-        <button className="sb-name" title={t('{line}\nClick to rename it (empty: automatic name)', { line })} onClick={() => setNaming(sim.custom ? sim.name : '')}>
-          {sim.name}
-        </button>
-      )}
+      ) : null}
       {sim && (
         <div className="sb-rows">
           {!draft && <code className="sb-line">{line}</code>}

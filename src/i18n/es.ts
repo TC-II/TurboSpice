@@ -1307,6 +1307,7 @@ export const es: Record<string, string> = {
   'Parameters (.param): used in the schematic as {name}.': 'Parámetros (.param): en el esquemático se usan como {name}.',
   'Project panel: testbenches and subcircuits': 'Panel del proyecto: testbenches y subcircuitos',
   'Propagate {inst} = {value} to the {n} other testbenches of «{group}»': 'Propagar {inst} = {value} a los otros {n} testbenches de «{group}»',
+  'Propagate {inst} to the other testbenches of the group': 'Propagar {inst} a los otros testbenches del grupo',
   'Propagate {inst} = {value} to the other testbench of «{group}»': 'Propagar {inst} = {value} al otro testbench de «{group}»',
   'Rename group': 'Renombrar grupo',
   'Show when the mouse approaches the edge (in select mode)': 'Mostrar al acercar el mouse al borde (en modo selección)',

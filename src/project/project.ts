@@ -89,7 +89,7 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
   const v = variantOf(p);
   const src = simOf(v, simId);
   if (!src || v.sims.length >= MAX_SIMS) return null;
-  const name = uniqueLabel(t('{p0} (copy)', { p0: simLabel(src) }), v.sims.map((s) => simLabel(s)));
+  const name = freeBenchName(p);
   const s: Sim = { id: newId('s'), name, asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };
   const i = v.sims.indexOf(src);
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims: [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)], activeSim: s.id })), id: s.id };
@@ -149,8 +149,14 @@ export function withGroups(p: Project): Project {
 export const setBenchGroup = (p: Project, simId: string, group?: string): Project =>
   mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
 
-/** Nombre libre para un testbench nuevo: «Testbench N» */
-export const freeBenchName = (p: Project) => uniqueLabel(t('Testbench {n}', { n: variantOf(p).sims.length + 1 }), variantOf(p).sims.map((s) => simLabel(s)));
+/** Nombre libre para un testbench nuevo (también las copias): «Testbench N», el siguiente número libre */
+export function freeBenchName(p: Project): string {
+  const used = new Set(variantOf(p).sims.map((s) => simLabel(s).trim().toLowerCase()));
+  for (let n = variantOf(p).sims.length + 1; ; n++) {
+    const name = t('Testbench {n}', { n });
+    if (!used.has(name.toLowerCase())) return name;
+  }
+}
 
 /**
  * Agrega una corrida con el circuito simulado. Si es igual al de la última, sólo se actualiza

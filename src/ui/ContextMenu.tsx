@@ -6,6 +6,30 @@ export interface ContextItem {
   title?: string;
   disabled?: boolean;
   onClick(): void;
+  /** campo editable en el propio menú («R1 = [valor]»): Enter lo aplica */
+  edit?: { value: string; onCommit(value: string): void };
+}
+
+function EditRow({ it, onClose }: { it: ContextItem; onClose(): void }) {
+  const [v, setV] = useState(it.edit!.value);
+  return (
+    <label className="ctx-edit" title={it.title}>
+      <span>{it.label}</span>
+      <input
+        autoFocus
+        value={v}
+        spellCheck={false}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          onClose();
+          if (v.trim() && v !== it.edit!.value) it.edit!.onCommit(v.trim());
+        }}
+      />
+    </label>
+  );
 }
 
 export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number }; items: ContextItem[]; onClose(): void }) {
@@ -33,7 +57,10 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
   }, [onClose]);
   return (
     <div ref={box} className="ctx-menu" role="menu" style={{ left: pos.x, top: pos.y }}>
-      {items.map((it, i) => (
+      {items.map((it, i) =>
+        it.edit ? (
+          <EditRow key={i} it={it} onClose={onClose} />
+        ) : (
         <button
           key={i}
           role="menuitem"
@@ -46,7 +73,8 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
         >
           {it.label}
         </button>
-      ))}
+        ),
+      )}
     </div>
   );
 }

@@ -124,13 +124,13 @@ const probe = async (x, y) => {
   await page.mouse.click(p.x, p.y);
   await page.waitForTimeout(200);
 };
-const benchName = () => page.locator('.simbar .sb-name').textContent();
+const benchName = () => page.locator('.capsule-variant').textContent();
 await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
-check(/Barrido DC|DC/.test(await benchName()) && (await benchName()) !== 'RC Filter', `un tipo nuevo crea otro testbench (${await benchName()})`);
-await page.locator('.simbar .sb-name').click();
-await page.getByLabel('Nombre de la simulación').fill('DC');
-await page.getByLabel('Nombre de la simulación').press('Enter');
+check(/^Testbench d+$/.test(await benchName()), `un tipo nuevo crea otro testbench, con nombre consecutivo (${await benchName()})`);
+await page.locator('.capsule-variant').dblclick();
+await page.getByLabel('Nombre del testbench').fill('DC');
+await page.getByLabel('Nombre del testbench').press('Enter');
 check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálogo: los parámetros van en la barra');
 check((await directive()) === '.dc V1 0 5 0.1', `elegir un tipo configura la simulación del testbench, con la fuente del circuito (${await directive()})`);
 check((await benchName()) === 'DC', `la barra muestra el nombre del testbench (${await benchName()})`);
@@ -232,10 +232,10 @@ await page.waitForTimeout(1000); // autoguardado
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await items()).length === 2, 'al recargar se recuperan los testbenches');
-// renombrar: click en el nombre de la barra
-await page.locator('.simbar .sb-name').click();
-await page.getByLabel('Nombre de la simulación').fill('Curva corta');
-await page.getByLabel('Nombre de la simulación').press('Enter');
+// renombrar: doble click en el nombre de la cápsula
+await page.locator('.capsule-variant').dblclick();
+await page.getByLabel('Nombre del testbench').fill('Curva corta');
+await page.getByLabel('Nombre del testbench').press('Enter');
 check((await benchName()) === 'Curva corta', 'click en el nombre lo renombra');
 await page.getByRole('button', { name: 'Borrar simulación' }).click();
 await slideToDelete(page);

@@ -78,6 +78,7 @@ import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
+import { parseSource } from './sim/sources.ts';
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
@@ -1404,7 +1405,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (sims.active || !docLine) return;
     const p0 = projectRef.current;
     const v = variantOf(p0);
-    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
+    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc), freeBenchName(p0));
     if (r) editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
@@ -1417,7 +1418,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // un testbench tiene una sola simulación: sin análisis se la pone; si ya tiene, se crea otro
     // testbench (en el mismo grupo) con el mismo circuito y ésta
     if (!docLine) return commit(setAnalysisLine(doc, line));
-    const r = addProjectSim(leave(), ascText(setAnalysisLine(doc, line)));
+    const p1 = leave();
+    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)), freeBenchName(p1));
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
@@ -1504,24 +1506,38 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // los otros testbenches del grupo que tienen el mismo componente
   const [ctxMenu, setCtxMenu] = useState<{ at: { x: number; y: number }; items: ContextItem[] } | null>(null);
   const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
-    if (curSub || !sims.active) return false;
     const s = doc.symbols[index];
     const inst = s?.attrs.get('InstName');
     if (!s || !inst) return false;
+    const eff = effectiveAttrs(s, lib.symbol(s.type));
+    const value = s.attrs.get('Value') ?? eff.get('Value') ?? '';
+    const prefix = (eff.get('Prefix') ?? '').toUpperCase();
+    // R, L, C y fuentes V de continua: el valor se edita en el mismo menú
+    const quick =
+      /^[RLC]$/.test(prefix) ||
+      (prefix === 'V' && parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') })?.kind === 'dc');
     const p0 = snapshot();
-    const peers = groupPeersWith(p0, sims.active, inst, s.type);
-    const me = variantOf(p0).sims.find((x) => x.id === sims.active);
-    // todos están en un grupo: el menú sólo aparece si hay a quién propagarle
-    if (!me?.group || !peers.length) return false;
-    const value = s.attrs.get('Value') ?? effectiveAttrs(s, lib.symbol(s.type)).get('Value') ?? '';
-    const group = p0.groups.find((g) => g.id === me.group)?.name ?? '';
+    const inBench = !curSub && !!sims.active;
+    const peers = inBench ? groupPeersWith(p0, sims.active, inst, s.type) : [];
+    const me = inBench ? variantOf(p0).sims.find((x) => x.id === sims.active) : undefined;
+    const canPropagate = !!me?.group && peers.length > 0;
+    // fuera de los casos rápidos, el menú sólo aparece si hay a quién propagarle
+    if (!quick && !canPropagate) return false;
+    const group = p0.groups.find((g) => g.id === me?.group)?.name ?? '';
     setCtxMenu({
       at,
       items: [
-        { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
+        quick
+          ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: v })) } }
+          : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
         {
-          label: peers.length === 1 ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group }) : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
+          label: !canPropagate
+            ? t('Propagate {inst} to the other testbenches of the group', { inst })
+            : peers.length === 1
+              ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group })
+              : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
           title: t('Copies its value and parameters to the component with the same name in the other testbenches of the group'),
+          disabled: !canPropagate,
           onClick: () => {
             editProject(propagateAttrs(snapshot(), peers, inst, s.type, s.attrs));
             setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value, n: peers.length, group }));
@@ -1543,8 +1559,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
     action === 'rename' ? renameBench(id) : action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
-  // nombre propio desde la barra (vacío: vuelve al automático)
-  const renameActive = (name: string) => editProject(renameProjectSim(projectRef.current, sims.active, name));
   // borrar la elegida (con el control deslizante): pasa a la siguiente, o a la base si era la única
   const deleteActive = () => sims.active && sims.items.length > 1 && setDialog({ kind: 'deleteSim', id: sims.active });
   const deleteSim = (id: string) => {
@@ -2781,13 +2795,6 @@ ${ltNetlistText(sim.built.lt)}
 
   return (
     <div className="schematic-mode">
-      {slots.menu &&
-        createPortal(
-          <>
-            <AppMenu menus={menus} />
-          </>,
-          slots.menu,
-        )}
       {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} />, slots.tools)}
       {slots.right &&
         createPortal(
@@ -2843,6 +2850,7 @@ ${ltNetlistText(sim.built.lt)}
                 <Icon name="layoutStack" size={16} />
               </button>
             </div>
+            <span className="appbar-sep" />
           </>,
           slots.tabs,
         )}
@@ -2861,6 +2869,7 @@ ${ltNetlistText(sim.built.lt)}
               onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
             />
             <span className="tb-sep" />
+            <AppMenu menus={menus} />
             {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
             <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className="labeled" openRef={simMenu}>
               {t('New simulation')} <Icon name="caret" size={14} />
@@ -2927,7 +2936,6 @@ ${ltNetlistText(sim.built.lt)}
             picker={picker}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}
-            onRename={renameActive}
             onDelete={deleteActive}
           />
           )}

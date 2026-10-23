@@ -94,8 +94,8 @@ describe('simulaciones', () => {
     p = renameSim(p, a.id, '  Arranque ');
     expect(simLabel(variantOf(p).sims[0])).toBe('Arranque');
     const d = duplicateSim(p, a.id)!;
-    expect(variantOf(d.project).sims.map((s) => simLabel(s))).toEqual(['Arranque', 'Arranque (copia)', 'AC 1 Hz–1 MHz']);
-    expect(simLabel(variantOf(duplicateSim(d.project, a.id)!.project).sims[1])).toBe('Arranque (copia) (2)');
+    expect(variantOf(d.project).sims.map((s) => simLabel(s))).toEqual(['Arranque', 'Testbench 3', 'AC 1 Hz–1 MHz']);
+    expect(simLabel(variantOf(duplicateSim(d.project, a.id)!.project).sims[1])).toBe('Testbench 4');
     // sin nombre no: un testbench siempre tiene nombre
     expect(renameSim(p, a.id, '')).toBe(p);
   });

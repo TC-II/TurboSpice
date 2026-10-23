@@ -85,7 +85,7 @@ import { benchParams, benchVariables, setBenchParams } from './schematic/benchPa
 import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
-import { formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
@@ -128,7 +128,7 @@ const EXAMPLES_TURBO = 'Examples.turbo';
 const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
 
 type Dialog =
-  | { kind: 'picker' }
+  | { kind: 'picker'; forSymbol?: boolean }
   | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
@@ -1781,6 +1781,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     warnShared();
   };
   const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
+  /** Un .asy existente como símbolo del subcircuito que se edita (#199) */
+  const adoptSymbolFor = (type: string) => {
+    const asy = lib.symbolText(type);
+    if (!curSub || !asy) return setMessage(t('Symbol not found: {p0}', { p0: type }));
+    if (subcktFile(projectRef.current, type)) return setMessage(t('Choose a symbol from the library, not another subcircuit'));
+    const ports = subPorts.map((n) => ({ name: n, dir: liveDoc.flags.find((f) => f.name === n)?.ioPin }));
+    editSymbol(adoptSymbol(asy, ports, symText ? symParams(symText) : []));
+    setMessage(t('Symbol {sym} adopted: check the port of each pin («Port of each pin», under the symbol)', { sym: baseName(type) }));
+  };
   // testbenches del panel, con sus .param y .step (el activo, con lo que se está editando)
   const treeBenches = useMemo(() => {
     if (!treeOpen && !treePeek) return [];
@@ -3004,6 +3013,7 @@ ${ltNetlistText(sim.built.lt)}
               onChange={editSymbol}
               onParams={(ps) => editSymbol(setSymParams(symText, ps))}
               onReset={() => editSymbol(setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))}
+              onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
             />
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
@@ -3287,6 +3297,7 @@ ${ltNetlistText(sim.built.lt)}
             // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
             const dir = [USER_DIR, PROJECT_DIR].find((d) => type.startsWith(`${d}/`));
             const name = dir ? type.slice(dir.length + 1) : type;
+            if (dialog.forSymbol) return adoptSymbolFor(name);
             if (!makesCycle([name])) setTool({ kind: 'place', type: name, orient: 'R0' });
           }}
         />

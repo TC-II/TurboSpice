@@ -3,14 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GRID } from '../asc/model.ts';
 import { parseAsy } from '../asc/parse.ts';
-import { formatParamList, movePin, resizeBody, symBody, symParams, symPins } from './symbolEdit.ts';
+import { assignPin, formatParamList, movePin, resizeBody, symBody, symParams, symPins } from './symbolEdit.ts';
 import { t } from '../i18n/i18n.ts';
 
 type Drag = { kind: 'pin'; index: number } | { kind: 'corner'; cx: 0 | 1; cy: 0 | 1 };
 
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 
-export function SymbolEditor({ name, text, ports, onChange, onParams, onReset }: {
+export function SymbolEditor({ name, text, ports, onChange, onParams, onReset, onPickSymbol }: {
   name: string;
   text: string;
   /** puertos del esquemático (para avisar los que no tienen pin) */
@@ -19,6 +19,8 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset }:
   onParams(ps: [string, string][]): void;
   /** volver al símbolo generado (rectángulo con los puertos a los costados) */
   onReset(): void;
+  /** elegir un .asy existente (opamp, transistor…) como símbolo (#199) */
+  onPickSymbol?(): void;
 }) {
   // mientras se arrastra se dibuja una copia local; al soltar se guarda
   const [live, setLive] = useState(text);
@@ -88,6 +90,11 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset }:
       <header>
         <strong>{t('Symbol')}</strong>
         <span className="tree-meta">{t('drag the pins and the corners')}</span>
+        {onPickSymbol && (
+          <button className="tree-add" onClick={onPickSymbol} title={t('Use the drawing and pins of an existing symbol (an opamp, a transistor…) and assign each port to a pin')}>
+            {t('Use a symbol…')}
+          </button>
+        )}
         <button className="tree-add" onClick={onReset} title={t('Back to the generated symbol: a rectangle with the ports on the sides')}>
           {t('Redo')}
         </button>
@@ -132,6 +139,29 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset }:
           );
         })}
       </svg>
+      {pins.length > 1 && (
+        <details className="sym-assign">
+          <summary>{t('Port of each pin')}</summary>
+          <table>
+            <tbody>
+              {pins.map((p, i) => (
+                <tr key={i}>
+                  <td className="tree-meta">{t('Pin {n}', { n: i + 1 })}</td>
+                  <td>
+                    <select aria-label={t('Port of pin {n}', { n: i + 1 })} value={p.name} onChange={(e) => onChange(assignPin(text, i, e.target.value, ports.map((n) => ({ name: n }))))}>
+                      {ports.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
       {missing.length > 0 && <p className="tree-warn">{t('Ports without a pin: {ports}', { ports: missing.join(', ') })}</p>}
       <ParamsEditor key={formatParamList(symParams(text))} params={symParams(text)} onChange={onParams} />
     </aside>

@@ -196,6 +196,25 @@ check((await page.getByText('DIV se usa en 2 testbenches').count()) > 0, 'la pri
 await page.keyboard.press('Control+z');
 await page.keyboard.press('Alt+ArrowUp');
 
+// --- un .asy existente como símbolo y el puerto de cada pin (#199) ---
+await page.getByRole('button', { name: 'Agregar un subcircuito vacío' }).click();
+await page.locator('.modal input').fill('AMP');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(500);
+await page.getByRole('button', { name: 'Usar un símbolo…' }).click();
+await page.locator('.modal input').fill('opamp2');
+await page.waitForTimeout(300);
+await page.keyboard.press('Enter');
+await page.waitForTimeout(400);
+const symLines = await page.locator('.sym-pane .sym-shapes line').count();
+const pinNames = () => page.locator('.sym-pane .sym-pin text').allTextContents();
+check(symLines === 8 && JSON.stringify(await pinNames()) === '["in","out"]', `usar opamp2 como símbolo de AMP (${symLines} líneas, pines ${(await pinNames()).join(', ')})`);
+await page.locator('.sym-assign summary').click();
+await page.getByLabel('Puerto del pin 1').selectOption('out');
+await page.waitForTimeout(300);
+check(JSON.stringify(await pinNames()) === '["out","in"]', `cambiar el puerto de un pin los intercambia (${(await pinNames()).join(', ')})`);
+await page.keyboard.press('Alt+ArrowUp');
+
 check(!errors.length, `sin errores en la página${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E jerarquía OK');

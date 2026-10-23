@@ -9,7 +9,8 @@ import { changedFiles, exportSubcktNetlist, runFilesOf, runSummary, subcktFilesF
 import { recordRun } from '../../src/project/project.ts';
 import { t } from '../../src/i18n/i18n.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
-import { addSubckt, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
+import { adoptSymbol, assignPin, symPins } from '../../src/project/symbolEdit.ts';
+import { addSubckt, storeSymbol, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
 import { newProject, parseTurbo, serializeTurbo } from '../../src/project/turbo.ts';
 
 const lib = new Library(buildBundle());
@@ -293,5 +294,46 @@ describe('copiar a Mis símbolos y modelos (#199)', () => {
     p = addSubckt(p, 'TOP', tb('BUF'));
     expect(subcktFilesFor(p, 'top').map((f) => f.name).sort()).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
     expect(subcktFilesFor(p, 'nope')).toEqual([]);
+  });
+});
+
+describe('un .asy existente como símbolo del subcircuito (#199)', () => {
+  const ports = [{ name: 'inp' }, { name: 'inn' }, { name: 'out', dir: 'Out' }];
+  const asy = lib.symbolText('OpAmps/opamp2')!;
+
+  it('toma el dibujo y los pines, como BLOCK, y asigna los puertos', () => {
+    const text = adoptSymbol(asy, ports, [['G', '10']]);
+    expect(text).toMatch(/^SymbolType BLOCK$/m);
+    expect(text).not.toMatch(/^SYMATTR (Prefix|Value) /m);
+    expect(text).toMatch(/^SYMATTR SpiceLine G=10$/m);
+    expect(text).toContain('LINE Normal -32 32 32 64');
+    const pins = symPins(text);
+    // OUT por nombre; inp, inn a In+ e In- por orden; V+ y V- sobran y se quitan
+    expect(pins.map((p) => [p.name, p.x, p.y])).toEqual([
+      ['inp', -32, 80],
+      ['inn', -32, 48],
+      ['out', 32, 64],
+    ]);
+    expect(pins.find((p) => p.name === 'out')!.order).toBe(3);
+  });
+
+  it('cambiar el puerto de un pin intercambia con el que lo tenía', () => {
+    const text = assignPin(adoptSymbol(asy, ports), 0, 'inn', ports);
+    expect(symPins(text).map((p) => [p.name, p.y])).toEqual([
+      ['inn', 80],
+      ['inp', 48],
+      ['out', 64],
+    ]);
+    expect(symPins(text).find((p) => p.name === 'inp')!.order).toBe(1);
+  });
+
+  it('el netlister lo usa como bloque', () => {
+    let p = withSub();
+    p = storeSymbol(p, 'BUF', adoptSymbol(asy, [{ name: 'in' }, { name: 'out' }]));
+    lib.setProjectFiles(p.files);
+    const lt = ltNetlist(parseAsc(tb()), lib);
+    lib.setProjectFiles([]);
+    expect(lt.blocks.map((b) => [b.name, b.ports])).toEqual([['BUF', ['in', 'out']]]);
+    expect(lt.elements[0].value).toBe('BUF');
   });
 });

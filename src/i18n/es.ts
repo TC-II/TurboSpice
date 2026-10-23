@@ -1467,4 +1467,11 @@ export const es: Record<string, string> = {
   "Copy {name} to My symbols and models": "Copiar {name} a Mis símbolos y modelos",
   "Copied to My symbols and models: {p0}": "Copiado a Mis símbolos y modelos: {p0}",
   "Not replaced (My symbols and models already has a different one): {p0}": "No se reemplazó (Mis símbolos y modelos ya tiene otro distinto): {p0}",
+  "Use the drawing and pins of an existing symbol (an opamp, a transistor…) and assign each port to a pin": "Usar el dibujo y los pines de un símbolo existente (un opamp, un transistor…) y asignar cada puerto a un pin",
+  "Use a symbol…": "Usar un símbolo…",
+  "Port of each pin": "Puerto de cada pin",
+  "Pin {n}": "Pin {n}",
+  "Port of pin {n}": "Puerto del pin {n}",
+  "Choose a symbol from the library, not another subcircuit": "Elegí un símbolo de la librería, no otro subcircuito",
+  "Symbol {sym} adopted: check the port of each pin («Port of each pin», under the symbol)": "Se usa el símbolo {sym}: revisá el puerto de cada pin («Puerto de cada pin», debajo del símbolo)",
 };

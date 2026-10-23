@@ -124,6 +124,66 @@ export function syncPins(text: string, ports: { name: string; dir?: string }[]):
   return maxY > body.y2 ? resizeBody(join(ls), { ...body, y2: maxY }) : join(ls);
 }
 
+// --- un .asy existente como símbolo (#199) --------------------------------------------------
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Cambia el nombre (PinName) del pin `index` y reordena con syncPins */
+function renamePins(text: string, names: Map<number, string>): string {
+  const pins = symPins(text);
+  const ls = lines(text);
+  pins.forEach((p, i) => {
+    const name = names.get(i);
+    if (name === undefined) return;
+    let k = p.line + 1;
+    for (; k < ls.length && ls[k].startsWith('PINATTR'); k++) {
+      if (/^PINATTR PinName /.test(ls[k])) {
+        ls[k] = `PINATTR PinName ${name}`;
+        return;
+      }
+    }
+    ls.splice(p.line + 1, 0, `PINATTR PinName ${name}`);
+    // las líneas de abajo se corrieron una: los índices de los pines siguientes también
+    pins.forEach((q) => q.line > p.line && q.line++);
+  });
+  return join(ls);
+}
+
+/**
+ * Usa el dibujo y los pines de otro símbolo (un opamp, un transistor) para el subcircuito: queda
+ * como BLOCK, sin los atributos que lo harían otro componente (Prefix, Value, SpiceModel…), con los
+ * parámetros `params`. Cada pin toma un puerto: el de nombre parecido («In+» → «inp» o «in_p» no;
+ * «OUT» → «out» sí) y, si no, los que quedan en el orden de los pines (SpiceOrder). Los pines que
+ * sobran se quitan y los puertos que no tienen pin se agregan en un borde (syncPins).
+ */
+export function adoptSymbol(asy: string, ports: { name: string; dir?: string }[], params: [string, string][] = []): string {
+  const drop = /^SYMATTR (Prefix|Value|Value2|SpiceModel|ModelFile|SpiceLine|SpiceLine2|Def_Sub|InstName)\b/;
+  let text = join(lines(asy).map((l) => (/^SymbolType /.test(l) ? 'SymbolType BLOCK' : l)).filter((l) => !drop.test(l)));
+  const pins = symPins(text).map((p, i) => ({ ...p, i }));
+  const free = new Set(ports.map((p) => p.name));
+  const names = new Map<number, string>();
+  for (const p of pins) {
+    const m = [...free].find((n) => norm(n) === norm(p.name));
+    if (m) names.set(p.i, m), free.delete(m);
+  }
+  const rest = [...free];
+  for (const p of [...pins].sort((a, b) => a.order - b.order)) if (!names.has(p.i) && rest.length) names.set(p.i, rest.shift()!);
+  // los pines sin puerto quedan con un nombre que no es puerto: syncPins los quita
+  pins.forEach((p) => names.has(p.i) || names.set(p.i, `\u0000${p.i}`));
+  text = renamePins(text, names);
+  return setSymParams(syncPins(text, ports), params);
+}
+
+/** Asigna el puerto `port` al pin `index`; si otro pin lo tenía, intercambian (#199) */
+export function assignPin(text: string, index: number, port: string, ports: { name: string; dir?: string }[]): string {
+  const pins = symPins(text);
+  if (!pins[index]) return text;
+  const names = new Map<number, string>([[index, port]]);
+  const other = pins.findIndex((p, i) => i !== index && p.name.toLowerCase() === port.toLowerCase());
+  if (other >= 0) names.set(other, pins[index].name);
+  return syncPins(renamePins(text, names), ports);
+}
+
 // --- parámetros ---------------------------------------------------------------------------
 
 /** "G=1 R={2*k} C=1n" → [["G","1"],["R","{2*k}"],["C","1n"]] (llaves y comillas con espacios) */

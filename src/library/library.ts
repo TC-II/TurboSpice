@@ -104,6 +104,16 @@ export class Library implements SymbolSource {
     return def;
   }
 
+  /** Texto .asy de un símbolo (el mismo que usa `symbol`), para copiarlo (#199) */
+  symbolText(type: string): string | undefined {
+    const name = baseName(type).toLowerCase();
+    const extra = this.projSymbols.get(name) ?? this.extra.get(name);
+    if (extra) return extra;
+    const path = this.resolvePath(type);
+    if (path) return this.bundle.symbols[path];
+    return this.ltSymbol(type)?.text;
+  }
+
   private symbolsChanged(): void {
     this.resolved.clear();
     this.rev++;

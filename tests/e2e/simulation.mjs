@@ -127,7 +127,7 @@ const probe = async (x, y) => {
 const benchName = () => page.locator('.capsule-variant').textContent();
 await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
-check(/^Testbench d+$/.test(await benchName()), `un tipo nuevo crea otro testbench, con nombre consecutivo (${await benchName()})`);
+check(/^Testbench \d+$/.test(await benchName()), `un tipo nuevo crea otro testbench, con nombre consecutivo (${await benchName()})`);
 await page.locator('.capsule-variant').dblclick();
 await page.getByLabel('Nombre del testbench').fill('DC');
 await page.getByLabel('Nombre del testbench').press('Enter');
@@ -145,7 +145,8 @@ if (!(await page.locator('.project-tree').count())) await page.getByRole('button
 await page.locator('.project-tree .tree-name').filter({ hasText: /^DC$/ }).hover();
 await page.getByRole('button', { name: 'Duplicar DC', exact: true }).click();
 await page.waitForTimeout(300);
-check((await benchName()) === 'DC (copia)', `la copia es otro testbench (${await benchName()})`);
+const copyName = await benchName();
+check(/^Testbench \d+$/.test(copyName), `la copia es otro testbench, con nombre consecutivo (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)
 const directiveIs = (t) =>
@@ -169,7 +170,7 @@ const openPanel = async () => {
 const benchRows = () => page.locator('.project-tree .tree-row[data-bench] .tree-name');
 const items = async () => {
   await openPanel();
-  return (await benchRows().allTextContents()).map((x) => x.trim()).filter((x) => /^DC( \(copia\))?$/.test(x));
+  return (await benchRows().allTextContents()).map((x) => x.trim()).filter((x) => x === 'DC' || x === copyName);
 };
 const goBench = async (name) => {
   await openPanel();
@@ -187,7 +188,7 @@ check((await page.locator('.project-tree .tree-group').count()) >= 1 && !(await 
 await benchRows().filter({ hasText: /^DC$/ }).click();
 await page.keyboard.press('ArrowDown');
 await page.waitForTimeout(300);
-check((await benchName()) === 'DC (copia)', `↓ en el panel pasa al siguiente testbench (${await benchName()})`);
+check((await benchName()) === copyName, `↓ en el panel pasa al siguiente testbench (${await benchName()})`);
 await page.keyboard.press('ArrowRight');
 check((await page.locator('.project-tree .tree-row.tree-sub').count()) === 2, '→ lo despliega: simulación y parámetros (plegados)');
 await page.keyboard.press('ArrowLeft');
@@ -215,7 +216,7 @@ const maxOf = async () => {
 };
 check((await maxOf()).startsWith('5 @'), `con sus resultados en memoria, sin volver a simular (máximo ${await maxOf()})`);
 // (también desde el panel, con el otro)
-await goBench('DC (copia)');
+await goBench(copyName);
 check((await chipNames()).join() === 'V(out),V(N001)', `el segundo conserva el suyo (${(await chipNames()).join()})`);
 check((await maxOf()).startsWith('2 @'), `y sus resultados (máximo ${await maxOf()})`);
 // el proyecto guardado (.turbo, #149) tiene los testbenches, el activo y la vista de cada uno
@@ -223,7 +224,7 @@ await page.evaluate(() => delete window.showSaveFilePicker);
 const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
 check(download.suggestedFilename() === 'Examples.turbo', `se guarda como proyecto (${download.suggestedFilename()})`);
 const saved = variantOf((await parseTurbo(readFileSync(await download.path(), 'utf8'))).project);
-const rc = saved.sims.filter((s) => /^DC/.test(s.name ?? ''));
+const rc = saved.sims.filter((s) => s.name === 'DC' || s.name === copyName);
 check(rc.length === 2 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .turbo guardado tiene los dos testbenches y el activo');
 const views = rc.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');
 check(views.join(' | ') === 'V(out) | V(out),V(N001)', `el archivo conserva la vista de cada uno (${views.join(' | ')})`);

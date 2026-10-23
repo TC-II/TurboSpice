@@ -2,12 +2,13 @@
 // simulación, colocarlo dos veces, bajar a una instancia, migas, subir al mismo lugar y medir
 // adentro (tensiones, corrientes, punto de operación y flechas de corriente).
 // Uso: node tests/e2e/hierarchy.mjs [url]   (con `npm run preview` corriendo)
+import { readFileSync } from 'node:fs';
 import { skipWelcome, launchBrowser, FIREFOX } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
 const browser = await launchBrowser();
-const context = await browser.newContext({ viewport: { width: 1600, height: 900 } });
+const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, acceptDownloads: true });
 if (!FIREFOX) await context.grantPermissions(['clipboard-read', 'clipboard-write']);
 await skipWelcome(context);
 const page = await context.newPage();
@@ -139,6 +140,12 @@ await page.keyboard.press('Alt+ArrowUp');
 await page.waitForTimeout(600);
 check((await crumbs()) === '' || !/DIV/.test(await crumbs()), 'Alt+↑ vuelve al testbench');
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
+
+// --- exportar como netlist .sub (#199) ---
+await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();
+const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.getByRole('button', { name: 'Exportar DIV como .sub' }).click()]);
+const subText = readFileSync(await dl.path(), 'utf8');
+check(dl.suggestedFilename() === 'DIV.sub' && /^\.subckt DIV in\b/m.test(subText) && /^\.ends DIV$/m.test(subText) && /^R1 /m.test(subText), `exportar DIV como .sub (${subText.split('\n').filter((l) => l.startsWith('.subckt')).join(' | ')})`);
 
 // --- aviso al editar un subcircuito usado en varios testbenches (#199) ---
 await page.locator('.project-tree .tree-row', { hasText: 'Testbench 1' }).first().hover();

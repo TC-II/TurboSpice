@@ -65,7 +65,7 @@ import {
   type ValueChange,
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
-import { exportAllZip, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
+import { exportAllZip, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -2346,6 +2346,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const z = exportSubcktZip(snapshot(), name, lib);
     if (z) download(z.name, new Blob([z.bytes as BlobPart], { type: 'application/zip' }));
   };
+  const exportSubNetlist = (name: string) => {
+    const r = exportSubcktNetlist(snapshot(), name, lib);
+    if (!r) return setMessage(t('{name} has no ports: there is nothing to export as .sub', { name }));
+    download(r.name, new Blob([r.text], { type: 'text/plain' }));
+    if (r.warnings.length) setMessage(r.warnings[0]);
+  };
   const importSubckts = async (list: File[]) => {
     try {
       const entries: ZipEntry[] = [];
@@ -2903,6 +2909,7 @@ ${ltNetlistText(sim.built.lt)}
               onRename={renameSub}
               onDelete={deleteSub}
               onExport={exportSub}
+              onExportNetlist={exportSubNetlist}
               onImport={() => subImport.current?.click()}
               onUpdateSymbol={(n) => {
                 const p = updateSymbol(snapshot(), n);

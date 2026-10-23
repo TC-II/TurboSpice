@@ -5,7 +5,7 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
-import { usedFiles } from '../../src/project/exchange.ts';
+import { exportSubcktNetlist, usedFiles } from '../../src/project/exchange.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
 import { addSubckt, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
@@ -235,5 +235,26 @@ describe('edición del símbolo (#180)', () => {
     sym = e.setSymParams(sym, [['G', '2'], ['R', '{1k*G}']]);
     expect(e.symParams(sym)).toEqual([['G', '2'], ['R', '{1k*G}']]);
     expect(e.setSymParams(sym, [])).not.toMatch(/SpiceLine|WINDOW 39/);
+  });
+});
+
+describe('exportar un subcircuito como .sub (#199)', () => {
+  it('su .subckt y los de adentro, sin «§»', () => {
+    let p = withSub();
+    p = addSubckt(p, 'TOP', tb('BUF').replace('FLAG -128 0 a', 'FLAG -128 0 a\nIOPIN -128 0 In'));
+    lib.setProjectFiles(p.files);
+    const r = exportSubcktNetlist(p, 'top', lib)!;
+    lib.setProjectFiles([]);
+    expect(r.name).toBe('TOP.sub');
+    const lines = r.text.split('\n');
+    expect(lines).toContain('.subckt BUF in out');
+    expect(lines).toContain('.ends BUF');
+    expect(lines).toContain('.subckt TOP a');
+    expect(lines).toContain('.ends TOP');
+    expect(lines.indexOf('.subckt BUF in out')).toBeLessThan(lines.indexOf('.subckt TOP a'));
+    expect(r.text).not.toMatch(/§|\.backanno|^\.end$/m);
+    expect(r.text).toMatch(/^XU1 \S+ \S+ BUF$/m);
+    expect(r.text).not.toMatch(/^\.op/m);
+    expect(exportSubcktNetlist(p, 'nope', lib)).toBeNull();
   });
 });

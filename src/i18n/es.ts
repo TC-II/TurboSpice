@@ -1453,4 +1453,7 @@ export const es: Record<string, string> = {
   "{name} can't contain itself": "{name} no puede contenerse a sí mismo",
   "{name} can't go inside {host}: {name} already contains {host}": "{name} no puede ir adentro de {host}: {name} ya contiene a {host}",
   "{name} is used in {n} testbenches: the changes apply to all of them": "{name} se usa en {n} testbenches: los cambios valen para todos",
+  "Export as a .sub netlist (to share it as a text subcircuit)": "Exportar como netlist .sub (para compartirlo como subcircuito en texto)",
+  "Export {name} as .sub": "Exportar {name} como .sub",
+  "{name} has no ports: there is nothing to export as .sub": "{name} no tiene puertos: no hay nada para exportar como .sub",
 };

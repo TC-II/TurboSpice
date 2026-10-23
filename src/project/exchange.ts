@@ -4,7 +4,8 @@
 // simulación por .asc) o varios archivos sueltos (cada .asc, una variante); los .asy/.lib/.sub
 // van a los archivos del proyecto.
 import { decode, decodeText } from '../asc/encoding.ts';
-import { baseName, type AscDoc } from '../asc/model.ts';
+import { baseName, emptyDoc, type AscDoc } from '../asc/model.ts';
+import { ltNetlist, ltNetlistText } from '../netlist/ltnetlist.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import type { SymbolSource } from '../asc/resolve.ts';
@@ -158,6 +159,32 @@ export function exportSubcktZip(p: Project, name: string, lib: SymbolSource): { 
   const enc = new TextEncoder();
   const entry = (f: ProjectFile): ZipEntry => ({ path: f.name, data: f.kind === 'schematic' ? ascBytes(parseAsc(f.text), lib).bytes : enc.encode(f.text) });
   return { name: `${safeName(name)}.zip`, bytes: makeZip([sch, ...sym, ...rest].map(entry)) };
+}
+
+/**
+ * Subcircuito suelto como netlist `.sub` para compartirlo (#199): su `.subckt` y los de los
+ * subcircuitos que usa, en el dialecto de LTspice (como su netlist), sin los nombres internos
+ * con «§». Los modelos de archivos quedan como `.lib archivo` (no se copian). Null si no existe
+ * o no se puede netlistar.
+ */
+export function exportSubcktNetlist(p: Project, name: string, lib: SymbolSource): { name: string; text: string; warnings: string[] } | null {
+  const sch = p.files.find((f) => f.kind === 'schematic' && f.name.replace(/\.asc$/i, '').toLowerCase() === name.toLowerCase());
+  if (!sch) return null;
+  const real = sch.name.replace(/\.asc$/i, '');
+  // una instancia suelta: el netlister arma el .subckt con los puertos del símbolo
+  const top: AscDoc = { ...emptyDoc(), symbols: [{ type: real, x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', 'X1']]) }] };
+  const lt = ltNetlist(top, lib);
+  if (!lt.blocks.some((b) => b.name.toLowerCase() === real.toLowerCase())) return null;
+  // los anidados primero (como los deja el netlister), el pedido al final
+  const text = ltNetlistText({ ...lt, elements: [], texts: [] });
+  const body = text.slice(text.indexOf('.subckt')).replace(/\n\.backanno\n\.end$/, '');
+  const lines = body
+    .split('\n')
+    .map((l) => l.replace(/\s*;§pnba .*$/, ''))
+    // los comandos de simulación son del testbench, no del subcircuito
+    .filter((l) => !/^\s*\.(op|tran|ac|dc|noise|tf|four|pz|sens|disto|step|meas|measure|save|options|option|probe|plot|print|wave|control|endc|net)\b/i.test(l))
+    .map((l) => (/^[A-Za-z]\S*§/.test(l) ? l.replace(/^(\S*)/, (m) => m.replace(/§/g, '')) : l));
+  return { name: `${safeName(real)}.sub`, text: [`* ${real}: subcircuit exported from TurboSpice`, ...lines].join('\n').replace(/\n+$/, '\n'), warnings: lt.warnings };
 }
 
 /**

@@ -46,7 +46,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onImport, onClose, onLeave }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -73,6 +73,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onNew(): void;
   /** exportar un subcircuito (.zip con su .asc y su .asy) e importar */
   onExport(name: string): void;
+  /** exportar como netlist .sub (#199) */
+  onExportNetlist(name: string): void;
   onImport(): void;
   /** convertir la selección (sin selección: undefined) */
   onFromSelection?(): void;
@@ -210,6 +212,9 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
           <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
+          <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
+            .sub
+          </button>
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>

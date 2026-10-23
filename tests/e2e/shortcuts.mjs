@@ -22,7 +22,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
 // el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)
 await openExample(page, 'RC Filter');

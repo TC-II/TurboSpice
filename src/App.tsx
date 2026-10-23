@@ -1511,7 +1511,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const p0 = snapshot();
     const peers = groupPeersWith(p0, sims.active, inst, s.type);
     const me = variantOf(p0).sims.find((x) => x.id === sims.active);
-    if (!me?.group) return false;
+    // todos están en un grupo: el menú sólo aparece si hay a quién propagarle
+    if (!me?.group || !peers.length) return false;
     const value = s.attrs.get('Value') ?? effectiveAttrs(s, lib.symbol(s.type)).get('Value') ?? '';
     const group = p0.groups.find((g) => g.id === me.group)?.name ?? '';
     setCtxMenu({
@@ -1521,7 +1522,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         {
           label: peers.length === 1 ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group }) : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
           title: t('Copies its value and parameters to the component with the same name in the other testbenches of the group'),
-          disabled: !peers.length,
           onClick: () => {
             editProject(propagateAttrs(snapshot(), peers, inst, s.type, s.attrs));
             setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value, n: peers.length, group }));

@@ -29,7 +29,7 @@ const check = (ok, msg) => {
 const libRequests = [];
 page.on('request', (r) => /library\/(bundle|cmp-passives)\.json/.test(r.url()) && libRequests.push(r.url().split('/').pop()));
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 60000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
 await page.locator('svg.editor .sym').first().waitFor();
 await page.waitForTimeout(500);
 check(libRequests[0] === 'bundle.json' && libRequests.includes('cmp-passives.json'), `librería y después las listas de pasivos (${libRequests.join(', ')})`);
@@ -43,10 +43,10 @@ check(cached.some((u) => /^ngspice\.wasm\?v=\w+$/.test(u)) && cached.some((u) =>
 const engineRequests = [];
 page.on('request', (r) => /engine\/(ngspice\.wasm|\w+\.cm)$/.test(r.url()) && engineRequests.push(r.url()));
 await page.reload();
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 60000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
 check(engineRequests.length === 0, `la segunda carga no vuelve a bajar el motor (${engineRequests.length} pedidos)`);
 // y simula con el motor de la caché
-await page.locator('[aria-label="Simular"]:enabled').click();
+await page.locator('[aria-label="Correr"]:enabled').click();
 await page.locator('.sim-state.ok').waitFor({ timeout: 30000 });
 check((await page.locator('.sim-state.err').count()) === 0, 'simula con el motor de la caché');
 

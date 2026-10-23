@@ -20,7 +20,7 @@ const check = (ok, msg) => {
 };
 
 await page.goto(URL);
-await page.locator('[aria-label="Simular"]:enabled').waitFor({ timeout: 30000 });
+await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 const svg = page.locator('svg.editor');
 const box = await svg.boundingBox();
 const mid = { x: box.x + box.width * 0.7, y: box.y + box.height * 0.75 };

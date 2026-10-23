@@ -1053,3 +1053,11 @@ button.hier-tab { padding-right: 10px; }
 .tree-runs:hover:not(:disabled) { color: var(--accent); }
 .tree-runs.none { opacity: .35; }
 .tree-row .tree-add { flex: none; }
+@media (max-width: 700px) {
+  .sim-row { flex-wrap: wrap; row-gap: 4px; }
+  .sim-row > .group.fixed { flex-wrap: wrap; row-gap: 4px; flex: 1 1 100%; }
+  .sim-row .capsule { max-width: 60vw; }
+  .sim-row > .bar-after { flex-basis: 100%; }
+  .sim-row .simbar .sb-row { flex-wrap: nowrap; }
+  .sim-row .simbar .sb-rows { flex: none; }
+}

@@ -42,6 +42,8 @@ const click = async (x, y) => {
 };
 let saves = 0;
 const saved = async () => {
+  // Chrome descarta una descarga automática pegada a la anterior: un respiro entre guardados
+  await page.waitForTimeout(400);
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
   const path = `${OUT}/rotate-${saves++}.turbo`;
   await download.saveAs(path);

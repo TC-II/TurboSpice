@@ -27,13 +27,10 @@ await openExample(page, 'RC Filter');
 await page.locator('svg.editor .sym').first().waitFor();
 const sym = (name) =>
   page.locator('svg.editor .symbols .sym').filter({ has: page.locator('text.win', { hasText: new RegExp(`^${name}$`) }) }).locator('.body');
-// botón derecho: si otros testbenches del grupo tienen el componente, primero aparece
-// «Editar… / Propagar…» y se elige Editar
-const rightEdit = async (b, name) => {
-  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
-  const editItem = page.getByRole('menuitem', { name: new RegExp(`^Editar ${name}`) });
-  await Promise.race([page.locator('[role=dialog]').waitFor(), editItem.waitFor()]);
-  if (await editItem.count()) await editItem.click();
+// doble clic abre el diálogo del componente (el botón derecho, en R, L, C y fuentes de continua,
+// edita sólo el valor en el menú)
+const rightEdit = async (b) => {
+  await page.mouse.dblclick(b.x + b.width / 2, b.y + b.height / 2);
   await page.locator('[role=dialog]').waitFor();
 };
 const edit = async (name) => {

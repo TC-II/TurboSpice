@@ -1450,4 +1450,6 @@ export const es: Record<string, string> = {
   "Use the results of %1": "Usar los resultados de %1",
   "Variable names separated by spaces: one column each. The table, its statistics and histograms are in Measurements": "Nombres de variables separados por espacios: una columna cada uno. La tabla, su estadística e histogramas están en Medidas",
   "Write the variables of \"Add a row to the table\"": "Escribí las variables de \"Agregar una fila a la tabla\"",
+  "{name} can't contain itself": "{name} no puede contenerse a sí mismo",
+  "{name} can't go inside {host}: {name} already contains {host}": "{name} no puede ir adentro de {host}: {name} ya contiene a {host}",
 };

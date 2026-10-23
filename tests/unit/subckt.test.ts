@@ -7,7 +7,7 @@ import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
 import { usedFiles } from '../../src/project/exchange.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
-import { addSubckt, childSubckts, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
+import { addSubckt, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
 
 const lib = new Library(buildBundle());
@@ -93,6 +93,18 @@ describe('subcircuitos del proyecto (#180)', () => {
     expect(childSubckts(p, subcktFile(p, 'TOP')!.text)).toEqual(['BUF']);
     const names = usedFiles(p.files, [tb('TOP')]).map((f) => f.name).sort();
     expect(names).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
+  });
+});
+
+describe('ciclos al colocar (#199)', () => {
+  it('no se puede colocar un subcircuito adentro de sí mismo, directa ni indirectamente', () => {
+    let p = withSub();
+    p = addSubckt(p, 'TOP', tb('BUF'));
+    p = addSubckt(p, 'OTHER');
+    expect(placingCycle(p, 'BUF', ['BUF'])).toBe('BUF');
+    expect(placingCycle(p, 'buf', ['res', 'TOP'])).toBe('TOP');
+    expect(placingCycle(p, 'TOP', ['BUF', 'OTHER', 'res'])).toBeNull();
+    expect(placingCycle(p, 'OTHER', ['TOP'])).toBeNull();
   });
 });
 

@@ -126,6 +126,14 @@ await page.waitForTimeout(400);
 const chips = await page.locator('.trace-chip .name').allTextContents();
 check(chips.some((c) => /^I\(x\w*\.r\d\)$/i.test(c)), `adentro: la punta de prueba mide la corriente (${chips.join(', ')})`);
 
+// --- ciclos (#199): no se puede pegar DIV adentro de DIV ---
+await page.keyboard.press('Escape');
+const nIn = await page.locator('svg.editor .sym').count();
+await page.evaluate((t) => navigator.clipboard.writeText(t), 'Version 4\nSHEET 1 880 680\nSYMBOL DIV 480 0 R0\nSYMATTR InstName X8\n');
+await page.keyboard.press('Control+v');
+await page.waitForTimeout(300);
+check((await page.locator('svg.editor .sym').count()) === nIn && (await page.getByText('DIV no puede contenerse a sí mismo').count()) > 0, 'no deja colocar el subcircuito adentro de sí mismo');
+
 // --- subir: al mismo lugar y zoom ---
 await page.keyboard.press('Alt+ArrowUp');
 await page.waitForTimeout(600);

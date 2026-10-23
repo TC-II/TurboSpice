@@ -85,7 +85,7 @@ import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
-import { addSubckt, childSubckts, freeSubcktName, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
+import { addSubckt, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -2003,6 +2003,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       setSelection([]);
     }
   };
+  /** Ciclos (#199): un subcircuito no se puede colocar adentro de sí mismo, ni indirectamente */
+  const makesCycle = (types: string[]): boolean => {
+    const host = pathRef.current[pathRef.current.length - 1]?.sub;
+    const c = host ? placingCycle(projectRef.current, host, types) : null;
+    if (c) setMessage(c.toLowerCase() === host!.toLowerCase() ? t("{name} can't contain itself", { name: c }) : t("{name} can't go inside {host}: {name} already contains {host}", { name: c, host: host! }));
+    return !!c;
+  };
   const paste = async () => {
     let text = '';
     try {
@@ -2013,6 +2020,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!/^\s*Version\s/.test(text)) text = clipboardFallback;
     if (!text) return;
     const frag = parseAsc(text);
+    if (makesCycle(frag.symbols.map((x) => x.type))) return;
     const at = editor.current?.cursor() ?? { x: 0, y: 0 };
     const r = pasteItems(doc, frag, at, lib);
     if (!r.refs.length) return;
@@ -3210,7 +3218,8 @@ ${ltNetlistText(sim.built.lt)}
             setDialog(null);
             // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
             const dir = [USER_DIR, PROJECT_DIR].find((d) => type.startsWith(`${d}/`));
-            setTool({ kind: 'place', type: dir ? type.slice(dir.length + 1) : type, orient: 'R0' });
+            const name = dir ? type.slice(dir.length + 1) : type;
+            if (!makesCycle([name])) setTool({ kind: 'place', type: name, orient: 'R0' });
           }}
         />
       )}

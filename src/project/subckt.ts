@@ -162,6 +162,28 @@ export function childSubckts(p: Project, asc: string): string[] {
   return out;
 }
 
+/**
+ * Ciclos (#199): ¿colocar `types` adentro del subcircuito `host` haría que se contenga a sí
+ * mismo, directa o indirectamente? Devuelve el subcircuito que lo causa, o null
+ */
+export function placingCycle(p: Project, host: string, types: string[]): string | null {
+  const h = host.toLowerCase();
+  const seen = new Set<string>();
+  const reaches = (name: string): boolean => {
+    const k = key(name);
+    if (k === h) return true;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    const f = subcktFile(p, k);
+    return !!f && childSubckts(p, f.text).some(reaches);
+  };
+  for (const tt of types) {
+    const f = subcktFile(p, key(tt));
+    if (f && reaches(subName(f.name))) return subName(f.name);
+  }
+  return null;
+}
+
 /** Variante activa (para la raíz del árbol) */
 export const testbenchName = (p: Project) => variantOf(p).name;
 

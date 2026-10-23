@@ -34,6 +34,9 @@ const P: Record<string, ReactNode> = {
   directive: <path d="M7 4 3 10l4 6M13 4l4 6-4 6M11 3.5l-2 13" />,
   // cruz a 45°, chica como los trazos del esquemático
   delete: <path d="M7 7l6 6M13 7l-6 6" />,
+  // mover: flecha de cuatro puntas; arrastrar: la misma con un cable que la sigue
+  move: <path d="M10 2.5v15M2.5 10h15M10 2.5 8 4.5M10 2.5l2 2M10 17.5l-2-2M10 17.5l2-2M2.5 10l2-2M2.5 10l2 2M17.5 10l-2-2M17.5 10l-2 2" />,
+  drag: <path d="M3 17.5h5v-5M8 12.5l6-6M14 6.5V10M14 6.5h-3.5M14 6.5l3-3" />,
   rotate: <path d="M15.5 8.5A6 6 0 1 0 14 14M15.5 3.5v5h-5" />,
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,

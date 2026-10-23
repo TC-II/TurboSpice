@@ -2609,6 +2609,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       id: 'edit',
       label: t('Editing'),
       tools: [
+        { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M / F7', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
+        { icon: 'drag', label: t('Drag'), title: t('Drag (stretching wires)'), shortcut: 'S / F8', onClick: () => startMove(true), active: tool.kind === 'move' && tool.stretch },
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Del', onClick: deleteSelection, active: tool.kind === 'delete' },

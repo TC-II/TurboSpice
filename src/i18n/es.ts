@@ -318,6 +318,7 @@ export const es: Record<string, string> = {
   'Dots': 'Puntos',
   'Double-click to rename': 'Doble clic para renombrar',
   'Drag': 'Arrastrar',
+  'Move': 'Mover',
   'Drag (stretching wires)': 'Arrastrar (estirando cables)',
   'Drag (wires stretch)': 'Arrastrar (los cables se estiran)',
   'Drag a box to zoom · Esc cancels': 'Arrastrá un recuadro para hacer zoom · Esc cancela',

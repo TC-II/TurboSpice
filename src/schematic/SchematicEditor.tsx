@@ -73,6 +73,9 @@ export type Tool =
   /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
   | { kind: 'zoom'; prev: Tool };
 
+/** Tipo de dato del arrastre de un subcircuito desde el panel del proyecto (#199) */
+export const SUBCKT_DRAG = 'application/x-turbospice-subckt';
+
 export interface EditorHandle {
   fit(): void;
   /** Posición del cursor en el esquemático (para pegar/duplicar) */
@@ -103,6 +106,8 @@ interface Props {
   onEdit(ref: ItemRef): void;
   /** botón derecho en un componente: true si muestra un menú propio (si no, se edita) */
   onSymbolMenu?(symbol: number, at: { x: number; y: number }): boolean;
+  /** se soltó un subcircuito arrastrado desde el panel del proyecto (#199): el símbolo a colocar, o null si no se puede */
+  onDropSubckt?(name: string): string | null;
   /** doble clic en un componente: true si lo abrió como subcircuito (#180) */
   onDescend?(symbol: number): boolean;
   /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
@@ -1064,6 +1069,21 @@ export function SchematicEditor(props: Props) {
       className={`editor tool-${cursorClass}${lod ? ` lod-${lod}` : ''}`}
       viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
       onWheel={onWheel}
+      onDragOver={(e) => {
+        if (props.onDropSubckt && e.dataTransfer.types.includes(SUBCKT_DRAG)) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      }}
+      onDrop={(e) => {
+        const name = e.dataTransfer.getData(SUBCKT_DRAG);
+        if (!name || !props.onDropSubckt) return;
+        e.preventDefault();
+        const type = props.onDropSubckt(name);
+        if (!type) return;
+        commit(placeSymbol(doc, type, placementOrigin(lib.symbol(type), 'R0', snapPoint(toDoc(e))), 'R0', lib));
+        setTool({ kind: 'select' });
+      }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

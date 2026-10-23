@@ -141,6 +141,22 @@ await page.waitForTimeout(600);
 check((await crumbs()) === '' || !/DIV/.test(await crumbs()), 'Alt+↑ vuelve al testbench');
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
 
+// --- arrastrar el subcircuito desde el panel al esquemático (#199) ---
+{
+  const n0 = await page.locator('svg.editor .sym').count();
+  const sb = await svg.boundingBox();
+  const src = await page.locator('.project-tree .tree-row .tree-name', { hasText: 'DIV' }).first().boundingBox();
+  await page.mouse.move(src.x + 20, src.y + src.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2, { steps: 10 });
+  await page.mouse.move(sb.x + sb.width - 120, sb.y + sb.height - 120, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  check((await page.locator('svg.editor .sym').count()) === n0 + 1, 'arrastrar DIV desde el panel lo coloca en el esquemático');
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(200);
+}
+
 // --- exportar como netlist .sub (#199) ---
 await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();
 const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.getByRole('button', { name: 'Exportar DIV como .sub' }).click()]);

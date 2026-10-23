@@ -2976,6 +2976,10 @@ ${ltNetlistText(sim.built.lt)}
             onEdit={editItem}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
+            onDropSubckt={(name) => {
+              const f = subcktFile(projectRef.current, name);
+              return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
+            }}
             highlightNet={traceNetShown}
             netColors={netColors}
             netNames={shownNets}

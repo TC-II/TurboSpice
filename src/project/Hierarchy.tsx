@@ -1,5 +1,6 @@
 // Navegación entre el testbench y los subcircuitos (#180): panel de proyecto (árbol), barra con
 // pestañas y migas de pan, y buscador rápido (Ctrl+P).
+import { SUBCKT_DRAG } from '../schematic/SchematicEditor.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import { Icon } from '../ui/icons.tsx';
@@ -202,7 +203,16 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   const node = (s: TreeSub, depth: number, seen: string[]): JSX.Element => (
     <li key={`${seen.join('/')}/${s.name}`}>
       <div className={`tree-row${current.toLowerCase() === s.name.toLowerCase() ? ' active' : ''}`} style={{ paddingLeft: 8 + depth * 14 }}>
-        <button className="tree-name" onClick={() => onOpen(s.name)} title={t('Open {name}', { name: s.name })}>
+        <button
+          className="tree-name"
+          onClick={() => onOpen(s.name)}
+          title={t('Open {name} (drag it onto the schematic to place it)', { name: s.name })}
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData(SUBCKT_DRAG, s.name);
+            e.dataTransfer.effectAllowed = 'copy';
+          }}
+        >
           <span className="tree-glyph">▭</span> {s.name}
         </button>
         <span className="tree-meta">{t('{n} pins', { n: s.ports })}</span>

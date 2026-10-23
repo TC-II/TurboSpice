@@ -1456,4 +1456,5 @@ export const es: Record<string, string> = {
   "Export as a .sub netlist (to share it as a text subcircuit)": "Exportar como netlist .sub (para compartirlo como subcircuito en texto)",
   "Export {name} as .sub": "Exportar {name} como .sub",
   "{name} has no ports: there is nothing to export as .sub": "{name} no tiene puertos: no hay nada para exportar como .sub",
+  "Open {name} (drag it onto the schematic to place it)": "Abrir {name} (arrastralo al esquemático para colocarlo)",
 };

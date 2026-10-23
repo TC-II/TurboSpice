@@ -776,6 +776,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     }
     out.push('.control', ...body, '.endc');
   }
+  if (ctl && !hooks) warnings.push(...controlRunWarnings(ctl.text.split('\\n').slice(1, -1), !!blocksCtl));
   for (const tt of lt.texts) {
     if (hooks && tt === ctl) continue;
     if (blocksCtl && tt === blocksCtl) continue;
@@ -933,6 +934,32 @@ function declaredParams(lt: LtNetlist): Set<string> {
     }
   }
   return out;
+}
+
+// Comandos de análisis de ngspice (13.5): en un .control corren ese análisis, no el del testbench
+const ANALYSIS_COMMANDS = /^(tran|ac|dc|op|noise|tf|pz|sens|disto|pss|sp)$/i;
+
+/**
+ * #197: un .control escrito a mano (sin secciones) decide qué se simula, y puede no ser la
+ * configuración de simulación del testbench; un programa de bloques sin "Simular" no simula
+ * nada. Se avisa en Problemas.
+ */
+export function controlRunWarnings(lines: string[], blocks: boolean): string[] {
+  let run = false;
+  const own: string[] = [];
+  for (const raw of lines) {
+    const l = raw.replace(/;.*$/, '').trim();
+    if (!l || l.startsWith('*')) continue;
+    const cmd = l.split(/\s+/)[0];
+    if (/^run$/i.test(cmd)) run = true;
+    else if (ANALYSIS_COMMANDS.test(cmd) && !own.includes(cmd.toLowerCase())) own.push(cmd.toLowerCase());
+  }
+  if (blocks) return run || own.length ? [] : [t('The blocks program has no Simulate block: nothing is simulated')];
+  const p0 = own.join(', ');
+  if (own.length && run) return [t('The .control block runs the simulation configuration and also its own analysis ({p0})', { p0 })];
+  if (own.length) return [t('The .control block runs its own analysis ({p0}), not the testbench\'s simulation configuration', { p0 })];
+  if (!run) return [t('The .control block has no "run" or analysis command: nothing is simulated')];
+  return [];
 }
 
 /** .step → bloque .control (o, si ya hay uno del usuario, sólo el primer valor). Devuelve las corridas. */

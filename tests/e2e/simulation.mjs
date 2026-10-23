@@ -3,7 +3,7 @@
 // simulaciones (#39).
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, openExample, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
+import { menu, openExample, resultsMenu, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
 import { lineOf, simOf, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
 
@@ -91,6 +91,24 @@ const legend = await page.locator('.readout tbody tr').count();
 check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas)`);
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
+
+// --- #197: un .control a mano con su propio análisis lo avisa en Problemas ---
+await menu(page, 'Simular', 'Bloque .control…');
+await page.locator('.modal textarea').fill('tran 1u 1m\n');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+await page.getByRole('button', { name: 'Simular', exact: true }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await resultsMenu(page, /^Problemas/);
+const own = await page.locator('.problems li', { hasText: 'corre su propio análisis (tran)' }).count();
+check(own === 1, 'Problemas avisa que el .control corre su propio análisis, no la configuración');
+await menu(page, 'Simular', 'Bloque .control…');
+await page.locator('.modal textarea').fill('print v(out)\n');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+await page.getByRole('button', { name: 'Simular', exact: true }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await resultsMenu(page, /^Problemas/);
+const none = await page.locator('.problems li', { hasText: 'no se simula nada' }).count();
+check(none === 1, 'y que un .control sin run ni análisis no simula nada');
 
 // --- #180: testbenches, cada uno con su esquemático y su simulación; cada uno conserva su gráfico ---
 await openExample(page, 'RC Filter');

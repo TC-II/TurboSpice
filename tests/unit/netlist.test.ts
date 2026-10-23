@@ -294,6 +294,24 @@ TEXT 0 0 Left 2 !.tran 10m\\n.step param R 1k 3k 1k
     expect(r.warnings).toEqual([]);
   });
 
+  it('#197: avisa cuando un .control a mano no corre la configuración del testbench', () => {
+    const ctl = (body: string) =>
+      ng(`Version 4
+SHEET 1 880 680
+TEXT 0 0 Left 2 !.tran 10m
+TEXT 0 100 Left 2 ;.control\\n${body}\\n.endc
+`).warnings;
+    expect(ctl('run\\nprint v(1)')).toEqual([]);
+    expect(ctl('tran 1u 1m\\nac dec 10 1 1k')).toEqual(['El bloque .control corre su propio análisis (tran, ac), no la configuración de simulación del testbench']);
+    expect(ctl('run\\nac dec 10 1 1k')).toEqual(['El bloque .control corre la configuración de simulación y además su propio análisis (ac)']);
+    expect(ctl('* tran 1u 1m\\nprint v(1)')).toEqual(['El bloque .control no tiene "run" ni un comando de análisis: no se simula nada']);
+    // con secciones (código propio del Estudio) TurboSpice agrega el run: sin aviso
+    expect(ctl('* antes de cada corrida\\n* después de cada corrida\\nprint v(1)')).toEqual([]);
+    // programa de bloques sin Simular
+    expect(ctl('* bloques\\necho hola')).toEqual(['El programa de bloques no tiene el bloque Simular: no se simula nada']);
+    expect(ctl('* bloques\\nrun')).toEqual([]);
+  });
+
   it('avisa los componentes sin valor', () => {
     const r = ng(`Version 4
 SHEET 1 880 680

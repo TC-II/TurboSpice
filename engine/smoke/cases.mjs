@@ -134,4 +134,66 @@ R1 a1 0 1k
       return near(v, 1 - Math.exp(-9e-3 / 2e-3), 1e-3, 'vend');
     },
   },
+  {
+    name: 'mixta: divisor por 2 con d_dff y puentes automáticos (#209)',
+    netlist: `* mixta
+.param vcc=5
+V1 clk 0 PULSE(0 5 0 1n 1n 49n 100n)
+X1 clk q div2
+.subckt div2 clk q
+aff dq clk null null q qb ffm
+.model ffm d_dff
+ainv q dq invm
+.model invm d_inverter
+.ends
+R1 q 0 1k
+.tran 1n 500n
+.end`,
+    check: (res) => {
+      const p = plot(res, 'tran');
+      const t = vec(p, 'time').real;
+      const d = p.vectors.find((v) => v.name === 'x1.dq');
+      if (!d || d.type !== 2000) return 'falta el nodo digital x1.dq';
+      // Dig(x1.dq) vale 1 al principio y cambia en cada flanco de subida del reloj (cada 100 ns)
+      const at = (x) => d.real[t.findIndex((tt) => tt >= x)];
+      if (at(0) !== 1 || at(50e-9) !== 0 || at(150e-9) !== 1) return `Dig(x1.dq) = ${at(0)}, ${at(50e-9)}, ${at(150e-9)}`;
+      // la salida analógica (puente automático con vcc=5; el dac_bridge tiene 20 Ω de salida)
+      return near(vec(p, 'q').real[t.findIndex((tt) => tt >= 50e-9)], (5 * 1e3) / 1020, 1e-6, 'V(q)');
+    },
+  },
+  {
+    name: 'OSDI (Verilog-A compilado) como side module wasm32: resistor vres (#209)',
+    // engine/osdi/vres.c, compilado por build.sh; el nativo necesitaría un .so (no se compara)
+    files: { 'vres.osdi': 'build/osdi/vres.osdi' },
+    native: false,
+    netlist: `* osdi
+V1 in 0 DC 10
+R1 in out 1k
+N1 out 0 rmod
+.model rmod vres r=3k
+.control
+pre_osdi vres.osdi
+op
+.endc
+.end`,
+    check: (res) => near(vec(plot(res, 'op'), 'out').real[0], 7.5, 1e-12, 'V(out)'),
+  },
+  {
+    name: 'Verilog-A compilado por OpenVAF a wasm32: diodo vdio con limexp y ddt (#209)',
+    // engine/osdi/vdio.va, compilado por engine/osdi/build-openvaf.sh (si no está, se saltea)
+    files: { 'vdio.osdi': 'build/osdi/vdio.osdi' },
+    native: false,
+    netlist: `* osdi openvaf
+V1 in 0 DC 5
+R1 in a 1k
+N1 a 0 dmod
+.model dmod vdio is=1e-14 cj=10p
+.control
+pre_osdi vdio.osdi
+op
+.endc
+.end`,
+    // ngspice nativo con el mismo .va compilado por OpenVAF para x86_64: 0.6928910 V
+    check: (res) => near(vec(plot(res, 'op'), 'a').real[0], 0.692891, 1e-6, 'V(a)'),
+  },
 ];

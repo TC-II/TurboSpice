@@ -467,6 +467,7 @@ function PaneView(props: {
       return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
     };
     let raf = 0;
+    const stepped = uPlot.paths.stepped!({ align: 1 });
     const opts: uPlot.Options = {
       width: Math.max(100, el.clientWidth),
       height: Math.max(80, el.clientHeight),
@@ -497,6 +498,8 @@ function PaneView(props: {
           stroke: c.color,
           width: 1.5,
           dash: c.dash ? [6, 4] : undefined,
+          // nodos digitales (#209): cada valor vale hasta el punto siguiente
+          ...(c.digital ? { paths: stepped } : {}),
           show: !c.hidden,
           spanGaps: false,
         })),

@@ -2,7 +2,7 @@
 // ngspice nativo (si está instalado) además de chequeos analíticos.
 // Uso: node engine/smoke/run.mjs
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -126,6 +126,15 @@ function compareNative(result, native) {
 // --- ejecución -------------------------------------------------------------
 let failed = 0;
 for (const c of CASES) {
+  // archivos que necesita el caso (p.ej. un .osdi); si falta alguno, se saltea
+  if (c.files) {
+    const missing = Object.values(c.files).filter((f) => !existsSync(join(HERE, '..', f)));
+    if (missing.length) {
+      console.log(`- ${c.name}: falta ${missing.join(', ')} (bash engine/build.sh)`);
+      continue;
+    }
+    ng.writeFiles(Object.fromEntries(Object.entries(c.files).map(([k, f]) => [k, new Uint8Array(readFileSync(join(HERE, '..', f)))])));
+  }
   const t0 = performance.now();
   const res = ng.simulate(c.netlist);
   const ms = (performance.now() - t0).toFixed(0);

@@ -7,12 +7,13 @@
     "engine": "bash engine/build.sh",
     "engine:fetch": "node scripts/fetch-engine.mjs",
     "smoke": "node engine/smoke/run.mjs",
+    "hdl": "node tests/hdl/run.mjs",
     "dev": "npm run assets && vite",
     "build": "npm run assets && tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -b",
-    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs && node tests/e2e/features.mjs && node tests/e2e/templates.mjs && node tests/e2e/wires.mjs && node tests/e2e/shortcuts.mjs && node tests/e2e/rotate.mjs && node tests/e2e/shapes.mjs && node tests/e2e/placing.mjs && node tests/e2e/dialogs.mjs && node tests/e2e/save.mjs && node tests/e2e/hierarchy.mjs && node tests/e2e/deviceparams.mjs && node tests/e2e/performance.mjs",
+    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs && node tests/e2e/features.mjs && node tests/e2e/templates.mjs && node tests/e2e/wires.mjs && node tests/e2e/shortcuts.mjs && node tests/e2e/rotate.mjs && node tests/e2e/shapes.mjs && node tests/e2e/placing.mjs && node tests/e2e/dialogs.mjs && node tests/e2e/save.mjs && node tests/e2e/hierarchy.mjs && node tests/e2e/deviceparams.mjs && node tests/e2e/verilog.mjs && node tests/e2e/performance.mjs",
     "e2e:firefox": "npm run e2e --browser=firefox",
     "windows:import": "node scripts/import-window-positions.mjs",
     "assets": "node scripts/copy-engine.mjs && node scripts/build-library.mjs",
@@ -20,6 +21,7 @@
     "corpus": "node tests/corpus/roundtrip.mjs && node tests/corpus/explicit.mjs && node tests/corpus/netlist.mjs"
   },
   "dependencies": {
+    "@yowasp/yosys": "0.70.1258",
     "blockly": "13.3.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",

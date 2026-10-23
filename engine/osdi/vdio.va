@@ -1,0 +1,12 @@
+`include "disciplines.vams"
+module vdio(a, c);
+  inout a, c;
+  electrical a, c;
+  parameter real is = 1e-14;
+  parameter real n = 1;
+  parameter real cj = 1p;
+  analog begin
+    I(a, c) <+ is * (limexp(V(a, c) / (n * $vt)) - 1);
+    I(a, c) <+ ddt(cj * V(a, c));
+  end
+endmodule

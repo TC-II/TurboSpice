@@ -28,8 +28,18 @@ export function schematicPorts(flags: { name: string; ioPin?: string }[]): strin
   return [...new Set(list)];
 }
 
-export function makeSymbol(o: { name: string; pins: string[]; block?: boolean; modelFile?: string; description?: string }): string {
-  const left = o.pins.slice(0, Math.ceil(o.pins.length / 2));
+export function makeSymbol(o: {
+  name: string;
+  pins: string[];
+  block?: boolean;
+  modelFile?: string;
+  description?: string;
+  /** cuántos pines van a la izquierda (por omisión, la mitad; los demás a la derecha) */
+  leftCount?: number;
+  /** parámetros de instancia por omisión ("vcc=5 tpd=1n") */
+  spiceLine?: string;
+}): string {
+  const left = o.pins.slice(0, o.leftCount ?? Math.ceil(o.pins.length / 2));
   const right = o.pins.slice(left.length);
   const rows = Math.max(left.length, right.length, 1);
   const h = rows * 32;
@@ -43,6 +53,7 @@ export function makeSymbol(o: { name: string; pins: string[]; block?: boolean; m
     'SYMATTR Prefix X',
   ];
   if (!o.block) out.push(`SYMATTR Value ${o.name}`);
+  if (o.spiceLine) out.push(`WINDOW 39 0 ${h / 2 + 24} Top 2`, `SYMATTR SpiceLine ${o.spiceLine}`);
   if (o.modelFile) out.push(`SYMATTR ModelFile ${o.modelFile}`);
   out.push(`SYMATTR Description ${o.description ?? (o.block ? t('Block {name}', { name: o.name }) : t('Subcircuit {name}', { name: o.name }))}`);
   let order = 1;

@@ -1,7 +1,7 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
 import { memo, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
-import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
+import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type PinDef, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
@@ -136,6 +136,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
             {def.texts.map((t, i) => (
               <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size}>{t.text}</AlignedText>
             ))}
+            {!hideLabels && def.pins.map((p, i) => <PinName key={`p${i}`} pin={p} />)}
           </>
         )}
       </g>
@@ -143,6 +144,28 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     </g>
   );
 });
+
+/**
+ * Nombre de un pin adentro del símbolo, como LTspice: PIN x y LEFT 8 → alineado a la izquierda, 8
+ * unidades hacia adentro (RIGHT, TOP y BOTTOM igual desde su lado); con NONE no se muestra.
+ */
+const PIN_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
+  LEFT: { align: 'Left', dx: 1, dy: 0 },
+  RIGHT: { align: 'Right', dx: -1, dy: 0 },
+  TOP: { align: 'Top', dx: 0, dy: 1 },
+  BOTTOM: { align: 'Bottom', dx: 0, dy: -1 },
+};
+
+function PinName({ pin }: { pin: PinDef }) {
+  const name = pin.attrs.get('PinName');
+  const t = PIN_TEXT[pin.align.toUpperCase()];
+  if (!name || !t) return null;
+  return (
+    <AlignedText x={pin.x + t.dx * pin.offset} y={pin.y + t.dy * pin.offset} align={t.align} size={1} className="pinname">
+      {name}
+    </AlignedText>
+  );
+}
 
 const GND_ROT: Record<string, Orient> = { top: 'R0', right: 'R90', bottom: 'R180', left: 'R270' };
 const FLAG_TEXT: Record<string, { align: string; dx: number; dy: number }> = {

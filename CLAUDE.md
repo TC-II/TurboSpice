@@ -4,4 +4,4 @@
   - Comandos de `.control` (Estudio, bloques): `docs/ngspice/md/13-interactive-interpreter/13.05-commands.md`.
   - Análisis y `.meas`/`.save`/`.options`: `docs/ngspice/md/11-analyses-and-output-control-batch/`.
   - Expresiones y funciones de `.param`: `docs/ngspice/md/02-circuit-description.md`; fuentes B: `05-…`.
-- Compatibilidad con LTspice: `docs/compatibilidad-ltspice.md`. Formato `.turbo`: `docs/turbo-formato.md`. Idiomas: `docs/i18n.md`.
+- Simulación mixta, Verilog y Verilog-A: `docs/mixed-signal.md`. Compatibilidad con LTspice: `docs/compatibilidad-ltspice.md`. Formato `.turbo`: `docs/turbo-formato.md`. Idiomas: `docs/i18n.md`.

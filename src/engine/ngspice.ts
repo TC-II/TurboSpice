@@ -18,6 +18,12 @@ export interface SimVector {
   imag?: Float64Array;
 }
 
+/**
+ * Tipo propio (no de ngspice) de los nodos digitales de XSPICE (#209), llevados al eje de
+ * tiempo del transitorio: 0, 1 o 0.5 (desconocido o alta impedancia), en escalones.
+ */
+export const DIGITAL_TYPE = 2000;
+
 export interface SimPlot {
   /** p.ej. "tran1", "ac1", "op1", "pz1" */
   name: string;
@@ -80,6 +86,8 @@ interface EmModule {
   _ngGet_Vec_Info(name: number): number;
   _ngSpice_AllPlots(): number;
   _ngSpice_AllVecs(plot: number): number;
+  _ngSpice_AllEvtNodes(): number;
+  _ngGet_Evt_NodeInfo(name: number): number;
 }
 
 export type NgspiceFactory = (opts: Record<string, unknown>) => Promise<unknown>;
@@ -107,6 +115,8 @@ export class Ngspice {
   private errors: string[] = [];
   private aborted = false;
   private hasCircuit = false;
+  /** descartar la salida de ngspice (consultas que avisan por error, como "no event nodes found") */
+  private muted = false;
   private opts: NgspiceOptions;
 
   private constructor(m: EmModule, opts: NgspiceOptions) {
@@ -150,6 +160,7 @@ export class Ngspice {
       // ngspice antepone "stdout " / "stderr "; por stderr también llegan avisos
       // ("Note: ...", "Warning: ..."), así que los errores se reconocen por el texto.
       const line = raw.replace(/^std(out|err) /, '');
+      if (this.muted) return 0;
       // el progreso de cada punto de AC ("Reference value : 5.2e+03"): ya llega por sendStat
       if (/^\s*Reference value\s*:/.test(line)) return 0;
       if (OUT_OF_MEMORY_RE.test(line) && !this.errors.includes(OUT_OF_MEMORY)) this.errors.unshift(OUT_OF_MEMORY);
@@ -278,7 +289,56 @@ export class Ngspice {
         .filter((v): v is SimVector => v !== null);
       plots.push({ name: plot, vectors });
     }
+    // los nodos digitales son del último análisis que corrió: si es un transitorio, van con él
+    const last = plots.at(-1);
+    if (last && /^tran\d+$/i.test(last.name)) last.vectors.push(...this.readEventNodes(last));
     return plots;
+  }
+
+  /**
+   * Nodos de eventos digitales de XSPICE (ngGet_Evt_NodeInfo) muestreados en los tiempos del
+   * transitorio: cada punto toma el último valor con tiempo ≤ t. Los eventos caen en puntos del
+   * transitorio (XSPICE pone un breakpoint en cada uno), así que los flancos quedan exactos.
+   * Los nodos no digitales (real, int de xtraevt) no se leen.
+   */
+  private readEventNodes(plot: SimPlot): SimVector[] {
+    const m = this.m;
+    const time = plot.vectors.find((v) => v.name === 'time')?.real;
+    if (!time) return [];
+    const out: SimVector[] = [];
+    // sin nodos de eventos ngspice escribe "Error: no event nodes found."
+    this.muted = true;
+    const names = this.readStringArray(m._ngSpice_AllEvtNodes());
+    this.muted = false;
+    for (const name of names) {
+      const p = m.stringToNewUTF8(name);
+      const info = m._ngGet_Evt_NodeInfo(p);
+      m._free(p);
+      if (!info) continue;
+      // evt_shared_data { pevt_data *evt_dect; int num_steps } y
+      // evt_data { int dcop; double step; char *node_value } (wasm32: step en +8, valor en +16)
+      const data = m.getValue(info, 'i32');
+      const n = m.getValue(info + 4, 'i32');
+      const steps = new Float64Array(n);
+      const levels = new Float64Array(n);
+      let digital = n > 0;
+      for (let i = 0; i < n && digital; i++) {
+        const e = m.getValue(data + 4 * i, 'i32');
+        steps[i] = m.getValue(e + 8, 'double');
+        // "0s", "1r", "Uz"…: nivel y fuerza; con fuerza z (alta impedancia) el nivel no vale
+        const v = m.UTF8ToString(m.getValue(e + 16, 'i32'));
+        if (!/^[01U][srzu]$/.test(v)) digital = false;
+        levels[i] = v[1] === 'z' || v[0] === 'U' ? 0.5 : v[0] === '1' ? 1 : 0;
+      }
+      if (!digital) continue;
+      const real = new Float64Array(time.length);
+      for (let k = 0, j = 0; k < time.length; k++) {
+        while (j + 1 < n && steps[j + 1] <= time[k]) j++;
+        real[k] = levels[j];
+      }
+      out.push({ name, type: DIGITAL_TYPE, real });
+    }
+    return out;
   }
 
   private readVector(fullName: string, name: string): SimVector | null {

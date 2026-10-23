@@ -275,7 +275,7 @@ export type FileConflict = 'replace' | 'keep' | 'rename';
 
 /** Tipo de archivo del proyecto según la extensión (null: no va al proyecto) */
 export const projectFileKind = (name: string): ProjectFile['kind'] | null =>
-  /\.asy$/i.test(name) ? 'symbol' : /\.(lib|sub|mod|inc|cir|txt|lb|bjt|dio|mos|jft)$/i.test(name) ? 'model' : null;
+  /\.asy$/i.test(name) ? 'symbol' : /\.(lib|sub|mod|inc|cir|txt|lb|bjt|dio|mos|jft)$/i.test(name) ? 'model' : /\.s?v$/i.test(name) ? 'verilog' : null;
 
 /** «x (2).lib», «x (3).lib»… que no esté entre `taken` */
 export function uniqueFileName(name: string, taken: string[]): string {

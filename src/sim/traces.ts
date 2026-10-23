@@ -1,5 +1,5 @@
 // Trazas con nombres de LTspice (V(out), I(R1), Ic(Q1)) sobre los vectores de ngspice.
-import type { SimPlot, SimVector } from '../engine/ngspice.ts';
+import { DIGITAL_TYPE, type SimPlot, type SimVector } from '../engine/ngspice.ts';
 import type { Resolver, Wave } from '../waveform/expr.ts';
 import { deviceVector, elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
 import { blockInstances, hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
@@ -11,6 +11,12 @@ const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id
 function findVector(plot: SimPlot, name: string): SimVector | undefined {
   const n = name.toLowerCase();
   return plot.vectors.find((v) => v.name.toLowerCase() === n);
+}
+
+/** Nodo digital de XSPICE (#209) por nombre */
+function findDigital(plot: SimPlot, name: string): SimVector | undefined {
+  const n = name.toLowerCase();
+  return plot.vectors.find((v) => v.type === DIGITAL_TYPE && v.name.toLowerCase() === n);
 }
 
 const wave = (v: SimVector | undefined): Wave | null => (v ? { re: v.real, ...(v.imag ? { im: v.imag } : {}) } : null);
@@ -43,6 +49,8 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
   };
   return (fn, args) => {
     const f = fn.toLowerCase();
+    // nodo digital (#209): Dig(q), con el mismo alcance de nombres que V()
+    if (f === 'dig') return wave(findDigital(plot, netVector(args[0])) ?? findDigital(plot, args[0]));
     if (f === 'v') {
       const a = node(args[0]);
       if (!a || args.length < 2) return a;
@@ -119,6 +127,7 @@ export function vectorExpr(v: SimVector): string {
   if (br) return `I(${br[1].toUpperCase()})`;
   const dev = parseDeviceVector(v.name);
   if (dev) return deviceTraceName(dev.device, dev.param);
+  if (v.type === DIGITAL_TYPE) return `Dig(${v.name})`;
   return v.type === 3 && !/[(@#]/.test(v.name) ? `V(${v.name})` : v.name;
 }
 

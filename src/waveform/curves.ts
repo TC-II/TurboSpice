@@ -21,6 +21,8 @@ export interface Curve {
   axis: 'y' | 'i' | 'ph';
   y: Float64Array;
   hidden: boolean;
+  /** nodo digital (#209): se dibuja en escalones */
+  digital?: boolean;
   /** corrida a la que pertenece ("R=2k", "#2") si hay varias */
   runLabel?: string;
 }
@@ -59,6 +61,9 @@ export function shade(hex: string, k: number, n: number): string {
 const isCurrentExpr = (e: string) => /^\s*I[bcdegsx]?\([^)]*\)\s*$/i.test(e) || deviceExprUnit(e) === 'A';
 /** Unidad de una traza simple: V(…), I(…) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
 const exprUnit = (e: string) => (/^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? ''));
+
+/** Traza de un nodo digital de XSPICE (#209): Dig(q) */
+const isDigitalExpr = (e: string) => /^\s*Dig\([^)]*\)\s*$/i.test(e);
 
 /** La unidad común de las trazas, o "" si no la hay */
 const sameUnit = (units: string[]) => (units.length && units.every((u) => u === units[0]) ? units[0] : '');
@@ -121,15 +126,16 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       } else {
         parts.push({ y: w.re, axis: isCurrentExpr(tt.expr) && hasV ? 'i' : 'y', dash: false, suffix: '' });
       }
+      const digital = isDigitalExpr(tt.expr) ? { digital: true } : {};
       for (const p of parts) {
         const y = toX(p.y);
         if (segs.length > 1) {
           segs.forEach(([a, b], si) => {
             const xs = scale.real.slice(a, b);
-            curves.push({ label: `${tt.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!tt.hidden, runLabel: `#${si + 1}` });
+            curves.push({ label: `${tt.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!tt.hidden, runLabel: `#${si + 1}`, ...digital });
           });
         } else {
-          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}) });
+          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}), ...digital });
         }
       }
     });

@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+import { applySynthesis, generatedSub, topModuleOf } from '../../src/hdl/project.ts';
+import { generatedFrom, yosysToSubckt, type YosysJson } from '../../src/hdl/synth.ts';
+
+// Netlist de Yosys de: module m(input [1:0] a, input clk, output y, output reg q); assign y = a[1] & a[0]; always @(posedge clk) q <= y;
+const JSON: YosysJson = {
+  modules: {
+    m: {
+      attributes: { top: '00000000000000000000000000000001' },
+      ports: { a: { direction: 'input', bits: [2, 3] }, clk: { direction: 'input', bits: [4] }, y: { direction: 'output', bits: [5] }, q: { direction: 'output', bits: [6] } },
+      cells: {
+        g: { type: '$_AND_', connections: { A: [2], B: [3], Y: [5] } },
+        f: { type: '$_DFF_P_', connections: { C: [4], D: [5], Q: [6] } },
+      },
+      netnames: { q: { bits: [6], hide_name: 0, attributes: { init: '1' } } },
+    },
+  },
+};
+
+describe('Verilog → XSPICE (#209)', () => {
+  it('traduce compuertas, flip-flops, buses y valores iniciales', () => {
+    const b = yosysToSubckt(JSON, 'm.v');
+    expect(b.inputs).toEqual(['a_1', 'a_0', 'clk']);
+    expect(b.outputs).toEqual(['y', 'q']);
+    expect(b.subckt).toContain('.subckt m a_1 a_0 clk y q vcc=5 tpd=1n');
+    expect(b.subckt).toContain('abi_a_1 [a_1] [a_1_d] hdl_adc');
+    expect(b.subckt).toMatch(/\[a_0_d a_1_d\] y_d hdl_and/);
+    expect(b.subckt).toMatch(/ y_d clk_d null null q_d null hdl_dff1/);
+    expect(b.subckt).toContain('abo_q [q_d] [q] hdl_dac');
+    expect(b.subckt).not.toContain('hdl_dlatch');
+    expect(generatedFrom(b.subckt)).toBe('m.v');
+  });
+
+  it('el módulo de más arriba es el que nadie instancia', () => {
+    expect(topModuleOf('module half(input a); endmodule\nmodule full(input a); half h1 (.a(a)); endmodule')).toBe('full');
+    expect(topModuleOf('module top(input a); sub u(a); endmodule\nmodule sub(input a); endmodule')).toBe('top');
+  });
+
+  it('agrega el .sub y el .asy; no pisa un .sub ajeno', () => {
+    const b = yosysToSubckt(JSON, 'm.v');
+    const out = applySynthesis([{ name: 'm.v', kind: 'verilog', text: '' }], 'm.v', b);
+    expect(out.files.map((f) => f.name)).toEqual(['m.v', 'm.sub', 'm.asy']);
+    expect(out.files[2].text).toContain('SYMATTR SpiceLine vcc=5 tpd=1n');
+    expect(generatedSub(out.files, 'm.v')?.name).toBe('m.sub');
+    expect(applySynthesis([{ name: 'm.sub', kind: 'model', text: '.subckt m a b\n.ends' }], 'm.v', b).clash).toBe('m.sub');
+  });
+});

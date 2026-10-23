@@ -2887,6 +2887,7 @@ ${ltNetlistText(sim.built.lt)}
             )}
           <input
             ref={subImport}
+            data-subckt-import
             type="file"
             hidden
             multiple

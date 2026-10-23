@@ -292,7 +292,7 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   check(files1.length === 1 && files1[0].name === 'Sample Project.turbo', `Drive: un solo archivo, «Sample Project.turbo» (${files1.map((f) => f.name)})`);
   const f = files1[0];
   const p1 = project(f.data);
-  check(!!p1 && p1.name === 'Sample Project' && p1.variants?.length >= 1, 'Drive: el contenido es un .turbo válido con el proyecto');
+  check(!!p1 && p1.name === 'Sample Project' && p1.testbenches?.length >= 1, 'Drive: el contenido es un .turbo válido con el proyecto');
   check(f.mimeType === 'application/json' && f.appProperties?.turbospice === '1', 'Drive: subido como JSON marcado de TurboSpice');
   check(!(await dirty(page)), 'Drive: al guardar se quita la marca de cambios');
   check(fake.tokens.every((t) => /^Bearer tok\d+$/.test(t)), 'Drive: todas las llamadas llevan el token');
@@ -551,7 +551,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
     n += l.length;
   }
   const lib = lines.join('');
-  await page.locator('input[type=file][accept*=".lib"]').setInputFiles({ name: 'grande.lib', mimeType: 'text/plain', buffer: Buffer.from(lib, 'utf8') });
+  await page.locator('input[type=file][accept*=".lib"]:not([data-subckt-import])').setInputFiles({ name: 'grande.lib', mimeType: 'text/plain', buffer: Buffer.from(lib, 'utf8') });
   await page.waitForTimeout(1500);
   await save(page);
   await waitToast(page, /Google Drive/);

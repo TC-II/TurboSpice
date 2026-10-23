@@ -1308,4 +1308,5 @@ export const es: Record<string, string> = {
   'Simulation settings': 'Configuración de simulación',
   'Value of {name}': 'Valor de {name}',
   'Variables (swept with .step):': 'Variables (barridas con .step):',
+  'Run history': 'Historial de corridas',
 };

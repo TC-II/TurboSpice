@@ -1484,6 +1484,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (id !== sims.active) goSim(id);
     else if (pathRef.current.length) go([]);
     // el diálogo, cuando ya se ve el testbench
+    if (item === 'history') return setTimeout(() => openHistory(id), 0);
     if (item !== 'schematic') setTimeout(() => (item === 'sim' ? openSimulation() : setDialog({ kind: 'benchParams' })), 0);
   };
   const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
@@ -2342,26 +2343,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     'sep',
     { label: t('Line style…'), onClick: () => openLineStyle() },
   ];
-  // Desplegable de Simular: las simulaciones guardadas (se elige cuál ver, #39); los tipos de
-  // análisis, que crean una simulación nueva con sus parámetros en la barra; los comandos a mano
-  // y los análisis programados
+  // Desplegable de Simular: los tipos de análisis (configuran la simulación del testbench, con
+  // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
+  // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...sims.items.map(
-      (x): MenuItem => ({
-        label: simName(x) || t('No analysis'),
-        title: t('{line} (double-click to rename)', { line: x.line }),
-        checked: x.id === sims.active,
-        onClick: () => goSim(x.id),
-        rename: { taken: sims.items.filter((y) => y.id !== x.id).map((y) => simName(y)), onRename: (n) => editProject(renameProjectSim(projectRef.current, x.id, n)) },
-        actions: [
-          ...(variant.sims.find((y) => y.id === x.id)?.runs.length ? [{ icon: 'clock' as const, label: t('History'), onClick: () => openHistory(x.id) }] : []),
-          { icon: 'copy', label: t('Duplicate'), onClick: () => duplicateSim(x.id) },
-          ...(sims.items.length > 1 ? [{ icon: 'trash' as const, label: t('Delete'), onClick: () => setDialog({ kind: 'deleteSim', id: x.id }) }] : []),
-        ],
-      }),
-    ),
-    { label: t('New testbench…'), onClick: newEmptyBench },
-    'sep',
     ...ANALYSES.map((x) => ({ label: x.label, title: t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
@@ -2820,7 +2805,7 @@ ${ltNetlistText(sim.built.lt)}
               project={project.name}
               benches={variant.sims.map((x) => {
                 const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
-                return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), params: benchParams(x.id === sims.active ? liveDoc : parseAsc(x.asc)).length };
+                return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(x.id === sims.active ? liveDoc : parseAsc(x.asc)).length };
               })}
               groups={project.groups}
               hoverReveal={hoverReveal}

@@ -29,9 +29,11 @@ export interface TreeBench {
   group?: string;
   /** cuántos .param tiene */
   params: number;
+  /** corridas en su historial */
+  runs: number;
 }
 
-export type BenchItem = 'sim' | 'schematic' | 'params';
+export type BenchItem = 'sim' | 'schematic' | 'params' | 'history';
 
 const COLLAPSED_KEY = 'turbospice.treeCollapsed';
 const loadCollapsed = (): Set<string> => {
@@ -163,6 +165,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           <ul>
             {item('sim', '⚙', t('Simulation settings'), b.detail)}
             {item('params', '{}', t('Parameters and variables'), b.params ? String(b.params) : undefined)}
+            {b.runs > 0 && item('history', '◷', t('Run history'), String(b.runs))}
           </ul>
         )}
       </li>

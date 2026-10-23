@@ -2669,16 +2669,11 @@ ${ltNetlistText(sim.built.lt)}
           <>
             <ProjectCapsule
               project={project.name}
-              variants={sims.items.map((x) => ({ id: x.id, name: simName(x) || t('No analysis'), detail: x.line ? analysisLabel(x.line) : t('No analysis') }))}
-              active={sims.active}
+              bench={(curSim && simName(curSim)) || t('No analysis')}
+              taken={sims.items.filter((x) => x.id !== sims.active).map((x) => simName(x))}
               dirty={dirty}
               onRenameProject={renameProject}
-              onRenameVariant={(id, name) => editProject(renameProjectSim(projectRef.current, id, name))}
-              onSelect={goSim}
-              onClone={() => duplicateSim(sims.active)}
-              onBlank={newEmptyBench}
-              onDuplicate={duplicateSim}
-              onDelete={(id) => setDialog({ kind: 'deleteSim', id })}
+              onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
             />
             <button
               className="theme-btn"

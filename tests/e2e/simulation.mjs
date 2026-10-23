@@ -117,8 +117,11 @@ check((await page.locator('.simbar .sim-state.ok').count()) === 1, 'y al simular
 await probe(272, -32); // red out
 check((await chipNames()).join() === 'V(out)', `primer testbench: V(out) (${(await chipNames()).join()})`);
 // otro testbench: copia del actual, con otros parámetros desde la barra
-await page.getByRole('button', { name: 'Testbenches', exact: true }).click();
-await page.getByRole('button', { name: 'Duplicar el actual' }).click();
+if (!(await page.locator('.project-tree').count())) await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
+// (las acciones del testbench aparecen al pasar el mouse por su fila)
+await page.locator('.project-tree .tree-name').filter({ hasText: /^[●○]\s*RC Filter$/ }).hover();
+await page.getByRole('button', { name: 'Duplicar RC Filter', exact: true }).click();
+await page.waitForTimeout(300);
 check((await benchName()) === 'RC Filter (copia)', `la copia es otro testbench (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)

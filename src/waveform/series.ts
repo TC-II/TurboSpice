@@ -69,8 +69,39 @@ const SI = ['f', 'p', 'n', 'µ', 'm', '', 'k', 'M', 'G', 'T'];
 /** Formato con prefijo SI: 0.0047 → "4.7m" */
 export function si(x: number, digits = 4): string {
   if (x === 0 || !Number.isFinite(x)) return String(x);
-  const e = Math.min(4, Math.max(-5, Math.floor(Math.log10(Math.abs(x)) / 3)));
-  return `${parseFloat((x / 10 ** (3 * e)).toPrecision(digits))}${SI[e + 5]}`;
+  let e = Math.min(4, Math.max(-5, Math.floor(Math.log10(Math.abs(x)) / 3)));
+  let m = parseFloat((x / 10 ** (3 * e)).toPrecision(digits));
+  // el redondeo puede llegar a 1000 (0.99997 → "1000m"): pasa al prefijo siguiente
+  if (Math.abs(m) >= 1000 && e < 4) m = parseFloat((x / 10 ** (3 * ++e)).toPrecision(digits));
+  return `${m}${SI[e + 5]}`;
+}
+
+/**
+ * Etiquetas de las marcas de un eje: un solo prefijo SI (el de la marca de mayor módulo) y los
+ * decimales que pide el paso entre marcas, así nunca se repiten aunque el rango sea mínimo
+ * (0.9996, 0.99965… → "999.60m", "999.65m"…). Sin marcas válidas devuelve ''.
+ * No usa offset (p. ej. "+999.6m") cuando las etiquetas quedan largas.
+ */
+export function axisTicks(tt: (number | null)[]): string[] {
+  const v = tt.filter((x): x is number => x != null && Number.isFinite(x));
+  const max = Math.max(0, ...v.map(Math.abs));
+  if (max === 0) return tt.map((x) => (x == null ? '' : '0'));
+  let e = Math.min(4, Math.max(-5, Math.floor(Math.log10(max) / 3)));
+  let step = Infinity;
+  for (let i = 1; i < v.length; i++) {
+    const d = Math.abs(v[i] - v[i - 1]);
+    if (d > 0) step = Math.min(step, d);
+  }
+  const decimals = (ee: number) =>
+    Number.isFinite(step) ? Math.min(9, Math.max(0, -Math.floor(Math.log10(step / 10 ** (3 * ee)) + 1e-9))) : 0;
+  // 999.97m con 2 decimales redondea a 1000.00m: sube de prefijo
+  if (e < 4 && Math.round((max / 10 ** (3 * e)) * 10 ** decimals(e)) / 10 ** decimals(e) >= 1000) e++;
+  const dec = decimals(e);
+  return tt.map((x) => {
+    if (x == null || !Number.isFinite(x)) return '';
+    const m = parseFloat((x / 10 ** (3 * e)).toFixed(dec));
+    return `${m === 0 ? '0' : m.toFixed(dec)}${m === 0 ? '' : SI[e + 5]}`;
+  });
 }
 
 /**

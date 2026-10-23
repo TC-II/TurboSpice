@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
-import { displayName, isLogScale, project, resample, scaleOf, si, type ComplexView } from './series.ts';
+import { axisTicks, displayName, isLogScale, project, resample, scaleOf, si, type ComplexView } from './series.ts';
 
 const PALETTE = ['#2f6fdb', '#d9480f', '#2b8a3e', '#ae3ec9', '#e67700', '#0b7285', '#c2255c', '#5c940d'];
 
@@ -52,7 +52,7 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
     const hasV = vectors.some((v) => !isCurrent(v));
     const hasI = vectors.some(isCurrent);
     const yScale = (v: SimVector) => (isCurrent(v) && hasV ? 'i' : 'y');
-    const ticks = (_u: uPlot, t: number[]) => t.map((x) => si(x, 3));
+    const ticks = (_u: uPlot, t: number[]) => axisTicks(t);
     const opts: uPlot.Options = {
       width: el.clientWidth,
       height: height(),

@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { scaleOf, si, siFixed } from './series.ts';
+import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { t } from '../i18n/i18n.ts';
@@ -430,7 +430,7 @@ function PaneView(props: {
     const fg = css.getPropertyValue('--fg').trim();
     const bg = css.getPropertyValue('--bg').trim() || '#fff';
     const markColor = { pole: css.getPropertyValue('--err').trim(), zero: css.getPropertyValue('--accent').trim() };
-    const ticks = (_u: uPlot, tt: number[]) => tt.map((x) => si(x, 3));
+    const ticks = (_u: uPlot, tt: number[]) => axisTicks(tt);
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);

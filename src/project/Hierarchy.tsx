@@ -162,7 +162,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         {open && (
           <ul>
             {item('sim', '⚙', t('Simulation settings'), b.detail)}
-            {item('schematic', '▭', t('Schematic'))}
             {item('params', '{}', t('Parameters and variables'), b.params ? String(b.params) : undefined)}
           </ul>
         )}

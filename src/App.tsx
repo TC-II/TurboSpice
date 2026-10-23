@@ -8,7 +8,7 @@ import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from '
 import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
-import { biasCommand, biasParams, elementBias, netBias, sameCircuit, type Bias } from './sim/bias.ts';
+import { biasCommand, biasParams, elementBias, netBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { Point, ShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
@@ -99,6 +99,7 @@ import { evalTrace } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
 import { probeExpr, traceResolver } from './sim/traces.ts';
+import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { StudyPanel, type StudyInfo } from './schematic/StudyPanel.tsx';
@@ -1646,35 +1647,53 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Punto de operación: el de la simulación elegida o el último calculado, mientras el circuito
   // sea el que se simuló (no importa el comando de análisis)
-  const op = useMemo(
-    () =>
-      sim?.result.bias && sameCircuit(sim.doc, doc)
-        ? { built: sim.built, bias: sim.result.bias }
-        : opPoint && sameCircuit(opPoint.doc, doc)
-          ? opPoint
-          : undefined,
-    [sim, opPoint, doc],
+  // Adentro de una instancia (#199): la simulación del testbench vista desde esa instancia, si
+  // el subcircuito es el que se simuló
+  const lvNow = path[path.length - 1];
+  const docText = useMemo(() => (lvNow?.inst ? ascText(doc) : ''), [lvNow, doc]);
+  const scopeIn = useCallback(
+    (built: BuiltSimulation | undefined): InstScope | undefined => {
+      if (!built || !lvNow?.inst) return undefined;
+      const sc = instScope(built, lvNow.sub, lvNow.prefix, lvNow.ports);
+      return sc && ascText(sc.block.doc) === docText ? sc : undefined;
+    },
+    [lvNow, docText],
   );
+  const simScope = useMemo(() => scopeIn(sim?.built), [scopeIn, sim]);
+  const op = useMemo((): { built: BuiltSimulation; bias: Bias; scope?: InstScope } | undefined => {
+    if (lvNow) {
+      for (const c of [sim?.result.bias ? { built: sim.built, bias: sim.result.bias } : null, opPoint]) {
+        const scope = c ? scopeIn(c.built) : undefined;
+        if (c && scope) return { built: c.built, bias: c.bias, scope };
+      }
+      return undefined;
+    }
+    return sim?.result.bias && sameCircuit(sim.doc, doc)
+      ? { built: sim.built, bias: sim.result.bias }
+      : opPoint && sameCircuit(opPoint.doc, doc)
+        ? opPoint
+        : undefined;
+  }, [sim, opPoint, doc, lvNow, scopeIn]);
   const bias = op?.bias;
   const describe = useMemo(() => {
     if (!op) return undefined;
     return ({ net, symbol }: { net?: string; symbol?: number }) => {
-      if (net) return net === '0' ? null : netBias(op.bias, net);
-      const el = symbol !== undefined ? op.built.lt.elements.find((e) => e.sym === symbol) : undefined;
-      return el ? elementBias(op.built, op.bias, el) : null;
+      if (net) return net === '0' ? null : op.scope ? scopedNetBias(op.bias, op.scope, net) : netBias(op.bias, net);
+      const el = symbol === undefined ? undefined : op.scope ? scopeElementOf(op.scope, symbol) : op.built.lt.elements.find((e) => e.sym === symbol);
+      return el ? elementBias(op.built, op.bias, el, op.scope) : null;
     };
   }, [op]);
   const annotations = useMemo((): Annotation[] | undefined => {
     if (!showOp || !op) return undefined;
-    const { built, bias } = op;
+    const { built, bias, scope } = op;
     const out: Annotation[] = [];
     for (const n of netNames(doc, conn, new Map())) {
-      const b = netBias(bias, n.name);
+      const b = scope ? scopedNetBias(bias, scope, n.name) : netBias(bias, n.name);
       if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
     }
-    for (const el of built.lt.elements) {
+    for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
       if (!/^[RLVIDQMJ]/i.test(el.prefix)) continue;
-      const b = elementBias(built, bias, el);
+      const b = elementBias(built, bias, el, scope);
       const s = doc.symbols[el.sym];
       if (!b?.short || !s) continue;
       const box = symbolBox(s, lib.symbol(s.type), lib);
@@ -1685,18 +1704,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
-    if (!sim || sim.doc !== doc || !(showOp || tool.kind === 'probe')) return undefined;
+    if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe')) return undefined;
     const traces = panes.flatMap((p) => p.traces.map((tt, i) => ({ t: tt, color: traceColor(tt, i) }))).filter((x) => !x.t.hidden);
     // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
     const colorOf = (target: { symbol: number; pin?: number }) => {
-      const expr = probeExpr(sim.built, target);
+      const expr = probeExpr(sim.built, target, simScope);
       return expr ? traces.find((x) => sameExpr(x.t.expr, expr))?.color : undefined;
     };
-    return currentArrows(doc, lib, sim.built.lt.elements).map((a) => {
+    return currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements).map((a) => {
       const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? colorOf({ symbol: a.sym });
       return color ? { ...a, color } : a;
     });
-  }, [sim, doc, lib, showOp, tool.kind, panes]);
+  }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope]);
 
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
@@ -1785,10 +1804,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const lv = pathRef.current[pathRef.current.length - 1];
     if (lv) {
       if (!lv.inst) return setMessage(t('To probe inside a subcircuit, enter it from an instance (double-click it in the testbench)'));
-      if (!target.net || target.net === '0') return setMessage(t('Inside a subcircuit the probe measures voltages (click a wire)'));
-      const up = lv.ports.get(target.net.toLowerCase());
-      if (up === '0') return;
-      expr = `V(${up ?? lv.prefix + target.net})`;
+      // con el subcircuito tal como se simuló: tensiones y corrientes de los de adentro (#199)
+      if (simScope) expr = probeExpr(sim.built, target, simScope);
+      else {
+        if (!target.net || target.net === '0') return setMessage(t('Inside a subcircuit the probe measures voltages (click a wire)'));
+        const up = lv.ports.get(target.net.toLowerCase());
+        if (up === '0') return;
+        expr = `V(${up ?? lv.prefix + target.net})`;
+      }
     }
     if (!expr) return;
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)

@@ -1,7 +1,8 @@
 // Trazas con nombres de LTspice (V(out), I(R1), Ic(Q1)) sobre los vectores de ngspice.
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
 import type { Resolver, Wave } from '../waveform/expr.ts';
-import { elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
+import { deviceVector, elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
+import { hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
 
 /** Parámetro de dispositivo de ngspice para Ic, Ib, Id… */
 const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id', ig: 'ig', is: 'is' };
@@ -44,6 +45,13 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       if (!a.im && !b.im) return { re };
       return { re, im: (a.im ?? new Float64Array(re.length)).map((x, k) => x - (b.im?.[k] ?? 0)) };
     }
+    // adentro de una instancia (#199): I(x_u1.r1) → @r.x_u1.r1[i], Ic(x_u1.q1) → @q.x_u1.q1[ic]
+    const dev = !element(args[0]) && args[0].includes('.') ? hierDevice(args[0]) : null;
+    if (dev) {
+      if (f === 'i') return wave([deviceVector(dev), `${dev}#branch`, `@${dev}[i]`].map((n) => n && findVector(plot, n)).find((x) => x) || undefined);
+      const term = TERMINAL[f];
+      return term ? wave(findVector(plot, `@${dev}[${term}]`)) : null;
+    }
     // corrientes: I(V1) → v1#branch, I(R1) → @r1[i], Ic(Q1) → @q1[ic]…
     const el = element(args[0]);
     const ng = el && sim ? sim.ng.names.get(el.name)?.toLowerCase() : args[0].toLowerCase();
@@ -70,11 +78,16 @@ export const multiPinPrefix = (prefix: string) => PIN_TERMINALS.some(([re]) => r
  * Expresión que mide la punta de prueba: V(red), I(elemento), o la corriente del pin de un
  * transistor (`pin` = SpiceOrder: Id/Ig/Is/Ib del MOS, Ic/Ib/Ie del BJT)
  */
-export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?: number; pin?: number }): string | null {
-  if (target.net && target.net !== '0') return `V(${target.net})`;
+export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?: number; pin?: number }, scope?: InstScope): string | null {
+  if (target.net && target.net !== '0') {
+    if (!scope) return `V(${target.net})`;
+    const n = scopeNet(scope, target.net);
+    return n === '0' ? null : `V(${n})`;
+  }
   if (target.symbol === undefined) return null;
-  const el = sim.lt.elements.find((e) => e.sym === target.symbol);
-  if (!el) return null;
+  const found = scope ? scopeElementOf(scope, target.symbol) : sim.lt.elements.find((e) => e.sym === target.symbol);
+  const el = found && scope ? { ...found, name: scopeElement(scope, found.name) ?? '' } : found;
+  if (!el?.name) return null;
   const p = el.prefix.toUpperCase();
   if (target.pin !== undefined) {
     const term = PIN_TERMINALS.find(([re]) => re.test(p))?.[1][target.pin - 1];

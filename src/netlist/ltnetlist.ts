@@ -50,6 +50,8 @@ export interface Block {
   /** parámetros con su valor por defecto ("G=1 R=1k"): el SpiceLine del símbolo (#180) */
   params?: string;
   lt: LtNetlist;
+  /** esquemático del bloque tal como se netlistó (para saber si lo que se ve es lo simulado) */
+  doc: AscDoc;
 }
 
 // Familias con modelo implícito: LTspice agrega estos .model y su librería estándar
@@ -94,7 +96,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     warnings.push(...lt.warnings.map((w) => `${name}: ${w}`));
     for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
     const params = (def.attrs.get('SpiceLine') ?? '').trim();
-    blocks.push({ name, ports, ...(/^[A-Za-z_]\w*\s*=/.test(params) ? { params } : {}), lt });
+    blocks.push({ name, ports, ...(/^[A-Za-z_]\w*\s*=/.test(params) ? { params } : {}), lt, doc: sub });
   };
   const conn = connectivity(doc, (tt) => lib.symbol(tt));
   let ncCounter = 0;

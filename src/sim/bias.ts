@@ -3,7 +3,8 @@
 import type { AscDoc } from '../asc/model.ts';
 import type { Element } from '../netlist/ltnetlist.ts';
 import { si } from '../waveform/series.ts';
-import { elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
+import { deviceVector, netVector, type BuiltSimulation } from './schematicSim.ts';
+import { blockInstances, scopeElement, scopeNet, hierDevice, type InstScope } from './context.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -37,6 +38,12 @@ export function biasParams(sim: BuiltSimulation): string[] {
     const n = ng.toLowerCase();
     for (const p of PARAMS[n[0]] ?? []) out.push(`@${n}[${p}]`);
   }
+  // los de adentro de cada instancia de un subcircuito del proyecto (#199): @q.x_u1.q1[gm]
+  for (const inst of blockInstances(sim))
+    for (const ng of inst.names.values()) {
+      const n = hierDevice(`${inst.prefix}${ng}`)!;
+      for (const p of PARAMS[n[0]] ?? []) out.push(`@${n}[${p}]`);
+    }
   return out;
 }
 
@@ -75,6 +82,12 @@ export function netBias(bias: Bias, net: string): BiasInfo | null {
   return { title: `V(${net})`, lines: [fmt(v, 'V')], short: fmt(v, 'V') };
 }
 
+/** Tensión de una red de adentro de una instancia (#199), con su nombre local en el título */
+export function scopedNetBias(bias: Bias, scope: InstScope, net: string): BiasInfo | null {
+  const b = netBias(bias, scopeNet(scope, net));
+  return b && { ...b, title: `V(${scope.prefix}${net})` };
+}
+
 /** Región de un BJT: corte / activa / saturación. `s` = 1 en NPN, -1 en PNP */
 function bjtRegion(vbe: number, vbc: number, s: number): string {
   const be = s * vbe;
@@ -89,15 +102,17 @@ function mosRegion(vgs: number, vds: number, von: number, vdsat: number, s: numb
   return Math.abs(vds) < Math.abs(vdsat) ? t('triode (linear)') : t('saturation');
 }
 
-export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element): BiasInfo | null {
-  const ng = sim.ng.names.get(el.name)?.toLowerCase();
+/** `scope`: el elemento es de adentro de esa instancia (#199) */
+export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope?: InstScope): BiasInfo | null {
+  const local = scope ? scopeElement(scope, el.name) : sim.ng.names.get(el.name)?.toLowerCase();
+  const ng = local && (scope ? hierDevice(local) : local);
   if (!ng) return null;
   const p = (k: string) => bias[`@${ng}[${k}]`];
-  const iVec = elementVector(sim, el.name);
+  const iVec = deviceVector(ng, el.value);
   const i = iVec ? bias[iVec] : undefined;
-  const v = (k: number) => nodeV(bias, el.nodes[k]);
+  const v = (k: number) => (el.nodes[k] === undefined ? undefined : nodeV(bias, scope ? scopeNet(scope, el.nodes[k]) : el.nodes[k]));
   const vab = v(0) !== undefined && v(1) !== undefined ? v(0)! - v(1)! : undefined;
-  const title = el.name.replace(/§/g, '');
+  const title = (scope ? `${scope.prefix}${el.name}` : el.name).replace(/§/g, '');
   const pol = /^(QP|MP|JP)$/i.test(el.prefix) ? -1 : 1;
   switch (ng[0]) {
     case 'r':

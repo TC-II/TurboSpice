@@ -76,7 +76,14 @@ export const netVector = (net: string) => ngNodeName(net).toLowerCase();
 export function elementVector(sim: BuiltSimulation, ltName: string): string | null {
   const ng = sim.ng.names.get(ltName)?.toLowerCase();
   if (!ng) return null;
-  const el = sim.lt.elements.find((e) => e.name === ltName);
+  return deviceVector(ng, sim.lt.elements.find((e) => e.name === ltName)?.value);
+}
+
+/**
+ * Vector con la corriente de un dispositivo por su nombre en ngspice (`r1`, o `r.x_u1.r1` adentro
+ * de una instancia); `value`, el de la B (con V= la corriente es la de la rama)
+ */
+export function deviceVector(ng: string, value = ''): string | null {
   switch (ng[0]) {
     case 'v':
     case 'l':
@@ -84,7 +91,7 @@ export function elementVector(sim: BuiltSimulation, ltName: string): string | nu
     case 'h':
       return `${ng}#branch`;
     case 'b':
-      return /^\s*v\s*=/i.test(el?.value ?? '') ? `${ng}#branch` : `@${ng}[i]`;
+      return /^\s*v\s*=/i.test(value) ? `${ng}#branch` : `@${ng}[i]`;
     case 'r':
     case 'c':
       return `@${ng}[i]`;

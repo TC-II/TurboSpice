@@ -44,6 +44,8 @@ export interface NgspiceNetlist {
   subcktParams: Map<string, Map<string, string>>;
   /** nombre del elemento en LTspice (InstName efectivo) → nombre en ngspice */
   names: Map<string, string>;
+  /** lo mismo adentro de cada bloque jerárquico (nombre del bloque en minúsculas), #199 */
+  blockNames: Map<string, Map<string, string>>;
   /** con .step: las corridas en orden de ejecución */
   steps?: StepRuns;
   /** líneas .meas (las evalúa TurboSpice sobre los resultados; en la netlist van comentadas) */
@@ -714,6 +716,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const used = new Set<string>();
   const includes: string[] = [];
   const subcktParams = new Map<string, Map<string, string>>();
+  const blockNames = new Map<string, Map<string, string>>();
   const out: string[] = [
     `* ${title}`,
     // Constante predefinida en las expresiones de LTspice que ngspice no tiene en .param
@@ -898,7 +901,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   // Bloques jerárquicos: un .subckt por esquemático (sus .model/.param quedan locales)
   for (const b of lt.blocks) {
     out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
-    out.push(...convertElements(b.lt, new Set(), new Map(), warnings, subcktParams));
+    const inner = new Map<string, string>();
+    blockNames.set(b.name.toLowerCase(), inner);
+    out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;
       for (const raw of tt.text.split('\\n')) {
@@ -917,7 +922,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, warnings, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
+  return { text: out.join('\n'), includes, names, blockNames, warnings, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

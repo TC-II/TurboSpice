@@ -23,7 +23,7 @@ import { t } from '../i18n/i18n.ts';
 //  - SRFLOP: in1=S, in2=R, asíncronos; R gana si están los dos;
 //  - el punto de operación respeta PRE/S y CLR/R; sin ellos Q arranca en Vlow.
 // SCHMITT (in1, _Q, Q, com): sube cuando V(in) > Vt+Vh y baja cuando V(in) < Vt−Vh, con V(in)
-// medida respecto de tierra (no de com); Vt vale Ref por omisión y Vh, 5 % de |Vt|. Es un SR
+// medida respecto de tierra (no de com), o V(in1,in2) en los diferenciales (in2 = in−); Vt vale Ref por omisión y Vh, 5 % de |Vt|. Es un SR
 // con set = (in > Vt+Vh) y reset = (in < Vt−Vh).
 // En ngspice: las entradas normalizadas pasan por un adc_bridge a un d_dff de XSPICE (el SR es un
 // d_dff sin reloj que sólo usa set y reset) y un dac_bridge vuelve a 0…1; de ahí en adelante
@@ -76,7 +76,9 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       const vt = p.has('vt') ? num('vt', '') : ref;
       const vhy = p.has('vh') ? num('vh', '') : `0.05*abs(${vt})`;
       const cmp = (e: string) => `min(max((${e})*1e4+0.5,0),1)`;
-      sig = [['fs', cmp(`V(${i1})-${vt}-${vhy}`)], ['fr', cmp(`${vt}-${vhy}-V(${i1})`)]];
+      // diferencial (diffschmitt…): in- = in2
+      const vin = i2 === '0' ? `V(${i1})` : `V(${i1},${i2})`;
+      sig = [['fs', cmp(`${vin}-${vt}-${vhy}`)], ['fr', cmp(`${vt}-${vhy}-${vin}`)]];
     } else {
       // CLR/R tiene prioridad: el set efectivo es set·¬reset
       sig = [
@@ -86,7 +88,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       ];
     }
     sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=${e}`));
-    anchor(dff ? [i1, i3, set, rst] : model === 'schmitt' ? [i1] : [set, rst]);
+    anchor(dff ? [i1, i3, set, rst] : model === 'schmitt' ? [i1, i2] : [set, rst]);
     const dig = (k: string) => `${n}${k}_d`;
     lines.push(
       `A_${n}adc [${sig.map(([k]) => `${n}${k}`).join(' ')}] [${sig.map(([k]) => dig(k)).join(' ')}] ${n}adcm`,

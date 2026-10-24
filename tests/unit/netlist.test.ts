@@ -1025,5 +1025,7 @@ SYMATTR InstName J1
     expect(l.some((x) => x.startsWith('B_A4__qb qb 0'))).toBe(true);
     const d = translateDigital('A5', ['in', '0', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
     expect(d.find((x) => x.startsWith('B_A5__fs'))).toContain('V(in)-({1}+{0})/2-0.05*abs(({1}+{0})/2)');
+    const f = translateDigital('A6', ['p', 'm', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
+    expect(f.find((x) => x.startsWith('B_A6__fs'))).toContain('(V(p,m)-');
   });
 });

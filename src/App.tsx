@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type Mutab
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
-import type { SimPlot, SimResult } from './engine/ngspice.ts';
+import { DIGITAL_TYPE, type SimPlot, type SimResult } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
@@ -125,6 +125,7 @@ import { synthesizeVerilog } from './hdl/client.ts';
 import { addVerilogModule, withParams, applySynth, isStale, moduleOf, storeVerilog, verilogFile, verilogModules, verilogPorts, verilogSources, verilogSymbol } from './hdl/project.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
 import { VerilogModule } from './hdl/VerilogModule.tsx';
+import { busNames } from './waveform/digital.ts';
 import { NewModuleDialog } from './project/NewModuleDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
@@ -2015,7 +2016,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [viewerTools, setViewerTools] = useState<HTMLElement | null>(null);
   const traceNames = useMemo(() => {
     const sc = plot && scaleOf(plot);
-    return plot ? [...new Set(plot.vectors.filter((v) => v !== sc).map(displayName))] : [];
+    if (!plot) return [];
+    // y los buses que forman los nodos digitales de los bloques Verilog (#209): Dig(x1.q[3:0])
+    return [...new Set([...plot.vectors.filter((v) => v !== sc).map(displayName), ...busNames(plot.vectors.filter((v) => v.type === DIGITAL_TYPE).map((v) => v.name))])];
   }, [plot]);
   // parámetros de los dispositivos para elegir en la caja de trazas (#202)
   const traceHints = useMemo(() => (sim ? deviceParamTraces(sim.built) : undefined), [sim]);

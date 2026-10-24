@@ -3,6 +3,7 @@
 // .plt de LTspice.
 import { readData, writeData } from '../asc/dataText.ts';
 import type { AscDoc } from '../asc/model.ts';
+import { isDigitalExpr, type Radix } from './digital.ts';
 
 export interface Trace {
   /** expresión con nombres de LTspice: "V(out)", "I(R1)", "V(out)/V(in)" */
@@ -10,6 +11,8 @@ export interface Trace {
   /** color CSS; si falta se usa la paleta por posición */
   color?: string;
   hidden?: boolean;
+  /** bus digital (#209): cómo se muestra su valor */
+  radix?: Radix;
 }
 
 /** FFT de las trazas de un panel (#236): ventana y rango de tiempo usado (sin rango = todo) */
@@ -21,6 +24,8 @@ export interface PaneFft {
 
 export interface Pane {
   traces: Trace[];
+  /** panel digital (#209): un carril por traza Dig(…); no comparte ejes con las analógicas */
+  digital?: boolean;
   /** panel de espectro: cada traza es una expresión del transitorio y se muestra su FFT */
   fft?: PaneFft;
 }
@@ -88,9 +93,23 @@ export function colorFor(panes: Pane[], expr: string): string {
  * mano); si está en otro, queda en los dos con el mismo color.
  */
 export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
-  const k = Math.max(0, Math.min(i, panes.length - 1));
-  const base = panes.length ? panes : emptyPanes();
-  if (base[k].traces.some((t) => sameExpr(t.expr, expr))) return panes;
+  let base = panes.length ? panes : emptyPanes();
+  let k = Math.max(0, Math.min(i, base.length - 1));
+  // una señal digital va a un panel digital y una analógica a uno analógico (#209): el activo si
+  // es de su tipo (o si está vacío: pasa a ser de su tipo), si no el primero que lo sea, y si no
+  // hay, uno nuevo abajo
+  const digital = isDigitalExpr(expr);
+  const kindOf = (p: Pane): Pane => (digital ? { ...p, digital: true } : (({ digital: _, ...rest }) => rest)(p));
+  if (!!base[k].digital !== digital) {
+    const j = base.findIndex((p) => !!p.digital === digital && !p.fft);
+    if (!base[k].traces.length && !base[k].fft) base = base.map((p, n) => (n === k ? kindOf(p) : p));
+    else if (j >= 0) k = j;
+    else {
+      base = [...base, digital ? { traces: [], digital: true } : { traces: [] }];
+      k = base.length - 1;
+    }
+  }
+  if (base[k].traces.some((t) => sameExpr(t.expr, expr))) return base === panes ? panes : base;
   const color = colorFor(base, expr);
   return base.map((p, j) => (j === k ? { ...p, traces: [...p.traces, { expr, color }] } : p));
 }

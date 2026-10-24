@@ -1115,3 +1115,18 @@ button.hier-tab { padding-right: 10px; }
 .vm-input input, .vm-field select { width: 9em; font: 12px var(--mono); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); color: var(--fg); }
 .vm-field select { width: 13em; font-family: inherit; }
 @media (max-width: 700px) { .canvas-wrap.with-tree .verilog-module, .canvas-wrap.with-sym .verilog-module { left: 0; right: 0; } .vm-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .vm-side { max-height: 40vh; } }
+
+/* Paneles digitales (#209): un carril por señal */
+.digital-lanes { overflow: hidden; user-select: none; }
+.digital-lanes svg { display: block; }
+.digital-lanes text { font: 11px var(--mono); fill: var(--fg-muted); }
+.digital-lanes .dl-name { font-size: 11px; }
+.digital-lanes .dl-value { fill: var(--fg); stroke: none; font-size: 11px; }
+.digital-lanes .dl-x path { stroke: var(--err); stroke-dasharray: 3 2; }
+.digital-lanes .dl-tick line { stroke: var(--grid); }
+.digital-lanes .dl-cursor line { stroke: var(--accent); stroke-dasharray: 4 3; }
+.digital-lanes .dl-cursor text { fill: var(--accent); }
+.digital-lanes .dl-hover { stroke: var(--fg-muted); stroke-width: 0.5; }
+.digital-lanes .dl-select { fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: var(--accent); }
+.pane.digital { flex: 0 0 auto; min-height: 0; }
+.trace-chip select.radix { font: 11px var(--mono); padding: 0 2px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); color: var(--fg); }

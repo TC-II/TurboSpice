@@ -22,6 +22,8 @@ export interface TreeSub {
   text: boolean;
   /** tipo de módulo: subcircuito (esquemático), modelo (netlist + símbolo) o Verilog (se sintetiza) */
   type?: 'model' | 'verilog';
+  /** Verilog con cambios sin sintetizar (#209) */
+  unsynthesized?: boolean;
   /** instancias desactualizadas (#199): pines sin conectar o cables sueltos sobre el símbolo */
   stale?: { label: string; inst: string; detail: string; go(): void }[];
 }
@@ -302,12 +304,15 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         <span className={`tree-kind${s.type ? ` ${s.type}` : ''}`} title={KIND[s.type ?? 'subckt'].title()}>
           {KIND[s.type ?? 'subckt'].label()}
         </span>
-        <span className="tree-meta">{t('{n} pins', { n: s.ports })}</span>
+        <span className="tree-meta" title={s.unsynthesized ? t('Changes not synthesized yet (it is synthesized before simulating)') : undefined}>
+          {t('{n} pins', { n: s.ports })}
+          {s.unsynthesized ? ' •' : ''}
+        </span>
         <button className={`tree-uses${s.uses.length ? '' : ' none'}`} onClick={() => setUsesOf(usesOf === s.name ? '' : s.name)} title={t('Where it is used')}>
           {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
         </button>
         <span className="tree-actions">
-          {s.type !== 'verilog' && <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>}
+          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
           {!s.type && <>
           <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
           <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>

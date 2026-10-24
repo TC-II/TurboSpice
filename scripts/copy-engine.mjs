@@ -17,10 +17,12 @@ rmSync(DST, { recursive: true, force: true });
 mkdirSync(DST, { recursive: true });
 cpSync(SRC, DST, { recursive: true });
 const codemodels = readdirSync(SRC).filter((f) => f.endsWith('.cm')).sort();
+// Icarus Verilog (#209): compilador y simulador de los bloques Verilog de comportamiento
+const icarus = existsSync(join(SRC, 'icarus')) ? readdirSync(join(SRC, 'icarus')).sort().map((f) => `icarus/${f}`) : [];
 // hash del contenido de cada archivo: el Worker guarda el motor en Cache Storage y sólo lo vuelve
 // a bajar si cambió (GitHub Pages cambia el ETag de todo en cada deploy, #191)
 const hashes = Object.fromEntries(
-  ['ngspice.mjs', 'ngspice.wasm', ...codemodels].map((f) => [f, createHash('sha256').update(readFileSync(join(SRC, f))).digest('hex').slice(0, 16)]),
+  ['ngspice.mjs', 'ngspice.wasm', ...codemodels, ...icarus].map((f) => [f, createHash('sha256').update(readFileSync(join(SRC, f))).digest('hex').slice(0, 16)]),
 );
-writeFileSync(join(DST, 'manifest.json'), JSON.stringify({ codemodels, hashes }, null, 2));
+writeFileSync(join(DST, 'manifest.json'), JSON.stringify({ codemodels, icarus, hashes }, null, 2));
 console.log(`motor copiado a public/engine (${codemodels.length} code models)`);

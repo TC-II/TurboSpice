@@ -7,6 +7,7 @@ import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
 import { PALETTE, isFftPane, sameExpr, sameFft, traceColor, type Pane, type PaneFft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
+import { digitalWidth, isDigitalExpr } from './digital.ts';
 
 /** Cómo se muestran las trazas complejas (AC): Bode = magnitud en dB y fase a la vez */
 export type ComplexMode = 'bode' | 'db' | 'phase' | 'mag' | 'reim' | 'smith';
@@ -24,6 +25,8 @@ export interface Curve {
   hidden: boolean;
   /** nodo digital (#209): se dibuja en escalones */
   digital?: boolean;
+  /** ancho en bits de una traza digital (1: un bit; más: un bus) */
+  bits?: number;
   /** corrida a la que pertenece ("R=2k", "#2") si hay varias */
   runLabel?: string;
 }
@@ -67,8 +70,6 @@ const isCurrentExpr = (e: string) => /^\s*I[bcdegsx]?\([^)]*\)\s*$/i.test(e) || 
 /** Unidad de una traza simple: V(…), I(…) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
 const exprUnit = (e: string) => (/^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? ''));
 
-/** Traza de un nodo digital de XSPICE (#209): Dig(q) */
-const isDigitalExpr = (e: string) => /^\s*Dig\([^)]*\)\s*$/i.test(e);
 
 /** La unidad común de las trazas, o "" si no la hay */
 const sameUnit = (units: string[]) => (units.length && units.every((u) => u === units[0]) ? units[0] : '');
@@ -132,7 +133,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       } else {
         parts.push({ y: w.re, axis: isCurrentExpr(tt.expr) && hasV ? 'i' : 'y', dash: false, suffix: '' });
       }
-      const digital = isDigitalExpr(tt.expr) ? { digital: true } : {};
+      const digital = isDigitalExpr(tt.expr) ? { digital: true, bits: digitalWidth(tt.expr) } : {};
       for (const p of parts) {
         const y = toX(p.y);
         if (segs.length > 1) {

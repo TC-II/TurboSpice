@@ -229,21 +229,18 @@ await page.locator('.trace-chip .name').first().click();
 check((await page.locator('.trace-chip').count()) === 0, 'Backspace + click en el nombre quita la traza');
 await page.keyboard.press('Escape');
 
-// --- botones Mover / Arrastrar en la barra (#198) ---
+// --- botón Mover en la barra (#198; «Arrastrar» se quitó en #220: el arrastre con estiramiento es el del ratón) ---
 await onSchematic();
 await page.setViewportSize({ width: 1900, height: 900 }); // en 1280 el grupo Edición pasa a «Más herramientas»
 const mv = page.locator('.iconbar button[aria-label="Mover"]');
-const dr = page.locator('.iconbar button[aria-label="Arrastrar"]');
 const act = async (l) => (await l.getAttribute('class'))?.includes('active') ?? false;
 await mv.waitFor();
-check((await mv.count()) === 1 && (await dr.count()) === 1, 'la barra tiene los botones Mover y Arrastrar');
-check(/\(M\)/.test((await mv.getAttribute('title')) ?? '') && /\(S\)/.test((await dr.getAttribute('title')) ?? ''), 'los tooltips de Mover/Arrastrar traen el atajo');
+check((await mv.count()) === 1 && (await page.locator('.iconbar button[aria-label="Arrastrar"]').count()) === 0, 'la barra tiene el botón Mover (y ya no Arrastrar)');
+check(/\(M\)/.test((await mv.getAttribute('title')) ?? ''), 'el tooltip de Mover trae el atajo');
 await mv.click();
-check((await act(mv)) && !(await act(dr)), 'click en Mover lo marca activo');
-await dr.click();
-check(!(await act(mv)) && (await act(dr)), 'click en Arrastrar lo marca activo y desmarca Mover');
+check(await act(mv), 'click en Mover lo marca activo');
 await page.keyboard.press('Escape');
-check(!(await act(mv)) && !(await act(dr)), 'Esc desactiva ambos');
+check(!(await act(mv)), 'Esc lo desactiva');
 await onSchematic();
 await page.keyboard.press('m');
 check(await act(mv), 'la tecla M marca el botón Mover');

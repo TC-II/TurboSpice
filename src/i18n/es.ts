@@ -1576,6 +1576,7 @@ export const es: Record<string, string> = {
   'Edit: move pins, corners and shapes (Del removes the selected shape)': 'Editar: mover pines, esquinas y figuras (Supr borra la figura seleccionada)',
   'Pin (on the grid)': 'Pin (en la grilla)',
   'drag the pins, the corners and the shapes': 'arrastrá los pines, las esquinas y las figuras',
+  'Parameters as shown on each instance: drag to move them': 'Parámetros como se ven en cada instancia: arrastralos para moverlos',
   'click to place the pin of {port}': 'click para poner el pin de {port}',
   'click to place a pin for a new port': 'click para poner un pin de un puerto nuevo',
   'drag to draw': 'arrastrá para dibujar',

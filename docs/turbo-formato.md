@@ -160,6 +160,9 @@ deshacer (§5).
   (`UserFile`, IndexedDB) → librería de TurboSpice.
 - Si al importar llega un archivo con el mismo nombre y **otro contenido**, se pregunta qué hacer:
   reemplazar, mantener el existente o renombrar el nuevo.
+- En el `.asy` BLOCK de un subcircuito, los parámetros van en `SYMATTR SpiceLine` y su rótulo en
+  `WINDOW 39 x y Top 2` (formato estándar de LTspice, sin campos nuevos). El Editor de subcircuitos
+  lo dibuja como en la instancia y permite moverlo; las instancias nuevas usan esa posición.
 
 ## 5. Deshacer
 - Una pila de deshacer **por simulación** (y otra para la base de la variante). Al cambiar de

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPin, addShape, removeShape, setShape, symPins, symShapes } from '../../src/project/symbolEdit.ts';
+import { addPin, addShape, moveParamWindow, removeShape, resizeBody, setShape, setSymParams, symParamWindow, symPins, symShapes } from '../../src/project/symbolEdit.ts';
 import { addFlag, setFlagName } from '../../src/schematic/edit.ts';
 import { emptyDoc } from '../../src/asc/model.ts';
 
@@ -33,5 +33,19 @@ describe('dibujo del símbolo del subcircuito', () => {
     expect(d.flags[0].ioPin).toBeUndefined();
     d = setFlagName(d, 0, 'b', 'Out');
     expect(d.flags[0].ioPin).toBe('Out');
+  });
+});
+
+describe('rótulo de los parámetros del símbolo (WINDOW 39)', () => {
+  it('se mueve, se conserva al cambiar parámetros y no sigue al cuerpo si se lo movió', () => {
+    let s = setSymParams(asy, [['G', '1']]);
+    expect(symParamWindow(s)).toEqual({ x: 0, y: 56, align: 'Top', size: 2 });
+    // sin mover, sigue al cuerpo
+    expect(symParamWindow(resizeBody(s, { x1: -48, y1: -32, x2: 48, y2: 64 }))?.y).toBe(88);
+    s = moveParamWindow(s, 64, -48);
+    expect(symParamWindow(s)).toEqual({ x: 64, y: -48, align: 'Top', size: 2 });
+    s = setSymParams(s, [['G', '2'], ['R', '1k']]);
+    expect(symParamWindow(s)).toMatchObject({ x: 64, y: -48 });
+    expect(symParamWindow(resizeBody(s, { x1: -48, y1: -32, x2: 48, y2: 64 }))).toMatchObject({ x: 64, y: -48 });
   });
 });

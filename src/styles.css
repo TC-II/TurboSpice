@@ -553,7 +553,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .appbar-right { margin-left: auto; }
 /* el nombre del archivo, centrado en la barra; tema y compartir pegados al usuario */
 .appbar-right .filename { position: absolute; left: 50%; transform: translateX(-50%); margin-left: 0; }
-.appbar-right + .account-col { margin-left: -10px; }
+.appbar-right + .account { margin-left: -10px; }
 /* sin lugar para centrarlo: va junto al tema */
 @media (max-width: 1000px) { .appbar-right .filename { position: static; transform: none; } }
 .app-menu-btn { display: inline-flex; padding: 4px; border-color: transparent; background: transparent; border-radius: 6px; }
@@ -586,10 +586,9 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 /* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
    del grupo que el separador de la barra de la simulación) */
 .iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }
-/* estado de la simulación elegida (bajo el usuario): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
-.account-col { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
-.account-col .account { margin-left: 0; }
-.sim-state { flex: none; box-sizing: border-box; width: 14px; height: 14px; margin: 0; border-radius: 50%; border: 2px solid var(--border); background: transparent; }
+/* estado de la simulación elegida (a la derecha de la barra de la simulación, bajo el avatar): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
+.sim-state-slot { flex: none; margin: 0 4px 0 auto; width: 30px; display: flex; justify-content: center; align-items: center; }
+.iconbar .sim-state, .sim-state { flex: none; overflow: visible; box-sizing: border-box; width: 16px; height: 16px; margin: 0; border-radius: 50%; border: 2.5px solid var(--border); background: transparent; }
 .sim-state.running { border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: sim-spin 0.8s linear infinite; }
 .sim-state.ok { border-color: var(--ok); }
 .sim-state.err { border-color: var(--err); }

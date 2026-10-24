@@ -196,7 +196,13 @@ export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMo
               </select>
             </label>
             {ELECTRICAL.map((p) => (
-              <ParamField key={p.name} label={p.label} unit={p.unit} name={p.name} value={values.get(p.name) ?? p.value} onChange={(v) => setParam(p.name, v)} />
+              <ParamField
+                key={p.name}
+                // en comportamiento no hay compuertas: tpd es un retardo más de cada salida (#209)
+                label={beh && p.name === 'tpd' ? t('Extra output delay (tpd)') : p.label}
+                help={beh && p.name === 'tpd' ? t('Added to every output, on top of the # delays of the code. Usually 0 or small.') : undefined}
+                unit={p.unit}
+                name={p.name} value={values.get(p.name) ?? p.value} onChange={(v) => setParam(p.name, v)} />
             ))}
             <p className="hint">{t('VIL above VIH gives hysteresis (Schmitt trigger). Values may depend on vcc: {vcc/2}.')}</p>
           </section>
@@ -221,12 +227,12 @@ export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMo
   );
 }
 
-function ParamField({ label, unit, name, value, onChange }: { label: string; unit: string; name: string; value: string; onChange(v: string): void }) {
+function ParamField({ label, help, unit, name, value, onChange }: { label: string; help?: string; unit: string; name: string; value: string; onChange(v: string): void }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   const commit = () => v.trim() && v.trim() !== value && onChange(v.trim());
   return (
-    <label className="vm-field" title={name}>
+    <label className="vm-field" title={help ?? name}>
       <span>
         {label} <code>{name}</code>
       </span>

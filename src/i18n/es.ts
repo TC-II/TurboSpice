@@ -1712,6 +1712,8 @@ export const es: Record<string, string> = {
   'subcir': 'subcir',
   'New Verilog module': 'Módulo Verilog nuevo',
   'Verilog Editor': 'Editor Verilog',
+  'Extra output delay (tpd)': 'Retardo extra de las salidas (tpd)',
+  'Added to every output, on top of the # delays of the code. Usually 0 or small.': 'Se suma a cada salida, además de los retardos # del código. Normalmente 0 o chico.',
   '{n}-bit bus': 'bus de {n} bits',
   'Bidirectional (inout)': 'Bidireccionales (inout)',
   'Outputs': 'Salidas',

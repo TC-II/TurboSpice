@@ -142,7 +142,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, control, onStudio, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, onStudio, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -160,6 +160,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   running: boolean;
   /** elegir una red o una fuente haciendo click en el esquemático */
   picker: Picker;
+  /** deja de elegir en el esquemático (el foco pasó a otro control) */
+  onPickCancel?(): void;
   /** texto del bloque .control si la simulación es Complex (#241) */
   control?: string;
   /** abrir el Studio */
@@ -185,6 +187,9 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     }
   };
   const change = (a: Analysis) => (setDraft(a), apply(a));
+  // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
+  const pick = (f: Extract<BarField, { kind: 'text' }>) =>
+    picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
   const rows = sim && draft && control === undefined ? barRows(draft) : [];
 
   // el indicador de estado vive bajo el widget del usuario (#213)
@@ -256,7 +261,14 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                       size={f.width ?? 7}
                       list={f.list && `bar-${f.list}`}
                       onChange={(e) => setDraft(f.set(e.target.value.trim()))}
-                      onBlur={() => apply()}
+                      // con el cursor en un campo de red o fuente se elige en el esquemático: un clic
+                      // ahí completa el campo, y también se puede escribir
+                      onFocus={() => f.list && pick(f)}
+                      onBlur={(e) => {
+                        apply();
+                        // el foco se fue a otro control (al hacer clic en el esquemático no hay otro)
+                        if (f.list && e.relatedTarget) onPickCancel?.();
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') apply();
                         if (e.key === 'Escape') setDraft(parseAnalysis(line));
@@ -271,8 +283,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                         aria-label={t('Pick {label} on the schematic', { label: f.label })}
                         onClick={(e) => {
                           e.preventDefault();
-                          // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
-                          picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
+                          pick(f);
                         }}
                       >
                         ⌖

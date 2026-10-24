@@ -851,12 +851,12 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .parts-table tr.empty td { color: var(--fg-muted); font-family: inherit; font-weight: 400; cursor: default; padding: 10px 8px; }
 
 /* ---------- Confirmación deslizando (#150, #151) ---------- */
-.slide-confirm { position: relative; height: 40px; margin: 12px 0 4px; border-radius: 999px; background: linear-gradient(90deg, color-mix(in srgb, var(--err) 35%, var(--bg-alt)) var(--slide), var(--bg-alt) var(--slide)); border: 1px solid var(--border); }
+.slide-confirm { --knob: 40px; position: relative; height: var(--knob); margin: 12px 0 4px; border-radius: 999px; overflow: hidden; background: linear-gradient(90deg, color-mix(in srgb, var(--err) 35%, var(--bg-alt)) calc((100% - var(--knob)) * var(--slide-f, 0) + var(--knob) / 2), var(--bg-alt) 0); box-shadow: inset 0 0 0 1px var(--border); }
 .slide-confirm .slide-label { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); font-size: 13px; pointer-events: none; }
-.slide-confirm input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; appearance: none; background: transparent; cursor: grab; }
-.slide-confirm input::-webkit-slider-thumb { appearance: none; width: 40px; height: 40px; border-radius: 50%; background: var(--err); box-shadow: 0 1px 4px rgb(0 0 0 / 30%); }
-.slide-confirm input::-moz-range-thumb { width: 40px; height: 40px; border: 0; border-radius: 50%; background: var(--err); }
-.slide-confirm input:focus-visible { outline: 2px solid var(--accent); border-radius: 999px; }
+.slide-confirm .slide-knob { position: absolute; top: 0; left: calc((100% - var(--knob)) * var(--slide-f, 0)); width: var(--knob); height: var(--knob); border-radius: 50%; background: var(--err); box-shadow: 0 1px 4px rgb(0 0 0 / 30%); cursor: grab; touch-action: none; transition: left .2s ease; }
+.slide-confirm.dragging .slide-knob { transition: none; cursor: grabbing; }
+.slide-confirm input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.slide-confirm:has(input:focus-visible) .slide-knob { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ---------- Ítems con acciones y renombrar con doble clic (#150, #151) ---------- */
 .menu-item.with-actions { display: flex; align-items: center; }

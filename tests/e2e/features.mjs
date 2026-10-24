@@ -723,7 +723,7 @@ await page.keyboard.press('Control+z');
 // valores amigables: 4k7
 await page.mouse.dblclick(r1.x, r1.y);
 await page.locator('.modal label.attr-row input:not([type=checkbox])').nth(1).fill('4k7');
-check((await page.locator('.modal .attrs small').textContent()) === '= 4.7kΩ', 'el diálogo interpreta 4k7');
+check((await page.locator('.modal .attrs small').textContent()) === '4.7kΩ', 'el diálogo interpreta 4k7');
 await page.keyboard.press('Enter');
 check((await page.locator('svg.editor .sym text.win', { hasText: '4.7k' }).count()) === 1, 'y lo guarda como 4.7k (compatible con LTspice)');
 

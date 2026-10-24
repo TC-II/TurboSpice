@@ -37,14 +37,14 @@ await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el p
 // --- #38: barra de herramientas y menú colapsado ---
 check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
 await page.keyboard.press('ArrowRight');
 check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
 await page.keyboard.press('Escape');
 check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  toolbarNames.slice(0, 17).join() === 'Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Mover,Arrastrar' && toolbarNames.includes('Borrar'),
+  toolbarNames.slice(0, 18).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Mover,Arrastrar' && toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');

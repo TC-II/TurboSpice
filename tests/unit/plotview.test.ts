@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { siFixed } from '../../src/waveform/series.ts';
-import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
+import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
 import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
@@ -53,6 +53,29 @@ describe('medidas', () => {
 
   it('CSV', () => {
     expect(toCsv('time', [0, 1], [{ name: 'V(a,b)', ys: [1, null] }])).toBe('time,"V(a,b)"\n0,1\n1,\n');
+  });
+});
+
+describe('diferencia de cursores (B − A, #246)', () => {
+  it('dx, dy y pendiente son B menos A', () => {
+    // A en (1, 2), B en (3, 8): dx = 2, dy = 6, pendiente = 3
+    const d = cursorDiff(1, 3, 2, 8);
+    expect(d.dx).toBe(2);
+    expect(d.dy).toBe(6);
+    expect(d.slope).toBe(3);
+  });
+
+  it('la frecuencia es 1/|B−A| (no depende del orden)', () => {
+    expect(cursorDiff(0, 0.5, 0, 0).freq).toBeCloseTo(2, 12);
+    expect(cursorDiff(0.5, 0, 0, 0).freq).toBeCloseTo(2, 12);
+  });
+
+  it('invertir A y B cambia el signo de dx, dy y la pendiente se mantiene', () => {
+    const ab = cursorDiff(1, 3, 2, 8);
+    const ba = cursorDiff(3, 1, 8, 2);
+    expect(ba.dx).toBe(-ab.dx);
+    expect(ba.dy).toBe(-ab.dy);
+    expect(ba.slope).toBe(ab.slope);
   });
 });
 

@@ -452,7 +452,7 @@ await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2);
 await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
 const dxRow = await page.locator('.readout tr.dx').textContent();
-check(/Trace|Traza/.test(head) && /A − B/.test(head) && !/\(/.test(head) && /Hz/.test(dxRow), `cursores A y B con Δ y 1/Δ en la fila del tiempo (${head} | ${dxRow})`);
+check(/Trace|Traza/.test(head) && /B − A/.test(head) && !/\(/.test(head) && /Hz/.test(dxRow), `cursores A y B con Δ y 1/Δ en la fila del tiempo (${head} | ${dxRow})`);
 await page.screenshot({ path: `${OUT}/plot-panel.png` });
 // #30: el gráfico no se recrea por estado ajeno a los datos (marca en el canvas de uPlot)
 const canvas = page.locator('.pane-chart canvas').first();

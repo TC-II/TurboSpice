@@ -3086,7 +3086,16 @@ ${ltNetlistText(sim.built.lt)}
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
-          {curSub && <div className="sub-hint">{t('{name}: draw the circuit between the ports (net labels with a port, N)', { name: curSub })}</div>}
+          {curSub && (
+            <div className="sub-hint" role="status">
+              <strong>{t('Subcircuit Editor')}</strong>
+              <span className="sub-hint-name">{curSub}</span>
+              <span className="sub-hint-text">{t('draw the circuit between the ports (net labels with a port, N)')}</span>
+              <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
+                {t('Return')}
+              </button>
+            </div>
+          )}
           {treeShown && (
             <ProjectTree
               project={project.name}

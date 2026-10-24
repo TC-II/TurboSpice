@@ -1579,4 +1579,11 @@ export const es: Record<string, string> = {
   'Remove the selected shape': 'Borrar la figura seleccionada',
   'Remove the selected shape (Del)': 'Borrar la figura seleccionada (Supr)',
   'Name of the new port': 'Nombre del puerto nuevo',
+  'Subcircuit Editor': 'Editor de subcircuito',
+  'draw the circuit between the ports (net labels with a port, N)': 'dibujá el circuito entre los puertos (etiquetas de red con puerto, N)',
+  'Return': 'Volver',
+  'Back to the testbench (Alt+↑ goes up one level)': 'Volver al testbench (Alt+↑ sube un nivel)',
+  'Fit the symbol to the view (wheel: zoom, middle or right button: pan)': 'Encuadrar el símbolo (rueda: zoom, botón del medio o derecho: desplazar)',
+  'Undo (Ctrl+Z)': 'Deshacer (Ctrl+Z)',
+  'Delete the selected shape (Del)': 'Borrar la figura seleccionada (Supr)',
 };

@@ -6,6 +6,7 @@ import { applyVariants, renameSubckt, withSubckts } from '../../src/hdl/variants
 import { busNames, busRange, formatRadix, joinBits } from '../../src/waveform/digital.ts';
 import { addTraceTo } from '../../src/waveform/view.ts';
 import { newProject } from '../../src/project/turbo.ts';
+import { portsOf } from '../../src/hdl/VerilogModule.tsx';
 
 // Netlist de Yosys de: module m #(parameter W = 2) (input [1:0] a, input clk, output y, output reg q);
 //   assign y = a[1] & a[0]; always @(posedge clk) q <= y;
@@ -141,5 +142,26 @@ describe('señales digitales en el visor (#209)', () => {
     expect(panes[0].traces.map((t) => t.expr)).toEqual(['V(out)', 'V(in)']);
     // un panel vacío toma el tipo de la primera traza
     expect(addTraceTo([{ traces: [] }], 0, 'Dig(a)')[0].digital).toBe(true);
+  });
+});
+
+describe('pines en la vista del módulo (#209)', () => {
+  it('los bits de un bus se muestran juntos', () => {
+    const pins = [
+      { name: 'clk', dir: 'in' as const },
+      { name: 'a_1', dir: 'in' as const },
+      { name: 'a_0', dir: 'in' as const },
+      { name: 'q_3', dir: 'out' as const },
+      { name: 'q_2', dir: 'out' as const },
+      { name: 'q_1', dir: 'out' as const },
+      { name: 'q_0', dir: 'out' as const },
+      { name: 'x_0', dir: 'out' as const },
+    ];
+    expect(portsOf(pins)).toEqual([
+      { name: 'clk', dir: 'in', bits: 1 },
+      { name: 'a[1:0]', dir: 'in', bits: 2 },
+      { name: 'q[3:0]', dir: 'out', bits: 4 },
+      { name: 'x_0', dir: 'out', bits: 1 },
+    ]);
   });
 });

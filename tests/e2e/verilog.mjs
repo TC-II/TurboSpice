@@ -100,7 +100,7 @@ check((await page.locator('.verilog-module strong').textContent()) === 'div4.v',
 await code.fill(VERILOG);
 await synthesize();
 check((await status()) === 'Sintetizado', `sintetiza con Yosys (${await status()})`);
-check((await page.locator('.vm-pins').textContent()).includes('q_1'), `muestra los pines (${await page.locator('.vm-pins').textContent()})`);
+check((await page.locator('.vm-pins').textContent()).includes('q[1:0]'), `muestra los pines con el bus junto (${await page.locator('.vm-pins').textContent()})`);
 check((await page.locator('.project-tree .tree-kind.verilog').count()) >= 1, 'aparece en el panel como módulo Verilog');
 // interfaz eléctrica: una familia lógica cambia los parámetros del símbolo
 await page.getByRole('combobox', { name: 'Familia lógica' }).selectOption({ label: '74HC (CMOS 5 V)' });

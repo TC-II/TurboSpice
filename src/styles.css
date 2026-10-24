@@ -1214,7 +1214,11 @@ button.hier-tab { padding-right: 10px; }
 .vm-side h4 { margin: 4px 0; font-size: 13px; }
 .vm-side .err { color: var(--err); white-space: pre-wrap; margin: 0; }
 .vm-side pre.log { max-height: 200px; border: 1px solid var(--border); border-radius: 6px; }
-.vm-pins { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; font-family: var(--mono); font-size: 12px; }
+.vm-pins { display: grid; gap: 4px; margin: 0; font-size: 12px; }
+.vm-pins > div { display: grid; grid-template-columns: 8.5em 1fr; gap: 8px; align-items: baseline; }
+.vm-pins dt { color: var(--fg-muted); }
+.vm-pins dd { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.vm-pins code { font-family: var(--mono); }
 .vm-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; }
 .vm-field code { color: var(--fg-muted); font-size: 11px; }
 .vm-input { display: flex; align-items: center; gap: 4px; }

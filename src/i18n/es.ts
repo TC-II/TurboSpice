@@ -1712,6 +1712,10 @@ export const es: Record<string, string> = {
   'subcir': 'subcir',
   'New Verilog module': 'Módulo Verilog nuevo',
   'Verilog Editor': 'Editor Verilog',
+  '{n}-bit bus': 'bus de {n} bits',
+  'Bidirectional (inout)': 'Bidireccionales (inout)',
+  'Outputs': 'Salidas',
+  'Inputs': 'Entradas',
   'write the module; its ports are the pins of the symbol': 'escribí el módulo; sus puertos son los pines del símbolo',
   'None yet: create one with «+ New» or import it.': 'Todavía no hay: creá uno con «+ Nuevo» o importalo.',
   // descripción completa de la simulación y errores de polos y ceros

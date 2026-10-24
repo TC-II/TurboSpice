@@ -10,7 +10,7 @@ import type { Resolver } from './expr.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { boxAxes, extent, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
-import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
+import { cursorForClick, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -250,7 +250,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button
         className={cursorMode ? 'active' : ''}
         onClick={() => setCursorMode((v) => !v)}
-        title={t('Cursors: click = cursor A, Shift+click or right-click = cursor B; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)')}
+        title={t('Cursors: first click = cursor A, second = cursor B, then a click moves the nearest one; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)')}
       >
         {t('Cursors')}
       </button>
@@ -361,7 +361,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             <section className="readout-card" aria-label={t('Cursors')}>
               <h4>{t('Cursors')}</h4>
               <CursorTable data={data} cursors={previewX !== undefined ? { ...cursors, a: previewX } : cursors} preview={unplaced} setCursors={setCursors} />
-              {unplaced && <p className="hint">{t('Click on the plot to set cursor A; Shift+click or right-click for B. Drag the lines to move them.')}</p>}
+              {unplaced && <p className="hint">{t('Click on the plot to set cursor A, then click again for B. Drag the lines to move them.')}</p>}
             </section>
           )}
           {showStats && allVisible.length > 0 && (
@@ -686,7 +686,8 @@ function PaneView(props: {
       e.preventDefault();
       el.focus({ preventScroll: true });
       const grab = grabbed(e);
-      dragging = grab ?? (e.button === 2 || e.shiftKey ? 'b' : 'a');
+      const px = posX(e);
+      dragging = grab ?? cursorForClick(cursorsRef.current, valX(e), e.button === 2 || e.shiftKey, (v) => Math.abs(u.valToPos(v, 'x') - px));
       root.setPointerCapture(e.pointerId);
       live.current.onCursor(grab ? { sel: grab } : { [dragging]: valX(e), sel: dragging });
     };
@@ -911,7 +912,7 @@ function PaneView(props: {
 
 function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[]; cursors: Cursors; preview?: boolean; setCursors(f: (c: Cursors) => Cursors): void }) {
   const { a, b } = cursors;
-  const dx = a !== undefined && b !== undefined ? b - a : NaN;
+  const dx = a !== undefined && b !== undefined ? a - b : NaN;
   const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
   const labels = [...new Set(data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => c.label)))];
   const xu = xUnit(data[0]?.xName);
@@ -944,9 +945,9 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
         <thead>
           <tr>
             <th>{t('Trace')}</th>
-            <th className={preview ? 'preview' : undefined} title={preview ? t('Follows the mouse: click to fix it') : undefined}>A ({fix(a ?? NaN, xu)})</th>
-            <th>B ({fix(b ?? NaN, xu)})</th>
-            <th>B − A</th>
+            <th>A</th>
+            <th>B</th>
+            <th>A − B</th>
             <th>{t('slope')}</th>
           </tr>
         </thead>
@@ -960,16 +961,17 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
                 <td style={{ color: c.color }}>{c.label}</td>
                 <td>{fix(ya)}</td>
                 <td>{fix(yb)}</td>
-                <td>{fix(yb - ya)}</td>
-                <td>{fix((yb - ya) / dx)}</td>
+                <td>{fix(ya - yb)}</td>
+                <td>{fix((ya - yb) / dx)}</td>
               </tr>
             );
           })}
           <tr className="dx">
             <td>{data[0]?.xName}</td>
-            <td colSpan={2} />
-            <td>Δx = {fix(dx, xu)}</td>
-            <td>1/Δx = {fix(1 / dx, xu === 's' ? 'Hz' : '')}</td>
+            <td className={preview ? 'xa preview' : 'xa'} title={preview ? t('Follows the mouse: click to fix it') : undefined}>{fix(a ?? NaN, xu)}</td>
+            <td className="xb">{fix(b ?? NaN, xu)}</td>
+            <td className="xd">{fix(dx, xu)}</td>
+            <td className="xf">{fix(1 / Math.abs(dx), xu === 's' ? 'Hz' : '')}</td>
           </tr>
         </tbody>
       </table>

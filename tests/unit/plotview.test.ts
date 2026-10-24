@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { siFixed } from '../../src/waveform/series.ts';
 import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
-import { addTraceTo, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
+import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
   it('seno: pico a pico, eficaz, frecuencia', () => {
@@ -23,6 +23,17 @@ describe('medidas', () => {
     expect(bw.high).toBeGreaterThan(990);
     expect(bw.high).toBeLessThan(1010);
     expect(bw.low).toBeNaN();
+  });
+
+  it('cursores: el primer click pone A, el segundo B y después se mueve el más cercano (#234)', () => {
+    expect(cursorForClick({}, 3)).toBe('a');
+    expect(cursorForClick({ a: 3 }, 5)).toBe('b');
+    expect(cursorForClick({ b: 5 }, 1)).toBe('a');
+    expect(cursorForClick({ a: 3, b: 5 }, 4.5)).toBe('b');
+    expect(cursorForClick({ a: 3, b: 5 }, 1)).toBe('a');
+    expect(cursorForClick({ a: 3, b: 5 }, 9)).toBe('b');
+    expect(cursorForClick({}, 1, true)).toBe('b');
+    expect(cursorForClick({ a: 3, b: 5 }, 9, false, (v) => (v === 3 ? 0 : 1))).toBe('a');
   });
 
   it('cursores: punto más cercano y paso a paso', () => {

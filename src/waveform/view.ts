@@ -30,6 +30,16 @@ export interface Cursors {
   sel?: CursorKey;
 }
 
+/** Cursor que ubica un click fuera de las líneas (#234): el primero pone A, el segundo B y
+ *  los siguientes mueven el más cercano. `toB` (Shift o click derecho) fuerza el B.
+ *  `dist` mide la distancia en el gráfico (en px, para que valga también en escala log). */
+export function cursorForClick(c: Cursors, x: number, toB = false, dist: (v: number) => number = (v) => Math.abs(v - x)): CursorKey {
+  if (toB) return 'b';
+  if (c.a === undefined) return 'a';
+  if (c.b === undefined) return 'b';
+  return dist(c.b) < dist(c.a) ? 'b' : 'a';
+}
+
 /** Estado del visor que no son las trazas: zoom y cursores (vale para un eje X) */
 export interface PlotState {
   /** nombre del eje X ("time", "frequency"…) en el que valen el zoom y los cursores */

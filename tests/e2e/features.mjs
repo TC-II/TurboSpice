@@ -750,9 +750,9 @@ await page.mouse.click(free2.x, free2.y);
 await page.keyboard.press('Escape');
 await page.getByRole('button', { name: 'Correr' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
+await resultsMenu(page, /^Errores/);
 const prob = page.locator('.problems li', { hasText: 'R2 no tiene valor asignado' });
-check((await prob.count()) === 1, 'Problemas lista el componente sin valor');
+check((await prob.count()) === 1, 'Errores lista el componente sin valor');
 await prob.getByRole('button', { name: 'ver en el esquemático' }).click();
 check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'y el link lo selecciona en el esquemático');
 

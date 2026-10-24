@@ -92,21 +92,21 @@ check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
 
-// --- #197: un .control a mano con su propio análisis lo avisa en Problemas ---
+// --- #197: un .control a mano con su propio análisis lo avisa en Errores ---
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('tran 1u 1m\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
+await resultsMenu(page, /^Errores/);
 const own = await page.locator('.problems li', { hasText: 'corre su propio análisis (tran)' }).count();
-check(own === 1, 'Problemas avisa que el .control corre su propio análisis, no la configuración');
+check(own === 1, 'Errores avisa que el .control corre su propio análisis, no la configuración');
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('print v(out)\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
+await resultsMenu(page, /^Errores/);
 const none = await page.locator('.problems li', { hasText: 'no se simula nada' }).count();
 check(none === 1, 'y que un .control sin run ni análisis no simula nada');
 

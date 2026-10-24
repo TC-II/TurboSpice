@@ -258,7 +258,7 @@ const userFileKind = (name: string): UserFile['kind'] | null =>
 let clipboardFallback = '';
 
 /** Nombre de cada vista del panel de resultados (en el botón Resultados) */
-const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Problems'), meas: t('Measurements') };
+const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Errors'), meas: t('Measurements') };
 
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
@@ -1212,7 +1212,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
             : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
           : built.warnings.length
-            ? t('{p0} — see the Problems tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
+            ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
             : undefined,
       );
       if (result.plots.length) {
@@ -2838,7 +2838,7 @@ ${ltNetlistText(sim.built.lt)}
         'sep',
         { label: 'Netlist', checked: panel === 'netlist', onClick: () => setPanel('netlist') },
         ...(sim.meas ? [{ label: t('Measurements ({length})', { length: sim.meas.names.length }), checked: panel === 'meas', onClick: () => setPanel('meas') }] : []),
-        { label: t('Problems{p0}', { p0: problems.length ? ` (${problems.length})` : '' }), checked: panel === 'problems', onClick: () => setPanel('problems') },
+        { label: t('Errors{p0}', { p0: problems.length ? ` (${problems.length})` : '' }), checked: panel === 'problems', onClick: () => setPanel('problems') },
         { label: 'Log', shortcut: 'Ctrl+L', checked: panel === 'log', onClick: () => setPanel('log') },
       ];
 

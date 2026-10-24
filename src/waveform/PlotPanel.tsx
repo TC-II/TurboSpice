@@ -8,11 +8,12 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { boxAxes, extent, panBy, zoomAbout } from './scales.ts';
+import { extent, panBy, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { Icon } from '../ui/icons.tsx';
+import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
@@ -77,8 +78,6 @@ type Range = [number, number];
 const GRAB = 6;
 // px que tiene que moverse el botón derecho para panear en vez de hacer clic
 const PAN_SLOP = 4;
-/** px que debe moverse un arrastre en el eje menos movido para contar como recuadro en X e Y */
-const DRAG_UNI = 20;
 
 const MAX_ROWS = 16;
 
@@ -217,6 +216,40 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     return () => window.removeEventListener('keydown', onKey, true);
   }, [fftPicking]);
   const isF = (i: number) => isFftPane(panes[i]);
+  /** cursores activos, con el A en el medio de lo que se ve si no estaba */
+  const startCursors = (extra: Cursors = {}) => {
+    setCursorMode(true);
+    const d = data.find((x, k) => x.x.length && !isF(k));
+    if (cursors.a !== undefined || !d) return setCursors({ ...cursors, ...extra });
+    const [lo, hi] = xRange ?? [d.x[0], d.x[d.x.length - 1]];
+    setCursors({ ...cursors, a: d.log ? Math.sqrt(lo * hi) : (lo + hi) / 2, ...extra });
+  };
+  /** lo que el menú del botón derecho de una traza agrega a lo propio del panel */
+  const traceActions = (i: number, ti: number): ContextItem[] => {
+    const tt = panes[i]?.traces[ti];
+    if (!tt) return [];
+    const items: ContextItem[] = [];
+    if (isTran && !isF(i)) items.push({ label: t('FFT of this trace'), onClick: () => (setFftOpen(true), addFft(tt.expr)) });
+    const label = data[i]?.curves.find((c) => c.trace === ti)?.label;
+    if (label !== undefined)
+      for (const [k, name] of [['ta', 'A'], ['tb', 'B']] as const)
+        items.push({
+          label: t('Cursor {name} on this trace', { name }),
+          onClick: () => (isF(i) ? (setCursorMode(true), setFCursors((c) => ({ ...c, [k]: label }))) : startCursors({ [k]: label })),
+        });
+    panes.forEach((p, j) => {
+      if (j !== i && acceptsTrace(p, tt) && !p.traces.some((o) => sameTrace(o, tt))) items.push({ label: t('Move to pane {n}', { n: j + 1 }), onClick: () => moveTrace(i, ti, j) });
+    });
+    if (panes[i].traces.length > 1)
+      items.push({
+        label: t('Move to a new pane'),
+        onClick: () => {
+          setPanes([...panes.map((p, k) => (k === i ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : p)), { traces: [tt] }]);
+          setActive(panes.length);
+        },
+      });
+    return items;
+  };
 
   useImperativeHandle(handle, () => ({
     csv: () => {
@@ -279,13 +312,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         case 'removeTraces':
           setZoomMode(false);
           return setRemoving(true);
-        case 'cursor': {
-          setCursorMode(true);
-          const d = data.find((x) => x.x.length);
-          if (cursors.a !== undefined || !d) return;
-          const [lo, hi] = xRange ?? [d.x[0], d.x[d.x.length - 1]];
-          return setCursors({ ...cursors, a: d.log ? Math.sqrt(lo * hi) : (lo + hi) / 2 });
-        }
+        case 'cursor':
+          return startCursors();
         case 'clearCursors':
           setFCursors({});
           setCursors({});
@@ -338,8 +366,9 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         <button
           className={fftOpen ? 'active' : ''}
           onClick={() => {
-            setFftOpen((v) => !v);
-            setFftPicking(false);
+            // al abrirla ya se elige la traza (⌖)
+            setFftOpen(!fftOpen);
+            setFftPicking(!fftOpen);
           }}
           title={t('Spectrum (FFT) and harmonic distortion of a trace')}
         >
@@ -429,6 +458,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             removing={removing}
             onPickTrace={fftPicking && !isF(i) ? addFft : undefined}
             labelOf={(tt) => traceLabel(tt, allTraces)}
+            traceActions={(ti) => traceActions(i, ti)}
             showGrid={showGrid}
             cursorMode={cursorMode}
             cursors={isF(i) ? fCursors : cursors}
@@ -494,12 +524,14 @@ function PaneView(props: {
   /** eje derecho (corrientes o fase) fijo por la rueda sobre él; null = todo el rango */
   rRange: Range | null;
   onWheelR(r: Range): void;
-  /** recuadro arrastrado: null en el eje que no se acerca (arrastre casi horizontal o vertical) */
-  onBoxZoom(x: Range | null, y: Range | null): void;
+  /** recuadro arrastrado */
+  onBoxZoom(x: Range, y: Range): void;
   zoomMode: boolean;
   removing: boolean;
   /** nombre de la traza en la leyenda (FFT(…), #260) */
   labelOf(tt: Trace): string;
+  /** acciones de la traza para su menú del botón derecho (FFT, cursores, mover de panel) */
+  traceActions(ti: number): ContextItem[];
   /** modo ⌖ de la FFT: un click en la cápsula elige la traza */
   onPickTrace?(expr: string): void;
   showGrid: boolean;
@@ -537,6 +569,9 @@ function PaneView(props: {
   const pressed = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  // menú del botón derecho sobre una traza de la leyenda
+  const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number } | null>(null);
+  const colorInputs = useRef(new Map<number, HTMLInputElement>());
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
   // la grilla del tema oscuro queda sobre el fondo claro)
   const [scheme, setScheme] = useState(0);
@@ -568,7 +603,7 @@ function PaneView(props: {
     const rightScale = data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i';
     const rightUnit = rightScale === 'ph' ? '°' : data.iUnit;
     /** eje bajo el mouse (la rueda acerca ése): se resalta para que se sepa cuál es */
-    let axisHover: 'left' | 'right' | null = null;
+    let axisHover: 'left' | 'right' | 'bottom' | null = null;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
     // Y sin zoom fijado: el rango de todos los datos (no el de lo visible), así el zoom en X no
     // cambia la escala de amplitud (#200); Ctrl+Y la ajusta a lo visible
@@ -583,6 +618,12 @@ function PaneView(props: {
       const e = fullY(scale);
       return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
     };
+    // X sin zoom: todo, o hasta donde llegan todas las FFT (con zoom out se ve el resto)
+    const x0 = data.x[0];
+    const x1 = data.x[data.x.length - 1];
+    const home = data.home ?? [x0, x1];
+    /** rango de X pedido por la rueda o el paneo, dentro de los datos (null: sin zoom) */
+    const toX = (lo: number, hi: number): Range | null => (!data.home && lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     let raf = 0;
     const stepped = uPlot.paths.stepped!({ align: 1 });
     const opts: uPlot.Options = {
@@ -590,7 +631,7 @@ function PaneView(props: {
       height: Math.max(80, el.clientHeight),
       legend: { show: false },
       scales: {
-        x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : {}) },
+        x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}) },
         y: { range: (u, min, max) => yRef.current ?? whole('y')(u, min, max, 'y') },
         i: { range: (u, min, max) => rRef.current ?? whole('i')(u, min, max, 'i') },
         ph: { range: (u, min, max) => rRef.current ?? whole('ph')(u, min, max, 'ph') },
@@ -623,12 +664,9 @@ function PaneView(props: {
       ],
       cursor: {
         sync: { key: props.syncKey },
-        // con los cursores activos no hay zoom por arrastre; Z: recuadro en X e Y (lo aplica setSelect).
-        // Se cambia en vivo, sin recrear el gráfico.
-        // Arrastrar = recuadro en X e Y (lo aplica setSelect); casi horizontal o casi vertical (menos de
-        // `uni` px en el otro eje) = zoom sólo en X o sólo en Y. Con los cursores activos no hay zoom
-        // por arrastre (Z lo fuerza). Se cambia en vivo, sin recrear el gráfico.
-        drag: live.current.zoomMode ? { x: true, y: true, setScale: false } : { x: !live.current.cursorMode, y: !live.current.cursorMode, uni: DRAG_UNI, setScale: false },
+        // Arrastrar = siempre el recuadro entre los dos puntos, en X e Y (lo aplica setSelect). Con los
+        // cursores activos no hay zoom por arrastre (Z lo fuerza). Se cambia en vivo, sin recrear el gráfico.
+        drag: { x: live.current.zoomMode || !live.current.cursorMode, y: live.current.zoomMode || !live.current.cursorMode, setScale: false },
         points: { size: 6 },
         bind: {
           // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
@@ -645,14 +683,12 @@ function PaneView(props: {
             // (los demás paneles reciben el mismo arrastre por la sincronización: lo aplica sólo el que lo empezó)
             if (!pressed.current) return;
             const s = u.select;
-            const ax = live.current.zoomMode ? { x: s.width >= 4, y: s.height >= 4 } : boxAxes(s, u.over.clientWidth, u.over.clientHeight);
-            if (!ax.x && !ax.y) return;
-            // (con el zoom forzado por Z hacen falta los dos ejes, como siempre)
-            if (live.current.zoomMode && !(ax.x && ax.y)) return;
+            // (un click o un recuadro de menos de 4 px de lado no hace nada)
+            if (s.width < 4 || s.height < 4) return;
             const x: Range = [u.posToVal(s.left, 'x'), u.posToVal(s.left + s.width, 'x')];
             const y: Range = [u.posToVal(s.top + s.height, 'y'), u.posToVal(s.top, 'y')];
             u.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false);
-            live.current.onBoxZoom(ax.x ? x : null, ax.y ? y : null);
+            live.current.onBoxZoom(x, y);
           },
         ],
         setCursor: [
@@ -690,6 +726,7 @@ function PaneView(props: {
               ctx.fillStyle = fg;
               ctx.globalAlpha = 0.08;
               if (axisHover === 'left') ctx.fillRect(0, top, left, height);
+              else if (axisHover === 'bottom') ctx.fillRect(left, top + height, width, u.ctx.canvas.height - top - height);
               else ctx.fillRect(left + width, top, u.ctx.canvas.width - left - width, height);
               ctx.restore();
             }
@@ -835,11 +872,9 @@ function PaneView(props: {
       pan.moved = panned = true;
       over.style.cursor = 'grabbing';
       const r = over.getBoundingClientRect();
-      const x0 = data.x[0];
-      const x1 = data.x[data.x.length - 1];
       if (r.width > 0 && dx) {
         const [lo, hi] = panBy(pan.sx[0], pan.sx[1], -dx / r.width, data.log, [x0, x1]);
-        live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
+        live.current.onWheelZoom(toX(lo, hi));
       }
       if (r.height > 0 && dy) {
         const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height);
@@ -873,15 +908,16 @@ function PaneView(props: {
       live.current.onCursor(grab ? { sel: grab } : { [dragging]: valX(e), sel: dragging });
     };
     /** sobre qué eje está el mouse (a la altura del área del gráfico) */
-    const axisAt = (e: { clientX: number; clientY: number }): 'left' | 'right' | null => {
+    const axisAt = (e: { clientX: number; clientY: number }): 'left' | 'right' | 'bottom' | null => {
       const r = over.getBoundingClientRect();
+      if (e.clientY > r.bottom && e.clientX >= r.left && e.clientX <= r.right) return 'bottom';
       if (e.clientY < r.top || e.clientY > r.bottom) return null;
       return e.clientX < r.left ? 'left' : e.clientX > r.right && hasRight ? 'right' : null;
     };
-    const hoverAxis = (a: 'left' | 'right' | null) => {
+    const hoverAxis = (a: 'left' | 'right' | 'bottom' | null) => {
       if (a === axisHover) return;
       axisHover = a;
-      root.style.cursor = a ? 'ns-resize' : '';
+      root.style.cursor = a === 'bottom' ? 'ew-resize' : a ? 'ns-resize' : '';
       root.title = a ? t('Wheel: zoom this axis') : '';
       u.redraw(false);
     };
@@ -912,10 +948,8 @@ function PaneView(props: {
         // Ctrl+rueda: desplaza la vista en X sin cambiar el zoom (y sin el zoom del navegador)
         const { min, max } = u.scales.x;
         if (min == null || max == null) return;
-        const x0 = data.x[0];
-        const x1 = data.x[data.x.length - 1];
         const [lo, hi] = panBy(min, max, (e.deltaY || e.deltaX) * 0.001, data.log, [x0, x1]);
-        if (lo !== min || hi !== max) live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
+        if (lo !== min || hi !== max) live.current.onWheelZoom(toX(lo, hi));
         return;
       }
       if (axisAt(e) === 'right') {
@@ -938,9 +972,7 @@ function PaneView(props: {
       if (min == null || max == null) return;
       const at = u.posToVal(Math.min(Math.max(e.clientX - r.left, 0), r.width), 'x');
       const [lo, hi] = zoomAbout(min, max, at, k, data.log);
-      const x0 = data.x[0];
-      const x1 = data.x[data.x.length - 1];
-      live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
+      live.current.onWheelZoom(toX(lo, hi));
     };
     // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece
     // (uPlot deja el recuadro vacío al terminar: la sombra va sólo durante el arrastre)
@@ -1005,7 +1037,8 @@ function PaneView(props: {
     const u = chart.current;
     if (!u) return;
     programmatic.current = true;
-    u.setScale('x', xRange ? { min: xRange[0], max: xRange[1] } : { min: data.x[0], max: data.x[data.x.length - 1] });
+    const home = data.home ?? [data.x[0], data.x[data.x.length - 1]];
+    u.setScale('x', xRange ? { min: xRange[0], max: xRange[1] } : { min: home[0], max: home[1] });
     programmatic.current = false;
   }, [xRange, yRange, props.rRange, data, cursorMode, zoomMode, showGrid]);
 
@@ -1019,6 +1052,16 @@ function PaneView(props: {
   // valor de cada traza en la posición del mouse (la primera curva de cada traza)
   const firstCurve = (ti: number) => data.curves.find((c) => c.trace === ti);
   const unitOf = (c: Curve | undefined) => (c?.axis === 'ph' ? '°' : c?.axis === 'i' ? 'A' : data.yUnit);
+
+  /** menú del botón derecho de una traza: lo de la leyenda y lo que agrega el visor */
+  const setTrace = (ti: number, f: (x: Trace) => Trace) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? f(x) : x)) }));
+  const traceMenu = (ti: number, tt: Trace): ContextItem[] => [
+    { label: t('Expression'), onClick: () => undefined, edit: { value: tt.expr, onCommit: (v) => setTrace(ti, (x) => ({ ...x, expr: v })) } },
+    { label: tt.hidden ? t('Show') : t('Hide'), onClick: () => setTrace(ti, (x) => ({ ...x, hidden: !x.hidden })) },
+    { label: t('Color…'), onClick: () => colorInputs.current.get(ti)?.click() },
+    ...props.traceActions(ti),
+    { label: t('Remove'), onClick: () => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) })) },
+  ];
 
   return (
     <div
@@ -1058,11 +1101,16 @@ function PaneView(props: {
               onDragStart={(e) => e.dataTransfer.setData('application/x-trace', JSON.stringify({ pane: index, trace: ti }))}
               onPointerEnter={() => props.onHoverExpr?.(tt.expr)}
               onPointerLeave={() => props.onHoverExpr?.(undefined)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ at: { x: e.clientX, y: e.clientY }, ti });
+              }}
               title={err ?? t('Click: show/hide · drag to another pane · color in the square')}
             >
               <label className="swatch" style={{ background: traceColor(tt, ti) }}>
                 <input
                   type="color"
+                  ref={(el) => (el ? colorInputs.current.set(ti, el) : colorInputs.current.delete(ti))}
                   aria-label={t('Color of {expr}', { expr: props.labelOf(tt) })}
                   value={traceColor(tt, ti)}
                   onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, color: e.target.value } : x)) }))}
@@ -1129,6 +1177,8 @@ function PaneView(props: {
           {pane.traces.length ? t('No trace can be plotted in this analysis.') : t('Empty pane: probe with the probe tool, type an expression or drag a trace here.')}
         </p>
       )}
+      {/* (en body: un ancestro del panel con transform haría que position: fixed no sea la ventana) */}
+      {menu && pane.traces[menu.ti] && createPortal(<ContextMenu at={menu.at} onClose={() => setMenu(null)} items={traceMenu(menu.ti, pane.traces[menu.ti])} />, document.body)}
       {props.onAddBelow && (
         <div className="pane-add">
           <button aria-label={t('Add pane')} title={t('Add a pane below (P)')} onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>

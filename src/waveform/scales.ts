@@ -42,19 +42,3 @@ export function panBy(min: number, max: number, f: number, log = false, bounds?:
   return log ? [10 ** a, 10 ** b] : [a, b];
 }
 
-/** Lo que pide un recuadro arrastrado sobre un gráfico de `w`×`h` px (cualquier unidad común) */
-export interface BoxAxes {
-  x: boolean;
-  y: boolean;
-}
-
-/**
- * Ejes que acerca un recuadro. Un arrastre casi horizontal (o vertical) hace que uPlot
- * extienda el recuadro a todo el alto (o ancho): ese eje queda como está y se acerca sólo el
- * otro. Menos de `min` px en un eje = no se acerca ese eje (un click no hace nada).
- */
-export function boxAxes(sel: { width: number; height: number }, w: number, h: number, min = 4): BoxAxes {
-  const fullW = sel.width >= w - 1;
-  const fullH = sel.height >= h - 1;
-  return { x: sel.width >= min && !(fullW && !fullH), y: sel.height >= min && !(fullH && !fullW) };
-}

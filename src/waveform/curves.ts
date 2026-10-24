@@ -40,6 +40,8 @@ export interface PaneData {
   iUnit: string;
   /** panel de FFT: fundamental y THD de cada traza */
   info?: string[];
+  /** vista en X sin zoom, si no es todo `x` (FFT de distintas grillas: hasta la menor frecuencia máxima) */
+  home?: [number, number];
 }
 
 export interface CurveContext {
@@ -168,7 +170,8 @@ export function traceLabel(tt: Trace, others: Trace[] = []): string {
 
 /**
  * Panel de FFT (#236): espectro (en dB) de cada traza del plot mostrado, cada una con su ventana
- * y rango de tiempo (#260); el eje X es la frecuencia (la grilla de la primera).
+ * y rango de tiempo (#260); el eje X es la frecuencia: la unión de las grillas de todas, cada
+ * una vacía fuera de la suya. Sin zoom se ve hasta la menor de las frecuencias máximas.
  */
 export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
   const scale = scaleOf(ctx.plot);
@@ -180,6 +183,7 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
     pane.traces.forEach((_, ti) => errors.set(ti, t('The FFT needs a transient analysis')));
     return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A' };
   }
+  const spectra: { ti: number; label: string; freq: Float64Array; db: Float64Array }[] = [];
   pane.traces.forEach((tt, ti) => {
     const o = tt.fft;
     if (!o) return errors.set(ti, t('The FFT needs a transient analysis'));
@@ -193,14 +197,28 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
       return;
     }
     const sp = spectrum(scale.real, w.re, { from, to, window: o.window });
-    const db = sp.amp.map((a) => 20 * Math.log10(a));
-    if (!x.length) x = sp.freq;
     const th = thd(sp);
     const label = traceLabel(tt, pane.traces);
     info.push(t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points', { expr: label, p1: si(th.fundamental), p2: si(th.amplitude), p3: th.thd.toFixed(3), p4: th.harmonics.length + 1, n: sp.n }));
-    // (otra ventana da la misma grilla; otro rango, otra: se lleva a la de la primera)
-    const y = x === sp.freq || (x.length === sp.freq.length && x[1] === sp.freq[1]) ? db : resample(sp.freq, db, x);
-    curves.push({ label, trace: ti, run: 0, color: traceColor(tt, ti), dash: false, axis: 'y', y, hidden: !!tt.hidden });
+    spectra.push({ ti, label, freq: sp.freq, db: sp.amp.map((a) => 20 * Math.log10(a)) });
   });
-  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info };
+  // (otra ventana da la misma grilla; otro rango u otro paso, otra)
+  const same = (a: Float64Array, b: Float64Array) => a === b || (a.length === b.length && a[1] === b[1] && a[a.length - 1] === b[b.length - 1]);
+  const grids = spectra.map((s) => s.freq).filter((f, k, all) => all.findIndex((g) => same(f, g)) === k);
+  x = grids.length === 1 ? grids[0] : union(grids);
+  for (const { ti, label, freq, db } of spectra) {
+    const tt = pane.traces[ti];
+    curves.push({ label, trace: ti, run: 0, color: traceColor(tt, ti), dash: false, axis: 'y', y: same(freq, x) ? db : resample(freq, db, x), hidden: !!tt.hidden });
+  }
+  const fmax = Math.min(...grids.map((f) => f[f.length - 1]));
+  const home: [number, number] | undefined = grids.length > 1 && fmax < x[x.length - 1] ? [x[0], fmax] : undefined;
+  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info, home };
+}
+
+/** Unión ordenada de grillas (sin repetir valores) */
+function union(grids: Float64Array[]): Float64Array {
+  const all = Float64Array.from(grids.flatMap((g) => Array.from(g))).sort();
+  let n = 0;
+  for (let i = 0; i < all.length; i++) if (!n || all[i] !== all[n - 1]) all[n++] = all[i];
+  return all.slice(0, n);
 }

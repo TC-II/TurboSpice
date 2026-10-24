@@ -1599,4 +1599,10 @@ export const es: Record<string, string> = {
   'Wheel: zoom this axis': 'Rueda: zoom en este eje',
   'Simulation aborted: the results shown are from the previous run': 'Simulación abortada: los resultados que se ven son de la corrida anterior',
   '{file}: {n} lines could not be read and were kept as they are (the first one: {line})': '{file}: {n} líneas no se pudieron leer y quedaron tal cual (la primera: {line})',
+  'Hide': 'Ocultar',
+  'Color…': 'Color…',
+  'FFT of this trace': 'FFT de esta traza',
+  'Cursor {name} on this trace': 'Cursor {name} en esta traza',
+  'Move to pane {n}': 'Mover al panel {n}',
+  'Move to a new pane': 'Mover a un panel nuevo',
 };

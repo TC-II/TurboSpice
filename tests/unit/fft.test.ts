@@ -68,6 +68,23 @@ describe('panel de FFT (#236)', async () => {
     expect(r.curves[1].y.length).toBe(r.x.length);
     expect(r.curves[1].label).toMatch(/^FFT\(V\(out\), 10(\.0+)?ms…20(\.0+)?ms\)$/);
   });
+
+  it('FFT de distintas grillas: el eje llega hasta la mayor frecuencia, cada una vacía fuera de la suya y sin zoom hasta la menor', async () => {
+    const { spectrum } = await import('../../src/waveform/fft.ts');
+    const a = spectrum(x, y, { window: 'hann' }).freq;
+    const b = spectrum(x, y, { window: 'hann', from: 10e-3, to: 12e-3 }).freq;
+    const r = paneCurves({ traces: [{ expr: 'V(out)', fft: { window: 'hann', from: 10e-3, to: 12e-3 } }, { expr: 'V(out)', fft: { window: 'hann' } }] }, ctx);
+    const top = Math.max(a[a.length - 1], b[b.length - 1]);
+    const low = Math.min(a[a.length - 1], b[b.length - 1]);
+    expect(r.x[r.x.length - 1]).toBe(top);
+    for (const f of [...a, ...b]) expect(r.x.includes(f)).toBe(true);
+    if (low < top) {
+      expect(r.home).toEqual([r.x[0], low]);
+      const short = r.curves.find((c) => Number.isNaN(c.y[r.x.length - 1]));
+      const long = r.curves.find((c) => Number.isFinite(c.y[r.x.length - 1]));
+      expect(short && long).toBeTruthy();
+    } else expect(r.home).toBeUndefined();
+  });
 });
 
 describe('identidad de las trazas y tipo de los paneles (#260)', async () => {

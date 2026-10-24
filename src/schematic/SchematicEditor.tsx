@@ -1210,7 +1210,7 @@ export function SchematicEditor(props: Props) {
     const rb = only >= 0 && !drag ? resizableBox(doc.texts[only]) : null;
     return !!rb && Math.abs(cursor.x - rb.x2) <= 6 / view.scale && Math.abs(cursor.y - rb.y2) <= 6 / view.scale;
   })();
-  const gridR = Math.min(1.5, 1.1 / view.scale);
+  const gridR = Math.min(2, 1.6 / view.scale);
   // Nivel de detalle (#195): los textos ilegibles se ocultan con una clase en el svg, que cambia
   // sólo con la escala (en un gesto pesado, al aplicar la vista), así el estilo se recalcula una vez
   const cursorClass =

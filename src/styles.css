@@ -103,7 +103,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-directive: #1d2025;
   --sch-comment: #2f6fdb;
   --sch-drawing: #1fa8d6;
-  --sch-grid: #b9bec7;
+  --sch-grid: #8a919c;
   --sch-sel: #e8590c;
   --sch-hl: #2b8a3e;
   --sch-ghost: #868e96;
@@ -117,7 +117,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
     --sch-directive: #e4e6ea;
     --sch-comment: #74a7ff;
     --sch-drawing: #6fd0f2;
-    --sch-grid: #3a3f47;
+    --sch-grid: #5b626e;
     --sch-sel: #ff922b;
     --sch-hl: #51cf66;
     --sch-ghost: #868e96;
@@ -131,7 +131,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-directive: #e4e6ea;
   --sch-comment: #74a7ff;
   --sch-drawing: #6fd0f2;
-  --sch-grid: #3a3f47;
+  --sch-grid: #5b626e;
   --sch-sel: #ff922b;
   --sch-hl: #51cf66;
 }

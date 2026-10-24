@@ -126,8 +126,8 @@ import { applySynthesis, topModuleOf, generatedPins, generatedSub } from './hdl/
 import { VerilogDialog, verilogTemplate } from './hdl/VerilogDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
-/** Nombre de un proyecto nuevo; con sesión de Google pasa a «project 2», «project 3»… si ya está en el Drive */
-const DEFAULT_PROJECT = 'project';
+/** Nombre de un proyecto nuevo; con sesión de Google pasa a «Project 2», «Project 3»… si ya está en el Drive */
+const DEFAULT_PROJECT = 'Project';
 const DEFAULT_NAME = /^project( \d+)?$/i;
 
 const BASE = import.meta.env.BASE_URL;
@@ -1019,7 +1019,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   // Con sesión de Google, un proyecto nuevo («project») con cambios se guarda solo en el Drive con
-  // un nombre libre («project 2», «project 3»…), para que el autoguardado no pise otro
+  // un nombre libre («Project 2», «Project 3»…), para que el autoguardado no pise otro
   const autoNaming = useRef(false);
   useEffect(() => {
     const f = fileRef.current;

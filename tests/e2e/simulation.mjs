@@ -136,7 +136,8 @@ const probe = async (x, y) => {
 const benchName = () => page.locator('.capsule-variant').textContent();
 await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
-check(/^Testbench \d+$/.test(await benchName()), `un tipo nuevo crea otro testbench, con nombre consecutivo (${await benchName()})`);
+// sin nombre propio, el testbench se llama como su análisis
+check((await benchName()) === 'Barrido DC', `un tipo nuevo crea otro testbench, con el nombre de su análisis (${await benchName()})`);
 await page.locator('.capsule-variant').dblclick();
 await page.getByLabel('Nombre del testbench').fill('DC');
 await page.getByLabel('Nombre del testbench').press('Enter');
@@ -155,7 +156,7 @@ await page.locator('.project-tree .tree-name').filter({ hasText: /^DC$/ }).hover
 await page.getByRole('button', { name: 'Duplicar DC', exact: true }).click();
 await page.waitForTimeout(300);
 const copyName = await benchName();
-check(/^Testbench \d+$/.test(copyName), `la copia es otro testbench, con nombre consecutivo (${await benchName()})`);
+check(copyName === 'DC (copia)', `la copia es otro testbench, «‹nombre› (copia)» (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)
 const directiveIs = (t) =>

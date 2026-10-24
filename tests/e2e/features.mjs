@@ -65,7 +65,8 @@ check(
   `desplegable de Simular: tipos, comandos y análisis programados (${simMenu.join(' | ')})`,
 );
 await page.getByRole('button', { name: 'Texto', exact: true }).click();
-check(await page.locator('.modal .seg input[type=radio]').nth(1).isChecked(), 'Texto abre el diálogo de comentario');
+// la herramienta Texto escribe en el lugar del click: no abre el diálogo
+check((await page.locator('.modal').count()) === 0 && (await page.locator('.schematic, .sch-canvas, svg').first().count()) > 0, 'Texto no abre el diálogo de comentario');
 await page.keyboard.press('Escape');
 // en ancho de celular la barra no desborda: los grupos que no entran van a "Más herramientas"
 await page.setViewportSize({ width: 375, height: 760 });
@@ -197,7 +198,8 @@ check((await page.getByLabel('Ventana', { exact: true }).locator('option').allTe
 await page.locator('.expr-form input').fill('V(out)/2');
 await page.locator('.expr-form input').press('Enter');
 const fftPick = page.locator('.fft-tools .fft-pick');
-await fftPick.click();
+// la FFT arranca eligiendo traza: el ⌖ sólo hace falta si no está en ese modo
+if (!(await page.locator('.plot-panel.fft-picking').count())) await fftPick.click();
 check((await page.locator('.plot-panel.fft-picking').count()) === 1 && (await page.locator('.trace-chip.pickable').count()) === 2, 'el ⌖ entra en modo de elegir traza');
 await page.keyboard.press('Escape');
 check((await page.locator('.plot-panel.fft-picking').count()) === 0, 'Esc cancela el ⌖');
@@ -315,17 +317,18 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check(back.key === full.key, 'doble click: vuelve a ver todo (X e Y)');
   await drag(0.4, 0.4, 0.5, 0.4 + 5 / b.height);
   const hx = await rng();
-  check(!same(hx.x, full.x) && same(hx.y, full.y), `arrastre casi horizontal: zoom sólo en X, el Y sigue (${full.y} = ${hx.y})`);
+  // el zoom es siempre a recuadro: aunque sea casi horizontal, cambian X e Y
+  check(!same(hx.x, full.x) && !same(hx.y, full.y), `arrastre casi horizontal: también es un recuadro (${full.y} → ${hx.y})`);
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -200);
   await page.waitForTimeout(300);
-  check(same((await rng()).y, full.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
+  check(same((await rng()).y, hx.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
   await page.keyboard.press('Space');
   await page.waitForTimeout(300);
   check((await rng()).key === full.key, 'Espacio: vuelve a ver todo');
   await drag(0.5, 0.2, 0.5 + 5 / b.width, 0.7);
   const vy = await rng();
-  check(same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: zoom sólo en Y, el X sigue (${full.y} → ${vy.y})`);
+  check(!same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: también es un recuadro (${full.y} → ${vy.y})`);
   await page.keyboard.press('Shift+Z');
   await page.waitForTimeout(300);
   check((await rng()).key === full.key, 'Shift+Z deshace el zoom en Y');

@@ -322,6 +322,22 @@ SYMATTR InstName D1
 `);
     expect(r.warnings).toContain('R1 no tiene valor asignado');
     expect(r.warnings.join()).not.toMatch(/D1/);
+    // bloquean la simulación (#256)
+    expect(r.missingValues).toEqual(['R1']);
+  });
+
+  it('un componente con valor no bloquea la simulación (#256)', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL cap 100 0 R0
+SYMATTR InstName C1
+SYMBOL diode 200 0 R0
+SYMATTR InstName D1
+`);
+    expect(r.missingValues).toEqual(['C1']);
   });
 
   it('adapta archivos de modelos de LTspice', () => {

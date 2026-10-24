@@ -88,6 +88,7 @@ import { benchParams, benchVariables, setBenchParams } from './schematic/benchPa
 import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
+import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
@@ -1607,6 +1608,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Botón derecho en un componente de un testbench de un grupo: editar o propagar sus valores a
   // los otros testbenches del grupo que tienen el mismo componente
   const [ctxMenu, setCtxMenu] = useState<{ at: { x: number; y: number }; items: ContextItem[] } | null>(null);
+  // menú del botón derecho de un comentario (tamaño, alineación)
+  const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
+  const closeTextMenu = useCallback(() => setTextMenu(null), []);
   const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
     const s = doc.symbols[index];
     const inst = s?.attrs.get('InstName');
@@ -2470,7 +2474,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case '.':
           return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
-          return handled(), setDialog({ kind: 'text', textKind: 'comment' });
+          return handled(), setTool({ kind: 'comment' });
         case 'Home':
           return handled(), editor.current?.fit();
       }
@@ -2769,7 +2773,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Net label…'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
         { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
-        { label: t('Comment…'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: t('Comment'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }) },
         'sep',
         ...shapeItems,
       ],
@@ -2893,7 +2897,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
         { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
-        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }), active: tool.kind === 'comment' },
         { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' || tool.kind === 'pencil' },
         { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
@@ -3203,9 +3207,26 @@ ${ltNetlistText(sim.built.lt)}
             />
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
+          {textMenu && doc.texts[textMenu.index] &&
+            createPortal(
+              <TextMenu
+                at={textMenu.at}
+                text={doc.texts[textMenu.index]}
+                onClose={closeTextMenu}
+                onChange={(patch) => commit(setText(doc, textMenu.index, patch))}
+                onEdit={() => editor.current?.editText(textMenu.index)}
+                onDialog={() => setDialog({ kind: 'text', index: textMenu.index, textKind: doc.texts[textMenu.index].kind })}
+                onDelete={() => {
+                  commit(deleteItems(doc, [{ kind: 'text', index: textMenu.index }]));
+                  setSelection([]);
+                }}
+              />,
+              document.body,
+            )}
           <SchematicEditor
             handle={editor}
             onSymbolMenu={symbolMenu}
+            onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
             onDescend={descend}
             docKey={docKey}
             doc={doc}
@@ -3805,6 +3826,8 @@ function toolHint(tt: Tool): string {
       return tt.name === '0' ? t('Click to place ground · Esc to finish') : t('Click to place the label "{name}"', { name: tt.name });
     case 'text':
       return t('Click to place the text');
+    case 'comment':
+      return t('Click where the comment goes and type · Enter or click outside to finish · Shift+Enter for a new line · Esc to cancel');
     case 'delete':
       return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
     case 'probe':

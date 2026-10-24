@@ -267,6 +267,14 @@ export const fontSize = (i: number) => FONT_SIZE[fontIndex(i)] * 0.8;
 /** Textos de menos de esto (px en pantalla) no se dibujan al alejar (#195) */
 export const MIN_TEXT_PX = 3;
 /** Cuántos tamaños de letra (desde el más chico) quedan ilegibles a esta escala: la clase lod-N del editor */
+/** Tamaños de letra de los TEXT de LTspice (índice 0-7 del .asc) y su factor */
+export const TEXT_SIZES = [0.625, 1, 1.5, 2, 2.5, 3.5, 5, 7];
+/** Justificaciones de un TEXT del .asc (spec §7) */
+export const TEXT_ALIGNS = ['Left', 'Center', 'Right', 'Top', 'Bottom', 'VLeft', 'VCenter', 'VRight', 'VTop', 'VBottom'];
+/** Comentario común: se escribe y edita en el lugar (no los bloques .control, los de datos ni los de ngspice) */
+export const inlineEditable = (t: SchText | undefined) => !!t && t.kind === 'comment' && !isControlBlock(t.text) && !isDataText(t) && !isNgspiceComment(t.text);
+/** Índice de tamaño cuya letra mide lo más parecido a `fs` (unidades del esquemático) */
+export const nearestFontIndex = (fs: number) => FONT_SIZE.reduce((best, _, i) => (Math.abs(fontSize(i) - fs) < Math.abs(fontSize(best) - fs) ? i : best), 0);
 export const illegibleSizes = (scale: number) => FONT_SIZE.filter((_, i) => fontSize(i) * scale < MIN_TEXT_PX).length;
 
 /** Caja aproximada de un texto libre (TEXT) */

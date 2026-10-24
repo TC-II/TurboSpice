@@ -6,7 +6,7 @@ import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type DrawnShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
+import { addFlag, addText, addWire, deleteItems, setText, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
 import { inverseOffset, toWorld } from '../asc/transform.ts';
 import { effectiveWindows } from '../asc/resolve.ts';
 import type { TextWindow } from '../asc/model.ts';
@@ -23,6 +23,9 @@ import {
   snapPoint,
   symbolBox,
   textBox,
+  fontSize,
+  inlineEditable,
+  nearestFontIndex,
   visibleText,
   wireVertexAt,
   fixedPoints,
@@ -55,6 +58,8 @@ export type Tool =
   | { kind: 'place'; type: string; orient: Orient }
   | { kind: 'flag'; name: string; ioPin?: string }
   | { kind: 'text'; text: string; textKind: 'directive' | 'comment' }
+  /** T: click en el esquemático y se escribe el comentario ahí mismo (Enter o click afuera lo deja, Esc cancela) */
+  | { kind: 'comment' }
   | { kind: 'delete' }
   | { kind: 'probe' }
   /** elegir una red o una fuente para un diálogo (Esc cancela) */
@@ -94,6 +99,8 @@ export interface EditorHandle {
   /** Zoom y posición (para volver al mismo lugar al subir por la jerarquía, #180) */
   view(): View;
   setView(v: View): void;
+  /** escribir en el lugar un comentario existente (false si no es un comentario común) */
+  editText(index: number): boolean;
 }
 
 interface Props {
@@ -108,6 +115,8 @@ interface Props {
   onEdit(ref: ItemRef): void;
   /** botón derecho en un componente: true si muestra un menú propio (si no, se edita) */
   onSymbolMenu?(symbol: number, at: { x: number; y: number }): boolean;
+  /** botón derecho en un comentario: true si muestra su menú (tamaño, alineación…) */
+  onTextMenu?(text: number, at: { x: number; y: number }): boolean;
   /** se soltó un subcircuito arrastrado desde el panel del proyecto (#199): el símbolo a colocar, o null si no se puede */
   onDropSubckt?(name: string): string | null;
   /** doble clic en un componente: true si lo abrió como subcircuito (#180) */
@@ -155,7 +164,10 @@ export interface View {
 type Drag =
   /** `right`: con el botón derecho; si no se movió, al soltar es un click derecho */
   | { mode: 'pan'; sx: number; sy: number; view: View; right?: boolean; moved?: boolean }
-  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean }
+  /** `editText`: click en un comentario ya seleccionado; si no se mueve, se edita en el lugar */
+  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean; editText?: number }
+  /** agrandar o achicar un comentario desde la esquina de su caja (cambia el tamaño de letra) */
+  | { mode: 'textsize'; index: number }
   /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
@@ -171,6 +183,18 @@ type Drag =
    * con otros, el mismo rótulo de todos. `at` es el ancla de cada uno en el esquemático.
    */
   | { mode: 'label'; start: Point; sym: number; shift: boolean; items: { sym: number; win: number; w: TextWindow; at: Point }[]; moved: boolean };
+
+interface InlineText {
+  index: number | null;
+  x: number;
+  y: number;
+  align: string;
+  size: number;
+  value: string;
+}
+
+/** Caja de un comentario sin justificación vertical (las verticales no se agrandan con la esquina) */
+const resizableBox = (t: AscDoc['texts'][number] | undefined) => (t && inlineEditable(t) && !t.align.startsWith('V') && t.align !== 'Invisible' ? textBox(t) : null);
 
 function docBox(doc: AscDoc, lib: Library, showSim: boolean): Box | null {
   const boxes: Box[] = [];
@@ -289,6 +313,10 @@ export function SchematicEditor(props: Props) {
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
+  // comentario que se está escribiendo en el lugar (`index` null: uno nuevo)
+  const [inline, setInline] = useState<InlineText | null>(null);
+  const inlineRef = useRef<InlineText | null>(null);
+  inlineRef.current = inline;
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
   // vistas anteriores (Shift+Z); los giros seguidos de la rueda cuentan como un solo paso
@@ -449,6 +477,7 @@ export function SchematicEditor(props: Props) {
       spacePanned: () => spaceUsed.current,
       view: () => viewRef.current,
       setView: (v: View) => setView(v),
+      editText: (index: number) => editInline(index),
     }),
     [fit, cursor, doc, lib, size.w],
   );
@@ -560,6 +589,36 @@ export function SchematicEditor(props: Props) {
     return null;
   };
 
+  /** Termina la escritura en el lugar: `save` la guarda (vacía, borra el comentario) */
+  const finishInline = (save: boolean) => {
+    const it = inlineRef.current;
+    if (!it) return;
+    inlineRef.current = null;
+    setInline(null);
+    // en el archivo los saltos de línea son "\n" literales
+    const text = it.value.replace(/\r?\n/g, '\\n');
+    if (save) {
+      if (it.index === null) {
+        if (text.trim()) {
+          commit(addText(doc, { x: it.x, y: it.y, align: it.align, size: it.size, kind: 'comment', text }));
+          setSelection([{ kind: 'text', index: doc.texts.length }]);
+        }
+      } else if (!text.trim()) {
+        commit(deleteItems(doc, [{ kind: 'text', index: it.index }], lib));
+        setSelection([]);
+      } else if (text !== doc.texts[it.index]?.text) commit(setText(doc, it.index, { text }));
+    }
+    if (tool.kind === 'comment') setTool({ kind: 'select' });
+  };
+  /** Edita en el lugar un comentario existente; false si no es un comentario común */
+  const editInline = (index: number) => {
+    const tt = doc.texts[index];
+    if (!inlineEditable(tt)) return false;
+    setSelection([{ kind: 'text', index }]);
+    setInline({ index, x: tt.x, y: tt.y, align: tt.align, size: tt.size, value: tt.text.split('\\n').join('\n') });
+    return true;
+  };
+
   // Botón derecho sin arrastrar: terminar cable / volver a seleccionar (como Esc en LTspice)
   const rightClick = (p: Point, screen?: { x: number; y: number }) => {
     if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
@@ -575,6 +634,10 @@ export function SchematicEditor(props: Props) {
       const hit = hitTest(doc, p, lib, tol, showSimCommand);
       // un componente con menú propio (#180: propagar al grupo): lo muestra quien lo pide
       if (hit?.kind === 'symbol' && screen && props.onSymbolMenu?.(hit.index, screen)) return;
+      if (hit?.kind === 'text' && screen && inlineEditable(doc.texts[hit.index]) && props.onTextMenu?.(hit.index, screen)) {
+        setSelection([hit]);
+        return;
+      }
       if (hit) onEdit(hit);
     }
   };
@@ -584,6 +647,12 @@ export function SchematicEditor(props: Props) {
     t.kind === 'shape' && t.shape === 'ARC' && t.pts.length >= 2 ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
 
   const onPointerDown = (e: React.PointerEvent) => {
+    // click afuera del comentario que se escribe: lo deja (y ese click no hace otra cosa)
+    if (inlineRef.current) {
+      e.preventDefault();
+      finishInline(true);
+      return;
+    }
     svgRef.current!.setPointerCapture(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -625,6 +694,13 @@ export function SchematicEditor(props: Props) {
 
     switch (tool.kind) {
       case 'select': {
+        // la esquina de la caja del comentario seleccionado: arrastrarla cambia el tamaño de letra
+        const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
+        const rb = only >= 0 ? resizableBox(doc.texts[only]) : null;
+        if (rb && Math.abs(p.x - rb.x2) <= 6 / view.scale && Math.abs(p.y - rb.y2) <= 6 / view.scale) {
+          setDrag({ mode: 'textsize', index: only });
+          return;
+        }
         // un rótulo se arrastra directamente; con su componente seleccionado junto a otros, se
         // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
         const label = labelAt(doc, p, lib, tol, lod);
@@ -686,7 +762,8 @@ export function SchematicEditor(props: Props) {
         }
         const sel = e.shiftKey ? (already ? selection.filter((s) => !(s.kind === hit.kind && s.index === hit.index)) : [...selection, hit]) : already ? selection : [hit];
         setSelection(sel);
-        setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false, whole: heavy() && selectsWhole(sel) });
+        const editText = hit.kind === 'text' && already && selection.length === 1 && !e.shiftKey ? hit.index : undefined;
+        setDrag({ mode: 'move', start: g, refs: sel, detach: e.ctrlKey || e.metaKey, moved: false, whole: heavy() && selectsWhole(sel), editText });
         return;
       }
       case 'wire': {
@@ -711,6 +788,11 @@ export function SchematicEditor(props: Props) {
       case 'text':
         commit(addText(doc, { x: g.x, y: g.y, align: 'Left', size: 2, kind: tool.textKind, text: tool.text }));
         setTool({ kind: 'select' });
+        return;
+      case 'comment':
+        // justo donde se hizo click (sin grilla), como en un editor de texto
+        setSelection([]);
+        setInline({ index: null, x: Math.round(p.x), y: Math.round(p.y), align: 'Left', size: 2, value: '' });
         return;
       case 'delete':
         // un click borra lo que está bajo la cruz; arrastrando, todo lo del recuadro (al soltar)
@@ -908,6 +990,16 @@ export function SchematicEditor(props: Props) {
       });
       if (!drag.moved && Math.hypot(dx, dy) > tol) setDrag({ ...drag, moved: true });
       setPreview(setWindows(doc, edits));
+    } else if (drag.mode === 'textsize') {
+      // el tamaño de letra cuya caja llega más cerca de la esquina arrastrada (alto o ancho)
+      const tt = doc.texts[drag.index];
+      const lines = tt.text.split('\\n');
+      const chars = Math.max(1, ...lines.map((l) => l.length));
+      const byH = (p.y - tt.y) / (lines.length * 1.2 - 0.5);
+      const w = tt.align === 'Right' ? tt.x - p.x : tt.align === 'Center' ? 2 * Math.abs(p.x - tt.x) : p.x - tt.x;
+      const byW = w / (chars * 0.6);
+      const size = nearestFontIndex(Math.max(byH, byW, 0));
+      setPreview(size === tt.size ? null : setText(doc, drag.index, { size }));
     } else if (drag.mode === 'move') {
       const g = snapPoint(p);
       const dx = g.x - drag.start.x;
@@ -949,6 +1041,8 @@ export function SchematicEditor(props: Props) {
       rightClick(toDoc(e), { x: e.clientX, y: e.clientY });
     }
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
+    if (drag.mode === 'textsize' && preview) commit(preview);
+    if (drag.mode === 'move' && !drag.moved && drag.editText !== undefined) editInline(drag.editText);
     if (drag.mode === 'label' && !drag.moved) {
       // click sobre un rótulo sin moverlo: selecciona su componente (Shift: agrega/quita)
       const ref: ItemRef = { kind: 'symbol', index: drag.sym };
@@ -1023,7 +1117,7 @@ export function SchematicEditor(props: Props) {
   }
 
   const onDoubleClick = (e: React.MouseEvent) => {
-    if (tool.kind !== 'select') return;
+    if (tool.kind !== 'select' || inlineRef.current) return;
     const p = toDoc(e);
     const label = labelAt(doc, p, lib, tol, lod);
     if (label && onEditLabel) return onEditLabel(label.sym, label.win);
@@ -1031,10 +1125,12 @@ export function SchematicEditor(props: Props) {
     const hit = hitTest(doc, p, lib, tol, showSimCommand);
     // doble clic en un subcircuito del proyecto: bajar a su esquemático (#180)
     if (hit?.kind === 'symbol' && props.onDescend?.(hit.index)) return;
+    if (hit?.kind === 'text' && editInline(hit.index)) return;
     if (hit) onEdit(hit);
   };
 
-  const shown = preview ?? doc;
+  // el comentario que se edita en el lugar no se dibuja (lo reemplaza el cuadro de texto)
+  const shown = inline?.index != null ? setText(preview ?? doc, inline.index, { text: '' }) : (preview ?? doc);
   const g = snapPoint(cursor);
   // lo que se está por colocar, dibujado igual a como va a quedar (colores, InstName, tierra)
   const ghost = useMemo(() => {
@@ -1100,6 +1196,12 @@ export function SchematicEditor(props: Props) {
     return [...out.values()];
   }, [selection, doc, lib]);
 
+  const resizeHover = (() => {
+    if (drag?.mode === 'textsize') return true;
+    const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
+    const rb = only >= 0 && !drag ? resizableBox(doc.texts[only]) : null;
+    return !!rb && Math.abs(cursor.x - rb.x2) <= 6 / view.scale && Math.abs(cursor.y - rb.y2) <= 6 / view.scale;
+  })();
   const gridR = Math.min(1.5, 1.1 / view.scale);
   // Nivel de detalle (#195): los textos ilegibles se ocultan con una clase en el svg, que cambia
   // sólo con la escala (en un gesto pesado, al aplicar la vista), así el estilo se recalcula una vez
@@ -1107,7 +1209,7 @@ export function SchematicEditor(props: Props) {
     drag?.mode === 'pan' && (!drag.right || drag.moved)
       ? 'grabbing'
       : tool.kind === 'select'
-        ? hoverLabel !== undefined ? 'label' : ''
+        ? hoverLabel !== undefined ? 'label' : resizeHover ? 'resize' : ''
         : tool.kind === 'probe' && probeKind ? `probe tool-probe-${probeKind}` : tool.kind;
 
   return (
@@ -1182,6 +1284,18 @@ export function SchematicEditor(props: Props) {
           ))}
         </g>
       )}
+      {tool.kind === 'select' && !inline && (!drag || drag.mode === 'textsize') && selection.length === 1 && selection[0].kind === 'text' && (() => {
+        const rb = resizableBox(shown.texts[selection[0].index]);
+        if (!rb) return null;
+        const k = 6 / view.scale;
+        return (
+          <g className="text-bbox">
+            <rect x={rb.x1 - 2} y={rb.y1 - 2} width={rb.x2 - rb.x1 + 4} height={rb.y2 - rb.y1 + 4} />
+            <rect className="handle" x={rb.x2 - k / 2} y={rb.y2 - k / 2} width={k} height={k} />
+          </g>
+        );
+      })()}
+      {inline && <InlineEditor it={inline} onChange={(value) => setInline({ ...inline, value })} onDone={finishInline} />}
       {currentArrows && currentArrows.length > 0 && <CurrentArrowsLayer items={currentArrows} />}
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} paired={paired} scale={view.scale} />}
       {netNames && netNames.length > 0 && !drag && (
@@ -1207,7 +1321,7 @@ export function SchematicEditor(props: Props) {
         // cursor de borrar: una cruz chica a 45° que sigue al mouse (sin grilla)
         <path className="delete-cursor" d={`M ${cursor.x - 5 / view.scale} ${cursor.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${cursor.x + 5 / view.scale} ${cursor.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
       )}
-      {tool.kind !== 'select' && tool.kind !== 'place' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && tool.kind !== 'pencil' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'comment' && tool.kind !== 'place' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && tool.kind !== 'pencil' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div
@@ -1223,5 +1337,54 @@ export function SchematicEditor(props: Props) {
       </div>
     )}
     </>
+  );
+}
+
+/**
+ * Cuadro para escribir un comentario en el lugar, dentro del svg (sigue al zoom): la primera
+ * línea queda donde va a quedar el texto. Enter lo deja (Shift+Enter: otra línea), Esc cancela.
+ */
+function InlineEditor({ it, onChange, onDone }: { it: InlineText; onChange(v: string): void; onDone(save: boolean): void }) {
+  const ta = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    // (después del click que lo abrió)
+    const id = requestAnimationFrame(() => {
+      ta.current?.focus();
+      ta.current?.select();
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+  const fs = fontSize(it.size);
+  const lines = it.value.split('\n');
+  const w = (Math.max(4, ...lines.map((l) => l.length)) + 2) * fs * 0.6;
+  const h = lines.length * fs * 1.2 + fs * 0.4;
+  const x = it.align === 'Right' ? it.x - w : it.align === 'Center' ? it.x - w / 2 : it.x;
+  const y = it.align === 'Top' ? it.y : it.align === 'Bottom' ? it.y - h : it.y - fs * 0.6 - fs * 0.2;
+  return (
+    <foreignObject x={x} y={y} width={w} height={h} className="inline-text">
+      <textarea
+        ref={ta}
+        value={it.value}
+        spellCheck={false}
+        wrap="off"
+        style={{ fontSize: fs, lineHeight: 1.2, textAlign: it.align === 'Right' ? 'right' : it.align === 'Center' ? 'center' : 'left' }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onDoubleClick={(e) => e.stopPropagation()}
+        onContextMenu={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={() => onDone(true)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            onDone(false);
+          } else if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            onDone(true);
+          }
+        }}
+      />
+    </foreignObject>
   );
 }

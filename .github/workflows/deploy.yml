@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: engine/dist-engine
-          key: engine-${{ env.EMSDK_VERSION }}-${{ hashFiles('engine/build.sh', 'engine/spinit') }}
+          key: engine-${{ env.EMSDK_VERSION }}-${{ hashFiles('engine/build.sh', 'engine/spinit', 'engine/osdi/imports.c', 'engine/icarus/**') }}
 
       - name: Setup emsdk
         if: steps.engine-cache.outputs.cache-hit != 'true'
@@ -41,7 +41,7 @@ jobs:
       - name: Compilar ngspice a WASM
         if: steps.engine-cache.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get update && sudo apt-get install -y bison flex
+          sudo apt-get update && sudo apt-get install -y bison flex gperf autoconf
           bash engine/build.sh
 
       # Para bajar el motor compilado desde una rama o PR sin esperar al deploy:
@@ -76,6 +76,7 @@ jobs:
           node tests/e2e/simulation.mjs http://localhost:4173/TurboSpice/ test-results
           node tests/e2e/features.mjs http://localhost:4173/TurboSpice/ test-results
           node tests/e2e/save.mjs http://localhost:4173/TurboSpice/
+          node tests/e2e/verilog.mjs http://localhost:4173/TurboSpice/
 
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'

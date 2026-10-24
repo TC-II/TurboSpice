@@ -1664,4 +1664,5 @@ export const es: Record<string, string> = {
   'Poles and zeros: the input is shorted. Its two nodes are the same net, or a wire or a voltage source joins them directly. Choose as input the node where the signal enters, on the circuit side.': 'Polos y ceros: la entrada está en cortocircuito. Sus dos nodos son la misma red, o un cable o una fuente de tensión los une directamente. Elegí como entrada el nodo por donde entra la señal, del lado del circuito.',
   'Poles and zeros: the search did not converge. Check that the input and output are connected through the circuit.': 'Polos y ceros: la búsqueda no convergió. Revisá que la entrada y la salida estén conectadas a través del circuito.',
   '{what} can\'t be ground (0): choose a node': '{what} no puede ser tierra (0): elegí un nodo',
+  '{analysis}: {problems}. Complete the boxes marked in red in the simulation bar.': '{analysis}: {problems}. Completá las cajas marcadas en rojo en la barra de simulación.',
 };

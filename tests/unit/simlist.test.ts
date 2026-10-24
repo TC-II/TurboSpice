@@ -9,6 +9,8 @@ import {
   activeSim,
   addSim,
   analysisDetail,
+  analysisProblem,
+  reuseLine,
   analysisLabel,
   pzLogErrors,
   pzProblem,
@@ -209,5 +211,30 @@ describe('descripción completa y errores de polos y ceros', () => {
   it('"Input is shorted" del log se explica', () => {
     expect(pzLogErrors(['doAnalyses: Input is shorted', 'run simulation(s) aborted'])[0]).toMatch(/cortocircuito/);
     expect(pzLogErrors(['ok'])).toEqual([]);
+  });
+});
+
+describe('análisis incompletos', () => {
+  it('se leen con los campos que faltan vacíos (la barra muestra sus cajas)', () => {
+    expect(parseAnalysis('.tf V()')).toEqual({ kind: 'tf', out: '', src: '' });
+    expect(parseAnalysis('.tf V(out)')).toEqual({ kind: 'tf', out: 'out', src: '' });
+    expect(parseAnalysis('.dc  0 5 0.1')).toMatchObject({ kind: 'dc', sweeps: [{ src: '', start: '0', stop: '5', step: '0.1' }] });
+    expect(parseAnalysis('.noise V()  dec 20 1 1meg')).toMatchObject({ kind: 'noise', out: '', src: '', sweep: { points: '20', start: '1', stop: '1meg' } });
+    expect(parseAnalysis('.sens V()')).toMatchObject({ kind: 'sens', out: '' });
+    expect(parseAnalysis('.ac dec 100')).toMatchObject({ kind: 'ac', sweep: { points: '100', start: '', stop: '' } });
+    expect(parseAnalysis('.tran')).toMatchObject({ kind: 'tran', tstop: '' });
+    expect(parseAnalysis('.tran 1m steady')).toBeNull();
+  });
+  it('al correr se dice qué falta', () => {
+    expect(analysisProblem('.tf V()')).toMatch(/Función de transferencia DC.*salida.*fuente/i);
+    expect(analysisProblem('.tf V(out) V1')).toBeUndefined();
+    expect(analysisProblem('.dc  0 5 0.1')).toMatch(/fuente/);
+  });
+  it('una simulación nueva toma los valores de otra, pero las redes y fuentes de este circuito', () => {
+    const info = { nets: ['0', 'Vx'], sources: ['V1'] };
+    expect(reuseLine('.tf V()', 'tf', info)).toBe('.tf V(Vx) V1');
+    expect(reuseLine('.tf V(out) V9', 'tf', info)).toBe('.tf V(Vx) V1');
+    expect(reuseLine('.dc V9 0 2 0.01', 'dc', info)).toBe('.dc V1 0 2 0.01');
+    expect(reuseLine('.noise V(out) V9 dec 7 1 1k', 'noise', info)).toBe('.noise V(Vx) V1 dec 7 1 1k');
   });
 });

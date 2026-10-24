@@ -38,7 +38,8 @@ describe('comandos de análisis', () => {
 
   it('las opciones que el formulario no maneja no se interpretan', () => {
     expect(parseAnalysis('.tran 10m steady')).toBeNull();
-    expect(parseAnalysis('.ac dec 10 1')).toBeNull();
+    // a un .ac le falta el fin: se lee con esa caja vacía (en rojo en la barra)
+    expect(parseAnalysis('.ac dec 10 1')).toMatchObject({ kind: 'ac', sweep: { points: '10', start: '1', stop: '' } });
   });
 
   it('todos los análisis por defecto (salvo los que piden nodos) son válidos', () => {

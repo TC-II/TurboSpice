@@ -89,8 +89,9 @@ export function formatAnalysis(a: Analysis): string {
     case 'ac':
       return `.ac ${sweepText(a.sweep)}`;
     case 'dc':
+      // la primera va aunque no tenga fuente: así no se pierden sus valores
       return `.dc ${a.sweeps
-        .filter((s) => s.src)
+        .filter((s, i) => i === 0 || s.src)
         .map((s) => `${s.src} ${s.start} ${s.stop} ${s.step}`)
         .join(' ')}`;
     case 'noise': {
@@ -122,14 +123,74 @@ function parseSweep(tt: string[]): Sweep | null {
 
 /** "V(out)" → "out"; "V(a,b)" → ["a","b"] */
 function unwrapV(s: string): [string, string] {
-  const m = /^v\s*\(\s*([^,)]+)\s*(?:,\s*([^)]+))?\)$/i.exec(s);
+  const m = /^v\s*\(\s*([^,)]*)\s*(?:,\s*([^)]*))?\)$/i.exec(s);
   return m ? [m[1].trim(), (m[2] ?? '').trim()] : [s, ''];
 }
 
-/** Interpreta una línea de análisis; null si no se reconoce (se edita como texto libre) */
+/**
+ * Interpreta una línea de análisis; null si no se reconoce (se edita como texto libre). A una línea
+ * incompleta (sin la fuente, el nodo o un valor: ".tf V()", ".dc  0 5 0.1") le quedan esos campos
+ * vacíos, para que la barra siga mostrando sus cajas y marque lo que falta.
+ */
 export function parseAnalysis(line: string): Analysis | null {
-  // V(a, b) con espacios: juntarlo en un token
   const tt = line.trim().replace(/\(\s*([^)]*?)\s*\)/g, (_, x: string) => `(${x.replace(/\s+/g, '')})`).split(/\s+/);
+  return parseComplete(tt) ?? parseIncomplete(tt);
+}
+
+const isV = (x: string) => /^v\s*\(/i.test(x);
+const SWEEP_TYPE = /^(dec|oct|lin)$/i;
+/** barrido al que le pueden faltar valores (vacíos); null si no tiene ni el tipo */
+function looseSweep(tt: string[]): Sweep | null {
+  const i = tt.findIndex((x) => SWEEP_TYPE.test(x));
+  if (i < 0) return null;
+  const [points = '', start = '', stop = ''] = tt.slice(i + 1);
+  return { type: tt[i].toLowerCase() as SweepType, points, start, stop };
+}
+
+/** Lo que se pueda leer de una línea incompleta (ver parseAnalysis) */
+function parseIncomplete(tt: string[]): Analysis | null {
+  const kind = tt[0]?.slice(1).toLowerCase();
+  const a = tt.slice(1).filter(Boolean);
+  const out = unwrapV(a.find(isV) ?? '')[0];
+  const ref = unwrapV(a.find(isV) ?? '')[1];
+  switch (kind) {
+    case 'tran': {
+      // sin tiempo final (con palabras que la barra no maneja, queda como texto)
+      if (a.some((x) => /^[a-z]/i.test(x) && !/^(uic|startup)$/i.test(x))) return null;
+      const d = defaultAnalysis('tran') as Extract<Analysis, { kind: 'tran' }>;
+      return { ...d, tstop: '', uic: a.some((x) => /^uic$/i.test(x)), startup: a.some((x) => /^startup$/i.test(x)) };
+    }
+    case 'ac':
+    case 'disto':
+    case 'sp': {
+      const sweep = looseSweep(a) ?? { type: 'dec', points: '', start: '', stop: '' };
+      return kind === 'ac' ? { kind, sweep } : kind === 'disto' ? { kind, sweep, f2overf1: '' } : { kind, sweep, noise: false };
+    }
+    case 'dc': {
+      // sin fuente: los valores de la primera quedan
+      const vals = a.length % 4 === 3 ? ['', ...a] : a;
+      const sweeps: DcSweep[] = [];
+      for (let i = 0; i < Math.max(vals.length, 1); i += 4) sweeps.push({ src: vals[i] ?? '', start: vals[i + 1] ?? '', stop: vals[i + 2] ?? '', step: vals[i + 3] ?? '' });
+      return { kind, sweeps: sweeps.slice(0, 2) };
+    }
+    case 'noise': {
+      const i = a.findIndex((x) => SWEEP_TYPE.test(x));
+      const before = i < 0 ? a : a.slice(0, i);
+      const src = before.find((x) => !isV(x)) ?? '';
+      return { kind, out, ref, src, sweep: looseSweep(a) ?? { ...SWEEP, points: '20' } };
+    }
+    case 'tf':
+      return { kind, out, src: a.find((x) => !isV(x)) ?? '' };
+    case 'sens':
+      return { kind, out, ac: false, sweep: { ...SWEEP, points: '10' } };
+    case 'pz':
+      return { kind, inP: '', inN: '0', outP: '', outN: '0', type: 'vol', which: 'pz' };
+  }
+  return null;
+}
+
+function parseComplete(tt: string[]): Analysis | null {
+  // (V(a, b) con espacios ya viene en un token)
   const kind = tt[0]?.slice(1).toLowerCase();
   const a = tt.slice(1);
   switch (kind) {

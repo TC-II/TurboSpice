@@ -33,7 +33,7 @@ import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type Pi
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, MAX_SIMS, pzLogErrors, pzProblem, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, MAX_SIMS, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -1202,9 +1202,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const built = await buildSimulation(doc, lib, ascName(), allTraces());
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
-      // un .pz sin nodos de entrada o salida tampoco: ngspice sólo diría "Error on line N"
-      const pz = pzProblem(lineOf(simAsc) ?? '');
-      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(pz ? [pz] : [])];
+      // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
+      const incomplete = analysisProblem(lineOf(simAsc) ?? '');
+      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
       const { result, ms } = blocking.length
         ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
         : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
@@ -1582,7 +1582,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
     // si ya es de ese tipo queda como está; si otro testbench usa ese tipo, se parte de sus parámetros
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
-    const line = same?.line ?? defaultLine(kind, circuitInfo());
+    // (sus redes y fuentes se adaptan a este circuito)
+    const line = same ? reuseLine(same.line, kind, circuitInfo()) : defaultLine(kind, circuitInfo());
     // una Complex simulation (#241) pasa a este análisis en el mismo testbench: el .control queda
     // guardado y vuelve al elegir otra vez Complex simulation
     if (isComplexLine(docLine)) return commit(setAnalysisLine(parkControl(doc), line));

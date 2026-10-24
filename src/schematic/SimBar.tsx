@@ -181,7 +181,11 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   const apply = (a: Analysis | null = draft) => {
     if (!a) return;
     const next = formatAnalysis(a);
-    if (next !== line && !validateAnalysis(a).length) {
+    // lo incompleto también se guarda (las cajas quedan en rojo y al correr se avisa qué falta), así
+    // lo que se ve es lo que se simula; sólo no, si al volver a leer la línea los valores cambiarían
+    // de caja (p. ej. a un barrido le falta el inicio y el fin pasaría a ser el inicio)
+    const ok = !validateAnalysis(a).length || JSON.stringify(parseAnalysis(next)) === JSON.stringify(a);
+    if (next !== line && ok) {
       applied.current = next;
       onApply(next);
     }

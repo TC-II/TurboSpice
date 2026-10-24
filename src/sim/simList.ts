@@ -9,7 +9,7 @@ import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import type { ComplexMode } from '../waveform/curves.ts';
 import { si } from '../waveform/series.ts';
 import type { Pane, PlotState } from '../waveform/view.ts';
-import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, type AnalysisKind, type Sweep } from './analyses.ts';
+import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, validateAnalysis, type AnalysisKind, type Sweep } from './analyses.ts';
 import { t } from '../i18n/i18n.ts';
 import { isComplexLine } from './complexSim.ts';
 
@@ -229,7 +229,8 @@ const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
 export function defaultLine(kind: AnalysisKind, info: { nets: string[]; sources: string[] }): string {
   const a = defaultAnalysis(kind);
   const src = info.sources[0] ?? '';
-  const named = info.nets.filter((n) => !AUTO_NET.test(n));
+  // (la tierra no es una salida ni una entrada)
+  const named = info.nets.filter((n) => !AUTO_NET.test(n) && n !== '0');
   const out = named.find((n) => /^out$/i.test(n)) ?? named[named.length - 1] ?? info.nets[0] ?? '';
   const inp = named.find((n) => /^in$/i.test(n)) ?? named[0] ?? '';
   switch (a.kind) {
@@ -248,6 +249,43 @@ export function defaultLine(kind: AnalysisKind, info: { nets: string[]; sources:
       a.inP = inp;
       a.outP = out;
       break;
+  }
+  return formatAnalysis(a);
+}
+
+/**
+ * Comando para una simulación nueva a partir del de otro testbench del mismo tipo: se conservan sus
+ * valores (tiempos, barridos), pero las redes y fuentes que no están en este circuito (o que
+ * faltaban) pasan a las de `defaultLine`; si no, una línea rota se copiaba a todas las nuevas
+ */
+export function reuseLine(line: string, kind: AnalysisKind, info: { nets: string[]; sources: string[] }): string {
+  const fresh = parseAnalysis(defaultLine(kind, info));
+  const a = parseAnalysis(line);
+  if (!a || !fresh || a.kind !== kind || fresh.kind !== kind) return defaultLine(kind, info);
+  const net = (v: string, d: string) => (v && (v === '0' || info.nets.some((n) => n.toLowerCase() === v.toLowerCase())) ? v : d);
+  const src = (v: string, d: string) => (v && info.sources.some((n) => n.toLowerCase() === v.toLowerCase()) ? v : d);
+  switch (a.kind) {
+    case 'dc': {
+      const f = fresh as typeof a;
+      const sweeps = a.sweeps.map((s, i) => ({ ...s, src: src(s.src, i ? '' : f.sweeps[0].src) })).filter((s, i) => i === 0 || s.src);
+      return formatAnalysis({ ...a, sweeps });
+    }
+    case 'noise': {
+      const f = fresh as typeof a;
+      return formatAnalysis({ ...a, out: net(a.out, f.out), ref: a.ref && net(a.ref, ''), src: src(a.src, f.src) });
+    }
+    case 'tf': {
+      const f = fresh as typeof a;
+      return formatAnalysis({ ...a, out: net(a.out, f.out), src: src(a.src, f.src) });
+    }
+    case 'sens': {
+      const f = fresh as typeof a;
+      return formatAnalysis({ ...a, out: net(a.out, f.out) });
+    }
+    case 'pz': {
+      const f = fresh as typeof a;
+      return formatAnalysis({ ...a, inP: net(a.inP, f.inP), inN: net(a.inN, '0'), outP: net(a.outP, f.outP), outN: net(a.outN, '0') });
+    }
   }
   return formatAnalysis(a);
 }
@@ -324,6 +362,21 @@ export function pzProblem(line: string): string | undefined {
   if (a.inP.toLowerCase() === (a.inN || '0').toLowerCase())
     return t('Poles and zeros: the input is between {p} and {n}, the same node. Choose as input the node where the signal enters.', { p: a.inP, n: a.inN || '0' });
   return undefined;
+}
+
+/**
+ * Qué le falta a un análisis para poder correr (la fuente, un nodo, un valor), dicho para el
+ * usuario; sin esto ngspice sólo diría "Error on line N"
+ */
+export function analysisProblem(line: string): string | undefined {
+  const pz = pzProblem(line);
+  if (pz) return pz;
+  const a = parseAnalysis(line);
+  if (!a) return undefined;
+  const errs = validateAnalysis(a);
+  if (!errs.length) return undefined;
+  const label = ANALYSES.find((x) => x.kind === a.kind)!.label;
+  return t('{analysis}: {problems}. Complete the boxes marked in red in the simulation bar.', { analysis: label, problems: errs.join('; ') });
 }
 
 /** Lo que ngspice escribe en el log de un .pz que falla, explicado */

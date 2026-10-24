@@ -96,8 +96,7 @@ import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
-import { spectrum, thd, type FftWindow } from './waveform/fft.ts';
-import { displayName, sameRuns, scaleOf, si, stepLabels, stepSweepPlots } from './waveform/series.ts';
+import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
@@ -1727,29 +1726,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
   }, []);
-  const doFft = (o: { expr: string; window: FftWindow; from?: number; to?: number }) => {
-    if (!sim || !plot) return;
-    const sc = scaleOf(plot)!;
-    let w;
-    try {
-      w = evalTrace(o.expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-    } catch (e) {
-      return setMessage((e as Error).message);
-    }
-    const sp = spectrum(sc.real, w.re, o);
-    const tt = thd(sp);
-    const name = `fft ${o.expr} (${plot.name})`;
-    const derived: SimPlot = {
-      name,
-      vectors: [
-        { name: 'frequency', type: 2, real: sp.freq },
-        { name: 'mag', type: 0, real: sp.amp },
-      ],
-      info: t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points, {window} window', { expr: o.expr, p1: si(tt.fundamental), p2: si(tt.amplitude), p3: tt.thd.toFixed(3), p4: tt.harmonics.length + 1, n: sp.n, window: o.window }),
-    };
-    setSim({ ...sim, result: { ...sim.result, plots: [...sim.result.plots.filter((p) => p.name !== name), derived] } });
-    selectPlot(name, panesByKind.current.get('fft') ?? [{ traces: [{ expr: 'db(mag)' }] }]);
-  };
   const pltInput = useRef<HTMLInputElement>(null);
 
   // Punto de operación: el de la simulación elegida o el último calculado, mientras el circuito
@@ -3321,7 +3297,7 @@ ${ltNetlistText(sim.built.lt)}
                   mode={mode}
                   active={activePane}
                   setActive={setActivePane}
-                  onFft={doFft}
+                  picker={picker}
                   onFocusTrace={() => traceBox.current?.focus()}
                   side={resultsSide}
                   toolsHost={viewerTools}

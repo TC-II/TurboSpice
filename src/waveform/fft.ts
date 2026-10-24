@@ -1,14 +1,17 @@
 // FFT de una señal del transitorio (paso de tiempo no uniforme → se remuestrea), con ventana,
 // espectro de amplitud de un solo lado y THD.
 
-export type FftWindow = 'rect' | 'hann' | 'hamming' | 'blackman' | 'flattop';
+import type { PaneFft } from './view.ts';
 
+export type FftWindow = PaneFft['window'];
+
+/** Ventanas con su nombre (en inglés: se traduce con t()) */
 export const WINDOWS: [FftWindow, string][] = [
-  ['hann', 'Hann'],
-  ['rect', 'Rectangular'],
-  ['hamming', 'Hamming'],
-  ['blackman', 'Blackman'],
-  ['flattop', 'Flat top (amplitudes exactas)'],
+  ['hann', 'Hann Window'],
+  ['hamming', 'Hamming Window'],
+  ['blackman', 'Blackman Window'],
+  ['flattop', 'Flat Top Window'],
+  ['rect', 'Rectangular Window'],
 ];
 
 function windowFn(w: FftWindow, n: number, N: number): number {

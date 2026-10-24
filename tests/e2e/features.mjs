@@ -190,14 +190,16 @@ const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
 check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
 // FFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
 await page.mouse.click(outW.x, outW.y);
-await page.getByRole('button', { name: 'FFT…' }).click();
-await page.getByLabel('Traza para la FFT').selectOption('V(out)');
-await page.getByRole('button', { name: 'Calcular' }).click();
-const fftInfo = await page.locator('.plot-info').textContent();
+await page.getByRole('button', { name: 'FFT', exact: true }).click();
+check(/Con todos los puntos/.test(await page.locator('.fft-tools .hint').last().textContent()), 'sin zoom, la FFT usa todos los puntos');
+check((await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents()).includes('Ventana de Hann'), 'ventanas con su nombre');
+await page.locator('.fft-tools input').fill('V(out)');
+const fftInfo = await page.locator('.fft-info').first().textContent();
 check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
-check((await page.getByRole('combobox', { name: 'Plot' }).inputValue()).startsWith('fft V(out)'), 'la FFT queda como un plot más');
-await page.getByRole('combobox', { name: 'Plot' }).selectOption('tran1');
-check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al volver al transitorio se recuperan sus trazas');
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)', 'la FFT queda como una traza en un panel debajo');
+check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la FFT tiene eje de frecuencias desde 0');
+await page.locator('.pane').last().getByRole('button', { name: 'Quitar panel' }).click();
+check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la FFT queda el transitorio');
 // #193: con zoom en un tramo chico las marcas del eje Y no se repiten
 {
   const cb = await page.locator('.pane-chart').first().boundingBox();

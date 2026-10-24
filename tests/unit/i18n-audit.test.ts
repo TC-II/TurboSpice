@@ -49,7 +49,7 @@ const SPANISH_OK = [
   /^\s*\/blob\/main\/docs\//,
 ];
 // Textos de la interfaz que son iguales en los dos idiomas (siglas, unidades, sintaxis de SPICE)
-const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT…', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);
+const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);
 
 describe('idioma de la interfaz: sin mezclar inglés y español', () => {
   it('cada t("…") tiene su traducción en es.ts', () => {

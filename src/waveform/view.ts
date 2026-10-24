@@ -12,8 +12,17 @@ export interface Trace {
   hidden?: boolean;
 }
 
+/** FFT de las trazas de un panel (#236): ventana y rango de tiempo usado (sin rango = todo) */
+export interface PaneFft {
+  window: 'rect' | 'hann' | 'hamming' | 'blackman' | 'flattop';
+  from?: number;
+  to?: number;
+}
+
 export interface Pane {
   traces: Trace[];
+  /** panel de espectro: cada traza es una expresión del transitorio y se muestra su FFT */
+  fft?: PaneFft;
 }
 
 /** Paneles por tipo de análisis ("tran", "ac", "dc", "noise"…) */
@@ -62,7 +71,7 @@ export const traceColor = (t: Trace, i: number) => t.color ?? PALETTE[i % PALETT
  */
 export function colorize(panes: Pane[]): Pane[] {
   if (panes.every((p) => p.traces.every((t) => t.color))) return panes;
-  return panes.map((p) => (p.traces.every((t) => t.color) ? p : { traces: p.traces.map((t, i) => (t.color ? t : { ...t, color: traceColor(t, i) })) }));
+  return panes.map((p) => (p.traces.every((t) => t.color) ? p : { ...p, traces: p.traces.map((t, i) => (t.color ? t : { ...t, color: traceColor(t, i) })) }));
 }
 
 /** Color para una traza nueva: el de la misma expresión en otro panel, o el primero libre */
@@ -83,7 +92,7 @@ export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
   const base = panes.length ? panes : emptyPanes();
   if (base[k].traces.some((t) => sameExpr(t.expr, expr))) return panes;
   const color = colorFor(base, expr);
-  return base.map((p, j) => (j === k ? { traces: [...p.traces, { expr, color }] } : p));
+  return base.map((p, j) => (j === k ? { ...p, traces: [...p.traces, { expr, color }] } : p));
 }
 
 /** Tipo de análisis de un plot de ngspice ("tran3" → "tran", "op vs R" → "op") */
@@ -106,9 +115,18 @@ export function asPlotView(v: unknown): PlotView | null {
       traces: (Array.isArray(p?.traces) ? (p.traces as unknown[]) : [])
         .filter((t): t is Trace => !!t && typeof (t as Trace).expr === 'string')
         .map((t) => ({ expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}) })),
+      ...asFft(p?.fft),
     }));
   }
   return Object.keys(out).length ? out : null;
+}
+
+const FFT_WINDOWS = ['rect', 'hann', 'hamming', 'blackman', 'flattop'];
+function asFft(v: unknown): { fft?: PaneFft } {
+  const f = v as PaneFft | undefined;
+  if (!f || typeof f !== 'object' || !FFT_WINDOWS.includes(f.window)) return {};
+  const num = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
+  return { fft: { window: f.window, ...(num(f.from) ? { from: f.from } : {}), ...(num(f.to) ? { to: f.to } : {}) } };
 }
 
 /** Vista guardada en el documento (comentario ";.plot …"), o null */

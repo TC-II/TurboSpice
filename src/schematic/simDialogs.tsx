@@ -27,7 +27,8 @@ export type Picker = (what: PickWhat) => Promise<string | null>;
 
 const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
 
-function Field({ label, value, onChange, placeholder, hint, required, number, list, pick }: {
+/** Campo con lista de valores y botón ⌖ para elegirlo en el esquemático (también en el visor, #236) */
+export function Field({ label, value, onChange, placeholder, hint, required, number, list, pick }: {
   label: string;
   value: string;
   onChange(v: string): void;

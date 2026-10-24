@@ -2,8 +2,9 @@
 // lleva al eje X del plot mostrado. Separado del componente para poder testearlo.
 import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceExprUnit } from '../sim/deviceParams.ts';
+import { spectrum, thd } from './fft.ts';
 import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
-import { isLogScale, resample, scaleOf } from './series.ts';
+import { isLogScale, resample, scaleOf, si } from './series.ts';
 import { PALETTE, traceColor, type Pane } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -37,6 +38,8 @@ export interface PaneData {
   /** unidades de los ejes izquierdo y derecho */
   yUnit: string;
   iUnit: string;
+  /** panel de FFT: fundamental y THD de cada traza */
+  info?: string[];
 }
 
 export interface CurveContext {
@@ -83,6 +86,7 @@ export function sweepSegments(x: Float64Array): [number, number][] {
 }
 
 export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
+  if (pane.fft) return fftCurves(pane, ctx);
   const scale = scaleOf(ctx.plot)!;
   const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
   const segs = all.length === 1 ? sweepSegments(scale.real) : [[0, scale.real.length] as [number, number]];
@@ -143,4 +147,39 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
 
   const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? sameUnit(visible.map((tt) => exprUnit(tt.expr))) : hasI ? 'A' : '';
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
+}
+
+/**
+ * Panel de FFT (#236): espectro (en dB) de cada traza del plot mostrado, en el rango de tiempo
+ * guardado en el panel; el eje X es la frecuencia.
+ */
+export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
+  const o = pane.fft!;
+  const scale = scaleOf(ctx.plot);
+  const errors = new Map<number, string>();
+  const curves: Curve[] = [];
+  const info: string[] = [];
+  let x = new Float64Array(0);
+  if (scale?.name !== 'time') {
+    pane.traces.forEach((_, ti) => errors.set(ti, t('The FFT needs a transient analysis')));
+    return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A' };
+  }
+  // todas las trazas con la misma grilla de frecuencias: mismo rango y cantidad de puntos
+  const from = Math.max(o.from ?? scale.real[0], scale.real[0]);
+  const to = Math.min(o.to ?? scale.real[scale.real.length - 1], scale.real[scale.real.length - 1]);
+  pane.traces.forEach((tt, ti) => {
+    let w;
+    try {
+      w = evalTrace(tt.expr, { resolve: ctx.resolver(ctx.plot), scale: scale.real, scaleName: scale.name });
+    } catch (e) {
+      errors.set(ti, (e as Error).message);
+      return;
+    }
+    const sp = spectrum(scale.real, w.re, { from, to, window: o.window, ...(x.length ? { points: x.length * 2 } : {}) });
+    if (!x.length) x = sp.freq;
+    const th = thd(sp);
+    info.push(t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points', { expr: tt.expr, p1: si(th.fundamental), p2: si(th.amplitude), p3: th.thd.toFixed(3), p4: th.harmonics.length + 1, n: sp.n }));
+    curves.push({ label: `FFT ${tt.expr}`, trace: ti, run: 0, color: traceColor(tt, ti), dash: false, axis: 'y', y: sp.amp.map((a) => 20 * Math.log10(a)), hidden: !!tt.hidden });
+  });
+  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info };
 }

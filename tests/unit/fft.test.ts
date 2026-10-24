@@ -26,3 +26,29 @@ describe('FFT y THD', () => {
     expect(r.harmonics[1]).toBeCloseTo(0.1, 2);
   });
 });
+
+describe('panel de FFT (#236)', async () => {
+  const { paneCurves } = await import('../../src/waveform/curves.ts');
+  const { asPlotView } = await import('../../src/waveform/view.ts');
+  const { x, y } = sig((v) => Math.sin(2 * Math.PI * 1000 * v));
+  const plot = { name: 'tran1', vectors: [{ name: 'time', type: 1, real: x }, { name: 'v(out)', type: 3, real: y }] } as never;
+  const resolver = () => (fn: string, args: string[]) => (fn.toLowerCase() === 'v' && args[0] === 'out' ? { re: y } : null);
+  const ctx = { plot, runs: [plot], labels: new Map(), resolver, mode: 'bode' as const };
+
+  it('la traza del panel se muestra como espectro en dB con eje de frecuencias', () => {
+    const d = paneCurves({ traces: [{ expr: 'V(out)' }], fft: { window: 'hann' } }, ctx);
+    expect(d.xName).toBe('frequency');
+    expect(d.yUnit).toBe('dB');
+    expect(d.curves).toHaveLength(1);
+    let k = 1;
+    for (let i = 2; i < d.x.length; i++) if (d.curves[0].y[i] > d.curves[0].y[k]) k = i;
+    expect(d.x[k]).toBeCloseTo(1000, -2);
+    expect(d.info?.[0]).toMatch(/fundamental 1(\.00)?kHz/);
+  });
+
+  it('el rango y la ventana del panel se guardan con la vista', () => {
+    const v = asPlotView({ tran: [{ traces: [{ expr: 'V(out)' }], fft: { window: 'hamming', from: 1e-3, to: 2e-3 } }, { traces: [], fft: { window: 'x' } }] });
+    expect(v?.tran[0].fft).toEqual({ window: 'hamming', from: 1e-3, to: 2e-3 });
+    expect(v?.tran[1].fft).toBeUndefined();
+  });
+});

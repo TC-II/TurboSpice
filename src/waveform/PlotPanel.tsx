@@ -7,7 +7,7 @@ import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
-import { bandwidth3dB, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
+import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { boxAxes, extent, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { colorFor, cursorForClick, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
@@ -974,7 +974,7 @@ function PaneView(props: {
 
 function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[]; cursors: Cursors; preview?: boolean; setCursors(f: (c: Cursors) => Cursors): void }) {
   const { a, b } = cursors;
-  const dx = a !== undefined && b !== undefined ? a - b : NaN;
+  const dx = a !== undefined && b !== undefined ? b - a : NaN;
   const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
   const labels = [...new Set(data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => c.label)))];
   const xu = xUnit(data[0]?.xName);
@@ -1009,7 +1009,7 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
             <th>{t('Trace')}</th>
             <th>A</th>
             <th>B</th>
-            <th>A − B</th>
+            <th>B − A</th>
             <th>{t('slope')}</th>
           </tr>
         </thead>
@@ -1023,8 +1023,8 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
                 <td style={{ color: c.color }}>{c.label}</td>
                 <td>{fix(ya)}</td>
                 <td>{fix(yb)}</td>
-                <td>{fix(ya - yb)}</td>
-                <td>{fix((ya - yb) / dx)}</td>
+                <td>{fix(cursorDiff(a ?? NaN, b ?? NaN, ya, yb).dy)}</td>
+                <td>{fix(cursorDiff(a ?? NaN, b ?? NaN, ya, yb).slope)}</td>
               </tr>
             );
           })}
@@ -1033,7 +1033,7 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
             <td className={preview ? 'xa preview' : 'xa'} title={preview ? t('Follows the mouse: click to fix it') : undefined}>{fix(a ?? NaN, xu)}</td>
             <td className="xb">{fix(b ?? NaN, xu)}</td>
             <td className="xd">{fix(dx, xu)}</td>
-            <td className="xf">{fix(1 / Math.abs(dx), xu === 's' ? 'Hz' : '')}</td>
+            <td className="xf">{fix(cursorDiff(a ?? NaN, b ?? NaN, NaN, NaN).freq, xu === 's' ? 'Hz' : '')}</td>
           </tr>
         </tbody>
       </table>

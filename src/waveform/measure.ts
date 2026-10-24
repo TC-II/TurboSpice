@@ -136,3 +136,13 @@ export function toCsv(xName: string, xs: ArrayLike<number>, cols: { name: string
   }
   return lines.join('\n') + '\n';
 }
+
+/**
+ * Diferencia entre los cursores B y A (B − A): en x, en y, pendiente (yB−yA)/(xB−xA)
+ * y frecuencia 1/|xB−xA|.
+ */
+export function cursorDiff(xa: number, xb: number, ya: number, yb: number) {
+  const dx = xb - xa;
+  const dy = yb - ya;
+  return { dx, dy, slope: dy / dx, freq: 1 / Math.abs(dx) };
+}

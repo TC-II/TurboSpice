@@ -785,6 +785,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     out.push('.control', ...body, '.endc');
   }
   if (ctl && !hooks) warnings.push(...controlRunWarnings(ctl.text.split('\\n').slice(1, -1), !!blocksCtl));
+  // #241 Complex simulation: un .control común sin "run" reemplaza al análisis del testbench (que
+  // queda en el .asc para LTspice): no se emiten los dos. Con "run", el análisis es lo que corre.
+  const replacesAnalysis = !!ctl && !hooks && !blocksCtl && !controlUsesRun(ctl.text.split('\\n').slice(1, -1));
   for (const tt of lt.texts) {
     if (hooks && tt === ctl) continue;
     if (blocksCtl && tt === blocksCtl) continue;
@@ -814,6 +817,10 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
         line = ic;
       }
       if (DROP_DIRECTIVES.test(line)) continue;
+      if (replacesAnalysis && TESTBENCH_ANALYSIS.test(line)) {
+        out.push(`* ${line}`);
+        continue;
+      }
       if (/^\.meas(ure)?\b/i.test(line)) {
         measures.push(line);
         out.push(`* ${line}`);
@@ -946,6 +953,12 @@ function declaredParams(lt: LtNetlist): Set<string> {
   return out;
 }
 
+// Comando de análisis del testbench (fuera del .control)
+const TESTBENCH_ANALYSIS = /^\.(tran|ac|dc|noise|op|tf|sens|pz|disto|sp|pss)\b/i;
+
+/** ¿El cuerpo del .control usa "run" (corre los análisis del testbench)? */
+export const controlUsesRun = (lines: string[]) => lines.some((raw) => /^run$/i.test(raw.replace(/;.*$/, '').trim().split(/\s+/)[0] ?? ''));
+
 // Comandos de análisis de ngspice (13.5): en un .control corren ese análisis, no el del testbench
 const ANALYSIS_COMMANDS = /^(tran|ac|dc|op|noise|tf|pz|sens|disto|pss|sp)$/i;
 
@@ -967,7 +980,8 @@ export function controlRunWarnings(lines: string[], blocks: boolean): string[] {
   if (blocks) return run || own.length ? [] : [t('The blocks program has no Simulate block: nothing is simulated')];
   const p0 = own.join(', ');
   if (own.length && run) return [t('The .control block runs the simulation configuration and also its own analysis ({p0})', { p0 })];
-  if (own.length) return [t('The .control block runs its own analysis ({p0}), not the testbench\'s simulation configuration', { p0 })];
+  // sin "run" es una Complex simulation (#241): su análisis reemplaza al del testbench
+  if (own.length) return [];
   if (!run) return [t('The .control block has no "run" or analysis command: nothing is simulated')];
   return [];
 }

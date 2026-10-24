@@ -2,12 +2,14 @@
 // los parámetros del análisis en una o dos líneas (el Barrido DC usa la segunda para la otra
 // fuente; las redes y fuentes se pueden elegir en el esquemático), un cuadrado con su estado
 // (sin correr, corriendo, lista) y una × para borrarla. Los cambios se aplican al salir del
-// campo o con Enter y reemplazan el comando del esquemático.
+// campo o con Enter y reemplazan el comando del esquemático. En una Complex simulation (#241) no
+// hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
+import { Icon } from '../ui/icons.tsx';
 
 type BarField =
   | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number }
@@ -123,7 +125,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, control, onStudio, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -141,6 +143,10 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   running: boolean;
   /** elegir una red o una fuente haciendo click en el esquemático */
   picker: Picker;
+  /** texto del bloque .control si la simulación es Complex (#241) */
+  control?: string;
+  /** abrir el Studio */
+  onStudio(): void;
   onApply(line: string): void;
   onRun(): void;
 }) {
@@ -163,7 +169,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     }
   };
   const change = (a: Analysis) => (setDraft(a), apply(a));
-  const rows = sim && draft ? barRows(draft) : [];
+  const rows = sim && draft && control === undefined ? barRows(draft) : [];
 
   // el indicador de estado vive bajo el widget del usuario (#213)
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -184,7 +190,15 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
       {!sim ? (
         <span className="sb-hint">{t('Select simulation type')}</span>
       ) : null}
-      {sim && (
+      {sim && control !== undefined && (
+        <span className="sb-complex">
+          <button type="button" className="sb-studio" onClick={onStudio} aria-label={t('Open the Studio')} title={t('Complex simulation: click to open the Studio')}>
+            <Icon name="study" size={16} /> {t('Complex simulation')}
+          </button>
+          <pre className="sb-control-pop" role="tooltip">{control}</pre>
+        </span>
+      )}
+      {sim && control === undefined && (
         <div className="sb-rows">
           {!draft && <code className="sb-line">{line}</code>}
           {draft && !rows.length && <span className="sb-hint">{t('No parameters')}</span>}

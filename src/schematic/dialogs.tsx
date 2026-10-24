@@ -404,7 +404,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
                   <button
                     type="button"
                     className="link"
-                    title={t('Sweep {k} of this instance from the Study (.step)', { k })}
+                    title={t('Sweep {k} of this instance from the Studio (.step)', { k })}
                     onClick={() => onSweep(k, cur.get(k.toLowerCase()) ?? d, Object.fromEntries(Object.entries(vals).filter(([kk, v]) => v !== (eff.get(kk) ?? ''))))}
                   >
                     {t('Sweep')}

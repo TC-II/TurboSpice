@@ -3,7 +3,8 @@
 import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
-import { findAnalysis, removeAnalysis } from '../schematic/directivesEdit.ts';
+import { removeAnalysis } from '../schematic/directivesEdit.ts';
+import { simLine } from '../sim/complexSim.ts';
 import { analysisLabel, MAX_SIMS, type SimView } from '../sim/simList.ts';
 import { EMPTY_ASC, newId, type Project, type ProjectFile, type Run, type Sim, type Variant } from './turbo.ts';
 import { t } from '../i18n/i18n.ts';
@@ -11,11 +12,11 @@ import { t } from '../i18n/i18n.ts';
 // --- lectura ----------------------------------------------------------------------------------
 
 const lineCache = new Map<string, string>();
-/** Comando de análisis de un .asc guardado ('' si no tiene) */
+/** Comando de análisis de un .asc guardado ('' si no tiene; COMPLEX_LINE si es Complex, #241) */
 export function lineOf(asc: string): string {
   let l = lineCache.get(asc);
   if (l === undefined) {
-    l = findAnalysis(parseAsc(asc))?.value ?? '';
+    l = simLine(parseAsc(asc));
     if (lineCache.size > 500) lineCache.clear();
     lineCache.set(asc, l);
   }

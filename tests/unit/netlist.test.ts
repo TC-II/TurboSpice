@@ -302,7 +302,8 @@ TEXT 0 0 Left 2 !.tran 10m
 TEXT 0 100 Left 2 ;.control\\n${body}\\n.endc
 `).warnings;
     expect(ctl('run\\nprint v(1)')).toEqual([]);
-    expect(ctl('tran 1u 1m\\nac dec 10 1 1k')).toEqual(['El bloque .control corre su propio análisis (tran, ac), no la configuración de simulación del testbench']);
+    // sin run es una Complex simulation (#241): su análisis reemplaza al del testbench, sin aviso
+    expect(ctl('tran 1u 1m\\nac dec 10 1 1k')).toEqual([]);
     expect(ctl('run\\nac dec 10 1 1k')).toEqual(['El bloque .control corre la configuración de simulación y además su propio análisis (ac)']);
     expect(ctl('* tran 1u 1m\\nprint v(1)')).toEqual(['El bloque .control no tiene "run" ni un comando de análisis: no se simula nada']);
     // con secciones (código propio del Estudio) TurboSpice agrega el run: sin aviso

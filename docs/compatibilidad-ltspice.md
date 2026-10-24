@@ -154,6 +154,14 @@ los ignora, así que el `.asc` sigue simulando igual en LTspice; TurboSpice reco
 empiezan con esas palabras y los ejecuta (en el esquemático se ven en violeta). Un comentario común como
 `;.step …` sigue siendo un comentario.
 
+**Complex simulation (#241).** Un testbench con un `.control` que decide qué se simula (escrito a
+mano o un programa de bloques del Studio; no los que tienen las marcas de sección) es del tipo
+*Complex simulation*. El `.asc` conserva el comando de análisis (`.tran …`) como directiva: es lo que
+simula LTspice. En la netlist de ngspice, si el `.control` no usa `run`, ese análisis va comentado (el
+bloque lo reemplaza); con `run`, es justamente lo que `run` corre. Al pasar el testbench a un análisis
+simple, el `.control` se guarda en el comentario con datos `;.ctloff …` (no se dibuja ni se ejecuta) y
+vuelve al elegir otra vez Complex simulation.
+
 ## Traducción a ngspice (lo implícito de LTspice, explícito)
 
 | LTspice | ngspice |

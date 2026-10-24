@@ -24,8 +24,8 @@ const P: Record<string, ReactNode> = {
   redo: <path d="M13 4.5 16.5 8 13 11.5M16.5 8H8a4.5 4.5 0 0 0 0 9h4" />,
   select: <path d="M4.5 3v13l3.5-3.5 2.5 5 2-1-2.5-5h5z" />,
   wire: <path d="M3 15.5h6v-11h8M3 15.5a1.2 1.2 0 1 0 0 .01M17 4.5a1.2 1.2 0 1 0 0 .01" />,
-  // resistencia europea (rectángulo)
-  component: <path d="M2 10h4M14 10h4M6 7h8v6H6z" />,
+  // chip (CI): cuerpo rectangular con pines a los cuatro lados y marca de pin 1
+  component: <path d="M5 5h10v10H5zM2 7.5h3M2 12.5h3M15 7.5h3M15 12.5h3M7.5 2v3M12.5 2v3M7.5 15v3M12.5 15v3M7.5 7.5h.01" />,
   ground: <path d="M10 3v7M4 10h12M6.5 13h7M9 16h2" />,
   label: <path d="M3 6.5h9l4.5 3.5-4.5 3.5H3zM6.5 10h.01" />,
   // figuras: línea, rectángulo y círculo

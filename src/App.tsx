@@ -379,7 +379,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
   const hierOn = path.length > 0;
-  const treeShown = treeOpen || treePeek;
+  // con «mostrar al acercar el mouse» el panel oculto queda como un borde visible (#251)
+  const treeShown = treeOpen || treePeek || hoverReveal;
   const [quickOpen, setQuickOpen] = useState(false);
   const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
@@ -3019,6 +3020,8 @@ ${ltNetlistText(sim.built.lt)}
               benches={treeBenches}
               groups={project.groups}
               peek={!treeOpen && treePeek}
+              edgeOnly={!treeOpen && !treePeek}
+              onEnter={() => !treeOpen && !treePeek && tool.kind === 'select' && setTreePeek(true)}
               onBenchItem={benchItem}
               onNewGroup={newGroup}
               onGroupAction={groupAction}

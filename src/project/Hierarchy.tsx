@@ -50,7 +50,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave, onEnter }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -60,6 +60,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   current: string;
   /** se está mostrando por acercar el mouse (encima del esquemático) */
   peek: boolean;
+  /** oculto en modo «mostrar al acercar el mouse»: queda sólo un borde visible (#251) */
+  edgeOnly?: boolean;
   onBench(id: string): void;
   /** volver al testbench activo (desde un subcircuito) */
   onTestbench(): void;
@@ -90,6 +92,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onClose(): void;
   /** el mouse salió del panel (para esconderlo si se mostró al acercarlo) */
   onLeave(): void;
+  /** el mouse entró al panel (para expandirlo desde el borde) */
+  onEnter?(): void;
 }) {
   // grupos, testbenches y sus parámetros plegados (los testbenches arrancan plegados: una línea)
   const [renamingProject, setRenamingProject] = useState(false);
@@ -340,7 +344,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
     </li>
   );
   return (
-    <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
+    <aside className={`project-tree${peek ? ' peek' : ''}${edgeOnly ? ' collapsed' : ''}`} aria-label={t('Project')} aria-hidden={edgeOnly || undefined} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
       <header>
         {renamingProject ? (
           <NameInput

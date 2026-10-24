@@ -1285,6 +1285,7 @@ export const es: Record<string, string> = {
   'Import subcircuits: .zip, .asc (+ .asy), .lib/.sub': 'Importar subcircuitos: .zip, .asc (+ .asy), .lib/.sub',
   '{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Studio.': '{inst}: {param} = {{pname}}, barrido con {step}. Editá los valores en el Estudio.',
   '{name} (order {n})': '{name} (orden {n})',
+  'Name: just the identifier, without braces (e.g. R3). Inside the subcircuit use it between braces in values and expressions: {R3}, {2*R3}. Each instance can override the default value (R3=10k).': 'Nombre: sólo el identificador, sin llaves (por ejemplo, R3). Adentro del subcircuito se usa entre llaves en valores y expresiones: {R3}, {2*R3}. Cada instancia puede cambiar el valor por defecto (R3=10k).',
   'None. Inside the subcircuit they are used as {name} (e.g. a resistor of value {R}); each instance can change them.': 'Ninguno. Adentro del subcircuito se usan como {name} (por ejemplo, una resistencia de valor {R}); cada instancia puede cambiarlos.',
   'Parameter name': 'Nombre del parámetro',
   'Parameters': 'Parámetros',

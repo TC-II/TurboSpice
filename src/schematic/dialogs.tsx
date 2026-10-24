@@ -262,9 +262,6 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
               <SymbolPreview path={current.path} lib={lib} className="big" />
               <strong>{current.path}</strong>
               <p>{current.desc}</p>
-              <p className="pins">
-                {t('Pins:')}{' '}{lib.symbol(current.path)?.pins.map((p) => p.attrs.get('PinName') || '?').join(', ')}
-              </p>
             </>
           )}
         </div>

@@ -1711,6 +1711,8 @@ export const es: Record<string, string> = {
   'Verilog: synthesizable code, turned into a digital block with its symbol': 'Verilog: código sintetizable que se convierte en un bloque digital con su símbolo',
   'subcir': 'subcir',
   'New Verilog module': 'Módulo Verilog nuevo',
+  'Verilog Editor': 'Editor Verilog',
+  'write the module; its ports are the pins of the symbol': 'escribí el módulo; sus puertos son los pines del símbolo',
   'None yet: create one with «+ New» or import it.': 'Todavía no hay: creá uno con «+ Nuevo» o importalo.',
   // descripción completa de la simulación y errores de polos y ceros
   'max step {v}': 'paso máx. {v}',

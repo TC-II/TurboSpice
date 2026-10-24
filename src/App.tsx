@@ -3253,10 +3253,12 @@ ${ltNetlistText(sim.built.lt)}
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
           {curSub && (
-            <div className="sub-hint" role="status">
-              <strong>{t('Subcircuit Editor')}</strong>
+            <div className={`sub-hint${curVerilog ? ' verilog' : ''}`} role="status">
+              <strong>{curVerilog ? t('Verilog Editor') : t('Subcircuit Editor')}</strong>
               <span className="sub-hint-name">{curSub}</span>
-              <span className="sub-hint-text">{t('draw the circuit between the ports (net labels with a port, N)')}</span>
+              <span className="sub-hint-text">
+                {curVerilog ? t('write the module; its ports are the pins of the symbol') : t('draw the circuit between the ports (net labels with a port, N)')}
+              </span>
               <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
                 {t('Return')}
               </button>
@@ -3836,7 +3838,7 @@ ${ltNetlistText(sim.built.lt)}
         />
       )}
       {dialog?.kind === 'newModule' && (
-        <NewModuleDialog kind={dialog.module} initial={freeSubcktName(projectRef.current)} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
+        <NewModuleDialog kind={dialog.module} initial={freeSubcktName(projectRef.current, dialog.module === 'verilog' ? 'VERILOG' : 'SUB')} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
       )}
       {driveConflict && (
         <Modal title={t('The file changed in Google Drive')} onClose={() => setDriveConflict(null)}>

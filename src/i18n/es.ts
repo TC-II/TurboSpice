@@ -1586,4 +1586,11 @@ export const es: Record<string, string> = {
   'Fit the symbol to the view (wheel: zoom, middle or right button: pan)': 'Encuadrar el símbolo (rueda: zoom, botón del medio o derecho: desplazar)',
   'Undo (Ctrl+Z)': 'Deshacer (Ctrl+Z)',
   'Delete the selected shape (Del)': 'Borrar la figura seleccionada (Supr)',
+  '{n} lines of the file could not be read and were kept as they are (the first one: {line})': '{n} líneas del archivo no se pudieron leer y quedaron tal cual (la primera: {line})',
+  'TurboSpice ran into an unexpected error': 'TurboSpice tuvo un error inesperado',
+  'Your work is autosaved in this browser: reloading the page brings it back.': 'Tu trabajo se autoguarda en este navegador: al recargar la página vuelve.',
+  'Reload': 'Recargar',
+  'This could not be shown: {message}': 'Esto no se pudo mostrar: {message}',
+  'Retry': 'Reintentar',
+  'unexpected "{v}"': '"{v}" inesperado',
 };

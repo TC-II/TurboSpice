@@ -78,6 +78,11 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .traces label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
 .plot { flex: 1; min-height: 0; overflow: hidden; }
 .empty { color: var(--fg-muted); }
+/* ErrorBoundary: el error en el lugar de lo que no se pudo dibujar */
+.crash { padding: 12px; font-size: 13px; color: var(--fg-muted); }
+.crash p { margin: 0 0 8px; }
+.crash-app { max-width: 640px; margin: 10vh auto; color: var(--fg); background: var(--bg); }
+.crash-app pre { white-space: pre-wrap; color: var(--err); }
 .scalars { border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
 .scalars th, .scalars td { text-align: left; padding: 3px 12px 3px 0; border-bottom: 1px solid var(--grid); }
 .scalars th { font-weight: 500; color: var(--fg-muted); }

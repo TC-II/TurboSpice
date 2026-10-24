@@ -8,5 +8,4 @@ export type WorkerResponse =
   | { id: number; type: 'ready' }
   | { id: number; type: 'result'; result: SimResult; ms: number }
   | { id: number; type: 'error'; message: string }
-  | { type: 'output'; line: string }
   | { type: 'status'; status: string; percent: number };

@@ -82,7 +82,8 @@ export async function importLtspiceLibrary(files: File[], onProgress?: (done: nu
       const tx = d.transaction(FILES, 'readwrite');
       for (const { rel, text } of batch) tx.objectStore(FILES).put(text, rel.toLowerCase());
       tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+      // sin espacio (QuotaExceededError) la transacción se aborta sin 'error': la importación quedaba colgada
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new DOMException('aborted', 'AbortError'));
     });
     for (const { rel, text } of batch) {
       const key = rel.toLowerCase();

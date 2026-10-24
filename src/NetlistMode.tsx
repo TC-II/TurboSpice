@@ -6,6 +6,7 @@ import { EXAMPLES } from './examples.ts';
 import { Plot } from './waveform/lazy.ts';
 import { displayName, scaleOf, si, type ComplexView } from './waveform/series.ts';
 import { t } from './i18n/i18n.ts';
+import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 
 export type Status =
   | { kind: 'loading' }
@@ -57,7 +58,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
 
   const abort = () => {
     engine.abort();
-    engine.ready.then(() => setStatus({ kind: 'idle' }));
+    engine.ready.then(() => setStatus({ kind: 'idle' }), (e: Error) => setStatus({ kind: 'error', message: e.message }));
     setStatus({ kind: 'error', message: t('Simulation aborted') });
   };
 
@@ -186,9 +187,11 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
                   </label>
                 ))}
               </div>
-              <Suspense fallback={null}>
-                <Plot plot={plot} vectors={chosen} view={view} />
-              </Suspense>
+              <ErrorBoundary resetKeys={[plot, chosen, view]}>
+                <Suspense fallback={null}>
+                  <Plot plot={plot} vectors={chosen} view={view} />
+                </Suspense>
+              </ErrorBoundary>
             </>
           )}
           {plot && !scale && <ScalarTable plot={plot} />}

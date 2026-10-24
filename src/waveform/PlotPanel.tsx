@@ -91,6 +91,10 @@ const safeRange: uPlot.Range.Function = (_u, min, max) => {
 const fmt = (v: number, unit = '') => (Number.isFinite(v) ? `${si(v, 4)}${unit}` : '—');
 /** Lecturas que cambian con el mouse (cursores, leyenda): siempre del mismo ancho, sin parpadeo */
 const fix = (v: number, unit = '') => `${siFixed(v)}${Number.isFinite(v) ? unit : ' '.repeat(unit.length)}`;
+const allFinite = (y: Float64Array) => {
+  for (let i = 0; i < y.length; i++) if (!Number.isFinite(y[i])) return false;
+  return true;
+};
 const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName === 'frequency' ? 'Hz' : '');
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
@@ -554,7 +558,13 @@ function PaneView(props: {
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
     // Y sin zoom fijado: el rango de todos los datos (no el de lo visible), así el zoom en X no
     // cambia la escala de amplitud (#200); Ctrl+Y la ajusta a lo visible
-    const fullY = (scale: string) => extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y));
+    // (los datos no cambian mientras vive el gráfico: se recorren una vez por escala, no en cada
+    // rueda o paneo, que con millones de puntos se notaba)
+    const extents = new Map<string, Range | null>();
+    const fullY = (scale: string) => {
+      if (!extents.has(scale)) extents.set(scale, extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y)));
+      return extents.get(scale)!;
+    };
     const whole = (scale: string): uPlot.Range.Function => (u, min, max) => {
       const e = fullY(scale);
       return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
@@ -743,8 +753,9 @@ function PaneView(props: {
         ],
       },
     };
-    // valores no finitos (dB de 0, divisiones por 0) como huecos: uPlot no los admite
-    const ys = data.curves.map((c) => Array.from(c.y, (v) => (Number.isFinite(v) ? v : null)));
+    // valores no finitos (dB de 0, divisiones por 0) como huecos: uPlot no los admite. Sin ellos
+    // va el arreglo tal cual (copiarlo a un Array de JS costaba ~100 ms y decenas de MB por millón de puntos)
+    const ys = data.curves.map((c) => (allFinite(c.y) ? c.y : Array.from(c.y, (v) => (Number.isFinite(v) ? v : null))));
     const u = new uPlot(opts, [data.x, ...ys] as uPlot.AlignedData, el);
     chart.current = u;
     live.current.register(u);

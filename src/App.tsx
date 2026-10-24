@@ -27,7 +27,7 @@ import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
-import { parseAsc } from './asc/parse.ts';
+import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
@@ -116,6 +116,7 @@ import { loadView } from './schematic/autosave.ts';
 import { decode, decodeText } from './asc/encoding.ts';
 import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
@@ -804,6 +805,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const view = asPlotView(shared.view);
     const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
     remember(loadDoc(d, f.name), { name: `${projectName(f.name)}${EXT}` });
+    warnMissing(f.doc);
     return true;
   }, [loadDoc]);
 
@@ -851,9 +853,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     if (!restored) return;
     const tt = setTimeout(() => {
-      serializeTurbo(snapshot()).then((turbo) =>
-        saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }),
-      );
+      serializeTurbo(snapshot())
+        .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
+        .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);
   }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
@@ -1143,7 +1145,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     try {
       if (bytes) return await openBytes(bytes, r.name, at);
       // la copia guardada en recientes
-      if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
+      if (!r.turbo) {
+        const d = parseAsc(r.asc);
+        remember(loadDoc(d, r.name), { name: `${projectName(r.name)}${EXT}` });
+        return warnMissing(d);
+      }
       const { project: parsed, warnings } = await parseTurbo(r.asc);
       const p = { ...parsed, name: projectName(r.name) };
       loadProject(p, { name: r.name, ...at });
@@ -1263,7 +1269,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const abort = () => {
     engine.abort();
-    engine.ready.then(() => setStatus({ kind: 'idle' }));
+    engine.ready.then(() => setStatus({ kind: 'idle' }), (e: Error) => setStatus({ kind: 'error', message: e.message }));
     setStatus({ kind: 'error', message: t('Simulation aborted') });
   };
   /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
@@ -2108,7 +2114,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Avisa si el circuito usa símbolos que no están en la librería ni entre los del usuario */
   const warnMissing = (d: AscDoc) => {
     const miss = missingSymbols(d);
-    if (miss.length) setMessage(t('Missing symbols: {p0}. Add them in File › My symbols and models.', { p0: miss.join(', ') }));
+    const bad = badLines(d);
+    const msgs = [
+      ...(miss.length ? [t('Missing symbols: {p0}. Add them in File › My symbols and models.', { p0: miss.join(', ') })] : []),
+      // (las líneas dañadas quedan tal cual en el archivo: no se pierden al guardar)
+      ...(bad.length ? [t('{n} lines of the file could not be read and were kept as they are (the first one: {line})', { n: bad.length, line: bad[0].slice(0, 80) })] : []),
+    ];
+    if (msgs.length) setMessage(msgs.join(' · '));
   };
   const storeUserFiles = (next: UserFile[]) => {
     setUserFiles(next);
@@ -3370,6 +3382,8 @@ ${ltNetlistText(sim.built.lt)}
               )}
             </div>
             <div className="results-body">
+              {/* un error al dibujar el gráfico (o el visor que no bajó sin red) no se lleva el resto */}
+              <ErrorBoundary resetKeys={[panel, plot, panes, mode]}>
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
               {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
                 <Suspense fallback={null}>
@@ -3403,6 +3417,7 @@ ${ltNetlistText(sim.built.lt)}
               )}
               {panel === 'plot' && plot && !scale &&
                 (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} />)}
+              </ErrorBoundary>
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
               {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}

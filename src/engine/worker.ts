@@ -80,7 +80,7 @@ async function load(): Promise<Ngspice> {
     {
       locateFile: (path) => `${ENGINE_URL}${path}`,
       ...(hash('ngspice.wasm') ? { instantiateWasm } : {}),
-      onOutput: (line) => post({ type: 'output', line }),
+      // (la salida llega entera en result.log: una línea por mensaje inundaba el hilo principal)
       onStatus: (status, percent) => {
         const now = performance.now();
         if (now - lastStatus > 100) {

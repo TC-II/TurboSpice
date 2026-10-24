@@ -55,6 +55,8 @@ export interface NgspiceNetlist {
   /** el .control lo generó un programa de bloques (tabla, listas e histogramas en el log) */
   blocks?: boolean;
   warnings: string[];
+  /** elementos sin valor asignado (R, C, L, fuentes…): no se simula hasta asignarlo (#256) */
+  missingValues: string[];
 }
 
 // Parámetros de L/C/V que ngspice no conoce y se expanden en elementos
@@ -618,6 +620,7 @@ function convertElements(
   startup = false,
   holdIc = false,
   coupled = new Set<string>(),
+  missingValues: string[] = [],
 ): string[] {
   const out: string[] = [];
   const extra: string[] = [];
@@ -647,6 +650,7 @@ function convertElements(
     // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
     if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {
       warnings.push(t('{name} has no value assigned', { name: e.name }));
+      missingValues.push(e.name);
     }
     if (letter === 'X') {
       const { main, params, order } = splitParams(e.value);
@@ -717,6 +721,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const includes: string[] = [];
   const subcktParams = new Map<string, Map<string, string>>();
   const blockNames = new Map<string, Map<string, string>>();
+  const missingValues: string[] = [];
   const out: string[] = [
     `* ${title}`,
     // Constante predefinida en las expresiones de LTspice que ngspice no tiene en .param
@@ -740,7 +745,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
   const holdIc = tranHoldsIc(lt);
   for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t('.ic I({l})={v}: ngspice uses the inductor\'s initial current only with .tran uic', { l, v }));
-  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt)));
+  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt), missingValues));
   out.push(...capacitorIcs(lt, names, holdIc));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
@@ -903,7 +908,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
     const inner = new Map<string, string>();
     blockNames.set(b.name.toLowerCase(), inner);
-    out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams));
+    out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams, undefined, false, false, undefined, missingValues));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;
       for (const raw of tt.text.split('\\n')) {
@@ -922,7 +927,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, blockNames, warnings, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
+  return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

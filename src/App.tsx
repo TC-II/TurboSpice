@@ -1156,9 +1156,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
       const built = await buildSimulation(doc, lib, ascName(), allTraces());
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
-      const tooBig = built.tooBig.map((p) => p.text);
-      const { result, ms } = tooBig.length
-        ? { result: { plots: [], log: tooBig, errors: tooBig, aborted: false }, ms: 0 }
+      // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
+      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name }))];
+      const { result, ms } = blocking.length
+        ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
         : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
@@ -2728,7 +2729,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const problems = sim
     ? [
         ...sim.result.errors.map((text) => ({ kind: 'err' as const, text })),
-        ...sim.built.warnings.map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
+        ...sim.built.warnings.filter((text) => !sim.result.errors.includes(text)).map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;

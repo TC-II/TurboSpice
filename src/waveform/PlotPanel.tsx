@@ -849,17 +849,20 @@ function PaneView(props: {
     let dragging: CursorKey | null = null;
     // paneo con el botón del medio o el derecho: el derecho, en modo cursor, pone el cursor B
     // si se suelta sin moverse más de PAN_SLOP px (clic); si se mueve, panea
-    let pan: { id: number; x: number; y: number; sx: Range; sy: Range; moved: boolean; click: PointerEvent | null } | null = null;
+    // (arrastrar con el izquierdo sobre un eje panea sólo esa escala)
+    let pan: { id: number; x: number; y: number; sx: Range; sy: Range; sr: Range | null; axis: 'left' | 'right' | 'bottom' | null; moved: boolean; click: PointerEvent | null } | null = null;
     let panned = false; // para no abrir el menú contextual tras un paneo con el botón derecho
     const panStart = (e: PointerEvent) => {
-      if (e.button !== 1 && e.button !== 2) return false;
+      const axis = e.button === 0 ? axisAt(e) : null;
+      if (e.button !== 1 && e.button !== 2 && !axis) return false;
       const { min: x0, max: x1 } = u.scales.x;
       const { min: y0, max: y1 } = u.scales.y;
       if (x0 == null || x1 == null || y0 == null || y1 == null) return false;
       e.preventDefault();
       el.focus({ preventScroll: true });
       const click = e.button === 2 && live.current.cursorMode && !live.current.zoomMode ? e : null;
-      pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: [x0, x1], sy: [y0, y1], moved: false, click };
+      const { min: r0, max: r1 } = u.scales[rightScale] ?? {};
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: [x0, x1], sy: [y0, y1], sr: r0 != null && r1 != null ? [r0, r1] : null, axis, moved: false, click };
       panned = false;
       root.setPointerCapture(e.pointerId);
       return true;
@@ -870,13 +873,20 @@ function PaneView(props: {
       const dy = e.clientY - pan.y;
       if (!pan.moved && Math.hypot(dx, dy) < PAN_SLOP) return;
       pan.moved = panned = true;
-      over.style.cursor = 'grabbing';
+      if (!pan.axis) over.style.cursor = 'grabbing';
       const r = over.getBoundingClientRect();
-      if (r.width > 0 && dx) {
+      const { axis } = pan;
+      if (axis === 'right') {
+        if (!pan.sr || !(r.height > 0) || !dy) return;
+        const [lo, hi] = panBy(pan.sr[0], pan.sr[1], dy / r.height);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelR([lo, hi]);
+        return;
+      }
+      if (r.width > 0 && dx && axis !== 'left') {
         const [lo, hi] = panBy(pan.sx[0], pan.sx[1], -dx / r.width, data.log, [x0, x1]);
         live.current.onWheelZoom(toX(lo, hi));
       }
-      if (r.height > 0 && dy) {
+      if (r.height > 0 && dy && axis !== 'bottom') {
         const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
       }
@@ -918,7 +928,7 @@ function PaneView(props: {
       if (a === axisHover) return;
       axisHover = a;
       root.style.cursor = a === 'bottom' ? 'ew-resize' : a ? 'ns-resize' : '';
-      root.title = a ? t('Wheel: zoom this axis') : '';
+      root.title = a ? t('Wheel: zoom this axis · drag: move it') : '';
       u.redraw(false);
     };
     const move = (e: PointerEvent) => {
@@ -977,7 +987,7 @@ function PaneView(props: {
     // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece
     // (uPlot deja el recuadro vacío al terminar: la sombra va sólo durante el arrastre)
     const selStart = (e: PointerEvent) => {
-      if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode)) {
+      if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode) && !axisAt(e)) {
         el.classList.add('selecting');
         pressed.current = true;
       }

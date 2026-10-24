@@ -1596,7 +1596,7 @@ export const es: Record<string, string> = {
   'This could not be shown: {message}': 'Esto no se pudo mostrar: {message}',
   'Retry': 'Reintentar',
   'unexpected "{v}"': '"{v}" inesperado',
-  'Wheel: zoom this axis': 'Rueda: zoom en este eje',
+  'Wheel: zoom this axis · drag: move it': 'Rueda: zoom en este eje · arrastrar: moverlo',
   'Simulation aborted: the results shown are from the previous run': 'Simulación abortada: los resultados que se ven son de la corrida anterior',
   '{file}: {n} lines could not be read and were kept as they are (the first one: {line})': '{file}: {n} líneas no se pudieron leer y quedaron tal cual (la primera: {line})',
   'Hide': 'Ocultar',

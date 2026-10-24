@@ -263,6 +263,8 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .textdlg { display: flex; flex-direction: column; gap: 8px; }
 .textdlg .seg { display: flex; gap: 16px; font-size: 13px; }
 .textdlg .seg input { width: auto; }
+.new-module .row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.new-module .err { color: var(--err); font-size: 13px; margin: 0; }
 .verilogdlg textarea { min-height: 300px; resize: vertical; line-height: 1.5; tab-size: 2; }
 .verilogdlg .row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .verilogdlg .row input { width: 24ch; }
@@ -1084,3 +1086,32 @@ button.hier-tab { padding-right: 10px; }
   .sim-row .simbar .sb-row { flex-wrap: nowrap; }
   .sim-row .simbar .sb-rows { flex: none; }
 }
+
+/* Módulo Verilog (#209): código, sintetizar e interfaz eléctrica en lugar del esquemático */
+.verilog-module { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); z-index: 1; }
+.canvas-wrap.with-sym .verilog-module { right: min(36%, 420px); }
+.canvas-wrap.with-tree .verilog-module { left: 260px; }
+.canvas-wrap.with-hier .verilog-module { top: 31px; }
+.vm-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.vm-bar strong { font-family: var(--mono); font-size: 13px; }
+.vm-bar button { margin-left: auto; }
+.vm-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--bg-alt); color: var(--fg-muted); }
+.vm-status.ok { color: var(--ok); }
+.vm-status.err { color: var(--err); }
+.vm-status.stale { color: var(--warn, #e67700); }
+.vm-body { flex: 1; display: grid; grid-template-columns: 1fr minmax(240px, 34%); min-height: 0; }
+.vm-code { display: flex; min-height: 0; border-right: 1px solid var(--border); }
+.vm-gutter { overflow: hidden; padding: 10px 6px 10px 10px; text-align: right; font: 13px/1.5 var(--mono); color: var(--fg-muted); user-select: none; background: var(--bg-alt); min-width: 3.2em; }
+.vm-gutter .err { color: #fff; background: var(--err); border-radius: 3px; }
+.vm-code textarea { flex: 1; resize: none; border: 0; outline: none; padding: 10px 12px; font: 13px/1.5 var(--mono); tab-size: 2; background: var(--bg); color: var(--fg); white-space: pre; overflow: auto; }
+.vm-side { overflow: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+.vm-side h4 { margin: 4px 0; font-size: 13px; }
+.vm-side .err { color: var(--err); white-space: pre-wrap; margin: 0; }
+.vm-side pre.log { max-height: 200px; border: 1px solid var(--border); border-radius: 6px; }
+.vm-pins { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; font-family: var(--mono); font-size: 12px; }
+.vm-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 3px 0; }
+.vm-field code { color: var(--fg-muted); font-size: 11px; }
+.vm-input { display: flex; align-items: center; gap: 4px; }
+.vm-input input, .vm-field select { width: 9em; font: 12px var(--mono); padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); color: var(--fg); }
+.vm-field select { width: 13em; font-family: inherit; }
+@media (max-width: 700px) { .canvas-wrap.with-tree .verilog-module, .canvas-wrap.with-sym .verilog-module { left: 0; right: 0; } .vm-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } .vm-side { max-height: 40vh; } }

@@ -40,7 +40,7 @@ let failed = 0;
 for (const c of CASES) {
   const t0 = Date.now();
   const problems = [];
-  const syn = await synthesize(runYosys, { [c.file]: c.verilog }, c.file, c.top);
+  const syn = await synthesize(runYosys, { [c.file]: c.verilog }, c.file, c.top, c.params);
   if (c.expectError) {
     if (!syn.error || !c.expectError.test(syn.error)) problems.push(`esperaba error ${c.expectError}, dio ${syn.error ?? 'ok'}`);
   } else if (syn.error) {

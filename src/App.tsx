@@ -49,7 +49,6 @@ import {
   propagateAttrs,
   mergeFiles,
   projectFileKind,
-  uniqueFileName,
   duplicateSim as duplicateProjectSim,
   removeVariant,
   lineOf,
@@ -90,7 +89,7 @@ import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
-import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
+import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -123,8 +122,10 @@ import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 import { synthesizeVerilog } from './hdl/client.ts';
-import { applySynthesis, topModuleOf, generatedPins, generatedSub } from './hdl/project.ts';
-import { VerilogDialog, verilogTemplate } from './hdl/VerilogDialog.tsx';
+import { addVerilogModule, withParams, applySynth, isStale, moduleOf, storeVerilog, verilogFile, verilogModules, verilogPorts, verilogSources, verilogSymbol } from './hdl/project.ts';
+import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
+import { VerilogModule } from './hdl/VerilogModule.tsx';
+import { NewModuleDialog } from './project/NewModuleDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
 /** Nombre de un proyecto nuevo; con sesión de Google pasa a «Project 2», «Project 3»… si ya está en el Drive */
@@ -160,8 +161,8 @@ type Dialog =
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }
   | { kind: 'projectfiles' }
-  /** editar un archivo Verilog del proyecto (#209); sin name, uno nuevo */
-  | { kind: 'verilog'; name?: string }
+  /** módulo nuevo: esquemático o Verilog (#209) */
+  | { kind: 'newModule' }
   /** pedir un nombre (testbench o subcircuito, #180) */
   | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
   /** parámetros y variables del testbench (#180) */
@@ -529,38 +530,66 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
     if (r.added.length) editProject({ ...projectRef.current, files: r.files });
     setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
-    // el Verilog agregado se sintetiza enseguida: genera su .sub y su símbolo
-    for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthProjectVerilog(name);
+    // un .v agregado es un módulo: se sintetiza enseguida (así aparece su símbolo)
+    for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthAndReport(moduleOf({ name }));
   };
-  /** Todos los Verilog del proyecto (un módulo puede usar los de otro archivo), con `name` = `text` */
-  const verilogSources = (name: string, text: string) => ({
-    ...Object.fromEntries(projectRef.current.files.filter((f) => f.kind === 'verilog').map((f) => [f.name, f.text])),
-    [name]: text,
-  });
-  /** Guarda el .sub y el .asy que generó un Verilog del proyecto */
-  const saveSynthesis = (name: string, text: string, r: SynthResult): boolean => {
-    if (!r.block) return false;
-    const files = [...projectRef.current.files.filter((f) => f.name.toLowerCase() !== name.toLowerCase()), { name, kind: 'verilog' as const, text }];
-    const out = applySynthesis(files, name, r.block);
-    if (out.clash) {
-      setMessage(t('{file} already exists in the project and wasn\'t generated from {name}: rename the module', { file: out.clash, name }));
-      return false;
+
+  // --- Módulos Verilog (#209): <nombre>.v + <nombre>.asy, como un subcircuito esquemático ---------
+  /** Sintetiza el módulo `name` (con `text`, o el código que tiene el proyecto) y guarda el resultado y su símbolo */
+  const synthModule = async (name: string, text?: string): Promise<SynthResult> => {
+    const f = verilogFile(projectRef.current, name);
+    if (!f) return { error: t('There is no Verilog module {name}', { name }), log: '' };
+    const src = text ?? f.text;
+    const code = src.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
+    if (!new RegExp(`^\\s*module\\s+${name}\\b`, 'm').test(code)) return { error: t('{file} has to define the module {name} (the name of the file)', { file: f.name, name }), log: '' };
+    const r = await synthesizeVerilog(verilogSources(projectRef.current, { name: f.name, text: src }), f.name, name);
+    if (r.block) {
+      const p = applySynth(projectRef.current, name, src, r.block);
+      projectRef.current = p;
+      editProject(p);
+      lib.setProjectFiles(p.files);
+      setLibVersion((v) => v + 1);
     }
-    editProject({ ...projectRef.current, files: out.files });
-    setMessage(t('{name}: symbol {sym} ready in the component browser (F2) under "{PROJECT_DIR}"', { name, sym: r.block.name, PROJECT_DIR }));
-    return true;
+    return r;
   };
-  const synthProjectVerilog = async (name: string) => {
-    const f = projectRef.current.files.find((x) => x.name === name);
-    if (!f) return;
+  const synthAndReport = async (name: string) => {
     setMessage(t('Synthesizing {name}…', { name }));
     try {
-      const r = await synthesizeVerilog(verilogSources(name, f.text), name, topModuleOf(f.text));
-      if (r.error) setMessage(t('{name}: {error}', { name, error: r.error }));
-      else saveSynthesis(name, f.text, r);
+      const r = await synthModule(name);
+      setMessage(r.error ? t('{name}: {error}', { name, error: r.error }) : t('{name}: symbol ready in the component browser (F2) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
     } catch (e) {
       setMessage(t('Yosys could not run: {msg}', { msg: (e as Error).message }));
     }
+  };
+  /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */
+  const synthStale = async () => {
+    for (const f of verilogModules(projectRef.current).filter(isStale)) {
+      setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: f.name }) });
+      const r = await synthModule(moduleOf(f));
+      if (r.error) throw new Error(`${f.name}: ${r.error}`);
+    }
+  };
+  /** Síntesis de las variantes por parameter (en memoria mientras no cambie el código) */
+  const variantCache = useRef(new Map<string, string>());
+  const withVariants = async (netlist: string): Promise<{ netlist: string; warnings: string[] }> => {
+    const p = projectRef.current;
+    const v = applyVariants(netlist, verilogModules(p).flatMap((f) => (f.synth ? [{ name: moduleOf(f), params: f.synth.params }] : [])));
+    if (!v.needs.length) return { netlist, warnings: v.warnings };
+    const subs: string[] = [];
+    for (const n of v.needs) {
+      const f = verilogFile(p, n.module)!;
+      const k = `${n.name}\u0000${f.text}`;
+      let sub = variantCache.current.get(k);
+      if (!sub) {
+        setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: `${moduleOf(f)} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')})` }) });
+        const r = await synthesizeVerilog(verilogSources(p), f.name, moduleOf(f), n.params);
+        if (!r.block) throw new Error(`${f.name} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')}): ${r.error}`);
+        sub = renameVariant(r.block.subckt, r.block.name, n.name);
+        variantCache.current.set(k, sub);
+      }
+      subs.push(sub);
+    }
+    return { netlist: withSubckts(v.netlist, subs), warnings: v.warnings };
   };
   const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
   /** Símbolo para un .subckt de un archivo de modelos del proyecto */
@@ -1155,7 +1184,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     try {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
+      // los módulos Verilog que cambiaron se sintetizan antes (#209)
+      await synthStale();
       const built = await buildSimulation(doc, lib, ascName(), allTraces());
+      // y las instancias con otro parameter usan su propia síntesis
+      const vv = await withVariants(built.netlist);
+      built.netlist = vv.netlist;
+      built.warnings.push(...vv.warnings);
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       const tooBig = built.tooBig.map((p) => p.text);
       const { result, ms } = tooBig.length
@@ -1311,6 +1346,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Si cambiaron los puertos del subcircuito, regenera su símbolo (y avisa) */
   const syncSymbol = (p: Project, name: string): Project => {
     if (!symbolOutdated(p, name)) return p;
+    // (un módulo Verilog pone su símbolo al día al sintetizarse)
+    if (verilogFile(p, name)) return updateSymbol(p, name);
     const f = subcktFile(p, name);
     setMessage(t('Symbol {name} updated with the ports: {ports}', { name, ports: f ? subcktPorts(parseAsc(f.text)).join(', ') : '' }));
     return updateSymbol(p, name);
@@ -1325,7 +1362,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     stacks.current.set(lv ? subKey(lv.sub) : keyOf(p), history.state);
     if (lv && !next.some((l) => l.sub.toLowerCase() === lv.sub.toLowerCase())) p = syncSymbol(p, lv.sub);
     const target = next[next.length - 1];
-    const text = target ? subcktFile(p, target.sub)?.text : activeAsc(variantOf(p));
+    const mf = target ? moduleFile(p, target.sub) : undefined;
+    // un módulo Verilog no tiene esquemático (se ve su código): el editor queda con uno vacío
+    const text = target ? (mf?.kind === 'verilog' ? EMPTY_ASC : mf?.text) : activeAsc(variantOf(p));
     if (text === undefined) return;
     const h = stacks.current.get(target ? subKey(target.sub) : keyOf(p));
     quietDoc.current = true;
@@ -1357,7 +1396,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Doble clic / E / Enter sobre una instancia de un subcircuito del proyecto: bajar */
   const descend = (si: number): boolean => {
     const s = docRef.current.symbols[si];
-    const f = s && subcktFile(projectRef.current, s.type);
+    const f = s && moduleFile(projectRef.current, s.type);
     if (!f) return false;
     const parent = pathRef.current[pathRef.current.length - 1];
     const el = lt.elements.find((e) => e.sym === si);
@@ -1387,7 +1426,17 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         onOk(n);
       },
     });
-  const newSubckt = () => askSubName(t('New subcircuit'), freeSubcktName(projectRef.current), createSubckt);
+  // módulo nuevo (#209): esquemático o Verilog
+  const newSubckt = () => setDialog({ kind: 'newModule' });
+  const createModule = (name: string, kind: 'schematic' | 'verilog') => {
+    setDialog(null);
+    if (kind === 'schematic') return createSubckt(name);
+    projectRef.current = addVerilogModule(projectRef.current, name);
+    editProject(projectRef.current);
+    openSub(name);
+    // (sintetizar la plantilla: así el módulo ya tiene símbolo para colocarlo)
+    synthAndReport(name);
+  };
   const createSubckt = (name: string) => {
     editProject(addSubckt(projectRef.current, name));
     // el proyecto nuevo tiene que estar antes de abrirlo
@@ -1835,10 +1884,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // mano); si está en otro panel, queda en los dos con el mismo color
   // Vista partida del subcircuito (#180): su símbolo al lado. Los pines siguen a los puertos
   // mientras se edita (los que quedan conservan su lugar)
-  const subPorts = useMemo(() => (curSub ? subcktPorts(liveDoc) : []), [curSub, liveDoc]);
+  // (un módulo Verilog, #209: en lugar del esquemático se ve su código; sus pines son los de la síntesis)
+  const curModule = curSub ? moduleFile(project, curSub) : undefined;
+  const curVerilog = curModule?.kind === 'verilog' ? curModule : undefined;
+  const subPorts = useMemo(() => (curVerilog ? verilogPorts(curVerilog).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []), [curSub, curVerilog, liveDoc]);
   const subPortsKey = subPorts.join(',');
   useEffect(() => {
-    if (!curSub) return;
+    if (!curSub || curVerilog) return;
     const p = storeSubckt(projectRef.current, curSub, ascText(docRef.current));
     if (!symbolOutdated(p, curSub)) return;
     const next = updateSymbol(p, curSub);
@@ -1882,8 +1934,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!treeOpen) return [];
     const p = curSub ? storeSubckt(project, curSub, ascText(liveDoc)) : storeActive(project, ascText(liveDoc));
     const label = (asc: string, nm?: string) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'));
-    return subckts(p).map((f) => {
+    return modules(p).map((f) => {
       const name = subName(f.name);
+      // un módulo Verilog (#209): sus pines son los de la última síntesis
+      if (f.kind === 'verilog')
+        return {
+          name,
+          ports: f.synth?.pins.length ?? 0,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+          verilog: true,
+          ...(isStale(f) ? { unsynthesized: true } : {}),
+        };
       const stale = staleInstances(p, name, lib, label).map((u) => ({
         label: u.where.label,
         inst: u.inst,
@@ -2166,7 +2230,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const base = project.name;
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
     const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName(), allTraces());
-    download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
+    download(`${base}.cir`, new Blob([(await withVariants(built.netlist)).netlist], { type: 'text/plain' }));
   };
   const exportImage = (f: 'svg' | 'png') => {
     const svg = editor.current?.svg();
@@ -2486,6 +2550,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     );
   };
   const exportSubNetlist = (name: string) => {
+    // un módulo Verilog (#209): su síntesis (primitivas de XSPICE: sirve para ngspice, no para LTspice)
+    const vf = verilogFile(projectRef.current, name);
+    if (vf) {
+      if (!vf.synth) return setMessage(t('{name} was not synthesized yet', { name }));
+      return download(`${name}.sub`, new Blob([vf.synth.subckt], { type: 'text/plain' }));
+    }
     const r = exportSubcktNetlist(snapshot(), name, lib);
     if (!r) return setMessage(t('{name} has no ports: there is nothing to export as .sub', { name }));
     download(r.name, new Blob([r.text], { type: 'text/plain' }));
@@ -3052,7 +3122,7 @@ ${ltNetlistText(sim.built.lt)}
             <QuickOpen
               items={[
                 ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
-                ...subckts(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: t('subcircuit') })),
+                ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
               ]}
               onPick={(k) => {
                 const id = k.slice(2);
@@ -3083,12 +3153,31 @@ ${ltNetlistText(sim.built.lt)}
               text={symText}
               ports={subPorts}
               onChange={editSymbol}
-              onParams={(ps) => editSymbol(setSymParams(symText, ps))}
-              onReset={() => editSymbol(setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))}
+              onParams={(ps) => editSymbol(curVerilog ? withParams(symText, ps) : setSymParams(symText, ps))}
+              onReset={() =>
+                editSymbol(curVerilog?.synth ? setSymParams(verilogSymbol(curSub, curVerilog.synth), symParams(symText)) : setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))
+              }
               onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
             />
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
+          {curVerilog && (
+            <VerilogModule
+              name={curSub}
+              text={curVerilog.text}
+              stale={isStale(curVerilog)}
+              pins={curVerilog.synth?.pins ?? []}
+              params={symText ? symParams(symText) : []}
+              onText={(text) => {
+                const p = storeVerilog(projectRef.current, curSub, text);
+                projectRef.current = p;
+                editProject(p);
+                warnShared();
+              }}
+              onSynthesize={(text) => synthModule(curSub, text)}
+              onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
+            />
+          )}
           <SchematicEditor
             handle={editor}
             onSymbolMenu={symbolMenu}
@@ -3106,7 +3195,7 @@ ${ltNetlistText(sim.built.lt)}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             onDropSubckt={(name) => {
-              const f = subcktFile(projectRef.current, name);
+              const f = moduleFile(projectRef.current, name);
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
             highlightNet={traceNetShown}
@@ -3495,12 +3584,11 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'projectfiles' && (
         <UserFilesDialog
           project={project.name}
-          files={project.files.map((f) => {
-            const sub = f.kind === 'verilog' ? generatedSub(project.files, f.name) : undefined;
-            return { name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : sub ? generatedPins(sub) : [] };
-          })}
-          onEditVerilog={(name) => setDialog({ kind: 'verilog', name })}
-          onNewVerilog={() => setDialog({ kind: 'verilog' })}
+          files={project.files.map((f) => ({ name: f.name, kind: f.kind, items: f.kind === 'model' ? scanModels(f.text).subckts : f.kind === 'verilog' ? verilogPorts(f).map((x) => x.name) : [] }))}
+          onEditVerilog={(name) => {
+            setDialog(null);
+            openSub(moduleOf({ name }));
+          }}
           hasSymbol={(n) => !!lib.symbol(n)}
           onAdd={async (files) => addProjectFiles(await Promise.all(files.map(async (x) => ({ name: x.name, text: decodeText(new Uint8Array(await x.arrayBuffer())) }))))}
           onRemove={removeProjectFile}
@@ -3508,16 +3596,8 @@ ${ltNetlistText(sim.built.lt)}
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog?.kind === 'verilog' && (
-        <VerilogDialog
-          name={dialog.name ?? uniqueFileName('counter.v', project.files.map((f) => f.name))}
-          initial={(dialog.name && project.files.find((f) => f.name === dialog.name)?.text) || verilogTemplate('counter')}
-          isNew={!dialog.name}
-          taken={project.files.map((f) => f.name)}
-          synth={(name, text) => synthesizeVerilog(verilogSources(name, text), name, topModuleOf(text))}
-          onSave={(name, text, r) => saveSynthesis(name, text, r) && setDialog({ kind: 'projectfiles' })}
-          onClose={() => setDialog({ kind: 'projectfiles' })}
-        />
+      {dialog?.kind === 'newModule' && (
+        <NewModuleDialog initial={freeSubcktName(projectRef.current)} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
       )}
       {driveConflict && (
         <Modal title={t('The file changed in Google Drive')} onClose={() => setDriveConflict(null)}>

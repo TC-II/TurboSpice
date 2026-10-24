@@ -1,58 +1,108 @@
-// Archivos Verilog del proyecto (#209): cada uno genera un <módulo>.sub (el subcircuito con XSPICE)
-// y un <módulo>.asy (entradas a la izquierda, salidas a la derecha) entre los archivos del proyecto.
-import { makeSymbol, subcktPins } from '../library/makeSymbol.ts';
-import type { ProjectFile } from '../project/turbo.ts';
-import { generatedFrom, type HdlBlock } from './synth.ts';
+// Módulos Verilog del proyecto (#209): <nombre>.v y su símbolo <nombre>.asy, como un subcircuito
+// esquemático es <nombre>.asc + <nombre>.asy. El módulo de más arriba del .v tiene que llamarse como
+// el archivo. La síntesis (Yosys) queda guardada en el .v (ProjectFile.synth): la librería la usa
+// como el archivo de modelos <nombre>.sub que nombra el símbolo (ModelFile).
+import { makeSymbol } from '../library/makeSymbol.ts';
+import { setSymParams, symParams, syncPins } from '../project/symbolEdit.ts';
+import type { Project, ProjectFile, VerilogSynth } from '../project/turbo.ts';
+import { t } from '../i18n/i18n.ts';
+import { ELECTRICAL, ELECTRICAL_NAMES } from './electrical.ts';
+import type { HdlBlock, PinDir } from './synth.ts';
 
 const key = (s: string) => s.toLowerCase();
 
-/** Pines de un .asy, en orden de SpiceOrder */
-function symbolPins(asy: string): string[] {
-  const pins: { name: string; order: number }[] = [];
-  let cur: { name: string; order: number } | null = null;
-  for (const line of asy.split(/\r?\n/)) {
-    if (/^PIN\s/.test(line)) pins.push((cur = { name: '', order: pins.length + 1 }));
-    const m = /^PINATTR\s+(PinName|SpiceOrder)\s+(.*)$/.exec(line.trim());
-    if (m && cur) {
-      if (m[1] === 'PinName') cur.name = m[2].trim();
-      else cur.order = parseInt(m[2]) || cur.order;
-    }
-  }
-  return pins.sort((a, b) => a.order - b.order).map((p) => p.name);
+export const isVerilogName = (name: string) => /\.s?v$/i.test(name);
+/** Nombre del módulo de un archivo Verilog del proyecto ("contador.v" → "contador") */
+export const moduleOf = (f: { name: string }) => f.name.replace(/\.s?v$/i, '');
+export const verilogModules = (p: Project): ProjectFile[] => p.files.filter((f) => f.kind === 'verilog');
+export const verilogFile = (p: Project, name: string): ProjectFile | undefined => verilogModules(p).find((f) => key(moduleOf(f)) === key(name));
+/** ¿Cambió el código desde la última síntesis (o nunca se sintetizó)? */
+export const isStale = (f: ProjectFile) => !f.synth || f.synth.source !== f.text;
+/** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo) */
+export const verilogSources = (p: Project, override?: { name: string; text: string }): Record<string, string> => ({
+  ...Object.fromEntries(verilogModules(p).map((f) => [f.name, f.text])),
+  ...(override ? { [override.name]: override.text } : {}),
+});
+
+/** Verilog de un módulo nuevo */
+export const verilogTemplate = (name: string) => `// ${t('{name}: synthesizable Verilog. Inputs go on the left of the symbol, outputs on the right.', { name })}
+// ${t('The electrical interface (levels, thresholds, drive, delay) is set below the code and on each instance.')}
+module ${name} (
+  input clk,
+  input rst,
+  output reg [3:0] q
+);
+  always @(posedge clk or posedge rst)
+    if (rst) q <= 0;
+    else q <= q + 1;
+endmodule
+`;
+
+const IOPIN: Record<PinDir, string> = { in: 'In', out: 'Out', inout: 'BiDir' };
+
+/** Parámetros del símbolo: los eléctricos y los parameter de Verilog, conservando los valores que ya tenía */
+function symbolParams(prev: [string, string][], block: { params: Record<string, string> }): [string, string][] {
+  const old = new Map(prev.map(([k, v]) => [key(k), v]));
+  const out: [string, string][] = ELECTRICAL.map((p) => [p.name, old.get(p.name) ?? p.value]);
+  for (const [k, v] of Object.entries(block.params)) if (!ELECTRICAL_NAMES.has(key(k))) out.push([k, old.get(key(k)) ?? v]);
+  return out;
+}
+
+/** Parámetros del símbolo sin mostrarlos en el esquemático (son muchos: se ven al editar la instancia) */
+export const withParams = (text: string, ps: [string, string][]) =>
+  setSymParams(text, ps)
+    .split('\n')
+    .filter((l) => !/^WINDOW 39 /.test(l))
+    .join('\n');
+
+/** Símbolo nuevo del módulo: entradas a la izquierda; inout y salidas a la derecha */
+export function verilogSymbol(name: string, block: Pick<HdlBlock, 'pins' | 'params'>): string {
+  const text = makeSymbol({
+    name,
+    pins: block.pins.map((p) => p.name),
+    leftCount: block.pins.filter((p) => p.dir === 'in').length,
+    modelFile: `${name}.sub`,
+    description: t('Verilog module {name}', { name }),
+  });
+  return withParams(text, symbolParams([], block));
 }
 
 /**
- * Archivos del proyecto después de sintetizar `source`: su .sub reemplazado (o nuevo) y su .asy
- * nuevo, o regenerado si los pines cambiaron (si siguen igual queda el que está, que pudo
- * editarse). No pisa un .sub que no generó este Verilog: devuelve el nombre en `clash`.
+ * Guarda la síntesis de un módulo: el resultado queda en su .v y el símbolo se crea o se pone al
+ * día (pines nuevos o que ya no están; los que siguen, en su lugar) con sus parámetros.
  */
-export function applySynthesis(files: ProjectFile[], source: string, block: HdlBlock): { files: ProjectFile[]; clash?: string } {
-  const subName = `${block.name}.sub`;
-  const asyName = `${block.name}.asy`;
-  const oldSub = files.find((f) => key(f.name) === key(subName));
-  if (oldSub && key(generatedFrom(oldSub.text) ?? '') !== key(source)) return { files, clash: subName };
-  const pins = [...block.inputs, ...block.outputs];
-  const sub: ProjectFile = { name: subName, kind: 'model', text: block.subckt };
-  const oldAsy = files.find((f) => key(f.name) === key(asyName));
-  const keepAsy = oldAsy && symbolPins(oldAsy.text).join(' ') === pins.join(' ');
-  const asy: ProjectFile = keepAsy
-    ? oldAsy
-    : { name: asyName, kind: 'symbol', text: makeSymbol({ name: block.name, pins, leftCount: block.inputs.length, modelFile: subName, spiceLine: block.params, description: `Verilog: ${source}` }) };
-  const rest = files.filter((f) => key(f.name) !== key(subName) && key(f.name) !== key(asyName));
-  return { files: [...rest, sub, asy] };
+export function applySynth(p: Project, name: string, text: string, block: HdlBlock): Project {
+  const file = verilogFile(p, name);
+  if (!file) return p;
+  const synth: VerilogSynth = { source: text, module: block.name, subckt: block.subckt, pins: block.pins, params: block.params };
+  const asyName = `${name}.asy`;
+  const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(asyName));
+  const nextSym = sym
+    ? withParams(syncPins(sym.text, block.pins.map((x) => ({ name: x.name, dir: IOPIN[x.dir] }))), symbolParams(symParams(sym.text), block))
+    : verilogSymbol(name, block);
+  const files = p.files.map((f) => (f === file ? { ...f, text, synth } : f === sym ? { ...f, text: nextSym } : f));
+  if (!sym) files.push({ name: asyName, kind: 'symbol', text: nextSym });
+  return { ...p, modified: Date.now(), files };
 }
 
-/** El .sub generado por un archivo Verilog del proyecto, si hay */
-export const generatedSub = (files: ProjectFile[], source: string): ProjectFile | undefined =>
-  files.find((f) => f.kind === 'model' && key(generatedFrom(f.text) ?? '') === key(source));
+/** Cambia el código de un módulo (sin sintetizar: queda desactualizado hasta la próxima síntesis) */
+export function storeVerilog(p: Project, name: string, text: string): Project {
+  const f = verilogFile(p, name);
+  if (!f || f.text === text) return p;
+  return { ...p, modified: Date.now(), files: p.files.map((x) => (x === f ? { ...x, text } : x)) };
+}
 
-/** Pines del .subckt generado (para mostrarlos) */
-export const generatedPins = (sub: ProjectFile): string[] => subcktPins(sub.text, sub.name.replace(/\.sub$/i, '')) ?? [];
+/** Agrega un módulo Verilog nuevo (todavía sin símbolo: aparece al sintetizarlo) */
+export function addVerilogModule(p: Project, name: string, text = verilogTemplate(name)): Project {
+  return { ...p, modified: Date.now(), files: [...p.files, { name: `${name}.v`, kind: 'verilog', text }] };
+}
+
+/** Pines del módulo (de su última síntesis) con la dirección como la de un puerto de esquemático */
+export const verilogPorts = (f: ProjectFile) => (f.synth?.pins ?? []).map((x) => ({ name: x.name, dir: IOPIN[x.dir] }));
 
 /**
  * Módulo de más arriba de un archivo Verilog: el que ningún otro del archivo instancia (si hay
- * varios, el último). Se le pasa a Yosys porque con todos los Verilog del proyecto juntos no puede
- * adivinar cuál se quiere.
+ * varios, el último).
  */
 export function topModuleOf(text: string): string | undefined {
   const code = text.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');

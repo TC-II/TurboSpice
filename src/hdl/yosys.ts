@@ -21,8 +21,9 @@ export interface SynthResult {
 /**
  * Sintetiza `files` (nombre → texto Verilog; todos los módulos que usa el de más arriba) y lo
  * traduce a un .subckt. `source`: nombre del archivo principal (para el comentario del .subckt).
+ * `params`: parameter del módulo de más arriba con otro valor (chparam).
  */
-export async function synthesize(run: RunYosys, files: Record<string, string>, source: string, top?: string): Promise<SynthResult> {
+export async function synthesize(run: RunYosys, files: Record<string, string>, source: string, top?: string, params: Record<string, string> = {}): Promise<SynthResult> {
   let log = '';
   const dec = new TextDecoder();
   const sink = (b: Uint8Array | null) => {
@@ -33,7 +34,7 @@ export async function synthesize(run: RunYosys, files: Record<string, string>, s
   const tree: Tree = Object.fromEntries(Object.values(files).map((text, i) => [names[i], text]));
   let out: Tree | undefined;
   try {
-    out = (await run(['-q', '-p', yosysScript(names, top)], tree, { stdout: sink, stderr: sink })) ?? undefined;
+    out = (await run(['-q', '-p', yosysScript(names, top, params)], tree, { stdout: sink, stderr: sink })) ?? undefined;
   } catch {
     // Exit: Yosys terminó con error; el motivo quedó en la salida ("fa.v:3: ERROR: …")
     log = plain(log);

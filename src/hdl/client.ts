@@ -26,10 +26,10 @@ function getWorker(): Worker {
 }
 
 /** Sintetiza Verilog en el Worker (la primera vez baja Yosys) */
-export function synthesizeVerilog(files: Record<string, string>, source: string, top?: string): Promise<SynthResult> {
+export function synthesizeVerilog(files: Record<string, string>, source: string, top?: string, params?: Record<string, string>): Promise<SynthResult> {
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    getWorker().postMessage({ id, files, source, top } satisfies YosysRequest);
+    getWorker().postMessage({ id, files, source, top, params } satisfies YosysRequest);
   });
 }

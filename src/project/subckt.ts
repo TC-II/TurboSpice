@@ -5,12 +5,14 @@ import { baseName, emptyDoc, type AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { makeSymbol, schematicPorts } from '../library/makeSymbol.ts';
+import { verilogPorts } from '../hdl/project.ts';
 import { syncPins } from './symbolEdit.ts';
 import { variantOf } from './project.ts';
 import type { Project, ProjectFile } from './turbo.ts';
 import { t } from '../i18n/i18n.ts';
 
-export const subName = (file: string) => file.replace(/\.asc$/i, '');
+/** Nombre del subcircuito: el del archivo sin extensión (.asc, o .v de un módulo Verilog, #209) */
+export const subName = (file: string) => file.replace(/\.(asc|s?v)$/i, '');
 const key = (name: string) => subName(baseName(name)).toLowerCase();
 
 /** Subcircuitos (esquemáticos) del proyecto */
@@ -18,8 +20,12 @@ export const subckts = (p: Project): ProjectFile[] => p.files.filter((f) => f.ki
 
 export const subcktFile = (p: Project, name: string): ProjectFile | undefined => subckts(p).find((f) => key(f.name) === key(name));
 
-/** ¿El símbolo de esta instancia es un subcircuito del proyecto? */
-export const isSubcktType = (p: Project, type: string) => !!subcktFile(p, type);
+/** Módulos del proyecto: subcircuitos esquemáticos y módulos Verilog (#209) */
+export const modules = (p: Project): ProjectFile[] => p.files.filter((f) => f.kind === 'schematic' || f.kind === 'verilog');
+export const moduleFile = (p: Project, name: string): ProjectFile | undefined => modules(p).find((f) => key(f.name) === key(name));
+
+/** ¿El símbolo de esta instancia es un módulo del proyecto (esquemático o Verilog)? */
+export const isSubcktType = (p: Project, type: string) => !!moduleFile(p, type);
 
 /** Puertos del subcircuito: sus etiquetas con IOPIN */
 export const subcktPorts = (doc: AscDoc) => schematicPorts(doc.flags);
@@ -38,13 +44,15 @@ function symbolPins(text: string): string[] {
 
 /** ¿Los puertos del esquemático ya no coinciden con los pines de su símbolo? */
 export function symbolOutdated(p: Project, name: string): boolean {
-  const sch = subcktFile(p, name);
+  const sch = moduleFile(p, name);
   const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(name));
+  // (un módulo Verilog tiene símbolo desde que se sintetiza, y la síntesis lo pone al día)
+  if (sch?.kind === 'verilog') return !!sym && !!sch.synth?.pins.length && portsDiffer(verilogPorts(sch).map((x) => x.name), symbolPins(sym.text));
   if (!sch || !sym) return !!sch;
-  const ports = subcktPorts(parseAsc(sch.text));
-  const pins = symbolPins(sym.text);
-  return ports.length !== pins.length || ports.some((x) => !pins.some((y) => y.toLowerCase() === x.toLowerCase()));
+  return portsDiffer(subcktPorts(parseAsc(sch.text)), symbolPins(sym.text));
 }
+
+const portsDiffer = (ports: string[], pins: string[]) => ports.length !== pins.length || ports.some((x) => !pins.some((y) => y.toLowerCase() === x.toLowerCase()));
 
 const replaceFile = (files: ProjectFile[], f: ProjectFile) => {
   const i = files.findIndex((x) => x.kind === f.kind && x.name.toLowerCase() === f.name.toLowerCase());
@@ -60,6 +68,11 @@ export function storeSubckt(p: Project, name: string, asc: string): Project {
 
 /** Regenera el símbolo con los puertos actuales */
 export const updateSymbol = (p: Project, name: string): Project => {
+  const v = moduleFile(p, name);
+  if (v?.kind === 'verilog') {
+    const sym = p.files.find((x) => x.kind === 'symbol' && key(x.name) === key(name));
+    return sym ? { ...p, modified: Date.now(), files: replaceFile(p.files, { ...sym, text: syncPins(sym.text, verilogPorts(v)) }) } : p;
+  }
   const f = subcktFile(p, name);
   if (!f) return p;
   const doc = parseAsc(f.text);
@@ -96,7 +109,7 @@ export function addSubckt(p: Project, name: string, asc = subcktTemplate(name)):
 
 /** Renombra el subcircuito, su símbolo y todas sus instancias */
 export function renameSubckt(p: Project, from: string, to: string): Project {
-  const f = subcktFile(p, from);
+  const f = moduleFile(p, from);
   if (!f) return p;
   const retype = (asc: string) => {
     const doc = parseAsc(asc);
@@ -109,8 +122,21 @@ export function renameSubckt(p: Project, from: string, to: string): Project {
     return changed ? serializeAsc(doc) : asc;
   };
   const files = p.files.map((x) => {
+    // un módulo Verilog: el archivo y el módulo de adentro (se vuelve a sintetizar)
+    if (x === f && f.kind === 'verilog') {
+      const { synth: _, ...rest } = x;
+      return { ...rest, name: `${to}.v`, text: x.text.replace(new RegExp(`^(\\s*module\\s+)${from}\\b`, 'm'), `$1${to}`) };
+    }
     if (x === f) return { ...x, name: `${to}.asc`, text: retype(x.text) };
-    if (x.kind === 'symbol' && key(x.name) === key(from)) return { ...x, name: `${to}.asy`, text: x.text.replace(/(SYMATTR Description .*?)\b\S+$/m, `$1${to}`) };
+    if (x.kind === 'symbol' && key(x.name) === key(from))
+      return {
+        ...x,
+        name: `${to}.asy`,
+        text: x.text
+          .replace(/(SYMATTR Description .*?)\b\S+$/m, `$1${to}`)
+          .replace(/^SYMATTR Value .*$/m, (l) => (f.kind === 'verilog' ? `SYMATTR Value ${to}` : l))
+          .replace(/^SYMATTR ModelFile .*$/m, (l) => (f.kind === 'verilog' ? `SYMATTR ModelFile ${to}.sub` : l)),
+      };
     if (x.kind === 'schematic') return { ...x, text: retype(x.text) };
     return x;
   });
@@ -126,7 +152,7 @@ export function renameSubckt(p: Project, from: string, to: string): Project {
 export const removeSubckt = (p: Project, name: string): Project => ({
   ...p,
   modified: Date.now(),
-  files: p.files.filter((f) => !((f.kind === 'schematic' || f.kind === 'symbol') && key(f.name) === key(name))),
+  files: p.files.filter((f) => !((f.kind === 'schematic' || f.kind === 'verilog' || f.kind === 'symbol') && key(f.name) === key(name))),
 });
 
 export interface Usage {
@@ -153,11 +179,11 @@ export function usages(p: Project, name: string, simLabel: (asc: string, name?: 
 
 /** Subcircuitos que se usan dentro de un circuito (para el árbol) */
 export function childSubckts(p: Project, asc: string): string[] {
-  const names = new Set(subckts(p).map((f) => key(f.name)));
+  const names = new Set(modules(p).map((f) => key(f.name)));
   const out: string[] = [];
   for (const s of parseAsc(asc).symbols) {
     const k = key(s.type);
-    if (names.has(k) && !out.some((x) => x.toLowerCase() === k)) out.push(subName(subcktFile(p, k)!.name));
+    if (names.has(k) && !out.some((x) => x.toLowerCase() === k)) out.push(subName(moduleFile(p, k)!.name));
   }
   return out;
 }

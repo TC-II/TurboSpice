@@ -20,6 +20,10 @@ export interface TreeSub {
   children: string[];
   outdated: boolean;
   text: boolean;
+  /** módulo Verilog (#209): .v en lugar de .asc */
+  verilog?: boolean;
+  /** Verilog con cambios sin sintetizar */
+  unsynthesized?: boolean;
   /** instancias desactualizadas (#199): pines sin conectar o cables sueltos sobre el símbolo */
   stale?: { label: string; inst: string; detail: string; go(): void }[];
 }
@@ -278,21 +282,31 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             e.dataTransfer.effectAllowed = 'copy';
           }}
         >
-          <span className="tree-glyph">▭</span> {s.name}
+          <span className={`tree-glyph${s.verilog ? ' verilog' : ''}`} title={s.verilog ? t('Verilog module') : undefined}>
+            {s.verilog ? 'V' : '▭'}
+          </span>{' '}
+          {s.name}
         </button>
-        <span className="tree-meta">{t('{n} pins', { n: s.ports })}</span>
+        <span className="tree-meta" title={s.unsynthesized ? t('Changes not synthesized yet (it is synthesized before simulating)') : undefined}>
+          {t('{n} pins', { n: s.ports })}
+          {s.unsynthesized ? ' •' : ''}
+        </span>
         <button className={`tree-uses${s.uses.length ? '' : ' none'}`} onClick={() => setUsesOf(usesOf === s.name ? '' : s.name)} title={t('Where it is used')}>
           {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
-          <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
+          {!s.verilog && (
+            <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
+          )}
           <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
             .sub
           </button>
-          <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
-            ☆
-          </button>
+          {!s.verilog && (
+            <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
+              ☆
+            </button>
+          )}
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
@@ -400,7 +414,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
               {t('From selection')}
             </button>
-            <button className="tree-add" onClick={onNew} title={t('New empty subcircuit')} aria-label={t('Add an empty subcircuit')}>
+            <button className="tree-add" onClick={onNew} title={t('New module: a schematic or Verilog')} aria-label={t('Add a module')}>
               + {t('New')}
             </button>
           </span>

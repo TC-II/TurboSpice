@@ -2,16 +2,16 @@
 // sintetiza el primer archivo Verilog y no traba la interfaz mientras corre.
 import { synthesize, type RunYosys, type SynthResult } from './yosys.ts';
 
-export type YosysRequest = { id: number; files: Record<string, string>; source: string; top?: string };
+export type YosysRequest = { id: number; files: Record<string, string>; source: string; top?: string; params?: Record<string, string> };
 export type YosysResponse = { id: number; result: SynthResult } | { id: number; failure: string };
 
 let run: Promise<RunYosys> | null = null;
 
 self.onmessage = async (e: MessageEvent<YosysRequest>) => {
-  const { id, files, source, top } = e.data;
+  const { id, files, source, top, params } = e.data;
   try {
     run ??= import('@yowasp/yosys').then((m) => m.runYosys as unknown as RunYosys);
-    const result = await synthesize(await run, files, source, top);
+    const result = await synthesize(await run, files, source, top, params);
     (self as unknown as Worker).postMessage({ id, result } satisfies YosysResponse);
   } catch (err) {
     run = null;

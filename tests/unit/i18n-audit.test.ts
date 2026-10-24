@@ -47,6 +47,7 @@ const SPANISH_OK = [
   /^\* /, // comentarios de netlist / marcas de bloques
   /\.(asc|turbo|html|md)$/,
   /^\s*\/blob\/main\/docs\//,
+  /^generation:/, // opciones de Icarus Verilog (-g…), no son de la interfaz
 ];
 // Textos de la interfaz que son iguales en los dos idiomas (siglas, unidades, sintaxis de SPICE)
 const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);

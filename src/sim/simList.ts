@@ -109,6 +109,60 @@ export function analysisLabel(line: string): string {
   }
 }
 
+/** un .pz al que le faltan nodos (sin entrada o salida elegidas queda ".pz  0  0 vol pz") */
+const PZ_INCOMPLETE = /^\s*\.pz\b/i;
+const SWEEP_TYPE: Record<string, string> = { dec: 'pts/dec', oct: 'pts/oct', lin: 'pts' };
+const sweepDetail = (s: Sweep) => `${sweepRange(s)}, ${s.points} ${SWEEP_TYPE[s.type] ?? s.type}`;
+
+/**
+ * Descripción completa de un análisis (la fila de la simulación en el panel del proyecto):
+ * "Transient 0–20 ms, max step 1 µs", "AC (Bode) 10 Hz–100 kHz, 100 pts/dec",
+ * "DC sweep V1 0–5 V step 100 mV", "Poles and zeros V(in)→V(out)"…
+ */
+export function analysisDetail(line: string): string {
+  if (isComplexLine(line)) return t('Complex simulation');
+  const a = parseAnalysis(line);
+  if (!a && PZ_INCOMPLETE.test(line)) return `${ANALYSES.find((x) => x.kind === 'pz')!.label} (${t('input and output not chosen')})`;
+  if (!a) return line.trim();
+  const label = ANALYSES.find((x) => x.kind === a.kind)!.label;
+  switch (a.kind) {
+    case 'tran':
+      return [
+        `${label} ${range(a.tstart, a.tstop, 's')}`,
+        ...(a.tmax ? [t('max step {v}', { v: quantity(a.tmax, 's') })] : []),
+        ...(a.uic ? ['UIC'] : []),
+        ...(a.startup ? ['startup'] : []),
+      ].join(', ');
+    case 'ac':
+      return `${label} ${sweepDetail(a.sweep)}`;
+    case 'dc': {
+      const sw = a.sweeps.filter((x) => x.src).map((x) => {
+        const u = /^i/i.test(x.src) ? 'A' : 'V';
+        return `${x.src} ${range(x.start, x.stop, u)}${x.step ? ` ${t('step {v}', { v: quantity(x.step, u) })}` : ''}`;
+      });
+      return sw.length ? `${label} ${sw.join(' · ')}` : `${label} (${t('no source chosen')})`;
+    }
+    case 'noise':
+      return `${label} ${volts(a.out)}${a.src ? ` / ${a.src}` : ''}, ${sweepDetail(a.sweep)}`;
+    case 'op':
+      return label;
+    case 'tf':
+      return `${label} ${volts(a.out)} / ${a.src}`;
+    case 'sens':
+      return `${label} ${volts(a.out)}${a.ac ? ` ${sweepDetail(a.sweep)}` : ''}`;
+    case 'pz': {
+      const node = (p: string, n: string) => (n && n !== '0' ? `V(${p},${n})` : `V(${p})`);
+      if (!a.inP || !a.outP || a.inP === '0' || a.outP === '0') return `${label} (${t('input and output not chosen')})`;
+      const what = { pz: t('poles and zeros'), pol: t('poles'), zer: t('zeros') }[a.which];
+      return `${label} ${node(a.inP, a.inN)}→${node(a.outP, a.outN)}${a.which !== 'pz' ? `, ${t('only {what}', { what })}` : ''}`;
+    }
+    case 'disto':
+      return `${label} ${sweepDetail(a.sweep)}`;
+    case 'sp':
+      return `${label} ${sweepDetail(a.sweep)}${a.noise ? `, ${t('with noise')}` : ''}`;
+  }
+}
+
 export const simName = (s: SimInstance) => s.name || analysisLabel(s.line);
 
 // --- operaciones sobre la lista ------------------------------------------------------------
@@ -253,4 +307,31 @@ export function takeSims(doc: AscDoc, line: string | null): { doc: AscDoc; sims:
   const v = readData(doc, 'sims');
   const sims = validList(v) ? (v.items.some((s) => s.id === v.active) ? v : { ...v, active: v.items[0]?.id ?? '' }) : null;
   return { doc: writeData(doc, 'sims', undefined), sims: sims ? followLine(sims, line) : simsFromLine(line) };
+}
+
+// --- polos y ceros: errores explicados ---------------------------------------------------------
+
+/**
+ * Por qué no se puede correr un .pz sin llamar a ngspice: sin nodo de entrada o de salida (p. ej.
+ * una simulación nueva en un circuito sin redes con nombre), ngspice sólo dice "Error on line N"
+ */
+export function pzProblem(line: string): string | undefined {
+  const a = parseAnalysis(line);
+  if (a?.kind !== 'pz' && !(!a && PZ_INCOMPLETE.test(line))) return undefined;
+  // el nodo + en tierra es lo que queda en la barra al borrar el nodo: no elegido
+  if (!a || a.kind !== 'pz' || !a.inP || !a.outP || a.inP === '0' || a.outP === '0')
+    return t('Poles and zeros: the input and output nodes are not chosen. Pick them in the simulation bar (the input is the node where the signal enters, the output the one you measure), or name the nets (e.g. "in" and "out").');
+  if (a.inP.toLowerCase() === (a.inN || '0').toLowerCase())
+    return t('Poles and zeros: the input is between {p} and {n}, the same node. Choose as input the node where the signal enters.', { p: a.inP, n: a.inN || '0' });
+  return undefined;
+}
+
+/** Lo que ngspice escribe en el log de un .pz que falla, explicado */
+export function pzLogErrors(log: string[]): string[] {
+  const out: string[] = [];
+  if (log.some((l) => /input is shorted/i.test(l)))
+    out.push(t('Poles and zeros: the input is shorted. Its two nodes are the same net, or a wire or a voltage source joins them directly. Choose as input the node where the signal enters, on the circuit side.'));
+  if (log.some((l) => /pz.*(no convergence|failed to converge)|pole-zero.*(failed|no convergence)/i.test(l)))
+    out.push(t('Poles and zeros: the search did not converge. Check that the input and output are connected through the circuit.'));
+  return out;
 }

@@ -1652,4 +1652,15 @@ export const es: Record<string, string> = {
   'New module': 'Módulo nuevo',
   'subcir': 'subcir',
   'None yet: create one with «+ New» or import it.': 'Todavía no hay: creá uno con «+ Nuevo» o importalo.',
+  // descripción completa de la simulación y errores de polos y ceros
+  'max step {v}': 'paso máx. {v}',
+  'step {v}': 'paso {v}',
+  'no source chosen': 'sin fuente elegida',
+  'input and output not chosen': 'sin entrada ni salida elegidas',
+  'only {what}': 'sólo {what}',
+  'with noise': 'con ruido',
+  'Poles and zeros: the input and output nodes are not chosen. Pick them in the simulation bar (the input is the node where the signal enters, the output the one you measure), or name the nets (e.g. "in" and "out").': 'Polos y ceros: no están elegidos los nodos de entrada y salida. Elegilos en la barra de simulación (la entrada es el nodo por donde entra la señal y la salida, el que medís) o poné nombre a las redes (p. ej. "in" y "out").',
+  'Poles and zeros: the input is between {p} and {n}, the same node. Choose as input the node where the signal enters.': 'Polos y ceros: la entrada está entre {p} y {n}, que son el mismo nodo. Elegí como entrada el nodo por donde entra la señal.',
+  'Poles and zeros: the input is shorted. Its two nodes are the same net, or a wire or a voltage source joins them directly. Choose as input the node where the signal enters, on the circuit side.': 'Polos y ceros: la entrada está en cortocircuito. Sus dos nodos son la misma red, o un cable o una fuente de tensión los une directamente. Elegí como entrada el nodo por donde entra la señal, del lado del circuito.',
+  'Poles and zeros: the search did not converge. Check that the input and output are connected through the circuit.': 'Polos y ceros: la búsqueda no convergió. Revisá que la entrada y la salida estén conectadas a través del circuito.',
 };

@@ -7,7 +7,10 @@ import { findAnalysis, setAnalysisLine } from '../../src/schematic/directivesEdi
 import {
   activeSim,
   addSim,
+  analysisDetail,
   analysisLabel,
+  pzLogErrors,
+  pzProblem,
   defaultLine,
   duplicateSim,
   emptySims,
@@ -179,5 +182,26 @@ describe('comando de análisis en el esquemático', () => {
     expect(setAnalysisLine(docWith('.tran 1m'), '.pz in 0 out 0 vol pz').texts[0].kind).toBe('comment');
     const d = docWith('.op');
     expect(setAnalysisLine(d, '.op')).toBe(d);
+  });
+});
+
+describe('descripción completa y errores de polos y ceros', () => {
+  it('la descripción tiene más detalle que el nombre', () => {
+    expect(analysisDetail('.dc V1 0 5 0.1')).toBe('Barrido DC V1 0–5 V paso 100 mV');
+    expect(analysisDetail('.ac dec 100 10 100k')).toBe('AC (Bode) 10 Hz–100 kHz, 100 pts/dec');
+    expect(analysisDetail('.tran 0 20m 0 1u')).toBe('Transitorio 0–20 ms, paso máx. 1 µs');
+    expect(analysisDetail('.pz in 0 out 0 vol pz')).toBe('Polos y ceros V(in)→V(out)');
+    expect(analysisDetail('.pz  0  0 vol pz')).toBe('Polos y ceros (sin entrada ni salida elegidas)');
+  });
+  it('un .pz sin nodos no llega a ngspice y explica por qué', () => {
+    expect(pzProblem('.pz  0  0 vol pz')).toMatch(/no están elegidos/);
+    expect(pzProblem('.pz 0 0 0 0 vol pz')).toMatch(/no están elegidos/);
+    expect(pzProblem('.pz in in out 0 vol pz')).toMatch(/mismo nodo/);
+    expect(pzProblem('.pz in 0 out 0 vol pz')).toBeUndefined();
+    expect(pzProblem('.tran 1m')).toBeUndefined();
+  });
+  it('"Input is shorted" del log se explica', () => {
+    expect(pzLogErrors(['doAnalyses: Input is shorted', 'run simulation(s) aborted'])[0]).toMatch(/cortocircuito/);
+    expect(pzLogErrors(['ok'])).toEqual([]);
   });
 });

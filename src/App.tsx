@@ -33,7 +33,7 @@ import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type Pi
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisLabel, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, MAX_SIMS, pzLogErrors, pzProblem, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -1202,10 +1202,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const built = await buildSimulation(doc, lib, ascName(), allTraces());
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
-      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name }))];
+      // un .pz sin nodos de entrada o salida tampoco: ngspice sólo diría "Error on line N"
+      const pz = pzProblem(lineOf(simAsc) ?? '');
+      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(pz ? [pz] : [])];
       const { result, ms } = blocking.length
         ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
         : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
+      // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
+      const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
+      if (pzErrs.length) result.errors.unshift(...pzErrs);
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
@@ -1980,7 +1985,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
       // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
-      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisDetail(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 

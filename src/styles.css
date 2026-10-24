@@ -947,7 +947,7 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .canvas-wrap.with-tree .hint-bar { left: 260px; }
 .canvas-wrap.with-hier > .pick-banner { top: 41px; z-index: 6; }
 .canvas-wrap.with-crumbs > .pick-banner { top: 74px; }
-.hier-bar { position: absolute; top: 0; left: 0; right: 0; display: flex; flex-direction: column; background: var(--bg-alt); border-bottom: 1px solid var(--border); z-index: 5; font-size: 13px; }
+.sub-hint { position: absolute; top: 0; left: 0; right: 0; height: 31px; box-sizing: border-box; display: flex; align-items: center; padding: 0 12px; background: var(--bg-alt); border-bottom: 1px solid var(--border); z-index: 5; font-size: 13px; color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hier-row { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
 .canvas-wrap.with-crumbs { padding-top: 64px; }
 .canvas-wrap.with-hier > .project-tree { top: 31px; }
@@ -968,7 +968,6 @@ button.hier-tab { padding-right: 10px; }
 .hier-sep { color: var(--fg-muted); margin: 0 6px; }
 .hier-crumbs button.link, .project-tree button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; cursor: pointer; }
 .hier-crumbs button.link:hover, .project-tree button.link:hover { text-decoration: underline; }
-.hier-up { margin-left: 8px; border: 0; border-radius: 999px; padding: 2px 10px; background: var(--accent); color: #fff; font: inherit; font-size: 12px; }
 .project-tree { position: absolute; top: 0; left: 0; bottom: 0; width: 260px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
 .project-tree header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
 .project-tree header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1005,13 +1004,13 @@ button.hier-tab { padding-right: 10px; }
 .sub-simbar { font-size: 12px; color: var(--fg-muted); padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Vista partida del subcircuito (#180): el símbolo y sus parámetros a la derecha */
-.canvas-wrap.with-sym { padding-right: min(36%, 420px); }
-.canvas-wrap.with-sym .hint-bar { right: min(36%, 420px); }
-.sym-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(36%, 420px); display: flex; flex-direction: column; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 4; font-size: 13px; overflow-y: auto; overflow-x: hidden; }
+.canvas-wrap.with-sym { --sym-wc: min(var(--sym-w, 420px), 75%); padding-right: var(--sym-wc); }
+.canvas-wrap.with-sym .hint-bar { right: var(--sym-wc); }
+.sym-pane { position: absolute; top: 0; right: 0; bottom: 0; width: var(--sym-wc, 420px); outline: none; display: flex; flex-direction: column; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 4; font-size: 13px; overflow: visible; }
 .canvas-wrap.with-hier > .sym-pane { top: 31px; }
 .sym-pane header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .sym-pane header .tree-add { margin-left: auto; }
-.sym-canvas { flex: 0 0 auto; height: 260px; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
+.sym-canvas { flex: 1 1 auto; min-height: 180px; height: auto; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
 .sym-dot { fill: var(--grid, #888); opacity: .5; }
 .sym-shapes { fill: none; stroke: var(--fg); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .sym-shapes * { vector-effect: non-scaling-stroke; }
@@ -1021,8 +1020,26 @@ button.hier-tab { padding-right: 10px; }
 .sym-pin rect { fill: var(--accent); }
 .sym-pin text { fill: var(--fg); font-size: 11px; font-family: var(--mono); user-select: none; }
 .sym-pin:hover rect { fill: #e67700; }
-.sym-params { padding: 8px 12px; }
-.sym-params h4 { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
+.sym-canvas { user-select: none; }
+.sym-canvas.drawing { cursor: crosshair; }
+.sym-resize { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; cursor: ew-resize; z-index: 2; }
+.sym-resize:hover, .sym-resize:active { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+.sym-tools { display: flex; align-items: center; gap: 2px; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.sym-tools button { display: inline-flex; padding: 4px; border: 0; border-radius: 6px; background: transparent; color: var(--fg-muted); }
+.sym-tools button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.sym-tools button.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.sym-tools .tree-meta { margin-left: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sym-ask { display: flex; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.sym-ask input { flex: 1; min-width: 0; font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
+.sym-shapes .sel { stroke: var(--accent); }
+.sym-shapes .preview { stroke: var(--accent); stroke-dasharray: 4 3; }
+.sym-shapes > * { cursor: move; pointer-events: stroke; stroke-width: 1.5; }
+.sym-canvas.drawing .sym-shapes > * { pointer-events: none; }
+.sym-end { fill: var(--bg); stroke: var(--accent); stroke-width: 1; cursor: crosshair; vector-effect: non-scaling-stroke; }
+.sym-pin-new { fill: none; stroke: var(--accent); stroke-dasharray: 2 2; vector-effect: non-scaling-stroke; }
+.sym-bottom { flex: 0 0 auto; max-height: 40%; overflow-y: auto; border-top: 1px solid var(--border); font-size: 12px; }
+.sym-params { padding: 4px 10px 6px; }
+.sym-params h4 { display: flex; align-items: center; justify-content: space-between; margin: 2px 0 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
 .sym-params table { width: 100%; border-collapse: collapse; }
 .sym-params th { text-align: left; font-weight: 500; color: var(--fg-muted); font-size: 11px; padding: 2px 4px; }
 .sym-params td { padding: 2px 4px; }

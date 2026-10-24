@@ -417,50 +417,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   );
 }
 
-/** Barra arriba del lienzo, adentro de un subcircuito: migas de pan para subir */
-export function HierBar({ testbench, path, onCrumb, onUp, onQuick }: {
-  testbench: string;
-  path: Level[];
-  /** -1 = testbench */
-  onCrumb(i: number): void;
-  onUp(): void;
-  onQuick(): void;
-}) {
-  return (
-    <div className="hier-bar">
-      <nav className="hier-crumbs" aria-label={t('Hierarchy')}>
-        {path[0]?.inst ? (
-          <button className="link" onClick={() => onCrumb(-1)}>
-            {testbench}
-          </button>
-        ) : (
-          <span className="tree-meta" title={t('Opened from the panel: to see the values of an instance, enter it from the testbench (double-click or E)')}>
-            {t('standalone')}
-          </span>
-        )}
-        {path.map((l, i) => (
-          <span key={i}>
-            <span className="hier-sep">›</span>
-            {i === path.length - 1 ? (
-              <strong>{l.inst ? `${l.inst} (${l.sub})` : l.sub}</strong>
-            ) : (
-              <button className="link" onClick={() => onCrumb(i)}>
-                {l.inst ? `${l.inst} (${l.sub})` : l.sub}
-              </button>
-            )}
-          </span>
-        ))}
-        <button className="hier-up" onClick={onUp} title={t('Go up one level (Alt+↑)')}>
-          ↑ {t('Up')}
-        </button>
-        <button className="hier-quick" onClick={onQuick} title={t('Go to a testbench or subcircuit (Ctrl+P)')}>
-          {t('Go to…')} <kbd>{'Ctrl+P'}</kbd>
-        </button>
-      </nav>
-    </div>
-  );
-}
-
 /** Buscador rápido de testbenches y subcircuitos */
 export function QuickOpen({ items, onPick, onClose }: { items: { key: string; label: string; hint: string }[]; onPick(key: string): void; onClose(): void }) {
   const [q, setQ] = useState('');

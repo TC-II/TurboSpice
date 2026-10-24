@@ -504,13 +504,18 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
   );
 }
 
-/** N: nombre de red (o tierra) */
-export function FlagDialog({ initial, onApply, onClose }: {
+/** N: nombre de red (o tierra); adentro de un subcircuito, también si es un puerto */
+export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
   initial: string;
-  onApply(name: string): void;
+  /** puerto actual de la etiqueta ('' = no es puerto) */
+  initialPort?: string;
+  /** mostrar la elección de puerto (adentro de un subcircuito) */
+  port?: boolean;
+  onApply(name: string, ioPin?: string): void;
   onClose(): void;
 }) {
   const [name, setName] = useState(initial);
+  const [io, setIo] = useState(initialPort ?? '');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -522,13 +527,24 @@ export function FlagDialog({ initial, onApply, onClose }: {
         className="attrs"
         onSubmit={(e) => {
           e.preventDefault();
-          if (name.trim()) onApply(name.trim());
+          if (name.trim()) onApply(name.trim(), port ? io : undefined);
         }}
       >
         <label>
           <span>{t('Name')}</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
+        {port && (
+          <label>
+            <span>{t('Subcircuit port')}</span>
+            <select value={io} onChange={(e) => setIo(e.target.value)}>
+              <option value="">{t('No (internal net)')}</option>
+              <option value="In">{t('Input')}</option>
+              <option value="Out">{t('Output')}</option>
+              <option value="BiDir">{t('Bidirectional')}</option>
+            </select>
+          </label>
+        )}
         <div className="buttons">
           <button type="button" onClick={onClose}>{t('Cancel')}</button>
           <button type="submit" className="primary">{t('OK')}</button>

@@ -137,9 +137,9 @@ export function placeSymbol(doc: AscDoc, type: string, at: Point, orient: Orient
   return cutNew({ ...doc, symbols: [...doc.symbols, sym] }, [{ kind: 'symbol', index: doc.symbols.length }], lib).doc;
 }
 
-export function addFlag(doc: AscDoc, at: Point, name: string): AscDoc {
+export function addFlag(doc: AscDoc, at: Point, name: string, ioPin?: string): AscDoc {
   const flags = doc.flags.filter((f) => !samePt(f, at));
-  return { ...doc, flags: [...flags, { x: at.x, y: at.y, name }] };
+  return { ...doc, flags: [...flags, ioPin ? { x: at.x, y: at.y, name, ioPin } : { x: at.x, y: at.y, name }] };
 }
 
 export function addText(doc: AscDoc, t: SchText): AscDoc {
@@ -683,8 +683,14 @@ export function setText(doc: AscDoc, index: number, patch: Partial<SchText>): As
   return { ...doc, texts: doc.texts.map((t, i) => (i === index ? { ...t, ...patch } : t)) };
 }
 
-export function setFlagName(doc: AscDoc, index: number, name: string): AscDoc {
-  return { ...doc, flags: doc.flags.map((f, i) => (i === index ? { ...f, name } : f)) };
+/** Nombre de la etiqueta; con `ioPin` también su puerto ('' = deja de ser puerto) */
+export function setFlagName(doc: AscDoc, index: number, name: string, ioPin?: string): AscDoc {
+  const set = (f: AscDoc['flags'][number]) => {
+    if (ioPin === undefined) return { ...f, name };
+    const { ioPin: _, ...rest } = f;
+    return ioPin ? { ...rest, name, ioPin } : { ...rest, name };
+  };
+  return { ...doc, flags: doc.flags.map((f, i) => (i === index ? set(f) : f)) };
 }
 
 /** Estilo de línea de las figuras indicadas ('' = sólida, sin campo en el archivo) */

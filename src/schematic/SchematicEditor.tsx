@@ -53,7 +53,7 @@ export type Tool =
   | { kind: 'select' }
   | { kind: 'wire'; start: Point | null }
   | { kind: 'place'; type: string; orient: Orient }
-  | { kind: 'flag'; name: string }
+  | { kind: 'flag'; name: string; ioPin?: string }
   | { kind: 'text'; text: string; textKind: 'directive' | 'comment' }
   | { kind: 'delete' }
   | { kind: 'probe' }
@@ -701,7 +701,7 @@ export function SchematicEditor(props: Props) {
         commit(placeSymbol(doc, tool.type, placementOrigin(lib.symbol(tool.type), tool.orient, g), tool.orient, lib));
         return;
       case 'flag':
-        commit(addFlag(doc, g, tool.name));
+        commit(addFlag(doc, g, tool.name, tool.ioPin));
         if (tool.name !== '0') setTool({ kind: 'select' });
         return;
       case 'text':

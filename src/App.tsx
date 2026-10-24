@@ -85,7 +85,7 @@ import { parseSource } from './sim/sources.ts';
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { BenchParamsDialog, HierBar, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
 import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
@@ -146,7 +146,7 @@ type Dialog =
   | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
-  | { kind: 'flag'; index?: number; at?: Point }
+  | { kind: 'flag'; index?: number; at?: Point; ioPin?: string }
   | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
   | { kind: 'share'; url: string }
@@ -379,7 +379,22 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const hasSubs = project.files.some((f) => f.kind === 'schematic');
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
-  const hierOn = path.length > 0;
+  // ancho del panel del símbolo (se arrastra su borde izquierdo)
+  const [symW, setSymWState] = useState(() => {
+    try {
+      return Number(localStorage.getItem('turbospice.symW')) || 420;
+    } catch {
+      return 420;
+    }
+  });
+  const setSymW = (w: number) => {
+    setSymWState(w);
+    try {
+      localStorage.setItem('turbospice.symW', String(Math.round(w)));
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
   // con «mostrar al acercar el mouse» el panel oculto queda como un borde visible (#251)
   const treeShown = treeOpen || treePeek || hoverReveal;
   const [quickOpen, setQuickOpen] = useState(false);
@@ -1880,6 +1895,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
       return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
+  /** Puerto nuevo pedido desde el símbolo (un pin con otro nombre): etiqueta con puerto debajo de las otras */
+  const addPort = (name: string) => {
+    const fs = doc.flags;
+    const x = fs.length ? Math.min(...fs.map((f) => f.x)) : -128;
+    const y = (fs.length ? Math.max(...fs.map((f) => f.y)) : -64) + 64;
+    commit(addFlag(doc, { x, y }, name, 'BiDir'));
+  };
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
@@ -2847,6 +2869,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
                 const b = await plotPanel.current?.png();
                 if (b) download(`${exportBase()}.png`, b);
               },
+        ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
             },
             { label: t('View to .plt (LTspice)'), onClick: () => exportPlt() },
             { label: t('Import .plt view…'), shortcut: 'O', onClick: () => pltInput.current?.click() },
@@ -3022,20 +3045,13 @@ ${ltNetlistText(sim.built.lt)}
             if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
             if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
           }}
-          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+          style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
+          className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
-          {hierOn && (
-          <HierBar
-            testbench={(curSim && simName(curSim)) || variant.name}
-            path={path}
-            onCrumb={(i) => go(path.slice(0, i + 1))}
-            onUp={goUp}
-            onQuick={() => setQuickOpen(true)}
-          />
-          )}
+          {curSub && <div className="sub-hint">{t('{name}: draw the circuit between the ports (net labels with a port, N)', { name: curSub })}</div>}
           {treeShown && (
             <ProjectTree
               project={project.name}
@@ -3148,6 +3164,8 @@ ${ltNetlistText(sim.built.lt)}
             showGrid={showGrid}
             showLoose={showLoose}
             showSimCommand={showSimCommand}
+              onWidth={setSymW}
+              onAddPort={addPort}
             onHover={onHover}
             diff={historyDiff}
           />
@@ -3224,10 +3242,10 @@ ${ltNetlistText(sim.built.lt)}
           <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} message={message} onDismiss={() => setMessage(undefined)} />
         </div>
 
-        {sim && (
+        {sim && !curSub && (
           <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
         )}
-        {sim && (
+        {sim && !curSub && (
           <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>
             <input
               ref={pltInput}
@@ -3650,11 +3668,11 @@ ${ltNetlistText(sim.built.lt)}
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
           onClose={() => setDialog(null)}
-          onApply={(name) => {
+          onApply={(name, io) => {
             setDialog(null);
-            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
-            else if (dialog.at) commit(addFlag(doc, dialog.at, name));
-            else setTool({ kind: 'flag', name });
+            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name, io));
+            else if (dialog.at) commit(addFlag(doc, dialog.at, name, io || undefined));
+            else setTool({ kind: 'flag', name, ioPin: io || undefined });
           }}
         />
       )}
@@ -3684,6 +3702,8 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
   return (
     <div className="hint-bar">
       <span className="hint-text">{text(hover)}</span>
+          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? '')}
+          port={!!curSub}
       {message && (
         <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
           {message}

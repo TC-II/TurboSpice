@@ -211,3 +211,58 @@ export function setSymParams(text: string, ps: [string, string][]): string {
   }
   return join(ls);
 }
+
+// --- dibujo: líneas, rectángulos, círculos y pines nuevos ----------------------------------
+
+export type ShapeKind = 'LINE' | 'RECTANGLE' | 'CIRCLE';
+
+export interface SymShape {
+  /** índice de la línea en el texto */
+  line: number;
+  kind: ShapeKind;
+  coords: [number, number, number, number];
+}
+
+/** Figuras del símbolo (LINE, RECTANGLE, CIRCLE), en el orden del archivo */
+export function symShapes(text: string): SymShape[] {
+  const out: SymShape[] = [];
+  lines(text).forEach((l, i) => {
+    const m = /^(LINE|RECTANGLE|CIRCLE)\s+\S+\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/.exec(l);
+    if (m) out.push({ line: i, kind: m[1] as ShapeKind, coords: [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])] });
+  });
+  return out;
+}
+
+/** Agrega una figura antes de los pines y atributos (detrás de las que ya hay) */
+export function addShape(text: string, kind: ShapeKind, c: [number, number, number, number]): string {
+  const ls = lines(text);
+  const last = symShapes(text).at(-1)?.line;
+  const at = last !== undefined ? last + 1 : Math.max(1, ls.findIndex((l) => /^SymbolType /.test(l)) + 1);
+  ls.splice(at, 0, `${kind} Normal ${c.join(' ')}`);
+  return join(ls);
+}
+
+/** Cambia las coordenadas de la figura de la línea `line` (conserva su estilo) */
+export function setShape(text: string, line: number, c: [number, number, number, number]): string {
+  const ls = lines(text);
+  const m = /^(LINE|RECTANGLE|CIRCLE)\s+(\S+)\s+-?\d+\s+-?\d+\s+-?\d+\s+-?\d+(.*)$/.exec(ls[line] ?? '');
+  if (!m) return text;
+  ls[line] = `${m[1]} ${m[2]} ${c.join(' ')}${m[3]}`;
+  return join(ls);
+}
+
+/** Saca la figura de la línea `line` */
+export function removeShape(text: string, line: number): string {
+  const ls = lines(text);
+  if (!/^(LINE|RECTANGLE|CIRCLE)\s/.test(ls[line] ?? '')) return text;
+  ls.splice(line, 1);
+  return join(ls);
+}
+
+/** Agrega un pin para el puerto `name` en (x, y); SpiceOrder al final */
+export function addPin(text: string, name: string, x: number, y: number): string {
+  const ls = lines(text);
+  const order = symPins(text).length + 1;
+  ls.push(`PIN ${x} ${y} ${sideOf(x, y, symBody(text))} 8`, `PINATTR PinName ${name}`, `PINATTR SpiceOrder ${order}`);
+  return join(ls);
+}

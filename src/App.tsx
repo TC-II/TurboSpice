@@ -3649,6 +3649,12 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
     };
   }, [sink]);
   const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
+  // los avisos se van solos; los largos y los errores duran más para poder leerlos
+  useEffect(() => {
+    if (!message) return;
+    const id = setTimeout(onDismiss, Math.min(15000, Math.max(error ? 10000 : 6000, message.length * 70)));
+    return () => clearTimeout(id);
+  }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="hint-bar">
       <span className="hint-text">{text(hover)}</span>

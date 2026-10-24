@@ -252,6 +252,15 @@ export function shapeFromClicks(kind: ShapeKind, pts: Point[], style?: string): 
   return withStyle({ kind, coords: [a.x, a.y, b.x, b.y, end.x, end.y, start.x, start.y] });
 }
 
+/**
+ * Segundo click con M / S (#222): suelta lo que se está moviendo y termina ahí, sin estado
+ * intermedio. Se confirma el fantasma (si lo hay), la herramienta vuelve a esperar qué mover y
+ * la selección se vacía (no queda resaltado: sus índices tampoco sirven tras limpiar cables).
+ */
+export function dropMove<D>(tool: Tool & { kind: 'move' }, preview: D | null): { commit: D | null; tool: Tool; selection: ItemRef[] } {
+  return { commit: preview, tool: { ...tool, refs: null, start: null }, selection: [] };
+}
+
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
@@ -687,10 +696,12 @@ export function SchematicEditor(props: Props) {
         return;
       case 'move': {
         if (tool.refs && tool.start) {
-          // segundo click: se suelta donde está
-          if (preview) commit(preview);
+          // segundo click: se suelta donde está y termina
+          const r = dropMove(tool, preview);
+          if (r.commit) commit(r.commit);
           setPreview(null);
-          setTool({ ...tool, refs: null, start: null });
+          setSelection(r.selection);
+          setTool(r.tool);
           return;
         }
         const hit = hitTest(doc, p, lib, tol, showSimCommand);

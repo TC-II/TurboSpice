@@ -97,6 +97,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-label: #1d2025;
   --sch-directive: #1d2025;
   --sch-comment: #2f6fdb;
+  --sch-drawing: #1fa8d6;
   --sch-grid: #b9bec7;
   --sch-sel: #e8590c;
   --sch-hl: #2b8a3e;
@@ -110,6 +111,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
     --sch-label: #c9ced6;
     --sch-directive: #e4e6ea;
     --sch-comment: #74a7ff;
+    --sch-drawing: #6fd0f2;
     --sch-grid: #3a3f47;
     --sch-sel: #ff922b;
     --sch-hl: #51cf66;
@@ -123,6 +125,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-label: #c9ced6;
   --sch-directive: #e4e6ea;
   --sch-comment: #74a7ff;
+  --sch-drawing: #6fd0f2;
   --sch-grid: #3a3f47;
   --sch-sel: #ff922b;
   --sch-hl: #51cf66;
@@ -205,7 +208,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
 .wires line { stroke: var(--sch-sym); stroke-width: 1.6; }
-.shapes > * { stroke: var(--sch-sym); stroke-width: 1.4; }
+.shapes > * { stroke: var(--sch-drawing); stroke-width: 1.4; }
 .shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
 .junctions circle { fill: var(--sch-sym); stroke: none; }
@@ -230,7 +233,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .flag.sel { color: var(--sch-sel); }
 .flag.sel text { fill: var(--sch-sel); }
 .texts .directive text { fill: var(--sch-directive); font-weight: 600; }
-.texts .comment text { fill: var(--sch-comment); }
+.texts .comment text { fill: var(--sch-drawing); }
 .texts .sel text { fill: var(--sch-sel); }
 .net-hl line { stroke: var(--sch-hl); stroke-width: 3.2; }
 .net-hl circle { fill: var(--sch-hl); stroke: none; }

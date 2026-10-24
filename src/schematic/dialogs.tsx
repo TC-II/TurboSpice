@@ -329,9 +329,13 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   const [patches, setPatches] = useState(new Map<number, LabelPatch>());
   const focusAttr = rows.find((r) => r.win === focusLabel)?.attr ?? 'InstName';
   const first = useRef<HTMLInputElement>(null);
-  // con una tabla de la librería (transistores, diodos…) el cursor arranca en su buscador, salvo
-  // que se haya abierto desde un rótulo
-  const searchFirst = !!parts?.length && focusLabel === undefined;
+  // R, L, C: la tabla de modelos de fabricante va escondida en «Avanzado» (#70), abierta si ya
+  // se usa uno; en semiconductores queda a la vista
+  const passive = !!parts?.length && parts.every((g) => PASSIVE_KINDS.has(g.kind));
+  // con una tabla de la librería a la vista (transistores, diodos…) el cursor arranca en su buscador,
+  // salvo que se haya abierto desde un rótulo; en R, L, C la tabla puede estar escondida, así que el
+  // cursor va al primer campo como en cualquier otro componente
+  const searchFirst = !!parts?.length && !passive && focusLabel === undefined;
   useEffect(() => {
     if (searchFirst) return;
     first.current?.focus();
@@ -360,9 +364,6 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     setVals(next);
     return next;
   };
-  // R, L, C: la tabla de modelos de fabricante va escondida en «Avanzado» (#70), abierta si ya
-  // se usa uno; en semiconductores queda a la vista
-  const passive = !!parts?.length && parts.every((g) => PASSIVE_KINDS.has(g.kind));
   // (un R de la tabla sólo pone el valor: un «1k» escrito a mano es lo mismo; un C o un L deja
   // además sus parásitos en SpiceLine, y eso sí lo reconoce)
   const [partsOpen, setPartsOpen] = useState(() => {

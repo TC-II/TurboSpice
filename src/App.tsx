@@ -1585,16 +1585,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: v })) } }
           : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
         {
-          label: !canPropagate
-            ? t('Propagate {inst} to the other testbenches of the workbench', { inst })
-            : peers.length === 1
-              ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group })
-              : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
+          // con el valor que se está escribiendo (#229): se aplica primero y después se propaga
+          label: (v = value) =>
+            !canPropagate
+              ? t('Propagate {inst} across the other testbenches of the workbench', { inst })
+              : t('Propagate {inst}={value} across «{group}»', { inst, value: v, group }),
           title: t('Copies its value and parameters to the component with the same name in the other testbenches of the workbench'),
           disabled: !canPropagate,
-          onClick: () => {
-            editProject(propagateAttrs(snapshot(), peers, inst, s.type, s.attrs));
-            setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value, n: peers.length, group }));
+          primary: true,
+          onClick: (edited) => {
+            const v = edited?.trim() || value;
+            const attrs = new Map(s.attrs);
+            if (quick && v !== value) {
+              commit(setSymbolAttrs(doc, index, { Value: v }));
+              attrs.set('Value', v);
+            }
+            editProject(propagateAttrs(snapshot(), peers, inst, s.type, attrs));
+            setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value: v, n: peers.length, group }));
           },
         },
       ],
@@ -3205,12 +3212,7 @@ ${ltNetlistText(sim.built.lt)}
               if (files.length) doImportLtspice(files);
             }}
           />
-          {message && (
-            <div className="toast" onClick={() => setMessage(undefined)}>
-              {message}
-            </div>
-          )}
-          <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} />
+          <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} message={message} onDismiss={() => setMessage(undefined)} />
         </div>
 
         {sim && (
@@ -3655,7 +3657,8 @@ ${ltNetlistText(sim.built.lt)}
 type Hover = { ref: ItemRef | null; at: Point } | null;
 
 /** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
-function HintBar({ sink, text }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string }) {
+/** Barra de estado bajo el esquemático: la ayuda a la izquierda y los avisos a la derecha (#229: sin ventanas emergentes) */
+function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string; message?: string; onDismiss(): void }) {
   const [hover, setHover] = useState<Hover>(null);
   useEffect(() => {
     sink.current = setHover;
@@ -3663,7 +3666,17 @@ function HintBar({ sink, text }: { sink: MutableRefObject<((h: Hover) => void) |
       sink.current = undefined;
     };
   }, [sink]);
-  return <div className="hint-bar">{text(hover)}</div>;
+  const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
+  return (
+    <div className="hint-bar">
+      <span className="hint-text">{text(hover)}</span>
+      {message && (
+        <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
+          {message}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function toolHint(tt: Tool): string {

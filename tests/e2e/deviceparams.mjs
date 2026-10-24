@@ -40,7 +40,7 @@ check(['@Q1[gm]', '@Q1[gpi]', '@Q1[cpi]', '@Q1[vbe]'].every((o) => options.inclu
 
 await add('@Q1[gm]');
 check((await names()).includes('@Q1[gm]'), `@Q1[gm] se agrega aunque no esté guardado (${await names()})`);
-const msg = await page.locator('.message, .toast, [role=status]').allTextContents();
+const msg = await page.locator('.message, .status-msg, [role=status]').allTextContents();
 check(msg.some((m) => /no se guardó en esta simulación/.test(m)), `avisa que se guarda al simular de nuevo (${msg.join(' | ')})`);
 await add('Ic(Q1)');
 await simulate();

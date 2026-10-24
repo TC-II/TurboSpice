@@ -10,6 +10,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runYosys } from '@yowasp/yosys';
 import { Ngspice } from '../../src/engine/ngspice.ts';
 import { synthesize } from '../../src/hdl/yosys.ts';
+import { compileIcarus, vvpForEngine } from '../../src/hdl/icarus.ts';
+import { cosimSubckt } from '../../src/hdl/synth.ts';
 import { CASES } from './cases.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +19,24 @@ const DIST = join(HERE, '..', '..', 'engine', 'dist-engine');
 const { default: factory } = await import(pathToFileURL(join(DIST, 'ngspice.mjs')).href);
 const codemodels = {};
 for (const f of readdirSync(DIST).filter((f) => f.endsWith('.cm'))) codemodels[f] = new Uint8Array(readFileSync(join(DIST, f)));
-const ng = await Ngspice.create(factory, { spinit: readFileSync(join(DIST, 'spinit'), 'utf8'), codemodels });
+const assets = { spinit: readFileSync(join(DIST, 'spinit'), 'utf8'), codemodels };
+const ng = await Ngspice.create(factory, assets);
+
+// Icarus en WebAssembly (engine/icarus/build.sh): el compilador y el simulador
+const ICARUS = join(DIST, 'icarus');
+const icarus = {
+  program: async (name, print) => (await import(pathToFileURL(join(ICARUS, `${name}.mjs`)).href)).default({ print, printErr: print }),
+  file: async (name) => new Uint8Array(readFileSync(join(ICARUS, name))),
+};
+const runtime = Object.fromEntries(['libvvp.so', 'ivlng.so', 'ivlng.vpi', 'system.vpi', 'v2005_math.vpi', 'va_math.vpi', 'v2009.vpi'].map((f) => [f, new Uint8Array(readFileSync(join(ICARUS, f)))]));
+/** Verilog de comportamiento: compila con Icarus y arma el .subckt con d_cosim */
+async function behavioral(c) {
+  const top = c.top ?? /module\s+(\w+)/.exec(c.verilog)[1];
+  const r = await compileIcarus(icarus, { [c.file]: c.verilog }, top, c.params);
+  if (r.error) return { error: r.error };
+  const vvpFile = `${top}.vvp`;
+  return { block: cosimSubckt(top, r.ports, r.params, vvpFile, c.file), vvp: { [vvpFile.toLowerCase()]: vvpForEngine(r.vvp) } };
+}
 
 const nativeOk = (() => {
   try {
@@ -40,14 +59,20 @@ let failed = 0;
 for (const c of CASES) {
   const t0 = Date.now();
   const problems = [];
-  const syn = await synthesize(runYosys, { [c.file]: c.verilog }, c.file, c.top, c.params);
+  const syn = c.behavioral ? await behavioral(c) : await synthesize(runYosys, { [c.file]: c.verilog }, c.file, c.top, c.params);
   if (c.expectError) {
     if (!syn.error || !c.expectError.test(syn.error)) problems.push(`esperaba error ${c.expectError}, dio ${syn.error ?? 'ok'}`);
   } else if (syn.error) {
     problems.push(`Yosys: ${syn.error}`);
   } else {
     const netlist = `* ${c.name}\n${syn.block.subckt}\n${c.circuit}\n.end\n`;
-    const res = ng.simulate(netlist);
+    // libvvp no se puede inicializar dos veces: un motor nuevo para cada caso con Icarus
+    const eng = c.behavioral ? await Ngspice.create(factory, assets) : ng;
+    if (c.behavioral) {
+      eng.writeLibs(runtime);
+      eng.writeFiles(syn.vvp);
+    }
+    const res = eng.simulate(netlist);
     if (res.errors.length) problems.push(...res.errors.map((e) => `ngspice: ${e}`));
     const p = res.plots.find((x) => x.name.startsWith('tran'));
     const time = p?.vectors.find((v) => v.name === 'time')?.real;

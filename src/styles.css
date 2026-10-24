@@ -1094,7 +1094,9 @@ button.hier-tab { padding-right: 10px; }
 .canvas-wrap.with-hier .verilog-module { top: 31px; }
 .vm-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
 .vm-bar strong { font-family: var(--mono); font-size: 13px; }
-.vm-bar button { margin-left: auto; }
+.vm-bar button { margin-left: 0; }
+.vm-bar .vm-mode { margin-left: auto; font-size: 12px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); color: var(--fg); }
+.vm-suggest { margin: 0; padding: 6px 8px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: 12px; }
 .vm-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: var(--bg-alt); color: var(--fg-muted); }
 .vm-status.ok { color: var(--ok); }
 .vm-status.err { color: var(--err); }

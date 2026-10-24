@@ -27,6 +27,9 @@ export interface ProjectFile {
   text: string;
   /** Verilog (#209): el último resultado de sintetizarlo (se simula con esto) */
   synth?: VerilogSynth;
+  /** Verilog: cómo se simula. Por omisión se sintetiza (Yosys); "behavioral": Icarus Verilog
+   *  (retardos #, initial, $display…) co-simulado con d_cosim */
+  hdl?: 'behavioral';
 }
 
 /** Resultado de sintetizar un módulo Verilog del proyecto */
@@ -41,7 +44,7 @@ export interface VerilogSynth {
   pins: { name: string; dir: 'in' | 'out' | 'inout' }[];
   /** parameter de Verilog del módulo de más arriba, con su valor por omisión */
   params: Record<string, string>;
-  /** comportamiento (Icarus, d_cosim): el código compilado a .vvp, en base64 */
+  /** comportamiento (Icarus, d_cosim): el código compilado (.vvp), listo para el motor */
   vvp?: string;
 }
 

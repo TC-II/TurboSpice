@@ -129,11 +129,15 @@ export class Ngspice {
     assets: NgspiceAssets,
     opts: NgspiceOptions = {},
   ): Promise<Ngspice> {
+    // lo que escriben por stdout/stderr las bibliotecas que carga ngspice (p. ej. el puente de
+    // Icarus, #209) va al log de la simulación
+    let self: Ngspice | null = null;
+    const libOutput = (line: string) => self?.libLine(line);
     const m = (await factory({
       locateFile: opts.locateFile,
       ...(opts.instantiateWasm ? { instantiateWasm: opts.instantiateWasm } : {}),
-      print: () => {},
-      printErr: () => {},
+      print: libOutput,
+      printErr: libOutput,
     })) as EmModule;
 
     // spinit y code models tienen que estar en el FS antes de ngSpice_Init
@@ -149,6 +153,7 @@ export class Ngspice {
     m.FS.writeFile('/proc/meminfo', 'MemTotal: 4194304 kB\nMemFree: 4194304 kB\n');
 
     const ng = new Ngspice(m, opts);
+    self = ng;
     ng.init();
     return ng;
   }
@@ -186,6 +191,14 @@ export class Ngspice {
     this.command(`cd ${WORK_DIR}`);
   }
 
+  /** Una línea de stdout/stderr de una biblioteca (no de ngspice, que usa su callback) */
+  private libLine(line: string): void {
+    if (!line.trim()) return;
+    this.log.push(line);
+    if (/\berror\b|\bfail(ed)?\b|unable|abort/i.test(line)) this.errors.push(line);
+    this.opts.onOutput?.(line);
+  }
+
   command(cmd: string): number {
     const p = this.m.stringToNewUTF8(cmd);
     try {
@@ -193,6 +206,15 @@ export class Ngspice {
     } finally {
       this.m._free(p);
     }
+  }
+
+  /**
+   * Icarus Verilog (#209): libvvp, sus módulos VPI y el puente ivlng, donde los busca el d_cosim
+   * de un bloque de comportamiento. libvvp no se puede inicializar dos veces: después de una
+   * simulación con Icarus hace falta un motor nuevo.
+   */
+  writeLibs(files: Record<string, Uint8Array>): void {
+    for (const [name, data] of Object.entries(files)) this.m.FS.writeFile(`${CM_DIR}/${name}`, data);
   }
 
   /** Escribe archivos auxiliares (modelos, .include, PWL) en /work */

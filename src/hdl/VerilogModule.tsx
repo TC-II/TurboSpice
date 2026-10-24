@@ -8,11 +8,16 @@ import type { SynthResult } from './yosys.ts';
  * el código, «Sintetizar» (Yosys) con sus errores y avisos, y la interfaz eléctrica y los
  * parameter por omisión de las instancias (los del símbolo; cada instancia los puede cambiar).
  */
-export function VerilogModule({ name, text, stale, pins, params, onText, onSynthesize, onParams }: {
+export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMode, pins, params, onText, onSynthesize, onParams }: {
   name: string;
   text: string;
   /** el código cambió desde la última síntesis (o nunca se sintetizó) */
   stale: boolean;
+  /** cómo se simula: síntesis (Yosys, compuertas de XSPICE) o comportamiento (Icarus, d_cosim) */
+  mode: 'synth' | 'behavioral';
+  /** el código usa retardos #, $display…: conviene el modo comportamiento */
+  suggestBehavioral: boolean;
+  onMode(mode: 'synth' | 'behavioral'): void;
   /** pines de la última síntesis */
   pins: { name: string; dir: 'in' | 'out' | 'inout' }[];
   /** parámetros del símbolo (SpiceLine): los eléctricos y los parameter de Verilog */
@@ -69,21 +74,35 @@ export function VerilogModule({ name, text, stale, pins, params, onText, onSynth
   const setParam = (k: string, v: string) => onParams(params.map(([pk, pv]) => [pk, pk.toLowerCase() === k.toLowerCase() ? v : pv]));
   const family = FAMILIES.find((f) => ELECTRICAL.every((p) => (values.get(p.name) ?? p.value) === (f.values[p.name] ?? p.value)));
 
+  const beh = mode === 'behavioral';
   const status = busy
-    ? { cls: 'busy', text: t('Synthesizing…') }
+    ? { cls: 'busy', text: beh ? t('Compiling…') : t('Synthesizing…') }
     : result?.error
-      ? { cls: 'err', text: t('Synthesis failed') }
+      ? { cls: 'err', text: beh ? t('Compilation failed') : t('Synthesis failed') }
       : stale
         ? { cls: 'stale', text: t('Changes not synthesized yet (it is synthesized before simulating)') }
-        : { cls: 'ok', text: t('Synthesized') };
+        : { cls: 'ok', text: beh ? t('Compiled (Icarus)') : t('Synthesized') };
 
   return (
     <div className="verilog-module">
       <div className="vm-bar">
         <strong>{name}.v</strong>
         <span className={`vm-status ${status.cls}`}>{status.text}</span>
-        <button type="button" className="primary" onClick={synthesize} disabled={busy} title={t('Synthesize with Yosys and update the symbol (Ctrl+Enter)')}>
-          {t('Synthesize')}
+        <select
+          className="vm-mode"
+          value={mode}
+          aria-label={t('How it is simulated')}
+          title={t('Synthesis: gates and flip-flops (synthesizable Verilog). Behavioral: Icarus Verilog runs the code as is (# delays, initial, $display…); one behavioral block per simulation.')}
+          onChange={(e) => {
+            onMode(e.target.value as 'synth' | 'behavioral');
+            setResult(null);
+          }}
+        >
+          <option value="synth">{t('Synthesis (Yosys)')}</option>
+          <option value="behavioral">{t('Behavioral (Icarus)')}</option>
+        </select>
+        <button type="button" className="primary" onClick={synthesize} disabled={busy} title={t('Compile and update the symbol (Ctrl+Enter)')}>
+          {mode === 'behavioral' ? t('Compile') : t('Synthesize')}
         </button>
       </div>
       <div className="vm-body">
@@ -118,6 +137,14 @@ export function VerilogModule({ name, text, stale, pins, params, onText, onSynth
           />
         </div>
         <aside className="vm-side">
+          {suggestBehavioral && (
+            <p className="vm-suggest">
+              {t('This code uses # delays or system tasks ($display…), which synthesis ignores.')}{' '}
+              <button type="button" className="link" onClick={() => onMode('behavioral')}>
+                {t('Simulate it as behavioral (Icarus)')}
+              </button>
+            </p>
+          )}
           {failure && <p className="err">{t('Yosys could not run: {msg}', { msg: failure })}</p>}
           {result?.error && <p className="err">{result.error}</p>}
           {result?.block?.warnings.map((w) => <p key={w} className="hint">{w}</p>)}
@@ -172,7 +199,7 @@ export function VerilogModule({ name, text, stale, pins, params, onText, onSynth
           )}
           {result?.log.trim() && (
             <details>
-              <summary>{t('Yosys output')}</summary>
+              <summary>{mode === 'behavioral' ? t('Icarus output') : t('Yosys output')}</summary>
               <pre className="log">{result.log}</pre>
             </details>
           )}

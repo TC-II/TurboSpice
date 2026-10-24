@@ -121,8 +121,8 @@ import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
-import { synthesizeVerilog } from './hdl/client.ts';
-import { addVerilogModule, withParams, applySynth, isStale, moduleOf, storeVerilog, verilogFile, verilogModules, verilogPorts, verilogSources, verilogSymbol } from './hdl/project.ts';
+import { compileBehavioral, synthesizeVerilog } from './hdl/client.ts';
+import { addVerilogModule, looksBehavioral, setHdlMode, vvpFileOf, withParams, applySynth, isStale, moduleOf, storeVerilog, verilogFile, verilogModules, verilogPorts, verilogSources, verilogSymbol } from './hdl/project.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
 import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
@@ -543,9 +543,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const src = text ?? f.text;
     const code = src.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '');
     if (!new RegExp(`^\\s*module\\s+${name}\\b`, 'm').test(code)) return { error: t('{file} has to define the module {name} (the name of the file)', { file: f.name, name }), log: '' };
-    const r = await synthesizeVerilog(verilogSources(projectRef.current, { name: f.name, text: src }), f.name, name);
+    const sources = verilogSources(projectRef.current, { name: f.name, text: src });
+    // comportamiento: Icarus (.vvp para d_cosim); si no, síntesis con Yosys
+    const r = f.hdl === 'behavioral' ? await compileBehavioral(sources, f.name, name, vvpFileOf(name)) : await synthesizeVerilog(sources, f.name, name);
     if (r.block) {
-      const p = applySynth(projectRef.current, name, src, r.block);
+      const p = applySynth(projectRef.current, name, src, r.block, r.vvp);
       projectRef.current = p;
       editProject(p);
       lib.setProjectFiles(p.files);
@@ -570,27 +572,42 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (r.error) throw new Error(`${f.name}: ${r.error}`);
     }
   };
-  /** Síntesis de las variantes por parameter (en memoria mientras no cambie el código) */
-  const variantCache = useRef(new Map<string, string>());
-  const withVariants = async (netlist: string): Promise<{ netlist: string; warnings: string[] }> => {
+  /**
+   * Antes de mandar la netlist al motor: las instancias con otro parameter usan su propia síntesis
+   * (en memoria mientras no cambie el código), y los bloques de comportamiento necesitan su .vvp
+   */
+  const variantCache = useRef(new Map<string, { subckt: string; vvp?: string }>());
+  const withVariants = async (netlist: string): Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }> => {
     const p = projectRef.current;
-    const v = applyVariants(netlist, verilogModules(p).flatMap((f) => (f.synth ? [{ name: moduleOf(f), params: f.synth.params }] : [])));
-    if (!v.needs.length) return { netlist, warnings: v.warnings };
+    const mods = verilogModules(p).filter((f) => f.synth);
+    const v = applyVariants(netlist, mods.map((f) => ({ name: moduleOf(f), params: f.synth!.params })));
+    const files: Record<string, string> = {};
+    for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
     const subs: string[] = [];
     for (const n of v.needs) {
       const f = verilogFile(p, n.module)!;
-      const k = `${n.name}\u0000${f.text}`;
-      let sub = variantCache.current.get(k);
-      if (!sub) {
-        setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: `${moduleOf(f)} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')})` }) });
-        const r = await synthesizeVerilog(verilogSources(p), f.name, moduleOf(f), n.params);
-        if (!r.block) throw new Error(`${f.name} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')}): ${r.error}`);
-        sub = renameVariant(r.block.subckt, r.block.name, n.name);
-        variantCache.current.set(k, sub);
+      const k = `${n.name}\u0000${f.hdl ?? ''}\u0000${f.text}`;
+      let hit = variantCache.current.get(k);
+      if (!hit) {
+        const label = `${moduleOf(f)} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')})`;
+        setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: label }) });
+        const r =
+          f.hdl === 'behavioral'
+            ? await compileBehavioral(verilogSources(p), f.name, moduleOf(f), vvpFileOf(n.name), n.params)
+            : await synthesizeVerilog(verilogSources(p), f.name, moduleOf(f), n.params);
+        if (!r.block) throw new Error(`${label}: ${r.error}`);
+        hit = { subckt: renameVariant(r.block.subckt, r.block.name, n.name), ...(r.vvp ? { vvp: r.vvp } : {}) };
+        variantCache.current.set(k, hit);
       }
-      subs.push(sub);
+      subs.push(hit.subckt);
+      if (hit.vvp) files[vvpFileOf(n.name)] = hit.vvp;
     }
-    return { netlist: withSubckts(v.netlist, subs), warnings: v.warnings };
+    // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
+    const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) =>
+      mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)),
+    );
+    if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
+    return { netlist: withSubckts(v.netlist, subs), files, warnings: v.warnings };
   };
   const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
   /** Símbolo para un .subckt de un archivo de modelos del proyecto */
@@ -1191,6 +1208,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // y las instancias con otro parameter usan su propia síntesis
       const vv = await withVariants(built.netlist);
       built.netlist = vv.netlist;
+      built.files = { ...built.files, ...vv.files };
       built.warnings.push(...vv.warnings);
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       const tooBig = built.tooBig.map((p) => p.text);
@@ -3169,6 +3187,13 @@ ${ltNetlistText(sim.built.lt)}
               name={curSub}
               text={curVerilog.text}
               stale={isStale(curVerilog)}
+              mode={curVerilog.hdl === 'behavioral' ? 'behavioral' : 'synth'}
+              suggestBehavioral={curVerilog.hdl !== 'behavioral' && looksBehavioral(curVerilog.text)}
+              onMode={(m) => {
+                const p = setHdlMode(projectRef.current, curSub, m);
+                projectRef.current = p;
+                editProject(p);
+              }}
               pins={curVerilog.synth?.pins ?? []}
               params={symText ? symParams(symText) : []}
               onText={(text) => {

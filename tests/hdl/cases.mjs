@@ -220,6 +220,71 @@ Rl2 y2 0 1k
     compare: ['y2', [100e-9]],
   },
   {
+    name: 'comportamiento (Icarus): retardos #, initial y un contador',
+    file: 'beh.v',
+    behavioral: true,
+    verilog: `\`timescale 1ns/1ps
+module beh(input clk, output reg y, output reg [3:0] cnt);
+  initial begin y = 0; cnt = 0; end
+  always @(posedge clk) begin
+    #5 y = ~y;
+    cnt <= cnt + 1;
+  end
+endmodule`,
+    circuit: `${CLK}
+X1 clk y cnt_3 cnt_2 cnt_1 cnt_0 beh
+.tran 1n 500n`,
+    check: (at, block) => {
+      if (block.pins.map((p) => p.name).join() !== 'clk,y,cnt_3,cnt_2,cnt_1,cnt_0') return `pines ${block.pins.map((p) => p.name)}`;
+      // y cambia 5 ns después de cada flanco de subida del reloj (≈0,5 ns + 5 ns + retardo y rampa)
+      if (at('y', 4e-9) > 2.5 || at('y', 50e-9) < 2.5 || at('y', 150e-9) > 2.5) return `y: ${at('y', 4e-9)} ${at('y', 50e-9)} ${at('y', 150e-9)}`;
+      const cnt = (tt) => [3, 2, 1, 0].reduce((a, b) => a * 2 + (at(`cnt_${b}`, tt) > 2.5 ? 1 : 0), 0);
+      if (cnt(450e-9) !== 5) return `cnt = ${cnt(450e-9)} (esperaba 5)`;
+    },
+  },
+  {
+    name: 'comportamiento (Icarus): generador con delays, sin entradas',
+    file: 'ring.v',
+    behavioral: true,
+    verilog: `\`timescale 1us/100ns
+module ring(output reg [4:0] out);
+  reg t;
+  initial out = 0;
+  always begin
+    #1;
+    t = out[4];
+    out <<= 1;
+    out[0] = ~t;
+  end
+endmodule`,
+    circuit: `X1 out_4 out_3 out_2 out_1 out_0 ring
+.tran 0.1u 20u`,
+    check: (at) => {
+      // anillo de Johnson de 5 bits: out[0] es 1 de 1 µs a 6 µs y 0 de 6 µs a 11 µs
+      if (at('out_0', 3e-6) < 2.5 || at('out_0', 8e-6) > 2.5 || at('out_4', 7e-6) < 2.5) return `out_0 ${at('out_0', 3e-6)} ${at('out_0', 8e-6)} out_4 ${at('out_4', 7e-6)}`;
+    },
+  },
+  {
+    name: 'comportamiento (Icarus): parameter por instancia (defparam)',
+    file: 'cntp.v',
+    behavioral: true,
+    top: 'cntp',
+    params: { N: '6' },
+    verilog: `\`timescale 1ns/1ps
+module cntp #(parameter N = 4) (input clk, output reg [N-1:0] q);
+  initial q = 0;
+  always @(posedge clk) q <= q + 1;
+endmodule`,
+    circuit: `${CLK}
+X1 clk q_5 q_4 q_3 q_2 q_1 q_0 cntp
+.tran 1n 4u`,
+    check: (at, block) => {
+      if (block.pins.length !== 7) return `pines ${block.pins.map((p) => p.name)}`;
+      const q = [5, 4, 3, 2, 1, 0].reduce((a, b) => a * 2 + (at(`q_${b}`, 3.05e-6) > 2.5 ? 1 : 0), 0);
+      if (q !== 31) return `q = ${q} (esperaba 31)`;
+    },
+  },
+  {
     name: 'error de sintaxis',
     file: 'bad.v',
     verilog: `module bad(input a, output y); assign y = ; endmodule`,

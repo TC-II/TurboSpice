@@ -16,8 +16,8 @@ export const isVerilogName = (name: string) => /\.s?v$/i.test(name);
 export const moduleOf = (f: { name: string }) => f.name.replace(/\.s?v$/i, '');
 export const verilogModules = (p: Project): ProjectFile[] => p.files.filter((f) => f.kind === 'verilog');
 export const verilogFile = (p: Project, name: string): ProjectFile | undefined => verilogModules(p).find((f) => key(moduleOf(f)) === key(name));
-/** ¿Cambió el código desde la última síntesis (o nunca se sintetizó)? */
-export const isStale = (f: ProjectFile) => !f.synth || f.synth.source !== f.text;
+/** ¿Cambió el código (o el modo) desde la última síntesis, o nunca se sintetizó? */
+export const isStale = (f: ProjectFile) => !f.synth || f.synth.source !== f.text || !!f.synth.vvp !== (f.hdl === 'behavioral');
 /** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo) */
 export const verilogSources = (p: Project, override?: { name: string; text: string }): Record<string, string> => ({
   ...Object.fromEntries(verilogModules(p).map((f) => [f.name, f.text])),
@@ -71,10 +71,10 @@ export function verilogSymbol(name: string, block: Pick<HdlBlock, 'pins' | 'para
  * Guarda la síntesis de un módulo: el resultado queda en su .v y el símbolo se crea o se pone al
  * día (pines nuevos o que ya no están; los que siguen, en su lugar) con sus parámetros.
  */
-export function applySynth(p: Project, name: string, text: string, block: HdlBlock): Project {
+export function applySynth(p: Project, name: string, text: string, block: HdlBlock, vvp?: string): Project {
   const file = verilogFile(p, name);
   if (!file) return p;
-  const synth: VerilogSynth = { source: text, module: block.name, subckt: block.subckt, pins: block.pins, params: block.params };
+  const synth: VerilogSynth = { source: text, module: block.name, subckt: block.subckt, pins: block.pins, params: block.params, ...(vvp ? { vvp } : {}) };
   const asyName = `${name}.asy`;
   const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(asyName));
   const nextSym = sym
@@ -90,6 +90,27 @@ export function storeVerilog(p: Project, name: string, text: string): Project {
   const f = verilogFile(p, name);
   if (!f || f.text === text) return p;
   return { ...p, modified: Date.now(), files: p.files.map((x) => (x === f ? { ...x, text } : x)) };
+}
+
+/** Cambia cómo se simula el módulo: síntesis (Yosys) o comportamiento (Icarus) */
+export function setHdlMode(p: Project, name: string, mode: 'synth' | 'behavioral'): Project {
+  const f = verilogFile(p, name);
+  if (!f || (f.hdl === 'behavioral') === (mode === 'behavioral')) return p;
+  const { hdl: _, ...rest } = f;
+  return { ...p, modified: Date.now(), files: p.files.map((x) => (x === f ? (mode === 'behavioral' ? { ...rest, hdl: 'behavioral' as const } : rest) : x)) };
+}
+
+/** El .vvp de un módulo de comportamiento, con el nombre que usa su .subckt */
+export const vvpFileOf = (name: string) => `${name.toLowerCase()}.vvp`;
+
+/**
+ * ¿El código usa cosas que la síntesis ignora o no acepta? (retardos #, $display…, forever, wait,
+ * fork): conviene simularlo como comportamiento
+ */
+export function looksBehavioral(text: string): boolean {
+  const code = text.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  // (#(…) después de "module x" o de un tipo de instancia son parámetros, no retardos)
+  return /(^|[^\w)\]])#\s*[\d(]/m.test(code.replace(/\b(module\s+\w+|\w+)\s*#\s*\(/g, '$1 (')) || /\$(display|write|monitor|strobe|finish|stop|time|realtime|random|urandom|fopen)\b|\b(forever|wait|fork)\b/.test(code);
 }
 
 /** Agrega un módulo Verilog nuevo (todavía sin símbolo: aparece al sintetizarlo) */

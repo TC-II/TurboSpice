@@ -72,6 +72,16 @@ done
 # las funciones de libc/libm que importan los modelos de OpenVAF (#209), con el mismo truco
 emcc -O2 -fPIC -sSIDE_MODULE=1 -o "$SO/osdi_imports.so" "$HERE/osdi/imports.c"
 
+# Icarus Verilog (#209): Verilog de comportamiento por d_cosim. libvvp, sus módulos VPI y el puente
+# se cargan con dlopen sólo si hace falta (van al link por lo que importan de libc y libc++); el
+# compilador (ivl, ivlpp) lo usa el Worker de Yosys/Icarus
+NGSPICE_INC="$SRC/src/include" bash "$HERE/icarus/build.sh"
+ICARUS="$BUILD/icarus-out"
+for f in libvvp.so ivlng.so ivlng.vpi system.vpi v2005_math.vpi va_math.vpi v2009.vpi; do
+  cp "$ICARUS/$f" "$SO/icarus_${f//./_}.so"
+done
+rm -rf "$DIST/icarus" && cp -r "$ICARUS" "$DIST/icarus"
+
 emcc -O2 "$OBJ/src/.libs/libngspice.a" "$SO"/*.so -lm -o "$DIST/ngspice.mjs" \
   -sMAIN_MODULE=2 -sAUTOLOAD_DYLIBS=0 \
   -sMODULARIZE -sEXPORT_ES6 -sENVIRONMENT=web,worker,node \

@@ -14,6 +14,8 @@ const post = (msg: WorkerResponse, transfer: Transferable[] = []) => self.postMe
 
 interface Manifest {
   codemodels: string[];
+  /** Icarus Verilog (#209): los archivos de engine/icarus/ (compilador y simulador) */
+  icarus?: string[];
   /** archivo → hash de su contenido (copy-engine.mjs) */
   hashes?: Record<string, string>;
 }
@@ -44,10 +46,24 @@ async function engineFile(file: string, hash: string | undefined): Promise<Respo
   }
 }
 
+let manifest: Manifest | null = null;
+
+/** Lo que carga ngspice para un bloque Verilog de comportamiento (d_cosim con Icarus, #209) */
+const ICARUS_RUNTIME = ['libvvp.so', 'ivlng.so', 'ivlng.vpi', 'system.vpi', 'v2005_math.vpi', 'va_math.vpi', 'v2009.vpi'];
+let icarusRuntime: Promise<Record<string, Uint8Array>> | null = null;
+const loadIcarus = () =>
+  (icarusRuntime ??= Promise.all(
+    ICARUS_RUNTIME.map(async (f) => {
+      const r = await engineFile(`icarus/${f}`, manifest?.hashes?.[`icarus/${f}`]);
+      if (!r.ok) throw new Error(`icarus/${f}: HTTP ${r.status}`);
+      return [f, new Uint8Array(await r.arrayBuffer())] as const;
+    }),
+  ).then(Object.fromEntries));
+
 async function load(): Promise<Ngspice> {
   // el manifest se revalida siempre: dice qué versión de cada archivo va
-  const manifest = (await (await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' })).json()) as Manifest;
-  const hash = (f: string) => manifest.hashes?.[f];
+  manifest = (await (await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' })).json()) as Manifest;
+  const hash = (f: string) => manifest?.hashes?.[f];
   // (con el hash en la URL el .mjs siempre corresponde al .wasm de la caché)
   const v = hash('ngspice.mjs');
   // import() directo: el dev server de Vite le agrega ?import y rechaza los archivos de public/
@@ -103,11 +119,17 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
       return;
     }
     if (req.files) engine.writeFiles(req.files);
+    // un bloque de comportamiento (Icarus por d_cosim): libvvp se inicializa una sola vez, así que
+    // después de esta simulación hace falta un motor nuevo
+    // (el d_cosim está en el .subckt del módulo: en la netlist o en un archivo de modelos)
+    const icarus = [req.netlist, ...Object.values(req.files ?? {})].some((x) => typeof x === 'string' && /ivlng\.so/i.test(x));
+    if (icarus) engine.writeLibs(await loadIcarus());
     const t0 = performance.now();
-    const result = engine.simulate(req.netlist, req.opts);
+    // (con Icarus, sin el «op» extra del punto de operación: sería otra inicialización de libvvp)
+    const result = engine.simulate(req.netlist, icarus ? { ...req.opts, bias: undefined } : req.opts);
     const ms = performance.now() - t0;
     // Tras un error fatal ngspice queda en estado indefinido: instancia nueva para la próxima
-    if (result.aborted) ng = null;
+    if (result.aborted || icarus) ng = null;
     const transfer = result.plots.flatMap((p) =>
       p.vectors.flatMap((v) => (v.imag ? [v.real.buffer, v.imag.buffer] : [v.real.buffer])),
     );

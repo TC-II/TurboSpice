@@ -12,6 +12,8 @@ const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 export interface SynthResult {
   block?: HdlBlock;
+  /** comportamiento (Icarus): el .vvp, listo para el motor */
+  vvp?: string;
   /** error de Yosys o de la traducción */
   error?: string;
   /** salida de Yosys (avisos) */

@@ -11,9 +11,11 @@ const out = join(dirname(fileURLToPath(import.meta.url)), '..', 'engine', 'dist-
 const files = [
   'ngspice.mjs', 'ngspice.wasm', 'spinit',
   'spice2poly.cm', 'analog.cm', 'digital.cm', 'xtradev.cm', 'xtraevt.cm', 'table.cm', 'tlines.cm',
+  // Icarus Verilog (#209)
+  ...['ivl.mjs', 'ivl.wasm', 'ivlpp.mjs', 'ivlpp.wasm', 'vvp.tgt', 'libvvp.so', 'ivlng.so', 'ivlng.vpi', 'system.vpi', 'v2005_math.vpi', 'va_math.vpi', 'v2009.vpi'].map((f) => `icarus/${f}`),
 ]
 
-mkdirSync(out, { recursive: true })
+mkdirSync(join(out, 'icarus'), { recursive: true })
 for (const f of files) {
   const res = await fetch(`${base}/${f}`)
   if (!res.ok) throw new Error(`${f}: HTTP ${res.status} (${base}/${f})`)

@@ -25,11 +25,19 @@ function getWorker(): Worker {
   return worker;
 }
 
-/** Sintetiza Verilog en el Worker (la primera vez baja Yosys) */
-export function synthesizeVerilog(files: Record<string, string>, source: string, top?: string, params?: Record<string, string>): Promise<SynthResult> {
+type NoId<T> = T extends unknown ? Omit<T, 'id'> : never;
+const request = (req: NoId<YosysRequest>): Promise<SynthResult> => {
   const id = nextId++;
   return new Promise((resolve, reject) => {
     pending.set(id, { resolve, reject });
-    getWorker().postMessage({ id, files, source, top, params } satisfies YosysRequest);
+    getWorker().postMessage({ ...req, id } as YosysRequest);
   });
-}
+};
+
+/** Sintetiza Verilog en el Worker (la primera vez baja Yosys) */
+export const synthesizeVerilog = (files: Record<string, string>, source: string, top?: string, params?: Record<string, string>) =>
+  request({ files, source, ...(top ? { top } : {}), ...(params ? { params } : {}) });
+
+/** Compila Verilog de comportamiento con Icarus (la primera vez lo baja): .vvp y .subckt con d_cosim */
+export const compileBehavioral = (files: Record<string, string>, source: string, top: string, vvpFile: string, params?: Record<string, string>) =>
+  request({ kind: 'icarus', files, source, top, vvpFile, ...(params ? { params } : {}) });

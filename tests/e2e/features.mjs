@@ -754,6 +754,7 @@ const rect = (sel) => page.locator(sel).boundingBox();
 for (const where of ['al costado', 'abajo']) {
   const dim = where === 'abajo' ? 'height' : 'width';
   const before = (await rect('.results-panel'))[dim];
+  await page.mouse.move(5, 5); // el cursor pudo quedar sobre el divisor (aparece al pasar el mouse)
   check(!(await page.getByRole('button', { name: 'Expandir resultados' }).isVisible()), `${where}: los botones no se ven sin hover`);
   await splitter.hover();
   check(await page.getByRole('button', { name: 'Expandir esquemático' }).isVisible(), `${where}: el hover sobre el divisor muestra los botones`);

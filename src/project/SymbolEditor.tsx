@@ -92,10 +92,18 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset, o
   const upx = Math.max(box[2] / size.w, box[3] / size.h) || 1;
   useEffect(() => {
     if (drag.current) return;
-    const xs = [...shapes.flatMap((s) => [s.coords[0], s.coords[2]]), ...pins.map((p) => p.x)];
-    const ys = [...shapes.flatMap((s) => [s.coords[1], s.coords[3]]), ...pins.map((p) => p.y)];
+    // los pines entran con su cuadradito y su nombre (11 unidades de alto, ~7 por letra)
+    const pinX = pins.flatMap((p) => {
+      const w = p.name.length * 7;
+      const ext = { LEFT: [p.x - 6, p.x + 6 + w], RIGHT: [p.x - 6 - w, p.x + 6], TOP: [p.x - w / 2 - 6, p.x + w / 2 + 6], BOTTOM: [p.x - w / 2 - 6, p.x + w / 2 + 6] }[p.align];
+      return ext ?? [p.x - 6, p.x + 6 + w];
+    });
+    const pinY = pins.flatMap((p) => [p.y - 18, p.y + 18]);
+    const xs = [...shapes.flatMap((s) => [s.coords[0], s.coords[2]]), ...pinX];
+    const ys = [...shapes.flatMap((s) => [s.coords[1], s.coords[3]]), ...pinY];
     const [lo, hi] = [Math.min(0, ...xs), Math.max(0, ...xs)];
     const [top, bot] = [Math.min(0, ...ys), Math.max(0, ...ys)];
+    if (boxOf.current !== name) manual.current = false;
     if (boxOf.current === name && manual.current) return;
     setBox((b) => {
       const fits = boxOf.current === name && lo >= b[0] + 8 && top >= b[1] + 24 && hi <= b[0] + b[2] - 8 && bot <= b[1] + b[3] - 8;
@@ -497,6 +505,8 @@ function ParamsEditor({ params, onChange }: { params: [string, string][]; onChan
         </button>
       </h4>
       {rows.length ? (
+        <>
+        <p className="tree-meta sym-params-help">{t('Name: just the identifier, without braces (e.g. R3). Inside the subcircuit use it between braces in values and expressions: {R3}, {2*R3}. Each instance can override the default value (R3=10k).')}</p>
         <table>
           <thead>
             <tr>
@@ -531,6 +541,7 @@ function ParamsEditor({ params, onChange }: { params: [string, string][]; onChan
             ))}
           </tbody>
         </table>
+        </>
       ) : (
         <p className="tree-meta">{t('None. Inside the subcircuit they are used as {name} (e.g. a resistor of value {R}); each instance can change them.')}</p>
       )}

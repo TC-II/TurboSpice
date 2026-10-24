@@ -1052,7 +1052,7 @@ button.hier-tab { padding-right: 10px; }
 .canvas-wrap.with-hier > .sym-pane { top: 31px; }
 .sym-pane header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .sym-pane header .tree-add { margin-left: auto; }
-.sym-canvas { flex: 1 1 auto; min-height: 180px; height: auto; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
+.sym-canvas { flex: 1 1 0; min-height: 180px; height: 0; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
 .sym-dot { fill: var(--grid, #888); opacity: .5; }
 .sym-shapes { fill: none; stroke: var(--fg); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .sym-shapes * { vector-effect: non-scaling-stroke; }
@@ -1094,6 +1094,7 @@ button.hier-tab { padding-right: 10px; }
 @media (max-width: 700px) { .canvas-wrap.with-sym { padding-right: 0; } .sym-pane { width: 85%; box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
 
 .sym-params p.tree-meta { white-space: normal; line-height: 1.4; }
+.sym-params-help { margin: 0 0 4px; }
 .tree-adds .tree-add { white-space: nowrap; }
 
 /* Panel del proyecto (#180): grupos, partes de cada testbench, mostrar al acercar el mouse */

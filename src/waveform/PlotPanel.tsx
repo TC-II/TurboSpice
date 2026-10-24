@@ -5,12 +5,12 @@ import { createPortal } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
-import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
+import { paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { boxAxes, extent, panBy, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
-import { colorFor, cursorForClick, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
+import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { Icon } from '../ui/icons.tsx';
 import { t } from '../i18n/i18n.ts';
@@ -100,8 +100,16 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   // ⌖: elegir con un click en su cápsula la traza cuya FFT se agrega (#245)
   const [fftPicking, setFftPicking] = useState(false);
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
-  // los paneles de FFT (#236) tienen eje de frecuencias: zoom y cursores propios
-  const [fRange, setFRange] = useState<Range | null>(null);
+  // los paneles de FFT (#236) tienen eje de frecuencias: cursores propios y zoom en X propio de
+  // cada panel (#260; los de tiempo comparten el eje X: es el mismo tiempo para todos)
+  const [fRanges, setFRanges] = useState<Record<number, Range>>({});
+  const setFRange = (i: number, r: Range | null) =>
+    setFRanges((old) => {
+      const next = { ...old };
+      if (r) next[i] = r;
+      else delete next[i];
+      return next;
+    });
   const [fCursors, setFCursors] = useState<Cursors>({});
   // el estado inicial vale sólo si es del mismo eje X
   const init = initial && initial.scale === scaleOf(plot)?.name ? initial : undefined;
@@ -167,21 +175,25 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? { ...p, ...f(p) } : p)));
   const moveTrace = (from: number, ti: number, to: number) => {
-    // (entre un panel de tiempo y uno de FFT no: la traza cambiaría de significado)
-    if (from === to || !panes[from].fft !== !panes[to].fft) return;
-    const tt = panes[from].traces[ti];
+    // (entre un panel de tiempo y uno de FFT no: la traza cambiaría de significado; a uno vacío sí, #260)
+    const tt = panes[from]?.traces[ti];
+    if (!tt || from === to || !acceptsTrace(panes[to], tt) || panes[to].traces.some((o) => sameTrace(o, tt))) return;
     setPanes(panes.map((p, k) => (k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { ...p, traces: [...p.traces, tt] } : p)));
   };
   /** FFT de una traza: traza nueva en el panel de FFT del mismo rango y ventana, o en uno nuevo debajo */
   const addFft = (expr: string) => {
     const fft = { window: fftWindow, ...(xRange ? { from: xRange[0], to: xRange[1] } : {}) };
-    const i = panes.findIndex((p) => p.fft && p.fft.window === fft.window && p.fft.from === fft.from && p.fft.to === fft.to);
-    const color = colorFor(panes, expr);
+    const tr = { expr, fft };
+    const i = panes.findIndex((p) => isFftPane(p) && p.traces.every((tt) => sameFft(tt.fft, fft)));
+    let color = colorFor(panes, expr);
+    // otra FFT de la misma señal (otra ventana o rango): otro color, para distinguirlas
+    const all = panes.flatMap((p) => p.traces.map((tt, k) => ({ tt, c: traceColor(tt, k).toLowerCase() })));
+    if (all.some(({ tt, c }) => tt.fft && c === color && !sameTrace(tt, tr))) color = PALETTE.find((c) => !all.some((o) => o.c === c)) ?? color;
     if (i >= 0) {
-      if (!panes[i].traces.some((tt) => tt.expr === expr)) update(i, (p) => ({ ...p, traces: [...p.traces, { expr, color }] }));
+      if (!panes[i].traces.some((tt) => sameTrace(tt, tr))) update(i, (p) => ({ ...p, traces: [...p.traces, { ...tr, color }] }));
       setActive(i);
     } else {
-      setPanes([...panes, { traces: [{ expr, color }], fft }]);
+      setPanes([...panes, { traces: [{ ...tr, color }] }]);
       setActive(panes.length);
     }
     setFftPicking(false);
@@ -197,13 +209,13 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [fftPicking]);
-  const isF = (i: number) => !!panes[i]?.fft;
+  const isF = (i: number) => isFftPane(panes[i]);
 
   useImperativeHandle(handle, () => ({
     csv: () => {
       const d = data[0];
       if (!d) return '';
-      const cols = data.filter((_, k) => !panes[k]?.fft).flatMap((pd) => pd.curves.filter((c) => !c.hidden).map((c) => ({ name: c.label, ys: c.y })));
+      const cols = data.filter((_, k) => !isF(k)).flatMap((pd) => pd.curves.filter((c) => !c.hidden).map((c) => ({ name: c.label, ys: c.y })));
       return toCsv(d.xName, d.x, cols);
     },
     png: () => exportPng(panes, data, charts.current),
@@ -211,7 +223,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       const i = Math.min(active, panes.length - 1);
       switch (a) {
         case 'fit':
-          setFRange(null);
+          setFRanges({});
           return zoomTo(null, {});
         case 'zoomBox':
           setRemoving(false);
@@ -227,10 +239,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         }
         case 'autoY': {
           // Y a lo que se ve ahora (con el zoom en X), fijo hasta el próximo cambio
-          if (!xRange && !fRange) return zoomTo(null, {});
+          if (!xRange && !Object.keys(fRanges).length) return zoomTo(null, {});
           const ys: Record<number, Range> = {};
           charts.current.forEach((u, k) => {
-            const xr = isF(k) ? fRange : xRange;
+            const xr = isF(k) ? (fRanges[k] ?? null) : xRange;
             if (!xr) return;
             const e = extent(data[k].x, data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => c.y), xr[0], xr[1]);
             if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
@@ -306,7 +318,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button
         className="fit-btn"
         onClick={() => {
-          setFRange(null);
+          setFRanges({});
           zoomTo(null, {});
         }}
         title={t('Fit to view')}
@@ -350,6 +362,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       )}
     </>
   );
+  const allTraces = panes.flatMap((p) => p.traces);
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
@@ -374,14 +387,18 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             active={i === active && panes.length > 1}
             onActivate={() => setActive(i)}
             canRemove={panes.length > 1}
-            onRemove={() => setPanes(panes.filter((_, k) => k !== i))}
+            onRemove={() => {
+              setPanes(panes.filter((_, k) => k !== i));
+              // (el zoom de los paneles de FFT que siguen se corre con ellos)
+              setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
+            }}
             onChange={(f) => update(i, f)}
             onDropTrace={(from, ti) => moveTrace(from, ti, i)}
-            xRange={isF(i) ? fRange : range}
+            xRange={isF(i) ? (fRanges[i] ?? null) : range}
             yRange={yRanges[i] ?? null}
-            onZoom={(r) => (isF(i) ? setFRange(r) : r ? zoomTo(r) : zoomTo(null, {}))}
+            onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : zoomTo(null, {}))}
             onWheelZoom={(r) => {
-              if (isF(i)) return setFRange(r);
+              if (isF(i)) return setFRange(i, r);
               zoomNow.current = { ...zoomNow.current, x: r };
               setXRange(r);
             }}
@@ -392,7 +409,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onBoxZoom={(x, y) => {
               setZoomMode(false);
               if (isF(i)) {
-                if (x) setFRange(x);
+                if (x) setFRange(i, x);
                 if (y) setYRanges({ ...zoomNow.current.y, [i]: y });
                 return;
               }
@@ -401,6 +418,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             zoomMode={zoomMode}
             removing={removing}
             onPickTrace={fftPicking && !isF(i) ? addFft : undefined}
+            labelOf={(tt) => traceLabel(tt, allTraces)}
             showGrid={showGrid}
             cursorMode={cursorMode}
             cursors={isF(i) ? fCursors : cursors}
@@ -436,7 +454,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             <section className="readout-card" aria-label={t('Stats')}>
               <h4>{t('Stats')}</h4>
               <StatsTable data={timeData} range={range} />
-              {freqData.length > 0 && <StatsTable data={freqData} range={fRange} />}
+              {data.map((d, k) => (isF(k) ? <StatsTable key={k} data={[d]} range={fRanges[k] ?? null} /> : null))}
             </section>
           )}
         </div>
@@ -467,6 +485,8 @@ function PaneView(props: {
   onBoxZoom(x: Range | null, y: Range | null): void;
   zoomMode: boolean;
   removing: boolean;
+  /** nombre de la traza en la leyenda (FFT(…), #260) */
+  labelOf(tt: Trace): string;
   /** modo ⌖ de la FFT: un click en la cápsula elige la traza */
   onPickTrace?(expr: string): void;
   showGrid: boolean;
@@ -965,7 +985,7 @@ function PaneView(props: {
           const v = hover !== null && c ? c.y[hover] : NaN;
           return (
             <span
-              key={`${tt.expr}${ti}`}
+              key={`${props.labelOf(tt)}${ti}`}
               className={`trace-chip${tt.hidden ? ' off' : ''}${err ? ' bad' : ''}${props.onPickTrace ? ' pickable' : ''}`}
               draggable={!props.onPickTrace}
               onClickCapture={(e) => {
@@ -982,7 +1002,7 @@ function PaneView(props: {
               <label className="swatch" style={{ background: traceColor(tt, ti) }}>
                 <input
                   type="color"
-                  aria-label={t('Color of {expr}', { expr: tt.expr })}
+                  aria-label={t('Color of {expr}', { expr: props.labelOf(tt) })}
                   value={traceColor(tt, ti)}
                   onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, color: e.target.value } : x)) }))}
                 />
@@ -995,11 +1015,11 @@ function PaneView(props: {
                   }))
                 }
               >
-                {tt.expr}
+                {props.labelOf(tt)}
               </button>
               {/* el lugar del valor queda reservado aunque el mouse no esté sobre el gráfico */}
           {err ? <span className="err">{err}</span> : <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>}
-              <button className="x" aria-label={t('Remove {expr}', { expr: tt.expr })} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
+              <button className="x" aria-label={t('Remove {expr}', { expr: props.labelOf(tt) })} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
                 ✕
               </button>
             </span>

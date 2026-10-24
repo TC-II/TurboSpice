@@ -549,7 +549,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .appbar-right { margin-left: auto; }
 /* el nombre del archivo, centrado en la barra; tema y compartir pegados al usuario */
 .appbar-right .filename { position: absolute; left: 50%; transform: translateX(-50%); margin-left: 0; }
-.appbar-right + .account { margin-left: -10px; }
+.appbar-right + .account-col { margin-left: -10px; }
 /* sin lugar para centrarlo: va junto al tema */
 @media (max-width: 1000px) { .appbar-right .filename { position: static; transform: none; } }
 .app-menu-btn { display: inline-flex; padding: 4px; border-color: transparent; background: transparent; border-radius: 6px; }
@@ -584,13 +584,15 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 /* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
    del grupo que el separador de la barra de la simulación) */
 .iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }
-/* estado de la simulación elegida: sin correr (naranja), corriendo (late), lista (verde) */
-.iconbar .simbar .sim-state { flex: none; width: 12px; height: 12px; margin: 0; border-radius: 2px; border: 1.5px solid var(--sch-sel); background: var(--sch-sel); }
-.iconbar .simbar .sim-state.running { border-color: var(--accent); background: var(--accent); animation: sim-pulse 0.9s ease-in-out infinite alternate; }
-.iconbar .simbar .sim-state.ok { border-color: var(--ok); background: var(--ok); }
-.iconbar .simbar .sim-state.err { border-color: var(--err); background: var(--err); }
-@keyframes sim-pulse { from { opacity: 1; } to { opacity: 0.25; } }
-@media (prefers-reduced-motion: reduce) { .iconbar .simbar .sim-state.running { animation: none; opacity: 0.6; } }
+/* estado de la simulación elegida (bajo el usuario): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
+.account-col { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
+.account-col .account { margin-left: 0; }
+.sim-state { flex: none; box-sizing: border-box; width: 14px; height: 14px; margin: 0; border-radius: 50%; border: 2px solid var(--border); background: transparent; }
+.sim-state.running { border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: sim-spin 0.8s linear infinite; }
+.sim-state.ok { border-color: var(--ok); }
+.sim-state.err { border-color: var(--err); }
+@keyframes sim-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .sim-state.running { animation-duration: 2.4s; } }
 .simbar .sb-field .pick-btn { padding: 0 3px; line-height: 1; color: var(--fg-muted); }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }

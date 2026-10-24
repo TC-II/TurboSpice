@@ -312,7 +312,10 @@ export function App() {
         <div className="appbar-slot appbar-tools" ref={setToolsSlot} />
         <div className="appbar-slot appbar-right" ref={setRightSlot} />
         {/* el usuario / login (#35), al final, después de Compartir */}
-        <AccountButton />
+        <div className="account-col">
+          <AccountButton />
+          <div id="sim-state-slot" />
+        </div>
       </header>
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&

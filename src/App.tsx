@@ -1941,7 +1941,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
     const i = Math.min(activePane, panes.length - 1);
-    if (panes[i]?.traces.some((tt) => sameExpr(tt.expr, expr))) return;
+    if (panes[i]?.traces.some((tt) => !tt.fft && sameExpr(tt.expr, expr))) return;
     const sc = scaleOf(plot);
     if (!sc) return setMessage(t('{name} has no X axis: choose another analysis to plot', { name: plot.name }));
     try {

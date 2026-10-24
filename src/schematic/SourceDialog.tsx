@@ -248,7 +248,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   // qué es) al cambiar el tipo; al abrir se respeta lo que hay, y si el usuario movió el rótulo
   // o tocó la casilla, también
   const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && !r.moved && !current;
-  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, r.visible])));
+  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, valueAuto(r) ? kind === 'dc' : r.visible])));
   const valueTouched = useRef(false);
   const firstKind = useRef<SourceKind | ''>(kind);
   useEffect(() => {

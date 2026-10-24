@@ -479,7 +479,7 @@ function Level({ y, label, to, on, x = 56 }: { y: number; label: string; to: num
 }
 
 function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
-  const a = spec.args.map((s) => spiceNumber(s ?? ''));
+  const a = Array.from(spec.args, (s) => spiceNumber(s ?? ''));
   const z = (i: number) => (isFinite(a[i]) ? a[i] : 0);
   const on = (id: string) => focus === id;
   let body: ReactNode = null;

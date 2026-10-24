@@ -159,3 +159,32 @@ describe('traducción a ngspice e importación de puntos', () => {
     expect(csvPoints('t,v\n0,0\n1m;1\n\n2e-3\t0.5\nfin')).toEqual([['0', '0'], ['1m', '1'], ['2e-3', '0.5']]);
   });
 });
+
+describe('parámetros posicionales con huecos (#233)', () => {
+  const sp = (kind: 'sine' | 'pulse' | 'exp' | 'sffm', args: string[]) => ({ ...emptySource(kind), args });
+  it('los intermedios vacíos se escriben como 0 y se releen igual', () => {
+    const sparse: string[] = ['0', '1', '1k'];
+    sparse[6] = '1';
+    const w = writeSource(sp('sine', sparse));
+    expect(w.Value).toBe('SINE(0 1 1k 0 0 0 1)');
+    expect(read(w.Value)!.args).toEqual(['0', '1', '1k', '0', '0', '0', '1']);
+    const holes = [...sparse]; // huecos → undefined, como en la ventana
+    expect(writeSource(sp('sine', holes)).Value).toBe('SINE(0 1 1k 0 0 0 1)');
+    const pulse: string[] = ['0', '1'];
+    pulse[7] = '3';
+    expect(writeSource(sp('pulse', pulse)).Value).toBe('PULSE(0 1 0 0 0 0 0 3)');
+    const exp: string[] = ['0', '1'];
+    exp[5] = '1m';
+    expect(writeSource(sp('exp', exp)).Value).toBe('EXP(0 1 0 0 0 1m)');
+  });
+  it('fase 0 y luego Tdelay: no rompe (undefined en los args)', () => {
+    const a: string[] = ['0', '1', '1k'];
+    a[5] = '0';
+    const b = [...a];
+    b[3] = '1m';
+    const s = sp('sine', b);
+    expect(writeSource(s).Value).toBe('SINE(0 1 1k 1m 0 0)');
+    expect(() => waveAt(s, 1e-3)).not.toThrow();
+    expect(spiceNumber(undefined as unknown as string)).toBeNaN();
+  });
+});

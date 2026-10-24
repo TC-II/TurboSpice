@@ -236,7 +236,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                         className="pick-btn"
                         title={f.list === 'nets' ? t('Pick the net on the schematic') : t('Pick the source on the schematic')}
                         aria-label={t('Pick {label} on the schematic', { label: f.label })}
-                        disabled={f.list === 'nets' && !info.nets.length}
                         onClick={(e) => {
                           e.preventDefault();
                           picker(f.list === 'nets' ? 'net' : 'source').then((v) => v && change(f.set(v)));

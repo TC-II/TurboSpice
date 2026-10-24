@@ -1,3 +1,4 @@
+import { parseAnalysis } from '../../src/sim/analyses.ts';
 import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc } from '../../src/asc/model.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -199,6 +200,11 @@ describe('descripción completa y errores de polos y ceros', () => {
     expect(pzProblem('.pz in in out 0 vol pz')).toMatch(/mismo nodo/);
     expect(pzProblem('.pz in 0 out 0 vol pz')).toBeUndefined();
     expect(pzProblem('.tran 1m')).toBeUndefined();
+  });
+  it('un .pz con nodos vacíos se sigue leyendo (la barra muestra sus campos)', () => {
+    expect(parseAnalysis('.pz  0  0 vol pz')).toMatchObject({ kind: 'pz', inP: '', inN: '0', outP: '', outN: '0' });
+    expect(parseAnalysis('.pz in 0  0 vol pol')).toMatchObject({ inP: 'in', outP: '', which: 'pol' });
+    expect(parseAnalysis('.pz in 0 out 0 vol pz')).toMatchObject({ inP: 'in', outP: 'out' });
   });
   it('"Input is shorted" del log se explica', () => {
     expect(pzLogErrors(['doAnalyses: Input is shorted', 'run simulation(s) aborted'])[0]).toMatch(/cortocircuito/);

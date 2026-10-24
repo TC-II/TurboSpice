@@ -215,7 +215,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
 {
   const plot = page.locator('.pane-chart .uplot').first();
   const over = plot.locator('.u-over');
-  await page.getByRole('button', { name: 'Ajustar', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Ajustar a la vista', exact: true }).last().click();
   await page.waitForTimeout(200);
   const rng = async () => {
     const [x, y] = await Promise.all([plot.getAttribute('data-range-x'), plot.getAttribute('data-range-y')]);
@@ -642,7 +642,7 @@ const resultsState = async () =>
   });
 const shownBefore = await resultsState();
 check((await page.getByRole('button', { name: 'Cerrar resultados' }).count()) === 0, 'no hay botón para cerrar (descartar) los resultados');
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 check(
   !(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()),
   'ocultar resultados colapsa el panel y deja la pestaña para mostrarlos',
@@ -675,7 +675,7 @@ await menu(page, 'Ver', 'Panel de resultados');
 check(!(await page.locator('.results-panel').isVisible()), 'Ver › Panel de resultados también los colapsa');
 await page.getByRole('button', { name: 'Mostrar resultados' }).click();
 check((await resultsState()) === shownBefore, 'y la pestaña del borde los vuelve a mostrar');
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 await page.keyboard.press('?');
 check(await page.getByRole('dialog', { name: 'Atajos de teclado' }).isVisible(), '"?" muestra los atajos');
 await page.keyboard.press('Escape');
@@ -808,7 +808,7 @@ const opRows = await page.locator('.result-table tbody tr').allTextContents();
 check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
 await resultsMenu(page, 'Netlist');
 check((await page.locator('.results-body pre').textContent()).includes('.subckt div in out'), 'el bloque es un .subckt en la netlist');
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 
 // --- #16-#20: Estudio (barrido + medición + tolerancias, ver código) ---
 await openExample(page, 'RC Filter');

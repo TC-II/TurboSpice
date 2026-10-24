@@ -1156,7 +1156,7 @@ export function SchematicEditor(props: Props) {
         // cursor de borrar: una cruz chica a 45° que sigue al mouse (sin grilla)
         <path className="delete-cursor" d={`M ${cursor.x - 5 / view.scale} ${cursor.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${cursor.x + 5 / view.scale} ${cursor.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
       )}
-      {tool.kind !== 'select' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'place' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

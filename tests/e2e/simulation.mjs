@@ -239,6 +239,7 @@ await page.getByLabel('Nombre del testbench').fill('Curva corta');
 await page.getByLabel('Nombre del testbench').press('Enter');
 check((await benchName()) === 'Curva corta', 'click en el nombre lo renombra');
 await openPanel();
+await page.locator('.project-tree .tree-row[data-bench]', { hasText: 'Curva corta' }).first().hover();
 await page.getByRole('button', { name: 'Borrar Curva corta', exact: true }).click();
 await slideToDelete(page);
 check((await benchName()) !== 'Curva corta' && (await items()).length === 1, 'el botón de borrar del panel borra el testbench (deslizando) y pasa a otro');

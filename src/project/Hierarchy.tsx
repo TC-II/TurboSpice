@@ -227,15 +227,19 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             </li>
             <li>
               <div className="tree-row tree-sub">
-                <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
-                  {pOpen ? '▾' : '▸'}
-                </button>
+                {nVars > 0 ? (
+                  <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
+                    {pOpen ? '▾' : '▸'}
+                  </button>
+                ) : (
+                  <span className="tree-caret" aria-hidden />
+                )}
                 <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')}>
                   {t('Parameters and variables')}
                 </button>
                 {nVars > 0 && <span className="tree-meta">{nVars}</span>}
               </div>
-              {pOpen && (
+              {pOpen && nVars > 0 && (
                 <ul className="tree-branch">
                   {b.params.map(([k, v]) => (
                     <li key={`p:${k}`}>
@@ -255,7 +259,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                       </div>
                     </li>
                   ))}
-                  {!nVars && <li className="tree-meta tree-empty">{t('None.')}</li>}
                 </ul>
               )}
             </li>

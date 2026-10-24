@@ -49,18 +49,18 @@ SYMATTR Value 1k
     expect(n.elements[0].nodes).toEqual(['0', 'NC_01']);
   });
 
-  it('Misc\\jumper es un subcircuito bypass (TCLib) entre las redes de sus dos pines', () => {
+  it('Misc\\jumper es un subcircuito bypass (TCLib) entre las redes de sus dos pines, en los pines de LTspice (±32, 64)', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680
 FLAG -32 64 out
 FLAG -32 144 0
-FLAG 0 144 0
-SYMBOL Misc\\\\jumper -32 64 R0
+FLAG 32 144 0
+SYMBOL Misc\\\\jumper 0 0 R0
 SYMATTR InstName J1
 SYMBOL res -48 48 R0
 SYMATTR InstName R1
 SYMATTR Value 1k
-SYMBOL res -16 48 R0
+SYMBOL res 16 48 R0
 SYMATTR InstName R2
 SYMATTR Value 2k
 `);
@@ -960,10 +960,72 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
     expect(t).toMatch(/^B_A1__qb qb 0 V=\{1\}-\(\{1\}-\{0\}\)\*V\(A1__x\)$/m);
     expect(t).toMatch(/^B_A1__q q 0 /m);
     const w: string[] = [];
-    expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'DFLOP', w)).toBeUndefined();
+    expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'COUNTER', w)).toBeUndefined();
     // parámetros sin "=" (como en TCLib/Charge_Pump.lib)
     const l = translateDigital('A4', ['u', '0', '0', '0', 'd', '0', 'c', '0'], 'AND Vhigh {Vcc} Trise 1n Tfall 2n', w)!;
     expect(l).toContain('.model A4__sm slew(rise_slope={1/(1n)} fall_slope={1/(2n)})');
     expect(l).toContain('B_A4__q c 0 V={0}+({Vcc}-{0})*min(max(V(A4__s),0),1)');
+  });
+});
+
+describe('flip-flops y Schmitt de LTspice (A: DFLOP, SRFLOP, SCHMITT; #133)', () => {
+  it('DFLOP: D=in1, CLK=in3, PRE=in4, CLR=in5 por un d_dff; CLR tiene prioridad sobre PRE', () => {
+    const w: string[] = [];
+    const l = translateDigital('A1', ['d', '0', 'clk', 'pre', 'clr', 'qb', 'q', '0'], 'DFLOP Td=10n', w)!;
+    expect(l).toContain('B_A1__fd A1__fd 0 V=min(max((V(d,0)-({1}+{0})/2)*1e4+0.5,0),1)');
+    expect(l).toContain('B_A1__fc A1__fc 0 V=min(max((V(clk,0)-({1}+{0})/2)*1e4+0.5,0),1)');
+    expect(l.find((x) => x.startsWith('B_A1__fs'))).toMatch(/V\(pre,0\).*\*\(1-min\(max\(\(V\(clr,0\)/);
+    expect(l).toContain('A_A1__ff A1__fd_d A1__fc_d A1__fs_d A1__fr_d A1__fq_d NULL A1__ffm');
+    expect(l).toContain('A_A1__dac [A1__fq_d] [A1__x] A1__dacm');
+    // la cadena de salida es la de las compuertas, sin chocar con los nodos del flip-flop
+    expect(l).toContain('T_A1__d A1__x 0 A1__d 0 Z0=1 TD={10n}');
+    expect(l).toContain('B_A1__q q 0 V={0}+({1}-{0})*min(max(V(A1__h),0),1)');
+    expect(l).toContain('B_A1__qb qb 0 V={1}-({1}-{0})*min(max(V(A1__h),0),1)');
+    const devs = l.filter((x) => !x.startsWith('.model')).map((x) => x.split(/\s+/)[0]);
+    expect(new Set(devs).size).toBe(devs.length);
+    expect(w).toEqual([]);
+  });
+
+  it('una entrada unida a tierra por un Misc\\jumper (bypass) no participa, como en LTspice que une las redes', () => {
+    const t = toNgspice(netFromAsc(`Version 4
+SHEET 1 880 680
+FLAG -32 32 a
+FLAG -32 48 b
+FLAG 32 48 q
+FLAG -96 48 0
+SYMBOL Digital\\\\and 0 0 R0
+SYMATTR InstName A1
+SYMBOL Misc\\\\jumper -64 -16 R0
+SYMATTR InstName J1
+`), 't', resolver).text;
+    expect(t).toMatch(/^X\S*J1 0 b bypass$/m);
+    const x = t.split('\n').find((l) => l.startsWith('B_A1__x'))!;
+    expect(x).toMatch(/V\(a,0\)/);
+    expect(x).not.toMatch(/V\(b,0\)/);
+  });
+
+  it('SRFLOP: S=in1, R=in2, d_dff sin reloj (pulldown) y R con prioridad; pines sin conectar en 0', () => {
+    const l = translateDigital('A2', ['s', 'r', '0', '0', '0', '0', 'q', '0'], 'SRFLOP', [])!;
+    expect(l).toContain('A_A2__ff A2__fr_d A2__fz_d A2__fs_d A2__fr_d A2__fq_d NULL A2__ffm');
+    expect(l).toContain('A_A2__fz A2__fz_d A2__fzm');
+    expect(l.find((x) => x.startsWith('B_A2__fs'))).toMatch(/V\(s,0\).*\*\(1-min\(max\(\(V\(r,0\)/);
+    expect(l.some((x) => x.startsWith('B_A2__qb'))).toBe(false);
+    const d = translateDigital('A3', ['d', '0', 'clk', '0', '0', '0', 'q', '0'], 'DFLOP', [])!;
+    expect(d).toContain('B_A3__fs A3__fs 0 V=0*(1-0)');
+    expect(d).toContain('B_A3__fr A3__fr 0 V=0');
+  });
+
+  it('SCHMITT: SR con set = in > Vt+Vh y reset = in < Vt−Vh; Vt = Ref y Vh = 5 % de |Vt| por omisión', () => {
+    const w: string[] = [];
+    const l = translateDigital('A4', ['in', '0', '0', '0', '0', 'qb', 'q', '0'], 'SCHMITT Vt=0.6 Vh=0.1', w)!;
+    expect(w).toEqual([]);
+    expect(l).toContain('B_A4__fs A4__fs 0 V=min(max((V(in)-{0.6}-{0.1})*1e4+0.5,0),1)');
+    expect(l).toContain('B_A4__fr A4__fr 0 V=min(max(({0.6}-{0.1}-V(in))*1e4+0.5,0),1)');
+    expect(l).toContain('A_A4__ff A4__fr_d A4__fz_d A4__fs_d A4__fr_d A4__fq_d NULL A4__ffm');
+    expect(l.some((x) => x.startsWith('B_A4__qb qb 0'))).toBe(true);
+    const d = translateDigital('A5', ['in', '0', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
+    expect(d.find((x) => x.startsWith('B_A5__fs'))).toContain('V(in)-({1}+{0})/2-0.05*abs(({1}+{0})/2)');
+    const f = translateDigital('A6', ['p', 'm', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
+    expect(f.find((x) => x.startsWith('B_A6__fs'))).toContain('(V(p,m)-');
   });
 });

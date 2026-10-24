@@ -3740,7 +3740,7 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
-          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? '')}
+          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? 'BiDir')}
           port={!!curSub}
           onClose={() => setDialog(null)}
           onApply={(name, io) => {

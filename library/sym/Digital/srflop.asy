@@ -1,0 +1,65 @@
+Version 4
+SymbolType CELL
+RECTANGLE Normal -32 16 32 120
+LINE Normal -48 48 -32 48
+LINE Normal -18 43 -20 42
+LINE Normal -20 42 -24 42
+LINE Normal -24 42 -26 44
+LINE Normal -26 44 -26 46
+LINE Normal -26 46 -24 48
+LINE Normal -24 48 -20 48
+LINE Normal -20 48 -18 50
+LINE Normal -18 50 -18 52
+LINE Normal -18 52 -20 54
+LINE Normal -20 54 -24 54
+LINE Normal -24 54 -26 53
+LINE Normal -48 96 -32 96
+LINE Normal -26 102 -26 90
+LINE Normal -26 90 -20 90
+LINE Normal -20 90 -18 92
+LINE Normal -18 92 -18 94
+LINE Normal -18 94 -20 96
+LINE Normal -20 96 -26 96
+LINE Normal -22 96 -18 102
+LINE Normal 32 48 48 48
+LINE Normal 20 42 24 42
+LINE Normal 24 42 26 44
+LINE Normal 26 44 26 52
+LINE Normal 26 52 24 54
+LINE Normal 24 54 20 54
+LINE Normal 20 54 18 52
+LINE Normal 18 52 18 44
+LINE Normal 18 44 20 42
+LINE Normal 23 51 27 55
+CIRCLE Normal 32 92 40 100
+LINE Normal 40 96 64 96
+LINE Normal 20 90 24 90
+LINE Normal 24 90 26 92
+LINE Normal 26 92 26 100
+LINE Normal 26 100 24 102
+LINE Normal 24 102 20 102
+LINE Normal 20 102 18 100
+LINE Normal 18 100 18 92
+LINE Normal 18 92 20 90
+LINE Normal 23 99 27 103
+LINE Normal 18 87 26 87
+WINDOW 0 -40 0 Left 2
+WINDOW 3 -40 152 Left 2
+SYMATTR Prefix A
+SYMATTR SpiceModel SRFLOP
+SYMATTR Description Set-reset flip-flop (R wins if both are high)
+PIN -48 48 NONE 0
+PINATTR PinName S
+PINATTR SpiceOrder 1
+PIN -48 96 NONE 0
+PINATTR PinName R
+PINATTR SpiceOrder 2
+PIN 64 96 NONE 0
+PINATTR PinName _Q
+PINATTR SpiceOrder 6
+PIN 48 48 NONE 0
+PINATTR PinName Q
+PINATTR SpiceOrder 7
+PIN -48 128 NONE 0
+PINATTR PinName com
+PINATTR SpiceOrder 8

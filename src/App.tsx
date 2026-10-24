@@ -593,6 +593,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const conn = lt.conn;
   const [showNets, setShowNets] = useState(false);
   const shownNets = useMemo(() => (showNets ? netNames(doc, conn, lt.ncNames) : undefined), [showNets, doc, conn, lt]);
+  // sin redes (esquemático vacío o sin nombres) el botón y Alt+N no hacen nada (#242)
+  const hasNets = conn.nets.some((n) => n.name);
   // red resaltada desde el panel de resultados (al pasar por una traza)
   const [traceNet, setTraceNet] = useState<string>();
 
@@ -2324,7 +2326,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
       if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
       if (e.altKey && lk === 'c') return handled(), openControl();
-      if (e.altKey && lk === 'n') return handled(), setShowNets((v) => !v);
+      if (e.altKey && lk === 'n') return handled(), hasNets && setShowNets((v) => !v);
       if (e.altKey && lk === 'e') return handled(), openStudy();
       if (e.altKey && lk === 'b') return handled(), subFromSelection();
       if (e.altKey) return;
@@ -2950,7 +2952,7 @@ ${ltNetlistText(sim.built.lt)}
             >
               <Icon name="probe" />
             </button>
-            <button className={showNets ? 'active' : ''} aria-label={t('Nets')} aria-keyshortcuts="Alt+N" title={t('Show the names of all the nets, without changing the schematic') + ' (Alt+N)'} onClick={() => setShowNets((v) => !v)}>
+            <button className={showNets ? 'active' : ''} aria-label={t('Nets')} aria-keyshortcuts="Alt+N" title={t('Show the names of all the nets, without changing the schematic') + ' (Alt+N)'} disabled={!hasNets} onClick={() => setShowNets((v) => !v)}>
               <Icon name="nets" />
             </button>
             <button

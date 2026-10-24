@@ -271,7 +271,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                         aria-label={t('Pick {label} on the schematic', { label: f.label })}
                         onClick={(e) => {
                           e.preventDefault();
-                          picker(f.list === 'nets' ? 'net' : 'source').then((v) => v && change(f.set(v)));
+                          // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
+                          picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
                         }}
                       >
                         ⌖

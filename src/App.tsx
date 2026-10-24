@@ -635,7 +635,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [traceNet, setTraceNet] = useState<string>();
 
   // Elegir una red o fuente en el esquemático desde un diálogo (que queda oculto mientras)
-  const [picking, setPicking] = useState<{ what: PickWhat; resolve(v: string | null): void; prev: Tool } | null>(null);
+  const [picking, setPicking] = useState<{ what: PickWhat; ground?: boolean; resolve(v: string | null): void; prev: Tool } | null>(null);
 
   const setTool = useCallback((tt: Tool) => {
     setToolState(tt);
@@ -2165,9 +2165,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
-  const picker: Picker = (what) =>
+  const picker: Picker = (what, opts) =>
     new Promise((resolve) => {
-      setPicking({ what, resolve, prev: tool });
+      setPicking({ what, ground: opts?.ground, resolve, prev: tool });
       setToolState({ kind: 'pick', what });
     });
   const endPick = (v: string | null) => {
@@ -2178,7 +2178,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const pickValue = ({ net, symbol }: { net?: string; symbol?: number }): string | null => {
     if (!picking) return null;
-    if (picking.what === 'net') return net && net !== '0' ? net : null;
+    if (picking.what === 'net') return net && (net !== '0' || picking.ground) ? net : null;
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
     if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;

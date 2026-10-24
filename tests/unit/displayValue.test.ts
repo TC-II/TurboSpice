@@ -23,7 +23,18 @@ describe('displayValue', () => {
     expect(displayValue('R', '{R}')).toBe('{R}');
     expect(displayValue('R', 'R=V(a)/1m')).toBe('R=V(a)/1m');
     expect(displayValue('C', '1u Rser=1')).toBe('1u Rser=1');
-    expect(displayValue('V', '5')).toBe('5');
+    expect(displayValue('V', 'SINE(0 1 1k)')).toBe('SINE(0 1 1k)');
+    expect(displayValue('V', 'DC 5')).toBe('DC 5');
+    expect(displayValue('V', '{vcc}')).toBe('{vcc}');
+    expect(displayValue('V', '5')).toBe('5V');
+    expect(displayValue('V', '3.3')).toBe('3.3V');
+    expect(displayValue('V', '100m')).toBe('100mV');
+    expect(displayValue('I', '1m')).toBe('1mA');
+    expect(displayValue('I', '2')).toBe('2A');
+    // sin unidad duplicada
+    expect(displayValue('V', '5V')).toBe('5V');
+    expect(displayValue('V', '100mV')).toBe('100mV');
+    expect(displayValue('I', '1mA')).toBe('1mA');
     expect(displayValue('D', '1N4148')).toBe('1N4148');
   });
 });

@@ -234,8 +234,8 @@ async function newPage(context) {
 }
 
 const dirty = async (page) => (await page.locator('.capsule-dirty').count()) > 0;
-const toast = async (page) => ((await page.locator('.toast').count()) ? (await page.locator('.toast').textContent()) : '');
-const waitToast = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('.toast')?.textContent ?? ''), re.source, { timeout: 10000 }).then(() => true, () => false);
+const toast = async (page) => ((await page.locator('.status-msg').count()) ? (await page.locator('.status-msg').textContent()) : '');
+const waitToast = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('.status-msg')?.textContent ?? ''), re.source, { timeout: 10000 }).then(() => true, () => false);
 const settle = (page, ms = 600) => page.waitForTimeout(ms);
 /** Un cambio en el circuito: una tierra nueva en un lugar libre */
 let groundAt = 0;
@@ -249,7 +249,7 @@ async function edit(page) {
 }
 /** Cierra el aviso anterior, para esperar el de esta acción */
 async function clearToast(page) {
-  await page.evaluate(() => document.querySelector('.toast')?.click());
+  await page.evaluate(() => document.querySelector('.status-msg')?.click());
 }
 const save = async (page) => {
   await clearToast(page);

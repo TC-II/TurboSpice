@@ -76,7 +76,7 @@ await page.mouse.click(body.x + body.width / 2, body.y + body.height / 2, { butt
 // en un testbench de un grupo (#180) aparece un menú: Editar… o propagar al grupo
 const ctxMenu = page.locator('.ctx-menu');
 if (await ctxMenu.count()) {
-  check((await ctxMenu.getByRole('menuitem').allTextContents()).some((x) => /^Propagar /.test(x)), 'en un grupo, el click derecho ofrece propagar el valor a los otros testbenches');
+  check(/^Propagar \S+ en /.test((await ctxMenu.locator('button.ctx-primary').textContent()) ?? ''), 'en un grupo, el click derecho ofrece un botón para propagar el valor a los otros testbenches (#229)');
   await ctxMenu.getByRole('menuitem').first().click();
 }
 check((await page.locator('[role=dialog]').count()) === 1, 'click derecho (sin arrastrar) sobre un componente lo edita');

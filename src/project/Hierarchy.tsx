@@ -4,6 +4,7 @@ import { SUBCKT_DRAG } from '../schematic/SchematicEditor.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import { Icon } from '../ui/icons.tsx';
+import { NameInput } from '../ui/EditableName.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** Un nivel de la jerarquía abierta: el subcircuito y la instancia por la que se bajó (si se bajó) */
@@ -49,7 +50,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -82,6 +83,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   /** convertir la selección (sin selección: undefined) */
   onFromSelection?(): void;
   onRename(name: string): void;
+  /** renombra el proyecto (clic en el título) */
+  onRenameProject(name: string): void;
   onDelete(name: string): void;
   onUpdateSymbol(name: string): void;
   onClose(): void;
@@ -89,6 +92,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onLeave(): void;
 }) {
   // grupos, testbenches y sus parámetros plegados (los testbenches arrancan plegados: una línea)
+  const [renamingProject, setRenamingProject] = useState(false);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [openBench, setOpenBench] = useState<Set<string>>(() => new Set());
   const [openParams, setOpenParams] = useState<Set<string>>(() => new Set());
@@ -338,7 +342,18 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   return (
     <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
       <header>
-        <strong title={project}>{project}</strong>
+        {renamingProject ? (
+          <NameInput
+            value={project}
+            label={t('Project name')}
+            onDone={(n) => {
+              setRenamingProject(false);
+              if (n) onRenameProject(n);
+            }}
+          />
+        ) : (
+          <strong className="tree-project" role="button" tabIndex={0} title={t('{project} (click to rename)', { project })} style={{ cursor: 'text' }} onClick={() => setRenamingProject(true)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') setRenamingProject(true); }}>{project}</strong>
+        )}
         <button className="tree-add" onClick={onNewGroup} title={t('New workbench of testbenches')}>
           + {t('Workbench')}
         </button>

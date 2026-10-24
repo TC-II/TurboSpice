@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-80 0 176 144">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <rect class="st0" x="-48" y="16" width="96" height="112"/>
+  <line class="st0" x1="-80" y1="48" x2="-48" y2="48"/>
+  <line class="st0" x1="-42" y1="42" x2="-38" y2="42"/>
+  <line class="st0" x1="-38" y1="42" x2="-34" y2="46"/>
+  <line class="st0" x1="-34" y1="46" x2="-34" y2="50"/>
+  <line class="st0" x1="-34" y1="50" x2="-38" y2="54"/>
+  <line class="st0" x1="-38" y1="54" x2="-42" y2="54"/>
+  <line class="st0" x1="-42" y1="54" x2="-42" y2="42"/>
+  <line class="st0" x1="-80" y1="96" x2="-48" y2="96"/>
+  <line class="st0" x1="48" y1="48" x2="80" y2="48"/>
+  <line class="st0" x1="36" y1="42" x2="40" y2="42"/>
+  <line class="st0" x1="40" y1="42" x2="42" y2="44"/>
+  <line class="st0" x1="42" y1="44" x2="42" y2="52"/>
+  <line class="st0" x1="42" y1="52" x2="40" y2="54"/>
+  <line class="st0" x1="40" y1="54" x2="36" y2="54"/>
+  <line class="st0" x1="36" y1="54" x2="34" y2="52"/>
+  <line class="st0" x1="34" y1="52" x2="34" y2="44"/>
+  <line class="st0" x1="34" y1="44" x2="36" y2="42"/>
+  <line class="st0" x1="39" y1="51" x2="43" y2="55"/>
+  <circle class="st0" cx="52" cy="96" r="4"/>
+  <line class="st0" x1="56" y1="96" x2="96" y2="96"/>
+  <line class="st0" x1="36" y1="90" x2="40" y2="90"/>
+  <line class="st0" x1="40" y1="90" x2="42" y2="92"/>
+  <line class="st0" x1="42" y1="92" x2="42" y2="100"/>
+  <line class="st0" x1="42" y1="100" x2="40" y2="102"/>
+  <line class="st0" x1="40" y1="102" x2="36" y2="102"/>
+  <line class="st0" x1="36" y1="102" x2="34" y2="100"/>
+  <line class="st0" x1="34" y1="100" x2="34" y2="92"/>
+  <line class="st0" x1="34" y1="92" x2="36" y2="90"/>
+  <line class="st0" x1="39" y1="99" x2="43" y2="103"/>
+  <line class="st0" x1="34" y1="87" x2="42" y2="87"/>
+  <line class="st0" x1="-48" y1="88" x2="-38" y2="96"/>
+  <line class="st0" x1="-38" y1="96" x2="-48" y2="104"/>
+  <line class="st0" x1="0" y1="0" x2="0" y2="16"/>
+  <line class="st0" x1="0" y1="128" x2="0" y2="144"/>
+</svg>

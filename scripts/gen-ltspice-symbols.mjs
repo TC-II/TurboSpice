@@ -174,6 +174,28 @@ const xorGate = [...orBody, A(-96, 64, 64.5, -29.7, 29.7), ...stubs(-48, [32, 48
 // buffers: triángulo con la entrada en (0, 64)
 const bufTri = (y0, y1, tip) => [...polyline([8, y0], [tip, 64], [8, y1], [8, y0]), L(0, 64, 8, 64)];
 const gate = (model, desc) => ['A', '', desc, [`SpiceModel ${model}`]];
+// flip-flops: caja con las letras en trazos (no hay texto en los gráficos), _Q con burbuja
+const glyphs = {
+  D: [[[0, 0], [4, 0], [8, 4], [8, 8], [4, 12], [0, 12], [0, 0]]],
+  Q: [[[2, 0], [6, 0], [8, 2], [8, 10], [6, 12], [2, 12], [0, 10], [0, 2], [2, 0]], [[5, 9], [9, 13]]],
+  S: [[[8, 1], [6, 0], [2, 0], [0, 2], [0, 4], [2, 6], [6, 6], [8, 8], [8, 10], [6, 12], [2, 12], [0, 11]]],
+  R: [[[0, 12], [0, 0], [6, 0], [8, 2], [8, 4], [6, 6], [0, 6]], [[4, 6], [8, 12]]],
+};
+const letter = (ch, x, y, bar = false) => [
+  ...glyphs[ch].flatMap((p) => polyline(...p.map(([a, b]) => [x + a, y + b]))),
+  ...(bar ? [L(x, y - 3, x + 8, y - 3)] : []),
+];
+const flopBox = (x0, x1, y0, y1, ins, qx, qbx) => [
+  R(x0, y0, x1, y1),
+  ...ins.flatMap(([ch, y, pin]) => [L(pin, y, x0, y), ...(ch ? letter(ch, x0 + 6, y - 6) : [])]),
+  L(x1, 48, qx, 48), ...letter('Q', x1 - 14, 42),
+  C(x1 + 4, 96, 4), L(x1 + 8, 96, qbx, 96), ...letter('Q', x1 - 14, 90, true),
+];
+const dflop = [
+  ...flopBox(-48, 48, 16, 128, [['D', 48, -80], ['', 96, -80]], 80, 96),
+  ...polyline([-48, 88], [-38, 96], [-48, 104]), L(0, 0, 0, 16), L(0, 128, 0, 144),
+];
+const srflop = flopBox(-32, 32, 16, 120, [['S', 48, -48], ['R', 96, -48]], 48, 64);
 
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
 const SYMBOLS = {
@@ -284,6 +306,11 @@ const SYMBOLS = {
   'Digital/inv': ((a) => [a[0], a[1], [[0, 64, 'in', 1], [64, 64, '_Q', 6], [0, 80, 'com', 8]],
     { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, a[2], [...bufTri(40, 88, 52), C(56, 64, 4), L(60, 64, 64, 64), L(0, 80, 8, 80)], a[3]])(
     gate('BUF', 'Inversor digital (salida _Q de un BUF)')),
+  'Digital/dflop': ['A', '', [[-80, 48, 'D', 1], [-80, 96, 'CLK', 3], [0, 0, 'PRE', 4], [0, 144, 'CLR', 5],
+    [96, 96, '_Q', 6], [80, 48, 'Q', 7], [-80, 144, 'com', 8]], { 0: [8, -16, 'Left'], 3: [8, 168, 'Left'] },
+    'D flip-flop: takes D on the rising edge of CLK; asynchronous PRE and CLR (CLR wins)', dflop, ['SpiceModel DFLOP']],
+  'Digital/srflop': ['A', '', [[-48, 48, 'S', 1], [-48, 96, 'R', 2], [64, 96, '_Q', 6], [48, 48, 'Q', 7], [-48, 128, 'com', 8]],
+    { 0: [-40, 0, 'Left'], 3: [-40, 152, 'Left'] }, 'Set-reset flip-flop (R wins if both are high)', srflop, ['SpiceModel SRFLOP']],
 };
 
 // Skins que no se generan: son los npn.svg y pnp.svg (BJT con cápsula) del skin Default de

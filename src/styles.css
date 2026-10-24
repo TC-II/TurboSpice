@@ -390,7 +390,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .plot-tools button { padding: 2px 10px; font-size: 13px; }
 .plot-tools button.fit-btn { display: inline-flex; padding: 3px 6px; }
 .plot-tools button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.expr-form { display: flex; gap: 4px; flex: 1 1 320px; max-width: 520px; }
+.expr-form { display: flex; gap: 4px; flex: 0 1 260px; max-width: 300px; }
 .expr-form input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 30px 3px 8px; }
 /* el "+" va dentro de la caja, al final */
 .expr-form { align-items: center; }
@@ -458,7 +458,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 /* barra de resultados: la vista elegida en el menú y las herramientas del visor */
 .results-view { font-size: 13px; font-weight: 600; color: var(--fg); }
 .incomplete-badge { font-size: 12px; font-weight: 600; color: var(--err); border-color: var(--err); background: transparent; padding: 1px 8px; }
-.viewer-tools { display: inline-flex; align-items: center; gap: 6px; }
+.viewer-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .viewer-tools:empty { display: none; }
 .viewer-tools button { padding: 2px 10px; font-size: 13px; }
 /* "+" para agregar un panel: aparece al acercarse al borde inferior del último */
@@ -685,7 +685,13 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .tol-add { display: flex; gap: 4px; max-width: 320px; }
 .study-control { min-height: 140px; }
 .study-code textarea { width: 100%; font: 13px/1.5 var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 240px; }
-.plot-info { margin: 0; } .fft-tools { padding: 4px 0; }
+.plot-info { margin: 0; }
+.fft-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.fft-tools .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plot-tools button.fft-pick, .fft-tools .fft-pick { padding: 2px 8px; }
+/* ⌖ de la FFT (#245): cursor de mira como el ícono y la cápsula bajo el mouse resaltada */
+.plot-panel.fft-picking, .plot-panel.fft-picking *, body:has(.plot-panel.fft-picking) .fft-pick { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='3.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23fff' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23222' stroke-width='1.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23222' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair !important; }
+.trace-chip.pickable:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 
 /* ---------- Expandir esquemático / resultados (#24) ---------- */

@@ -3298,7 +3298,6 @@ ${ltNetlistText(sim.built.lt)}
                   mode={mode}
                   active={activePane}
                   setActive={setActivePane}
-                  picker={picker}
                   onFocusTrace={() => traceBox.current?.focus()}
                   side={resultsSide}
                   toolsHost={viewerTools}

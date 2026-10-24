@@ -193,12 +193,25 @@ await page.mouse.click(outW.x, outW.y);
 await page.getByRole('button', { name: 'FFT', exact: true }).click();
 check(/Con todos los puntos/.test(await page.locator('.fft-tools .hint').last().textContent()), 'sin zoom, la FFT usa todos los puntos');
 check((await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents()).includes('Ventana de Hann'), 'ventanas con su nombre');
-await page.locator('.fft-tools input').fill('V(out)');
+// #245: ⌖ y click en la cápsula de la leyenda; varias FFT en el mismo panel
+await page.locator('.expr-form input').fill('V(out)/2');
+await page.locator('.expr-form input').press('Enter');
+const fftPick = page.locator('.fft-tools .fft-pick');
+await fftPick.click();
+check((await page.locator('.plot-panel.fft-picking').count()) === 1 && (await page.locator('.trace-chip.pickable').count()) === 2, 'el ⌖ entra en modo de elegir traza');
+await page.keyboard.press('Escape');
+check((await page.locator('.plot-panel.fft-picking').count()) === 0, 'Esc cancela el ⌖');
+await fftPick.click();
+await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
 const fftInfo = await page.locator('.fft-info').first().textContent();
 check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)', 'la FFT queda como una traza en un panel debajo');
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)', 'la FFT queda como una traza en un panel debajo');
 check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la FFT tiene eje de frecuencias desde 0');
+await fftPick.click();
+await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: 'V(out)/2' }).click();
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.pane').last().locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2', 'dos FFT a la vez en el panel de FFT');
 await page.locator('.pane').last().getByRole('button', { name: 'Quitar panel' }).click();
+await page.locator('.pane').first().getByRole('button', { name: 'Quitar V(out)/2' }).click();
 check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la FFT queda el transitorio');
 // #193: con zoom en un tramo chico las marcas del eje Y no se repiten
 {

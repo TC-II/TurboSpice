@@ -1490,26 +1490,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     enter(r.project);
     markDirty();
   };
-  /** Testbench nuevo: vacío o copia del actual */
-  const askBenchName = (title: string, initial: string, onOk: (name: string) => void) =>
-    setDialog({
-      kind: 'name',
-      title,
-      label: t('Name'),
-      initial,
-      check: (n) => (sims.items.some((x) => (simName(x) || '').toLowerCase() === n.toLowerCase()) ? t('There is already a testbench called {name}', { name: n }) : null),
-      onOk: (n) => {
-        setDialog(null);
-        onOk(n);
-      },
-    });
-  const newEmptyBench = (group?: string) =>
-    askBenchName(t('New testbench'), freeBenchName(projectRef.current), (name) => {
-      const r = addProjectSim(leave(), EMPTY_ASC, name);
-      if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
-      enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
-      markDirty();
-    });
+  /** Testbench nuevo, vacío, con el nombre por defecto (se renombra después) */
+  const newEmptyBench = (group?: string) => {
+    const r = addProjectSim(leave(), EMPTY_ASC, freeBenchName(projectRef.current));
+    if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
+    enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
+    markDirty();
+  };
   const renameBench = (id: string) => {
     const cur = sims.items.find((x) => x.id === id);
     if (!cur) return;

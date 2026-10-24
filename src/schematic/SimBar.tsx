@@ -3,6 +3,7 @@
 // fuente; las redes y fuentes se pueden elegir en el esquemático), un cuadrado con su estado
 // (sin correr, corriendo, lista) y una × para borrarla. Los cambios se aplican al salir del
 // campo o con Enter y reemplazan el comando del esquemático.
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
@@ -167,6 +168,18 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   const change = (a: Analysis) => (setDraft(a), apply(a));
   const rows = sim && draft ? barRows(draft) : [];
 
+  // el indicador de estado vive bajo el widget del usuario (#213)
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => setSlot(document.getElementById('sim-state-slot')), []);
+  const stateEl = sim && (
+    <span
+      className={`status sim-state ${state}`}
+      role="status"
+      aria-label={t('Simulation: {p0}', { p0: STATE_TEXT[state].toLowerCase() })}
+      title={stateDetail ? `${STATE_TEXT[state]}: ${stateDetail}` : STATE_TEXT[state]}
+    />
+  );
+
   return (
     <div className="simbar" role="group" aria-label={t('Selected simulation')}>
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
@@ -241,14 +254,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
           ))}
         </div>
       )}
-      {sim && (
-        <span
-          className={`status sim-state ${state}`}
-          role="status"
-          aria-label={t('Simulation: {p0}', { p0: STATE_TEXT[state].toLowerCase() })}
-          title={stateDetail ? `${STATE_TEXT[state]}: ${stateDetail}` : STATE_TEXT[state]}
-        />
-      )}
+      {slot && stateEl && createPortal(stateEl, slot)}
       {sim && errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
       {sim && (
         <button className="sb-delete" aria-label={t('Delete simulation')} title={t('Delete this simulation (and its results)')} onClick={onDelete}>

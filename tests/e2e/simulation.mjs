@@ -134,9 +134,9 @@ await page.getByLabel('Nombre del testbench').press('Enter');
 check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálogo: los parámetros van en la barra');
 check((await directive()) === '.dc V1 0 5 0.1', `elegir un tipo configura la simulación del testbench, con la fuente del circuito (${await directive()})`);
 check((await benchName()) === 'DC', `la barra muestra el nombre del testbench (${await benchName()})`);
-check((await page.locator('.simbar .sim-state.idle').count()) === 1, 'el cuadrado de estado arranca sin correr');
+check((await page.locator('.sim-state.idle').count()) === 1, 'el cuadrado de estado arranca sin correr');
 await simulate();
-check((await page.locator('.simbar .sim-state.ok').count()) === 1, 'y al simular queda listo');
+check((await page.locator('.sim-state.ok').count()) === 1, 'y al simular queda listo');
 await probe(272, -32); // red out
 check((await chipNames()).join() === 'V(out)', `primer testbench: V(out) (${(await chipNames()).join()})`);
 // otro testbench: copia del actual, con otros parámetros desde la barra

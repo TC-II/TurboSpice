@@ -77,9 +77,13 @@ export function applySynth(p: Project, name: string, text: string, block: HdlBlo
   const synth: VerilogSynth = { source: text, module: block.name, subckt: block.subckt, pins: block.pins, params: block.params, ...(vvp ? { vvp } : {}) };
   const asyName = `${name}.asy`;
   const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(asyName));
-  const nextSym = sym
+  // un símbolo que sigue siendo el generado se vuelve a generar (con los pines nuevos bien
+  // repartidos); uno editado conserva su dibujo y la posición de los pines que siguen
+  const noParams = (text: string) => text.split('\n').filter((l) => !/^SYMATTR SpiceLine /.test(l)).join('\n');
+  const generated = !!sym && !!file.synth && noParams(sym.text) === noParams(verilogSymbol(name, file.synth));
+  const nextSym = sym && !generated
     ? withParams(syncPins(sym.text, block.pins.map((x) => ({ name: x.name, dir: IOPIN[x.dir] }))), symbolParams(symParams(sym.text), block))
-    : verilogSymbol(name, block);
+    : withParams(verilogSymbol(name, block), symbolParams(sym ? symParams(sym.text) : [], block));
   const files = p.files.map((f) => (f === file ? { ...f, text, synth } : f === sym ? { ...f, text: nextSym } : f));
   if (!sym) files.push({ name: asyName, kind: 'symbol', text: nextSym });
   return { ...p, modified: Date.now(), files };

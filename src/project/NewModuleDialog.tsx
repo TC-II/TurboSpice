@@ -31,7 +31,7 @@ export function NewModuleDialog({ initial, check, onOk, onClose }: {
             <input type="radio" name="kind" checked={kind === 'schematic'} onChange={() => setKind('schematic')} /> {t('Schematic')}
           </label>
           <label>
-            <input type="radio" name="kind" checked={kind === 'verilog'} onChange={() => setKind('verilog')} /> Verilog
+            <input type="radio" name="kind" checked={kind === 'verilog'} onChange={() => setKind('verilog')} /> {'Verilog'}
           </label>
         </div>
         <p className="hint">

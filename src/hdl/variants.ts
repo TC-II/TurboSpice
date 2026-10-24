@@ -76,6 +76,6 @@ export const renameSubckt = (subckt: string, from: string, to: string) =>
 export function withSubckts(netlist: string, subckts: string[]): string {
   if (!subckts.length) return netlist;
   const i = netlist.search(/^\s*\.end\s*$/im);
-  const add = `${subckts.join('\n')}\n`;
+  const add = subckts.map((x) => x.replace(/\n*$/, '\n')).join('');
   return i < 0 ? `${netlist}\n${add}` : `${netlist.slice(0, i)}${add}${netlist.slice(i)}`;
 }

@@ -22,3 +22,18 @@ describe('skins de transistores (#57)', () => {
     }
   });
 });
+
+describe('trazos de los skins (#231)', () => {
+  const { skins } = buildBundle();
+
+  it('ningún stroke-width queda por debajo de 1 px (se dibujan con non-scaling-stroke)', () => {
+    for (const [name, s] of Object.entries(skins)) {
+      for (const m of s.body.matchAll(/stroke-width:\s*(\d*\.?\d+)/g)) expect(Number(m[1]), name).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('los signos + y − de la fuente de tensión llevan contorno de 1 px', () => {
+    expect(skins.voltage.body).toContain('stroke-width: 1px');
+    expect(skins.voltage.body).not.toMatch(/stroke-width:\s*\.5/);
+  });
+});

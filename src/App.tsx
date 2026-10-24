@@ -43,6 +43,7 @@ import {
   removeGroup,
   renameGroup,
   setBenchGroup,
+  placeBench,
   simLabel,
   groupPeersWith,
   propagateAttrs,
@@ -1608,7 +1609,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     });
     return true;
   };
-  const moveBench = (id: string, group?: string) => editProject(setBenchGroup(snapshot(), id, group));
+  const moveBench = (id: string, group: string, before?: string) => {
+    const p0 = snapshot();
+    const p = placeBench(p0, id, group, before);
+    if (p !== p0) editProject(p);
+  };
   /** Abrir una parte de un testbench: su configuración de simulación, su esquemático o sus parámetros */
   const benchItem = (id: string, item: BenchItem) => {
     if (id !== sims.active) goSim(id);

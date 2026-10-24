@@ -313,10 +313,7 @@ export function App() {
         <div className="appbar-slot appbar-tools" ref={setToolsSlot} />
         <div className="appbar-slot appbar-right" ref={setRightSlot} />
         {/* el usuario / login (#35), al final, después de Compartir */}
-        <div className="account-col">
-          <AccountButton />
-          <div id="sim-state-slot" />
-        </div>
+        <AccountButton />
       </header>
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
@@ -2988,6 +2985,8 @@ ${ltNetlistText(sim.built.lt)}
           />
           )}
         </div>
+        {/* el estado de la simulación (#243), a la derecha, bajo el avatar */}
+        <div id="sim-state-slot" className="sim-state-slot" />
       </div>
 
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>

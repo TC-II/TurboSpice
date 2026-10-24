@@ -69,7 +69,7 @@ describe('exportar e importar (#157)', () => {
     expect(z.name).toBe('Filtro_ RC.zip');
     expect(exportAllZip(p, lib).name).toBe('Filtro_ RC.zip');
     const entries = await readZip(z.bytes);
-    expect(entries.map((e) => e.path)).toEqual(['Testbench 1.asc', 'Bode_fino.asc', 'miop.asy', 'miop.sub']);
+    expect(entries.map((e) => e.path)).toEqual(['Tran 0 - 10m.asc', 'Bode_fino.asc', 'miop.asy', 'miop.sub']);
     expect(decode(entries[1].data).text).toContain('.ac dec 10 1 1meg');
   });
 
@@ -80,8 +80,8 @@ describe('exportar e importar (#157)', () => {
     const r = importEntries(newProject('Otro'), entries, z.name);
     const benches = asBenches(r.project).variants[0].sims;
     expect(benches.map((s) => [s.name, lineOf(s.asc)])).toEqual([
-      ['Testbench 1', ''],
-      ['Testbench 1 (2)', '.tran 10m'],
+      [undefined, ''],
+      ['Tran 0 - 10m', '.tran 10m'],
       ['Bode_fino', '.ac dec 10 1 1meg'],
     ]);
     expect(asBenches(r.project).groups.map((g) => g.name)).toEqual(['Filtro_ RC']);
@@ -97,7 +97,7 @@ describe('exportar e importar (#157)', () => {
       { path: 'leeme.pdf', data: new Uint8Array(3) },
     ]);
     expect(r.variants).toEqual(['a', 'b']);
-    expect(asBenches(r.project).variants[0].sims.map((s) => s.name)).toEqual(['Testbench 1', 'a', 'b']);
+    expect(asBenches(r.project).variants[0].sims.map((s) => s.name)).toEqual([undefined, 'a', 'b']);
     expect(r.files.map((f) => f.name)).toEqual(['m.lib']);
   });
 

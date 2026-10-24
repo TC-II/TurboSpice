@@ -77,7 +77,7 @@ export function variantAscs(v: Variant): { name: string; asc: string }[] {
   const list = v.sims.length ? v.sims.map((s) => ({ label: simLabel(s), asc: s.asc })) : [{ label: v.name, asc: v.base }];
   const taken: string[] = [];
   return list.map((x) => {
-    const name = uniqueFileName(`${safeName(x.label)}.asc`, taken);
+    const name = uniqueFileName(`${safeName(x.label.replace(/^\.+/, ''))}.asc`, taken);
     taken.push(name);
     return { name, asc: x.asc };
   });

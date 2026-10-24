@@ -90,8 +90,9 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
   const v = variantOf(p);
   const src = simOf(v, simId);
   if (!src || v.sims.length >= MAX_SIMS) return null;
-  const name = freeBenchName(p);
-  const s: Sim = { id: newId('s'), name, asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };
+  // con nombre propio, la copia lo lleva con «(copia)»; con el automático, sigue siendo automático
+  const name = src.name ? t('{name} (copy)', { name: src.name }) : undefined;
+  const s: Sim = { id: newId('s'), ...(name ? { name } : {}), asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };
   const i = v.sims.indexOf(src);
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims: [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)], activeSim: s.id })), id: s.id };
 }

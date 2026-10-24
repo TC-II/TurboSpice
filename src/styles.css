@@ -591,10 +591,13 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }
 /* estado de la simulación elegida (a la derecha de la barra de la simulación, bajo el avatar): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
 .sim-state-slot { flex: none; margin: 0 4px 0 auto; width: 30px; display: flex; justify-content: center; align-items: center; }
-.iconbar .sim-state, .sim-state { flex: none; overflow: visible; box-sizing: border-box; width: 16px; height: 16px; margin: 0; border-radius: 50%; border: 2.5px solid var(--border); background: transparent; }
-.sim-state.running { border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: sim-spin 0.8s linear infinite; }
+.iconbar .sim-state, .sim-state { --sim-d: 18px; --sim-t: 4px; --sim-run: #f08c00; position: relative; flex: none; overflow: visible; box-sizing: border-box; width: var(--sim-d); height: var(--sim-d); margin: 0; border-radius: 50%; border: var(--sim-t) solid var(--border); background: transparent; }
 .sim-state.ok { border-color: var(--ok); }
 .sim-state.err { border-color: var(--err); }
+/* corriendo: arco naranja que se desvanece hacia la cola, con la cabeza redondeada */
+.sim-state.running { border-color: transparent; animation: sim-spin 0.8s linear infinite; }
+.sim-state.running::before { content: ""; position: absolute; inset: calc(var(--sim-t) * -1); border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg, var(--sim-run) 358deg); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--sim-t) - 0.5px), #000 calc(100% - var(--sim-t))); mask: radial-gradient(farthest-side, transparent calc(100% - var(--sim-t) - 0.5px), #000 calc(100% - var(--sim-t))); }
+.sim-state.running::after { content: ""; position: absolute; top: calc(var(--sim-t) * -1); left: calc(50% - var(--sim-t) / 2); width: var(--sim-t); height: var(--sim-t); border-radius: 50%; background: var(--sim-run); }
 @keyframes sim-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .sim-state.running { animation-duration: 2.4s; } }
 .simbar .sb-field .pick-btn { padding: 0 3px; line-height: 1; color: var(--fg-muted); }

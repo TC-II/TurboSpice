@@ -187,6 +187,12 @@ svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg
 svg.editor.tool-grabbing { cursor: grabbing; }
 svg.editor.tool-wire, svg.editor.tool-place { cursor: none; }
 svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
+svg.editor.tool-comment { cursor: text; }
+svg.editor.tool-resize { cursor: nwse-resize; }
+svg.editor .text-bbox rect { fill: none; stroke: var(--accent); stroke-width: 0.6; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+svg.editor .text-bbox rect.handle { fill: var(--bg); stroke-dasharray: none; stroke-width: 1.2; }
+svg.editor .inline-text textarea { box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0 0 0 0; border: 1px dashed var(--accent); border-radius: 0; outline: none; resize: none; overflow: hidden; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--sch-drawing, var(--fg)); font-family: system-ui, sans-serif; white-space: pre; }
+.text-menu select { flex: 1; min-width: 0; font-size: 13px; }
 /* borrar: el cursor es la × dibujada en la grilla */
 svg.editor.tool-delete { cursor: none; }
 svg.editor.tool-label { cursor: move; }

@@ -2396,8 +2396,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           return setTool({ kind: 'place', type: 'current', orient: 'R0' });
         case 'g':
           return setTool({ kind: 'flag', name: '0' });
-        case 's':
-          return handled(), startMove(true);
         case '.':
           return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
@@ -2669,7 +2667,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         'sep',
         { label: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false) },
-        { label: t('Drag (stretching wires)'), shortcut: 'S', onClick: () => startMove(true) },
       ],
     },
     {
@@ -2821,7 +2818,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
-        { icon: 'drag', label: t('Drag'), title: t('Drag (stretching wires)'), shortcut: 'S', onClick: () => startMove(true), active: tool.kind === 'move' && tool.stretch },
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         { icon: 'delete', label: t('Delete'), title: t('Delete'), shortcut: 'Del', onClick: deleteSelection, active: tool.kind === 'delete' },
@@ -3697,7 +3693,7 @@ function toolHint(tt: Tool): string {
     case 'move':
       return tt.refs
         ? t('Click to drop{p0} · right-click or Esc cancels', { p0: tt.stretch ? t(' (wires stretch)') : '' })
-        : t('{p0}: click an element or drag a box to choose · Esc to finish', { p0: tt.stretch ? t('Drag (wires stretch)') : t('Move (without stretching wires)') });
+        : t('{p0}: click an element or drag a box to choose · Esc to finish', { p0: t('Move (without stretching wires)') });
     case 'shape': {
       const n = tt.pts.length;
       if (tt.shape === 'ARC' && n >= 2) return t('{p0} · right-click cancels', { p0: n === 2 ? t("Click the arc's start point") : t('Click the end point (counterclockwise)') });

@@ -123,18 +123,6 @@ await page.keyboard.press('Escape');
 check((await symPos()) !== before && (await wires()) === nWires, 'M: click, sigue al cursor y se suelta con otro click');
 await page.keyboard.press('Control+z');
 check((await symPos()) === before, 'Ctrl+Z deshace el movimiento');
-// S sobre el capacitor (conectado a cables): los cables se estiran
-const capWires = await page.evaluate(() => [...document.querySelectorAll('svg.editor .wires line')].map((l) => l.getAttribute('x2')).join());
-await page.keyboard.press('s');
-const cap = await at(240, 48);
-await page.mouse.click(cap.x, cap.y);
-const capDst = await at(272, 48);
-await page.mouse.move(capDst.x, capDst.y, { steps: 4 });
-await page.mouse.click(capDst.x, capDst.y);
-await page.keyboard.press('Escape');
-const capWires2 = await page.evaluate(() => [...document.querySelectorAll('svg.editor .wires line')].map((l) => l.getAttribute('x2')).join());
-check(capWires2 !== capWires, 'S: los cables conectados se estiran');
-await page.keyboard.press('Control+z');
 
 // --- J / K: líneas y rectángulos decorativos ---
 const shapes = () => svg.locator('.shapes > *').count();

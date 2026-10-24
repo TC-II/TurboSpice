@@ -634,7 +634,6 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['. · T', t('SPICE directive · comment')],
       ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],
       ['M', t('Move: click an element (or a box); it follows the cursor until the next click; wires don\'t stretch')],
-      ['S', t('Drag: like M, but wires stretch')],
       ['Del · Backspace', t('Delete the selection (no selection: delete mode, by click or box)')],
       ['Ctrl+C · Ctrl+X · Ctrl+V', t('Copy · cut · paste (also between tabs)')],
       ['Ctrl+A', t('Select all')],

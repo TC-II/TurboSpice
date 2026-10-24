@@ -1031,6 +1031,11 @@ button.hier-tab { padding-right: 10px; }
 .proj-toggle:hover, .proj-toggle.on { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
 .proj-toggle.on { color: var(--accent); }
 .project-tree.peek { box-shadow: 4px 0 18px rgb(0 0 0 / 25%); z-index: 7; }
+/* «mostrar al acercar el mouse» (#251): oculto queda un borde de 6px; se expande y contrae animado */
+.project-tree.peek, .project-tree.collapsed { transition: transform .18s ease-out, box-shadow .18s ease-out; }
+.project-tree.collapsed { transform: translateX(calc(-100% + 6px)); overflow: hidden; box-shadow: none; z-index: 7; border-right: 2px solid var(--accent); }
+.project-tree.collapsed > * { visibility: hidden; transition: visibility 0s .18s; }
+@media (prefers-reduced-motion: reduce) { .project-tree.peek, .project-tree.collapsed, .project-tree.collapsed > * { transition: none; } }
 .tree-hover { position: sticky; bottom: 0; background: var(--bg-alt); display: flex; gap: 6px; align-items: flex-start; margin-top: auto; padding: 10px 12px; border-top: 1px solid var(--border); font-size: 11px; color: var(--fg-muted); line-height: 1.3; }
 .tree-hover input { margin: 1px 0 0; }
 .tree-caret { border: 0; background: transparent; color: var(--fg-muted); width: 16px; padding: 0; font-size: 11px; flex: none; }

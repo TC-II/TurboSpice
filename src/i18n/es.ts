@@ -1289,7 +1289,7 @@ export const es: Record<string, string> = {
   'Each parameter needs a valid name and a value': 'Cada parámetro necesita un nombre válido y un valor',
   'Edit {inst}…': 'Editar {inst}…',
   'Edit sweeps in the Study…': 'Editar los barridos en el Estudio…',
-  'Empty: drag testbenches here': 'Vacío: arrastrá testbenches acá',
+  'Empty: create or drag a Testbench': 'Vacío: creá o arrastrá un testbench acá',
   'Expand {name}': 'Desplegar {name}',
   'Workbench': 'Workbench',
   'Workbench {n}': 'Workbench {n}',

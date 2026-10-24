@@ -202,6 +202,29 @@ describe('grupos y propagar valores (#180)', () => {
     expect(variantOf(p).sims.filter((s) => s.group === h.id).map((s) => s.id)).toEqual([a, b.id]);
     expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([b.id]);
   });
+  it('placeBench: reordena dentro del grupo y mueve entre grupos (#218)', async () => {
+    const { withGroups, addGroup, placeBench } = await import('../../src/project/project.ts');
+    let p = withGroups(storeActive(newProject('P'), withR('1k', '.tran 1m')));
+    const g1 = p.groups[0].id;
+    const a = variantOf(p).sims[0].id;
+    const b = addSim(p, withR('1k', '.op'))!;
+    const c = addSim(b.project, withR('1k', '.op'))!;
+    p = withGroups(c.project);
+    const order = (q: typeof p) => variantOf(q).sims.map((s) => s.id);
+    expect(order(p)).toEqual([a, b.id, c.id]);
+    p = placeBench(p, c.id, g1, a);
+    expect(order(p)).toEqual([c.id, a, b.id]);
+    p = placeBench(p, c.id, g1); // al final del grupo
+    expect(order(p)).toEqual([a, b.id, c.id]);
+    expect(placeBench(p, c.id, g1)).toBe(p); // sin cambios
+    expect(placeBench(p, a, g1, a)).toBe(p);
+    const g2 = addGroup(p, 'Otro');
+    p = placeBench(g2.project, a, g2.id);
+    expect(variantOf(p).sims.find((s) => s.id === a)!.group).toBe(g2.id);
+    p = placeBench(p, b.id, g2.id, a);
+    expect(order(p)).toEqual([c.id, b.id, a]);
+    expect(variantOf(p).sims.filter((s) => s.group === g2.id).map((s) => s.id)).toEqual([b.id, a]);
+  });
   it('withGroups: todo testbench queda en un grupo (crea «Group 1» si no hay)', async () => {
     const { withGroups, addGroup } = await import('../../src/project/project.ts');
     const p = withGroups(newProject('P'));

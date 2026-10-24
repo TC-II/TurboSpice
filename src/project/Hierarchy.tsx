@@ -67,7 +67,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onNewBench(group?: string): void;
   onNewGroup(): void;
   onGroupAction(id: string, action: 'rename' | 'delete'): void;
-  onMoveBench(id: string, group: string): void;
+  /** mover a un grupo; con `before`, justo antes de ese testbench (#218), si no al final */
+  onMoveBench(id: string, group: string, before?: string): void;
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
@@ -125,6 +126,29 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
       setDropOn(null);
     },
   });
+  // reordenar (#218): soltar sobre otro testbench lo pone antes o después (una línea marca dónde)
+  const [insertAt, setInsertAt] = useState<{ id: string; after: boolean } | null>(null);
+  const reorder = (b: TreeBench) => ({
+    onDragOver: (e: React.DragEvent) => {
+      if (!dragging) return;
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      const after = e.clientY > r.top + r.height / 2;
+      if (insertAt?.id !== b.id || insertAt.after !== after) setInsertAt({ id: b.id, after });
+      setDropOn(null);
+    },
+    onDragLeave: () => setInsertAt(null),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      if (dragging && insertAt && b.group) {
+        const peers = benches.filter((x) => x.group === b.group && x.id !== dragging);
+        const before = insertAt.after ? peers[peers.findIndex((x) => x.id === b.id) + 1]?.id : b.id;
+        if (before !== dragging) onMoveBench(dragging, b.group, before);
+      }
+      setDragging('');
+      setInsertAt(null);
+    },
+  });
   // los testbenches a la vista, en orden: las flechas ↑ ↓ pasan de uno a otro (como en el historial)
   const visible = groups.filter((g) => !collapsed.has(g.id)).flatMap((g) => benches.filter((b) => b.group === g.id));
   const treeRef = useRef<HTMLElement>(null);
@@ -152,16 +176,17 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
     return (
       <li key={b.id}>
         <div
-          className={`tree-row${active ? ' active' : ''}${dragging === b.id ? ' dragging' : ''}`}
+          className={`tree-row${active ? ' active' : ''}${dragging === b.id ? ' dragging' : ''}${insertAt?.id === b.id ? (insertAt.after ? ' insert-after' : ' insert-before') : ''}`}
           data-bench={b.id}
+          {...reorder(b)}
           draggable
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', b.name);
             setDragging(b.id);
           }}
-          onDragEnd={() => (setDragging(''), setDropOn(null))}
-          title={t('Drag it onto a workbench to move it')}
+          onDragEnd={() => (setDragging(''), setDropOn(null), setInsertAt(null))}
+          title={t('Drag it to reorder it, or onto a workbench to move it')}
         >
           <button className="tree-caret" onClick={() => toggleIn(setOpenBench, b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
             {open ? '▾' : '▸'}

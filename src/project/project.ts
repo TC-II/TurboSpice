@@ -149,6 +149,28 @@ export function withGroups(p: Project): Project {
 export const setBenchGroup = (p: Project, simId: string, group?: string): Project =>
   mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
 
+/**
+ * Reordena (#218): pone el testbench en `group`, justo antes de `before` (otro testbench), o al
+ * final del grupo si `before` no se da. El orden queda en el arreglo de simulaciones (y en el .turbo).
+ */
+export function placeBench(p: Project, simId: string, group: string, before?: string): Project {
+  const v = variantOf(p);
+  const s = simOf(v, simId);
+  if (!s || before === simId) return p;
+  const rest = v.sims.filter((x) => x !== s);
+  const moved: Sim = { ...s, group };
+  let i = before ? rest.findIndex((x) => x.id === before) : -1;
+  if (i < 0) {
+    // después del último del grupo (o al final si el grupo está vacío)
+    let last = -1;
+    rest.forEach((x, k) => x.group === group && (last = k));
+    i = last < 0 ? rest.length : last + 1;
+  }
+  const sims = [...rest.slice(0, i), moved, ...rest.slice(i)];
+  if (s.group === group && sims.every((x, k) => x.id === v.sims[k].id)) return p;
+  return mapVariant(p, v.id, (x) => ({ ...x, sims }));
+}
+
 /** Nombre libre para un testbench nuevo (también las copias): «Testbench N», el siguiente número libre */
 export function freeBenchName(p: Project): string {
   const used = new Set(variantOf(p).sims.map((s) => simLabel(s).trim().toLowerCase()));

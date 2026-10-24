@@ -1284,7 +1284,7 @@ export const es: Record<string, string> = {
   'Copies its value and parameters to the component with the same name in the other testbenches of the workbench': 'Copia su valor y sus parámetros al componente con el mismo nombre en los otros testbenches del workbench',
   'Delete the workbench (its testbenches stay)': 'Borrar el workbench (sus testbenches quedan)',
   'Delete the workbench {name}?': '¿Borrar el workbench {name}?',
-  'Drag it onto a workbench to move it': 'Arrastralo sobre un workbench para moverlo',
+  'Drag it to reorder it, or onto a workbench to move it': 'Arrastralo para reordenarlo, o sobre un workbench para moverlo',
   'Drop here to take it out of the workbench': 'Soltalo acá para sacarlo del workbench',
   'Each parameter needs a valid name and a value': 'Cada parámetro necesita un nombre válido y un valor',
   'Edit {inst}…': 'Editar {inst}…',

@@ -92,6 +92,7 @@ Filtro RC.turbo          Proyecto   — el archivo: se abre, se guarda en Drive,
 vista (`;.plot`, `;.sims`, bloques, como hoy). Eso hace que cada simulación sea exportable tal cual a
 LTspice. Dentro del `.turbo` cada simulación tiene un solo análisis, así que el `;.sims` actual
 (una lista de varios análisis en un `.asc`) se reemplaza por la lista de simulaciones del JSON.
+El orden de `sims` es el orden de los testbenches en el panel del proyecto (se cambia arrastrándolos, #218).
 
 **Historial deduplicado (`blobs`).** `current`, `base` y cada corrida guardan sólo el hash; el texto
 está una sola vez en `blobs`. Si muchas corridas tienen el mismo circuito, no se repite. Es robusto

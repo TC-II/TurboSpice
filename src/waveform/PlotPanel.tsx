@@ -126,6 +126,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const charts = useRef(new Map<number, uPlot>());
   // eje Y fijado por un zoom a recuadro (por panel; sin entrada = autoescala)
   const [yRanges, setYRanges] = useState<Record<number, Range>>(init?.yRanges ?? {});
+  // eje derecho (corrientes o fase) fijado con la rueda sobre él (por panel; sin entrada = todo el rango)
+  const [rRanges, setRRanges] = useState<Record<number, Range>>({});
   const [zoomMode, setZoomMode] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [showGrid, setShowGrid] = useState(true);
@@ -147,6 +149,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     lastScale.current = scaleName;
     setXRange(null);
     setYRanges({});
+    setRRanges({});
     zoomHistory.current = [];
     setCursors({});
   }, [scaleName]);
@@ -228,6 +231,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       switch (a) {
         case 'fit':
           setFRanges({});
+          setRRanges({});
           return zoomTo(null, {});
         case 'zoomBox':
           setRemoving(false);
@@ -400,7 +404,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onDropTrace={(from, ti) => moveTrace(from, ti, i)}
             xRange={isF(i) ? (fRanges[i] ?? null) : range}
             yRange={yRanges[i] ?? null}
-            onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : zoomTo(null, {}))}
+            rRange={rRanges[i] ?? null}
+            onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : (setRRanges({}), zoomTo(null, {})))}
             onWheelZoom={(r) => {
               if (isF(i)) return setFRange(i, r);
               zoomNow.current = { ...zoomNow.current, x: r };
@@ -410,6 +415,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
               zoomNow.current = { ...zoomNow.current, y: { ...zoomNow.current.y, [i]: r } };
               setYRanges(zoomNow.current.y);
             }}
+            onWheelR={(r) => setRRanges((old) => ({ ...old, [i]: r }))}
             onBoxZoom={(x, y) => {
               setZoomMode(false);
               if (isF(i)) {
@@ -485,6 +491,9 @@ function PaneView(props: {
   onWheelZoom(r: Range | null): void;
   /** Y de este panel por la rueda sobre el eje (o con Shift) */
   onWheelY(r: Range): void;
+  /** eje derecho (corrientes o fase) fijo por la rueda sobre él; null = todo el rango */
+  rRange: Range | null;
+  onWheelR(r: Range): void;
   /** recuadro arrastrado: null en el eje que no se acerca (arrastre casi horizontal o vertical) */
   onBoxZoom(x: Range | null, y: Range | null): void;
   zoomMode: boolean;
@@ -521,6 +530,8 @@ function PaneView(props: {
   marksRef.current = props.marks;
   const yRef = useRef(yRange);
   yRef.current = yRange;
+  const rRef = useRef(props.rRange);
+  rRef.current = props.rRange;
   const programmatic = useRef(false);
   /** el arrastre en curso empezó en este gráfico */
   const pressed = useRef(false);
@@ -554,7 +565,10 @@ function PaneView(props: {
       return out;
     };
     const hasRight = data.curves.some((c) => c.axis !== 'y');
-    const rightUnit = data.curves.some((c) => c.axis === 'ph') ? '°' : data.iUnit;
+    const rightScale = data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i';
+    const rightUnit = rightScale === 'ph' ? '°' : data.iUnit;
+    /** eje bajo el mouse (la rueda acerca ése): se resalta para que se sepa cuál es */
+    let axisHover: 'left' | 'right' | null = null;
     const unitOf = (c: Curve) => (c.axis === 'ph' ? '°' : c.axis === 'i' ? data.iUnit : data.yUnit);
     // Y sin zoom fijado: el rango de todos los datos (no el de lo visible), así el zoom en X no
     // cambia la escala de amplitud (#200); Ctrl+Y la ajusta a lo visible
@@ -578,8 +592,8 @@ function PaneView(props: {
       scales: {
         x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : {}) },
         y: { range: (u, min, max) => yRef.current ?? whole('y')(u, min, max, 'y') },
-        i: { range: whole('i') },
-        ph: { range: whole('ph') },
+        i: { range: (u, min, max) => rRef.current ?? whole('i')(u, min, max, 'i') },
+        ph: { range: (u, min, max) => rRef.current ?? whole('ph')(u, min, max, 'ph') },
       },
       axes: [
         {
@@ -590,7 +604,7 @@ function PaneView(props: {
         },
         { scale: 'y', values: ticks('Y'), stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
         ...(hasRight
-          ? [{ scale: data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i', side: 1, values: ticks('R'), stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
+          ? [{ scale: rightScale, side: 1, values: ticks('R'), stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
           : []),
       ],
       series: [
@@ -666,8 +680,19 @@ function PaneView(props: {
             // (rangos visibles de X e Y, para leerlos en los e2e: el canvas no se puede leer)
             u.root.dataset.rangeX = `${u.scales.x.min}|${u.scales.x.max}`;
             u.root.dataset.rangeY = `${u.scales.y?.min}|${u.scales.y?.max}`;
+            u.root.dataset.rangeR = `${u.scales[rightScale]?.min}|${u.scales[rightScale]?.max}`;
             const c = cursorsRef.current;
             const ctx = u.ctx;
+            // el eje que acerca la rueda, levemente resaltado
+            if (axisHover) {
+              const { left, top, width, height } = u.bbox;
+              ctx.save();
+              ctx.fillStyle = fg;
+              ctx.globalAlpha = 0.08;
+              if (axisHover === 'left') ctx.fillRect(0, top, left, height);
+              else ctx.fillRect(left + width, top, u.ctx.canvas.width - left - width, height);
+              ctx.restore();
+            }
             // f₀ de polos (×) y ceros (○): líneas verticales punteadas
             if (data.xName === 'frequency')
               for (const m of marksRef.current ?? []) {
@@ -847,11 +872,26 @@ function PaneView(props: {
       root.setPointerCapture(e.pointerId);
       live.current.onCursor(grab ? { sel: grab } : { [dragging]: valX(e), sel: dragging });
     };
+    /** sobre qué eje está el mouse (a la altura del área del gráfico) */
+    const axisAt = (e: { clientX: number; clientY: number }): 'left' | 'right' | null => {
+      const r = over.getBoundingClientRect();
+      if (e.clientY < r.top || e.clientY > r.bottom) return null;
+      return e.clientX < r.left ? 'left' : e.clientX > r.right && hasRight ? 'right' : null;
+    };
+    const hoverAxis = (a: 'left' | 'right' | null) => {
+      if (a === axisHover) return;
+      axisHover = a;
+      root.style.cursor = a ? 'ns-resize' : '';
+      root.title = a ? t('Wheel: zoom this axis') : '';
+      u.redraw(false);
+    };
     const move = (e: PointerEvent) => {
       if (pan) return panMove(e);
       if (dragging) live.current.onCursor({ [dragging]: valX(e) });
       else over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : '';
+      if (!dragging) hoverAxis(axisAt(e));
     };
+    const leave = () => hoverAxis(null);
     const up = (e: PointerEvent) => {
       if (panEnd(e) || !dragging) return;
       dragging = null;
@@ -878,7 +918,15 @@ function PaneView(props: {
         if (lo !== min || hi !== max) live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
         return;
       }
-      if (e.clientX > r.right && e.clientY <= r.bottom) return; // eje derecho: sin zoom
+      if (axisAt(e) === 'right') {
+        // eje derecho (corrientes o fase): su propia escala
+        const { min, max } = u.scales[rightScale];
+        if (min == null || max == null) return;
+        const [lo, hi] = zoomAbout(min, max, u.posToVal(Math.min(Math.max(e.clientY - r.top, 0), r.height), rightScale), k);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelR([lo, hi]);
+        return;
+      }
+      if (e.clientX > r.right) return; // a la derecha, sin eje derecho: nada
       if (onYAxis || e.shiftKey) {
         const { min, max } = u.scales.y;
         if (min == null || max == null) return;
@@ -912,6 +960,7 @@ function PaneView(props: {
     window.addEventListener('pointercancel', selEnd);
     root.addEventListener('pointerdown', down);
     root.addEventListener('pointermove', move);
+    root.addEventListener('pointerleave', leave);
     root.addEventListener('pointerup', up);
     root.addEventListener('pointercancel', up);
     root.addEventListener('contextmenu', context);
@@ -927,6 +976,7 @@ function PaneView(props: {
       window.removeEventListener('pointercancel', selEnd);
       root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move);
+      root.removeEventListener('pointerleave', leave);
       root.removeEventListener('pointerup', up);
       root.removeEventListener('pointercancel', up);
       root.removeEventListener('contextmenu', context);
@@ -957,7 +1007,7 @@ function PaneView(props: {
     programmatic.current = true;
     u.setScale('x', xRange ? { min: xRange[0], max: xRange[1] } : { min: data.x[0], max: data.x[data.x.length - 1] });
     programmatic.current = false;
-  }, [xRange, yRange, data, cursorMode, zoomMode, showGrid]);
+  }, [xRange, yRange, props.rRange, data, cursorMode, zoomMode, showGrid]);
 
   useEffect(() => {
     chart.current?.redraw(false);

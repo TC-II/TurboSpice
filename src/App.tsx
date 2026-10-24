@@ -70,7 +70,7 @@ import {
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { staleInstances } from './project/staleInstances.ts';
-import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
+import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom, type Imported } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -1179,6 +1179,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
     const doc = liveDoc;
     setViewRun('');
+    aborting.current = false;
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
@@ -1263,14 +1264,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         setPanel(errs.length ? 'problems' : meas?.rows.length && (nothingPlotted || (blk.table && !xy.length)) ? 'meas' : 'plot');
       } else setPanel(errs.length ? 'problems' : 'log');
     } catch (e) {
-      setStatus({ kind: 'error', message: (e as Error).message });
+      // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
+      if (!aborting.current) setStatus({ kind: 'error', message: (e as Error).message });
     }
   };
 
+  const aborting = useRef(false);
   const abort = () => {
     engine.abort();
-    engine.ready.then(() => setStatus({ kind: 'idle' }), (e: Error) => setStatus({ kind: 'error', message: e.message }));
-    setStatus({ kind: 'error', message: t('Simulation aborted') });
+    aborting.current = true;
+    // queda "sin simular" (no "lista": lo que se ve, si hay algo, es de la corrida anterior)
+    setStatus({ kind: 'aborted' });
+    setMessage(sim ? t('Simulation aborted: the results shown are from the previous run') : t('Simulation aborted'));
+    engine.ready.catch((e: Error) => setStatus({ kind: 'error', message: e.message }));
   };
   /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
   const showLog = () => {
@@ -2502,6 +2508,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       let p = leave();
       const variants: string[] = [];
       const files: Project['files'] = [];
+      const damaged: Imported['damaged'] = [];
       const loose: ZipEntry[] = [];
       for (const f of list) {
         const data = new Uint8Array(await f.arrayBuffer());
@@ -2513,12 +2520,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         p = r.project;
         variants.push(...r.variants);
         files.push(...r.files);
+        damaged.push(...r.damaged);
       }
       if (loose.length) {
         const r = importEntries(p, loose);
         p = r.project;
         variants.push(...r.variants);
         files.push(...r.files);
+        damaged.push(...r.damaged);
       }
       const merged = await mergeFiles(p.files, files, askConflict);
       enter(asBenches({ ...p, files: merged.files }), true);
@@ -2527,7 +2536,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         ...(variants.length ? [`${variants.length === 1 ? t('the testbench') : t('{length} testbenches:', { length: variants.length })} ${variants.join(', ')}`] : []),
         ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
-      setMessage(parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)'));
+      const imported = parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)');
+      // las líneas dañadas quedan tal cual en el testbench (no se pierden al guardar), pero hay que avisarlo
+      const bad = damaged.map((d) => t('{file}: {n} lines could not be read and were kept as they are (the first one: {line})', { file: d.file, n: d.lines, line: d.first.slice(0, 80) }));
+      setMessage([imported, ...bad].join(' · '));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }
@@ -3061,13 +3073,15 @@ ${ltNetlistText(sim.built.lt)}
           <SimBar
             sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}
             info={circuitInfo()}
-            state={running ? 'running' : status.kind === 'error' ? 'err' : sim ? 'ok' : 'idle'}
+            state={running ? 'running' : status.kind === 'error' ? 'err' : status.kind === 'aborted' ? 'idle' : sim ? 'ok' : 'idle'}
             stateDetail={
               status.kind === 'running'
                 ? status.percent ? `${status.percent.toFixed(0)} %` : undefined
                 : status.kind === 'error'
                   ? status.message
-                  : status.kind === 'done' && sim
+                  : status.kind === 'aborted'
+                    ? t('Simulation aborted')
+                    : status.kind === 'done' && sim
                     ? t('done in {p0} ms', { p0: status.ms.toFixed(0) })
                     : undefined
             }
@@ -3755,9 +3769,10 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
   }, [sink]);
   const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
   // los avisos se van solos; los largos y los errores duran más para poder leerlos
+  const ms = message ? Math.min(45000, Math.max(error ? 30000 : 18000, message.length * 210)) : 0;
   useEffect(() => {
     if (!message) return;
-    const id = setTimeout(onDismiss, Math.min(15000, Math.max(error ? 10000 : 6000, message.length * 70)));
+    const id = setTimeout(onDismiss, ms);
     return () => clearTimeout(id);
   }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -3767,6 +3782,13 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
         <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
           {message}
         </span>
+      )}
+      {message && (
+        // cuánto le queda al aviso: el aro se vacía desde las 12 en sentido antihorario (key: reinicia con cada aviso)
+        <svg key={message} className={error ? 'status-timer error' : 'status-timer'} viewBox="0 0 12 12" aria-hidden="true">
+          <circle className="track" cx="6" cy="6" r="4.5" />
+          <circle className="left" cx="6" cy="6" r="4.5" pathLength={100} style={{ animationDuration: `${ms}ms` }} />
+        </svg>
       )}
     </div>
   );

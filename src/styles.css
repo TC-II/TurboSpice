@@ -182,6 +182,13 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .hint-bar .hint-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hint-bar .status-msg { flex: 0 1 auto; min-width: 0; margin-left: auto; overflow: hidden; text-overflow: ellipsis; text-align: right; color: var(--fg); pointer-events: auto; cursor: pointer; }
 .hint-bar .status-msg.error { color: #d33; font-weight: 600; }
+/* tiempo que le queda al aviso: un aro chico como el del estado de la simulación, que se vacía */
+.hint-bar .status-timer { flex: none; width: 12px; height: 12px; align-self: center; margin-left: -6px; transform: rotate(-90deg); }
+.hint-bar .status-timer circle { fill: none; stroke-width: 2.5; }
+.hint-bar .status-timer .track { stroke: var(--border); }
+.hint-bar .status-timer .left { stroke: var(--fg-muted); stroke-dasharray: 100 100; animation: status-timer linear forwards; }
+.hint-bar .status-timer.error .left { stroke: #d33; }
+@keyframes status-timer { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 100; } }
 
 svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg); touch-action: none; user-select: none; cursor: default; }
 svg.editor.tool-grabbing { cursor: grabbing; }

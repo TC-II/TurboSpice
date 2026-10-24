@@ -13,13 +13,16 @@ export type Status =
   | { kind: 'idle' }
   | { kind: 'running'; percent: number; text: string }
   | { kind: 'done'; ms: number }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string }
+  /** el usuario cortó la simulación: no hay resultados nuevos */
+  | { kind: 'aborted' };
 
 const FIRST = Object.keys(EXAMPLES)[0];
 
 export function NetlistMode({ engine }: { engine: EngineClient }) {
   const [netlist, setNetlist] = useState(EXAMPLES[FIRST]);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  const aborting = useRef(false);
   const [result, setResult] = useState<SimResult | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [plotName, setPlotName] = useState<string>('');
@@ -36,6 +39,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
 
   const simulate = async () => {
     const e = engine;
+    aborting.current = false;
     setStatus({ kind: 'running', percent: 0, text: '' });
     try {
       const { result, ms } = await e.simulate(netlist);
@@ -52,14 +56,16 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
           : { kind: 'done', ms },
       );
     } catch (err) {
-      setStatus({ kind: 'error', message: (err as Error).message });
+      // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
+      if (!aborting.current) setStatus({ kind: 'error', message: (err as Error).message });
     }
   };
 
   const abort = () => {
     engine.abort();
-    engine.ready.then(() => setStatus({ kind: 'idle' }), (e: Error) => setStatus({ kind: 'error', message: e.message }));
-    setStatus({ kind: 'error', message: t('Simulation aborted') });
+    aborting.current = true;
+    setStatus({ kind: 'aborted' });
+    engine.ready.catch((e: Error) => setStatus({ kind: 'error', message: e.message }));
   };
 
   const plot: SimPlot | undefined = result?.plots.find((p) => p.name === plotName);
@@ -239,5 +245,7 @@ export function StatusText({ status }: { status: Status }) {
       return <span className="status ok">{t('Done in')}{' '}{status.ms.toFixed(0)} ms</span>;
     case 'error':
       return <span className="status err">{status.message}</span>;
+    case 'aborted':
+      return <span className="status err">{t('Simulation aborted')}</span>;
   }
 }

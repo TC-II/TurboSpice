@@ -5,6 +5,8 @@ import { decode } from '../../src/asc/encoding.ts';
 import { badLines, parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { EngineClient } from '../../src/engine/client.ts';
+import { importEntries } from '../../src/project/exchange.ts';
+import { newProject } from '../../src/project/turbo.ts';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
 
@@ -18,6 +20,12 @@ describe('parseAsc tolerante', () => {
     // lo que no se pudo leer vuelve al guardar (con los atributos del símbolo dañado)
     const out = serializeAsc(doc);
     for (const l of ['WIRE 0 0 x 16', 'SYMBOL res 32 32 R45', 'SYMATTR InstName R1', 'LINE Normal 0 0 nan 3']) expect(out).toContain(l);
+  });
+  it('al importar un .asc con líneas dañadas se informa cuáles', () => {
+    const data = new TextEncoder().encode(['Version 4', 'SHEET 1 880 680', 'WIRE x0 16 0 -32', 'WIRE 0 0 16 0'].join('\n'));
+    const r = importEntries(newProject('P'), [{ path: 'roto.asc', data }]);
+    expect(r.variants).toEqual(['roto']);
+    expect(r.damaged).toEqual([{ file: 'roto.asc', lines: 1, first: 'WIRE x0 16 0 -32' }]);
   });
   it('un archivo sano no tiene líneas dañadas', () => {
     const f = readdirSync(FIX).find((x) => x.endsWith('.asc'))!;

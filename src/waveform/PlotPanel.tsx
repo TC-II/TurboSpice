@@ -12,7 +12,6 @@ import { boxAxes, extent, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { colorFor, cursorForClick, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
-import { Field, type Picker } from '../schematic/simDialogs.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { t } from '../i18n/i18n.ts';
 
@@ -52,8 +51,6 @@ interface Props {
   setActive(i: number): void;
   /** traza bajo el mouse (para resaltar su red en el esquemático) */
   onHoverExpr?(expr: string | undefined): void;
-  /** elegir en el esquemático la red cuya tensión va a la FFT (⌖) */
-  picker?: Picker;
   handle?: Ref<PlotPanelHandle>;
   /** lugar de la barra de resultados donde van Cursores, FFT, Medidas y Ajustar */
   toolsHost?: HTMLElement | null;
@@ -96,9 +93,10 @@ const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName ===
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, picker, handle, marks, initial, onState, onFocusTrace, side, toolsHost }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, side, toolsHost }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
-  const [fftExpr, setFftExpr] = useState('');
+  // ⌖: elegir con un click en su cápsula la traza cuya FFT se agrega (#245)
+  const [fftPicking, setFftPicking] = useState(false);
   const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
   // los paneles de FFT (#236) tienen eje de frecuencias: zoom y cursores propios
   const [fRange, setFRange] = useState<Range | null>(null);
@@ -184,9 +182,19 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       setPanes([...panes, { traces: [{ expr, color }], fft }]);
       setActive(panes.length);
     }
-    setFftExpr('');
-    setFftOpen(false);
+    setFftPicking(false);
   };
+  useEffect(() => {
+    if (!fftPicking) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setFftPicking(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [fftPicking]);
   const isF = (i: number) => !!panes[i]?.fft;
 
   useImperativeHandle(handle, () => ({
@@ -269,7 +277,6 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const range: Range | null = xRange;
   const isTran = scaleName === 'time';
-  const timeTraces = [...new Set(panes.filter((p) => !p.fft).flatMap((p) => p.traces.map((tt) => tt.expr)))];
   const windowName: Record<FftWindow, string> = {
     hann: t('Hann Window'),
     hamming: t('Hamming Window'),
@@ -306,9 +313,38 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         <Icon name="fit" />
       </button>
       {isTran && (
-        <button className={fftOpen ? 'active' : ''} onClick={() => setFftOpen((v) => !v)} title={t('Spectrum (FFT) and harmonic distortion of a trace')}>
+        <button
+          className={fftOpen ? 'active' : ''}
+          onClick={() => {
+            setFftOpen((v) => !v);
+            setFftPicking(false);
+          }}
+          title={t('Spectrum (FFT) and harmonic distortion of a trace')}
+        >
           FFT
         </button>
+      )}
+      {fftOpen && isTran && (
+        <span className="fft-tools">
+          <select value={fftWindow} aria-label={t('Window')} onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
+            {WINDOWS.map(([w]) => (
+              <option key={w} value={w}>{windowName[w]}</option>
+            ))}
+          </select>
+          <button
+            className={`pick-btn fft-pick${fftPicking ? ' active' : ''}`}
+            aria-label={t('Trace for the FFT')}
+            title={t('Pick the trace for the FFT: click its name in the legend (Esc cancels)')}
+            onClick={() => setFftPicking((v) => !v)}
+          >
+            ⌖
+          </button>
+          <span className="hint">
+            {range
+              ? t('Computed only over the current range: ({p0}s … {p1}s)', { p0: si(range[0]), p1: si(range[1]) })
+              : t('Using all the points (zoom in to compute over a range)')}
+          </span>
+        </span>
       )}
     </>
   );
@@ -316,38 +352,11 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
   return (
-    <div className="plot-panel">
+    <div className={`plot-panel${fftPicking ? ' fft-picking' : ''}`}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
+      {fftPicking && <p className="hint plot-info">{t('Click a trace in the legend to add its FFT · Esc cancels')}</p>}
       {(zoomMode || removing) && (
         <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
-      )}
-      {fftOpen && isTran && (
-        <div className="plot-tools fft-tools">
-          <select value={fftWindow} aria-label={t('Window')} onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
-            {WINDOWS.map(([w]) => (
-              <option key={w} value={w}>{windowName[w]}</option>
-            ))}
-          </select>
-          {/* el mismo campo con lista y ⌖ que el de la fuente de un barrido DC */}
-          <Field
-            label={t('Trace for the FFT')}
-            value={fftExpr}
-            list="fft-traces"
-            placeholder={t('Trace…')}
-            onChange={(v) => {
-              setFftExpr(v);
-              const known = timeTraces.find((e) => e.toLowerCase() === v.toLowerCase());
-              if (known) addFft(known);
-            }}
-            pick={picker && { what: 'net', picker: (w) => picker(w).then((n) => (n ? `V(${n})` : null)) }}
-          />
-          <datalist id="fft-traces">{timeTraces.map((e) => <option key={e} value={e} />)}</datalist>
-          <span className="hint">
-            {range
-              ? t('Computed only over the current range: ({p0}s … {p1}s)', { p0: si(range[0]), p1: si(range[1]) })
-              : t('Using all the points (zoom in to compute over a range)')}
-          </span>
-        </div>
       )}
       {plot.info && <p className="hint plot-info">{plot.info}</p>}
       {/* cursores y medidas: a la derecha de los paneles con los resultados abajo (son anchos y
@@ -389,6 +398,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             }}
             zoomMode={zoomMode}
             removing={removing}
+            onPickTrace={fftPicking && !isF(i) ? addFft : undefined}
             showGrid={showGrid}
             cursorMode={cursorMode}
             cursors={isF(i) ? fCursors : cursors}
@@ -455,6 +465,8 @@ function PaneView(props: {
   onBoxZoom(x: Range | null, y: Range | null): void;
   zoomMode: boolean;
   removing: boolean;
+  /** modo ⌖ de la FFT: un click en la cápsula elige la traza */
+  onPickTrace?(expr: string): void;
   showGrid: boolean;
   cursorMode: boolean;
   cursors: Cursors;
@@ -885,8 +897,14 @@ function PaneView(props: {
           return (
             <span
               key={`${tt.expr}${ti}`}
-              className={`trace-chip${tt.hidden ? ' off' : ''}${err ? ' bad' : ''}`}
-              draggable
+              className={`trace-chip${tt.hidden ? ' off' : ''}${err ? ' bad' : ''}${props.onPickTrace ? ' pickable' : ''}`}
+              draggable={!props.onPickTrace}
+              onClickCapture={(e) => {
+                if (!props.onPickTrace) return;
+                e.preventDefault();
+                e.stopPropagation();
+                props.onPickTrace(tt.expr);
+              }}
               onDragStart={(e) => e.dataTransfer.setData('application/x-trace', JSON.stringify({ pane: index, trace: ti }))}
               onPointerEnter={() => props.onHoverExpr?.(tt.expr)}
               onPointerLeave={() => props.onHoverExpr?.(undefined)}

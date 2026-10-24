@@ -104,6 +104,7 @@ import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameE
 import { sameExceptData } from './asc/dataText.ts';
 import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
+import { opPinShown, toggleOpPin } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -1777,16 +1778,21 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       return el ? elementBias(op.built, op.bias, el, op.scope) : null;
     };
   }, [op]);
+  // valores del OP fijados con la punta de prueba (#228); se borran con otro punto de operación
+  const [opPins, setOpPins] = useState<Set<string>>(() => new Set());
+  useEffect(() => setOpPins(new Set()), [op?.bias]);
   const annotations = useMemo((): Annotation[] | undefined => {
-    if (!showOp || !op) return undefined;
+    if (!op || (!showOp && !opPins.size)) return undefined;
+    const pins = showOp ? undefined : opPins;
     const { built, bias, scope } = op;
     const out: Annotation[] = [];
     for (const n of netNames(doc, conn, new Map())) {
+      if (!opPinShown(pins, { net: n.name })) continue;
       const b = scope ? scopedNetBias(bias, scope, n.name) : netBias(bias, n.name);
       if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
     }
     for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
-      if (!/^[RLVIDQMJ]/i.test(el.prefix)) continue;
+      if (!/^[RLVIDQMJ]/i.test(el.prefix) || !opPinShown(pins, { symbol: el.sym })) continue;
       const b = elementBias(built, bias, el, scope);
       const s = doc.symbols[el.sym];
       if (!b?.short || !s) continue;
@@ -1794,7 +1800,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       out.push({ at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
     }
     return out;
-  }, [showOp, op, doc, conn, lib]);
+  }, [showOp, opPins, op, doc, conn, lib]);
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
@@ -1918,6 +1924,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot) return;
+    // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
+    if (!scaleOf(plot) && op) return setOpPins((p) => toggleOpPin(p, target));
     let expr = probeExpr(sim.built, target);
     // adentro de un subcircuito (#180): la red de esta instancia en la netlist del testbench
     const lv = pathRef.current[pathRef.current.length - 1];

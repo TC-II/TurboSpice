@@ -596,6 +596,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 @keyframes sim-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .sim-state.running { animation-duration: 2.4s; } }
 .simbar .sb-field .pick-btn { padding: 0 3px; line-height: 1; color: var(--fg-muted); }
+.simbar .sb-field .pick-btn:disabled { opacity: 0.35; cursor: default; }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }

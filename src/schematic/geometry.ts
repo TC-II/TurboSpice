@@ -426,7 +426,7 @@ export function alignedBox(x: number, y: number, align: string, size: number, le
 
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
 
-const VALUE_UNIT: Record<string, string> = { R: 'Ω', C: 'F', L: 'H' };
+const VALUE_UNIT: Record<string, string> = { R: 'Ω', C: 'F', L: 'H', V: 'V', I: 'A' };
 
 /**
  * Cómo se ve el valor de un R, C o L en el esquemático: con prefijo SI y unidad (10Meg → 10MΩ,

@@ -3295,9 +3295,6 @@ ${ltNetlistText(sim.built.lt)}
                   )}
                 </>
               )}
-              <button className="close" onClick={() => setExpanded('schematic')} aria-label={t('Hide results')} title={t('Hide results (Ctrl+1)')}>
-                {resultsSide ? '▶' : '▼'}
-              </button>
             </div>
             <div className="results-body">
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}

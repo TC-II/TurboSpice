@@ -406,8 +406,6 @@ export const es: Record<string, string> = {
   'hand-written .meas': '.meas escrito a mano',
   'harmonics only': 'sólo armónicos',
   'Help': 'Ayuda',
-  'Hide results': 'Ocultar resultados',
-  'Hide results (Ctrl+1)': 'Ocultar resultados (Ctrl+1)',
   'Hide zeros': 'Ocultar ceros',
   'Hierarchical blocks (.asc)': 'Bloques jerárquicos (.asc)',
   'Histogram of {label}': 'Histograma de {label}',

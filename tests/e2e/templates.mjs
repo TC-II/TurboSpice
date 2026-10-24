@@ -54,7 +54,7 @@ await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check(await simulate(), 'barrido: simula sin errores');
 const sweepRows = await measRows();
 check(sweepRows.length === 3, `barrido: una medición por corrida (${sweepRows.join(' | ')})`);
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 
 // --- Monte Carlo ---
 await template('Monte Carlo');
@@ -71,11 +71,11 @@ check(mc1.length === 50 && Math.max(...vals) > Math.min(...vals), `Monte Carlo: 
 check(yields.every((y) => y === 0 || y === 1 || y === 0.5), `rendimiento: 1 o 0 por corrida (${[...new Set(yields)].join(', ')})`);
 check((await page.locator('.histogram').count()) >= 1, 'Monte Carlo: histograma');
 await page.screenshot({ path: `${OUT}/template-montecarlo.png` });
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 check(await simulate(), 'Monte Carlo: simula otra vez');
 const mc2 = await measRows();
 check(JSON.stringify(mc1) === JSON.stringify(mc2), 'Monte Carlo con semilla fija: reproducible');
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 
 // --- serie de simulaciones ---
 await template('Serie de simulaciones');
@@ -87,7 +87,7 @@ const plots = await page.locator('select[aria-label="Plot"] option').allTextCont
 check(['tran', 'ac', 'op'].every((k) => plots.some((p) => p.startsWith(k))), `serie: un resultado por análisis (${plots.join(', ')})`);
 const serRows = await measRows();
 check(serRows.length >= 2, `serie: mediciones de cada análisis (${serRows.join(' | ')})`);
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 
 // --- búsqueda / ajuste (bloques): R1 para que el máximo de V(out) a los 5 ms sea 0.9 ---
 await template('Búsqueda / ajuste (bloques)');
@@ -104,7 +104,7 @@ const found = /valor encontrado:[\s\S]*?mid = (\S+)[\s\S]*?m = (\S+)/.exec(log);
 // (el máximo es el del segundo pulso, a los 15 ms: el capacitor no se descarga del todo)
 check(found && Math.abs(parseFloat(found[2]) - 0.9) < 0.005 && parseFloat(found[1]) > 1000 && parseFloat(found[1]) < 5000, `búsqueda: R1 = ${found?.[1]} lleva la medición a 0.9 (${found?.[2]})`);
 
-await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+await page.keyboard.press('Control+1');
 
 // --- el resto: cada una se inserta y simula sin errores ---
 for (const name of ['Barrido anidado', 'Barrido de temperatura', 'Peor caso / esquinas', 'Medición vs. parámetro', 'Respuesta al escalón', 'Respuesta en frecuencia', 'Distorsión', 'Impedancias / PSRR / CMRR']) {
@@ -121,7 +121,7 @@ for (const name of ['Barrido anidado', 'Barrido de temperatura', 'Peor caso / es
     await resultsMenu(page, 'Log');
     check(/THD/i.test(await page.locator('.results-body pre').textContent()), 'distorsión: la THD en el Log');
   }
-  if (await page.getByRole('button', { name: 'Ocultar resultados' }).count()) await page.getByRole('button', { name: 'Ocultar resultados' }).click();
+  await page.keyboard.press('Control+1');
 }
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();

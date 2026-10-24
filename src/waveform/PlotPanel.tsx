@@ -12,6 +12,7 @@ import { boxAxes, extent, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
+import { Icon } from '../ui/icons.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
@@ -262,8 +263,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title={t('Maximum, minimum, peak-to-peak, average, RMS and frequency in the visible range')}>
         {t('Stats')}
       </button>
-      <button onClick={() => zoomTo(null, {})} title={t('See everything (Space or double-click on the plot). Drag a box to zoom (a nearly horizontal or vertical drag zooms only time or only amplitude); wheel: time, Shift+wheel or wheel over the Y axis: amplitude; Ctrl+Y: fit Y to the visible part; Shift+Z: previous zoom')}>
-        {t('Fit')}
+      <button className="fit-btn" onClick={() => zoomTo(null, {})} title={t('Fit to view')} aria-label={t('Fit to view')}>
+        <Icon name="fit" />
       </button>
     </>
   );

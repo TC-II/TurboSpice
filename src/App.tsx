@@ -1612,8 +1612,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
     action === 'rename' ? renameBench(id) : action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
-  // borrar la elegida (con el control deslizante): pasa a la siguiente, o a la base si era la única
-  const deleteActive = () => sims.active && sims.items.length > 1 && setDialog({ kind: 'deleteSim', id: sims.active });
   const deleteSim = (id: string) => {
     const p0 = leave();
     stacks.current.delete(`${variantOf(p0).id}/${id}`);
@@ -2991,7 +2989,6 @@ ${ltNetlistText(sim.built.lt)}
             picker={picker}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}
-            onDelete={deleteActive}
           />
           )}
         </div>

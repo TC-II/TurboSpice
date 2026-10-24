@@ -5,7 +5,6 @@
 // campo o con Enter y reemplazan el comando del esquemático.
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
-import { Icon } from '../ui/icons.tsx';
 import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
@@ -124,7 +123,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun, onDelete }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -144,8 +143,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   picker: Picker;
   onApply(line: string): void;
   onRun(): void;
-  /** nombre propio; vacío vuelve al automático */
-  onDelete(): void;
 }) {
   const line = sim?.line ?? '';
   const [draft, setDraft] = useState(() => parseAnalysis(line));
@@ -256,11 +253,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
       )}
       {slot && stateEl && createPortal(stateEl, slot)}
       {sim && errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
-      {sim && (
-        <button className="sb-delete" aria-label={t('Delete simulation')} title={t('Delete this simulation (and its results)')} onClick={onDelete}>
-          <Icon name="delete" size={16} />
-        </button>
-      )}
       {sim && stale && !running && (
         <button className="sb-run" onClick={onRun} title={t('Its results are no longer in memory (those of the last simulations viewed are kept)')}>
           {t('Run again')}

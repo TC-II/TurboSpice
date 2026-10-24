@@ -580,8 +580,6 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar .simbar .sb-rows { flex: 0 1 auto; min-width: 0; }
 
 
-.iconbar .simbar .sb-delete { padding: 2px; color: var(--fg-muted); flex: none; }
-.iconbar .simbar .sb-delete:hover { color: var(--err); }
 /* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
    del grupo que el separador de la barra de la simulación) */
 .iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }

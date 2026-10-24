@@ -238,9 +238,10 @@ await page.locator('.capsule-variant').dblclick();
 await page.getByLabel('Nombre del testbench').fill('Curva corta');
 await page.getByLabel('Nombre del testbench').press('Enter');
 check((await benchName()) === 'Curva corta', 'click en el nombre lo renombra');
-await page.getByRole('button', { name: 'Borrar simulación' }).click();
+await openPanel();
+await page.getByRole('button', { name: 'Borrar Curva corta', exact: true }).click();
 await slideToDelete(page);
-check((await benchName()) !== 'Curva corta' && (await items()).length === 1, 'la × borra el activo (deslizando) y pasa a otro');
+check((await benchName()) !== 'Curva corta' && (await items()).length === 1, 'el botón de borrar del panel borra el testbench (deslizando) y pasa a otro');
 await goBench('DC');
 check((await directive()) === '.dc V1 0 5 0.1', 'el otro testbench sigue con su simulación');
 // al lado de la fuente, elegirla en el esquemático (como en el menú completo)

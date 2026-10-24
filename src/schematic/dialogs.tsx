@@ -659,6 +659,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       [t('Space'), t('Fit (see everything)')],
       ['Z · Shift+Z', t('Zoom to a box (X and Y) · previous zoom')],
       ['Ctrl+Y', t('Vertical autoscale')],
+      [t('Ctrl+wheel'), t('Scroll along the X axis')],
       ['Ctrl+G', t('Show/hide the grid')],
       ['A', t('Add trace (expression field, with autocomplete)')],
       ['P · B', t('Add pane · add pane below the active one')],

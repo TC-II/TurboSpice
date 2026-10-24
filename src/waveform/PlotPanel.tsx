@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { boxAxes, extent, zoomAbout } from './scales.ts';
+import { boxAxes, extent, panBy, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { colorFor, cursorForClick, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
@@ -772,12 +772,23 @@ function PaneView(props: {
       if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
     };
     const context = (e: MouseEvent) => live.current.cursorMode && e.preventDefault();
-    // rueda: zoom en X alrededor del cursor; sobre el eje Y (o con Shift), zoom en Y de este panel
+    // rueda: zoom en X alrededor del cursor; sobre el eje Y (o con Shift), zoom en Y de este panel;
+    // Ctrl+rueda: desplaza en X
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = over.getBoundingClientRect();
       const k = Math.exp(e.deltaY * 0.0015);
       const onYAxis = e.clientX < r.left;
+      if (e.ctrlKey) {
+        // Ctrl+rueda: desplaza la vista en X sin cambiar el zoom (y sin el zoom del navegador)
+        const { min, max } = u.scales.x;
+        if (min == null || max == null) return;
+        const x0 = data.x[0];
+        const x1 = data.x[data.x.length - 1];
+        const [lo, hi] = panBy(min, max, (e.deltaY || e.deltaX) * 0.001, x0, x1, data.log);
+        if (lo !== min || hi !== max) live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
+        return;
+      }
       if (e.clientX > r.right && e.clientY <= r.bottom) return; // eje derecho: sin zoom
       if (onYAxis || e.shiftKey) {
         const { min, max } = u.scales.y;

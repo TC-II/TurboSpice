@@ -24,6 +24,18 @@ export function zoomAbout(min: number, max: number, at: number, k: number, log =
   return log ? [10 ** lo, 10 ** hi] : [lo, hi];
 }
 
+/**
+ * Rango [min, max] desplazado una fracción `f` de su ancho (en décadas si es log), sin cambiar
+ * el ancho y sin salirse de [x0, x1]
+ */
+export function panBy(min: number, max: number, f: number, x0: number, x1: number, log = false): Range {
+  const t = (v: number) => (log ? Math.log10(v) : v);
+  const [a, b, lo, hi] = [t(min), t(max), t(x0), t(x1)];
+  const d = Math.min(Math.max((b - a) * f, lo - a), hi - b);
+  const r: Range = [a + d, b + d];
+  return log ? [10 ** r[0], 10 ** r[1]] : r;
+}
+
 /** Lo que pide un recuadro arrastrado sobre un gráfico de `w`×`h` px (cualquier unidad común) */
 export interface BoxAxes {
   x: boolean;

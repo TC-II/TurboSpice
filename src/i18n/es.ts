@@ -1073,6 +1073,8 @@ export const es: Record<string, string> = {
   'What to show in that analysis\' results (same as "Remember view"); it doesn\'t run on every run': 'Qué mostrar en los resultados de ese análisis (lo mismo que "Recordar vista"); no se ejecuta en cada corrida',
   'What to vary': 'Qué variar',
   'Wheel': 'Rueda',
+  'Ctrl+wheel': 'Ctrl+rueda',
+  'Scroll along the X axis': 'Desplazar en el eje X',
   'Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit': 'Rueda: zoom · arrastrar: mover · Shift+arrastrar: zoom a un recuadro · doble click: ajustar',
   'Window': 'Ventana',
   '{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points': '{expr}: fundamental {p1}Hz, amplitud {p2} · THD {p3} % (armónicas 2 a {p4}) · {n} puntos',

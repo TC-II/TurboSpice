@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { boxAxes, extent, zoomAbout } from '../../src/waveform/scales.ts';
+import { boxAxes, extent, panBy, zoomAbout } from '../../src/waveform/scales.ts';
 
 describe('escalas del visor', () => {
   it('extent: sólo valores finitos dentro del rango de X', () => {
@@ -18,6 +18,16 @@ describe('escalas del visor', () => {
     expect(lo).toBeCloseTo(10);
     expect(hi).toBeCloseTo(1e3);
     expect(zoomAbout(2, 4, 3, 2)).toEqual([1, 5]);
+  });
+
+  it('panBy: desplaza sin cambiar el ancho, en décadas y sin salirse de los datos', () => {
+    expect(panBy(2, 4, 0.5, 0, 10)).toEqual([3, 5]);
+    expect(panBy(2, 4, -0.5, 0, 10)).toEqual([1, 3]);
+    expect(panBy(7, 9, 5, 0, 10)).toEqual([8, 10]);
+    expect(panBy(1, 3, -5, 0, 10)).toEqual([0, 2]);
+    const [lo, hi] = panBy(10, 100, 1, 1, 1e4, true);
+    expect(lo).toBeCloseTo(100);
+    expect(hi).toBeCloseTo(1e3);
   });
 
   it('boxAxes: recuadro, casi horizontal, casi vertical y click', () => {

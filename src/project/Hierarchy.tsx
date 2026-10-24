@@ -371,9 +371,11 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         <button className="tree-add" onClick={onNewGroup} title={t('New workbench of testbenches')}>
           + {t('Workbench')}
         </button>
-        <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
-          <Icon name="close" size={14} />
-        </button>
+        {!renamingProject && (
+          <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
+            <Icon name="close" size={14} />
+          </button>
+        )}
       </header>
       <ul className="tree-branch tree-groups">
         {groups.map((g) => {

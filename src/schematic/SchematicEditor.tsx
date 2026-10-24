@@ -261,6 +261,25 @@ export function dropMove<D>(tool: Tool & { kind: 'move' }, preview: D | null): {
   return { commit: preview, tool: { ...tool, refs: null, start: null }, selection: [] };
 }
 
+/** Posición de la cápsula: 16 px (de pantalla) del cursor, del lado que tenga lugar */
+// el ancestro con posición en el que se ubica la cápsula (un <svg> no tiene offsetParent)
+function positionedAncestor(el: Element | null): HTMLElement | null {
+  for (let p = el?.parentElement; p; p = p.parentElement) if (getComputedStyle(p).position !== 'static') return p;
+  return null;
+}
+
+export function tipStyle(tip: { x: number; y: number; w: number; h: number }): { left?: number; right?: number; top?: number; bottom?: number } {
+  const OFF = 16;
+  const right = tip.x < tip.w - 220;
+  const below = tip.y < tip.h - 200;
+  return {
+    left: right ? tip.x + OFF : undefined,
+    right: right ? undefined : tip.w - tip.x + OFF,
+    top: below ? tip.y + OFF : undefined,
+    bottom: below ? undefined : tip.h - tip.y + OFF,
+  };
+}
+
 export function SchematicEditor(props: Props) {
   const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
@@ -845,8 +864,9 @@ export function SchematicEditor(props: Props) {
     }
     const info = target && describe ? describe(target) : null;
     if (info) {
-      const r = svgRect();
-      setTip({ x: e.clientX - r.left, y: e.clientY - r.top, w: r.width, h: r.height, info });
+      // en píxeles de pantalla respecto del contenedor (que puede tener padding por los paneles)
+      const box = positionedAncestor(svgRef.current)?.getBoundingClientRect() ?? svgRect();
+      setTip({ x: e.clientX - box.left, y: e.clientY - box.top, w: box.width, h: box.height, info });
     } else if (tip) setTip(null);
     if (tool.kind === 'move' && tool.refs && tool.start && !drag) {
       const g = snapPoint(p);
@@ -1174,12 +1194,7 @@ export function SchematicEditor(props: Props) {
         className="bias-tip"
         role="tooltip"
         // del lado del cursor que tenga lugar, para no tapar lo que se señala
-        style={{
-          left: tip.x < tip.w - 220 ? tip.x + 16 : undefined,
-          right: tip.x < tip.w - 220 ? undefined : tip.w - tip.x + 16,
-          top: tip.y < tip.h - 200 ? tip.y + 16 : undefined,
-          bottom: tip.y < tip.h - 200 ? undefined : tip.h - tip.y + 16,
-        }}
+        style={tipStyle(tip)}
       >
         <strong>{tip.info.title}</strong>
         {tip.info.lines.map((l, i) => (

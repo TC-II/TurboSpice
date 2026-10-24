@@ -97,6 +97,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-label: #1d2025;
   --sch-directive: #1d2025;
   --sch-comment: #2f6fdb;
+  --sch-drawing: #1fa8d6;
   --sch-grid: #b9bec7;
   --sch-sel: #e8590c;
   --sch-hl: #2b8a3e;
@@ -110,6 +111,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
     --sch-label: #c9ced6;
     --sch-directive: #e4e6ea;
     --sch-comment: #74a7ff;
+    --sch-drawing: #6fd0f2;
     --sch-grid: #3a3f47;
     --sch-sel: #ff922b;
     --sch-hl: #51cf66;
@@ -123,6 +125,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-label: #c9ced6;
   --sch-directive: #e4e6ea;
   --sch-comment: #74a7ff;
+  --sch-drawing: #6fd0f2;
   --sch-grid: #3a3f47;
   --sch-sel: #ff922b;
   --sch-hl: #51cf66;
@@ -183,13 +186,13 @@ svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
 svg.editor.tool-delete { cursor: none; }
 svg.editor.tool-label { cursor: move; }
 svg.editor.tool-pick { cursor: crosshair; }
-/* punta de prueba (como en LTspice): punta sobre una red (tensión), pinza sobre un componente (corriente) */
-svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 26 9 19' stroke='%23222' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 18 22 6' stroke='%23222' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") 2 26, crosshair; }
-svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='9' cy='19' r='6' fill='none' stroke='%23222' stroke-width='2'/%3E%3Cpath d='M13.5 14.5 24 4' stroke='%23222' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 9 19, crosshair; }
+/* punta de prueba (como en LTspice): el cursor es el ícono `probe` de la barra (multímetro digital); sobre un componente (corriente) lleva una "A" */
+svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") 4 28, crosshair; }
+svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23fff%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%2F%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23fff%27%20stroke%3D%27%23222%27%20stroke-width%3D%271.5%27%2F%3E%3Cpath%20d%3D%27M19.5%2026L23%2017.5L26.5%2026M20.8%2023.5H25.2%27%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 4 28, crosshair; }
 /* esquemático oscuro: en blanco */
-@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 26 9 19' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 18 22 6' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") 2 26, crosshair; } :root:not([data-theme='light']) svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='9' cy='19' r='6' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M13.5 14.5 24 4' stroke='%23fff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 9 19, crosshair; } }
-:root[data-theme='dark'] svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M2 26 9 19' stroke='%23fff' stroke-width='1.5' stroke-linecap='round'/%3E%3Cpath d='M10 18 22 6' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E") 2 26, crosshair; }
-:root[data-theme='dark'] svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Ccircle cx='9' cy='19' r='6' fill='none' stroke='%23fff' stroke-width='2'/%3E%3Cpath d='M13.5 14.5 24 4' stroke='%23fff' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E") 9 19, crosshair; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") 4 28, crosshair; } :root:not([data-theme='light']) svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23222%27%20stroke%3D%27%23222%27%20stroke-width%3D%273%27%2F%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23222%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.5%27%2F%3E%3Cpath%20d%3D%27M19.5%2026L23%2017.5L26.5%2026M20.8%2023.5H25.2%27%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 4 28, crosshair; } }
+:root[data-theme='dark'] svg.editor.tool-probe { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") 4 28, crosshair; }
+:root[data-theme='dark'] svg.editor.tool-probe-i { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20viewBox%3D%270%200%2032%2032%27%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23222%27%20stroke-width%3D%274%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%278%27%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.6%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M4%2028L15%2013%27%2F%3E%3Cpath%20d%3D%27M15%2013L21%205%27%20stroke-width%3D%273%27%2F%3E%3C%2Fg%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23222%27%20stroke%3D%27%23222%27%20stroke-width%3D%273%27%2F%3E%3Ccircle%20cx%3D%2723%27%20cy%3D%2722%27%20r%3D%277%27%20fill%3D%27%23222%27%20stroke%3D%27%23fff%27%20stroke-width%3D%271.5%27%2F%3E%3Cpath%20d%3D%27M19.5%2026L23%2017.5L26.5%2026M20.8%2023.5H25.2%27%20fill%3D%27none%27%20stroke%3D%27%23fff%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E") 4 28, crosshair; }
 svg.editor.tool-zoom, svg.editor.tool-shape { cursor: crosshair; }
 svg.editor.tool-move { cursor: move; }
 /* nivel de detalle (#195): textos de menos de ~3 px en pantalla, ocultos */
@@ -205,7 +208,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .schematic { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
 .wires line { stroke: var(--sch-sym); stroke-width: 1.6; }
-.shapes > * { stroke: var(--sch-sym); stroke-width: 1.4; }
+.shapes > * { stroke: var(--sch-drawing); stroke-width: 1.4; }
 .shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
 .junctions circle { fill: var(--sch-sym); stroke: none; }
@@ -230,7 +233,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .flag.sel { color: var(--sch-sel); }
 .flag.sel text { fill: var(--sch-sel); }
 .texts .directive text { fill: var(--sch-directive); font-weight: 600; }
-.texts .comment text { fill: var(--sch-comment); }
+.texts .comment text { fill: var(--sch-drawing); }
 .texts .sel text { fill: var(--sch-sel); }
 .net-hl line { stroke: var(--sch-hl); stroke-width: 3.2; }
 .net-hl circle { fill: var(--sch-hl); stroke: none; }
@@ -392,7 +395,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .plot-tools button { padding: 2px 10px; font-size: 13px; }
 .plot-tools button.fit-btn { display: inline-flex; padding: 3px 6px; }
 .plot-tools button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.expr-form { display: flex; gap: 4px; flex: 1 1 320px; max-width: 520px; }
+.expr-form { display: flex; gap: 4px; flex: 0 1 260px; max-width: 300px; }
 .expr-form input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 30px 3px 8px; }
 /* el "+" va dentro de la caja, al final */
 .expr-form { align-items: center; }
@@ -460,7 +463,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 /* barra de resultados: la vista elegida en el menú y las herramientas del visor */
 .results-view { font-size: 13px; font-weight: 600; color: var(--fg); }
 .incomplete-badge { font-size: 12px; font-weight: 600; color: var(--err); border-color: var(--err); background: transparent; padding: 1px 8px; }
-.viewer-tools { display: inline-flex; align-items: center; gap: 6px; }
+.viewer-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
 .viewer-tools:empty { display: none; }
 .viewer-tools button { padding: 2px 10px; font-size: 13px; }
 /* "+" para agregar un panel: aparece al acercarse al borde inferior del último */
@@ -555,7 +558,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .appbar-right { margin-left: auto; }
 /* el nombre del archivo, centrado en la barra; tema y compartir pegados al usuario */
 .appbar-right .filename { position: absolute; left: 50%; transform: translateX(-50%); margin-left: 0; }
-.appbar-right + .account-col { margin-left: -10px; }
+.appbar-right + .account { margin-left: -10px; }
 /* sin lugar para centrarlo: va junto al tema */
 @media (max-width: 1000px) { .appbar-right .filename { position: static; transform: none; } }
 .app-menu-btn { display: inline-flex; padding: 4px; border-color: transparent; background: transparent; border-radius: 6px; }
@@ -588,10 +591,9 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 /* separador entre Simular y la punta de prueba / punto de operación (mismo aire a los dos lados
    del grupo que el separador de la barra de la simulación) */
 .iconbar .tb-sep { flex: none; width: 1px; height: 22px; margin: 0 10px 0 4px; background: var(--border); }
-/* estado de la simulación elegida (bajo el usuario): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
-.account-col { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: auto; }
-.account-col .account { margin-left: 0; }
-.sim-state { flex: none; box-sizing: border-box; width: 14px; height: 14px; margin: 0; border-radius: 50%; border: 2px solid var(--border); background: transparent; }
+/* estado de la simulación elegida (a la derecha de la barra de la simulación, bajo el avatar): sin simular incoloro, corriendo naranja y girando, lista un aro verde / rojo */
+.sim-state-slot { flex: none; margin: 0 4px 0 auto; width: 30px; display: flex; justify-content: center; align-items: center; }
+.iconbar .sim-state, .sim-state { flex: none; overflow: visible; box-sizing: border-box; width: 16px; height: 16px; margin: 0; border-radius: 50%; border: 2.5px solid var(--border); background: transparent; }
 .sim-state.running { border-color: color-mix(in srgb, var(--accent) 25%, transparent); border-top-color: var(--accent); animation: sim-spin 0.8s linear infinite; }
 .sim-state.ok { border-color: var(--ok); }
 .sim-state.err { border-color: var(--err); }
@@ -687,7 +689,13 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .tol-add { display: flex; gap: 4px; max-width: 320px; }
 .study-control { min-height: 140px; }
 .study-code textarea { width: 100%; font: 13px/1.5 var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 240px; }
-.plot-info { margin: 0; } .fft-tools { padding: 4px 0; }
+.plot-info { margin: 0; }
+.fft-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.fft-tools .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plot-tools button.fft-pick, .fft-tools .fft-pick { padding: 2px 8px; }
+/* ⌖ de la FFT (#245): cursor de mira como el ícono y la cápsula bajo el mouse resaltada */
+.plot-panel.fft-picking, .plot-panel.fft-picking *, body:has(.plot-panel.fft-picking) .fft-pick { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='3.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23fff' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23222' stroke-width='1.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23222' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair !important; }
+.trace-chip.pickable:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 
 /* ---------- Expandir esquemático / resultados (#24) ---------- */

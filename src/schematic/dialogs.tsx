@@ -34,7 +34,7 @@ export function checkValue(prefix: string, value: string): { value: string; info
   if (!Number.isFinite(x)) return { value: v, warn: t('"{first}" doesn\'t look like a numeric value (e.g. 4.7k, 4k7, 10u, 1meg, {R})', { first }) };
   // "1M" es mili en SPICE: avisar, es un error clásico
   const milli = /^[\d.]+M$/.test(main) ? t(' — careful: M is milli; mega is "meg"') : '';
-  return { value: v, info: `= ${si(x, 4)}${unit}${milli}` };
+  return { value: v, info: `${si(x, 4)}${unit}${milli}` };
 }
 import { SymbolView } from './SchematicCanvas.tsx';
 import { getLang, locale, t } from '../i18n/i18n.ts';
@@ -330,7 +330,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
   const [rows, setRows] = useState(() => labelRows(inst, def, windowDefaults));
   const [patches, setPatches] = useState(new Map<number, LabelPatch>());
-  const focusAttr = rows.find((r) => r.win === focusLabel)?.attr ?? 'Value';
+  const focusAttr = rows.find((r) => r.win === focusLabel)?.attr ?? 'InstName';
   const first = useRef<HTMLInputElement>(null);
   // con una tabla de la librería (transistores, diodos…) el cursor arranca en su buscador, salvo
   // que se haya abierto desde un rótulo
@@ -387,7 +387,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     onApply(changed, patches, false);
   };
   return (
-    <Modal title={`${baseName(inst.type)} — ${eff.get('InstName') ?? ''}`} onClose={onClose} wide={!!parts?.length && partsOpen}>
+    <Modal title={`${baseName(inst.type)} — ${vals.InstName ?? ''}`} onClose={onClose} wide={!!parts?.length && partsOpen}>
       <form
         className="attrs"
         onSubmit={(e) => {
@@ -453,8 +453,6 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
             {partsOpen && table}
           </details>
         )}
-        {rows.length > 0 && <p className="hint">{t('Labels can be dragged with the mouse (Shift: free).')}</p>}
-        {def?.attrs.get('Description') && <p className="hint">{def.attrs.get('Description')}</p>}
         <div className="buttons">
           <button type="button" onClick={onClose}>{t('Cancel')}</button>
           <button type="submit" className="primary">{t('OK')}</button>

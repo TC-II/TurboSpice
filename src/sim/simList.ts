@@ -11,6 +11,7 @@ import { si } from '../waveform/series.ts';
 import type { Pane, PlotState } from '../waveform/view.ts';
 import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, type AnalysisKind, type Sweep } from './analyses.ts';
 import { t } from '../i18n/i18n.ts';
+import { isComplexLine } from './complexSim.ts';
 
 /** Lo que se veía de una simulación: se recupera al volver a elegirla */
 export interface SimView {
@@ -67,6 +68,8 @@ const volts = (n: string) => (/^[vi]\s*\(/i.test(n) ? n : `V(${n})`);
 
 /** Nombre legible de un comando de análisis: "Transitorio 0–10 ms", "Barrido DC V1 0–5 V" */
 export function analysisLabel(line: string): string {
+  // el Studio o un .control (#241)
+  if (isComplexLine(line)) return t('Complex simulation');
   const a = parseAnalysis(line);
   if (!a) return line.trim();
   const label = ANALYSES.find((x) => x.kind === a.kind)!.label;

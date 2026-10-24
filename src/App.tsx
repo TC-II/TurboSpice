@@ -34,6 +34,7 @@ import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { activeSim, analysisLabel, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
+import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
@@ -430,7 +431,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [historyOpen, curRuns, liveDoc, project.files]); // eslint-disable-line react-hooks/exhaustive-deps
   // adentro de un subcircuito (#180) el comando es el del testbench (lo que se simula)
   const tbDoc = useMemo(() => (curSub ? parseAsc(activeAsc(variant)) : null), [curSub, variant]);
-  const docLine = findAnalysis(tbDoc ?? doc)?.value ?? '';
+  // (#241: COMPLEX_LINE si el testbench es una Complex simulation)
+  const docLine = simLine(tbDoc ?? doc);
   const sims = useMemo(
     (): SimList => ({
       items: variant.sims.map((s) => ({ id: s.id, ...(s.name ? { name: s.name } : {}), line: s.id === variant.activeSim ? docLine : lineOf(s.asc), ...(s.view ? { view: s.view } : {}) })),
@@ -1482,6 +1484,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // si ya es de ese tipo queda como está; si otro testbench usa ese tipo, se parte de sus parámetros
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
     const line = same?.line ?? defaultLine(kind, circuitInfo());
+    // una Complex simulation (#241) pasa a este análisis en el mismo testbench: el .control queda
+    // guardado y vuelve al elegir otra vez Complex simulation
+    if (isComplexLine(docLine)) return commit(setAnalysisLine(parkControl(doc), line));
     // un testbench tiene una sola simulación: sin análisis se la pone; si ya tiene, se crea otro
     // testbench (en el mismo grupo) con el mismo circuito y ésta
     if (!docLine) return commit(setAnalysisLine(doc, line));
@@ -2176,6 +2181,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const openStudy = () => setDialog({ kind: 'study' });
   /**
+   * Complex simulation (#241): si el testbench ya lo es, abre el Studio; si pasó a un análisis
+   * simple, recupera su .control; si nunca tuvo, abre el Studio para armarlo
+   */
+  const complexSim = () => {
+    if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
+    if (!isComplexLine(docLine) && hasParkedControl(doc)) return commit(unparkControl(doc));
+    openStudy();
+  };
+  /**
    * Barrer un parámetro de un subcircuito en una instancia (#180): la instancia pasa a usar
    * {U1_G} y se agrega «.step param U1_G list <valor>», que el Estudio muestra como un barrido
    */
@@ -2199,7 +2213,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     setDialog(null);
     commit(d);
-    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Study.', { inst, param, pname, step }));
+    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Studio.', { inst, param, pname, step }));
     setDialog({ kind: 'study' });
   };
   const studyInfo = (): StudyInfo => {
@@ -2572,12 +2586,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...ANALYSES.map((x) => ({ label: x.label, title: docLine ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    ...ANALYSES.map((x) => ({ label: x.label, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    {
+      label: t('Complex simulation'),
+      title: t('The Studio or a .control block decides what is simulated, instead of a single analysis'),
+      checked: isComplexLine(docLine),
+      onClick: complexSim,
+    },
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
-    { label: t('Study…'), shortcut: 'Alt+E', onClick: openStudy },
+    { label: t('Studio…'), shortcut: 'Alt+E', onClick: openStudy },
     { label: t('.control block…'), shortcut: 'Alt+C', onClick: openControl },
   ];
   const menus: MenuDef[] = [
@@ -2694,7 +2714,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Study)'), onClick: toggleSimCommand, checked: showSimCommand },
+        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'), onClick: toggleSimCommand, checked: showSimCommand },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },
@@ -2983,6 +3003,8 @@ ${ltNetlistText(sim.built.lt)}
             stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
             running={running}
             picker={picker}
+            control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
+            onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}
           />

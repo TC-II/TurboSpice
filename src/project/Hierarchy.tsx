@@ -344,7 +344,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                   + {t('Testbench')}
                 </button>
               </div>
-              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b) => bench(b)) : <li className="tree-meta tree-empty">{t('Empty: drag testbenches here')}</li>}</ul>}
+              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b) => bench(b)) : <li className="tree-meta tree-empty">{t('Empty: create or drag a Testbench')}</li>}</ul>}
             </li>
           );
         })}

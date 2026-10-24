@@ -44,7 +44,10 @@ for (const scheme of ['light', 'dark']) {
   await page.getByRole('button', { name: 'Simular' }).click();
   await page.getByRole('button', { name: 'Abortar' }).click({ timeout: 5000 });
   await page.getByText('Simulación abortada').waitFor({ timeout: 5000 });
-  await page.getByText('Listo').waitFor({ timeout: 30000 });
+  // el estado queda en «abortada»: el motor reiniciado se prueba simulando otra vez
+  await page.selectOption('select[aria-label="Ejemplos"]', examples[0]);
+  await page.getByRole('button', { name: 'Simular' }).click();
+  await page.locator('.status.ok').waitFor({ timeout: 30000 });
   console.log(`✓ [${scheme}] abortar y reiniciar motor`);
 
   if (consoleErrors.length) {

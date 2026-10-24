@@ -1258,7 +1258,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // símbolos faltantes: el circuito simulado no es el del esquemático, el aviso va primero (#108)
       const missing = built.missingSymbols;
       setMessage(
-        missing.length
+        errs.length && !result.plots.length
+          ? t('{p0} — see the Errors tab', { p0: errs[0] })
+          : missing.length
           ? missing.length === 1
             ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
             : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
@@ -3154,9 +3156,8 @@ ${ltNetlistText(sim.built.lt)}
             stateDetail={
               status.kind === 'running'
                 ? status.percent ? `${status.percent.toFixed(0)} %` : undefined
-                : status.kind === 'error'
-                  ? status.message
-                  : status.kind === 'aborted'
+                // el texto del error va a la barra de estado, no a la de simulación
+                : status.kind === 'aborted'
                     ? t('Simulation aborted')
                     : status.kind === 'done' && sim
                     ? t('done in {p0} ms', { p0: status.ms.toFixed(0) })

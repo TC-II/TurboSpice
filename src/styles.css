@@ -618,12 +618,17 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 
 .simbar .sb-rows { display: flex; flex-direction: column; gap: 2px; }
 .simbar .sb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* grupos en columnas (polos y ceros): cada grupo, un campo debajo del otro con los cuadros alineados */
+.simbar .sb-rows.sb-cols { flex-direction: row; align-items: flex-start; gap: 14px; }
+.simbar .sb-cols .sb-row { flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: 2px; }
 .simbar .sb-field { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
 .simbar .sb-field input, .simbar .sb-field select { font: 12px var(--mono); padding: 1px 4px; color: var(--fg); }
 .simbar .sb-checks { display: inline-flex; flex-direction: column; line-height: 1.15; }
 .simbar .sb-check { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
 .simbar .sb-hint { color: var(--fg-muted); }
 .simbar .sb-hint.warn { color: var(--err); }
+/* campo de la barra que falta completar (o no es un número) */
+.simbar .sb-field input.missing { border-color: var(--err); box-shadow: 0 0 0 1px var(--err); background: color-mix(in srgb, var(--err) 10%, var(--bg)); }
 .simbar .sb-line { font: 12px var(--mono); }
 /* Complex simulation (#241): el .control en solo lectura al pasar el mouse por el ícono */
 .simbar .sb-complex { position: relative; display: inline-flex; }

@@ -189,7 +189,7 @@ export function parseAnalysis(line: string): Analysis | null {
   return null;
 }
 
-const isNum = (s: string) => /^\{.+\}$/.test(s.trim()) || /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-zµμ]*$/i.test(s.trim());
+export const isNum = (s: string) => /^\{.+\}$/.test(s.trim()) || /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-zµμ]*$/i.test(s.trim());
 
 /** Errores del formulario (vacío = se puede aceptar) */
 export function validateAnalysis(a: Analysis): string[] {

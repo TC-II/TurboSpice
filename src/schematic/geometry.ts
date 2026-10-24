@@ -322,6 +322,12 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, sho
   for (const x of wires) if (x.d > WIRE_NEAR) out.push(wireOf(x));
   // las figuras, al final: sólo por su trazo, la última dibujada primero
   for (let i = doc.shapes.length - 1; i >= 0; i--) if (shapeDist(doc.shapes[i], p) <= tol) out.push({ kind: 'shape', index: i });
+  // una imagen de fondo se elige también por adentro, después de todo lo demás
+  for (let i = doc.shapes.length - 1; i >= 0; i--) {
+    const [x1, y1, x2, y2] = doc.shapes[i].coords;
+    if (doc.shapes[i].kind === 'IMAGE' && !out.some((r) => r.kind === 'shape' && r.index === i) && inBox(p, { x1: Math.min(x1, x2), y1: Math.min(y1, y2), x2: Math.max(x1, x2), y2: Math.max(y1, y2) }, 0))
+      out.push({ kind: 'shape', index: i });
+  }
   return out;
 }
 

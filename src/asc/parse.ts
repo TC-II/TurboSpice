@@ -13,7 +13,7 @@ import {
 } from './model.ts';
 import { t } from '../i18n/i18n.ts';
 
-const SHAPES = new Set<ShapeKind>(['LINE', 'RECTANGLE', 'CIRCLE', 'ARC']);
+const SHAPES = new Set<ShapeKind>(['LINE', 'RECTANGLE', 'CIRCLE', 'ARC', 'PATH', 'IMAGE']);
 
 const splitLines = (text: string) => text.split(/\r\n|\r|\n/);
 
@@ -45,6 +45,14 @@ function parseWindow(parts: string[]): [number, TextWindow] {
 function parseShape(kind: ShapeKind, line: string): Shape {
   // KIND Normal x1 y1 x2 y2 [... ARC: xs ys xe ye] [style]
   const toks = line.trim().split(/\s+/).slice(2);
+  if (kind === 'IMAGE') return { kind, coords: toks.slice(0, 4).map(num), data: toks.slice(4).join('') };
+  if (kind === 'PATH') {
+    // PATH Normal n x1 y1 … xn yn [style]
+    const n = 2 * num(toks.shift() ?? '0');
+    const shape: Shape = { kind, coords: toks.slice(0, n).map(num) };
+    if (toks.length > n) shape.style = toks.slice(n).join(' ');
+    return shape;
+  }
   const n = kind === 'ARC' ? 8 : 4;
   const shape: Shape = { kind, coords: toks.slice(0, n).map(num) };
   if (toks.length > n) shape.style = toks.slice(n).join(' ');

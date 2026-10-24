@@ -10,7 +10,7 @@ import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasCommand, biasParams, elementBias, netBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
-import type { Point, ShapeKind } from './asc/model.ts';
+import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
@@ -257,6 +257,23 @@ const userFileKind = (name: string): UserFile['kind'] | null =>
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
 let clipboardFallback = '';
+
+/**
+ * Imagen pegada → data URL y tamaño en unidades del esquemático (1 px = 1 unidad, el lado mayor
+ * a lo sumo 800). Las grandes se achican y pasan a JPEG para no inflar el archivo.
+ */
+async function clipboardImage(blob: Blob): Promise<{ data: string; w: number; h: number }> {
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const png = canvas.toDataURL('image/png');
+  const data = png.length > 600_000 ? canvas.toDataURL('image/jpeg', 0.85) : png;
+  const s = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+  return { data, w: Math.round(bmp.width * s), h: Math.round(bmp.height * s) };
+}
 
 /** Nombre de cada vista del panel de resultados (en el botón Resultados) */
 const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Errors'), meas: t('Measurements') };
@@ -622,7 +639,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, []);
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
-  const shapeTool = (shape: ShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
@@ -1878,6 +1895,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     warnShared();
   };
   const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
+  /** Puerto nuevo pedido desde el símbolo (un pin con otro nombre): etiqueta con puerto debajo de las otras */
+  const addPort = (name: string) => {
+    const fs = doc.flags;
+    const x = fs.length ? Math.min(...fs.map((f) => f.x)) : -128;
+    const y = (fs.length ? Math.max(...fs.map((f) => f.y)) : -64) + 64;
+    commit(addFlag(doc, { x, y }, name, 'BiDir'));
+  };
   /** Un .asy existente como símbolo del subcircuito que se edita (#199) */
   const adoptSymbolFor = (type: string) => {
     const asy = lib.symbolText(type);
@@ -1895,13 +1919,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
       return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
-  /** Puerto nuevo pedido desde el símbolo (un pin con otro nombre): etiqueta con puerto debajo de las otras */
-  const addPort = (name: string) => {
-    const fs = doc.flags;
-    const x = fs.length ? Math.min(...fs.map((f) => f.x)) : -128;
-    const y = (fs.length ? Math.max(...fs.map((f) => f.y)) : -64) + 64;
-    commit(addFlag(doc, { x, y }, name, 'BiDir'));
-  };
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
@@ -2167,6 +2184,22 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return !!c;
   };
   const paste = async () => {
+    // una imagen en el portapapeles se pega como fondo del esquemático (figura IMAGE, en base64)
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((ty) => ty.startsWith('image/'));
+        if (!type) continue;
+        const img = await clipboardImage(await item.getType(type));
+        const at = editor.current?.cursor() ?? { x: 0, y: 0 };
+        const shape = { kind: 'IMAGE' as const, coords: [at.x, at.y, at.x + img.w, at.y + img.h], data: img.data };
+        commit({ ...doc, shapes: [...doc.shapes, shape] });
+        setTool({ kind: 'select' });
+        setSelection([{ kind: 'shape', index: doc.shapes.length }]);
+        return;
+      }
+    } catch {
+      // sin permiso o sin API de imágenes: se sigue con el texto
+    }
     let text = '';
     try {
       text = await navigator.clipboard.readText();
@@ -2602,6 +2635,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     { label: t('Rectangle'), shortcut: 'K', onClick: shapeTool('RECTANGLE') },
     { label: t('Circle'), shortcut: 'O', onClick: shapeTool('CIRCLE') },
     { label: t('Arc'), shortcut: 'U', onClick: shapeTool('ARC') },
+    { label: t('Pencil (freehand)'), onClick: () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) }) },
+    { label: t('Paste image'), onClick: () => void paste() },
     'sep',
     { label: t('Line style…'), onClick: () => openLineStyle() },
   ];
@@ -2834,8 +2869,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'component', label: t('Component'), title: t('Component'), shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
         { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
         { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
+        ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
         { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
-        { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' },
+        { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' || tool.kind === 'pencil' },
         { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
     },
@@ -2869,7 +2905,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
                 const b = await plotPanel.current?.png();
                 if (b) download(`${exportBase()}.png`, b);
               },
-        ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
             },
             { label: t('View to .plt (LTspice)'), onClick: () => exportPlt() },
             { label: t('Import .plt view…'), shortcut: 'O', onClick: () => pltInput.current?.click() },
@@ -3129,6 +3164,8 @@ ${ltNetlistText(sim.built.lt)}
               onParams={(ps) => editSymbol(setSymParams(symText, ps))}
               onReset={() => editSymbol(setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))}
               onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
+              onWidth={setSymW}
+              onAddPort={addPort}
             />
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
@@ -3164,8 +3201,6 @@ ${ltNetlistText(sim.built.lt)}
             showGrid={showGrid}
             showLoose={showLoose}
             showSimCommand={showSimCommand}
-              onWidth={setSymW}
-              onAddPort={addPort}
             onHover={onHover}
             diff={historyDiff}
           />
@@ -3667,6 +3702,8 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
+          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? '')}
+          port={!!curSub}
           onClose={() => setDialog(null)}
           onApply={(name, io) => {
             setDialog(null);
@@ -3702,8 +3739,6 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
   return (
     <div className="hint-bar">
       <span className="hint-text">{text(hover)}</span>
-          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? '')}
-          port={!!curSub}
       {message && (
         <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
           {message}
@@ -3740,6 +3775,8 @@ function toolHint(tt: Tool): string {
       const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t('the arc (its ellipse\'s box)') }[tt.shape];
       return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
     }
+    case 'pencil':
+      return t('Drag to draw freehand · Esc to finish');
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':

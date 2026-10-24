@@ -67,6 +67,17 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
       return <ellipse className={className} cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} />;
     case 'ARC':
       return <path className={className} d={arcPath(c)} strokeDasharray={dash} />;
+    case 'PATH':
+      return <polyline className={className} points={c.join(' ')} strokeDasharray={dash} />;
+    case 'IMAGE': {
+      const [x, y, w, h] = [Math.min(c[0], c[2]), Math.min(c[1], c[3]), Math.abs(c[2] - c[0]), Math.abs(c[3] - c[1])];
+      return (
+        <g className={className}>
+          <image href={s.data} x={x} y={y} width={w} height={h} preserveAspectRatio="none" />
+          {className === 'sel' && <rect x={x} y={y} width={w} height={h} />}
+        </g>
+      );
+    }
   }
 }
 
@@ -244,7 +255,9 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
 
   return (
     <g className="schematic">
-      <g className="shapes">{doc.shapes.map((s, i) => <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
+      {/* imágenes pegadas: detrás de todo el esquemático */}
+      <g className="images">{doc.shapes.map((s, i) => s.kind === 'IMAGE' && <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
+      <g className="shapes">{doc.shapes.map((s, i) => s.kind !== 'IMAGE' && <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
         {doc.wires.map((w, i) => (
           <line

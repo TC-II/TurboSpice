@@ -34,7 +34,10 @@ export function shapeOutline(s: Shape): Point[] {
   switch (s.kind) {
     case 'LINE':
       return [{ x: c[0], y: c[1] }, { x: c[2], y: c[3] }];
+    case 'PATH':
+      return shapePoints(s);
     case 'RECTANGLE':
+    case 'IMAGE':
       return [{ x: c[0], y: c[1] }, { x: c[2], y: c[1] }, { x: c[2], y: c[3] }, { x: c[0], y: c[3] }, { x: c[0], y: c[1] }];
     case 'CIRCLE':
     case 'ARC': {

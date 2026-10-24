@@ -3,7 +3,7 @@
 import type { AscDoc, Shape, ShapeKind, TextWindow } from './model.ts';
 
 // Orden en que LTspice escribe los gráficos del esquemático
-const SHAPE_ORDER: ShapeKind[] = ['LINE', 'RECTANGLE', 'CIRCLE', 'ARC'];
+const SHAPE_ORDER: ShapeKind[] = ['IMAGE', 'LINE', 'RECTANGLE', 'CIRCLE', 'ARC', 'PATH'];
 
 const attrOut = (v: string) => (v === '' ? '""' : v);
 
@@ -12,7 +12,9 @@ export function windowLine(idx: number, w: TextWindow): string {
 }
 
 export function shapeLine(s: Shape): string {
-  return [s.kind, 'Normal', ...s.coords, ...(s.style ? [s.style] : [])].join(' ');
+  if (s.kind === 'IMAGE') return ['IMAGE', 'Normal', ...s.coords, s.data ?? ''].join(' ');
+  const count = s.kind === 'PATH' ? [s.coords.length / 2] : [];
+  return [s.kind, 'Normal', ...count, ...s.coords, ...(s.style ? [s.style] : [])].join(' ');
 }
 
 export function serializeAsc(doc: AscDoc): string {

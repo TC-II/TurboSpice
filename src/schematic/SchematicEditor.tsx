@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
 import { flushSync } from 'react-dom';
 import type { CircuitDiff } from '../project/diff.ts';
-import { GRID, type AscDoc, type Orient, type Point, type Shape, type ShapeKind, type Wire } from '../asc/model.ts';
+import { GRID, type AscDoc, type Orient, type Point, type Shape, type DrawnShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { addFlag, addText, addWire, deleteItems, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
@@ -69,7 +69,9 @@ export type Tool =
    * `pts`: los clicks hechos. Línea, rectángulo y círculo (su caja) llevan 2; el arco, 4: la
    * caja de la elipse, el punto de inicio y el de fin (va en sentido antihorario).
    */
-  | { kind: 'shape'; shape: ShapeKind; pts: Point[]; style?: string }
+  | { kind: 'shape'; shape: DrawnShapeKind; pts: Point[]; style?: string }
+  /** lápiz: anotaciones a mano alzada (figura PATH), arrastrando con el botón izquierdo */
+  | { kind: 'pencil'; style?: string }
   /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
   | { kind: 'zoom'; prev: Tool };
 
@@ -158,6 +160,8 @@ type Drag =
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
   | { mode: 'zoom'; start: Point }
+  /** trazo del lápiz en curso */
+  | { mode: 'pencil'; pts: Point[] }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
   | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
   /** desplazar un tramo de cable en forma perpendicular */
@@ -235,7 +239,7 @@ function freeEnd(doc: AscDoc, p: Point): boolean {
  * Figura a partir de los clicks de la herramienta: 'more' si faltan clicks, 'invalid' si el
  * último no sirve (un punto repetido, una caja sin ancho o alto).
  */
-export function shapeFromClicks(kind: ShapeKind, pts: Point[], style?: string): Shape | 'more' | 'invalid' {
+export function shapeFromClicks(kind: DrawnShapeKind, pts: Point[], style?: string): Shape | 'more' | 'invalid' {
   const [a, b, start, end] = pts;
   if (!b) return 'more';
   if (b.x === a.x && b.y === a.y) return 'invalid';
@@ -735,6 +739,9 @@ export function SchematicEditor(props: Props) {
         setTool({ ...tool, refs, start: g });
         return;
       }
+      case 'pencil':
+        setDrag({ mode: 'pencil', pts: [{ x: Math.round(p.x), y: Math.round(p.y) }] });
+        return;
       case 'shape': {
         const at = arcEnd(tool, p) ?? g;
         const s = shapeFromClicks(tool.shape, [...tool.pts, at], tool.style);
@@ -873,6 +880,12 @@ export function SchematicEditor(props: Props) {
       setPreview(moveItems(doc, tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, lib));
     }
     if (!drag) return;
+    if (drag.mode === 'pencil') {
+      // un punto cada ~2 px de pantalla: el trazo sigue la mano sin llenarse de puntos
+      const last = drag.pts[drag.pts.length - 1];
+      if (Math.hypot(p.x - last.x, p.y - last.y) * view.scale >= 2) setDrag({ ...drag, pts: [...drag.pts, { x: Math.round(p.x), y: Math.round(p.y) }] });
+      return;
+    }
     if (drag.mode === 'pan') {
       if (drag.right && !drag.moved) {
         if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 4) return;
@@ -922,6 +935,10 @@ export function SchematicEditor(props: Props) {
       }
     }
     if (!drag) return;
+    if (drag.mode === 'pencil' && drag.pts.length > 1) {
+      const style = tool.kind === 'pencil' ? tool.style : undefined;
+      commit({ ...doc, shapes: [...doc.shapes, { kind: 'PATH', coords: drag.pts.flatMap((q) => [q.x, q.y]), ...(style ? { style } : {}) }] });
+    }
     if (drag.mode === 'pan') commitView();
     if (drag.mode === 'pan' && drag.right && !drag.moved) {
       // en Windows el menú contextual llega después de soltar, cuando ya puede haber un diálogo
@@ -1146,6 +1163,9 @@ export function SchematicEditor(props: Props) {
         diff={diff}
       />
       <g className="schematic placing">{ghost}</g>
+      {drag?.mode === 'pencil' && (
+        <g className="schematic"><g className="shapes"><polyline points={drag.pts.map((q) => `${q.x},${q.y}`).join(' ')} /></g></g>
+      )}
       {tool.kind === 'wire' && tool.start && (
         // el cable que se está trazando, igual a como va a quedar (horizontal/vertical, o recto con Ctrl)
         <g className="wires drawing">
@@ -1187,7 +1207,7 @@ export function SchematicEditor(props: Props) {
         // cursor de borrar: una cruz chica a 45° que sigue al mouse (sin grilla)
         <path className="delete-cursor" d={`M ${cursor.x - 5 / view.scale} ${cursor.y - 5 / view.scale} l ${10 / view.scale} ${10 / view.scale} M ${cursor.x + 5 / view.scale} ${cursor.y - 5 / view.scale} l ${-10 / view.scale} ${10 / view.scale}`} />
       )}
-      {tool.kind !== 'select' && tool.kind !== 'place' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
+      {tool.kind !== 'select' && tool.kind !== 'place' && tool.kind !== 'probe' && tool.kind !== 'pick' && tool.kind !== 'delete' && tool.kind !== 'move' && tool.kind !== 'pencil' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
     </svg>
     {tip && (
       <div

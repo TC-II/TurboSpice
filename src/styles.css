@@ -1122,3 +1122,6 @@ button.hier-tab { padding-right: 10px; }
   .sim-row .simbar .sb-row { flex-wrap: nowrap; }
   .sim-row .simbar .sb-rows { flex: none; }
 }
+.images > .sel rect { stroke: var(--sch-sel); stroke-width: 2.2; stroke-dasharray: 6 4; }
+.images image { opacity: 0.85; }
+svg.editor.tool-pencil { cursor: crosshair; }

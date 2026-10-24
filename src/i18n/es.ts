@@ -173,6 +173,11 @@ export const es: Record<string, string> = {
   'Apply': 'Aplicar',
   'Apply code': 'Aplicar código',
   'Arc': 'Arco',
+  'Pencil (freehand)': 'Lápiz (a mano alzada)',
+  'Paste image': 'Pegar imagen',
+  'Drag to draw freehand · Esc to finish': 'Arrastrá para dibujar a mano alzada · Esc termina',
+  'Freehand': 'Trazo a mano alzada',
+  'Image': 'Imagen',
   'at ({x}, {y})': 'en ({x}, {y})',
   'At the end': 'Al final',
   'automatic': 'automático',
@@ -1554,7 +1559,6 @@ export const es: Record<string, string> = {
   'Run history of {name}': 'Historial de corridas de {name}',
   '↑ ↓ to go through the testbenches': '↑ ↓ para recorrer los testbenches',
   'Run|verb': 'Correr',
-};
   'Subcircuit port': 'Puerto del subcircuito',
   'No (internal net)': 'No (red interna)',
   'Input': 'Entrada',
@@ -1572,3 +1576,4 @@ export const es: Record<string, string> = {
   'Remove the selected shape': 'Borrar la figura seleccionada',
   'Remove the selected shape (Del)': 'Borrar la figura seleccionada (Supr)',
   'Name of the new port': 'Nombre del puerto nuevo',
+};

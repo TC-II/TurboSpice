@@ -20,14 +20,15 @@ describe('escalas del visor', () => {
     expect(zoomAbout(2, 4, 3, 2)).toEqual([1, 5]);
   });
 
-  it('panBy: desplaza sin cambiar el ancho, en décadas y sin salirse de los datos', () => {
-    expect(panBy(2, 4, 0.5, 0, 10)).toEqual([3, 5]);
-    expect(panBy(2, 4, -0.5, 0, 10)).toEqual([1, 3]);
-    expect(panBy(7, 9, 5, 0, 10)).toEqual([8, 10]);
-    expect(panBy(1, 3, -5, 0, 10)).toEqual([0, 2]);
-    const [lo, hi] = panBy(10, 100, 1, 1, 1e4, true);
+  it('panBy: desplaza en fracciones del ancho, lineal, en décadas y con límites', () => {
+    expect(panBy(0, 10, 0.5)).toEqual([5, 15]);
+    expect(panBy(0, 10, -0.2)).toEqual([-2, 8]);
+    const [lo, hi] = panBy(10, 1e3, 0.5, true);
     expect(lo).toBeCloseTo(100);
-    expect(hi).toBeCloseTo(1e3);
+    expect(hi).toBeCloseTo(1e4);
+    expect(panBy(2, 6, -1, false, [0, 10])).toEqual([0, 4]);
+    expect(panBy(2, 6, 2, false, [0, 10])).toEqual([6, 10]);
+    expect(panBy(-5, 15, 0.3, false, [0, 10])).toEqual([0, 10]);
   });
 
   it('boxAxes: recuadro, casi horizontal, casi vertical y click', () => {

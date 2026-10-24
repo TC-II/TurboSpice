@@ -25,15 +25,21 @@ export function zoomAbout(min: number, max: number, at: number, k: number, log =
 }
 
 /**
- * Rango [min, max] desplazado una fracción `f` de su ancho (en décadas si es log), sin cambiar
- * el ancho y sin salirse de [x0, x1]
+ * Rango [min, max] desplazado una fracción `f` de su ancho (paneo; en escala log, en décadas).
+ * Con `bounds` no sale de esos límites: se frena en el borde manteniendo el ancho.
  */
-export function panBy(min: number, max: number, f: number, x0: number, x1: number, log = false): Range {
+export function panBy(min: number, max: number, f: number, log = false, bounds?: Range): Range {
   const t = (v: number) => (log ? Math.log10(v) : v);
-  const [a, b, lo, hi] = [t(min), t(max), t(x0), t(x1)];
-  const d = Math.min(Math.max((b - a) * f, lo - a), hi - b);
-  const r: Range = [a + d, b + d];
-  return log ? [10 ** r[0], 10 ** r[1]] : r;
+  let [a, b] = [t(min), t(max)];
+  const d = (b - a) * f;
+  [a, b] = [a + d, b + d];
+  if (bounds) {
+    const [lo, hi] = [t(bounds[0]), t(bounds[1])];
+    if (b - a >= hi - lo) [a, b] = [lo, hi];
+    else if (a < lo) [a, b] = [lo, lo + (b - a)];
+    else if (b > hi) [a, b] = [hi - (b - a), hi];
+  }
+  return log ? [10 ** a, 10 ** b] : [a, b];
 }
 
 /** Lo que pide un recuadro arrastrado sobre un gráfico de `w`×`h` px (cualquier unidad común) */

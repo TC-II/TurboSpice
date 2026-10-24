@@ -75,6 +75,8 @@ export interface PzMark {
 type Range = [number, number];
 /** distancia (px) a la línea de un cursor para tomarlo y arrastrarlo */
 const GRAB = 6;
+// px que tiene que moverse el botón derecho para panear en vez de hacer clic
+const PAN_SLOP = 4;
 /** px que debe moverse un arrastre en el eje menos movido para contar como recuadro en X e Y */
 const DRAG_UNI = 20;
 
@@ -752,26 +754,82 @@ function PaneView(props: {
       return best;
     };
     let dragging: CursorKey | null = null;
+    // paneo con el botón del medio o el derecho: el derecho, en modo cursor, pone el cursor B
+    // si se suelta sin moverse más de PAN_SLOP px (clic); si se mueve, panea
+    let pan: { id: number; x: number; y: number; sx: Range; sy: Range; moved: boolean; click: PointerEvent | null } | null = null;
+    let panned = false; // para no abrir el menú contextual tras un paneo con el botón derecho
+    const panStart = (e: PointerEvent) => {
+      if (e.button !== 1 && e.button !== 2) return false;
+      const { min: x0, max: x1 } = u.scales.x;
+      const { min: y0, max: y1 } = u.scales.y;
+      if (x0 == null || x1 == null || y0 == null || y1 == null) return false;
+      e.preventDefault();
+      el.focus({ preventScroll: true });
+      const click = e.button === 2 && live.current.cursorMode && !live.current.zoomMode ? e : null;
+      pan = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: [x0, x1], sy: [y0, y1], moved: false, click };
+      panned = false;
+      root.setPointerCapture(e.pointerId);
+      return true;
+    };
+    const panMove = (e: PointerEvent) => {
+      if (!pan) return;
+      const dx = e.clientX - pan.x;
+      const dy = e.clientY - pan.y;
+      if (!pan.moved && Math.hypot(dx, dy) < PAN_SLOP) return;
+      pan.moved = panned = true;
+      over.style.cursor = 'grabbing';
+      const r = over.getBoundingClientRect();
+      const x0 = data.x[0];
+      const x1 = data.x[data.x.length - 1];
+      if (r.width > 0 && dx) {
+        const [lo, hi] = panBy(pan.sx[0], pan.sx[1], -dx / r.width, data.log, [x0, x1]);
+        live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
+      }
+      if (r.height > 0 && dy) {
+        const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
+      }
+    };
+    const panEnd = (e: PointerEvent) => {
+      if (!pan) return false;
+      const { moved, click } = pan;
+      pan = null;
+      over.style.cursor = '';
+      if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
+      if (!moved && click) {
+        // clic derecho sin arrastre: lo de siempre (cursor B)
+        const px = posX(click);
+        const grab = grabbed(click);
+        const k = grab ?? cursorForClick(cursorsRef.current, valX(click), true, (v) => Math.abs(u.valToPos(v, 'x') - px));
+        live.current.onCursor(grab ? { sel: grab } : { [k]: valX(click), sel: k });
+      }
+      return true;
+    };
     const down = (e: PointerEvent) => {
-      if (!live.current.cursorMode || live.current.zoomMode || (e.button !== 0 && e.button !== 2)) return;
+      if (panStart(e)) return;
+      if (!live.current.cursorMode || live.current.zoomMode || e.button !== 0) return;
       e.preventDefault();
       el.focus({ preventScroll: true });
       const grab = grabbed(e);
       const px = posX(e);
-      dragging = grab ?? cursorForClick(cursorsRef.current, valX(e), e.button === 2 || e.shiftKey, (v) => Math.abs(u.valToPos(v, 'x') - px));
+      dragging = grab ?? cursorForClick(cursorsRef.current, valX(e), e.shiftKey, (v) => Math.abs(u.valToPos(v, 'x') - px));
       root.setPointerCapture(e.pointerId);
       live.current.onCursor(grab ? { sel: grab } : { [dragging]: valX(e), sel: dragging });
     };
     const move = (e: PointerEvent) => {
+      if (pan) return panMove(e);
       if (dragging) live.current.onCursor({ [dragging]: valX(e) });
       else over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : '';
     };
     const up = (e: PointerEvent) => {
-      if (!dragging) return;
+      if (panEnd(e) || !dragging) return;
       dragging = null;
       if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
     };
-    const context = (e: MouseEvent) => live.current.cursorMode && e.preventDefault();
+    const context = (e: MouseEvent) => {
+      if (live.current.cursorMode || panned) e.preventDefault();
+      panned = false;
+    };
     // rueda: zoom en X alrededor del cursor; sobre el eje Y (o con Shift), zoom en Y de este panel;
     // Ctrl+rueda: desplaza en X
     const wheel = (e: WheelEvent) => {
@@ -785,7 +843,7 @@ function PaneView(props: {
         if (min == null || max == null) return;
         const x0 = data.x[0];
         const x1 = data.x[data.x.length - 1];
-        const [lo, hi] = panBy(min, max, (e.deltaY || e.deltaX) * 0.001, x0, x1, data.log);
+        const [lo, hi] = panBy(min, max, (e.deltaY || e.deltaX) * 0.001, data.log, [x0, x1]);
         if (lo !== min || hi !== max) live.current.onWheelZoom(lo <= x0 && hi >= x1 ? null : [lo, hi]);
         return;
       }

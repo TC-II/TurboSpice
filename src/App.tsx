@@ -2949,7 +2949,7 @@ ${ltNetlistText(sim.built.lt)}
             >
               <Icon name="probe" />
             </button>
-            <button className={showNets ? 'active' : ''} aria-label={t('Nets')} aria-keyshortcuts="Alt+N" title={t('Show the names of all the nets, without changing the schematic') + ' (Alt+N)'} disabled={!hasNets} onClick={() => setShowNets((v) => !v)}>
+            <button className={showNets && hasNets ? 'active' : ''} aria-label={t('Nets')} aria-keyshortcuts="Alt+N" title={t('Show the names of all the nets, without changing the schematic') + ' (Alt+N)'} disabled={!hasNets} onClick={() => setShowNets((v) => !v)}>
               <Icon name="nets" />
             </button>
             <button

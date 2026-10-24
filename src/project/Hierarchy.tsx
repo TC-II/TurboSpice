@@ -45,7 +45,7 @@ export type BenchItem = 'sim' | 'schematic' | 'params' | 'history' | 'study';
 
 /** Tipos de módulo: glifo, etiqueta de la fila, nombre en el menú «+ New» y ayuda */
 const KIND = {
-  subckt: { glyph: '▭', label: () => t('subcircuit'), name: () => t('Subcircuit'), title: () => t('Subcircuit: schematic and its symbol') },
+  subckt: { glyph: '▭', label: () => t('subcir'), name: () => t('Subcircuit'), title: () => t('Subcircuit: schematic and its symbol') },
   model: { glyph: '◇', label: () => t('model'), name: () => t('Model'), title: () => t('Model: netlist (.subckt or .model) and its symbol') },
   verilog: { glyph: '⟨⟩', label: () => t('verilog'), name: () => t('Verilog'), title: () => t('Verilog: synthesizable code, turned into a digital block with its symbol') },
 };

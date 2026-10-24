@@ -1650,5 +1650,6 @@ export const es: Record<string, string> = {
   'Verilog': 'Verilog',
   'Verilog: synthesizable code, turned into a digital block with its symbol': 'Verilog: código sintetizable que se convierte en un bloque digital con su símbolo',
   'New module': 'Módulo nuevo',
+  'subcir': 'subcir',
   'None yet: create one with «+ New» or import it.': 'Todavía no hay: creá uno con «+ Nuevo» o importalo.',
 };

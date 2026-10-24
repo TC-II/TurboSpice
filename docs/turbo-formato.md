@@ -167,6 +167,16 @@ deshacer (§5).
 - En el `.asy` BLOCK de un subcircuito, los parámetros van en `SYMATTR SpiceLine` y su rótulo en
   `WINDOW 39 x y Top 2` (formato estándar de LTspice, sin campos nuevos). El Editor de subcircuitos
   lo dibuja como en la instancia y permite moverlo; las instancias nuevas usan esa posición.
+- **Módulos «Modelo»** (editor de módulos, panel del proyecto → Módulos → «+ Modelo»): un archivo
+  `"kind": "model"` con `"module": "model"` (`NOMBRE.lib`, la netlist con un `.subckt` o un `.model`)
+  más su símbolo `NOMBRE.asy` (`"kind": "symbol"`), que lo usa con `SYMATTR ModelFile NOMBRE.lib` y
+  lleva `Prefix`, `Value`, `SpiceModel`, `SpiceLine`… y los pines con `PinName`/`SpiceOrder`, como
+  un par `.sub` + `.asy` de TCLib. Sin `"module"` es un archivo de modelos común. Ejemplo:
+
+  ```json
+  { "name": "MYAMP.lib", "kind": "model", "module": "model", "text": ".subckt MYAMP in out\n…\n.ends MYAMP\n" },
+  { "name": "MYAMP.asy", "kind": "symbol", "text": "Version 4\nSymbolType CELL\n…\nSYMATTR ModelFile MYAMP.lib\n…" }
+  ```
 
 ## 5. Deshacer
 - Una pila de deshacer **por simulación** (y otra para la base de la variante). Al cambiar de

@@ -424,6 +424,7 @@ export const es: Record<string, string> = {
   'Google Identity Services didn\'t load': 'Google Identity Services no cargó',
   'Google sign-in isn\'t configured': 'El inicio de sesión con Google no está configurado',
   'Grid': 'Grilla',
+  'Show or hide the grid': 'Mostrar u ocultar la grilla',
   'ground': 'tierra',
   'Ground': 'Tierra',
   'Ground (GND)': 'Tierra (GND)',

@@ -435,20 +435,22 @@ const cb = await page.locator('.pane-chart').first().boundingBox();
   const cp = await page.locator('.pane-chart').first().boundingBox();
   await page.mouse.move(cp.x + cp.width * 0.3, cp.y + cp.height / 2, { steps: 3 });
   await page.waitForTimeout(150);
-  const h1 = await page.locator('.readout th.preview').textContent();
+  const h1 = await page.locator('.readout td.preview').textContent();
   await page.mouse.move(cp.x + cp.width * 0.6, cp.y + cp.height / 2, { steps: 3 });
   await page.waitForTimeout(150);
-  const h2 = await page.locator('.readout th.preview').textContent();
-  check(/^A \(/.test(h1) && h1 !== h2, `cursor A preliminar sigue al mouse (${h1} → ${h2})`);
+  const h2 = await page.locator('.readout td.preview').textContent();
+  check(!!h1 && h1 !== h2, `cursor A preliminar sigue al mouse (${h1} → ${h2})`);
 }
 await page.mouse.click(cb.x + cb.width * 0.3, cb.y + cb.height / 2);
 await page.waitForTimeout(400); // que no cuente como doble click
 // al aparecer la tabla de cursores el gráfico se achica: volver a medirlo
 const cb2 = await page.locator('.pane-chart').first().boundingBox();
-await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2, { button: 'right' });
+// #234: el segundo click (izquierdo) fija el B
+await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2);
 await page.waitForTimeout(100);
 const head = await page.locator('.readout thead').textContent();
-check(/A \(.+\)/.test(head) && /B \(.+\)/.test(head) && /Δx = /.test(await page.locator('.readout tr.dx').textContent()), `cursores A y B con Δx (${head})`);
+const dxRow = await page.locator('.readout tr.dx').textContent();
+check(/Trace|Traza/.test(head) && /A − B/.test(head) && !/\(/.test(head) && /Hz/.test(dxRow), `cursores A y B con Δ y 1/Δ en la fila del tiempo (${head} | ${dxRow})`);
 await page.screenshot({ path: `${OUT}/plot-panel.png` });
 // #30: el gráfico no se recrea por estado ajeno a los datos (marca en el canvas de uPlot)
 const canvas = page.locator('.pane-chart canvas').first();
@@ -457,11 +459,10 @@ await page.locator('.trace-chip').first().hover();
 await page.locator('.pane-chart').first().hover();
 await page.locator('.pane').first().click({ position: { x: 5, y: 5 } });
 check((await canvas.evaluate((c) => c.dataset.e2e).catch(() => undefined)) === 'mismo', 'el gráfico no se recrea al pasar por una traza ni al activar el panel');
-// clicks seguidos y rápidos (sin esperar el doble click) colocan siempre el cursor A
+// clicks seguidos y rápidos (sin esperar el doble click) cerca del A mueven siempre el A (el más cercano)
 // (el lugar del valor queda reservado: sin cursor dice "—")
 const cursorHead = async (k) => {
-  const re = k === 'A' ? /A \(([^)]+)\)/ : /B \(([^)]+)\)/;
-  const v = re.exec(await page.locator('.readout thead').textContent())?.[1]?.trim();
+  const v = (await page.locator(`.readout tr.dx td.x${k.toLowerCase()}`).textContent())?.trim();
   return v && v !== '—' ? v : undefined;
 };
 const headA = () => cursorHead('A');
@@ -471,7 +472,7 @@ let placed = 0;
 let lastA = await headA();
 for (let k = 0; k < 20; k++) {
   const r = await page.locator('.pane-chart').first().boundingBox();
-  await page.mouse.click(r.x + r.width * (0.15 + 0.035 * k), r.y + r.height * 0.4);
+  await page.mouse.click(r.x + r.width * (0.1 + 0.01 * k), r.y + r.height * 0.4);
   const now = await headA();
   if (now && now !== lastA) placed++;
   lastA = now;
@@ -479,7 +480,7 @@ for (let k = 0; k < 20; k++) {
 check(placed === 20 && (await headB()) === bBefore, `20 clicks seguidos mueven siempre el cursor A (${placed}/20) y no el B`);
 // arrastrar el cursor B actualiza la tabla en vivo
 const rb = await page.locator('.pane-chart').first().boundingBox();
-await page.mouse.click(rb.x + rb.width * 0.8, rb.y + rb.height / 2, { button: 'right' });
+await page.mouse.click(rb.x + rb.width * 0.8, rb.y + rb.height / 2); // el más cercano: B
 const b0 = await headB();
 const dx0 = await page.locator('.readout tr.dx').textContent();
 await page.mouse.move(rb.x + rb.width * 0.8, rb.y + rb.height / 2);

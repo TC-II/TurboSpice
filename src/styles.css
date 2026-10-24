@@ -1150,9 +1150,14 @@ button.hier-tab { padding-right: 10px; }
 .ctx-menu button.ctx-primary { margin-top: 4px; text-align: center; background: var(--accent); color: #fff; font-weight: 600; }
 .ctx-menu button.ctx-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); }
 .ctx-menu button.ctx-primary:disabled { background: var(--bg-alt); color: var(--fg-muted); }
-.ctx-edit { display: flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 13px; }
+.ctx-edit { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; font-size: 13px; }
+.ctx-edit label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .ctx-edit span { font-family: var(--mono); white-space: nowrap; }
 .ctx-edit input { flex: 1; min-width: 0; font: 13px var(--mono); }
+.ctx-menu button.ctx-ok { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; background: var(--accent); color: #fff; }
+.ctx-menu button.ctx-ok:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
+/* menú de un valor (R, L, C): una caja angosta */
+.ctx-menu.ctx-quick { width: 140px; min-width: 0; max-width: none; }
 .tree-row.tree-var .tree-name { font-size: 12px; }
 .tree-row.tree-var code { font: 11.5px var(--mono); color: var(--fg); }
 .tree-row.tree-var .tree-meta { font-family: var(--mono); }

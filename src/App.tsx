@@ -1698,7 +1698,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             !canPropagate
               ? t('Propagate {inst} across the other testbenches of the workbench', { inst })
               : t('Propagate {inst}={value} across «{group}»', { inst, value: v, group }),
-          title: t('Copies its value and parameters to the component with the same name in the other testbenches of the workbench'),
+          short: t('Propagate'),
           disabled: !canPropagate,
           primary: true,
           onClick: (edited) => {

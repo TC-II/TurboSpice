@@ -44,6 +44,7 @@ const P: Record<string, ReactNode> = {
   rotate: <path d="M15.5 8.5A6 6 0 1 0 14 14M15.5 3.5v5h-5" />,
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,
+  check: <path d="M4 10.5l4 4 8-9" />,
   // grilla: 4×4 puntitos
   grid: <path d="M4 4h.01M8 4h.01M12 4h.01M16 4h.01M4 8h.01M8 8h.01M12 8h.01M16 8h.01M4 12h.01M8 12h.01M12 12h.01M16 12h.01M4 16h.01M8 16h.01M12 16h.01M16 16h.01" />,
   nets: capsule('NET'),

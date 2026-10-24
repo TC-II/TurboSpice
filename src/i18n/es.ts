@@ -425,6 +425,7 @@ export const es: Record<string, string> = {
   'Google sign-in isn\'t configured': 'El inicio de sesión con Google no está configurado',
   'Grid': 'Grilla',
   'Show or hide the grid': 'Mostrar u ocultar la grilla',
+  'Propagate': 'Propagar',
   'ground': 'tierra',
   'Ground': 'Tierra',
   'Ground (GND)': 'Tierra (GND)',

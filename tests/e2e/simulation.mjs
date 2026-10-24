@@ -250,7 +250,6 @@ await page.locator('.pick-banner').getByRole('button', { name: 'Cancelar' }).cli
 // un testbench nuevo está vacío y sin simulación: Simular despliega el menú para elegir el tipo
 await openPanel();
 await page.locator('.project-tree .tree-group .tree-add').first().click();
-await page.getByRole('button', { name: 'Aceptar' }).click();
 check((await page.locator('svg.editor .symbols > g').count()) === 0 && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'el testbench nuevo arranca vacío y sin simulación');
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 check(await page.getByRole('menu', { name: 'Nueva simulación' }).isVisible(), 'sin simulación, Simular despliega el menú');

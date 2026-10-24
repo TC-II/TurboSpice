@@ -5,7 +5,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { GRID } from '../asc/model.ts';
 import { Icon, type IconName } from '../ui/icons.tsx';
-import { addPin, addShape, assignPin, formatParamList, movePin, removeShape, resizeBody, setShape, symBody, symParams, symPins, symShapes, type ShapeKind } from './symbolEdit.ts';
+import { AlignedText } from '../schematic/SchematicCanvas.tsx';
+import { addPin, addShape, assignPin, formatParamList, moveParamWindow, movePin, removeShape, resizeBody, setShape, symBody, symParamWindow, symParams, symPins, symShapes, type ShapeKind } from './symbolEdit.ts';
 import { t } from '../i18n/i18n.ts';
 
 type Tool = 'edit' | 'pin' | ShapeKind;
@@ -19,6 +20,8 @@ type Drag =
   | { kind: 'end'; line: number; end: 0 | 1 }
   /** la figura entera, desde donde se la agarró */
   | { kind: 'shape'; line: number; from: Pt; orig: Quad }
+  /** el rótulo de los parámetros (WINDOW 39), desde donde se lo agarró */
+  | { kind: 'param'; from: Pt; orig: Pt }
   /** dibujando una figura nueva */
   | { kind: 'draw'; shape: ShapeKind; from: Pt; to: Pt }
   /** desplazando la vista (botón del medio o derecho) */
@@ -71,6 +74,9 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset, o
   const pins = useMemo(() => symPins(live), [live]);
   const shapes = useMemo(() => symShapes(live), [live]);
   const body = symBody(live);
+  // los parámetros como se verán en la instancia colocada: el SpiceLine en su WINDOW 39
+  const paramWin = symParamWindow(live);
+  const paramText = formatParamList(symParams(live));
   const bodyLine = shapes.find((s) => s.kind === 'RECTANGLE')?.line;
   useEffect(() => setSel((v) => (v !== null && shapes.some((s) => s.line === v) ? v : null)), [shapes]);
   // vista: lo que ocupa el símbolo. Fija mientras se arrastra y mientras el dibujo entre, para que
@@ -188,6 +194,10 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset, o
         if (!s) return tt;
         return setShape(tt, d.line, d.end ? [s.coords[0], s.coords[1], p.x, p.y] : [p.x, p.y, s.coords[2], s.coords[3]]);
       });
+    } else if (d.kind === 'param') {
+      // en la grilla de los rótulos del esquemático (8)
+      const p = toDoc(e, 1);
+      setLive((tt) => moveParamWindow(tt, snapTo(d.orig.x + p.x - d.from.x, 8), snapTo(d.orig.y + p.y - d.from.y, 8)));
     } else if (d.kind === 'shape') {
       const p = toDoc(e, 1);
       const [dx, dy] = [p.x - d.from.x, p.y - d.from.y];
@@ -435,6 +445,21 @@ export function SymbolEditor({ name, text, ports, onChange, onParams, onReset, o
                   );
                 }),
               ))}
+        {paramWin && paramText && (
+          <g
+            className="sym sym-param"
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              aside.current?.focus({ preventScroll: true });
+              start({ kind: 'param', from: toDoc(e, 1), orig: { x: paramWin.x, y: paramWin.y } })(e);
+            }}
+          >
+            <AlignedText x={paramWin.x} y={paramWin.y} align={paramWin.align} size={paramWin.size} className="win">
+              {paramText}
+            </AlignedText>
+            <title>{t('Parameters as shown on each instance: drag to move them')}</title>
+          </g>
+        )}
         {askPin && <rect className="sym-pin-new" x={askPin.x - 5} y={askPin.y - 5} width={10} height={10} />}
         {pins.map((p, i) => {
           const l = label(p);

@@ -140,7 +140,9 @@ function pwlPoints(nums: string[]): [string, string][] | null {
 
 /** Saca los parámetros vacíos del final y completa con 0 los vacíos del medio */
 function argList(args: string[]): string {
-  const a = args.map((x) => x.trim());
+  // Array.from recorre también los huecos (args puede venir disperso o con undefined desde la
+  // ventana): con .map se saltaban y el join dejaba "", corriendo los parámetros posicionales
+  const a = Array.from(args, (x) => (x ?? '').trim());
   while (a.length && !a[a.length - 1]) a.pop();
   return a.map((x) => x || '0').join(' ');
 }
@@ -177,7 +179,7 @@ export function writeSource(spec: SourceSpec): { Value: string; Value2: string |
 
 /** "4k7" → 4700, "10u" → 1e-5, "1Meg" → 1e6; NaN si no es un número (p. ej. una expresión) */
 export function spiceNumber(s: string): number {
-  const t = s.trim().replace(/[µμ]/g, 'u');
+  const t = (s ?? '').trim().replace(/[µμ]/g, 'u');
   return parseSpiceNumber(fromRkm(t) ?? t);
 }
 
@@ -227,7 +229,7 @@ export function solvePulse(
 // Valor de la forma de onda en el tiempo (vista previa, en JS)
 
 export function waveAt(spec: SourceSpec, t: number): number {
-  const a = spec.args.map(spiceNumber).map((x) => (isFinite(x) ? x : 0));
+  const a = Array.from(spec.args, (s) => spiceNumber(s ?? '')).map((x) => (isFinite(x) ? x : 0));
   switch (spec.kind) {
     case 'dc': {
       const v = spiceNumber(spec.dc);

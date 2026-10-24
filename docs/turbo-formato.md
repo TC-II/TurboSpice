@@ -160,6 +160,16 @@ deshacer (§5).
   (`UserFile`, IndexedDB) → librería de TurboSpice.
 - Si al importar llega un archivo con el mismo nombre y **otro contenido**, se pregunta qué hacer:
   reemplazar, mantener el existente o renombrar el nuevo.
+- **Módulos «Modelo»** (editor de módulos, panel del proyecto → Módulos → «+ Modelo»): un archivo
+  `"kind": "model"` con `"module": "model"` (`NOMBRE.lib`, la netlist con un `.subckt` o un `.model`)
+  más su símbolo `NOMBRE.asy` (`"kind": "symbol"`), que lo usa con `SYMATTR ModelFile NOMBRE.lib` y
+  lleva `Prefix`, `Value`, `SpiceModel`, `SpiceLine`… y los pines con `PinName`/`SpiceOrder`, como
+  un par `.sub` + `.asy` de TCLib. Sin `"module"` es un archivo de modelos común. Ejemplo:
+
+  ```json
+  { "name": "MYAMP.lib", "kind": "model", "module": "model", "text": ".subckt MYAMP in out\n…\n.ends MYAMP\n" },
+  { "name": "MYAMP.asy", "kind": "symbol", "text": "Version 4\nSymbolType CELL\n…\nSYMATTR ModelFile MYAMP.lib\n…" }
+  ```
 
 ## 5. Deshacer
 - Una pila de deshacer **por simulación** (y otra para la base de la variante). Al cambiar de

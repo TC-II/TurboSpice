@@ -25,6 +25,8 @@ export interface ProjectFile {
   name: string;
   kind: 'symbol' | 'model' | 'schematic' | 'verilog';
   text: string;
+  /** archivo de modelos que es un módulo «Modelo» (con su símbolo <nombre>.asy) del editor de módulos */
+  module?: 'model';
 }
 
 /** Una vez que se simuló: el circuito exacto (inmutable) */
@@ -319,7 +321,10 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
     }));
 
   const files: ProjectFile[] = Array.isArray(raw.files)
-    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog'))
+    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog')).map((f) => {
+        const { module, ...rest } = f;
+        return module === 'model' && f.kind === 'model' ? { ...rest, module } : rest;
+      })
     : [];
   const variants: Variant[] = raw.variants.map((vr: unknown, vi: number): Variant => {
     if (!isObj(vr)) throw new Error(t('invalid .turbo: malformed variant'));

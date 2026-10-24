@@ -91,6 +91,8 @@ import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { addModelModule, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
+import { ModelEditor } from './project/ModelEditor.tsx';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
@@ -394,7 +396,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const v = lsGet('turbospice.tree');
     return v === '1' ? true : v === '0' ? false : null;
   });
-  const hasSubs = project.files.some((f) => f.kind === 'schematic');
+  const hasSubs = project.files.some((f) => f.kind === 'schematic' || isModelModule(f));
+  // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
+  const [curModel, setCurModel] = useState('');
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
   // ancho del panel del símbolo (se arrastra su borde izquierdo)
@@ -544,6 +548,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       off = true;
     };
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setCurModel(''), [path, sims.active]);
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
     lib.setProjectFiles(project.files);
@@ -1488,6 +1493,49 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     projectRef.current = p;
     editProject(p);
   };
+  // --- Módulos «Modelo»: netlist (.subckt/.model) + símbolo ---------------------------------
+  const newModel = () =>
+    askSubName(t('New model'), freeSubcktName(projectRef.current, 'MODEL'), (name) => {
+      const p = addModelModule(projectRef.current, name);
+      projectRef.current = p;
+      editProject(p);
+      setCurModel(name);
+    });
+  const renameModel = (from: string) =>
+    askSubName(t('Rename model'), from, (to) => {
+      if (to === from) return;
+      const retype = (asc: string) => {
+        const d = parseAsc(asc);
+        let changed = false;
+        for (const s of d.symbols)
+          if (baseName(s.type).toLowerCase() === from.toLowerCase()) {
+            s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
+            changed = true;
+          }
+        return changed ? serializeAsc(d) : asc;
+      };
+      // lo que se está editando también se renombra (se guarda antes)
+      const p = renameModelModule(snapshot(), from, to, retype);
+      projectRef.current = p;
+      editProject(p);
+      history.reset(parseAsc(retype(ascText(docRef.current))));
+      if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
+    }, from);
+  const deleteModel = (name: string) => {
+    const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
+    setDialog({
+      kind: 'slide',
+      title: t('Delete model {name}?', { name }),
+      message: n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Its netlist and its symbol will be deleted.'),
+      onConfirm: () => {
+        setDialog(null);
+        if (curModel.toLowerCase() === name.toLowerCase()) setCurModel('');
+        const p = removeModelModule(projectRef.current, name);
+        projectRef.current = p;
+        editProject(p);
+      },
+    });
+  };
   /** Ir a una instancia de un subcircuito (desde «usado en») */
   const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
     const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
@@ -1953,7 +2001,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         outdated: symbolOutdated(p, name),
         text: false,
       };
-    });
+    }).concat(
+      modelModules(p).map((f): TreeSub => {
+        const name = modelModuleName(f);
+        return {
+          name,
+          type: 'model',
+          ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+        };
+      }),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
   const toggleTree = () => {
@@ -3123,17 +3184,18 @@ ${ltNetlistText(sim.built.lt)}
               onLeave={() => setTreePeek(false)}
               activeBench={sims.active}
               subs={treeSubs}
-              current={curSub}
+              current={curModel || curSub}
               onBench={goSim}
               onTestbench={() => path.length && go([])}
               onNewBench={newEmptyBench}
               onRenameProject={renameProject}
               onBenchAction={benchAction}
-              onOpen={(n) => openSub(n)}
+              onOpen={(n) => (modelModuleFile(projectRef.current, n) ? setCurModel(n) : openSub(n))}
               onNew={newSubckt}
+              onNewModel={newModel}
               onFromSelection={selection.length ? subFromSelection : undefined}
-              onRename={renameSub}
-              onDelete={deleteSub}
+              onRename={(n) => (modelModuleFile(projectRef.current, n) ? renameModel(n) : renameSub(n))}
+              onDelete={(n) => (modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
               onExport={exportSub}
               onExportNetlist={exportSubNetlist}
               onToUser={subToUser}
@@ -3152,9 +3214,11 @@ ${ltNetlistText(sim.built.lt)}
               items={[
                 ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
                 ...subckts(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: t('subcircuit') })),
+                ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
               ]}
               onPick={(k) => {
                 const id = k.slice(2);
+                if (k.startsWith('m:')) return setCurModel(id);
                 if (k.startsWith('s:')) return openSub(id);
                 if (id !== sims.active) return goSim(id);
                 if (path.length) go([]);
@@ -3189,6 +3253,26 @@ ${ltNetlistText(sim.built.lt)}
               onAddPort={addPort}
             />
           )}
+          {curModel && modelModuleFile(project, curModel) && (
+            <ModelEditor
+              name={curModel}
+              text={modelModuleFile(project, curModel)!.text}
+              symText={modelSymbolText(project, curModel) ?? ''}
+              symW={symW}
+              onWidth={setSymW}
+              onText={(text) => {
+                const p = storeModelText(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onSymbol={(text) => {
+                const p = storeModelSymbol(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onClose={() => setCurModel('')}
+            />
+          )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
           <SchematicEditor
             handle={editor}
@@ -3207,6 +3291,8 @@ ${ltNetlistText(sim.built.lt)}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             onDropSubckt={(name) => {
+              const m = modelModuleFile(projectRef.current, name);
+              if (m) return viewRun ? null : modelModuleName(m);
               const f = subcktFile(projectRef.current, name);
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}

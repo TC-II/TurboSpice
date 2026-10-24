@@ -65,7 +65,8 @@ check(
   `desplegable de Simular: tipos, comandos y análisis programados (${simMenu.join(' | ')})`,
 );
 await page.getByRole('button', { name: 'Texto', exact: true }).click();
-check(await page.locator('.modal .seg input[type=radio]').nth(1).isChecked(), 'Texto abre el diálogo de comentario');
+// la herramienta Texto escribe en el lugar del click: no abre el diálogo
+check((await page.locator('.modal').count()) === 0 && (await page.locator('.schematic, .sch-canvas, svg').first().count()) > 0, 'Texto no abre el diálogo de comentario');
 await page.keyboard.press('Escape');
 // en ancho de celular la barra no desborda: los grupos que no entran van a "Más herramientas"
 await page.setViewportSize({ width: 375, height: 760 });
@@ -197,7 +198,8 @@ check((await page.getByLabel('Ventana', { exact: true }).locator('option').allTe
 await page.locator('.expr-form input').fill('V(out)/2');
 await page.locator('.expr-form input').press('Enter');
 const fftPick = page.locator('.fft-tools .fft-pick');
-await fftPick.click();
+// la FFT arranca eligiendo traza: el ⌖ sólo hace falta si no está en ese modo
+if (!(await page.locator('.plot-panel.fft-picking').count())) await fftPick.click();
 check((await page.locator('.plot-panel.fft-picking').count()) === 1 && (await page.locator('.trace-chip.pickable').count()) === 2, 'el ⌖ entra en modo de elegir traza');
 await page.keyboard.press('Escape');
 check((await page.locator('.plot-panel.fft-picking').count()) === 0, 'Esc cancela el ⌖');
@@ -205,13 +207,53 @@ await fftPick.click();
 await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
 const fftInfo = await page.locator('.fft-info').first().textContent();
 check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)', 'la FFT queda como una traza en un panel debajo');
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,FFT(V(out))', 'la FFT queda como una traza en un panel debajo');
 check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la FFT tiene eje de frecuencias desde 0');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: 'V(out)/2' }).click();
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.pane').last().locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2', 'dos FFT a la vez en el panel de FFT');
-await page.locator('.pane').last().getByRole('button', { name: 'Quitar panel' }).click();
-await page.locator('.pane').first().getByRole('button', { name: 'Quitar V(out)/2' }).click();
+const fftNames = (k) => page.locator('.pane').nth(k).locator('.trace-chip .name').allTextContents().then((v) => v.join());
+check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'FFT(V(out)),FFT(V(out)/2)', 'dos FFT a la vez en el panel de FFT');
+// #260: otra ventana, otro panel; el nombre dice la ventana; zoom propio de cada panel de FFT
+await page.getByLabel('Ventana', { exact: true }).selectOption('rect');
+await fftPick.click();
+await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
+check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2)' && (await fftNames(2)) === 'FFT(V(out), Rectangular)', 'FFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
+{
+const rangeX = (k) => page.locator('.pane').nth(k).locator('.uplot').getAttribute('data-range-x');
+const r1 = await rangeX(1);
+const r2 = await rangeX(2);
+{
+  await page.locator('.pane').nth(2).locator('.pane-chart').scrollIntoViewIfNeeded();
+  const cb = await page.locator('.pane').nth(2).locator('.pane-chart').boundingBox();
+  await page.mouse.move(cb.x + cb.width / 3, cb.y + cb.height / 2);
+  await page.mouse.wheel(0, -300);
+  await page.waitForTimeout(200);
+}
+check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de FFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
+}
+// (arrastre de HTML5 con eventos: el del mouse de Playwright no siempre llega a un panel vacío)
+const dnd = async (src, dst) => {
+  const dt = await page.evaluateHandle(() => new DataTransfer());
+  await src.dispatchEvent('dragstart', { dataTransfer: dt });
+  await dst.dispatchEvent('dragover', { dataTransfer: dt });
+  await dst.dispatchEvent('drop', { dataTransfer: dt });
+  await src.dispatchEvent('dragend', { dataTransfer: dt }).catch(() => {});
+};
+// las dos FFT de V(out) en el mismo panel: dos curvas y dos nombres
+await dnd(page.locator('.pane').nth(2).locator('.trace-chip').first(), page.locator('.pane').nth(1).locator('.pane-chart'));
+check((await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2),FFT(V(out), Rectangular)' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos FFT de la misma señal en un panel: ${await fftNames(1)}`);
+// el panel que quedó vacío acepta una traza de tiempo; uno de FFT, no
+await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(1).locator('.pane-chart'));
+check((await fftNames(0)) === 'V(out),V(out)/2', 'una traza de tiempo no va a un panel de FFT');
+await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(2).locator('.pane-empty'));
+check((await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2', `el panel vacío (antes de FFT) acepta una traza de tiempo: ${await fftNames(0)} | ${await fftNames(1)} | ${await fftNames(2)} (${await page.locator('.pane').count()})`);
+// y una FFT a un panel nuevo vacío
+await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
+await page.locator('.pane-add button').click();
+await dnd(page.locator('.pane').nth(1).locator('.trace-chip', { hasText: 'Rectangular' }), page.locator('.pane').nth(2).locator('.pane-empty'));
+check((await fftNames(2)) === 'FFT(V(out), Rectangular)' && (await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2)', `una FFT a un panel nuevo vacío: ${await fftNames(1)} | ${await fftNames(2)}`);
+await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
+await page.locator('.pane').nth(1).getByRole('button', { name: 'Quitar panel' }).click();
 check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la FFT queda el transitorio');
 // #193: con zoom en un tramo chico las marcas del eje Y no se repiten
 {
@@ -275,17 +317,18 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check(back.key === full.key, 'doble click: vuelve a ver todo (X e Y)');
   await drag(0.4, 0.4, 0.5, 0.4 + 5 / b.height);
   const hx = await rng();
-  check(!same(hx.x, full.x) && same(hx.y, full.y), `arrastre casi horizontal: zoom sólo en X, el Y sigue (${full.y} = ${hx.y})`);
+  // el zoom es siempre a recuadro: aunque sea casi horizontal, cambian X e Y
+  check(!same(hx.x, full.x) && !same(hx.y, full.y), `arrastre casi horizontal: también es un recuadro (${full.y} → ${hx.y})`);
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -200);
   await page.waitForTimeout(300);
-  check(same((await rng()).y, full.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
+  check(same((await rng()).y, hx.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
   await page.keyboard.press('Space');
   await page.waitForTimeout(300);
   check((await rng()).key === full.key, 'Espacio: vuelve a ver todo');
   await drag(0.5, 0.2, 0.5 + 5 / b.width, 0.7);
   const vy = await rng();
-  check(same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: zoom sólo en Y, el X sigue (${full.y} → ${vy.y})`);
+  check(!same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: también es un recuadro (${full.y} → ${vy.y})`);
   await page.keyboard.press('Shift+Z');
   await page.waitForTimeout(300);
   check((await rng()).key === full.key, 'Shift+Z deshace el zoom en Y');
@@ -750,9 +793,9 @@ await page.mouse.click(free2.x, free2.y);
 await page.keyboard.press('Escape');
 await page.getByRole('button', { name: 'Correr' }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
+await resultsMenu(page, /^Errores/);
 const prob = page.locator('.problems li', { hasText: 'R2 no tiene valor asignado' });
-check((await prob.count()) === 1, 'Problemas lista el componente sin valor');
+check((await prob.count()) === 1, 'Errores lista el componente sin valor');
 await prob.getByRole('button', { name: 'ver en el esquemático' }).click();
 check((await page.locator('svg.editor .sym.sel text.win').allTextContents()).includes('R2'), 'y el link lo selecciona en el esquemático');
 

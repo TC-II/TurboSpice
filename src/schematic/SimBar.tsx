@@ -2,15 +2,17 @@
 // los parámetros del análisis en una o dos líneas (el Barrido DC usa la segunda para la otra
 // fuente; las redes y fuentes se pueden elegir en el esquemático), un cuadrado con su estado
 // (sin correr, corriendo, lista) y una × para borrarla. Los cambios se aplican al salir del
-// campo o con Enter y reemplazan el comando del esquemático.
+// campo o con Enter y reemplazan el comando del esquemático. En una Complex simulation (#241) no
+// hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
-import { formatAnalysis, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
+import { formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
+import { Icon } from '../ui/icons.tsx';
 
 type BarField =
-  | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number }
+  | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number; required?: boolean; numeric?: boolean; notGround?: boolean }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
   /** casillas una debajo de la otra */
@@ -25,9 +27,9 @@ const POINTS: Record<Sweep['type'], string> = { dec: t('Points/decade'), oct: t(
 
 /** Barrido en frecuencia: inicio, fin, puntos y tipo de barrido */
 const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
-  { kind: 'text', label: t('F start'), value: s.start, set: (start) => set({ ...s, start }) },
-  { kind: 'text', label: t('F stop'), value: s.stop, set: (stop) => set({ ...s, stop }) },
-  { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5 },
+  { kind: 'text', label: t('F start'), value: s.start, set: (start) => set({ ...s, start }), required: true, numeric: true },
+  { kind: 'text', label: t('F stop'), value: s.stop, set: (stop) => set({ ...s, stop }), required: true, numeric: true },
+  { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5, required: true, numeric: true },
   {
     kind: 'select',
     label: t('Sweep'),
@@ -41,6 +43,16 @@ const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
   },
 ];
 
+/** Qué le falta a un campo (se marca en rojo; el texto queda como ayuda al pasar el mouse) */
+const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefined =>
+  f.required && !f.value.trim()
+    ? t('{what} is missing', { what: f.label })
+    : f.notGround && f.value.trim() === '0'
+      ? t('{what} can\'t be ground (0): choose a node', { what: f.label })
+    : f.numeric && f.value.trim() && !isNum(f.value)
+      ? t('{what}: "{v}" isn\'t a number', { what: f.label, v: f.value })
+      : undefined;
+
 /** Campos de la barra por línea */
 function barRows(a: Analysis): BarField[][] {
   const text = (label: string, value: string, set: (v: string) => Analysis, o: Partial<Extract<BarField, { kind: 'text' }>> = {}): BarField => ({ kind: 'text', label, value, set, ...o });
@@ -48,9 +60,9 @@ function barRows(a: Analysis): BarField[][] {
     case 'tran':
       return [
         [
-          text(t('Stop time'), a.tstop, (tstop) => ({ ...a, tstop })),
-          text(t('Save from'), a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0' }),
-          text(t('Maximum step'), a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto' }),
+          text(t('Stop time'), a.tstop, (tstop) => ({ ...a, tstop }), { required: true, numeric: true }),
+          text(t('Save from'), a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0', numeric: true }),
+          text(t('Maximum step'), a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto', numeric: true }),
           {
             kind: 'checks',
             label: t('options'),
@@ -74,37 +86,41 @@ function barRows(a: Analysis): BarField[][] {
         };
         const n = i + 1;
         return [
-          text(t('Source {n}', { n }), s.src, (src) => upd({ src }), { list: 'sources', placeholder: i ? t('optional') : '', width: 6 }),
-          text(t('Start {n}', { n }), s.start, (start) => upd({ start })),
-          text(t('Stop {n}', { n }), s.stop, (stop) => upd({ stop })),
-          text(t('Increment {n}', { n }), s.step, (step) => upd({ step })),
+          text(t('Source {n}', { n }), s.src, (src) => upd({ src }), { list: 'sources', placeholder: i ? t('optional') : '', width: 6, required: !i }),
+          // la segunda fuente sólo pide sus valores si tiene nombre
+          text(t('Start {n}', { n }), s.start, (start) => upd({ start }), { required: !i || !!s.src, numeric: true }),
+          text(t('Stop {n}', { n }), s.stop, (stop) => upd({ stop }), { required: !i || !!s.src, numeric: true }),
+          text(t('Increment {n}', { n }), s.step, (step) => upd({ step }), { required: !i || !!s.src, numeric: true }),
         ];
       });
     case 'noise':
       return [
         [
-          text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }),
+          text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }),
           text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') }),
-          text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources' }),
+          text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true }),
         ],
         sweepFields(a.sweep, (sweep) => ({ ...a, sweep })),
       ];
     case 'op':
       return [];
     case 'tf':
-      return [[text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }), text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources' })]];
+      return [[text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }), text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true })]];
     case 'sens':
       return [
-        [text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets' }), { kind: 'check', label: t('In AC'), value: a.ac, set: (ac) => ({ ...a, ac }) }],
+        [text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }), { kind: 'check', label: t('In AC'), value: a.ac, set: (ac) => ({ ...a, ac }) }],
         ...(a.ac ? [sweepFields(a.sweep, (sweep) => ({ ...a, sweep }))] : []),
       ];
     case 'pz':
       return [
+        // en columnas (ver COLUMNS): entrada + y −, salida + y −, transferencia y qué calcular
         [
-          text(t('Input +'), a.inP, (inP) => ({ ...a, inP }), { list: 'nets' }),
-          text(t('Input −'), a.inN, (inN) => ({ ...a, inN }), { list: 'nets' }),
-          text(t('Output +'), a.outP, (outP) => ({ ...a, outP }), { list: 'nets' }),
-          text(t('Output −'), a.outN, (outN) => ({ ...a, outN }), { list: 'nets' }),
+          text(t('Input +'), a.inP, (inP) => ({ ...a, inP }), { list: 'nets', required: true, notGround: true }),
+          text(t('Input −'), a.inN, (inN) => ({ ...a, inN }), { list: 'nets', required: true }),
+        ],
+        [
+          text(t('Output +'), a.outP, (outP) => ({ ...a, outP }), { list: 'nets', required: true, notGround: true }),
+          text(t('Output −'), a.outN, (outN) => ({ ...a, outN }), { list: 'nets', required: true }),
         ],
         [
           { kind: 'select', label: t('Transfer'), value: a.type, options: [['vol', 'V/V'], ['cur', 'V/I']], set: (type) => ({ ...a, type: type as 'vol' }) },
@@ -118,12 +134,15 @@ function barRows(a: Analysis): BarField[][] {
   }
 }
 
+/** Análisis cuyos grupos de campos van en columnas (uno debajo del otro) en vez de en filas */
+const COLUMNS = new Set<Analysis['kind']>(['pz']);
+
 /** Estado de la simulación elegida: sin correr, corriendo, lista o con error */
 export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, control, onStudio, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -141,6 +160,10 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   running: boolean;
   /** elegir una red o una fuente haciendo click en el esquemático */
   picker: Picker;
+  /** texto del bloque .control si la simulación es Complex (#241) */
+  control?: string;
+  /** abrir el Studio */
+  onStudio(): void;
   onApply(line: string): void;
   onRun(): void;
 }) {
@@ -153,7 +176,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     if (line !== applied.current) setDraft(parseAnalysis(line));
     applied.current = null;
   }, [line]);
-  const errors = draft ? validateAnalysis(draft) : [];
   const apply = (a: Analysis | null = draft) => {
     if (!a) return;
     const next = formatAnalysis(a);
@@ -163,7 +185,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     }
   };
   const change = (a: Analysis) => (setDraft(a), apply(a));
-  const rows = sim && draft ? barRows(draft) : [];
+  const rows = sim && draft && control === undefined ? barRows(draft) : [];
 
   // el indicador de estado vive bajo el widget del usuario (#213)
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -184,8 +206,16 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
       {!sim ? (
         <span className="sb-hint">{t('Select simulation type')}</span>
       ) : null}
-      {sim && (
-        <div className="sb-rows">
+      {sim && control !== undefined && (
+        <span className="sb-complex">
+          <button type="button" className="sb-studio" onClick={onStudio} aria-label={t('Open the Studio')} title={t('Complex simulation: click to open the Studio')}>
+            <Icon name="study" size={16} /> {t('Complex simulation')}
+          </button>
+          <pre className="sb-control-pop" role="tooltip">{control}</pre>
+        </span>
+      )}
+      {sim && control === undefined && (
+        <div className={draft && COLUMNS.has(draft.kind) ? 'sb-rows sb-cols' : 'sb-rows'}>
           {!draft && <code className="sb-line">{line}</code>}
           {draft && !rows.length && <span className="sb-hint">{t('No parameters')}</span>}
           {rows.map((r, i) => (
@@ -218,6 +248,9 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                     <input
                       value={f.value}
                       aria-label={f.label}
+                      className={fieldProblem(f) ? 'missing' : undefined}
+                      title={fieldProblem(f)}
+                      aria-invalid={!!fieldProblem(f) || undefined}
                       placeholder={f.placeholder}
                       spellCheck={false}
                       size={f.width ?? 7}
@@ -238,7 +271,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                         aria-label={t('Pick {label} on the schematic', { label: f.label })}
                         onClick={(e) => {
                           e.preventDefault();
-                          picker(f.list === 'nets' ? 'net' : 'source').then((v) => v && change(f.set(v)));
+                          // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
+                          picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
                         }}
                       >
                         ⌖
@@ -252,7 +286,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
         </div>
       )}
       {slot && stateEl && createPortal(stateEl, slot)}
-      {sim && errors.length > 0 && <span className="sb-hint warn">{errors[0]}</span>}
       {sim && stale && !running && (
         <button className="sb-run" onClick={onRun} title={t('Its results are no longer in memory (those of the last simulations viewed are kept)')}>
           {t('Run again')}

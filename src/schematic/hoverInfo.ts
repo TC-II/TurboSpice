@@ -49,7 +49,7 @@ export function hoverInfo(doc: AscDoc, lib: Library, conn: Connectivity, ref: It
     case 'shape': {
       const sh = doc.shapes[ref.index];
       if (!sh) return [];
-      const name = { LINE: t('Line'), RECTANGLE: t('Rectangle'), CIRCLE: t('Circle'), ARC: t('Arc') }[sh.kind];
+      const name = { LINE: t('Line'), RECTANGLE: t('Rectangle'), CIRCLE: t('Circle'), ARC: t('Arc'), PATH: t('Freehand'), IMAGE: t('Image') }[sh.kind];
       const [x1, y1, x2, y2] = sh.coords;
       const style = LINE_STYLES.find((ls) => ls.value === (sh.style ?? ''))?.label ?? t('style {style}', { style: sh.style });
       return [name, `(${x1}, ${y1}) → (${x2}, ${y2})`, t('line {p0}', { p0: style.toLowerCase() })];

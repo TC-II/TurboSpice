@@ -1,3 +1,4 @@
+import { parseAnalysis } from '../../src/sim/analyses.ts';
 import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc } from '../../src/asc/model.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -7,7 +8,10 @@ import { findAnalysis, setAnalysisLine } from '../../src/schematic/directivesEdi
 import {
   activeSim,
   addSim,
+  analysisDetail,
   analysisLabel,
+  pzLogErrors,
+  pzProblem,
   defaultLine,
   duplicateSim,
   emptySims,
@@ -28,14 +32,18 @@ const docWith = (line: string): AscDoc => ({ ...emptyDoc(), texts: [{ x: 0, y: 0
 
 describe('nombre automático de una simulación', () => {
   it('es legible, con unidades', () => {
-    expect(analysisLabel('.tran 10m')).toBe('Transitorio 0–10 ms');
-    expect(analysisLabel('.tran 0 20m 5m 1u')).toBe('Transitorio 5 ms–20 ms');
-    expect(analysisLabel('.ac dec 100 1 1meg')).toBe('AC 1 Hz–1 MHz');
-    expect(analysisLabel('.dc V1 0 5 0.1')).toBe('Barrido DC V1 0–5 V');
-    expect(analysisLabel('.dc V1 0 5 0.1 I2 1m 3m 1m')).toBe('Barrido DC V1 0–5 V · I2 1 mA–3 mA');
-    expect(analysisLabel('.op')).toBe('Punto de operación');
+    expect(analysisLabel('.tran 10m')).toBe('Tran 0 - 10m');
+    expect(analysisLabel('.tran 0 20m 5m 1u')).toBe('Tran 5m - 20m');
+    expect(analysisLabel('.tran 100m')).toBe('Tran 0 - 100m');
+    expect(analysisLabel('.ac dec 10 100 100k')).toBe('AC 100Hz - 100KHz');
+    expect(analysisLabel('.noise V(out) V1 dec 10 1 1meg')).toBe('Ruido 1Hz - 1MHz');
+    expect(analysisLabel('.pz in 0 out 0 vol pz')).toBe('Polos y ceros');
+    expect(analysisLabel('.ac dec 100 1 1meg')).toBe('AC 1Hz - 1MHz');
+    expect(analysisLabel('.dc V1 0 5 0.1')).toBe('Barrido DC');
+    expect(analysisLabel('.dc V1 0 5 0.1 I2 1m 3m 1m')).toBe('Barrido DC');
+    expect(analysisLabel('.op')).toBe('.OP');
     expect(analysisLabel('.tf V(out) V1')).toBe('Transferencia V(out)/V1');
-    expect(analysisLabel('.tran {T}')).toBe('Transitorio 0–{T}');
+    expect(analysisLabel('.tran {T}')).toBe('Tran 0 - {T}');
   });
   it('un comando que no se entiende queda como está', () => {
     expect(analysisLabel('.tran 1m steady')).toBe('.tran 1m steady');
@@ -44,7 +52,7 @@ describe('nombre automático de una simulación', () => {
     const r = simsFromLine('.op');
     const named = renameSim(r, r.active, '  Polarización ');
     expect(simName(named.items[0])).toBe('Polarización');
-    expect(simName(renameSim(named, r.active, '').items[0])).toBe('Punto de operación');
+    expect(simName(renameSim(named, r.active, '').items[0])).toBe('.OP');
   });
 });
 
@@ -175,5 +183,31 @@ describe('comando de análisis en el esquemático', () => {
     expect(setAnalysisLine(docWith('.tran 1m'), '.pz in 0 out 0 vol pz').texts[0].kind).toBe('comment');
     const d = docWith('.op');
     expect(setAnalysisLine(d, '.op')).toBe(d);
+  });
+});
+
+describe('descripción completa y errores de polos y ceros', () => {
+  it('la descripción tiene más detalle que el nombre', () => {
+    expect(analysisDetail('.dc V1 0 5 0.1')).toBe('Barrido DC V1 0–5 V paso 100 mV');
+    expect(analysisDetail('.ac dec 100 10 100k')).toBe('AC (Bode) 10 Hz–100 kHz, 100 pts/dec');
+    expect(analysisDetail('.tran 0 20m 0 1u')).toBe('Transitorio 0–20 ms, paso máx. 1 µs');
+    expect(analysisDetail('.pz in 0 out 0 vol pz')).toBe('Polos y ceros V(in)→V(out)');
+    expect(analysisDetail('.pz  0  0 vol pz')).toBe('Polos y ceros (sin entrada ni salida elegidas)');
+  });
+  it('un .pz sin nodos no llega a ngspice y explica por qué', () => {
+    expect(pzProblem('.pz  0  0 vol pz')).toMatch(/no están elegidos/);
+    expect(pzProblem('.pz 0 0 0 0 vol pz')).toMatch(/no están elegidos/);
+    expect(pzProblem('.pz in in out 0 vol pz')).toMatch(/mismo nodo/);
+    expect(pzProblem('.pz in 0 out 0 vol pz')).toBeUndefined();
+    expect(pzProblem('.tran 1m')).toBeUndefined();
+  });
+  it('un .pz con nodos vacíos se sigue leyendo (la barra muestra sus campos)', () => {
+    expect(parseAnalysis('.pz  0  0 vol pz')).toMatchObject({ kind: 'pz', inP: '', inN: '0', outP: '', outN: '0' });
+    expect(parseAnalysis('.pz in 0  0 vol pol')).toMatchObject({ inP: 'in', outP: '', which: 'pol' });
+    expect(parseAnalysis('.pz in 0 out 0 vol pz')).toMatchObject({ inP: 'in', outP: 'out' });
+  });
+  it('"Input is shorted" del log se explica', () => {
+    expect(pzLogErrors(['doAnalyses: Input is shorted', 'run simulation(s) aborted'])[0]).toMatch(/cortocircuito/);
+    expect(pzLogErrors(['ok'])).toEqual([]);
   });
 });

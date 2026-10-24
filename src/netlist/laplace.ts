@@ -206,11 +206,11 @@ function parseRational(src: string): Rat {
       if (/^\(\s*-\s*1\s*\)$/.test(args) && tt.v.toLowerCase() === 'sqrt') throw new Unsupported('sqrt(-1)');
       return constR(`${tt.v}${args}`);
     }
-    throw new Unsupported(`"${tt.v}" inesperado`);
+    throw new Unsupported(t('unexpected "{v}"', { v: tt.v }));
   }
 
   const r = sum();
-  if (p < toks.length) throw new Unsupported(`"${(toks[p] as { v: unknown }).v}" inesperado`);
+  if (p < toks.length) throw new Unsupported(t('unexpected "{v}"', { v: String((toks[p] as { v: unknown }).v) }));
   // factores s comunes (KVCO/s*s): se cancelan
   let n = trim(r.n);
   let d = trim(r.d);

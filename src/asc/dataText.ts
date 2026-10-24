@@ -5,9 +5,10 @@ import type { AscDoc, SchText } from './model.ts';
 
 /**
  * Prefijos de los comentarios con datos (programa de bloques del Estudio, vista de ploteo de la
- * simulación activa y lista de simulaciones, #39)
+ * simulación activa, lista de simulaciones, #39, y bloque .control guardado mientras el
+ * testbench usa un análisis simple, #241)
  */
-export const DATA_TAGS = { study: '.study ', plot: '.plot ', sims: '.sims ' } as const;
+export const DATA_TAGS = { study: '.study ', plot: '.plot ', sims: '.sims ', ctloff: '.ctloff ' } as const;
 export type DataTag = keyof typeof DATA_TAGS;
 
 export const isDataTextOf = (t: { kind: string; text: string }, tag: DataTag) => t.kind === 'comment' && t.text.startsWith(DATA_TAGS[tag]);

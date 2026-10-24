@@ -13,9 +13,11 @@ export interface Trace {
   hidden?: boolean;
   /** bus digital (#209): cómo se muestra su valor */
   radix?: Radix;
+  /** traza de espectro (#236, #260): la FFT de la expresión del transitorio, con su ventana y rango */
+  fft?: PaneFft;
 }
 
-/** FFT de las trazas de un panel (#236): ventana y rango de tiempo usado (sin rango = todo) */
+/** FFT de una traza (#236): ventana y rango de tiempo usado (sin rango = todo) */
 export interface PaneFft {
   window: 'rect' | 'hann' | 'hamming' | 'blackman' | 'flattop';
   from?: number;
@@ -26,9 +28,24 @@ export interface Pane {
   traces: Trace[];
   /** panel digital (#209): un carril por traza Dig(…); no comparte ejes con las analógicas */
   digital?: boolean;
-  /** panel de espectro: cada traza es una expresión del transitorio y se muestra su FFT */
+  /** @deprecated (#245) la FFT era del panel; ahora va en cada traza. Sólo se lee de vistas viejas */
   fft?: PaneFft;
 }
+
+/** Tipo de un panel según sus trazas (#260): de espectro si tiene FFT, null si está vacío */
+export const paneKind = (p: Pane): 'fft' | 'time' | null => (p.traces.length ? (p.traces.some((tt) => tt.fft) ? 'fft' : 'time') : null);
+export const isFftPane = (p: Pane | undefined) => !!p && paneKind(p) === 'fft';
+/** ¿La traza puede ir a ese panel? Uno vacío acepta cualquiera; si no, del mismo tipo */
+export const acceptsTrace = (p: Pane, tt: Trace) => {
+  const k = paneKind(p);
+  // lo digital no comparte ejes con lo analógico (#209); un panel vacío acepta cualquiera
+  if (p.traces.length && !!p.digital !== isDigitalExpr(tt.expr)) return false;
+  return k === null || k === (tt.fft ? 'fft' : 'time');
+};
+
+export const sameFft = (a?: PaneFft, b?: PaneFft) => (!a || !b ? !a && !b : a.window === b.window && a.from === b.from && a.to === b.to);
+/** Identidad de una traza (#260): la expresión y, si es FFT, su ventana y rango */
+export const sameTrace = (a: Trace, b: Trace) => sameExpr(a.expr, b.expr) && sameFft(a.fft, b.fft);
 
 /** Paneles por tipo de análisis ("tran", "ac", "dc", "noise"…) */
 export type PlotView = Record<string, Pane[]>;
@@ -93,23 +110,22 @@ export function colorFor(panes: Pane[], expr: string): string {
  * mano); si está en otro, queda en los dos con el mismo color.
  */
 export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
+  let k = Math.max(0, Math.min(i, panes.length - 1));
   let base = panes.length ? panes : emptyPanes();
-  let k = Math.max(0, Math.min(i, base.length - 1));
-  // una señal digital va a un panel digital y una analógica a uno analógico (#209): el activo si
-  // es de su tipo (o si está vacío: pasa a ser de su tipo), si no el primero que lo sea, y si no
-  // hay, uno nuevo abajo
-  const digital = isDigitalExpr(expr);
-  const kindOf = (p: Pane): Pane => (digital ? { ...p, digital: true } : (({ digital: _, ...rest }) => rest)(p));
-  if (!!base[k].digital !== digital) {
-    const j = base.findIndex((p) => !!p.digital === digital && !p.fft);
-    if (!base[k].traces.length && !base[k].fft) base = base.map((p, n) => (n === k ? kindOf(p) : p));
-    else if (j >= 0) k = j;
-    else {
-      base = [...base, digital ? { traces: [], digital: true } : { traces: [] }];
+  // en un panel de FFT no (#260), y una señal digital sólo en uno digital (#209): al primer panel
+  // que la acepte, o a uno nuevo
+  const tt: Trace = { expr };
+  if (!acceptsTrace(base[k], tt)) {
+    k = base.findIndex((p) => acceptsTrace(p, tt));
+    if (k < 0) {
+      base = [...base, { traces: [] }];
       k = base.length - 1;
     }
   }
-  if (base[k].traces.some((t) => sameExpr(t.expr, expr))) return base === panes ? panes : base;
+  // un panel vacío toma el tipo de la primera traza
+  if (!base[k].traces.length && !!base[k].digital !== isDigitalExpr(expr))
+    base = base.map((p, n) => (n !== k ? p : isDigitalExpr(expr) ? { ...p, digital: true } : (({ digital: _, ...rest }) => rest)(p)));
+  if (base[k].traces.some((t) => !t.fft && sameExpr(t.expr, expr))) return base === panes ? panes : base;
   const color = colorFor(base, expr);
   return base.map((p, j) => (j === k ? { ...p, traces: [...p.traces, { expr, color }] } : p));
 }
@@ -130,12 +146,18 @@ export function asPlotView(v: unknown): PlotView | null {
   const out: PlotView = {};
   for (const [kind, panes] of Object.entries(v as Record<string, unknown>)) {
     if (!Array.isArray(panes)) continue;
-    out[kind] = panes.map((p) => ({
-      traces: (Array.isArray(p?.traces) ? (p.traces as unknown[]) : [])
-        .filter((t): t is Trace => !!t && typeof (t as Trace).expr === 'string')
-        .map((t) => ({ expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}) })),
-      ...asFft(p?.fft),
-    }));
+    out[kind] = panes.map((p) => {
+      // (vistas de #245: la FFT del panel pasa a cada una de sus trazas)
+      const paneFft = asFft(p?.fft).fft;
+      return {
+        traces: (Array.isArray(p?.traces) ? (p.traces as unknown[]) : [])
+          .filter((t): t is Trace => !!t && typeof (t as Trace).expr === 'string')
+          .map((t) => {
+            const fft = asFft(t.fft).fft ?? paneFft;
+            return { expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}), ...(fft ? { fft } : {}) };
+          }),
+      };
+    });
   }
   return Object.keys(out).length ? out : null;
 }
@@ -241,7 +263,8 @@ const isCurrent = (expr: string) => /^I[a-z]?\(/i.test(expr.trim());
 export function serializePlt(view: PlotView): string {
   const out: string[] = [];
   for (const [kind, title] of SECTIONS) {
-    const panes = view[kind]?.filter((p) => p.traces.length);
+    // (LTspice no tiene trazas de FFT en el .plt del transitorio)
+    const panes = view[kind]?.map((p) => ({ ...p, traces: p.traces.filter((t) => !t.fft) })).filter((p) => p.traces.length);
     if (!panes?.length) continue;
     out.push(`[${title}]`, '{', `   Npanes: ${panes.length}`);
     panes.forEach((p, pi) => {

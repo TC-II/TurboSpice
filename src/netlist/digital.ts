@@ -16,8 +16,21 @@ import { t } from '../i18n/i18n.ts';
 // umbral; el retardo es una línea de transmisión ideal más un nodo que sólo sigue a la entrada
 // cuando x(t) = x(t−Td) (si no, retiene); las rampas son el code model XSPICE slew; las
 // salidas, fuentes B entre Vlow y Vhigh referidas a com.
+//
+// Flip-flops (medido con LTspice -b, 24.1.9):
+//  - DFLOP: in1=D, in3=CLK, in4=PRE, in5=CLR; toma D en el flanco de subida de CLK; PRE y CLR
+//    son asíncronos, activos en alto, y CLR gana si están los dos;
+//  - SRFLOP: in1=S, in2=R, asíncronos; R gana si están los dos;
+//  - el punto de operación respeta PRE/S y CLR/R; sin ellos Q arranca en Vlow.
+// SCHMITT (in1, _Q, Q, com): sube cuando V(in) > Vt+Vh y baja cuando V(in) < Vt−Vh, con V(in)
+// medida respecto de tierra (no de com), o V(in1,in2) en los diferenciales (in2 = in−); Vt vale Ref por omisión y Vh, 5 % de |Vt|. Es un SR
+// con set = (in > Vt+Vh) y reset = (in < Vt−Vh).
+// En ngspice: las entradas normalizadas pasan por un adc_bridge a un d_dff de XSPICE (el SR es un
+// d_dff sin reloj que sólo usa set y reset) y un dac_bridge vuelve a 0…1; de ahí en adelante
+// (Td, rampas, Tau, salidas) es igual que en las compuertas.
 
 const GATES = new Set(['and', 'or', 'xor', 'buf']);
+const FLOPS = new Set(['dflop', 'srflop', 'schmitt']);
 
 /** Parámetros "k=v" o "k v" (LTspice acepta los dos; v puede ser {expr}) de la línea A */
 function params(text: string): Map<string, string> {
@@ -29,15 +42,15 @@ function params(text: string): Map<string, string> {
 
 /**
  * Líneas ngspice equivalentes a la compuerta de LTspice, o undefined si el modelo no es una
- * compuerta combinacional (flip-flops, schmitt… quedan como están).
+ * compuerta, un flip-flop ni un Schmitt (contadores… quedan como están).
  */
 export function translateDigital(name: string, nodes: string[], value: string, warnings: string[]): string[] | undefined {
   const m = /^\s*(\w+)\b(.*)$/s.exec(value);
   const model = m?.[1].toLowerCase() ?? '';
-  if (!GATES.has(model) || nodes.length !== 8) return undefined;
+  if ((!GATES.has(model) && !FLOPS.has(model)) || nodes.length !== 8) return undefined;
   const p = params(m![2]);
   // tripdt/tripdv sólo controlan el paso de LTspice
-  const known = new Set(['vhigh', 'vlow', 'ref', 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
+  const known = new Set(['vhigh', 'vlow', 'ref', ...(model === 'schmitt' ? ['vt', 'vh'] : []), 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
   const ignored = [...p.keys()].filter((k) => !known.has(k));
   if (ignored.length) warnings.push(t('{name}: gate parameters not translated: {p1}', { name, p1: ignored.join(', ') }));
   const num = (k: string, d: string) => `{${p.get(k) ?? d}}`;
@@ -49,18 +62,57 @@ export function translateDigital(name: string, nodes: string[], value: string, w
 
   // entradas normalizadas: rampa de 0,1 mV alrededor del umbral (continua para Newton)
   const bit = (x: string) => `min(max((V(${x},${com})-${ref})*1e4+0.5,0),1)`;
-  const ins = model === 'buf' ? [i1] : [i1, i2, i3, i4, i5].filter((x) => x !== '0');
-  const b = ins.map(bit);
   const not = (x: string) => `(1-${x})`;
-  let logic: string;
-  if (!b.length) logic = model === 'and' ? '1' : '0';
-  else if (model === 'buf' || model === 'and') logic = b.join('*');
-  else if (model === 'or') logic = `1-${b.map(not).join('*')}`;
-  else logic = b.map((x, i) => [x, ...b.filter((_, j) => j !== i).map(not)].join('*')).join('+');
-  lines.push(`B_${n}x ${n}x 0 V=${logic}`);
   // en ngspice un nodo que sólo aparece en la expresión de una B no existe: cada entrada lleva
   // una resistencia de 1 TΩ a com (como gmin; ver floating.ts)
-  [...new Set(ins)].filter((x) => x !== '0' && x !== com).forEach((x, k) => lines.push(`R_${n}i${k + 1} ${x} ${com} 1e12`));
+  const anchor = (ins: string[]) =>
+    [...new Set(ins)].filter((x) => x !== '0' && x !== com).forEach((x, k) => lines.push(`R_${n}i${k + 1} ${x} ${com} 1e12`));
+  if (FLOPS.has(model)) {
+    const dff = model === 'dflop';
+    const set = dff ? i4 : i1, rst = dff ? i5 : i2;
+    const on = (x: string) => (x === '0' ? '0' : bit(x));
+    let sig: [string, string][];
+    if (model === 'schmitt') {
+      const vt = p.has('vt') ? num('vt', '') : ref;
+      const vhy = p.has('vh') ? num('vh', '') : `0.05*abs(${vt})`;
+      const cmp = (e: string) => `min(max((${e})*1e4+0.5,0),1)`;
+      // diferencial (diffschmitt…): in- = in2
+      const vin = i2 === '0' ? `V(${i1})` : `V(${i1},${i2})`;
+      sig = [['fs', cmp(`${vin}-${vt}-${vhy}`)], ['fr', cmp(`${vt}-${vhy}-${vin}`)]];
+    } else {
+      // CLR/R tiene prioridad: el set efectivo es set·¬reset
+      sig = [
+        ['fs', `${on(set)}*${not(on(rst))}`],
+        ['fr', on(rst)],
+        ...(dff ? ([['fd', on(i1)], ['fc', on(i3)]] as [string, string][]) : []),
+      ];
+    }
+    sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=${e}`));
+    anchor(dff ? [i1, i3, set, rst] : model === 'schmitt' ? [i1, i2] : [set, rst]);
+    const dig = (k: string) => `${n}${k}_d`;
+    lines.push(
+      `A_${n}adc [${sig.map(([k]) => `${n}${k}`).join(' ')}] [${sig.map(([k]) => dig(k)).join(' ')}] ${n}adcm`,
+      `.model ${n}adcm adc_bridge(in_low=0.5 in_high=0.5 rise_delay=1e-12 fall_delay=1e-12)`,
+      // SR: d_dff sin flancos (clk a un pulldown); data da igual
+      dff
+        ? `A_${n}ff ${dig('fd')} ${dig('fc')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm`
+        : `A_${n}ff ${dig('fr')} ${dig('fz')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm`,
+      `.model ${n}ffm d_dff(clk_delay=1e-12 set_delay=1e-12 reset_delay=1e-12 rise_delay=1e-12 fall_delay=1e-12)`,
+      `A_${n}dac [${dig('fq')}] [${n}x] ${n}dacm`,
+      `.model ${n}dacm dac_bridge(out_low=0 out_high=1 t_rise=1e-10 t_fall=1e-10)`,
+    );
+    if (!dff) lines.push(`A_${n}fz ${dig('fz')} ${n}fzm`, `.model ${n}fzm d_pulldown`);
+  } else {
+    const ins = model === 'buf' ? [i1] : [i1, i2, i3, i4, i5].filter((x) => x !== '0');
+    const b = ins.map(bit);
+    let logic: string;
+    if (!b.length) logic = model === 'and' ? '1' : '0';
+    else if (model === 'buf' || model === 'and') logic = b.join('*');
+    else if (model === 'or') logic = `1-${b.map(not).join('*')}`;
+    else logic = b.map((x, i) => [x, ...b.filter((_, j) => j !== i).map(not)].join('*')).join('+');
+    lines.push(`B_${n}x ${n}x 0 V=${logic}`);
+    anchor(ins);
+  }
   let y = `${n}x`;
 
   if (p.has('td') && p.get('td') !== '0') {
@@ -90,7 +142,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
     } else lines.push(`B_${n}${tag} ${node} ${com} V=${expr}`);
   };
   // recortada a [0, 1]: la línea T y el nodo de retención sobrepasan un poco con trap
-  const v = y === `${n}x` ? `V(${y})` : `min(max(V(${y}),0),1)`;
+  const v = y === `${n}x` && !FLOPS.has(model) ? `V(${y})` : `min(max(V(${y}),0),1)`;
   out(q, 'q', `${vl}+(${vh}-${vl})*${v}`);
   out(qb, 'qb', `${vh}-(${vh}-${vl})*${v}`);
   return lines;

@@ -25,6 +25,7 @@ export interface Extracted {
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 const isAuto = (n: Net) => !n.labels.length || /^N\d+$/i.test(n.name);
 
+/** @deprecated ya no está en la interfaz (se sacó «From selection» del panel Módulos y Alt+B); queda sólo por sus tests */
 export function extractSubckt(doc: AscDoc, refs: ItemRef[], conn: Connectivity, lib: Library, name: string): Extracted | string {
   const pick = (k: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === k).map((r) => r.index));
   const [S, W, F, T, SH] = [pick('symbol'), pick('wire'), pick('flag'), pick('text'), pick('shape')];

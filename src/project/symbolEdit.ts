@@ -72,10 +72,13 @@ export function resizeBody(text: string, b: { x1: number; y1: number; x2: number
   if (i >= 0) ls[i] = rect;
   else ls.splice(Math.max(1, ls.findIndex((l) => l.startsWith('SymbolType')) + 1), 0, rect);
   const cx = Math.round((b.x1 + b.x2) / 2);
+  // los parámetros sólo siguen al cuerpo si están donde se los pone solos (no si se los movió)
+  const old = symBody(text);
+  const p39 = old && `${Math.round((old.x1 + old.x2) / 2)} ${old.y2 + 24}`;
   for (let k = 0; k < ls.length; k++) {
     if (/^WINDOW 0 /.test(ls[k])) ls[k] = `WINDOW 0 ${cx} ${b.y1 - 8} Bottom 2`;
     else if (/^WINDOW 3 /.test(ls[k])) ls[k] = `WINDOW 3 ${cx} ${b.y2 + 8} Top 2`;
-    else if (/^WINDOW 39 /.test(ls[k])) ls[k] = `WINDOW 39 ${cx} ${b.y2 + 24} Top 2`;
+    else if (/^WINDOW 39 /.test(ls[k]) && (!p39 || ls[k].startsWith(`WINDOW 39 ${p39} `))) ls[k] = `WINDOW 39 ${cx} ${b.y2 + 24} Top 2`;
   }
   return join(ls);
 }
@@ -201,13 +204,86 @@ export const symParams = (text: string): [string, string][] => parseParamList(/^
 
 /** Cambia los parámetros del símbolo; con parámetros se muestran en la instancia (WINDOW 39) */
 export function setSymParams(text: string, ps: [string, string][]): string {
+  // la posición de los parámetros (WINDOW 39) se conserva si ya la tenían (se la pudo mover)
+  const w39 = lines(text).find((l) => /^WINDOW 39 /.test(l));
   let ls = lines(text).filter((l) => !/^SYMATTR SpiceLine /.test(l) && !/^WINDOW 39 /.test(l));
   if (ps.length) {
     const body = symBody(text) ?? { x1: 0, y1: 0, x2: 0, y2: 0 };
     const i = ls.findIndex((l) => l.startsWith('SYMATTR'));
     const at = i < 0 ? ls.findIndex((l) => l.startsWith('PIN')) : i;
-    const add = [`WINDOW 39 ${Math.round((body.x1 + body.x2) / 2)} ${body.y2 + 24} Top 2`, `SYMATTR SpiceLine ${formatParamList(ps)}`];
+    const add = [w39 ?? `WINDOW 39 ${Math.round((body.x1 + body.x2) / 2)} ${body.y2 + 24} Top 2`, `SYMATTR SpiceLine ${formatParamList(ps)}`];
     ls = at < 0 ? [...ls, ...add] : [...ls.slice(0, at), ...add, ...ls.slice(at)];
   }
+  return join(ls);
+}
+
+/** Rótulo de los parámetros en la instancia (WINDOW 39), si el símbolo tiene */
+export function symParamWindow(text: string): { x: number; y: number; align: string; size: number } | null {
+  const m = /^WINDOW 39 (-?\d+) (-?\d+) (\S+)(?: (\d+))?/m.exec(text);
+  return m ? { x: Number(m[1]), y: Number(m[2]), align: m[3], size: m[4] === undefined ? 2 : Number(m[4]) } : null;
+}
+
+/** Mueve el rótulo de los parámetros (WINDOW 39); las instancias nuevas lo ponen ahí */
+export function moveParamWindow(text: string, x: number, y: number): string {
+  const ls = lines(text);
+  const i = ls.findIndex((l) => /^WINDOW 39 /.test(l));
+  if (i < 0) return text;
+  const m = /^WINDOW 39 \S+ \S+ (.*)$/.exec(ls[i]);
+  ls[i] = `WINDOW 39 ${x} ${y} ${m?.[1] ?? 'Top 2'}`;
+  return join(ls);
+}
+
+// --- dibujo: líneas, rectángulos, círculos y pines nuevos ----------------------------------
+
+export type ShapeKind = 'LINE' | 'RECTANGLE' | 'CIRCLE';
+
+export interface SymShape {
+  /** índice de la línea en el texto */
+  line: number;
+  kind: ShapeKind;
+  coords: [number, number, number, number];
+}
+
+/** Figuras del símbolo (LINE, RECTANGLE, CIRCLE), en el orden del archivo */
+export function symShapes(text: string): SymShape[] {
+  const out: SymShape[] = [];
+  lines(text).forEach((l, i) => {
+    const m = /^(LINE|RECTANGLE|CIRCLE)\s+\S+\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/.exec(l);
+    if (m) out.push({ line: i, kind: m[1] as ShapeKind, coords: [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5])] });
+  });
+  return out;
+}
+
+/** Agrega una figura antes de los pines y atributos (detrás de las que ya hay) */
+export function addShape(text: string, kind: ShapeKind, c: [number, number, number, number]): string {
+  const ls = lines(text);
+  const last = symShapes(text).at(-1)?.line;
+  const at = last !== undefined ? last + 1 : Math.max(1, ls.findIndex((l) => /^SymbolType /.test(l)) + 1);
+  ls.splice(at, 0, `${kind} Normal ${c.join(' ')}`);
+  return join(ls);
+}
+
+/** Cambia las coordenadas de la figura de la línea `line` (conserva su estilo) */
+export function setShape(text: string, line: number, c: [number, number, number, number]): string {
+  const ls = lines(text);
+  const m = /^(LINE|RECTANGLE|CIRCLE)\s+(\S+)\s+-?\d+\s+-?\d+\s+-?\d+\s+-?\d+(.*)$/.exec(ls[line] ?? '');
+  if (!m) return text;
+  ls[line] = `${m[1]} ${m[2]} ${c.join(' ')}${m[3]}`;
+  return join(ls);
+}
+
+/** Saca la figura de la línea `line` */
+export function removeShape(text: string, line: number): string {
+  const ls = lines(text);
+  if (!/^(LINE|RECTANGLE|CIRCLE)\s/.test(ls[line] ?? '')) return text;
+  ls.splice(line, 1);
+  return join(ls);
+}
+
+/** Agrega un pin para el puerto `name` en (x, y); SpiceOrder al final */
+export function addPin(text: string, name: string, x: number, y: number): string {
+  const ls = lines(text);
+  const order = symPins(text).length + 1;
+  ls.push(`PIN ${x} ${y} ${sideOf(x, y, symBody(text))} 8`, `PINATTR PinName ${name}`, `PINATTR SpiceOrder ${order}`);
   return join(ls);
 }

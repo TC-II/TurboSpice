@@ -22,7 +22,7 @@ import {
   uniqueLabel,
   variantOf,
 } from '../../src/project/project.ts';
-import { asBenches, BENCHES, EMPTY_ASC, newProject, type Project } from '../../src/project/turbo.ts';
+import { asBenches, BENCHES, EMPTY_ASC, isDefaultBenchName, newProject, type Project } from '../../src/project/turbo.ts';
 
 const asc = (line: string, wires = 1): string => {
   const d: AscDoc = {
@@ -33,7 +33,7 @@ const asc = (line: string, wires = 1): string => {
   return serializeAsc(d);
 };
 
-// dos testbenches: «Testbench 1» con .tran y uno sin nombre con .ac (el activo)
+// dos testbenches sin nombre propio: uno con .tran y uno sin nombre con .ac (el activo)
 function twoSims(): Project {
   let p = storeActive(newProject('P'), asc('.tran 10m'));
   p = addSim(p, asc('.ac dec 10 1 1meg'))!.project;
@@ -44,9 +44,21 @@ describe('testbenches (#180)', () => {
   it('un proyecto nuevo tiene un testbench vacío', () => {
     const p = newProject('P');
     expect(p.variants).toHaveLength(1);
-    expect(p.variants[0].sims.map((s) => [s.name, s.asc])).toEqual([['Testbench 1', EMPTY_ASC]]);
+    expect(p.variants[0].sims.map((s) => [s.name, s.asc])).toEqual([[undefined, EMPTY_ASC]]);
+    expect(simLabel(p.variants[0].sims[0])).toBe('Sin análisis');
     expect(variantOf(p).activeSim).toBe(p.variants[0].sims[0].id);
     expect(freeBenchName(p)).toBe('Testbench 2');
+  });
+
+  it('el «Testbench N» por defecto de archivos viejos pasa a ser automático; los propios quedan', () => {
+    const old: Project = { ...newProject('P'), variants: [{ id: BENCHES, name: 'P', base: EMPTY_ASC, activeSim: 'x1', sims: [
+      { id: 'x1', name: 'Testbench 3', asc: asc('.tran 100m'), runs: [] },
+      { id: 'x2', name: 'Mi bode', asc: asc('.ac dec 10 100 100k'), runs: [] },
+    ] }] };
+    const p = asBenches({ ...old, variants: [{ ...old.variants[0], id: 'v' }], activeVariant: 'v' });
+    expect(p.variants[0].sims.map((s) => [s.name, simLabel(s)])).toEqual([[undefined, 'Tran 0 - 100m'], ['Mi bode', 'Mi bode']]);
+    expect(isDefaultBenchName('Testbench 12')).toBe(true);
+    expect(isDefaultBenchName('Testbench A')).toBe(false);
   });
 
   it('las variantes (versión 1) se aplanan: cada simulación es un testbench', () => {
@@ -56,7 +68,7 @@ describe('testbenches (#180)', () => {
     expect(p.variants).toHaveLength(1);
     expect(p.variants[0].id).toBe(BENCHES);
     // una variante con varias simulaciones es un grupo
-    expect(p.variants[0].sims.map((s) => [s.name, s.group])).toEqual([['Transitorio 0–10 ms', 'g_a'], ['AC 1 Hz–1 MHz', 'g_a'], ['Pasaaltos', undefined], ['Vacía', undefined]]);
+    expect(p.variants[0].sims.map((s) => [s.name, s.group])).toEqual([[undefined, 'g_a'], [undefined, 'g_a'], ['Pasaaltos', undefined], ['Vacía', undefined]]);
     expect(p.groups).toEqual([{ id: 'g_a', name: 'Pasabajos' }]);
     // el activo es el de la variante activa
     expect(simOfActive(p)).toBe('bs0');
@@ -89,13 +101,20 @@ describe('simulaciones', () => {
   it('nombre automático, propio y copia', () => {
     let p = twoSims();
     const [a, b] = variantOf(p).sims;
-    expect(simLabel(a)).toBe('Testbench 1');
-    expect(simLabel(b)).toBe('AC 1 Hz–1 MHz');
+    expect(simLabel(a)).toBe('Tran 0 - 10m');
+    expect(simLabel(b)).toBe('AC 1Hz - 1MHz');
+    // el automático sigue al análisis y a sus límites
+    const a2 = variantOf(storeActive(selectSim(p, a.id), asc('.tran 100m'))).sims[0];
+    expect(simLabel(a2)).toBe('Tran 0 - 100m');
+    expect(simLabel(variantOf(storeActive(selectSim(p, a.id), asc('.op'))).sims[0])).toBe('.OP');
     p = renameSim(p, a.id, '  Arranque ');
     expect(simLabel(variantOf(p).sims[0])).toBe('Arranque');
     const d = duplicateSim(p, a.id)!;
-    expect(variantOf(d.project).sims.map((s) => simLabel(s))).toEqual(['Arranque', 'Testbench 3', 'AC 1 Hz–1 MHz']);
-    expect(simLabel(variantOf(duplicateSim(d.project, a.id)!.project).sims[1])).toBe('Testbench 4');
+    expect(variantOf(d.project).sims.map((s) => simLabel(s))).toEqual(['Arranque', 'Arranque (copia)', 'AC 1Hz - 1MHz']);
+    // el nombre propio queda fijo aunque cambie el análisis
+    expect(simLabel(variantOf(storeActive(selectSim(p, a.id), asc('.op'))).sims[0])).toBe('Arranque');
+    // la copia de uno automático sigue siendo automática
+    expect(variantOf(duplicateSim(p, b.id)!.project).sims[2].name).toBeUndefined();
     // sin nombre no: un testbench siempre tiene nombre
     expect(renameSim(p, a.id, '')).toBe(p);
   });

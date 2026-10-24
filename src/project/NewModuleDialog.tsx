@@ -11,7 +11,9 @@ const RESERVED = new Set('module endmodule input output inout wire reg logic alw
  * Módulo nuevo del proyecto (#180, #209): un subcircuito esquemático (.asc) o un módulo Verilog
  * (.v); los dos con su símbolo y se colocan, se bajan y se editan igual.
  */
-export function NewModuleDialog({ initial, check, onOk, onClose }: {
+export function NewModuleDialog({ kind, initial, check, onOk, onClose }: {
+  /** el tipo que se eligió en el menú «+ New» */
+  kind: ModuleKind;
   initial: string;
   /** error del nombre (vacío si sirve) */
   check(name: string): string | null;
@@ -19,21 +21,12 @@ export function NewModuleDialog({ initial, check, onOk, onClose }: {
   onClose(): void;
 }) {
   const [name, setName] = useState(initial);
-  const [kind, setKind] = useState<ModuleKind>('schematic');
   const n = name.trim();
   const error = check(n) ?? (kind === 'verilog' && (!/^[A-Za-z_]\w*$/.test(n) || RESERVED.has(n)) ? t('Invalid Verilog module name: letters, digits and _') : null);
   const ok = () => !error && n && onOk(n, kind);
   return (
-    <Modal title={t('New module')} onClose={onClose}>
+    <Modal title={kind === 'verilog' ? t('New Verilog module') : t('New subcircuit')} onClose={onClose}>
       <div className="textdlg new-module">
-        <div className="seg" role="radiogroup" aria-label={t('Kind of module')}>
-          <label>
-            <input type="radio" name="kind" checked={kind === 'schematic'} onChange={() => setKind('schematic')} /> {t('Schematic')}
-          </label>
-          <label>
-            <input type="radio" name="kind" checked={kind === 'verilog'} onChange={() => setKind('verilog')} /> {'Verilog'}
-          </label>
-        </div>
         <p className="hint">
           {kind === 'schematic'
             ? t('A circuit drawn with components, with ports as pins (net labels with a port).')

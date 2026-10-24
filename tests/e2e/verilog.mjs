@@ -1,4 +1,4 @@
-// E2E de los módulos Verilog (#209): «+ Nuevo» pregunta esquemático o Verilog; el módulo Verilog
+// E2E de los módulos Verilog (#209): «+ New › Verilog» crea uno; el módulo Verilog
 // se edita y se sintetiza en su vista (código, pines, interfaz eléctrica); se coloca como cualquier
 // subcircuito, con doble clic se baja a su código; las señales digitales van en un panel propio
 // (buses con radix); el modo comportamiento (Icarus) corre retardos y $display; todo sigue ahí
@@ -76,8 +76,8 @@ const openTree = async () => {
 };
 const newModule = async (name, kind) => {
   await openTree();
-  await page.getByRole('button', { name: 'Agregar un módulo' }).click();
-  await page.locator('.new-module label', { hasText: kind }).locator('input').check();
+  await page.locator('.tree-newmenu .tree-add').click();
+  await page.getByRole('menuitem', { name: kind }).click();
   await page.locator('.new-module input[aria-label="Nombre"]').fill(name);
   await page.locator('.new-module button.primary').click();
   await page.locator('.verilog-module').waitFor();
@@ -92,16 +92,16 @@ await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 
 // --- módulo nuevo: pregunta esquemático o Verilog ---
 await openTree();
-await page.getByRole('button', { name: 'Agregar un módulo' }).click();
-check((await page.locator('.new-module input[type=radio]').count()) === 2, 'módulo nuevo: pregunta esquemático o Verilog');
-await page.locator('.new-module button', { hasText: 'Cancelar' }).click();
+await page.locator('.tree-newmenu .tree-add').click();
+check((await page.getByRole('menuitem').count()) === 3, 'módulo nuevo: el menú ofrece subcircuito, modelo o Verilog');
+await page.locator('.tree-newmenu .tree-add').click();
 await newModule('div4', 'Verilog');
 check((await page.locator('.verilog-module strong').textContent()) === 'div4.v', 'abre la vista del módulo Verilog (código en lugar del esquemático)');
 await code.fill(VERILOG);
 await synthesize();
 check((await status()) === 'Sintetizado', `sintetiza con Yosys (${await status()})`);
 check((await page.locator('.vm-pins').textContent()).includes('q_1'), `muestra los pines (${await page.locator('.vm-pins').textContent()})`);
-check((await page.locator('.project-tree .tree-glyph.verilog').count()) >= 1, 'aparece en el panel como módulo Verilog');
+check((await page.locator('.project-tree .tree-kind.verilog').count()) >= 1, 'aparece en el panel como módulo Verilog');
 // interfaz eléctrica: una familia lógica cambia los parámetros del símbolo
 await page.getByRole('combobox', { name: 'Familia lógica' }).selectOption({ label: '74HC (CMOS 5 V)' });
 await page.waitForTimeout(300);
@@ -169,7 +169,7 @@ await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await openTree();
 check((await page.locator('.project-tree .tree-name', { hasText: 'div4' }).count()) >= 1, 'después de recargar, div4 sigue en el panel');
-await page.locator('.project-tree .tree-name', { hasText: /^\s*V\s*div4$/ }).click();
+await page.locator('.project-tree .tree-name', { hasText: /div4$/ }).click();
 await page.locator('.verilog-module').waitFor();
 check((await status()) === 'Sintetizado' && (await code.inputValue()).includes('module div4'), 'y se abre con su código, sintetizado');
 

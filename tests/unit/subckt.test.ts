@@ -350,11 +350,11 @@ describe('exportar a .zip para LTspice (#199)', () => {
     const entries = await readZip(exportAllZip(p, lib).bytes);
     lib.setProjectFiles([]);
     const names = entries.map((e) => e.path).sort();
-    expect(names).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy', 'Testbench 1.asc']);
+    expect(names).toEqual(['BUF.asc', 'BUF.asy', 'OP.asc', 'TOP.asc', 'TOP.asy']);
     // como LTspice: los bloques se buscan junto al .asc, por el nombre del símbolo
     const other = new Library(buildBundle());
-    other.setProjectFiles(entries.filter((e) => e.path !== 'Testbench 1.asc').map((e) => ({ name: e.path, kind: e.path.endsWith('.asy') ? 'symbol' : 'schematic', text: decode(e.data).text })));
-    const tbText = decode(entries.find((e) => e.path === 'Testbench 1.asc')!.data).text;
+    other.setProjectFiles(entries.filter((e) => e.path !== 'OP.asc').map((e) => ({ name: e.path, kind: e.path.endsWith('.asy') ? 'symbol' : 'schematic', text: decode(e.data).text })));
+    const tbText = decode(entries.find((e) => e.path === 'OP.asc')!.data).text;
     expect(ltNetlistText(ltNetlist(parseAsc(tbText), other))).toBe(before);
   });
 });

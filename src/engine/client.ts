@@ -21,7 +21,6 @@ type Req = WorkerRequest extends infer R ? (R extends { id: number } ? Omit<R, '
 const friendly = (msg: string) => (OUT_OF_MEMORY_RE.test(msg) ? OUT_OF_MEMORY : msg);
 
 export class EngineClient {
-  onOutput?: (line: string) => void;
   onStatus?: (status: string, percent: number) => void;
 
   private worker?: Worker;
@@ -37,8 +36,12 @@ export class EngineClient {
     if (autoStart) this.spawn();
   }
 
+  /** la carga del Worker falló (sin red, wasm dañado): el próximo uso lo vuelve a intentar */
+  private failed = false;
+
   /** Motor cargado (lo arranca si todavía no) */
   get ready(): Promise<void> {
+    if (this.failed) this.restart();
     this.start();
     return this.readyP;
   }
@@ -51,7 +54,6 @@ export class EngineClient {
     this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = (ev: MessageEvent<WorkerResponse>) => {
       const msg = ev.data;
-      if (msg.type === 'output') return this.onOutput?.(msg.line);
       if (msg.type === 'status') return this.onStatus?.(msg.status, msg.percent);
       const p = this.pending.get(msg.id);
       if (!p) return;
@@ -73,7 +75,13 @@ export class EngineClient {
       // (el Worker se cae, p. ej., si el navegador le niega memoria): uno nuevo para la próxima
       if (sim) this.restart();
     };
-    this.readyP = this.request({ type: 'init' }) as Promise<void>;
+    this.failed = false;
+    const ready = this.request({ type: 'init' }) as Promise<void>;
+    // (rechazada sin nadie esperándola no debe quedar como "unhandled rejection")
+    ready.catch(() => {
+      if (this.readyP === ready) this.failed = true;
+    });
+    this.readyP = ready;
   }
 
   private request(req: Req): Promise<SimOutcome | void> {
@@ -91,15 +99,18 @@ export class EngineClient {
 
   /** Corta la simulación en curso: termina el Worker y levanta uno nuevo. */
   abort(): void {
-    this.worker?.terminate();
-    for (const p of this.pending.values()) p.reject(new Error(t('Simulation aborted')));
-    this.pending.clear();
-    this.spawn();
+    this.restart(t('Simulation aborted'));
   }
 
-  /** Worker nuevo (tras un error fatal de ngspice o una caída del Worker) */
-  private restart(): void {
+  /**
+   * Worker nuevo (tras un error fatal de ngspice o una caída del Worker). Lo que todavía esperaba
+   * al Worker viejo no va a llegar nunca: se rechaza.
+   */
+  private restart(reason = t('Error in the engine Worker')): void {
     this.worker?.terminate();
+    const orphans = [...this.pending.values()];
+    this.pending.clear();
+    for (const p of orphans) p.reject(new Error(reason));
     this.spawn();
   }
 }

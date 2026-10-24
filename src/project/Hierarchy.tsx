@@ -20,9 +20,9 @@ export interface TreeSub {
   children: string[];
   outdated: boolean;
   text: boolean;
-  /** módulo Verilog (#209): .v en lugar de .asc */
-  verilog?: boolean;
-  /** Verilog con cambios sin sintetizar */
+  /** tipo de módulo: subcircuito (esquemático), modelo (netlist + símbolo) o Verilog (se sintetiza) */
+  type?: 'model' | 'verilog';
+  /** Verilog con cambios sin sintetizar (#209) */
   unsynthesized?: boolean;
   /** instancias desactualizadas (#199): pines sin conectar o cables sueltos sobre el símbolo */
   stale?: { label: string; inst: string; detail: string; go(): void }[];
@@ -45,6 +45,13 @@ export interface TreeBench {
 
 export type BenchItem = 'sim' | 'schematic' | 'params' | 'history' | 'study';
 
+/** Tipos de módulo: glifo, etiqueta de la fila, nombre en el menú «+ New» y ayuda */
+const KIND = {
+  subckt: { glyph: '▭', label: () => t('subcir'), name: () => t('Subcircuit'), title: () => t('Subcircuit: schematic and its symbol') },
+  model: { glyph: '◇', label: () => t('model'), name: () => t('Model'), title: () => t('Model: netlist (.subckt or .model) and its symbol') },
+  verilog: { glyph: '⟨⟩', label: () => t('verilog'), name: () => t('Verilog'), title: () => t('Verilog: synthesizable code, turned into a digital block with its symbol') },
+};
+
 const COLLAPSED_KEY = 'turbospice.treeCollapsed';
 const loadCollapsed = (): Set<string> => {
   try {
@@ -54,7 +61,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onNewModel, onNewVerilog, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave, onEnter }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -64,6 +71,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   current: string;
   /** se está mostrando por acercar el mouse (encima del esquemático) */
   peek: boolean;
+  /** oculto en modo «mostrar al acercar el mouse»: queda sólo un borde visible (#251) */
+  edgeOnly?: boolean;
   onBench(id: string): void;
   /** volver al testbench activo (desde un subcircuito) */
   onTestbench(): void;
@@ -77,6 +86,10 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
+  /** módulo nuevo de tipo Modelo (netlist .subckt/.model + símbolo) */
+  onNewModel?(): void;
+  /** módulo nuevo de tipo Verilog (#209) */
+  onNewVerilog?(): void;
   /** exportar un subcircuito (.zip con su .asc y su .asy) e importar */
   onExport(name: string): void;
   /** exportar como netlist .sub (#199) */
@@ -84,8 +97,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   /** copiar a My symbols and models (#199, #171) */
   onToUser(name: string): void;
   onImport(): void;
-  /** convertir la selección (sin selección: undefined) */
-  onFromSelection?(): void;
   onRename(name: string): void;
   /** renombra el proyecto (clic en el título) */
   onRenameProject(name: string): void;
@@ -94,9 +105,12 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onClose(): void;
   /** el mouse salió del panel (para esconderlo si se mostró al acercarlo) */
   onLeave(): void;
+  /** el mouse entró al panel (para expandirlo desde el borde) */
+  onEnter?(): void;
 }) {
   // grupos, testbenches y sus parámetros plegados (los testbenches arrancan plegados: una línea)
   const [renamingProject, setRenamingProject] = useState(false);
+  const [newMenu, setNewMenu] = useState(false);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [openBench, setOpenBench] = useState<Set<string>>(() => new Set());
   const [openParams, setOpenParams] = useState<Set<string>>(() => new Set());
@@ -227,15 +241,19 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             </li>
             <li>
               <div className="tree-row tree-sub">
-                <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
-                  {pOpen ? '▾' : '▸'}
-                </button>
+                {nVars > 0 ? (
+                  <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
+                    {pOpen ? '▾' : '▸'}
+                  </button>
+                ) : (
+                  <span className="tree-caret" aria-hidden />
+                )}
                 <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')}>
                   {t('Parameters and variables')}
                 </button>
                 {nVars > 0 && <span className="tree-meta">{nVars}</span>}
               </div>
-              {pOpen && (
+              {pOpen && nVars > 0 && (
                 <ul className="tree-branch">
                   {b.params.map(([k, v]) => (
                     <li key={`p:${k}`}>
@@ -255,7 +273,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                       </div>
                     </li>
                   ))}
-                  {!nVars && <li className="tree-meta tree-empty">{t('None.')}</li>}
                 </ul>
               )}
             </li>
@@ -282,11 +299,11 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             e.dataTransfer.effectAllowed = 'copy';
           }}
         >
-          <span className={`tree-glyph${s.verilog ? ' verilog' : ''}`} title={s.verilog ? t('Verilog module') : undefined}>
-            {s.verilog ? 'V' : '▭'}
-          </span>{' '}
-          {s.name}
+          <span className="tree-glyph">{KIND[s.type ?? 'subckt'].glyph}</span> {s.name}
         </button>
+        <span className={`tree-kind${s.type ? ` ${s.type}` : ''}`} title={KIND[s.type ?? 'subckt'].title()}>
+          {KIND[s.type ?? 'subckt'].label()}
+        </span>
         <span className="tree-meta" title={s.unsynthesized ? t('Changes not synthesized yet (it is synthesized before simulating)') : undefined}>
           {t('{n} pins', { n: s.ports })}
           {s.unsynthesized ? ' •' : ''}
@@ -296,17 +313,15 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
-          {!s.verilog && (
-            <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
-          )}
+          {!s.type && <>
+          <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
           <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
             .sub
           </button>
-          {!s.verilog && (
-            <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
-              ☆
-            </button>
-          )}
+          <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
+            ☆
+          </button>
+          </>}
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
@@ -354,7 +369,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
     </li>
   );
   return (
-    <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
+    <aside className={`project-tree${peek ? ' peek' : ''}${edgeOnly ? ' collapsed' : ''}`} aria-label={t('Project')} aria-hidden={edgeOnly || undefined} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
       <header>
         {renamingProject ? (
           <NameInput
@@ -405,7 +420,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           );
         })}
       </ul>
-      {/* módulos (por ahora sólo subcircuitos), abajo de todo */}
+      {/* módulos (subcircuitos y modelos), abajo de todo */}
       <section className="tree-modules">
         <h4>
           {t('Modules')}
@@ -413,61 +428,29 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             <button className="tree-add" onClick={onImport} title={t('Import subcircuits: .zip, .asc (+ .asy), .lib/.sub')}>
               {t('Import')}
             </button>
-            <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
-              {t('From selection')}
-            </button>
-            <button className="tree-add" onClick={onNew} title={t('New module: a schematic or Verilog')} aria-label={t('Add a module')}>
-              + {t('New')}
-            </button>
+            <span className="tree-newmenu" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setNewMenu(false)}>
+              <button className="tree-add" onClick={() => setNewMenu(!newMenu)} aria-haspopup="menu" aria-expanded={newMenu} title={t('New module')}>
+                + {t('New')} ▾
+              </button>
+              {newMenu && (
+                <span className="tree-menu" role="menu">
+                  {([
+                    ['subckt', onNew],
+                    ['model', onNewModel],
+                    ['verilog', onNewVerilog],
+                  ] as const).map(([k, fn]) => fn && (
+                    <button key={k} role="menuitem" onClick={() => { setNewMenu(false); fn(); }} title={KIND[k].title()}>
+                      <span className="tree-glyph">{KIND[k].glyph}</span> {KIND[k].name()}
+                    </button>
+                  ))}
+                </span>
+              )}
+            </span>
           </span>
         </h4>
-        {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}
+        {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet: create one with «+ New» or import it.')}</p>}
       </section>
     </aside>
-  );
-}
-
-/** Barra arriba del lienzo, adentro de un subcircuito: migas de pan para subir */
-export function HierBar({ testbench, path, onCrumb, onUp, onQuick }: {
-  testbench: string;
-  path: Level[];
-  /** -1 = testbench */
-  onCrumb(i: number): void;
-  onUp(): void;
-  onQuick(): void;
-}) {
-  return (
-    <div className="hier-bar">
-      <nav className="hier-crumbs" aria-label={t('Hierarchy')}>
-        {path[0]?.inst ? (
-          <button className="link" onClick={() => onCrumb(-1)}>
-            {testbench}
-          </button>
-        ) : (
-          <span className="tree-meta" title={t('Opened from the panel: to see the values of an instance, enter it from the testbench (double-click or E)')}>
-            {t('standalone')}
-          </span>
-        )}
-        {path.map((l, i) => (
-          <span key={i}>
-            <span className="hier-sep">›</span>
-            {i === path.length - 1 ? (
-              <strong>{l.inst ? `${l.inst} (${l.sub})` : l.sub}</strong>
-            ) : (
-              <button className="link" onClick={() => onCrumb(i)}>
-                {l.inst ? `${l.inst} (${l.sub})` : l.sub}
-              </button>
-            )}
-          </span>
-        ))}
-        <button className="hier-up" onClick={onUp} title={t('Go up one level (Alt+↑)')}>
-          ↑ {t('Up')}
-        </button>
-        <button className="hier-quick" onClick={onQuick} title={t('Go to a testbench or subcircuit (Ctrl+P)')}>
-          {t('Go to…')} <kbd>{'Ctrl+P'}</kbd>
-        </button>
-      </nav>
-    </div>
   );
 }
 

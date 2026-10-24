@@ -9,7 +9,6 @@ import { verilogPorts } from '../hdl/project.ts';
 import { syncPins } from './symbolEdit.ts';
 import { variantOf } from './project.ts';
 import type { Project, ProjectFile } from './turbo.ts';
-import { t } from '../i18n/i18n.ts';
 
 /** Nombre del subcircuito: el del archivo sin extensión (.asc, o .v de un módulo Verilog, #209) */
 export const subName = (file: string) => file.replace(/\.(asc|s?v)$/i, '');
@@ -94,10 +93,9 @@ export function storeSymbol(p: Project, name: string, text: string): Project {
 }
 
 /** Esquemático inicial: un puerto de entrada y uno de salida */
-export function subcktTemplate(name: string): string {
+export function subcktTemplate(_name: string): string {
   const doc = emptyDoc();
   doc.flags.push({ x: -128, y: 0, name: 'in', ioPin: 'In' }, { x: 128, y: 0, name: 'out', ioPin: 'Out' });
-  doc.texts.push({ x: -128, y: -96, align: 'Left', size: 2, kind: 'comment', text: t('{name}: draw the circuit between the ports (net labels with a port, N)', { name }) });
   return serializeAsc(doc);
 }
 

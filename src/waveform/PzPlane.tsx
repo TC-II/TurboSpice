@@ -9,10 +9,15 @@ import { si } from './series.ts';
 import { PALETTE } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 
-/** lado máximo del mapa [px] */
-const MAX = 360;
+/** lado máximo del área del mapa [px] */
+const MAX = 900;
 const ZETAS = [0.1, 0.2, 0.3, 0.5, 0.707];
 const HIT = 10;
+/** márgenes alrededor del área del mapa: las marcas de los ejes van afuera, como en los gráficos */
+const GL = 46;
+const GR = 10;
+const GT = 8;
+const GB = 20;
 
 interface View {
   cx: number;
@@ -29,7 +34,7 @@ interface Props {
   labels?: Map<string, string>;
   /** nombre base de los archivos exportados */
   name?: string;
-  /** al lado de otro gráfico: mapa más chico y la tabla debajo */
+  /** al lado de otro gráfico: mapa más chico y sin tabla */
   compact?: boolean;
 }
 
@@ -44,19 +49,34 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
   const [view, setView] = useState<View | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const svg = useRef<SVGSVGElement>(null);
-  // el mapa es cuadrado y ocupa el alto disponible del panel (hasta MAX px)
-  const box = useRef<HTMLDivElement>(null);
-  const [side, setSide] = useState(MAX);
+  // el área del mapa es cuadrada: con espacio al costado, la tabla va a la derecha y el mapa toma
+  // el alto; en un panel angosto (o más alto que ancho), la tabla va debajo
+  const root = useRef<HTMLDivElement>(null);
+  const tools = useRef<HTMLDivElement>(null);
+  const foot = useRef<HTMLDivElement>(null);
+  const [side, setSide] = useState(320);
+  const [stacked, setStacked] = useState(false);
   useEffect(() => {
-    const el = box.current;
+    const el = root.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setSide(Math.max(100, Math.round(Math.min(MAX, el.clientHeight, el.parentElement?.clientWidth ?? MAX)))));
+    const fit = () => {
+      const w = el.clientWidth;
+      const h = el.clientHeight - (tools.current?.offsetHeight ?? 0) - (foot.current?.offsetHeight ?? 0) - 12;
+      const st = !compact && (w < 620 || w < el.clientHeight * 1.15);
+      const p = compact ? Math.min(w - GL - GR, h - GT - GB) : st ? Math.min(w - GL - GR, h * 0.6 - GT - GB) : Math.min(h - GT - GB, w * 0.55 - GL - GR);
+      setStacked(st);
+      setSide(Math.round(Math.max(110, Math.min(MAX, p))));
+    };
+    const ro = new ResizeObserver(fit);
     ro.observe(el);
+    if (foot.current) ro.observe(foot.current);
     return () => ro.disconnect();
-  }, []);
+  }, [compact]);
   const rows = useRef<(HTMLTableRowElement | null)[]>([]);
   // el dibujo se hace en px reales para que los textos no cambien de tamaño
   const W = side;
+  const SW = W + GL + GR;
+  const SH = W + GT + GB;
   const multi = runs.length > 1;
   const runLabel = (run: number) => labels?.get(runs[run]?.name) ?? runs[run]?.name ?? '';
   const color = (r: Root) => (multi ? PALETTE[r.run % PALETTE.length] : undefined);
@@ -90,13 +110,14 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
   useEffect(() => setView(null), [fitted]);
   const v = view ?? fitted;
 
+  // px, py: coordenadas dentro del área del mapa (el <g> la corre a los márgenes)
   const k = W / (2 * v.h);
   const px = (x: number) => W / 2 + (x - v.cx) * k;
   const py = (y: number) => W / 2 - (y - v.cy) * k;
   const world = (sx: number, sy: number): [number, number] => [v.cx + (sx - W / 2) / k, v.cy - (sy - W / 2) / k];
   const local = (e: { clientX: number; clientY: number }): [number, number] => {
     const b = svg.current!.getBoundingClientRect();
-    return [((e.clientX - b.left) * W) / b.width, ((e.clientY - b.top) * W) / b.height];
+    return [((e.clientX - b.left) * SW) / b.width - GL, ((e.clientY - b.top) * SH) / b.height - GT];
   };
 
   // rueda: zoom alrededor del mouse (listener propio: React registra wheel como pasivo)
@@ -110,8 +131,10 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
       const b = el.getBoundingClientRect();
       const { v: c, W } = viewRef.current;
       const kk = W / (2 * c.h);
-      const wx = c.cx + (((e.clientX - b.left) * W) / b.width - W / 2) / kk;
-      const wy = c.cy - (((e.clientY - b.top) * W) / b.height - W / 2) / kk;
+      const sx = ((e.clientX - b.left) * (W + GL + GR)) / b.width - GL;
+      const sy = ((e.clientY - b.top) * (W + GT + GB)) / b.height - GT;
+      const wx = c.cx + (sx - W / 2) / kk;
+      const wy = c.cy - (sy - W / 2) / kk;
       const f = Math.exp(e.deltaY * 0.0015);
       setView({ cx: wx + (c.cx - wx) * f, cy: wy + (c.cy - wy) * f, h: c.h * f });
     };
@@ -152,22 +175,40 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
   useEffect(() => {
     if (hover !== null) rows.current[hover]?.scrollIntoView?.({ block: 'nearest' });
   }, [hover]);
+  /** click en una fila: centra el mapa en esa raíz, con su módulo como escala */
+  const focus = (i: number) => {
+    const [x, y] = pts[i];
+    setView({ cx: x, cy: y, h: Math.max(Math.hypot(x, y) * 0.5, fitted.h * 0.02) || fitted.h });
+  };
 
   // grilla
   const [vx0, vx1, vy0, vy1] = [v.cx - v.h, v.cx + v.h, v.cy - v.h, v.cy + v.h];
-  const step = niceStep(2 * v.h, Math.max(3, Math.round(W / 60)));
+  const step = niceStep(2 * v.h, Math.max(3, Math.round(W / 70)));
   const far = Math.hypot(Math.max(Math.abs(vx0), Math.abs(vx1)), Math.max(Math.abs(vy0), Math.abs(vy1)));
   const decades = log ? ticks(1, Math.ceil(far), 1) : [];
   const circles = log ? decades : guides ? ticks(step, far, step) : [];
+  const xt = log ? [] : ticks(vx0, vx1, step);
+  const yt = log ? [] : ticks(vy0, vy1, step);
   const ox = px(0);
   const oy = py(0);
   const unitText = hz ? 'Hz' : 'rad/s';
   const bad = roots.filter(unstable);
+  const nPoles = roots.filter((r) => r.kind === 'pole').length;
+
+  // raíces en el mismo punto (polos dobles, etc.): se marca la multiplicidad
+  const mult = useMemo(() => {
+    const seen = new Map<string, number[]>();
+    roots.forEach((r, i) => {
+      const key = `${r.kind}|${r.run}|${r.re.toPrecision(4)}|${r.im.toPrecision(4)}`;
+      seen.set(key, [...(seen.get(key) ?? []), i]);
+    });
+    return [...seen.values()].filter((g) => g.length > 1);
+  }, [roots]);
 
   const exportAs = async (what: string) => {
     if (what === 'csv') return download(`${name}.csv`, new Blob([pzCsv(roots, runLabel)], { type: 'text/csv' }));
     if (!svg.current) return;
-    const text = schematicSvg(svg.current, { x1: 0, y1: 0, x2: W, y2: W });
+    const text = schematicSvg(svg.current, { x1: 0, y1: 0, x2: SW, y2: SH });
     if (what === 'svg') return download(`${name}.svg`, new Blob([text], { type: 'image/svg+xml' }));
     const png = await schematicPng(text);
     if (png) download(`${name}.png`, png);
@@ -175,201 +216,252 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
 
   const hr = hover !== null ? roots[hover] : undefined;
   const hi = hr && rootInfo(hr);
+  const glyph = (r: Root) => (
+    <span className={`pz-glyph ${r.kind}`} style={{ color: color(r) }}>
+      {r.kind === 'pole' ? '×' : '○'}
+    </span>
+  );
   return (
-    <div className={`pz-view${compact ? ' compact' : ''}`}>
-      <div className="pz-side">
-        <div className="plot-tools">
-          <button onClick={() => setView(null)} title={t('See all poles and zeros (double-click on the map)')}>
-            {t('Fit')}
+    <div ref={root} className={`pz-view${compact ? ' compact' : ''}${stacked ? ' stacked' : ''}`}>
+      <div className="plot-tools pz-tools" ref={tools}>
+        <button onClick={() => setView(null)} title={t('See all poles and zeros (double-click on the map)')}>
+          {t('Fit')}
+        </button>
+        <span className="pz-seg" role="group" aria-label={t('Units')}>
+          <button className={hz ? '' : 'active'} aria-pressed={!hz} onClick={() => setHz(false)}>
+            rad/s
           </button>
-          <select value={hz ? 'hz' : 'rad'} aria-label={t('Units')} onChange={(e) => setHz(e.target.value === 'hz')}>
-            <option value="rad">rad/s</option>
-            <option value="hz">Hz (s/2π)</option>
-          </select>
-          <label className="check inline" title={t('Radius in decades of |s| (keeps the angle, i.e. ζ): for widely spread poles')}>
-            <input type="checkbox" checked={log} onChange={(e) => setLog(e.target.checked)} /> Log
-          </label>
-          <label className="check inline" title={t('Lines of constant ζ and circles of constant ω₀')}>
-            <input type="checkbox" checked={guides} onChange={(e) => setGuides(e.target.checked)} /> {t('ζ/ω₀ guides')}
-          </label>
-          <select
-            value=""
-            aria-label={t('Export poles and zeros')}
-            onChange={(e) => {
-              void exportAs(e.target.value);
-              e.target.value = '';
-            }}
-          >
-            <option value="">{t('Export…')}</option>
-            <option value="png">{t('Map to PNG')}</option>
-            <option value="svg">{t('Map to SVG')}</option>
-            <option value="csv">{t('Table to CSV')}</option>
-          </select>
-        </div>
-        <div className="pz-map" ref={box} style={{ width: side }}>
-          <svg
-            ref={svg}
-            className={`pz-plane${drag?.mode === 'pan' ? ' panning' : ''}`}
-            viewBox={`0 0 ${W} ${W}`}
-            role="img"
-            aria-label={t('s-plane')}
-            onPointerDown={onDown}
-            onPointerMove={onMove}
-            onPointerUp={onUp}
-            onPointerLeave={() => !drag && setHover(null)}
-            onDoubleClick={() => setView(null)}
-          >
-            <rect className="bg" x={0} y={0} width={W} height={W} />
-            {ox < W && <rect className="rhp" x={Math.max(0, ox)} y={0} width={W - Math.max(0, ox)} height={W} />}
-            {!log && ticks(vx0, vx1, step).map((x) => <line key={`gx${x}`} className="grid" x1={px(x)} x2={px(x)} y1={0} y2={W} />)}
-            {!log && ticks(vy0, vy1, step).map((y) => <line key={`gy${y}`} className="grid" x1={0} x2={W} y1={py(y)} y2={py(y)} />)}
-            {circles.map((r) => (
-              <circle key={`c${r}`} className={log ? 'grid' : 'guide'} cx={ox} cy={oy} r={r * k} />
-            ))}
-            {guides &&
-              ZETAS.flatMap((z) =>
-                [1, -1].map((sg) => {
-                  const R = far * 2;
-                  const s = Math.sqrt(1 - z * z);
-                  return <line key={`z${z}${sg}`} className="guide" x1={ox} y1={oy} x2={px(-z * R)} y2={py(sg * s * R)} />;
-                }),
-              )}
-            {guides &&
-              ZETAS.map((z) => {
-                const d = Math.min(far, v.h) * 0.85;
-                return (
-                  <text key={`zt${z}`} className="guide-label" x={px(-z * d)} y={py(Math.sqrt(1 - z * z) * d) - 3}>
-                    ζ={z}
+          <button className={hz ? 'active' : ''} aria-pressed={hz} onClick={() => setHz(true)} title="s/2π">
+            Hz
+          </button>
+        </span>
+        <button className={log ? 'active' : ''} aria-pressed={log} onClick={() => setLog(!log)} title={t('Radius in decades of |s| (keeps the angle, i.e. ζ): for widely spread poles')}>
+          Log
+        </button>
+        <button className={guides ? 'active' : ''} aria-pressed={guides} onClick={() => setGuides(!guides)} title={t('Lines of constant ζ and circles of constant ω₀')}>
+          {t('ζ/ω₀ guides')}
+        </button>
+        <select
+          value=""
+          aria-label={t('Export poles and zeros')}
+          onChange={(e) => {
+            void exportAs(e.target.value);
+            e.target.value = '';
+          }}
+        >
+          <option value="">{t('Export…')}</option>
+          <option value="png">{t('Map to PNG')}</option>
+          <option value="svg">{t('Map to SVG')}</option>
+          <option value="csv">{t('Table to CSV')}</option>
+        </select>
+        <span className="pz-summary">
+          {multi && (
+            <ul className="pz-legend">
+              {runs.map((p, i) => (
+                <li key={p.name}>
+                  <i style={{ background: PALETTE[i % PALETTE.length] }} />
+                  {runLabel(i)}
+                </li>
+              ))}
+            </ul>
+          )}
+          {!compact && (
+            <span className="pz-count">
+              <span className="pz-glyph pole">×</span> {nPoles} <span className="pz-glyph zero">○</span> {roots.length - nPoles}
+            </span>
+          )}
+          <span className={`pz-badge ${bad.length ? 'bad' : 'ok'}`} title={bad.length ? t('in the right half-plane: the circuit is unstable') : undefined}>
+            {bad.length ? `⚠ ${t('Unstable')}` : `✓ ${t('Stable')}`}
+          </span>
+        </span>
+      </div>
+      <div className="pz-body">
+        <div className="pz-side" style={{ width: SW }}>
+          <div className="pz-map">
+            <svg
+              ref={svg}
+              className={`pz-plane${drag?.mode === 'pan' ? ' panning' : ''}`}
+              width={SW}
+              height={SH}
+              viewBox={`0 0 ${SW} ${SH}`}
+              role="img"
+              aria-label={t('s-plane')}
+              onPointerDown={onDown}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerLeave={() => !drag && setHover(null)}
+              onDoubleClick={() => setView(null)}
+            >
+              <defs>
+                <clipPath id="pz-clip">
+                  <rect x={0} y={0} width={W} height={W} />
+                </clipPath>
+              </defs>
+              <g transform={`translate(${GL} ${GT})`}>
+                <g clipPath="url(#pz-clip)">
+                  {ox < W && <rect className="rhp" x={Math.max(0, ox)} y={0} width={W - Math.max(0, ox)} height={W} />}
+                  {xt.map((x) => (
+                    <line key={`gx${x}`} className="grid" x1={px(x)} x2={px(x)} y1={0} y2={W} />
+                  ))}
+                  {yt.map((y) => (
+                    <line key={`gy${y}`} className="grid" x1={0} x2={W} y1={py(y)} y2={py(y)} />
+                  ))}
+                  {circles.map((r) => (
+                    <circle key={`c${r}`} className={log ? 'grid' : 'guide'} cx={ox} cy={oy} r={r * k} />
+                  ))}
+                  {guides &&
+                    ZETAS.flatMap((z) =>
+                      [1, -1].map((sg) => {
+                        const R = far * 2;
+                        const s = Math.sqrt(1 - z * z);
+                        return <line key={`z${z}${sg}`} className="guide" x1={ox} y1={oy} x2={px(-z * R)} y2={py(sg * s * R)} />;
+                      }),
+                    )}
+                  {guides &&
+                    ZETAS.map((z) => {
+                      const d = Math.min(far, v.h) * 0.85;
+                      return (
+                        <text key={`zt${z}`} className="guide-label" x={px(-z * d)} y={py(Math.sqrt(1 - z * z) * d) - 3}>
+                          ζ={z}
+                        </text>
+                      );
+                    })}
+                  <line x1={0} y1={oy} x2={W} y2={oy} className="axis" />
+                  <line x1={ox} y1={0} x2={ox} y2={W} className="axis" />
+                  {log &&
+                    decades.map((d) => (
+                      <text key={`td${d}`} x={px(d) + 3} y={oy - 4}>
+                        {si(10 ** (decade0 + d), 3)}
+                      </text>
+                    ))}
+                  <text className="axis-name" x={W - 6} y={Math.min(W - 6, Math.max(14, oy - 6))} textAnchor="end">
+                    σ
                   </text>
-                );
-              })}
-            <line x1={0} y1={oy} x2={W} y2={oy} className="axis" />
-            <line x1={ox} y1={0} x2={ox} y2={W} className="axis" />
-            {!log &&
-              ticks(vx0, vx1, step)
-                .filter((x) => x !== 0)
-                .map((x) => (
-                  <text key={`tx${x}`} x={px(x)} y={W - 4} textAnchor="middle">
+                  <text className="axis-name" x={Math.min(W - 20, Math.max(6, ox + 6))} y={14}>
+                    jω
+                  </text>
+                  {hr && <circle className="halo" cx={px(pts[hover!][0])} cy={py(pts[hover!][1])} r={11} />}
+                  {roots.map((r, i) => {
+                    const [x, y] = pts[i];
+                    const sz = i === hover ? 6 : 4.5;
+                    const cls = `${r.kind}${i === hover ? ' hl' : ''}`;
+                    const style = color(r) ? { stroke: color(r) } : undefined;
+                    return r.kind === 'pole' ? (
+                      <path key={i} className={cls} style={style} d={`M ${px(x) - sz} ${py(y) - sz} l ${2 * sz} ${2 * sz} m ${-2 * sz} 0 l ${2 * sz} ${-2 * sz}`} />
+                    ) : (
+                      <circle key={i} className={cls} style={style} cx={px(x)} cy={py(y)} r={sz} />
+                    );
+                  })}
+                  {mult.map((g) => (
+                    <text key={`m${g[0]}`} className="mult" x={px(pts[g[0]][0]) + 7} y={py(pts[g[0]][1]) - 6}>
+                      {g.length}
+                    </text>
+                  ))}
+                  {drag?.mode === 'box' && (
+                    <rect
+                      className="zoom-box"
+                      x={Math.min(drag.x0, drag.x1)}
+                      y={Math.min(drag.y0, drag.y1)}
+                      width={Math.abs(drag.x1 - drag.x0)}
+                      height={Math.abs(drag.y1 - drag.y0)}
+                    />
+                  )}
+                </g>
+                <rect className="frame" x={0.5} y={0.5} width={W - 1} height={W - 1} />
+                {xt.map((x) => (
+                  <text key={`tx${x}`} x={px(x)} y={W + 14} textAnchor="middle">
                     {si(x, 3)}
                   </text>
                 ))}
-            {!log &&
-              ticks(vy0, vy1, step)
-                .filter((y) => y !== 0)
-                .map((y) => (
-                  <text key={`ty${y}`} x={4} y={py(y) - 2}>
+                {yt.map((y) => (
+                  <text key={`ty${y}`} x={-6} y={py(y) + 3.5} textAnchor="end">
                     {si(y, 3)}
                   </text>
                 ))}
-            {log &&
-              decades.map((d) => (
-                <text key={`td${d}`} x={px(d) + 2} y={oy - 3}>
-                  {si(10 ** (decade0 + d), 3)}
+                <text x={-6} y={W + 14} textAnchor="end" className="unit">
+                  {log ? `log ${unitText}` : unitText}
                 </text>
-              ))}
-            <text x={W - 4} y={Math.min(W - 18, Math.max(12, oy - 4))} textAnchor="end">
-              σ
-            </text>
-            <text x={Math.min(W - 20, Math.max(4, ox + 4))} y={12}>
-              jω
-            </text>
-            <text x={W - 4} y={12} textAnchor="end" className="unit">
-              {log ? `|s| log, ${unitText}` : unitText}
-            </text>
-            {roots.map((r, i) => {
-              const [x, y] = pts[i];
-              const sz = i === hover ? 7 : 5;
-              const cls = `${r.kind}${i === hover ? ' hl' : ''}`;
-              const style = color(r) ? { stroke: color(r) } : undefined;
-              return r.kind === 'pole' ? (
-                <path key={i} className={cls} style={style} d={`M ${px(x) - sz} ${py(y) - sz} l ${2 * sz} ${2 * sz} m ${-2 * sz} 0 l ${2 * sz} ${-2 * sz}`} />
-              ) : (
-                <circle key={i} className={cls} style={style} cx={px(x)} cy={py(y)} r={sz} />
-              );
-            })}
-            {drag?.mode === 'box' && (
-              <rect
-                className="zoom-box"
-                x={Math.min(drag.x0, drag.x1)}
-                y={Math.min(drag.y0, drag.y1)}
-                width={Math.abs(drag.x1 - drag.x0)}
-                height={Math.abs(drag.y1 - drag.y0)}
-              />
+              </g>
+            </svg>
+            {hr && hi && (
+              <div className="pz-tip" style={{ left: GL + px(pts[hover!][0]), top: GT + py(pts[hover!][1]) }}>
+                <b>
+                  {glyph(hr)} {hr.kind === 'pole' ? t('pole') : t('zero')} {hr.n}
+                  {multi ? ` · ${runLabel(hr.run)}` : ''}
+                </b>
+                <span>
+                  s = {complexText(hr.re / unit, hr.im / unit)} {unitText}
+                </span>
+                <span>f₀ = {si(hi.f0)}Hz</span>
+                {Number.isFinite(hi.q) && <span>Q = {fmtNum(hi.q)}</span>}
+                <span>ζ = {fmtNum(hi.zeta)}</span>
+                <span>τ = {Number.isFinite(hi.tau) ? `${si(hi.tau)}s` : '∞'}</span>
+              </div>
             )}
-          </svg>
-          {hr && hi && (
-            <div className="pz-tip" style={{ left: `${(px(pts[hover!][0]) / W) * 100}%`, top: `${(py(pts[hover!][1]) / W) * 100}%` }}>
-              <b>
-                {hr.kind === 'pole' ? t('pole') : t('zero')} {hr.n}
-                {multi ? ` · ${runLabel(hr.run)}` : ''}
-              </b>
-              <span>
-                s = {complexText(hr.re / unit, hr.im / unit)} {unitText}
-              </span>
-              <span>f₀ = {si(hi.f0)}Hz</span>
-              {Number.isFinite(hi.q) && <span>Q = {fmtNum(hi.q)}</span>}
-              <span>ζ = {fmtNum(hi.zeta)}</span>
-              <span>τ = {Number.isFinite(hi.tau) ? `${si(hi.tau)}s` : '∞'}</span>
-            </div>
-          )}
+          </div>
+          <div className="pz-foot" ref={foot}>
+            {!compact && SW >= 380 && <p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
+          </div>
         </div>
-        {!compact && <p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
-        {bad.length > 0 && (
-          <p className="hint warn">
-            ⚠ {bad.length === 1 ? t('A pole') : t('{length} poles', { length: bad.length })} {t('in the right half-plane: the circuit is unstable')}{multi ? t(' (in some run)') : ''}.
-          </p>
-        )}
-        {multi && (
-          <ul className="pz-legend">
-            {runs.map((p, i) => (
-              <li key={p.name} style={{ color: PALETTE[i % PALETTE.length] }}>
-                ━ {runLabel(i)}
-              </li>
-            ))}
-          </ul>
+        {!compact && (
+          <div className="pz-table">
+            {bad.length > 0 && (
+              <p className="pz-warn">
+                ⚠ {bad.length === 1 ? t('A pole') : t('{length} poles', { length: bad.length })} {t('in the right half-plane: the circuit is unstable')}
+                {multi ? t(' (in some run)') : ''}.
+              </p>
+            )}
+            <table>
+              <thead>
+                <tr>
+                  {multi && <th>{t('Run')}</th>}
+                  <th />
+                  <th className="num">σ [{unitText}]</th>
+                  <th className="num">ω [{unitText}]</th>
+                  <th className="num">f₀</th>
+                  <th className="num">Q</th>
+                  <th className="num">ζ</th>
+                  <th className="num">τ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {roots.map((r, i) => {
+                  const info = rootInfo(r);
+                  return (
+                    <tr
+                      key={i}
+                      ref={(el) => {
+                        rows.current[i] = el;
+                      }}
+                      className={`${i === hover ? 'hl' : ''}${unstable(r) ? ' unstable' : ''}`}
+                      title={t('Click: center the map on it')}
+                      onClick={() => focus(i)}
+                      onPointerEnter={() => setHover(i)}
+                      onPointerLeave={() => setHover(null)}
+                    >
+                      {multi && (
+                        <td className="run">
+                          <i style={{ background: color(r) }} />
+                          {runLabel(r.run)}
+                        </td>
+                      )}
+                      <th>
+                        {glyph({ ...r, run: multi ? -1 : r.run })} {r.kind === 'pole' ? t('pole') : t('zero')} {r.n}
+                      </th>
+                      <td className="num">{si(r.re / unit)}</td>
+                      <td className="num">{r.im ? `${r.im < 0 ? '−' : '+'}${si(Math.abs(r.im / unit))}` : '0'}</td>
+                      <td className="num">{si(info.f0)}Hz</td>
+                      <td className="num">{Number.isFinite(info.q) ? fmtNum(info.q) : '—'}</td>
+                      <td className="num">{fmtNum(info.zeta)}</td>
+                      <td className="num">{Number.isFinite(info.tau) ? `${si(info.tau)}s` : '∞'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-      {!compact && (
-        <div className="pz-table">
-          <table className="scalars">
-            <thead>
-              <tr>
-                {multi && <th>{t('Run')}</th>}
-                <th />
-                <th>{hz ? 's/2π [Hz]' : 's [rad/s]'}</th>
-                <th>f₀ = |s|/2π</th>
-                <th>Q</th>
-                <th>ζ</th>
-                <th>τ = 1/|σ|</th>
-              </tr>
-            </thead>
-            <tbody>
-              {roots.map((r, i) => {
-                const info = rootInfo(r);
-                return (
-                  <tr
-                    key={i}
-                    ref={(el) => {
-                      rows.current[i] = el;
-                    }}
-                    className={`${i === hover ? 'hl' : ''}${unstable(r) ? ' unstable' : ''}`}
-                    onPointerEnter={() => setHover(i)}
-                    onPointerLeave={() => setHover(null)}
-                  >
-                    {multi && <td style={{ color: color(r) }}>{runLabel(r.run)}</td>}
-                    <th>{r.kind === 'pole' ? t('× pole {n}', { n: r.n }) : t('○ zero {n}', { n: r.n })}</th>
-                    <td>{complexText(r.re / unit, r.im / unit)}</td>
-                    <td>{si(info.f0)}Hz</td>
-                    <td>{Number.isFinite(info.q) ? fmtNum(info.q) : '—'}</td>
-                    <td>{fmtNum(info.zeta)}</td>
-                    <td>{Number.isFinite(info.tau) ? `${si(info.tau)}s` : '∞'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

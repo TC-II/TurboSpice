@@ -30,6 +30,11 @@ const P: Record<string, ReactNode> = {
   label: <path d="M3 6.5h9l4.5 3.5-4.5 3.5H3zM6.5 10h.01" />,
   // figuras: línea, rectángulo y círculo
   shapes: <path d="M2.5 17.5l6-6M11 3.5h6v6h-6zM6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6M13.5 14a3 3 0 1 0 .01 0" />,
+  line: <path d="M4 16 16 4" />,
+  rect: <path d="M4 5.5h12v9H4z" />,
+  circle: <path d="M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12" />,
+  // pin: cuadradito con su patita
+  pin: <path d="M3 10h7M10 7.5h5v5h-5z" />,
   text: <path d="M4 5V3.5h12V5M10 3.5v13M7.5 16.5h5" />,
   directive: <path d="M7 4 3 10l4 6M13 4l4 6-4 6M11 3.5l-2 13" />,
   // cruz a 45°, chica como los trazos del esquemático

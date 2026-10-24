@@ -716,7 +716,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
     ...st.measures.filter((m) => m.kind !== 'raw' && !m.signal).map((m) => t('The signal of {name} is missing', { name: m.name })),
   ];
   return (
-    <Modal title={t('Study')} onClose={onClose} wide hidden={hidden}>
+    <Modal title={t('Studio')} onClose={onClose} wide hidden={hidden}>
       <datalist id="study-components">{info.components.map((c) => <option key={c.name} value={c.name}>{c.value}</option>)}</datalist>
       <datalist id="study-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="study-params">{info.params.map((n) => <option key={n} value={n} />)}</datalist>
@@ -895,7 +895,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       )}
       {tab === 'code' && (
         <div className="study-code">
-          <textarea spellCheck={false} rows={14} aria-label={t('Study code')} value={shownCode} onChange={(e) => setCode(e.target.value)} />
+          <textarea spellCheck={false} rows={14} aria-label={t('Studio code')} value={shownCode} onChange={(e) => setCode(e.target.value)} />
           <p className="hint">
             {t('Lines starting with ";" are disabled. You can edit by hand: when applying, what\'s recognized becomes cards again and the rest stays as a directive.')}
           </p>

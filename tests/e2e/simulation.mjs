@@ -92,21 +92,30 @@ check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
 
-// --- #197: un .control a mano con su propio análisis lo avisa en Problemas ---
+// --- #197/#241: un .control a mano sin "run" es una Complex simulation: su análisis reemplaza al
+// del testbench sin aviso; con "run" y además su propio análisis corren los dos, y se avisa ---
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('tran 1u 1m\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
-const own = await page.locator('.problems li', { hasText: 'corre su propio análisis (tran)' }).count();
-check(own === 1, 'Problemas avisa que el .control corre su propio análisis, no la configuración');
+await resultsMenu(page, /^Errores/);
+const quiet = await page.locator('.problems li', { hasText: 'propio análisis' }).count();
+check(quiet === 0, 'un .control sin run con su propio análisis (Complex simulation) no avisa');
+await menu(page, 'Simular', 'Bloque .control…');
+await page.locator('.modal textarea').fill('run\ntran 1u 1m\n');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+await page.getByRole('button', { name: 'Correr', exact: true }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await resultsMenu(page, /^Errores/);
+const own = await page.locator('.problems li', { hasText: 'además su propio análisis (tran)' }).count();
+check(own === 1, 'Errores avisa que el .control corre la configuración y además su propio análisis');
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('print v(out)\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await resultsMenu(page, /^Problemas/);
+await resultsMenu(page, /^Errores/);
 const none = await page.locator('.problems li', { hasText: 'no se simula nada' }).count();
 check(none === 1, 'y que un .control sin run ni análisis no simula nada');
 
@@ -127,7 +136,8 @@ const probe = async (x, y) => {
 const benchName = () => page.locator('.capsule-variant').textContent();
 await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
-check(/^Testbench \d+$/.test(await benchName()), `un tipo nuevo crea otro testbench, con nombre consecutivo (${await benchName()})`);
+// sin nombre propio, el testbench se llama como su análisis
+check((await benchName()) === 'Barrido DC', `un tipo nuevo crea otro testbench, con el nombre de su análisis (${await benchName()})`);
 await page.locator('.capsule-variant').dblclick();
 await page.getByLabel('Nombre del testbench').fill('DC');
 await page.getByLabel('Nombre del testbench').press('Enter');
@@ -146,7 +156,7 @@ await page.locator('.project-tree .tree-name').filter({ hasText: /^DC$/ }).hover
 await page.getByRole('button', { name: 'Duplicar DC', exact: true }).click();
 await page.waitForTimeout(300);
 const copyName = await benchName();
-check(/^Testbench \d+$/.test(copyName), `la copia es otro testbench, con nombre consecutivo (${await benchName()})`);
+check(copyName === 'DC (copia)', `la copia es otro testbench, «‹nombre› (copia)» (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)
 const directiveIs = (t) =>

@@ -140,3 +140,4 @@ export function topModuleOf(text: string): string | undefined {
   const tops = names.filter((n) => !used(n));
   return tops.at(-1) ?? names.at(-1);
 }
+

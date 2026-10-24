@@ -51,11 +51,28 @@ function db(): Promise<IDBDatabase> {
   dbPromise ??= new Promise((resolve, reject) => {
     const req = indexedDB.open(DB, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const d = req.result;
+      // el navegador puede cerrar la conexión (borrado de datos, otra pestaña que actualiza la
+      // base): la próxima operación abre una nueva en vez de fallar para siempre
+      d.onclose = () => (dbPromise = null);
+      d.onversionchange = () => (d.close(), (dbPromise = null));
+      resolve(d);
+    };
+    req.onerror = () => {
+      dbPromise = null;
+      reject(req.error);
+    };
   });
   return dbPromise;
 }
+
+/** Fin de una transacción de escritura; sin espacio (QuotaExceededError) se aborta sin 'error' */
+const done = (tx: IDBTransaction) =>
+  new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = tx.onabort = () => reject(tx.error ?? new DOMException('aborted', 'AbortError'));
+  });
 
 async function get<T>(key: string): Promise<T | undefined> {
   const d = await db();
@@ -67,13 +84,9 @@ async function get<T>(key: string): Promise<T | undefined> {
 }
 
 async function put(key: string, value: unknown): Promise<void> {
-  const d = await db();
-  return new Promise((resolve, reject) => {
-    const tx = d.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(value, key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const tx = (await db()).transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).put(value, key);
+  return done(tx);
 }
 
 /** Errores de IndexedDB (modo privado, almacenamiento bloqueado): se ignoran */
@@ -165,11 +178,7 @@ export const saveResult = <T>(simId: string, r: CachedResult<T>) => quiet(put(`r
 export const dropResult = (simId: string) => quiet(del(`res:${simId}`), undefined);
 
 async function del(key: string): Promise<void> {
-  const d = await db();
-  return new Promise((resolve, reject) => {
-    const tx = d.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).delete(key);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
+  const tx = (await db()).transaction(STORE, 'readwrite');
+  tx.objectStore(STORE).delete(key);
+  return done(tx);
 }

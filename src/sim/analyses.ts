@@ -169,10 +169,14 @@ export function parseAnalysis(line: string): Analysis | null {
       const sweep = /^ac$/i.test(a[1] ?? '') ? parseSweep(a.slice(2)) : null;
       return sweep ? { kind, out, ac: true, sweep } : null;
     }
-    case 'pz':
-      return a.length === 6 && /^(vol|cur)$/i.test(a[4]) && /^(pz|pol|zer)$/i.test(a[5])
-        ? { kind, inP: a[0], inN: a[1], outP: a[2], outN: a[3], type: a[4].toLowerCase() as 'vol', which: a[5].toLowerCase() as 'pz' }
-        : null;
+    case 'pz': {
+      // sin entrada o salida elegidas (".pz  0  0 vol pz") faltan nodos: se leen vacíos para que la
+      // barra siga mostrando sus campos
+      const n = a.length - 2;
+      if (n < 2 || n > 4 || !/^(vol|cur)$/i.test(a[n]) || !/^(pz|pol|zer)$/i.test(a[n + 1])) return null;
+      const [inP, inN, outP, outN] = n === 4 ? a : n === 3 ? [a[0], a[1], '', a[2]] : ['', a[0], '', a[1]];
+      return { kind, inP, inN, outP, outN, type: a[n].toLowerCase() as 'vol', which: a[n + 1].toLowerCase() as 'pz' };
+    }
     case 'disto': {
       const sweep = parseSweep(a);
       return sweep ? { kind, sweep, f2overf1: a[4] ?? '' } : null;
@@ -185,7 +189,7 @@ export function parseAnalysis(line: string): Analysis | null {
   return null;
 }
 
-const isNum = (s: string) => /^\{.+\}$/.test(s.trim()) || /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-zµμ]*$/i.test(s.trim());
+export const isNum = (s: string) => /^\{.+\}$/.test(s.trim()) || /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-zµμ]*$/i.test(s.trim());
 
 /** Errores del formulario (vacío = se puede aceptar) */
 export function validateAnalysis(a: Analysis): string[] {

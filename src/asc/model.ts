@@ -77,7 +77,13 @@ export interface SchText {
   text: string;
 }
 
-export type ShapeKind = 'LINE' | 'RECTANGLE' | 'CIRCLE' | 'ARC';
+/** Figuras que se dibujan con clicks (las de LTspice) */
+export type DrawnShapeKind = 'LINE' | 'RECTANGLE' | 'CIRCLE' | 'ARC';
+/**
+ * PATH (trazo a mano alzada) e IMAGE (imagen de fondo en base64) son propias de TurboSpice:
+ * `PATH Normal n x1 y1 … xn yn [style]` e `IMAGE Normal x1 y1 x2 y2 data:image/…;base64,…`
+ */
+export type ShapeKind = DrawnShapeKind | 'PATH' | 'IMAGE';
 
 export interface Shape {
   kind: ShapeKind;
@@ -85,6 +91,8 @@ export interface Shape {
   coords: number[];
   /** Estilo de línea opcional (1 = guiones, 2 = puntos, …) */
   style?: string;
+  /** IMAGE: la imagen como data URL (base64) */
+  data?: string;
 }
 
 export interface AscDoc {

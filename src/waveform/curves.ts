@@ -5,7 +5,7 @@ import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { spectrum, thd } from './fft.ts';
 import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
-import { PALETTE, traceColor, type Pane } from './view.ts';
+import { PALETTE, isFftPane, sameExpr, sameFft, traceColor, type Pane, type PaneFft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 import { digitalWidth, isDigitalExpr } from './digital.ts';
 
@@ -43,6 +43,8 @@ export interface PaneData {
   iUnit: string;
   /** panel de FFT: fundamental y THD de cada traza */
   info?: string[];
+  /** vista en X sin zoom, si no es todo `x` (FFT de distintas grillas: hasta la menor frecuencia máxima) */
+  home?: [number, number];
 }
 
 export interface CurveContext {
@@ -87,7 +89,7 @@ export function sweepSegments(x: Float64Array): [number, number][] {
 }
 
 export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
-  if (pane.fft) return fftCurves(pane, ctx);
+  if (isFftPane(pane)) return fftCurves(pane, ctx);
   const scale = scaleOf(ctx.plot)!;
   const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
   const segs = all.length === 1 ? sweepSegments(scale.real) : [[0, scale.real.length] as [number, number]];
@@ -150,12 +152,29 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
 }
 
+const WINDOW_LABEL: Record<PaneFft['window'], string> = { hann: 'Hann', hamming: 'Hamming', blackman: 'Blackman', flattop: 'Flat top', rect: 'Rectangular' };
+
 /**
- * Panel de FFT (#236): espectro (en dB) de cada traza del plot mostrado, en el rango de tiempo
- * guardado en el panel; el eje X es la frecuencia.
+ * Nombre de una traza en la leyenda (#260): "FFT(I(R1))" para una FFT; si otra FFT de la misma
+ * señal (en `others`) difiere en la ventana o el rango, se agrega lo que las distingue:
+ * "FFT(I(R1), Hann)", "FFT(I(R1), 1ms…2ms)".
+ */
+export function traceLabel(tt: Trace, others: Trace[] = []): string {
+  const f = tt.fft;
+  if (!f) return tt.expr;
+  const twins = others.filter((o) => o !== tt && o.fft && sameExpr(o.expr, tt.expr) && !sameFft(o.fft, f));
+  const extra: string[] = [];
+  if (twins.some((o) => o.fft!.window !== f.window)) extra.push(t(WINDOW_LABEL[f.window]));
+  if (twins.some((o) => o.fft!.from !== f.from || o.fft!.to !== f.to)) extra.push(f.from !== undefined && f.to !== undefined ? `${si(f.from)}s…${si(f.to)}s` : t('all points'));
+  return `FFT(${[tt.expr, ...extra].join(', ')})`;
+}
+
+/**
+ * Panel de FFT (#236): espectro (en dB) de cada traza del plot mostrado, cada una con su ventana
+ * y rango de tiempo (#260); el eje X es la frecuencia: la unión de las grillas de todas, cada
+ * una vacía fuera de la suya. Sin zoom se ve hasta la menor de las frecuencias máximas.
  */
 export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
-  const o = pane.fft!;
   const scale = scaleOf(ctx.plot);
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
@@ -165,10 +184,12 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
     pane.traces.forEach((_, ti) => errors.set(ti, t('The FFT needs a transient analysis')));
     return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A' };
   }
-  // todas las trazas con la misma grilla de frecuencias: mismo rango y cantidad de puntos
-  const from = Math.max(o.from ?? scale.real[0], scale.real[0]);
-  const to = Math.min(o.to ?? scale.real[scale.real.length - 1], scale.real[scale.real.length - 1]);
+  const spectra: { ti: number; label: string; freq: Float64Array; db: Float64Array }[] = [];
   pane.traces.forEach((tt, ti) => {
+    const o = tt.fft;
+    if (!o) return errors.set(ti, t('The FFT needs a transient analysis'));
+    const from = Math.max(o.from ?? scale.real[0], scale.real[0]);
+    const to = Math.min(o.to ?? scale.real[scale.real.length - 1], scale.real[scale.real.length - 1]);
     let w;
     try {
       w = evalTrace(tt.expr, { resolve: ctx.resolver(ctx.plot), scale: scale.real, scaleName: scale.name });
@@ -176,11 +197,29 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
       errors.set(ti, (e as Error).message);
       return;
     }
-    const sp = spectrum(scale.real, w.re, { from, to, window: o.window, ...(x.length ? { points: x.length * 2 } : {}) });
-    if (!x.length) x = sp.freq;
+    const sp = spectrum(scale.real, w.re, { from, to, window: o.window });
     const th = thd(sp);
-    info.push(t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points', { expr: tt.expr, p1: si(th.fundamental), p2: si(th.amplitude), p3: th.thd.toFixed(3), p4: th.harmonics.length + 1, n: sp.n }));
-    curves.push({ label: `FFT ${tt.expr}`, trace: ti, run: 0, color: traceColor(tt, ti), dash: false, axis: 'y', y: sp.amp.map((a) => 20 * Math.log10(a)), hidden: !!tt.hidden });
+    const label = traceLabel(tt, pane.traces);
+    info.push(t('{expr}: fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points', { expr: label, p1: si(th.fundamental), p2: si(th.amplitude), p3: th.thd.toFixed(3), p4: th.harmonics.length + 1, n: sp.n }));
+    spectra.push({ ti, label, freq: sp.freq, db: sp.amp.map((a) => 20 * Math.log10(a)) });
   });
-  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info };
+  // (otra ventana da la misma grilla; otro rango u otro paso, otra)
+  const same = (a: Float64Array, b: Float64Array) => a === b || (a.length === b.length && a[1] === b[1] && a[a.length - 1] === b[b.length - 1]);
+  const grids = spectra.map((s) => s.freq).filter((f, k, all) => all.findIndex((g) => same(f, g)) === k);
+  x = grids.length === 1 ? grids[0] : union(grids);
+  for (const { ti, label, freq, db } of spectra) {
+    const tt = pane.traces[ti];
+    curves.push({ label, trace: ti, run: 0, color: traceColor(tt, ti), dash: false, axis: 'y', y: same(freq, x) ? db : resample(freq, db, x), hidden: !!tt.hidden });
+  }
+  const fmax = Math.min(...grids.map((f) => f[f.length - 1]));
+  const home: [number, number] | undefined = grids.length > 1 && fmax < x[x.length - 1] ? [x[0], fmax] : undefined;
+  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info, home };
+}
+
+/** Unión ordenada de grillas (sin repetir valores) */
+function union(grids: Float64Array[]): Float64Array {
+  const all = Float64Array.from(grids.flatMap((g) => Array.from(g))).sort();
+  let n = 0;
+  for (let i = 0; i < all.length; i++) if (!n || all[i] !== all[n - 1]) all[n++] = all[i];
+  return all.slice(0, n);
 }

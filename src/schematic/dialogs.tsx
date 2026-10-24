@@ -404,7 +404,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
                   <button
                     type="button"
                     className="link"
-                    title={t('Sweep {k} of this instance from the Study (.step)', { k })}
+                    title={t('Sweep {k} of this instance from the Studio (.step)', { k })}
                     onClick={() => onSweep(k, cur.get(k.toLowerCase()) ?? d, Object.fromEntries(Object.entries(vals).filter(([kk, v]) => v !== (eff.get(kk) ?? ''))))}
                   >
                     {t('Sweep')}
@@ -504,13 +504,18 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
   );
 }
 
-/** N: nombre de red (o tierra) */
-export function FlagDialog({ initial, onApply, onClose }: {
+/** N: nombre de red (o tierra); adentro de un subcircuito, también si es un puerto */
+export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
   initial: string;
-  onApply(name: string): void;
+  /** puerto actual de la etiqueta ('' = no es puerto) */
+  initialPort?: string;
+  /** mostrar la elección de puerto (adentro de un subcircuito) */
+  port?: boolean;
+  onApply(name: string, ioPin?: string): void;
   onClose(): void;
 }) {
   const [name, setName] = useState(initial);
+  const [io, setIo] = useState(initialPort ?? '');
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => {
     input.current?.focus();
@@ -522,13 +527,26 @@ export function FlagDialog({ initial, onApply, onClose }: {
         className="attrs"
         onSubmit={(e) => {
           e.preventDefault();
-          if (name.trim()) onApply(name.trim());
+          if (name.trim()) onApply(name.trim(), port ? io : undefined);
         }}
       >
         <label>
           <span>{t('Name')}</span>
           <input ref={input} value={name} spellCheck={false} onChange={(e) => setName(e.target.value.replace(/\s/g, ''))} />
         </label>
+        {port && (
+          <label>
+            <span>{t('Subcircuit port')}</span>
+            <select value={io} onChange={(e) => setIo(e.target.value)}>
+              <optgroup label={t('Accessible')}>
+                <option value="BiDir">{t('Bidirectional')}</option>
+                <option value="In">{t('Input')}</option>
+                <option value="Out">{t('Output')}</option>
+              </optgroup>
+              <option value="">{t('Internal (not on the symbol)')}</option>
+            </select>
+          </label>
+        )}
         <div className="buttons">
           <button type="button" onClick={onClose}>{t('Cancel')}</button>
           <button type="submit" className="primary">{t('OK')}</button>
@@ -659,6 +677,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       [t('Space'), t('Fit (see everything)')],
       ['Z · Shift+Z', t('Zoom to a box (X and Y) · previous zoom')],
       ['Ctrl+Y', t('Vertical autoscale')],
+      [t('Ctrl+wheel'), t('Scroll along the X axis')],
       ['Ctrl+G', t('Show/hide the grid')],
       ['A', t('Add trace (expression field, with autocomplete)')],
       ['P · B', t('Add pane · add pane below the active one')],

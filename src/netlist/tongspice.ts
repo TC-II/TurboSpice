@@ -55,6 +55,8 @@ export interface NgspiceNetlist {
   /** el .control lo generó un programa de bloques (tabla, listas e histogramas en el log) */
   blocks?: boolean;
   warnings: string[];
+  /** elementos sin valor asignado (R, C, L, fuentes…): no se simula hasta asignarlo (#256) */
+  missingValues: string[];
 }
 
 // Parámetros de L/C/V que ngspice no conoce y se expanden en elementos
@@ -618,9 +620,11 @@ function convertElements(
   startup = false,
   holdIc = false,
   coupled = new Set<string>(),
+  missingValues: string[] = [],
 ): string[] {
   const out: string[] = [];
   const extra: string[] = [];
+  const grounded = bypassGrounded(lt.elements);
   for (const e of lt.elements) {
     const name = ngspiceName(e, used);
     names.set(e.name, name);
@@ -638,7 +642,8 @@ function convertElements(
     }
     const letter = name[0].toUpperCase();
     // compuertas digitales de LTspice (ver digital.ts)
-    const gate = letter === 'A' ? translateDigital(name, e.nodes, e.value, warnings) : undefined;
+    // una entrada unida a tierra por un jumper (bypass) está en el nodo 0 en LTspice, que une las redes
+    const gate = letter === 'A' ? translateDigital(name, e.nodes.map((n) => (grounded.has(n) ? '0' : n)), e.value, warnings) : undefined;
     if (gate) {
       out.push(...gate);
       continue;
@@ -647,6 +652,7 @@ function convertElements(
     // (En D, Q, M y J el valor por defecto es un modelo implícito válido.)
     if (/^[RCLVIEFGHB]$/.test(letter) && (e.value === '' || e.value.toUpperCase() === letter)) {
       warnings.push(t('{name} has no value assigned', { name: e.name }));
+      missingValues.push(e.name);
     }
     if (letter === 'X') {
       const { main, params, order } = splitParams(e.value);
@@ -717,6 +723,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const includes: string[] = [];
   const subcktParams = new Map<string, Map<string, string>>();
   const blockNames = new Map<string, Map<string, string>>();
+  const missingValues: string[] = [];
   const out: string[] = [
     `* ${title}`,
     // Constante predefinida en las expresiones de LTspice que ngspice no tiene en .param
@@ -740,7 +747,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
   const holdIc = tranHoldsIc(lt);
   for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t('.ic I({l})={v}: ngspice uses the inductor\'s initial current only with .tran uic', { l, v }));
-  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt)));
+  out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt), missingValues));
   out.push(...capacitorIcs(lt, names, holdIc));
   const implicit = [...lt.implicitModels];
   for (const b of lt.blocks) for (const m of b.lt.implicitModels) if (!implicit.includes(m)) implicit.push(m);
@@ -780,6 +787,9 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     out.push('.control', ...body, '.endc');
   }
   if (ctl && !hooks) warnings.push(...controlRunWarnings(ctl.text.split('\\n').slice(1, -1), !!blocksCtl));
+  // #241 Complex simulation: un .control común sin "run" reemplaza al análisis del testbench (que
+  // queda en el .asc para LTspice): no se emiten los dos. Con "run", el análisis es lo que corre.
+  const replacesAnalysis = !!ctl && !hooks && !blocksCtl && !controlUsesRun(ctl.text.split('\\n').slice(1, -1));
   for (const tt of lt.texts) {
     if (hooks && tt === ctl) continue;
     if (blocksCtl && tt === blocksCtl) continue;
@@ -809,6 +819,10 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
         line = ic;
       }
       if (DROP_DIRECTIVES.test(line)) continue;
+      if (replacesAnalysis && TESTBENCH_ANALYSIS.test(line)) {
+        out.push(`* ${line}`);
+        continue;
+      }
       if (/^\.meas(ure)?\b/i.test(line)) {
         measures.push(line);
         out.push(`* ${line}`);
@@ -903,7 +917,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
     const inner = new Map<string, string>();
     blockNames.set(b.name.toLowerCase(), inner);
-    out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams));
+    out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams, undefined, false, false, undefined, missingValues));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;
       for (const raw of tt.text.split('\\n')) {
@@ -922,7 +936,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, blockNames, warnings, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
+  return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */
@@ -940,6 +954,12 @@ function declaredParams(lt: LtNetlist): Set<string> {
   }
   return out;
 }
+
+// Comando de análisis del testbench (fuera del .control)
+const TESTBENCH_ANALYSIS = /^\.(tran|ac|dc|noise|op|tf|sens|pz|disto|sp|pss)\b/i;
+
+/** ¿El cuerpo del .control usa "run" (corre los análisis del testbench)? */
+export const controlUsesRun = (lines: string[]) => lines.some((raw) => /^run$/i.test(raw.replace(/;.*$/, '').trim().split(/\s+/)[0] ?? ''));
 
 // Comandos de análisis de ngspice (13.5): en un .control corren ese análisis, no el del testbench
 const ANALYSIS_COMMANDS = /^(tran|ac|dc|op|noise|tf|pz|sens|disto|pss|sp)$/i;
@@ -962,7 +982,8 @@ export function controlRunWarnings(lines: string[], blocks: boolean): string[] {
   if (blocks) return run || own.length ? [] : [t('The blocks program has no Simulate block: nothing is simulated')];
   const p0 = own.join(', ');
   if (own.length && run) return [t('The .control block runs the simulation configuration and also its own analysis ({p0})', { p0 })];
-  if (own.length) return [t('The .control block runs its own analysis ({p0}), not the testbench\'s simulation configuration', { p0 })];
+  // sin "run" es una Complex simulation (#241): su análisis reemplaza al del testbench
+  if (own.length) return [];
   if (!run) return [t('The .control block has no "run" or analysis command: nothing is simulated')];
   return [];
 }
@@ -1083,4 +1104,23 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   }
   // nodos sin camino de continua a tierra: como LTspice (ver floating.ts)
   return { netlist: fixFloatingNodes(text, files).text, files, warnings };
+}
+
+/**
+ * Nodos unidos a tierra sólo a través de Misc\jumper (subcircuito bypass de TCLib, una fuente de 0 V).
+ * LTspice une esas redes con la de tierra, así que para él son el nodo 0.
+ */
+function bypassGrounded(elements: { name: string; nodes: string[]; value: string }[]): Set<string> {
+  const adj = new Map<string, string[]>();
+  for (const e of elements) {
+    if (!/^X/i.test(e.name) || e.nodes.length !== 2 || !/^\s*bypass\b/i.test(e.value)) continue;
+    const [a, b] = e.nodes;
+    adj.set(a, [...(adj.get(a) ?? []), b]);
+    adj.set(b, [...(adj.get(b) ?? []), a]);
+  }
+  const seen = new Set<string>(['0']);
+  const todo = ['0'];
+  while (todo.length) for (const n of adj.get(todo.pop()!) ?? []) if (!seen.has(n)) (seen.add(n), todo.push(n));
+  seen.delete('0');
+  return seen;
 }

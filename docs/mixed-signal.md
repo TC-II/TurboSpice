@@ -19,7 +19,8 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
 ## Módulos Verilog
 
 Un módulo Verilog es `<nombre>.v` + `<nombre>.asy`, como un subcircuito esquemático es `.asc` + `.asy`:
-- **+ Nuevo** en Módulos pregunta *Esquemático* o *Verilog*. Doble clic en una instancia (o abrirlo
+- **Módulos › «+ New» › Verilog** crea uno (el menú también tiene Subcircuito y Modelo); se abre
+  igual con clic en el panel o desde *Archivos del proyecto*. Doble clic en una instancia (o abrirlo
   desde el panel) muestra su vista: el código (con números de línea y el error marcado), el modo, los
   pines, la interfaz eléctrica y los parámetros; al costado, el editor del símbolo. Alt+↑ vuelve.
 - El módulo de más arriba del `.v` se llama como el archivo. La síntesis queda en el `.v`

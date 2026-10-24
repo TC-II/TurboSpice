@@ -10,7 +10,7 @@ import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasCommand, biasParams, elementBias, netBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
-import type { Point, ShapeKind } from './asc/model.ts';
+import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
@@ -27,24 +27,23 @@ import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
-import { parseAsc } from './asc/parse.ts';
+import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisLabel, defaultLine, keepResult, MAX_SIMS, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, MAX_SIMS, pzLogErrors, pzProblem, simName, type SimList, type SimView } from './sim/simList.ts';
+import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
   addGroup,
   applyValues,
-  freeBenchName,
   removeGroup,
   renameGroup,
   setBenchGroup,
   placeBench,
-  simLabel,
   groupPeersWith,
   propagateAttrs,
   mergeFiles,
@@ -68,7 +67,7 @@ import {
 } from './project/project.ts';
 import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { staleInstances } from './project/staleInstances.ts';
-import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom } from './project/exchange.ts';
+import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom, type Imported } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
@@ -83,12 +82,14 @@ import { parseSource } from './sim/sources.ts';
 import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { BenchParamsDialog, HierBar, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
-import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
+import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { addModelModule, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
+import { ModelEditor } from './project/ModelEditor.tsx';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
@@ -114,6 +115,7 @@ import { loadView } from './schematic/autosave.ts';
 import { decode, decodeText } from './asc/encoding.ts';
 import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
@@ -147,7 +149,7 @@ type Dialog =
   | { kind: 'attrs'; index: number; label?: number }
   | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
-  | { kind: 'flag'; index?: number; at?: Point }
+  | { kind: 'flag'; index?: number; at?: Point; ioPin?: string }
   | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
   | { kind: 'share'; url: string }
@@ -162,8 +164,8 @@ type Dialog =
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }
   | { kind: 'projectfiles' }
-  /** módulo nuevo: esquemático o Verilog (#209) */
-  | { kind: 'newModule' }
+  /** módulo nuevo (#209): esquemático o Verilog, el que se eligió en «+ New» */
+  | { kind: 'newModule'; module: 'schematic' | 'verilog' }
   /** pedir un nombre (testbench o subcircuito, #180) */
   | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
   /** parámetros y variables del testbench (#180) */
@@ -259,8 +261,25 @@ const userFileKind = (name: string): UserFile['kind'] | null =>
 /** Copia interna por si el navegador no deja leer el portapapeles */
 let clipboardFallback = '';
 
+/**
+ * Imagen pegada → data URL y tamaño en unidades del esquemático (1 px = 1 unidad, el lado mayor
+ * a lo sumo 800). Las grandes se achican y pasan a JPEG para no inflar el archivo.
+ */
+async function clipboardImage(blob: Blob): Promise<{ data: string; w: number; h: number }> {
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * k);
+  canvas.height = Math.round(bmp.height * k);
+  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const png = canvas.toDataURL('image/png');
+  const data = png.length > 600_000 ? canvas.toDataURL('image/jpeg', 0.85) : png;
+  const s = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+  return { data, w: Math.round(bmp.width * s), h: Math.round(bmp.height * s) };
+}
+
 /** Nombre de cada vista del panel de resultados (en el botón Resultados) */
-const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Problems'), meas: t('Measurements') };
+const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Errors'), meas: t('Measurements') };
 
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
@@ -377,11 +396,29 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const v = lsGet('turbospice.tree');
     return v === '1' ? true : v === '0' ? false : null;
   });
-  const hasSubs = project.files.some((f) => f.kind === 'schematic');
+  const hasSubs = project.files.some((f) => f.kind === 'schematic' || isModelModule(f));
+  // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
+  const [curModel, setCurModel] = useState('');
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
-  const hierOn = path.length > 0;
-  const treeShown = treeOpen || treePeek;
+  // ancho del panel del símbolo (se arrastra su borde izquierdo)
+  const [symW, setSymWState] = useState(() => {
+    try {
+      return Number(localStorage.getItem('turbospice.symW')) || 420;
+    } catch {
+      return 420;
+    }
+  });
+  const setSymW = (w: number) => {
+    setSymWState(w);
+    try {
+      localStorage.setItem('turbospice.symW', String(Math.round(w)));
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
+  // con «mostrar al acercar el mouse» el panel oculto queda como un borde visible (#251)
+  const treeShown = treeOpen || treePeek || hoverReveal;
   const [quickOpen, setQuickOpen] = useState(false);
   const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
@@ -432,7 +469,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [historyOpen, curRuns, liveDoc, project.files]); // eslint-disable-line react-hooks/exhaustive-deps
   // adentro de un subcircuito (#180) el comando es el del testbench (lo que se simula)
   const tbDoc = useMemo(() => (curSub ? parseAsc(activeAsc(variant)) : null), [curSub, variant]);
-  const docLine = findAnalysis(tbDoc ?? doc)?.value ?? '';
+  // (#241: COMPLEX_LINE si el testbench es una Complex simulation)
+  const docLine = simLine(tbDoc ?? doc);
   const sims = useMemo(
     (): SimList => ({
       items: variant.sims.map((s) => ({ id: s.id, ...(s.name ? { name: s.name } : {}), line: s.id === variant.activeSim ? docLine : lineOf(s.asc), ...(s.view ? { view: s.view } : {}) })),
@@ -510,6 +548,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       off = true;
     };
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setCurModel(''), [path, sims.active]);
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
     lib.setProjectFiles(project.files);
@@ -643,7 +682,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [traceNet, setTraceNet] = useState<string>();
 
   // Elegir una red o fuente en el esquemático desde un diálogo (que queda oculto mientras)
-  const [picking, setPicking] = useState<{ what: PickWhat; resolve(v: string | null): void; prev: Tool } | null>(null);
+  const [picking, setPicking] = useState<{ what: PickWhat; ground?: boolean; resolve(v: string | null): void; prev: Tool } | null>(null);
 
   const setTool = useCallback((tt: Tool) => {
     setToolState(tt);
@@ -651,7 +690,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, []);
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
-  const shapeTool = (shape: ShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(true);
@@ -816,6 +855,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const view = asPlotView(shared.view);
     const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
     remember(loadDoc(d, f.name), { name: `${projectName(f.name)}${EXT}` });
+    warnMissing(f.doc);
     return true;
   }, [loadDoc]);
 
@@ -863,9 +903,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     if (!restored) return;
     const tt = setTimeout(() => {
-      serializeTurbo(snapshot()).then((turbo) =>
-        saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }),
-      );
+      serializeTurbo(snapshot())
+        .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
+        .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);
   }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
@@ -1155,7 +1195,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     try {
       if (bytes) return await openBytes(bytes, r.name, at);
       // la copia guardada en recientes
-      if (!r.turbo) return void remember(loadDoc(parseAsc(r.asc), r.name), { name: `${projectName(r.name)}${EXT}` });
+      if (!r.turbo) {
+        const d = parseAsc(r.asc);
+        remember(loadDoc(d, r.name), { name: `${projectName(r.name)}${EXT}` });
+        return warnMissing(d);
+      }
       const { project: parsed, warnings } = await parseTurbo(r.asc);
       const p = { ...parsed, name: projectName(r.name) };
       loadProject(p, { name: r.name, ...at });
@@ -1185,6 +1229,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
     const doc = liveDoc;
     setViewRun('');
+    aborting.current = false;
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
     engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
@@ -1210,10 +1255,16 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       built.files = { ...built.files, ...vv.files };
       built.warnings.push(...vv.warnings);
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
-      const tooBig = built.tooBig.map((p) => p.text);
-      const { result, ms } = tooBig.length
-        ? { result: { plots: [], log: tooBig, errors: tooBig, aborted: false }, ms: 0 }
+      // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
+      // un .pz sin nodos de entrada o salida tampoco: ngspice sólo diría "Error on line N"
+      const pz = pzProblem(lineOf(simAsc) ?? '');
+      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(pz ? [pz] : [])];
+      const { result, ms } = blocking.length
+        ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
         : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
+      // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
+      const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
+      if (pzErrs.length) result.errors.unshift(...pzErrs);
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
       // .meas: se evalúan sobre los resultados de cada corrida
@@ -1261,12 +1312,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // símbolos faltantes: el circuito simulado no es el del esquemático, el aviso va primero (#108)
       const missing = built.missingSymbols;
       setMessage(
-        missing.length
+        errs.length && !result.plots.length
+          ? t('{p0} — see the Errors tab', { p0: errs[0] })
+          : missing.length
           ? missing.length === 1
             ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
             : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
           : built.warnings.length
-            ? t('{p0} — see the Problems tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
+            ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
             : undefined,
       );
       if (result.plots.length) {
@@ -1275,14 +1328,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         setPanel(errs.length ? 'problems' : meas?.rows.length && (nothingPlotted || (blk.table && !xy.length)) ? 'meas' : 'plot');
       } else setPanel(errs.length ? 'problems' : 'log');
     } catch (e) {
-      setStatus({ kind: 'error', message: (e as Error).message });
+      // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
+      if (!aborting.current) setStatus({ kind: 'error', message: (e as Error).message });
     }
   };
 
+  const aborting = useRef(false);
   const abort = () => {
     engine.abort();
-    engine.ready.then(() => setStatus({ kind: 'idle' }));
-    setStatus({ kind: 'error', message: t('Simulation aborted') });
+    aborting.current = true;
+    // queda "sin simular" (no "lista": lo que se ve, si hay algo, es de la corrida anterior)
+    setStatus({ kind: 'aborted' });
+    setMessage(sim ? t('Simulation aborted: the results shown are from the previous run') : t('Simulation aborted'));
+    engine.ready.catch((e: Error) => setStatus({ kind: 'error', message: e.message }));
   };
   /** Ctrl+L: log de la simulación (Problemas si hubo errores) */
   const showLog = () => {
@@ -1445,7 +1503,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       },
     });
   // módulo nuevo (#209): esquemático o Verilog
-  const newSubckt = () => setDialog({ kind: 'newModule' });
+  const newSubckt = () => setDialog({ kind: 'newModule', module: 'schematic' });
   const createModule = (name: string, kind: 'schematic' | 'verilog') => {
     setDialog(null);
     if (kind === 'schematic') return createSubckt(name);
@@ -1460,25 +1518,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // el proyecto nuevo tiene que estar antes de abrirlo
     projectRef.current = addSubckt(projectRef.current, name);
     openSub(name);
-  };
-  /** La selección pasa a un subcircuito nuevo y queda su instancia en su lugar */
-  const subFromSelection = () => {
-    if (!selection.length) return setMessage(t('Select the part of the circuit to turn into a subcircuit'));
-    const refs = selection;
-    askSubName(t('Subcircuit from the selection'), freeSubcktName(projectRef.current), (name) => extractTo(name, refs));
-  };
-  const extractTo = (name: string, selection: ItemRef[]) => {
-    const r = extractSubckt(doc, selection, conn, lib, name);
-    if (typeof r === 'string') return setMessage(r);
-    const p0 = snapshot();
-    const p: Project = { ...p0, modified: Date.now(), files: [...p0.files, { name: `${name}.asc`, kind: 'schematic', text: serializeAsc(r.sub) }, { name: `${name}.asy`, kind: 'symbol', text: r.symbol }] };
-    projectRef.current = p;
-    editProject(p);
-    lib.setProjectFiles(p.files);
-    setLibVersion((v) => v + 1);
-    commit(r.parent);
-    setSelection([{ kind: 'symbol', index: r.parent.symbols.length - 1 }]);
-    setMessage(t('Subcircuit {name} created with the ports {ports}: double-click {inst} (or E) to enter it', { name, ports: r.ports.join(', '), inst: r.inst }));
   };
   const renameSub = (from: string) => askSubName(t('Rename subcircuit'), from, (to) => to !== from && doRenameSub(from, to), from);
   const doRenameSub = (from: string, to: string) => {
@@ -1514,6 +1553,49 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     projectRef.current = p;
     editProject(p);
   };
+  // --- Módulos «Modelo»: netlist (.subckt/.model) + símbolo ---------------------------------
+  const newModel = () =>
+    askSubName(t('New model'), freeSubcktName(projectRef.current, 'MODEL'), (name) => {
+      const p = addModelModule(projectRef.current, name);
+      projectRef.current = p;
+      editProject(p);
+      setCurModel(name);
+    });
+  const renameModel = (from: string) =>
+    askSubName(t('Rename model'), from, (to) => {
+      if (to === from) return;
+      const retype = (asc: string) => {
+        const d = parseAsc(asc);
+        let changed = false;
+        for (const s of d.symbols)
+          if (baseName(s.type).toLowerCase() === from.toLowerCase()) {
+            s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
+            changed = true;
+          }
+        return changed ? serializeAsc(d) : asc;
+      };
+      // lo que se está editando también se renombra (se guarda antes)
+      const p = renameModelModule(snapshot(), from, to, retype);
+      projectRef.current = p;
+      editProject(p);
+      history.reset(parseAsc(retype(ascText(docRef.current))));
+      if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
+    }, from);
+  const deleteModel = (name: string) => {
+    const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
+    setDialog({
+      kind: 'slide',
+      title: t('Delete model {name}?', { name }),
+      message: n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Its netlist and its symbol will be deleted.'),
+      onConfirm: () => {
+        setDialog(null);
+        if (curModel.toLowerCase() === name.toLowerCase()) setCurModel('');
+        const p = removeModelModule(projectRef.current, name);
+        projectRef.current = p;
+        editProject(p);
+      },
+    });
+  };
   /** Ir a una instancia de un subcircuito (desde «usado en») */
   const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
     const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
@@ -1539,7 +1621,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (sims.active || !docLine) return;
     const p0 = projectRef.current;
     const v = variantOf(p0);
-    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc), freeBenchName(p0));
+    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
     if (r) editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
@@ -1549,18 +1631,21 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // si ya es de ese tipo queda como está; si otro testbench usa ese tipo, se parte de sus parámetros
     const same = [...sims.items].reverse().find((s) => ANALYSIS_LINE.exec(s.line)?.[1].toLowerCase() === kind);
     const line = same?.line ?? defaultLine(kind, circuitInfo());
+    // una Complex simulation (#241) pasa a este análisis en el mismo testbench: el .control queda
+    // guardado y vuelve al elegir otra vez Complex simulation
+    if (isComplexLine(docLine)) return commit(setAnalysisLine(parkControl(doc), line));
     // un testbench tiene una sola simulación: sin análisis se la pone; si ya tiene, se crea otro
     // testbench (en el mismo grupo) con el mismo circuito y ésta
     if (!docLine) return commit(setAnalysisLine(doc, line));
     const p1 = leave();
-    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)), freeBenchName(p1));
+    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)));
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
-  /** Testbench nuevo, vacío, con el nombre por defecto (se renombra después) */
+  /** Testbench nuevo, vacío, con el nombre automático (sigue a su análisis hasta que se lo renombra) */
   const newEmptyBench = (group?: string) => {
-    const r = addProjectSim(leave(), EMPTY_ASC, freeBenchName(projectRef.current));
+    const r = addProjectSim(leave(), EMPTY_ASC);
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
     markDirty();
@@ -1626,6 +1711,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Botón derecho en un componente de un testbench de un grupo: editar o propagar sus valores a
   // los otros testbenches del grupo que tienen el mismo componente
   const [ctxMenu, setCtxMenu] = useState<{ at: { x: number; y: number }; items: ContextItem[] } | null>(null);
+  // menú del botón derecho de un comentario (tamaño, alineación)
+  const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
+  const closeTextMenu = useCallback(() => setTextMenu(null), []);
   const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
     const s = doc.symbols[index];
     const inst = s?.attrs.get('InstName');
@@ -1927,6 +2015,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     warnShared();
   };
   const symText = curSub ? subcktSymbolText(project, curSub) : undefined;
+  /** Puerto nuevo pedido desde el símbolo (un pin con otro nombre): etiqueta con puerto debajo de las otras */
+  const addPort = (name: string) => {
+    const fs = doc.flags;
+    const x = fs.length ? Math.min(...fs.map((f) => f.x)) : -128;
+    const y = (fs.length ? Math.max(...fs.map((f) => f.y)) : -64) + 64;
+    commit(addFlag(doc, { x, y }, name, 'BiDir'));
+  };
   /** Un .asy existente como símbolo del subcircuito que se edita (#199) */
   const adoptSymbolFor = (type: string) => {
     const asy = lib.symbolText(type);
@@ -1942,7 +2037,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return variant.sims.map((x) => {
       const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
-      return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+      // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
+      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisDetail(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
@@ -1963,7 +2059,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           children: [],
           outdated: false,
           text: false,
-          verilog: true,
+          type: 'verilog' as const,
           ...(isStale(f) ? { unsynthesized: true } : {}),
         };
       const stale = staleInstances(p, name, lib, label).map((u) => ({
@@ -1984,7 +2080,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         outdated: symbolOutdated(p, name),
         text: false,
       };
-    });
+    }).concat(
+      modelModules(p).map((f): TreeSub => {
+        const name = modelModuleName(f);
+        return {
+          name,
+          type: 'model',
+          ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+        };
+      }),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
   const toggleTree = () => {
@@ -2017,7 +2126,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
     const i = Math.min(activePane, panes.length - 1);
-    if (panes[i]?.traces.some((tt) => sameExpr(tt.expr, expr))) return;
+    if (panes[i]?.traces.some((tt) => !tt.fft && sameExpr(tt.expr, expr))) return;
     const sc = scaleOf(plot);
     if (!sc) return setMessage(t('{name} has no X axis: choose another analysis to plot', { name: plot.name }));
     try {
@@ -2112,9 +2221,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
-  const picker: Picker = (what) =>
+  const picker: Picker = (what, opts) =>
     new Promise((resolve) => {
-      setPicking({ what, resolve, prev: tool });
+      setPicking({ what, ground: opts?.ground, resolve, prev: tool });
       setToolState({ kind: 'pick', what });
     });
   const endPick = (v: string | null) => {
@@ -2125,7 +2234,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const pickValue = ({ net, symbol }: { net?: string; symbol?: number }): string | null => {
     if (!picking) return null;
-    if (picking.what === 'net') return net && net !== '0' ? net : null;
+    if (picking.what === 'net') return net && (net !== '0' || picking.ground) ? net : null;
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
     if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;
@@ -2147,7 +2256,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Avisa si el circuito usa símbolos que no están en la librería ni entre los del usuario */
   const warnMissing = (d: AscDoc) => {
     const miss = missingSymbols(d);
-    if (miss.length) setMessage(t('Missing symbols: {p0}. Add them in File › My symbols and models.', { p0: miss.join(', ') }));
+    const bad = badLines(d);
+    const msgs = [
+      ...(miss.length ? [t('Missing symbols: {p0}. Add them in File › My symbols and models.', { p0: miss.join(', ') })] : []),
+      // (las líneas dañadas quedan tal cual en el archivo: no se pierden al guardar)
+      ...(bad.length ? [t('{n} lines of the file could not be read and were kept as they are (the first one: {line})', { n: bad.length, line: bad[0].slice(0, 80) })] : []),
+    ];
+    if (msgs.length) setMessage(msgs.join(' · '));
   };
   const storeUserFiles = (next: UserFile[]) => {
     setUserFiles(next);
@@ -2223,6 +2338,22 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return !!c;
   };
   const paste = async () => {
+    // una imagen en el portapapeles se pega como fondo del esquemático (figura IMAGE, en base64)
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((ty) => ty.startsWith('image/'));
+        if (!type) continue;
+        const img = await clipboardImage(await item.getType(type));
+        const at = editor.current?.cursor() ?? { x: 0, y: 0 };
+        const shape = { kind: 'IMAGE' as const, coords: [at.x, at.y, at.x + img.w, at.y + img.h], data: img.data };
+        commit({ ...doc, shapes: [...doc.shapes, shape] });
+        setTool({ kind: 'select' });
+        setSelection([{ kind: 'shape', index: doc.shapes.length }]);
+        return;
+      }
+    } catch {
+      // sin permiso o sin API de imágenes: se sigue con el texto
+    }
     let text = '';
     try {
       text = await navigator.clipboard.readText();
@@ -2260,6 +2391,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const openStudy = () => setDialog({ kind: 'study' });
   /**
+   * Complex simulation (#241): si el testbench ya lo es, abre el Studio; si pasó a un análisis
+   * simple, recupera su .control; si nunca tuvo, abre el Studio para armarlo
+   */
+  const complexSim = () => {
+    if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
+    if (!isComplexLine(docLine) && hasParkedControl(doc)) return commit(unparkControl(doc));
+    openStudy();
+  };
+  /**
    * Barrer un parámetro de un subcircuito en una instancia (#180): la instancia pasa a usar
    * {U1_G} y se agrega «.step param U1_G list <valor>», que el Estudio muestra como un barrido
    */
@@ -2283,7 +2423,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     setDialog(null);
     commit(d);
-    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Study.', { inst, param, pname, step }));
+    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Studio.', { inst, param, pname, step }));
     setDialog({ kind: 'study' });
   };
   const studyInfo = (): StudyInfo => {
@@ -2410,7 +2550,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (e.altKey && lk === 'c') return handled(), openControl();
       if (e.altKey && lk === 'n') return handled(), hasNets && setShowNets((v) => !v);
       if (e.altKey && lk === 'e') return handled(), openStudy();
-      if (e.altKey && lk === 'b') return handled(), subFromSelection();
       if (e.altKey) return;
       if (ctrl) return;
       if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
@@ -2467,7 +2606,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case '.':
           return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
-          return handled(), setDialog({ kind: 'text', textKind: 'comment' });
+          return handled(), setTool({ kind: 'comment' });
         case 'Home':
           return handled(), editor.current?.fit();
       }
@@ -2504,6 +2643,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       let p = leave();
       const variants: string[] = [];
       const files: Project['files'] = [];
+      const damaged: Imported['damaged'] = [];
       const loose: ZipEntry[] = [];
       for (const f of list) {
         const data = new Uint8Array(await f.arrayBuffer());
@@ -2515,12 +2655,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         p = r.project;
         variants.push(...r.variants);
         files.push(...r.files);
+        damaged.push(...r.damaged);
       }
       if (loose.length) {
         const r = importEntries(p, loose);
         p = r.project;
         variants.push(...r.variants);
         files.push(...r.files);
+        damaged.push(...r.damaged);
       }
       const merged = await mergeFiles(p.files, files, askConflict);
       enter(asBenches({ ...p, files: merged.files }), true);
@@ -2529,7 +2671,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         ...(variants.length ? [`${variants.length === 1 ? t('the testbench') : t('{length} testbenches:', { length: variants.length })} ${variants.join(', ')}`] : []),
         ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
-      setMessage(parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)'));
+      const imported = parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)');
+      // las líneas dañadas quedan tal cual en el testbench (no se pierden al guardar), pero hay que avisarlo
+      const bad = damaged.map((d) => t('{file}: {n} lines could not be read and were kept as they are (the first one: {line})', { file: d.file, n: d.lines, line: d.first.slice(0, 80) }));
+      setMessage([imported, ...bad].join(' · '));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }
@@ -2655,6 +2800,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     { label: t('Rectangle'), shortcut: 'K', onClick: shapeTool('RECTANGLE') },
     { label: t('Circle'), shortcut: 'O', onClick: shapeTool('CIRCLE') },
     { label: t('Arc'), shortcut: 'U', onClick: shapeTool('ARC') },
+    { label: t('Pencil (freehand)'), onClick: () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) }) },
+    { label: t('Paste image'), onClick: () => void paste() },
     'sep',
     { label: t('Line style…'), onClick: () => openLineStyle() },
   ];
@@ -2662,12 +2809,18 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...ANALYSES.map((x) => ({ label: x.label, title: docLine ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    ...ANALYSES.map((x) => ({ label: x.label, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    {
+      label: t('Complex simulation'),
+      title: t('The Studio or a .control block decides what is simulated, instead of a single analysis'),
+      checked: isComplexLine(docLine),
+      onClick: complexSim,
+    },
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
-    { label: t('Study…'), shortcut: 'Alt+E', onClick: openStudy },
+    { label: t('Studio…'), shortcut: 'Alt+E', onClick: openStudy },
     { label: t('.control block…'), shortcut: 'Alt+C', onClick: openControl },
   ];
   const menus: MenuDef[] = [
@@ -2758,7 +2911,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Net label…'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
         { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
-        { label: t('Comment…'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: t('Comment'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }) },
         'sep',
         ...shapeItems,
       ],
@@ -2784,7 +2937,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Study)'), onClick: toggleSimCommand, checked: showSimCommand },
+        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'), onClick: toggleSimCommand, checked: showSimCommand },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },
@@ -2819,7 +2972,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const problems = sim
     ? [
         ...sim.result.errors.map((text) => ({ kind: 'err' as const, text })),
-        ...sim.built.warnings.map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
+        ...sim.built.warnings.filter((text) => !sim.result.errors.includes(text)).map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
@@ -2881,8 +3034,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'component', label: t('Component'), title: t('Component'), shortcut: 'P', onClick: () => setDialog({ kind: 'picker' }), active: tool.kind === 'place' },
         { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
         { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
-        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
-        { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' },
+        ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
+        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }), active: tool.kind === 'comment' },
+        { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' || tool.kind === 'pencil' },
         { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
     },
@@ -2929,7 +3083,7 @@ ${ltNetlistText(sim.built.lt)}
         'sep',
         { label: 'Netlist', checked: panel === 'netlist', onClick: () => setPanel('netlist') },
         ...(sim.meas ? [{ label: t('Measurements ({length})', { length: sim.meas.names.length }), checked: panel === 'meas', onClick: () => setPanel('meas') }] : []),
-        { label: t('Problems{p0}', { p0: problems.length ? ` (${problems.length})` : '' }), checked: panel === 'problems', onClick: () => setPanel('problems') },
+        { label: t('Errors{p0}', { p0: problems.length ? ` (${problems.length})` : '' }), checked: panel === 'problems', onClick: () => setPanel('problems') },
         { label: 'Log', shortcut: 'Ctrl+L', checked: panel === 'log', onClick: () => setPanel('log') },
       ];
 
@@ -3060,19 +3214,22 @@ ${ltNetlistText(sim.built.lt)}
           <SimBar
             sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}
             info={circuitInfo()}
-            state={running ? 'running' : status.kind === 'error' ? 'err' : sim ? 'ok' : 'idle'}
+            state={running ? 'running' : status.kind === 'error' ? 'err' : status.kind === 'aborted' ? 'idle' : sim ? 'ok' : 'idle'}
             stateDetail={
               status.kind === 'running'
                 ? status.percent ? `${status.percent.toFixed(0)} %` : undefined
-                : status.kind === 'error'
-                  ? status.message
-                  : status.kind === 'done' && sim
+                // el texto del error va a la barra de estado, no a la de simulación
+                : status.kind === 'aborted'
+                    ? t('Simulation aborted')
+                    : status.kind === 'done' && sim
                     ? t('done in {p0} ms', { p0: status.ms.toFixed(0) })
                     : undefined
             }
             stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
             running={running}
             picker={picker}
+            control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
+            onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}
           />
@@ -3089,19 +3246,21 @@ ${ltNetlistText(sim.built.lt)}
             if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
             if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
           }}
-          className={`canvas-wrap${hierOn ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+          style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
+          className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
           // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
-          {hierOn && (
-          <HierBar
-            testbench={(curSim && simName(curSim)) || variant.name}
-            path={path}
-            onCrumb={(i) => go(path.slice(0, i + 1))}
-            onUp={goUp}
-            onQuick={() => setQuickOpen(true)}
-          />
+          {curSub && (
+            <div className="sub-hint" role="status">
+              <strong>{t('Subcircuit Editor')}</strong>
+              <span className="sub-hint-name">{curSub}</span>
+              <span className="sub-hint-text">{t('draw the circuit between the ports (net labels with a port, N)')}</span>
+              <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
+                {t('Return')}
+              </button>
+            </div>
           )}
           {treeShown && (
             <ProjectTree
@@ -3109,6 +3268,8 @@ ${ltNetlistText(sim.built.lt)}
               benches={treeBenches}
               groups={project.groups}
               peek={!treeOpen && treePeek}
+              edgeOnly={!treeOpen && !treePeek}
+              onEnter={() => !treeOpen && !treePeek && tool.kind === 'select' && setTreePeek(true)}
               onBenchItem={benchItem}
               onNewGroup={newGroup}
               onGroupAction={groupAction}
@@ -3116,17 +3277,21 @@ ${ltNetlistText(sim.built.lt)}
               onLeave={() => setTreePeek(false)}
               activeBench={sims.active}
               subs={treeSubs}
-              current={curSub}
+              current={curModel || curSub}
               onBench={goSim}
               onTestbench={() => path.length && go([])}
               onNewBench={newEmptyBench}
               onRenameProject={renameProject}
               onBenchAction={benchAction}
-              onOpen={(n) => openSub(n)}
+              onOpen={(n) => {
+                if (modelModuleFile(projectRef.current, n)) setCurModel(n);
+                else openSub(n);
+              }}
               onNew={newSubckt}
-              onFromSelection={selection.length ? subFromSelection : undefined}
-              onRename={renameSub}
-              onDelete={deleteSub}
+              onNewModel={newModel}
+              onNewVerilog={() => setDialog({ kind: 'newModule', module: 'verilog' })}
+              onRename={(n) => (modelModuleFile(projectRef.current, n) ? renameModel(n) : renameSub(n))}
+              onDelete={(n) => (modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
               onExport={exportSub}
               onExportNetlist={exportSubNetlist}
               onToUser={subToUser}
@@ -3145,9 +3310,11 @@ ${ltNetlistText(sim.built.lt)}
               items={[
                 ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
                 ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
+                ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
               ]}
               onPick={(k) => {
                 const id = k.slice(2);
+                if (k.startsWith('m:')) return setCurModel(id);
                 if (k.startsWith('s:')) return openSub(id);
                 if (id !== sims.active) return goSim(id);
                 if (path.length) go([]);
@@ -3180,6 +3347,28 @@ ${ltNetlistText(sim.built.lt)}
                 editSymbol(curVerilog?.synth ? setSymParams(verilogSymbol(curSub, curVerilog.synth), symParams(symText)) : setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))
               }
               onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
+              onWidth={setSymW}
+              onAddPort={addPort}
+            />
+          )}
+          {curModel && modelModuleFile(project, curModel) && (
+            <ModelEditor
+              name={curModel}
+              text={modelModuleFile(project, curModel)!.text}
+              symText={modelSymbolText(project, curModel) ?? ''}
+              symW={symW}
+              onWidth={setSymW}
+              onText={(text) => {
+                const p = storeModelText(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onSymbol={(text) => {
+                const p = storeModelSymbol(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onClose={() => setCurModel('')}
             />
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
@@ -3207,9 +3396,26 @@ ${ltNetlistText(sim.built.lt)}
               onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
             />
           )}
+          {textMenu && doc.texts[textMenu.index] &&
+            createPortal(
+              <TextMenu
+                at={textMenu.at}
+                text={doc.texts[textMenu.index]}
+                onClose={closeTextMenu}
+                onChange={(patch) => commit(setText(doc, textMenu.index, patch))}
+                onEdit={() => editor.current?.editText(textMenu.index)}
+                onDialog={() => setDialog({ kind: 'text', index: textMenu.index, textKind: doc.texts[textMenu.index].kind })}
+                onDelete={() => {
+                  commit(deleteItems(doc, [{ kind: 'text', index: textMenu.index }]));
+                  setSelection([]);
+                }}
+              />,
+              document.body,
+            )}
           <SchematicEditor
             handle={editor}
             onSymbolMenu={symbolMenu}
+            onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
             onDescend={descend}
             docKey={docKey}
             doc={doc}
@@ -3224,6 +3430,8 @@ ${ltNetlistText(sim.built.lt)}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             onDropSubckt={(name) => {
+              const m = modelModuleFile(projectRef.current, name);
+              if (m) return viewRun ? null : modelModuleName(m);
               const f = moduleFile(projectRef.current, name);
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
@@ -3315,10 +3523,10 @@ ${ltNetlistText(sim.built.lt)}
           <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} message={message} onDismiss={() => setMessage(undefined)} />
         </div>
 
-        {sim && (
+        {sim && !curSub && (
           <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
         )}
-        {sim && (
+        {sim && !curSub && (
           <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>
             <input
               ref={pltInput}
@@ -3399,6 +3607,8 @@ ${ltNetlistText(sim.built.lt)}
               )}
             </div>
             <div className="results-body">
+              {/* un error al dibujar el gráfico (o el visor que no bajó sin red) no se lleva el resto */}
+              <ErrorBoundary resetKeys={[panel, plot, panes, mode]}>
               {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
               {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
                 <Suspense fallback={null}>
@@ -3432,6 +3642,7 @@ ${ltNetlistText(sim.built.lt)}
               )}
               {panel === 'plot' && plot && !scale &&
                 (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} />)}
+              </ErrorBoundary>
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
               {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}
@@ -3625,7 +3836,7 @@ ${ltNetlistText(sim.built.lt)}
         />
       )}
       {dialog?.kind === 'newModule' && (
-        <NewModuleDialog initial={freeSubcktName(projectRef.current)} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
+        <NewModuleDialog kind={dialog.module} initial={freeSubcktName(projectRef.current)} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
       )}
       {driveConflict && (
         <Modal title={t('The file changed in Google Drive')} onClose={() => setDriveConflict(null)}>
@@ -3731,12 +3942,14 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
+          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? 'BiDir')}
+          port={!!curSub}
           onClose={() => setDialog(null)}
-          onApply={(name) => {
+          onApply={(name, io) => {
             setDialog(null);
-            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name));
-            else if (dialog.at) commit(addFlag(doc, dialog.at, name));
-            else setTool({ kind: 'flag', name });
+            if (dialog.index !== undefined) commit(setFlagName(doc, dialog.index, name, io));
+            else if (dialog.at) commit(addFlag(doc, dialog.at, name, io || undefined));
+            else setTool({ kind: 'flag', name, ioPin: io || undefined });
           }}
         />
       )}
@@ -3758,9 +3971,10 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
   }, [sink]);
   const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
   // los avisos se van solos; los largos y los errores duran más para poder leerlos
+  const ms = message ? Math.min(45000, Math.max(error ? 30000 : 18000, message.length * 210)) : 0;
   useEffect(() => {
     if (!message) return;
-    const id = setTimeout(onDismiss, Math.min(15000, Math.max(error ? 10000 : 6000, message.length * 70)));
+    const id = setTimeout(onDismiss, ms);
     return () => clearTimeout(id);
   }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
@@ -3770,6 +3984,13 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
         <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
           {message}
         </span>
+      )}
+      {message && (
+        // cuánto le queda al aviso: el aro se vacía desde las 12 en sentido antihorario (key: reinicia con cada aviso)
+        <svg key={message} className={error ? 'status-timer error' : 'status-timer'} viewBox="0 0 12 12" aria-hidden="true">
+          <circle className="track" cx="6" cy="6" r="4.5" />
+          <circle className="left" cx="6" cy="6" r="4.5" pathLength={100} style={{ animationDuration: `${ms}ms` }} />
+        </svg>
       )}
     </div>
   );
@@ -3787,6 +4008,8 @@ function toolHint(tt: Tool): string {
       return tt.name === '0' ? t('Click to place ground · Esc to finish') : t('Click to place the label "{name}"', { name: tt.name });
     case 'text':
       return t('Click to place the text');
+    case 'comment':
+      return t('Click where the comment goes and type · Enter or click outside to finish · Shift+Enter for a new line · Esc to cancel');
     case 'delete':
       return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
     case 'probe':
@@ -3802,6 +4025,8 @@ function toolHint(tt: Tool): string {
       const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t('the arc (its ellipse\'s box)') }[tt.shape];
       return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
     }
+    case 'pencil':
+      return t('Drag to draw freehand · Esc to finish');
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':

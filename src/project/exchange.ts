@@ -6,7 +6,7 @@
 import { decode, decodeText } from '../asc/encoding.ts';
 import { baseName, emptyDoc, type AscDoc } from '../asc/model.ts';
 import { ltNetlist, ltNetlistText } from '../netlist/ltnetlist.ts';
-import { parseAsc } from '../asc/parse.ts';
+import { badLines, parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import type { SymbolSource } from '../asc/resolve.ts';
 import { findAnalysis, setAnalysisLine } from '../schematic/directivesEdit.ts';
@@ -77,7 +77,7 @@ export function variantAscs(v: Variant): { name: string; asc: string }[] {
   const list = v.sims.length ? v.sims.map((s) => ({ label: simLabel(s), asc: s.asc })) : [{ label: v.name, asc: v.base }];
   const taken: string[] = [];
   return list.map((x) => {
-    const name = uniqueFileName(`${safeName(x.label)}.asc`, taken);
+    const name = uniqueFileName(`${safeName(x.label.replace(/^\.+/, ''))}.asc`, taken);
     taken.push(name);
     return { name, asc: x.asc };
   });
@@ -140,6 +140,8 @@ export interface Imported {
   variants: string[];
   /** símbolos y modelos que llegaron (para sumarlos con mergeFiles, que pregunta los repetidos) */
   files: ProjectFile[];
+  /** .asc con líneas que no se pudieron leer (quedaron tal cual): archivo, cuántas y la primera */
+  damaged: { file: string; lines: number; first: string }[];
 }
 
 /**
@@ -150,6 +152,7 @@ export interface Imported {
 export function importEntries(p: Project, entries: ZipEntry[], zipName?: string): Imported {
   const groups = new Map<string, { name: string; doc: AscDoc }[]>();
   const files: ProjectFile[] = [];
+  const damaged: Imported['damaged'] = [];
   for (const e of entries) {
     const parts = e.path.split('/');
     const file = parts.pop()!;
@@ -157,7 +160,10 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
     if (/\.asc$/i.test(file)) {
       const key = parts.length ? parts.join('/') : zipName ? `\0${zipName}` : `\0${file}`;
       const list = groups.get(key) ?? [];
-      list.push({ name: file, doc: parseAsc(decode(e.data).text) });
+      const doc = parseAsc(decode(e.data).text);
+      const bad = badLines(doc);
+      if (bad.length) damaged.push({ file, lines: bad.length, first: bad[0] });
+      list.push({ name: file, doc });
       groups.set(key, list);
       continue;
     }
@@ -173,7 +179,7 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
     added.push(variantFromAscs(docs, name));
   }
   const project = added.length ? { ...p, variants: [...p.variants, ...added], activeVariant: added[0].id, modified: Date.now() } : p;
-  return { project, variants: added.map((v) => v.name), files };
+  return { project, variants: added.map((v) => v.name), files, damaged };
 }
 
 // --- subcircuitos (#180) ------------------------------------------------------------------------

@@ -23,7 +23,8 @@ const validNumber = (s: string) => /^\{.+\}$/.test(s.trim()) || Number.isFinite(
 export type PickWhat = 'net' | 'source' | 'component';
 
 /** Elegir una red, fuente o componente haciendo click en el esquemático (null si se cancela) */
-export type Picker = (what: PickWhat) => Promise<string | null>;
+/** `ground`: la tierra (0) también vale (un nodo de referencia); si no, se ignora */
+export type Picker = (what: PickWhat, opts?: { ground?: boolean }) => Promise<string | null>;
 
 const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
 
@@ -38,7 +39,7 @@ export function Field({ label, value, onChange, placeholder, hint, required, num
   number?: boolean;
   list?: string;
   /** botón para elegir el valor en el esquemático */
-  pick?: { what: PickWhat; picker: Picker };
+  pick?: { what: PickWhat; picker: Picker; ground?: boolean };
 }) {
   const bad = (required && !value.trim()) || (number && value.trim() !== '' && !validNumber(value));
   const input = <input value={value} placeholder={placeholder} spellCheck={false} list={list} onChange={(e) => onChange(e.target.value.trim())} />;
@@ -56,7 +57,7 @@ export function Field({ label, value, onChange, placeholder, hint, required, num
             aria-label={t('Pick {label} on the schematic', { label })}
             onClick={(e) => {
               e.preventDefault();
-              pick.picker(pick.what).then((v) => v && onChange(v));
+              pick.picker(pick.what, { ground: pick.ground }).then((v) => v && onChange(v));
             }}
           >
             ⌖
@@ -126,8 +127,9 @@ export interface CircuitInfo {
 }
 
 export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
-  const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true) => (
-    <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker }} />
+  // ground: un nodo de referencia, donde se puede elegir la tierra
+  const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true, ground = false) => (
+    <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker, ground }} />
   );
   const source = (label: string, value: string, onChange: (v: string) => void) => (
     <Field label={label} value={value} onChange={onChange} list="sim-sources" required pick={picker && { what: 'source', picker }} />
@@ -176,7 +178,7 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
       return (
         <>
           {node(t('Output node'), a.out, (out) => set({ ...a, out }))}
-          {node(t('Reference'), a.ref, (ref) => set({ ...a, ref }), t('Empty = ground'), false)}
+          {node(t('Reference'), a.ref, (ref) => set({ ...a, ref }), t('Empty = ground'), false, true)}
           {source(t('Input source'), a.src, (src) => set({ ...a, src }))}
           <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />
         </>
@@ -204,9 +206,9 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
       return (
         <>
           {node(t('Input +'), a.inP, (inP) => set({ ...a, inP }))}
-          {node(t('Input −'), a.inN, (inN) => set({ ...a, inN }))}
+          {node(t('Input −'), a.inN, (inN) => set({ ...a, inN }), undefined, true, true)}
           {node(t('Output +'), a.outP, (outP) => set({ ...a, outP }))}
-          {node(t('Output −'), a.outN, (outN) => set({ ...a, outN }))}
+          {node(t('Output −'), a.outN, (outN) => set({ ...a, outN }), undefined, true, true)}
           <Select
             label={t('Transfer')}
             value={a.type}

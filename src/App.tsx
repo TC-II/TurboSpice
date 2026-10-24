@@ -3028,6 +3028,7 @@ ${ltNetlistText(sim.built.lt)}
               onBench={goSim}
               onTestbench={() => path.length && go([])}
               onNewBench={newEmptyBench}
+              onRenameProject={renameProject}
               onBenchAction={benchAction}
               onOpen={(n) => openSub(n)}
               onNew={newSubckt}

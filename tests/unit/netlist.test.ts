@@ -49,22 +49,22 @@ SYMATTR Value 1k
     expect(n.elements[0].nodes).toEqual(['0', 'NC_01']);
   });
 
-  it('Misc\\jumper une las redes de sus dos pines y no genera línea', () => {
+  it('Misc\\jumper es un subcircuito bypass (TCLib) entre las redes de sus dos pines', () => {
     const n = netFromAsc(`Version 4
 SHEET 1 880 680
 FLAG -32 64 out
 FLAG -32 144 0
-FLAG 32 144 0
-SYMBOL Misc\\\\jumper 0 0 R0
+FLAG 0 144 0
+SYMBOL Misc\\\\jumper -32 64 R0
 SYMATTR InstName J1
 SYMBOL res -48 48 R0
 SYMATTR InstName R1
 SYMATTR Value 1k
-SYMBOL res 16 48 R0
+SYMBOL res -16 48 R0
 SYMATTR InstName R2
 SYMATTR Value 2k
 `);
-    expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['R1 out 0', 'R2 out 0']);
+    expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['X§J1 out P001', 'R1 out 0', 'R2 P001 0']);
   });
 
   it('redes sin cables (pines que se tocan): P001, P002… con contador aparte, en el orden de los símbolos (#109)', () => {

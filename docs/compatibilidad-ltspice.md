@@ -74,8 +74,9 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   "andaban" sin los bloques. #127
 - Un punto de interés (pin, etiqueta, extremo de cable) sobre el **interior** de un cable se conecta.
   Dos cables que se cruzan por el medio **no**.
-- `Misc\jumper` une las redes de sus dos pines y no genera línea en la netlist (aunque su `.asy`
-  tiene `Prefix J`). Verificado con la netlist de LTspice de `examples/Educational/160.asc`.
+- `Misc\jumper`: en LTspice une las redes de sus dos pines y no genera línea en la netlist. En
+  TurboSpice es un subcircuito `bypass` de TCLib (fuente de 0 V entre sus pines), así que genera una
+  línea `X` y permite medir la corriente que pasa por él.
 - Etiquetas con el mismo nombre son la misma red, **distinguiendo mayúsculas** (`-v` y `-V` quedan como
   redes distintas en la netlist; SPICE las une después).
 - Nombre de red: tierra (`0`) > etiqueta (la primera en orden alfabético) > `N001`, `N002`…

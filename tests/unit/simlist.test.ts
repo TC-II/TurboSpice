@@ -28,14 +28,18 @@ const docWith = (line: string): AscDoc => ({ ...emptyDoc(), texts: [{ x: 0, y: 0
 
 describe('nombre automático de una simulación', () => {
   it('es legible, con unidades', () => {
-    expect(analysisLabel('.tran 10m')).toBe('Transitorio 0–10 ms');
-    expect(analysisLabel('.tran 0 20m 5m 1u')).toBe('Transitorio 5 ms–20 ms');
-    expect(analysisLabel('.ac dec 100 1 1meg')).toBe('AC 1 Hz–1 MHz');
-    expect(analysisLabel('.dc V1 0 5 0.1')).toBe('Barrido DC V1 0–5 V');
-    expect(analysisLabel('.dc V1 0 5 0.1 I2 1m 3m 1m')).toBe('Barrido DC V1 0–5 V · I2 1 mA–3 mA');
-    expect(analysisLabel('.op')).toBe('Punto de operación');
+    expect(analysisLabel('.tran 10m')).toBe('Tran 0 - 10m');
+    expect(analysisLabel('.tran 0 20m 5m 1u')).toBe('Tran 5m - 20m');
+    expect(analysisLabel('.tran 100m')).toBe('Tran 0 - 100m');
+    expect(analysisLabel('.ac dec 10 100 100k')).toBe('AC 100Hz - 100KHz');
+    expect(analysisLabel('.noise V(out) V1 dec 10 1 1meg')).toBe('Ruido 1Hz - 1MHz');
+    expect(analysisLabel('.pz in 0 out 0 vol pz')).toBe('Polos y ceros');
+    expect(analysisLabel('.ac dec 100 1 1meg')).toBe('AC 1Hz - 1MHz');
+    expect(analysisLabel('.dc V1 0 5 0.1')).toBe('Barrido DC');
+    expect(analysisLabel('.dc V1 0 5 0.1 I2 1m 3m 1m')).toBe('Barrido DC');
+    expect(analysisLabel('.op')).toBe('.OP');
     expect(analysisLabel('.tf V(out) V1')).toBe('Transferencia V(out)/V1');
-    expect(analysisLabel('.tran {T}')).toBe('Transitorio 0–{T}');
+    expect(analysisLabel('.tran {T}')).toBe('Tran 0 - {T}');
   });
   it('un comando que no se entiende queda como está', () => {
     expect(analysisLabel('.tran 1m steady')).toBe('.tran 1m steady');
@@ -44,7 +48,7 @@ describe('nombre automático de una simulación', () => {
     const r = simsFromLine('.op');
     const named = renameSim(r, r.active, '  Polarización ');
     expect(simName(named.items[0])).toBe('Polarización');
-    expect(simName(renameSim(named, r.active, '').items[0])).toBe('Punto de operación');
+    expect(simName(renameSim(named, r.active, '').items[0])).toBe('.OP');
   });
 });
 

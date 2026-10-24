@@ -40,12 +40,10 @@ import {
   addSim as addProjectSim,
   addGroup,
   applyValues,
-  freeBenchName,
   removeGroup,
   renameGroup,
   setBenchGroup,
   placeBench,
-  simLabel,
   groupPeersWith,
   propagateAttrs,
   mergeFiles,
@@ -1513,7 +1511,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (sims.active || !docLine) return;
     const p0 = projectRef.current;
     const v = variantOf(p0);
-    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc), freeBenchName(p0));
+    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
     if (r) editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
@@ -1530,14 +1528,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // testbench (en el mismo grupo) con el mismo circuito y ésta
     if (!docLine) return commit(setAnalysisLine(doc, line));
     const p1 = leave();
-    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)), freeBenchName(p1));
+    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)));
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
-  /** Testbench nuevo, vacío, con el nombre por defecto (se renombra después) */
+  /** Testbench nuevo, vacío, con el nombre automático (sigue a su análisis hasta que se lo renombra) */
   const newEmptyBench = (group?: string) => {
-    const r = addProjectSim(leave(), EMPTY_ASC, freeBenchName(projectRef.current));
+    const r = addProjectSim(leave(), EMPTY_ASC);
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
     markDirty();
@@ -1923,7 +1921,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return variant.sims.map((x) => {
       const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
-      return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+      // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
+      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 

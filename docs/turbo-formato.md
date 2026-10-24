@@ -16,8 +16,12 @@
 > ```
 >
 > JSON de la versión 2: `"version": 2`, `"activeTestbench": "s1"` y `"testbenches": [{ "id",
-> "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con nombre
-> obligatorio y `"group"` opcional). `"groups": [{ "id", "name" }]` agrupa testbenches (en el panel
+> "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con `"group"` opcional).
+> `"name"` es opcional y hace de marca: **sin** él, el testbench lleva el nombre automático de su
+> análisis (`Tran 0 - 100m`, `AC 100Hz - 100KHz`, `.OP`, `DC Sweep`, `Noise 1Hz - 1MHz`,
+> `Poles and Zeros`…), que se recalcula cada vez que cambian el análisis o sus límites; **con** él
+> (el usuario lo renombró) el nombre queda fijo. Al abrir, un `"Testbench N"` (el nombre que se
+> ponía antes por defecto) se toma como automático. `"groups": [{ "id", "name" }]` agrupa testbenches (en el panel
 > del proyecto, colapsables; al abrir un `.turbo` de la versión 1, una variante con varias
 > simulaciones pasa a ser un grupo). `files[].kind` puede ser `"symbol"`, `"model"` o `"schematic"`
 > (subcircuito). No hay `variants` ni circuito base. Un proyecto siempre tiene al menos un testbench.

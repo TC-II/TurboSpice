@@ -294,6 +294,8 @@ export const es: Record<string, string> = {
   'DC for .op [': 'DC para .op [',
   'DC gain, input and output resistance (.tf).': 'Ganancia, resistencia de entrada y de salida en continua (.tf).',
   'DC sweep': 'Barrido DC',
+  'DC Sweep': 'Barrido DC',
+  'Poles and Zeros': 'Polos y ceros',
   'DC transfer function': 'Función de transferencia DC',
   'DC value': 'Valor DC',
   'DC voltages and currents (.op).': 'Tensiones y corrientes de continua (.op).',

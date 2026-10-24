@@ -66,7 +66,20 @@ const range = (a: string, b: string, unit: string) => `${quantity(a || '0', unit
 const sweepRange = (s: Sweep) => range(s.start, s.stop, 'Hz');
 const volts = (n: string) => (/^[vi]\s*\(/i.test(n) ? n : `V(${n})`);
 
-/** Nombre legible de un comando de análisis: "Transitorio 0–10 ms", "Barrido DC V1 0–5 V" */
+/** "100m" → "100m", "1e5" → "100K" (prefijo SI, k en mayúscula); las expresiones ({R}) quedan como están */
+function compact(v: string): string {
+  const n = parseSpiceNumber(v);
+  if (!Number.isFinite(n)) return v;
+  return si(n).replace(/k$/, 'K');
+}
+/** "1Hz - 1MHz" */
+const freqs = (s: Sweep) => `${compact(s.start)}Hz - ${compact(s.stop)}Hz`;
+
+/**
+ * Nombre automático de un testbench según su análisis: "Tran 0 - 100m", "AC 100Hz - 100KHz",
+ * ".OP", "DC Sweep", "Noise 1Hz - 1MHz", "Poles and Zeros"… Se recalcula al cambiar el análisis o
+ * sus límites mientras el testbench no tenga nombre propio.
+ */
 export function analysisLabel(line: string): string {
   // el Studio o un .control (#241)
   if (isComplexLine(line)) return t('Complex simulation');
@@ -75,24 +88,21 @@ export function analysisLabel(line: string): string {
   const label = ANALYSES.find((x) => x.kind === a.kind)!.label;
   switch (a.kind) {
     case 'tran':
-      return `${label} ${range(a.tstart, a.tstop, 's')}`;
+      return `Tran ${compact(a.tstart || '0')} - ${compact(a.tstop)}`;
     case 'ac':
-      return `AC ${sweepRange(a.sweep)}`;
+      return `AC ${freqs(a.sweep)}`;
     case 'dc':
-      return `${label} ${a.sweeps
-        .filter((s) => s.src)
-        .map((s) => `${s.src} ${range(s.start, s.stop, /^i/i.test(s.src) ? 'A' : 'V')}`)
-        .join(' · ')}`;
+      return t('DC Sweep');
     case 'noise':
-      return `${label} ${volts(a.out)} ${sweepRange(a.sweep)}`;
+      return `${label} ${freqs(a.sweep)}`;
     case 'op':
-      return label;
+      return '.OP';
     case 'tf':
       return t('Transfer {p0}/{src}', { p0: volts(a.out), src: a.src });
     case 'sens':
       return `${label} ${volts(a.out)}${a.ac ? ` ${sweepRange(a.sweep)}` : ''}`;
     case 'pz':
-      return `${label} ${a.inP}→${a.outP}`;
+      return t('Poles and Zeros');
     case 'disto':
     case 'sp':
       return `${label} ${sweepRange(a.sweep)}`;

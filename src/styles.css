@@ -1193,7 +1193,7 @@ button.hier-tab { padding-right: 10px; }
 
 /* Módulo Verilog (#209): código, sintetizar e interfaz eléctrica en lugar del esquemático */
 .verilog-module { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); z-index: 1; }
-.canvas-wrap.with-sym .verilog-module { right: min(36%, 420px); }
+.canvas-wrap.with-sym .verilog-module { right: var(--sym-wc, 420px); }
 .canvas-wrap.with-tree .verilog-module { left: 260px; }
 .canvas-wrap.with-hier .verilog-module { top: 31px; }
 .vm-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); }

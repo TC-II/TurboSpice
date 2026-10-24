@@ -46,7 +46,8 @@ const P: Record<string, ReactNode> = {
   control: <path d="M6 4H4.5v12H6M14 4h1.5v12H14M7.5 8l2 2-2 2M10.5 12.5h2" />,
   run: <path d="M6 4l10 6-10 6z" />,
   stop: <path d="M5 5h10v10H5z" />,
-  probe: <path d="M15 3l2 2-7.5 7.5-3-.5-.5-3zM6.5 12.5 3 17" />,
+  // punta digital (pen de multímetro): cuerpo, pantalla, dos botones, cuello y punta
+  probe: <path d="M7.5 1.5h5a1.5 1.5 0 0 1 1.5 1.5v7.5L12 13.5H8L6 10.5V3a1.5 1.5 0 0 1 1.5-1.5zM8 4h4v3.5H8zM8 10h.01M12 10h.01M8.5 13.5v2.5h3v-2.5M10 16v2.5" />,
   op: capsule('OP'),
   info: <path d="M10 9v5M10 6v.01M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16" />,
   help: <path d="M7.5 7.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7M10 14.5v.01M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16" />,

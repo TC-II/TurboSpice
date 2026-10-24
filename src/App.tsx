@@ -126,6 +126,10 @@ import { applySynthesis, topModuleOf, generatedPins, generatedSub } from './hdl/
 import { VerilogDialog, verilogTemplate } from './hdl/VerilogDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
+/** Nombre de un proyecto nuevo; con sesión de Google pasa a «project 2», «project 3»… si ya está en el Drive */
+const DEFAULT_PROJECT = 'project';
+const DEFAULT_NAME = /^project( \d+)?$/i;
+
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
 /** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
@@ -333,10 +337,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const liveDoc = history.value;
   const docRef = useRef(liveDoc);
   docRef.current = liveDoc;
-  const [file, setFile] = useState<FileState>({ name: t('Untitled{EXT}', { EXT }) });
+  const [file, setFile] = useState<FileState>({ name: `${DEFAULT_PROJECT}${EXT}` });
   // proyecto (.turbo, #149): variantes y simulaciones, cada una con su circuito. El que se está
   // editando vive en `history` y pasa al proyecto al cambiar de simulación o al guardar (snapshot)
-  const [project, setProjectRaw] = useState<Project>(() => withGroups(newProject(t('Untitled'))));
+  const [project, setProjectRaw] = useState<Project>(() => withGroups(newProject(DEFAULT_PROJECT)));
   // los testbenches viven siempre en un grupo (proyectos viejos: pasan a «Group 1»)
   const setProjectState = (p: Project) => setProjectRaw(withGroups(p));
   const projectRef = useRef(project);
@@ -1014,6 +1018,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
+  // Con sesión de Google, un proyecto nuevo («project») con cambios se guarda solo en el Drive con
+  // un nombre libre («project 2», «project 3»…), para que el autoguardado no pise otro
+  const autoNaming = useRef(false);
+  useEffect(() => {
+    const f = fileRef.current;
+    if (!google.account || !dirty || f.driveId || autoNaming.current || !DEFAULT_NAME.test(projectRef.current.name)) return;
+    autoNaming.current = true;
+    (async () => {
+      const taken = new Set((await drive.list()).map((x) => x.name.toLowerCase()));
+      let n = DEFAULT_PROJECT;
+      for (let i = 2; taken.has(`${n}${EXT}`.toLowerCase()); i++) n = `${DEFAULT_PROJECT} ${i}`;
+      if (fileRef.current.driveId) return;
+      const { p, bytes } = await turboBytes(`${n}${EXT}`);
+      const r = await drive.save(`${n}${EXT}`, bytes);
+      savedAs({ ...fileRef.current, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
+    })()
+      .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
+      .finally(() => (autoNaming.current = false));
+  }, [google.account, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
 
@@ -1093,7 +1117,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
   };
 
-  const doNew = () => confirmDiscard() && loadProject(newProject(t('Untitled')), { name: t('Untitled{EXT}', { EXT }) });
+  const doNew = () => confirmDiscard() && loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
 
   /** Abre un proyecto de public/examples, opcionalmente en una de sus variantes */
   const doExample = async (name: string, variant?: string) => {
@@ -1502,7 +1526,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const newGroup = () =>
     setDialog({
       kind: 'name',
-      title: t('New group'),
+      title: t('New workbench'),
       label: t('Name'),
       initial: uniqueGroupName(),
       check: () => null,
@@ -1513,16 +1537,16 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     });
   const uniqueGroupName = () => {
     const names = new Set(projectRef.current.groups.map((g) => g.name.toLowerCase()));
-    for (let i = 1; ; i++) if (!names.has(t('Group {n}', { n: i }).toLowerCase())) return t('Group {n}', { n: i });
+    for (let i = 1; ; i++) if (!names.has(t('Workbench {n}', { n: i }).toLowerCase())) return t('Workbench {n}', { n: i });
   };
   const groupAction = (id: string, action: 'rename' | 'delete') => {
     const g = projectRef.current.groups.find((x) => x.id === id);
     if (!g) return;
-    if (action === 'delete' && projectRef.current.groups.length < 2) return setMessage(t('A project always has at least one group'));
+    if (action === 'delete' && projectRef.current.groups.length < 2) return setMessage(t('A project always has at least one workbench'));
     if (action === 'rename')
       return setDialog({
         kind: 'name',
-        title: t('Rename group'),
+        title: t('Rename workbench'),
         label: t('Name'),
         initial: g.name,
         check: () => null,
@@ -1533,7 +1557,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       });
     setDialog({
       kind: 'slide',
-      title: t('Delete the group {name}?', { name: g.name }),
+      title: t('Delete the workbench {name}?', { name: g.name }),
       message: t('Its testbenches are not deleted: they move to {name}.', { name: projectRef.current.groups.find((x) => x.id !== id)?.name ?? '' }),
       onConfirm: () => {
         setDialog(null);
@@ -1571,11 +1595,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
         {
           label: !canPropagate
-            ? t('Propagate {inst} to the other testbenches of the group', { inst })
+            ? t('Propagate {inst} to the other testbenches of the workbench', { inst })
             : peers.length === 1
               ? t('Propagate {inst} = {value} to the other testbench of «{group}»', { inst, value, group })
               : t('Propagate {inst} = {value} to the {n} other testbenches of «{group}»', { inst, value, group, n: peers.length }),
-          title: t('Copies its value and parameters to the component with the same name in the other testbenches of the group'),
+          title: t('Copies its value and parameters to the component with the same name in the other testbenches of the workbench'),
           disabled: !canPropagate,
           onClick: () => {
             editProject(propagateAttrs(snapshot(), peers, inst, s.type, s.attrs));
@@ -2703,6 +2727,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       ],
     },
     {
+      label: t('Settings'),
+      items: [
+        { label: t('Show the project panel when the mouse approaches the edge (in select mode)'), onClick: () => setHoverReveal(!hoverReveal), checked: hoverReveal },
+      ],
+    },
+    {
       label: t('Help'),
       items: [
         { label: t('Keyboard shortcuts'), shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
@@ -2835,7 +2865,7 @@ ${ltNetlistText(sim.built.lt)}
 
   return (
     <div className="schematic-mode">
-      {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} />, slots.tools)}
+      {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
       {slots.right &&
         createPortal(
           <>
@@ -2909,7 +2939,6 @@ ${ltNetlistText(sim.built.lt)}
               onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
             />
             <span className="tb-sep" />
-            <AppMenu menus={menus} />
             {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
             <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className="labeled" openRef={simMenu}>
               {t('New simulation')} <Icon name="caret" size={14} />
@@ -3008,9 +3037,7 @@ ${ltNetlistText(sim.built.lt)}
               project={project.name}
               benches={treeBenches}
               groups={project.groups}
-              hoverReveal={hoverReveal}
               peek={!treeOpen && treePeek}
-              onHoverReveal={setHoverReveal}
               onBenchItem={benchItem}
               onNewGroup={newGroup}
               onGroupAction={groupAction}

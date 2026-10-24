@@ -138,7 +138,7 @@ export function removeGroup(p: Project, id: string): Project {
  * los que no tienen grupo (o uno que ya no existe) pasan al primero. Sin cambios devuelve el mismo.
  */
 export function withGroups(p: Project): Project {
-  const groups = p.groups.length ? p.groups : [{ id: newId('g'), name: t('Group {n}', { n: 1 }) }];
+  const groups = p.groups.length ? p.groups : [{ id: newId('g'), name: t('Workbench {n}', { n: 1 }) }];
   const ids = new Set(groups.map((g) => g.id));
   const loose = (s: Sim) => !s.group || !ids.has(s.group);
   if (groups === p.groups && !p.variants.some((v) => v.sims.some(loose))) return p;

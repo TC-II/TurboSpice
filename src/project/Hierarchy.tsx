@@ -49,7 +49,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, hoverReveal, peek, onHoverReveal, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -57,11 +57,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   subs: TreeSub[];
   /** subcircuito abierto ('' = testbench) */
   current: string;
-  /** mostrar el panel al acercar el mouse al borde (en modo selección) */
-  hoverReveal: boolean;
   /** se está mostrando por acercar el mouse (encima del esquemático) */
   peek: boolean;
-  onHoverReveal(on: boolean): void;
   onBench(id: string): void;
   /** volver al testbench activo (desde un subcircuito) */
   onTestbench(): void;
@@ -164,7 +161,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             setDragging(b.id);
           }}
           onDragEnd={() => (setDragging(''), setDropOn(null))}
-          title={t('Drag it onto a group to move it')}
+          title={t('Drag it onto a workbench to move it')}
         >
           <button className="tree-caret" onClick={() => toggleIn(setOpenBench, b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
             {open ? '▾' : '▸'}
@@ -317,8 +314,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
     <aside className={`project-tree${peek ? ' peek' : ''}`} aria-label={t('Project')} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
       <header>
         <strong title={project}>{project}</strong>
-        <button className="tree-add" onClick={onNewGroup} title={t('New group of testbenches')}>
-          + {t('Group')}
+        <button className="tree-add" onClick={onNewGroup} title={t('New workbench of testbenches')}>
+          + {t('Workbench')}
         </button>
         <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
           <Icon name="close" size={14} />
@@ -339,12 +336,12 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                 </button>
                 <span className="tree-actions">
                   <button onClick={() => onGroupAction(g.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
-                  <button onClick={() => onGroupAction(g.id, 'delete')} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the group (its testbenches stay)') : t('A project always has at least one group')} aria-label={t('Delete {name}', { name: g.name })}>
+                  <button onClick={() => onGroupAction(g.id, 'delete')} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the workbench (its testbenches stay)') : t('A project always has at least one workbench')} aria-label={t('Delete {name}', { name: g.name })}>
                     <Icon name="trash" size={13} />
                   </button>
                 </span>
-                <button className="tree-add" onClick={() => onNewBench(g.id)} title={t('New testbench in this group')} aria-label={t('New testbench in {name}', { name: g.name })}>
-                  + {t('New')}
+                <button className="tree-add" onClick={() => onNewBench(g.id)} title={t('New testbench in this workbench')} aria-label={t('New testbench in {name}', { name: g.name })}>
+                  + {t('Testbench')}
                 </button>
               </div>
               {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b) => bench(b)) : <li className="tree-meta tree-empty">{t('Empty: drag testbenches here')}</li>}</ul>}
@@ -352,25 +349,24 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           );
         })}
       </ul>
-      <h4>
-        {t('Subcircuits')}
-        <span className="tree-adds">
-          <button className="tree-add" onClick={onImport} title={t('Import subcircuits: .zip, .asc (+ .asy), .lib/.sub')}>
-            {t('Import')}
-          </button>
-          <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
-            {t('From selection')}
-          </button>
-          <button className="tree-add" onClick={onNew} title={t('New empty subcircuit')} aria-label={t('Add an empty subcircuit')}>
-            + {t('New')}
-          </button>
-        </span>
-      </h4>
-      {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}
-      <label className="tree-hover">
-        <input type="checkbox" checked={hoverReveal} onChange={(e) => onHoverReveal(e.target.checked)} />
-        {t('Show when the mouse approaches the edge (in select mode)')}
-      </label>
+      {/* módulos (por ahora sólo subcircuitos), abajo de todo */}
+      <section className="tree-modules">
+        <h4>
+          {t('Modules')}
+          <span className="tree-adds">
+            <button className="tree-add" onClick={onImport} title={t('Import subcircuits: .zip, .asc (+ .asy), .lib/.sub')}>
+              {t('Import')}
+            </button>
+            <button className="tree-add" onClick={onFromSelection} disabled={!onFromSelection} title={t('Turn the selected components into a subcircuit (Alt+B)')}>
+              {t('From selection')}
+            </button>
+            <button className="tree-add" onClick={onNew} title={t('New empty subcircuit')} aria-label={t('Add an empty subcircuit')}>
+              + {t('New')}
+            </button>
+          </span>
+        </h4>
+        {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}
+      </section>
     </aside>
   );
 }

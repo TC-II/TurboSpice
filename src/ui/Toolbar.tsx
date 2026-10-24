@@ -59,7 +59,7 @@ export function groupsThatFit(widths: number[], avail: number, moreW = MORE_W): 
   return n;
 }
 
-export function Toolbar({ label, groups, fixed, after }: { label: string; groups: ToolGroup[]; fixed?: ReactNode; after?: ReactNode }) {
+export function Toolbar({ label, groups, lead, fixed, after }: { label: string; groups: ToolGroup[]; lead?: ReactNode; fixed?: ReactNode; after?: ReactNode }) {
   const bar = useRef<HTMLDivElement>(null);
   // ancho de cada grupo la última vez que se vio (los ocultos no se pueden medir)
   const widths = useRef(new Map<string, number>());
@@ -71,7 +71,7 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
     const fit = () => {
       for (const g of el.querySelectorAll<HTMLElement>(':scope > [data-group]')) widths.current.set(g.dataset.group!, g.offsetWidth);
       const cs = getComputedStyle(el);
-      const fixedW = el.querySelector<HTMLElement>(':scope > .fixed')?.offsetWidth ?? 0;
+      const fixedW = (el.querySelector<HTMLElement>(':scope > .fixed')?.offsetWidth ?? 0) + (el.querySelector<HTMLElement>(':scope > .lead')?.offsetWidth ?? 0);
       // ancho natural de lo de la derecha (sin achicarse)
       // lo de la derecha se achica (sus campos pasan a más filas) hasta su mínimo
       const afterW = el.querySelector(':scope > .bar-after') ? AFTER_MIN : 0;
@@ -96,6 +96,7 @@ export function Toolbar({ label, groups, fixed, after }: { label: string; groups
 
   return (
     <div className="iconbar" role="toolbar" aria-label={label} ref={bar}>
+      {lead && <div className="group lead">{lead}</div>}
       {groups.slice(0, shown).map((g) => (
         <div key={g.id} className="group" role="group" aria-label={g.label} data-group={g.id}>
           {g.tools.map((tt) => (

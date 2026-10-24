@@ -240,9 +240,11 @@ const SYMBOLS = {
     'Fuente de corriente controlada por un polinomio', [...diamond(0, 16, 96), ...downArrow(0, 38, 74)]],
   'Misc/fixedind': ['L', 'L', [[16, 16, 'A', 1], [16, 96, 'B', 2]], { 0: [36, 40, 'Left'], 3: [36, 80, 'Left'] },
     'Inductor de valor fijo', [L(16, 16, 16, 24), L(16, 88, 16, 96), ...[24, 40, 56, 72].map((y) => A(16, y + 8, 8, -90, 90)), L(32, 24, 32, 88)]],
-  // sin Prefix: en LTspice une las dos redes y no genera línea en la netlist (ver connectivity.ts)
-  'Misc/jumper': ['', '', [[-32, 64, '+', 1], [32, 64, '-', 2]], { 0: [0, 40, 'Bottom'] },
-    'Puente: une las dos redes', [A(0, 80, 36, 26.4, 153.6), C(-32, 64, 2), C(32, 64, 2)]],
+  // en LTspice une las dos redes sin línea en la netlist; acá es el bypass de TCLib (fuente de 0 V,
+  // #224) con los pines donde los tiene LTspice, para que los .asc se conecten igual
+  'Misc/jumper': ['X', '', [[-32, 64, 'A', 1], [32, 64, 'B', 2]], { 0: [0, 40, 'Bottom'] },
+    'Wire. Created by Javier Petrucci and Agustin Gullino (ITBA)', [A(0, 80, 36, 26.4, 153.6), C(-32, 64, 2), C(32, 64, 2)],
+    ['SpiceModel bypass', 'ModelFile TCLib/bypass.lib']],
   'Misc/neonbulb': ['X', '', [[0, -48, 'V+', 1], [0, 48, 'V-', 2]], { 0: [16, -48, 'Left'] },
     'Lámpara de neón', [L(0, -48, 0, -30), L(0, 30, 0, 48), C(0, 0, 30), L(0, -30, 0, -8), L(-14, -8, 14, -8), L(0, 30, 0, 8), L(-14, 8, 14, 8),
       F([16, 0], [12, -2], [12, 2])],

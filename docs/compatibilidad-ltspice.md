@@ -76,7 +76,11 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   Dos cables que se cruzan por el medio **no**.
 - `Misc\jumper`: en LTspice une las redes de sus dos pines y no genera línea en la netlist. En
   TurboSpice es un subcircuito `bypass` de TCLib (fuente de 0 V entre sus pines), así que genera una
-  línea `X` y permite medir la corriente que pasa por él.
+  línea `X` y permite medir la corriente que pasa por él. Los pines están donde los tiene LTspice,
+  (−32, 64) y (32, 64), así los `.asc` de LTspice se conectan igual. Como LTspice une las redes, una
+  entrada de compuerta o flip-flop unida a tierra por jumpers está en el nodo 0 y **no participa**;
+  el traductor la trata igual (`bypassGrounded` en `tongspice.ts`). Los pines están donde los tiene LTspice
+  (−32, 64) y (32, 64), así los `.asc` de LTspice se conectan igual.
 - Etiquetas con el mismo nombre son la misma red, **distinguiendo mayúsculas** (`-v` y `-V` quedan como
   redes distintas en la netlist; SPICE las une después).
 - Nombre de red: tierra (`0`) > etiqueta (la primera en orden alfabético) > `N001`, `N002`…

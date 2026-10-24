@@ -195,6 +195,8 @@ const dflop = [
   ...flopBox(-48, 48, 16, 128, [['D', 48, -80], ['', 96, -80]], 80, 96),
   ...polyline([-48, 88], [-38, 96], [-48, 104]), L(0, 0, 0, 16), L(0, 128, 0, 144),
 ];
+// Schmitt: el lazo de histéresis dentro del triángulo, con su esquina inferior izquierda en (x, y)
+const hyst = (x, y) => [L(x - 4, y, x + 4, y), L(x, y - 8, x + 8, y - 8), L(x, y, x, y - 8), L(x + 4, y, x + 4, y - 8)];
 const srflop = flopBox(-32, 32, 16, 120, [['S', 48, -48], ['R', 96, -48]], 48, 64);
 
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
@@ -308,6 +310,16 @@ const SYMBOLS = {
   'Digital/inv': ((a) => [a[0], a[1], [[0, 64, 'in', 1], [64, 64, '_Q', 6], [0, 80, 'com', 8]],
     { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, a[2], [...bufTri(40, 88, 52), C(56, 64, 4), L(60, 64, 64, 64), L(0, 80, 8, 80)], a[3]])(
     gate('BUF', 'Inversor digital (salida _Q de un BUF)')),
+  'Digital/schmitt': ['A', '', [[0, 64, 'in', 1], [64, 80, '_Q', 6], [64, 48, 'Q', 7], [0, 96, 'com', 8]],
+    { 0: [8, 16, 'Left'], 3: [8, 120, 'Left'] }, 'Schmitt-trigger buffer with complementary output',
+    [...polyline([0, 32], [64, 64], [0, 96], [0, 32]), ...hyst(12, 72), L(32, 48, 64, 48), C(52, 80, 8), L(60, 80, 64, 80)],
+    ['SpiceModel SCHMITT']],
+  'Digital/schmtbuf': ['A', '', [[0, 64, 'in', 1], [64, 64, 'Q', 7], [0, 80, 'com', 8]],
+    { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, 'Schmitt-trigger buffer',
+    [...polyline([0, 48], [40, 64], [0, 80], [0, 48]), ...hyst(8, 68), L(40, 64, 64, 64)], ['SpiceModel SCHMITT']],
+  'Digital/schmtinv': ['A', '', [[0, 64, 'in', 1], [64, 64, '_Q', 6], [0, 80, 'com', 8]],
+    { 0: [8, 32, 'Left'], 3: [8, 104, 'Left'] }, 'Schmitt-trigger inverter',
+    [...polyline([0, 48], [40, 64], [0, 80], [0, 48]), ...hyst(8, 68), C(48, 64, 8), L(56, 64, 64, 64)], ['SpiceModel SCHMITT']],
   'Digital/dflop': ['A', '', [[-80, 48, 'D', 1], [-80, 96, 'CLK', 3], [0, 0, 'PRE', 4], [0, 144, 'CLR', 5],
     [96, 96, '_Q', 6], [80, 48, 'Q', 7], [-80, 144, 'com', 8]], { 0: [8, -16, 'Left'], 3: [8, 168, 'Left'] },
     'D flip-flop: takes D on the rising edge of CLK; asynchronous PRE and CLR (CLR wins)', dflop, ['SpiceModel DFLOP']],

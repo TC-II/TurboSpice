@@ -22,12 +22,15 @@ import { t } from '../i18n/i18n.ts';
 //    son asíncronos, activos en alto, y CLR gana si están los dos;
 //  - SRFLOP: in1=S, in2=R, asíncronos; R gana si están los dos;
 //  - el punto de operación respeta PRE/S y CLR/R; sin ellos Q arranca en Vlow.
+// SCHMITT (in1, _Q, Q, com): sube cuando V(in) > Vt+Vh y baja cuando V(in) < Vt−Vh, con V(in)
+// medida respecto de tierra (no de com); Vt vale Ref por omisión y Vh, 5 % de |Vt|. Es un SR
+// con set = (in > Vt+Vh) y reset = (in < Vt−Vh).
 // En ngspice: las entradas normalizadas pasan por un adc_bridge a un d_dff de XSPICE (el SR es un
 // d_dff sin reloj que sólo usa set y reset) y un dac_bridge vuelve a 0…1; de ahí en adelante
 // (Td, rampas, Tau, salidas) es igual que en las compuertas.
 
 const GATES = new Set(['and', 'or', 'xor', 'buf']);
-const FLOPS = new Set(['dflop', 'srflop']);
+const FLOPS = new Set(['dflop', 'srflop', 'schmitt']);
 
 /** Parámetros "k=v" o "k v" (LTspice acepta los dos; v puede ser {expr}) de la línea A */
 function params(text: string): Map<string, string> {
@@ -39,7 +42,7 @@ function params(text: string): Map<string, string> {
 
 /**
  * Líneas ngspice equivalentes a la compuerta de LTspice, o undefined si el modelo no es una
- * compuerta ni un flip-flop (schmitt, contadores… quedan como están).
+ * compuerta, un flip-flop ni un Schmitt (contadores… quedan como están).
  */
 export function translateDigital(name: string, nodes: string[], value: string, warnings: string[]): string[] | undefined {
   const m = /^\s*(\w+)\b(.*)$/s.exec(value);
@@ -47,7 +50,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   if ((!GATES.has(model) && !FLOPS.has(model)) || nodes.length !== 8) return undefined;
   const p = params(m![2]);
   // tripdt/tripdv sólo controlan el paso de LTspice
-  const known = new Set(['vhigh', 'vlow', 'ref', 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
+  const known = new Set(['vhigh', 'vlow', 'ref', ...(model === 'schmitt' ? ['vt', 'vh'] : []), 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
   const ignored = [...p.keys()].filter((k) => !known.has(k));
   if (ignored.length) warnings.push(t('{name}: gate parameters not translated: {p1}', { name, p1: ignored.join(', ') }));
   const num = (k: string, d: string) => `{${p.get(k) ?? d}}`;
@@ -68,14 +71,22 @@ export function translateDigital(name: string, nodes: string[], value: string, w
     const dff = model === 'dflop';
     const set = dff ? i4 : i1, rst = dff ? i5 : i2;
     const on = (x: string) => (x === '0' ? '0' : bit(x));
-    // CLR/R tiene prioridad: el set efectivo es set·¬reset
-    const sig: [string, string][] = [
-      ['fs', `${on(set)}*${not(on(rst))}`],
-      ['fr', on(rst)],
-      ...(dff ? ([['fd', on(i1)], ['fc', on(i3)]] as [string, string][]) : []),
-    ];
+    let sig: [string, string][];
+    if (model === 'schmitt') {
+      const vt = p.has('vt') ? num('vt', '') : ref;
+      const vhy = p.has('vh') ? num('vh', '') : `0.05*abs(${vt})`;
+      const cmp = (e: string) => `min(max((${e})*1e4+0.5,0),1)`;
+      sig = [['fs', cmp(`V(${i1})-${vt}-${vhy}`)], ['fr', cmp(`${vt}-${vhy}-V(${i1})`)]];
+    } else {
+      // CLR/R tiene prioridad: el set efectivo es set·¬reset
+      sig = [
+        ['fs', `${on(set)}*${not(on(rst))}`],
+        ['fr', on(rst)],
+        ...(dff ? ([['fd', on(i1)], ['fc', on(i3)]] as [string, string][]) : []),
+      ];
+    }
     sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=${e}`));
-    anchor(dff ? [i1, i3, set, rst] : [set, rst]);
+    anchor(dff ? [i1, i3, set, rst] : model === 'schmitt' ? [i1] : [set, rst]);
     const dig = (k: string) => `${n}${k}_d`;
     lines.push(
       `A_${n}adc [${sig.map(([k]) => `${n}${k}`).join(' ')}] [${sig.map(([k]) => dig(k)).join(' ')}] ${n}adcm`,

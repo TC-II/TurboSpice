@@ -960,7 +960,7 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
     expect(t).toMatch(/^B_A1__qb qb 0 V=\{1\}-\(\{1\}-\{0\}\)\*V\(A1__x\)$/m);
     expect(t).toMatch(/^B_A1__q q 0 /m);
     const w: string[] = [];
-    expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', w)).toBeUndefined();
+    expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'COUNTER', w)).toBeUndefined();
     // parámetros sin "=" (como en TCLib/Charge_Pump.lib)
     const l = translateDigital('A4', ['u', '0', '0', '0', 'd', '0', 'c', '0'], 'AND Vhigh {Vcc} Trise 1n Tfall 2n', w)!;
     expect(l).toContain('.model A4__sm slew(rise_slope={1/(1n)} fall_slope={1/(2n)})');
@@ -968,7 +968,7 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
   });
 });
 
-describe('flip-flops de LTspice (A: DFLOP, SRFLOP; #133)', () => {
+describe('flip-flops y Schmitt de LTspice (A: DFLOP, SRFLOP, SCHMITT; #133)', () => {
   it('DFLOP: D=in1, CLK=in3, PRE=in4, CLR=in5 por un d_dff; CLR tiene prioridad sobre PRE', () => {
     const w: string[] = [];
     const l = translateDigital('A1', ['d', '0', 'clk', 'pre', 'clr', 'qb', 'q', '0'], 'DFLOP Td=10n', w)!;
@@ -1013,5 +1013,17 @@ SYMATTR InstName J1
     const d = translateDigital('A3', ['d', '0', 'clk', '0', '0', '0', 'q', '0'], 'DFLOP', [])!;
     expect(d).toContain('B_A3__fs A3__fs 0 V=0*(1-0)');
     expect(d).toContain('B_A3__fr A3__fr 0 V=0');
+  });
+
+  it('SCHMITT: SR con set = in > Vt+Vh y reset = in < Vt−Vh; Vt = Ref y Vh = 5 % de |Vt| por omisión', () => {
+    const w: string[] = [];
+    const l = translateDigital('A4', ['in', '0', '0', '0', '0', 'qb', 'q', '0'], 'SCHMITT Vt=0.6 Vh=0.1', w)!;
+    expect(w).toEqual([]);
+    expect(l).toContain('B_A4__fs A4__fs 0 V=min(max((V(in)-{0.6}-{0.1})*1e4+0.5,0),1)');
+    expect(l).toContain('B_A4__fr A4__fr 0 V=min(max(({0.6}-{0.1}-V(in))*1e4+0.5,0),1)');
+    expect(l).toContain('A_A4__ff A4__fr_d A4__fz_d A4__fs_d A4__fr_d A4__fq_d NULL A4__ffm');
+    expect(l.some((x) => x.startsWith('B_A4__qb qb 0'))).toBe(true);
+    const d = translateDigital('A5', ['in', '0', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
+    expect(d.find((x) => x.startsWith('B_A5__fs'))).toContain('V(in)-({1}+{0})/2-0.05*abs(({1}+{0})/2)');
   });
 });

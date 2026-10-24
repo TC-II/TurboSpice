@@ -92,15 +92,24 @@ check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas
 check((await page.getByText('Superponer las 3 corridas').count()) === 1, 'opción para superponer corridas');
 await page.screenshot({ path: `${OUT}/simulation.png` });
 
-// --- #197: un .control a mano con su propio análisis lo avisa en Errores ---
+// --- #197/#241: un .control a mano sin "run" es una Complex simulation: su análisis reemplaza al
+// del testbench sin aviso; con "run" y además su propio análisis corren los dos, y se avisa ---
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('tran 1u 1m\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await resultsMenu(page, /^Errores/);
-const own = await page.locator('.problems li', { hasText: 'corre su propio análisis (tran)' }).count();
-check(own === 1, 'Errores avisa que el .control corre su propio análisis, no la configuración');
+const quiet = await page.locator('.problems li', { hasText: 'propio análisis' }).count();
+check(quiet === 0, 'un .control sin run con su propio análisis (Complex simulation) no avisa');
+await menu(page, 'Simular', 'Bloque .control…');
+await page.locator('.modal textarea').fill('run\ntran 1u 1m\n');
+await page.getByRole('button', { name: 'Aceptar' }).click();
+await page.getByRole('button', { name: 'Correr', exact: true }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await resultsMenu(page, /^Errores/);
+const own = await page.locator('.problems li', { hasText: 'además su propio análisis (tran)' }).count();
+check(own === 1, 'Errores avisa que el .control corre la configuración y además su propio análisis');
 await menu(page, 'Simular', 'Bloque .control…');
 await page.locator('.modal textarea').fill('print v(out)\n');
 await page.getByRole('button', { name: 'Aceptar' }).click();

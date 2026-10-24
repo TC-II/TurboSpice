@@ -1,0 +1,63 @@
+Version 4
+SymbolType CELL
+RECTANGLE Normal -48 16 48 128
+LINE Normal -80 48 -48 48
+LINE Normal -42 42 -38 42
+LINE Normal -38 42 -34 46
+LINE Normal -34 46 -34 50
+LINE Normal -34 50 -38 54
+LINE Normal -38 54 -42 54
+LINE Normal -42 54 -42 42
+LINE Normal -80 96 -48 96
+LINE Normal 48 48 80 48
+LINE Normal 36 42 40 42
+LINE Normal 40 42 42 44
+LINE Normal 42 44 42 52
+LINE Normal 42 52 40 54
+LINE Normal 40 54 36 54
+LINE Normal 36 54 34 52
+LINE Normal 34 52 34 44
+LINE Normal 34 44 36 42
+LINE Normal 39 51 43 55
+CIRCLE Normal 48 92 56 100
+LINE Normal 56 96 96 96
+LINE Normal 36 90 40 90
+LINE Normal 40 90 42 92
+LINE Normal 42 92 42 100
+LINE Normal 42 100 40 102
+LINE Normal 40 102 36 102
+LINE Normal 36 102 34 100
+LINE Normal 34 100 34 92
+LINE Normal 34 92 36 90
+LINE Normal 39 99 43 103
+LINE Normal 34 87 42 87
+LINE Normal -48 88 -38 96
+LINE Normal -38 96 -48 104
+LINE Normal 0 0 0 16
+LINE Normal 0 128 0 144
+WINDOW 0 8 -16 Left 2
+WINDOW 3 8 168 Left 2
+SYMATTR Prefix A
+SYMATTR SpiceModel DFLOP
+SYMATTR Description D flip-flop: takes D on the rising edge of CLK; asynchronous PRE and CLR (CLR wins)
+PIN -80 48 NONE 0
+PINATTR PinName D
+PINATTR SpiceOrder 1
+PIN -80 96 NONE 0
+PINATTR PinName CLK
+PINATTR SpiceOrder 3
+PIN 0 0 NONE 0
+PINATTR PinName PRE
+PINATTR SpiceOrder 4
+PIN 0 144 NONE 0
+PINATTR PinName CLR
+PINATTR SpiceOrder 5
+PIN 96 96 NONE 0
+PINATTR PinName _Q
+PINATTR SpiceOrder 6
+PIN 80 48 NONE 0
+PINATTR PinName Q
+PINATTR SpiceOrder 7
+PIN -80 144 NONE 0
+PINATTR PinName com
+PINATTR SpiceOrder 8

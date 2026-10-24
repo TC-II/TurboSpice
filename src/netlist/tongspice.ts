@@ -624,6 +624,7 @@ function convertElements(
 ): string[] {
   const out: string[] = [];
   const extra: string[] = [];
+  const grounded = bypassGrounded(lt.elements);
   for (const e of lt.elements) {
     const name = ngspiceName(e, used);
     names.set(e.name, name);
@@ -641,7 +642,8 @@ function convertElements(
     }
     const letter = name[0].toUpperCase();
     // compuertas digitales de LTspice (ver digital.ts)
-    const gate = letter === 'A' ? translateDigital(name, e.nodes, e.value, warnings) : undefined;
+    // una entrada unida a tierra por un jumper (bypass) está en el nodo 0 en LTspice, que une las redes
+    const gate = letter === 'A' ? translateDigital(name, e.nodes.map((n) => (grounded.has(n) ? '0' : n)), e.value, warnings) : undefined;
     if (gate) {
       out.push(...gate);
       continue;
@@ -1102,4 +1104,23 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   }
   // nodos sin camino de continua a tierra: como LTspice (ver floating.ts)
   return { netlist: fixFloatingNodes(text, files).text, files, warnings };
+}
+
+/**
+ * Nodos unidos a tierra sólo a través de Misc\jumper (subcircuito bypass de TCLib, una fuente de 0 V).
+ * LTspice une esas redes con la de tierra, así que para él son el nodo 0.
+ */
+function bypassGrounded(elements: { name: string; nodes: string[]; value: string }[]): Set<string> {
+  const adj = new Map<string, string[]>();
+  for (const e of elements) {
+    if (!/^X/i.test(e.name) || e.nodes.length !== 2 || !/^\s*bypass\b/i.test(e.value)) continue;
+    const [a, b] = e.nodes;
+    adj.set(a, [...(adj.get(a) ?? []), b]);
+    adj.set(b, [...(adj.get(b) ?? []), a]);
+  }
+  const seen = new Set<string>(['0']);
+  const todo = ['0'];
+  while (todo.length) for (const n of adj.get(todo.pop()!) ?? []) if (!seen.has(n)) (seen.add(n), todo.push(n));
+  seen.delete('0');
+  return seen;
 }

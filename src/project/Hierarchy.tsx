@@ -20,6 +20,8 @@ export interface TreeSub {
   children: string[];
   outdated: boolean;
   text: boolean;
+  /** tipo de módulo: subcircuito (esquemático) o modelo (netlist + símbolo) */
+  type?: 'model';
   /** instancias desactualizadas (#199): pines sin conectar o cables sueltos sobre el símbolo */
   stale?: { label: string; inst: string; detail: string; go(): void }[];
 }
@@ -50,7 +52,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave, onEnter }: {
+export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onNewModel, onFromSelection, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave, onEnter }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -75,6 +77,8 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
   onOpen(name: string): void;
   onNew(): void;
+  /** módulo nuevo de tipo Modelo (netlist .subckt/.model + símbolo) */
+  onNewModel?(): void;
   /** exportar un subcircuito (.zip con su .asc y su .asy) e importar */
   onExport(name: string): void;
   /** exportar como netlist .sub (#199) */
@@ -227,15 +231,19 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             </li>
             <li>
               <div className="tree-row tree-sub">
-                <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
-                  {pOpen ? '▾' : '▸'}
-                </button>
+                {nVars > 0 ? (
+                  <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
+                    {pOpen ? '▾' : '▸'}
+                  </button>
+                ) : (
+                  <span className="tree-caret" aria-hidden />
+                )}
                 <button className="tree-name" onClick={() => onBenchItem(b.id, 'params')}>
                   {t('Parameters and variables')}
                 </button>
                 {nVars > 0 && <span className="tree-meta">{nVars}</span>}
               </div>
-              {pOpen && (
+              {pOpen && nVars > 0 && (
                 <ul className="tree-branch">
                   {b.params.map(([k, v]) => (
                     <li key={`p:${k}`}>
@@ -255,7 +263,6 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                       </div>
                     </li>
                   ))}
-                  {!nVars && <li className="tree-meta tree-empty">{t('None.')}</li>}
                 </ul>
               )}
             </li>
@@ -282,14 +289,18 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
             e.dataTransfer.effectAllowed = 'copy';
           }}
         >
-          <span className="tree-glyph">▭</span> {s.name}
+          <span className="tree-glyph">{s.type === 'model' ? '◇' : '▭'}</span> {s.name}
         </button>
+        <span className={`tree-kind${s.type === 'model' ? ' model' : ''}`} title={s.type === 'model' ? t('Model: netlist (.subckt or .model) and its symbol') : t('Subcircuit: schematic and its symbol')}>
+          {s.type === 'model' ? t('model') : t('subcircuit')}
+        </span>
         <span className="tree-meta">{t('{n} pins', { n: s.ports })}</span>
         <button className={`tree-uses${s.uses.length ? '' : ' none'}`} onClick={() => setUsesOf(usesOf === s.name ? '' : s.name)} title={t('Where it is used')}>
           {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
+          {s.type !== 'model' && <>
           <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
           <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
             .sub
@@ -297,6 +308,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
             ☆
           </button>
+          </>}
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
@@ -395,7 +407,7 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           );
         })}
       </ul>
-      {/* módulos (por ahora sólo subcircuitos), abajo de todo */}
+      {/* módulos (subcircuitos y modelos), abajo de todo */}
       <section className="tree-modules">
         <h4>
           {t('Modules')}
@@ -407,8 +419,13 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
               {t('From selection')}
             </button>
             <button className="tree-add" onClick={onNew} title={t('New empty subcircuit')} aria-label={t('Add an empty subcircuit')}>
-              + {t('New')}
+              + {onNewModel ? t('Subcircuit') : t('New')}
             </button>
+            {onNewModel && (
+              <button className="tree-add" onClick={onNewModel} title={t('New model: a .subckt or .model netlist with its symbol')} aria-label={t('Add a model')}>
+                + {t('Model')}
+              </button>
+            )}
           </span>
         </h4>
         {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet. Create an empty one, or select part of the circuit and use «From selection» (Alt+B).')}</p>}

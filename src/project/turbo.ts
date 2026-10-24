@@ -25,6 +25,8 @@ export interface ProjectFile {
   name: string;
   kind: 'symbol' | 'model' | 'schematic' | 'verilog';
   text: string;
+  /** archivo de modelos que es un módulo «Modelo» (con su símbolo <nombre>.asy) del editor de módulos */
+  module?: 'model';
 }
 
 /** Una vez que se simuló: el circuito exacto (inmutable) */
@@ -97,10 +99,10 @@ export const activeVariant = (p: Project): Variant => p.variants.find((v) => v.i
 export const BENCHES = 'tb';
 
 /** Testbench nuevo (con un circuito, vacío si no se da) */
-export const newBench = (name: string, asc = EMPTY_ASC): Sim => ({ id: newId('s'), name, asc, runs: [] });
+export const newBench = (name?: string, asc = EMPTY_ASC): Sim => ({ id: newId('s'), ...(name ? { name } : {}), asc, runs: [] });
 
 /** Proyecto nuevo con un testbench vacío */
-export function newProject(name: string, benchName = t('Testbench 1')): Project {
+export function newProject(name: string, benchName?: string): Project {
   const now = Date.now();
   const b = newBench(benchName);
   return { name, created: now, modified: now, files: [], activeVariant: BENCHES, variants: [{ id: BENCHES, name, base: EMPTY_ASC, activeSim: b.id, sims: [b] }], groups: [] };
@@ -114,7 +116,7 @@ export function newProject(name: string, benchName = t('Testbench 1')): Project 
  */
 export function asBenches(p: Project): Project {
   const v0 = p.variants[0];
-  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => s.name) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups) return p;
+  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => !s.name || !isDefaultBenchName(s.name)) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups) return p;
   const groups = [...(p.groups ?? [])];
   const several = p.variants.length > 1;
   const sims: Sim[] = [];
@@ -129,10 +131,8 @@ export function asBenches(p: Project): Project {
   for (const v of p.variants) {
     const list = v.sims.length ? v.sims : [{ id: newId('s'), asc: v.base, runs: [] } as Sim];
     for (const s of list) {
-      const line = findAnalysis(parseAsc(s.asc))?.value;
-      const own = s.name || (line ? analysisLabel(line) : t('No analysis'));
-      // los testbenches ya existentes conservan su nombre; de una variante (versión 1 o un .asc
-      // importado) con una sola simulación, el nombre es el de la variante
+      // los testbenches ya existentes conservan su nombre propio; de una variante (versión 1 o un
+      // .asc importado) con una sola simulación, el nombre es el de la variante
       // una variante con varias simulaciones (de la versión 1 o de un .zip importado) pasa a ser
       // un grupo con un testbench por simulación
       let group = s.group;
@@ -141,12 +141,22 @@ export function asBenches(p: Project): Project {
         if (!g) groups.push((g = { id: `g_${v.id}`, name: v.name }));
         group = g.id;
       }
-      const name = unique(v.id === BENCHES || group ? own : !v.sims.length || several ? v.name : own);
-      sims.push({ ...s, name, ...(group ? { group } : {}) });
+      // sin nombre propio (o con el «Testbench N» que se ponía antes) queda sin `name`: lleva el
+      // automático, que sigue a su análisis (analysisLabel)
+      const own = s.name && !isDefaultBenchName(s.name) ? s.name : undefined;
+      const fixed = v.id === BENCHES || group || (v.sims.length && !several) ? own : v.name;
+      const { name: _, ...rest } = s;
+      sims.push({ ...rest, ...(fixed ? { name: unique(fixed) } : {}), ...(group ? { group } : {}) });
       if (v.id === p.activeVariant && (s.id === v.activeSim || !active)) active = s.id;
     }
   }
   return { ...p, activeVariant: BENCHES, variants: [{ id: BENCHES, name: p.name, base: EMPTY_ASC, activeSim: active || sims[0].id, sims }], groups };
+}
+
+/** «Testbench N» (en inglés o en el idioma actual): el nombre que se ponía antes por defecto */
+export function isDefaultBenchName(name: string): boolean {
+  const m = /(\d+)\s*$/.exec(name.trim());
+  return !!m && [`Testbench ${m[1]}`, t('Testbench {n}', { n: m[1] })].some((x) => x.toLowerCase() === name.trim().toLowerCase());
 }
 
 /** Nombre del proyecto a partir del archivo: sin .turbo ni .asc */
@@ -319,7 +329,10 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
     }));
 
   const files: ProjectFile[] = Array.isArray(raw.files)
-    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog'))
+    ? raw.files.filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog')).map((f) => {
+        const { module, ...rest } = f;
+        return module === 'model' && f.kind === 'model' ? { ...rest, module } : rest;
+      })
     : [];
   const variants: Variant[] = raw.variants.map((vr: unknown, vi: number): Variant => {
     if (!isObj(vr)) throw new Error(t('invalid .turbo: malformed variant'));
@@ -340,9 +353,12 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
       });
       const damagedRuns = runs.filter((r) => r.damaged).length;
       const name = typeof sr.name === 'string' && sr.name ? sr.name : undefined;
-      const label = v2 ? `«${name ?? vname}»` : `«${vname}${name ? ` · ${name}` : ''}»`;
-      if (damagedRuns) warnings.push(`${label}: ${damagedRuns === 1 ? t('one run in the history is damaged') : t('{damagedRuns} runs in the history are damaged', { damagedRuns })}`);
       let asc = get(sr.current);
+      // sin nombre propio, el automático (el de su análisis)
+      const line = v2 && !name && asc ? findAnalysis(parseAsc(asc))?.value : undefined;
+      const shown = name ?? (line ? analysisLabel(line) : vname);
+      const label = v2 ? `«${shown}»` : `«${vname}${name ? ` · ${name}` : ''}»`;
+      if (damagedRuns) warnings.push(`${label}: ${damagedRuns === 1 ? t('one run in the history is damaged') : t('{damagedRuns} runs in the history are damaged', { damagedRuns })}`);
       if (asc === null) {
         asc = [...runs].reverse().find((r) => !r.damaged)?.asc ?? EMPTY_ASC;
         warnings.push(t('{label}: the current circuit is damaged; recovered {p1}', { label, p1: asc === EMPTY_ASC ? t('empty') : t('the one from the last run') }));

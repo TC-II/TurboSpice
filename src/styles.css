@@ -194,6 +194,12 @@ svg.editor { width: 100%; height: 100%; display: block; background: var(--sch-bg
 svg.editor.tool-grabbing { cursor: grabbing; }
 svg.editor.tool-wire, svg.editor.tool-place { cursor: none; }
 svg.editor.tool-flag, svg.editor.tool-text { cursor: crosshair; }
+svg.editor.tool-comment { cursor: text; }
+svg.editor.tool-resize { cursor: nwse-resize; }
+svg.editor .text-bbox rect { fill: none; stroke: var(--accent); stroke-width: 0.6; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
+svg.editor .text-bbox rect.handle { fill: var(--bg); stroke-dasharray: none; stroke-width: 1.2; }
+svg.editor .inline-text textarea { box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0 0 0 0; border: 1px dashed var(--accent); border-radius: 0; outline: none; resize: none; overflow: hidden; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--sch-drawing, var(--fg)); font-family: system-ui, sans-serif; white-space: pre; }
+.text-menu select { flex: 1; min-width: 0; font-size: 13px; }
 /* borrar: el cursor es la × dibujada en la grilla */
 svg.editor.tool-delete { cursor: none; }
 svg.editor.tool-label { cursor: move; }
@@ -1059,13 +1065,14 @@ button.hier-tab { padding-right: 10px; }
 .canvas-wrap.with-hier > .sym-pane { top: 31px; }
 .sym-pane header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .sym-pane header .tree-add { margin-left: auto; }
-.sym-canvas { flex: 1 1 auto; min-height: 180px; height: auto; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
+.sym-canvas { flex: 1 1 0; min-height: 180px; height: 0; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
 .sym-dot { fill: var(--grid, #888); opacity: .5; }
 .sym-shapes { fill: none; stroke: var(--fg); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .sym-shapes * { vector-effect: non-scaling-stroke; }
 .sym-title { fill: var(--fg-muted); font-size: 12px; }
 .sym-corner { fill: var(--bg); stroke: var(--accent); stroke-width: 1; cursor: nwse-resize; vector-effect: non-scaling-stroke; }
 .sym-pin { cursor: grab; }
+.sym-param { cursor: move; }
 .sym-pin rect { fill: var(--accent); }
 .sym-pin text { fill: var(--fg); font-size: 11px; font-family: var(--mono); user-select: none; }
 .sym-pin:hover rect { fill: #e67700; }
@@ -1101,6 +1108,7 @@ button.hier-tab { padding-right: 10px; }
 @media (max-width: 700px) { .canvas-wrap.with-sym { padding-right: 0; } .sym-pane { width: 85%; box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
 
 .sym-params p.tree-meta { white-space: normal; line-height: 1.4; }
+.sym-params-help { margin: 0 0 4px; }
 .tree-adds .tree-add { white-space: nowrap; }
 
 /* Panel del proyecto (#180): grupos, partes de cada testbench, mostrar al acercar el mouse */
@@ -1177,3 +1185,18 @@ button.hier-tab { padding-right: 10px; }
 .images > .sel rect { stroke: var(--sch-sel); stroke-width: 2.2; stroke-dasharray: 6 4; }
 .images image { opacity: 0.85; }
 svg.editor.tool-pencil { cursor: crosshair; }
+
+/* Editor de módulos «Modelo»: netlist y atributos a la izquierda, símbolo a la derecha */
+.model-editor { position: absolute; inset: 0; z-index: 7; background: var(--bg); }
+.canvas-wrap.with-tree > .model-editor { left: 260px; }
+.model-editor > .sub-hint { --sub-mode: #4dabf7; left: 0; }
+.model-editor > .sym-pane { top: 31px; }
+.model-left { position: absolute; top: 31px; left: 0; bottom: 0; right: var(--sym-wc, 420px); display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; overflow: auto; box-sizing: border-box; font-size: 13px; }
+.model-label { font-weight: 600; }
+.model-text { flex: 1 1 auto; min-height: 180px; font-family: var(--mono); font-size: 13px; resize: vertical; background: var(--bg-alt); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; white-space: pre; }
+.model-attrs table { border-collapse: collapse; }
+.model-attrs td, .model-attrs th { padding: 2px 6px 2px 0; text-align: left; }
+.model-attrs input { font-family: var(--mono); width: 100%; min-width: 160px; box-sizing: border-box; }
+.tree-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; border-radius: 4px; border: 1px solid currentColor; color: var(--fg-muted); }
+.tree-kind.model { color: #4dabf7; }
+@media (max-width: 700px) { .canvas-wrap.with-tree > .model-editor { left: 0; } .model-left { right: 0; } }

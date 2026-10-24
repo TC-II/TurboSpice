@@ -44,7 +44,8 @@ describe('.turbo', () => {
     // base = actual de la 1.ª = corridas r1 y r3; r2; la de AC
     expect(Object.keys(json.blobs)).toHaveLength(3);
     expect(json.version).toBe(2);
-    expect(json.testbenches.map((b: { name: string }) => b.name)).toEqual(['Transitorio 0–10 ms', 'AC']);
+    // sin nombre propio no se guarda `name`: el automático sigue al análisis
+    expect(json.testbenches.map((b: { name?: string }) => b.name)).toEqual([undefined, 'AC']);
     const runs = json.testbenches[0].runs;
     expect(runs[0].asc).toBe(runs[2].asc);
     expect(runs[0].time).toBe('2026-10-22T15:00:00.000Z');
@@ -60,7 +61,7 @@ describe('.turbo', () => {
     expect(runs.map((r) => !!r.damaged)).toEqual([false, true, false]);
     expect(runs[0].asc).toContain('.tran 10m');
     expect(project.variants[0].sims[1].asc).toContain('.ac dec');
-    expect(warnings).toEqual(['«Transitorio 0–10 ms»: una corrida del historial está dañada']);
+    expect(warnings).toEqual(['«Tran 0 - 10m»: una corrida del historial está dañada']);
     // al volver a guardar, la dañada no se escribe
     const again = JSON.parse(await serializeTurbo(project));
     expect(again.testbenches[0].runs.map((r: { id: string }) => r.id)).toEqual(['r1', 'r3']);
@@ -112,7 +113,7 @@ describe('proyecto desde un .asc', () => {
     const p = projectFromAsc(withSims(docWith('.ac dec 10 1 1meg'), l), 'Filtro RC.asc');
     expect(p.name).toBe('Filtro RC');
     const v = p.variants[0];
-    expect(v.sims.map((s) => s.name)).toEqual(['Transitorio 0–10 ms', 'Bode']);
+    expect(v.sims.map((s) => s.name)).toEqual([undefined, 'Bode']);
     expect(v.sims.map((s) => findAnalysis(parseAscText(s.asc))?.value)).toEqual(['.tran 10m', '.ac dec 10 1 1meg']);
     expect(v.activeSim).toBe(v.sims[1].id);
     // el .asc de cada simulación ya no lleva la lista

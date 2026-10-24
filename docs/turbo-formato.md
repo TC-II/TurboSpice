@@ -16,8 +16,12 @@
 > ```
 >
 > JSON de la versión 2: `"version": 2`, `"activeTestbench": "s1"` y `"testbenches": [{ "id",
-> "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con nombre
-> obligatorio y `"group"` opcional). `"groups": [{ "id", "name" }]` agrupa testbenches (en el panel
+> "name", "current", "view", "runs" }]` (cada uno como una simulación de abajo, con `"group"` opcional).
+> `"name"` es opcional y hace de marca: **sin** él, el testbench lleva el nombre automático de su
+> análisis (`Tran 0 - 100m`, `AC 100Hz - 100KHz`, `.OP`, `DC Sweep`, `Noise 1Hz - 1MHz`,
+> `Poles and Zeros`…), que se recalcula cada vez que cambian el análisis o sus límites; **con** él
+> (el usuario lo renombró) el nombre queda fijo. Al abrir, un `"Testbench N"` (el nombre que se
+> ponía antes por defecto) se toma como automático. `"groups": [{ "id", "name" }]` agrupa testbenches (en el panel
 > del proyecto, colapsables; al abrir un `.turbo` de la versión 1, una variante con varias
 > simulaciones pasa a ser un grupo). `files[].kind` puede ser `"symbol"`, `"model"` o `"schematic"`
 > (subcircuito). No hay `variants` ni circuito base. Un proyecto siempre tiene al menos un testbench.
@@ -160,6 +164,19 @@ deshacer (§5).
   (`UserFile`, IndexedDB) → librería de TurboSpice.
 - Si al importar llega un archivo con el mismo nombre y **otro contenido**, se pregunta qué hacer:
   reemplazar, mantener el existente o renombrar el nuevo.
+- En el `.asy` BLOCK de un subcircuito, los parámetros van en `SYMATTR SpiceLine` y su rótulo en
+  `WINDOW 39 x y Top 2` (formato estándar de LTspice, sin campos nuevos). El Editor de subcircuitos
+  lo dibuja como en la instancia y permite moverlo; las instancias nuevas usan esa posición.
+- **Módulos «Modelo»** (editor de módulos, panel del proyecto → Módulos → «+ Modelo»): un archivo
+  `"kind": "model"` con `"module": "model"` (`NOMBRE.lib`, la netlist con un `.subckt` o un `.model`)
+  más su símbolo `NOMBRE.asy` (`"kind": "symbol"`), que lo usa con `SYMATTR ModelFile NOMBRE.lib` y
+  lleva `Prefix`, `Value`, `SpiceModel`, `SpiceLine`… y los pines con `PinName`/`SpiceOrder`, como
+  un par `.sub` + `.asy` de TCLib. Sin `"module"` es un archivo de modelos común. Ejemplo:
+
+  ```json
+  { "name": "MYAMP.lib", "kind": "model", "module": "model", "text": ".subckt MYAMP in out\n…\n.ends MYAMP\n" },
+  { "name": "MYAMP.asy", "kind": "symbol", "text": "Version 4\nSymbolType CELL\n…\nSYMATTR ModelFile MYAMP.lib\n…" }
+  ```
 
 ## 5. Deshacer
 - Una pila de deshacer **por simulación** (y otra para la base de la variante). Al cambiar de

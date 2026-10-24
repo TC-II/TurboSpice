@@ -538,10 +538,12 @@ export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
           <label>
             <span>{t('Subcircuit port')}</span>
             <select value={io} onChange={(e) => setIo(e.target.value)}>
-              <option value="">{t('No (internal net)')}</option>
-              <option value="In">{t('Input')}</option>
-              <option value="Out">{t('Output')}</option>
-              <option value="BiDir">{t('Bidirectional')}</option>
+              <optgroup label={t('Accessible')}>
+                <option value="BiDir">{t('Bidirectional')}</option>
+                <option value="In">{t('Input')}</option>
+                <option value="Out">{t('Output')}</option>
+              </optgroup>
+              <option value="">{t('Internal (not on the symbol)')}</option>
             </select>
           </label>
         )}

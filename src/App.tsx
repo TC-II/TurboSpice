@@ -40,12 +40,10 @@ import {
   addSim as addProjectSim,
   addGroup,
   applyValues,
-  freeBenchName,
   removeGroup,
   renameGroup,
   setBenchGroup,
   placeBench,
-  simLabel,
   groupPeersWith,
   propagateAttrs,
   mergeFiles,
@@ -90,7 +88,10 @@ import { benchParams, benchVariables, setBenchParams } from './schematic/benchPa
 import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
+import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { addModelModule, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
+import { ModelEditor } from './project/ModelEditor.tsx';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subckts, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
@@ -394,7 +395,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const v = lsGet('turbospice.tree');
     return v === '1' ? true : v === '0' ? false : null;
   });
-  const hasSubs = project.files.some((f) => f.kind === 'schematic');
+  const hasSubs = project.files.some((f) => f.kind === 'schematic' || isModelModule(f));
+  // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
+  const [curModel, setCurModel] = useState('');
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
   // ancho del panel del símbolo (se arrastra su borde izquierdo)
@@ -544,6 +547,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       off = true;
     };
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setCurModel(''), [path, sims.active]);
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
     lib.setProjectFiles(project.files);
@@ -1494,6 +1498,49 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     projectRef.current = p;
     editProject(p);
   };
+  // --- Módulos «Modelo»: netlist (.subckt/.model) + símbolo ---------------------------------
+  const newModel = () =>
+    askSubName(t('New model'), freeSubcktName(projectRef.current, 'MODEL'), (name) => {
+      const p = addModelModule(projectRef.current, name);
+      projectRef.current = p;
+      editProject(p);
+      setCurModel(name);
+    });
+  const renameModel = (from: string) =>
+    askSubName(t('Rename model'), from, (to) => {
+      if (to === from) return;
+      const retype = (asc: string) => {
+        const d = parseAsc(asc);
+        let changed = false;
+        for (const s of d.symbols)
+          if (baseName(s.type).toLowerCase() === from.toLowerCase()) {
+            s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
+            changed = true;
+          }
+        return changed ? serializeAsc(d) : asc;
+      };
+      // lo que se está editando también se renombra (se guarda antes)
+      const p = renameModelModule(snapshot(), from, to, retype);
+      projectRef.current = p;
+      editProject(p);
+      history.reset(parseAsc(retype(ascText(docRef.current))));
+      if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
+    }, from);
+  const deleteModel = (name: string) => {
+    const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
+    setDialog({
+      kind: 'slide',
+      title: t('Delete model {name}?', { name }),
+      message: n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Its netlist and its symbol will be deleted.'),
+      onConfirm: () => {
+        setDialog(null);
+        if (curModel.toLowerCase() === name.toLowerCase()) setCurModel('');
+        const p = removeModelModule(projectRef.current, name);
+        projectRef.current = p;
+        editProject(p);
+      },
+    });
+  };
   /** Ir a una instancia de un subcircuito (desde «usado en») */
   const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
     const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
@@ -1519,7 +1566,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (sims.active || !docLine) return;
     const p0 = projectRef.current;
     const v = variantOf(p0);
-    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc), freeBenchName(p0));
+    const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
     if (r) editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
@@ -1536,14 +1583,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // testbench (en el mismo grupo) con el mismo circuito y ésta
     if (!docLine) return commit(setAnalysisLine(doc, line));
     const p1 = leave();
-    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)), freeBenchName(p1));
+    const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)));
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
-  /** Testbench nuevo, vacío, con el nombre por defecto (se renombra después) */
+  /** Testbench nuevo, vacío, con el nombre automático (sigue a su análisis hasta que se lo renombra) */
   const newEmptyBench = (group?: string) => {
-    const r = addProjectSim(leave(), EMPTY_ASC, freeBenchName(projectRef.current));
+    const r = addProjectSim(leave(), EMPTY_ASC);
     if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
     markDirty();
@@ -1609,6 +1656,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // Botón derecho en un componente de un testbench de un grupo: editar o propagar sus valores a
   // los otros testbenches del grupo que tienen el mismo componente
   const [ctxMenu, setCtxMenu] = useState<{ at: { x: number; y: number }; items: ContextItem[] } | null>(null);
+  // menú del botón derecho de un comentario (tamaño, alineación)
+  const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
+  const closeTextMenu = useCallback(() => setTextMenu(null), []);
   const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
     const s = doc.symbols[index];
     const inst = s?.attrs.get('InstName');
@@ -1929,7 +1979,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     return variant.sims.map((x) => {
       const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
       const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
-      return { id: x.id, name: simLabel(x) || t('No analysis'), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+      // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
+      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisLabel(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
     });
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
@@ -1959,7 +2010,20 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         outdated: symbolOutdated(p, name),
         text: false,
       };
-    });
+    }).concat(
+      modelModules(p).map((f): TreeSub => {
+        const name = modelModuleName(f);
+        return {
+          name,
+          type: 'model',
+          ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+        };
+      }),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
   const toggleTree = () => {
@@ -2471,7 +2535,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         case '.':
           return handled(), setDialog({ kind: 'text', textKind: 'directive' });
         case 't':
-          return handled(), setDialog({ kind: 'text', textKind: 'comment' });
+          return handled(), setTool({ kind: 'comment' });
         case 'Home':
           return handled(), editor.current?.fit();
       }
@@ -2770,7 +2834,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Net label…'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         'sep',
         { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
-        { label: t('Comment…'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { label: t('Comment'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }) },
         'sep',
         ...shapeItems,
       ],
@@ -2894,7 +2958,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'ground', label: t('Ground'), title: t('Ground (GND)'), shortcut: 'G', onClick: () => setTool({ kind: 'flag', name: '0' }), active: tool.kind === 'flag' && tool.name === '0' },
         { icon: 'label', label: t('Label'), title: t('Net label'), shortcut: 'N', onClick: () => setDialog({ kind: 'flag' }) },
         ...(curSub ? [{ icon: 'label', label: t('Port'), title: t('Subcircuit port: a net label that becomes a pin of the symbol'), onClick: () => setDialog({ kind: 'flag', ioPin: 'BiDir' }) }] : []),
-        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setDialog({ kind: 'text', textKind: 'comment' }) },
+        { icon: 'text', label: t('Text'), title: t('Text (comment)'), shortcut: 'T', onClick: () => setTool({ kind: 'comment' }), active: tool.kind === 'comment' },
         { icon: 'shapes', label: t('Shapes'), title: t('Shapes: line, rectangle, circle, arc'), items: shapeItems, active: tool.kind === 'shape' || tool.kind === 'pencil' },
         { icon: 'directive', label: t('Directive'), title: t('Free SPICE directive'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
       ],
@@ -3137,17 +3201,18 @@ ${ltNetlistText(sim.built.lt)}
               onLeave={() => setTreePeek(false)}
               activeBench={sims.active}
               subs={treeSubs}
-              current={curSub}
+              current={curModel || curSub}
               onBench={goSim}
               onTestbench={() => path.length && go([])}
               onNewBench={newEmptyBench}
               onRenameProject={renameProject}
               onBenchAction={benchAction}
-              onOpen={(n) => openSub(n)}
+              onOpen={(n) => (modelModuleFile(projectRef.current, n) ? setCurModel(n) : openSub(n))}
               onNew={newSubckt}
+              onNewModel={newModel}
               onFromSelection={selection.length ? subFromSelection : undefined}
-              onRename={renameSub}
-              onDelete={deleteSub}
+              onRename={(n) => (modelModuleFile(projectRef.current, n) ? renameModel(n) : renameSub(n))}
+              onDelete={(n) => (modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
               onExport={exportSub}
               onExportNetlist={exportSubNetlist}
               onToUser={subToUser}
@@ -3166,9 +3231,11 @@ ${ltNetlistText(sim.built.lt)}
               items={[
                 ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
                 ...subckts(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: t('subcircuit') })),
+                ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
               ]}
               onPick={(k) => {
                 const id = k.slice(2);
+                if (k.startsWith('m:')) return setCurModel(id);
                 if (k.startsWith('s:')) return openSub(id);
                 if (id !== sims.active) return goSim(id);
                 if (path.length) go([]);
@@ -3203,10 +3270,47 @@ ${ltNetlistText(sim.built.lt)}
               onAddPort={addPort}
             />
           )}
+          {curModel && modelModuleFile(project, curModel) && (
+            <ModelEditor
+              name={curModel}
+              text={modelModuleFile(project, curModel)!.text}
+              symText={modelSymbolText(project, curModel) ?? ''}
+              symW={symW}
+              onWidth={setSymW}
+              onText={(text) => {
+                const p = storeModelText(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onSymbol={(text) => {
+                const p = storeModelSymbol(projectRef.current, curModel, text);
+                projectRef.current = p;
+                editProject(p);
+              }}
+              onClose={() => setCurModel('')}
+            />
+          )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
+          {textMenu && doc.texts[textMenu.index] &&
+            createPortal(
+              <TextMenu
+                at={textMenu.at}
+                text={doc.texts[textMenu.index]}
+                onClose={closeTextMenu}
+                onChange={(patch) => commit(setText(doc, textMenu.index, patch))}
+                onEdit={() => editor.current?.editText(textMenu.index)}
+                onDialog={() => setDialog({ kind: 'text', index: textMenu.index, textKind: doc.texts[textMenu.index].kind })}
+                onDelete={() => {
+                  commit(deleteItems(doc, [{ kind: 'text', index: textMenu.index }]));
+                  setSelection([]);
+                }}
+              />,
+              document.body,
+            )}
           <SchematicEditor
             handle={editor}
             onSymbolMenu={symbolMenu}
+            onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
             onDescend={descend}
             docKey={docKey}
             doc={doc}
@@ -3221,6 +3325,8 @@ ${ltNetlistText(sim.built.lt)}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
             onDropSubckt={(name) => {
+              const m = modelModuleFile(projectRef.current, name);
+              if (m) return viewRun ? null : modelModuleName(m);
               const f = subcktFile(projectRef.current, name);
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
@@ -3740,7 +3846,7 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'flag' && (
         <FlagDialog
           initial={dialog.index !== undefined ? doc.flags[dialog.index].name : ''}
-          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? '')}
+          initialPort={dialog.index !== undefined ? (doc.flags[dialog.index].ioPin ?? '') : (dialog.ioPin ?? 'BiDir')}
           port={!!curSub}
           onClose={() => setDialog(null)}
           onApply={(name, io) => {
@@ -3806,6 +3912,8 @@ function toolHint(tt: Tool): string {
       return tt.name === '0' ? t('Click to place ground · Esc to finish') : t('Click to place the label "{name}"', { name: tt.name });
     case 'text':
       return t('Click to place the text');
+    case 'comment':
+      return t('Click where the comment goes and type · Enter or click outside to finish · Shift+Enter for a new line · Esc to cancel');
     case 'delete':
       return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
     case 'probe':

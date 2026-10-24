@@ -85,7 +85,6 @@ import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
-import { extractSubckt } from './project/extract.ts';
 import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
@@ -126,7 +125,7 @@ import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 import { synthesizeVerilog } from './hdl/client.ts';
-import { applySynthesis, topModuleOf, generatedPins, generatedSub } from './hdl/project.ts';
+import { applySynthesis, topModuleOf, generatedPins, generatedSub, removeVerilogModule, verilogModules } from './hdl/project.ts';
 import { VerilogDialog, verilogTemplate } from './hdl/VerilogDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
@@ -164,7 +163,7 @@ type Dialog =
   | { kind: 'deleteVariant'; id: string }
   | { kind: 'projectfiles' }
   /** editar un archivo Verilog del proyecto (#209); sin name, uno nuevo */
-  | { kind: 'verilog'; name?: string }
+  | { kind: 'verilog'; name?: string; fromTree?: boolean }
   /** pedir un nombre (testbench o subcircuito, #180) */
   | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
   /** parámetros y variables del testbench (#180) */
@@ -1445,25 +1444,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     projectRef.current = addSubckt(projectRef.current, name);
     openSub(name);
   };
-  /** La selección pasa a un subcircuito nuevo y queda su instancia en su lugar */
-  const subFromSelection = () => {
-    if (!selection.length) return setMessage(t('Select the part of the circuit to turn into a subcircuit'));
-    const refs = selection;
-    askSubName(t('Subcircuit from the selection'), freeSubcktName(projectRef.current), (name) => extractTo(name, refs));
-  };
-  const extractTo = (name: string, selection: ItemRef[]) => {
-    const r = extractSubckt(doc, selection, conn, lib, name);
-    if (typeof r === 'string') return setMessage(r);
-    const p0 = snapshot();
-    const p: Project = { ...p0, modified: Date.now(), files: [...p0.files, { name: `${name}.asc`, kind: 'schematic', text: serializeAsc(r.sub) }, { name: `${name}.asy`, kind: 'symbol', text: r.symbol }] };
-    projectRef.current = p;
-    editProject(p);
-    lib.setProjectFiles(p.files);
-    setLibVersion((v) => v + 1);
-    commit(r.parent);
-    setSelection([{ kind: 'symbol', index: r.parent.symbols.length - 1 }]);
-    setMessage(t('Subcircuit {name} created with the ports {ports}: double-click {inst} (or E) to enter it', { name, ports: r.ports.join(', '), inst: r.inst }));
-  };
   const renameSub = (from: string) => askSubName(t('Rename subcircuit'), from, (to) => to !== from && doRenameSub(from, to), from);
   const doRenameSub = (from: string, to: string) => {
     // guardar lo que se edita, renombrar en todo el proyecto y volver a mostrar el nivel actual
@@ -1526,6 +1506,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       history.reset(parseAsc(retype(ascText(docRef.current))));
       if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
     }, from);
+  /** el módulo Verilog que se llama `name` (su módulo sintetizado o, sin sintetizar, su archivo) */
+  const verilogOf = (name: string) => verilogModules(projectRef.current.files).find((v) => v.name.toLowerCase() === name.toLowerCase());
+  const deleteVerilog = (name: string) => {
+    const v = verilogOf(name);
+    if (!v) return;
+    const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
+    setDialog({
+      kind: 'slide',
+      title: t('Delete the Verilog module {name}?', { name }),
+      message: n ? t('{name} is used {n} times. Delete it anyway? The instances will lose their symbol.', { name, n }) : t('Its Verilog file, its .sub and its symbol will be deleted.'),
+      onConfirm: () => {
+        setDialog(null);
+        const p = { ...projectRef.current, modified: Date.now(), files: removeVerilogModule(projectRef.current.files, v.file) };
+        projectRef.current = p;
+        editProject(p);
+        lib.setProjectFiles(p.files);
+        setLibVersion((x) => x + 1);
+      },
+    });
+  };
   const deleteModel = (name: string) => {
     const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
     setDialog({
@@ -2023,6 +2023,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           text: false,
         };
       }),
+      verilogModules(p.files).map((v): TreeSub => ({
+        name: v.name,
+        type: 'verilog',
+        ports: v.sub ? generatedPins(v.sub).length : 0,
+        uses: v.sub ? usages(p, v.name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, v.name) })) : [],
+        children: [],
+        outdated: false,
+        text: false,
+      })),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
@@ -2478,7 +2487,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (e.altKey && lk === 'c') return handled(), openControl();
       if (e.altKey && lk === 'n') return handled(), hasNets && setShowNets((v) => !v);
       if (e.altKey && lk === 'e') return handled(), openStudy();
-      if (e.altKey && lk === 'b') return handled(), subFromSelection();
       if (e.altKey) return;
       if (ctrl) return;
       if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
@@ -3207,12 +3215,17 @@ ${ltNetlistText(sim.built.lt)}
               onNewBench={newEmptyBench}
               onRenameProject={renameProject}
               onBenchAction={benchAction}
-              onOpen={(n) => (modelModuleFile(projectRef.current, n) ? setCurModel(n) : openSub(n))}
+              onOpen={(n) => {
+                const v = verilogOf(n);
+                if (v) setDialog({ kind: 'verilog', name: v.file, fromTree: true });
+                else if (modelModuleFile(projectRef.current, n)) setCurModel(n);
+                else openSub(n);
+              }}
               onNew={newSubckt}
               onNewModel={newModel}
-              onFromSelection={selection.length ? subFromSelection : undefined}
+              onNewVerilog={() => setDialog({ kind: 'verilog', fromTree: true })}
               onRename={(n) => (modelModuleFile(projectRef.current, n) ? renameModel(n) : renameSub(n))}
-              onDelete={(n) => (modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
+              onDelete={(n) => (verilogOf(n) ? deleteVerilog(n) : modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
               onExport={exportSub}
               onExportNetlist={exportSubNetlist}
               onToUser={subToUser}
@@ -3738,8 +3751,8 @@ ${ltNetlistText(sim.built.lt)}
           isNew={!dialog.name}
           taken={project.files.map((f) => f.name)}
           synth={(name, text) => synthesizeVerilog(verilogSources(name, text), name, topModuleOf(text))}
-          onSave={(name, text, r) => saveSynthesis(name, text, r) && setDialog({ kind: 'projectfiles' })}
-          onClose={() => setDialog({ kind: 'projectfiles' })}
+          onSave={(name, text, r) => saveSynthesis(name, text, r) && setDialog(dialog.fromTree ? null : { kind: 'projectfiles' })}
+          onClose={() => setDialog(dialog.fromTree ? null : { kind: 'projectfiles' })}
         />
       )}
       {driveConflict && (

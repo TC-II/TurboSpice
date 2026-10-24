@@ -19,6 +19,9 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
 ## Verilog (sintetizable)
 
 Archivos `.v`/`.sv` del proyecto (tipo `verilog` en el `.turbo`):
+- **Panel del proyecto › Módulos › «+ New» › Verilog**: editor con «Sintetizar» y «Guardar». Cada `.v`
+  aparece en Módulos como un módulo «verilog» (con el nombre de su módulo sintetizado): clic para
+  editarlo, arrastrarlo al esquemático, ver dónde se usa o borrarlo (con su `.sub` y su `.asy`).
 - **Archivos del proyecto › Archivo Verilog nuevo…**: editor con «Sintetizar» y «Guardar».
 - También se pueden arrastrar o agregar desde ese diálogo, y se sintetizan al llegar.
 

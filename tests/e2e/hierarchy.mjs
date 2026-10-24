@@ -197,7 +197,8 @@ await page.keyboard.press('Control+z');
 await page.keyboard.press('Alt+ArrowUp');
 
 // --- un .asy existente como símbolo y el puerto de cada pin (#199) ---
-await page.getByRole('button', { name: 'Agregar un subcircuito vacío' }).click();
+await page.getByRole('button', { name: 'Módulo nuevo' }).click();
+await page.getByRole('menuitem', { name: /Subcircuito/ }).click();
 await page.locator('.modal input').fill('AMP');
 await page.keyboard.press('Enter');
 await page.waitForTimeout(500);

@@ -65,3 +65,17 @@ export function topModuleOf(text: string): string | undefined {
   const tops = names.filter((n) => !used(n));
   return tops.at(-1) ?? names.at(-1);
 }
+
+/** Módulos Verilog del proyecto (panel Módulos): el archivo y el nombre de su módulo sintetizado */
+export const verilogModules = (files: ProjectFile[]): { file: string; name: string; sub?: ProjectFile }[] =>
+  files.filter((f) => f.kind === 'verilog').map((f) => {
+    const sub = generatedSub(files, f.name);
+    return { file: f.name, name: sub ? sub.name.replace(/\.sub$/i, '') : f.name, sub };
+  });
+
+/** Quita un archivo Verilog con el .sub y el .asy que generó */
+export function removeVerilogModule(files: ProjectFile[], file: string): ProjectFile[] {
+  const sub = generatedSub(files, file);
+  const gone = new Set([file, ...(sub ? [sub.name, sub.name.replace(/\.sub$/i, '.asy')] : [])].map(key));
+  return files.filter((f) => !gone.has(key(f.name)));
+}

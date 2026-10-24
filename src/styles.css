@@ -1199,4 +1199,9 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .model-attrs input { font-family: var(--mono); width: 100%; min-width: 160px; box-sizing: border-box; }
 .tree-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; border-radius: 4px; border: 1px solid currentColor; color: var(--fg-muted); }
 .tree-kind.model { color: #4dabf7; }
+.tree-kind.verilog { color: #b197fc; }
+.tree-newmenu { position: relative; display: inline-flex; }
+.tree-menu { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
+.tree-menu button { display: flex; gap: 6px; align-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; text-align: left; padding: 4px 8px; white-space: nowrap; }
+.tree-menu button:hover, .tree-menu button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 @media (max-width: 700px) { .canvas-wrap.with-tree > .model-editor { left: 0; } .model-left { right: 0; } }

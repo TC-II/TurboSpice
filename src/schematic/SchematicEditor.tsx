@@ -262,6 +262,12 @@ export function dropMove<D>(tool: Tool & { kind: 'move' }, preview: D | null): {
 }
 
 /** Posición de la cápsula: 16 px (de pantalla) del cursor, del lado que tenga lugar */
+// el ancestro con posición en el que se ubica la cápsula (un <svg> no tiene offsetParent)
+function positionedAncestor(el: Element | null): HTMLElement | null {
+  for (let p = el?.parentElement; p; p = p.parentElement) if (getComputedStyle(p).position !== 'static') return p;
+  return null;
+}
+
 export function tipStyle(tip: { x: number; y: number; w: number; h: number }): { left?: number; right?: number; top?: number; bottom?: number } {
   const OFF = 16;
   const right = tip.x < tip.w - 220;
@@ -859,7 +865,7 @@ export function SchematicEditor(props: Props) {
     const info = target && describe ? describe(target) : null;
     if (info) {
       // en píxeles de pantalla respecto del contenedor (que puede tener padding por los paneles)
-      const box = (svgRef.current?.offsetParent as HTMLElement | null)?.getBoundingClientRect() ?? svgRect();
+      const box = positionedAncestor(svgRef.current)?.getBoundingClientRect() ?? svgRect();
       setTip({ x: e.clientX - box.left, y: e.clientY - box.top, w: box.width, h: box.height, info });
     } else if (tip) setTip(null);
     if (tool.kind === 'move' && tool.refs && tool.start && !drag) {

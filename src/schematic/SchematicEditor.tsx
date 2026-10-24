@@ -420,6 +420,14 @@ export function SchematicEditor(props: Props) {
   // nombre de red y tensión del OP en el mismo punto: se acomodan para no pisarse
   const paired = useMemo(() => (netNames && annotations ? pairedPoints(netNames, annotations) : undefined), [netNames, annotations]);
   const [pickHover, setPickHover] = useState<{ value: string; symbol?: number } | null>(null);
+  // la red bajo el cursor sólo se resalta con la punta de prueba o al elegir una red: al terminar
+  // (el clic que elige vuelve a la herramienta anterior) se suelta, si no quedaba pintada para
+  // siempre y en todos los testbench (el editor y los nombres de red son los mismos)
+  useEffect(() => {
+    if (tool.kind === 'probe' || tool.kind === 'pick') return;
+    setHoverNet(undefined);
+    setPickHover(null);
+  }, [tool.kind]);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
   const spaceUsed = useRef(false);
@@ -1240,6 +1248,8 @@ export function SchematicEditor(props: Props) {
       onPointerCancel={onPointerUp}
       onPointerLeave={() => {
         setTip(null);
+        setHoverNet(undefined);
+        setPickHover(null);
         lastHover.current = '';
         onHover?.(null);
       }}

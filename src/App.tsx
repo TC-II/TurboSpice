@@ -2223,7 +2223,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   const picker: Picker = (what, opts) =>
     new Promise((resolve) => {
-      setPicking({ what, ground: opts?.ground, resolve, prev: tool });
+      // si ya se estaba eligiendo para otro campo, ése queda sin valor y la herramienta a la que
+      // se vuelve sigue siendo la de antes de empezar
+      picking?.resolve(null);
+      setPicking({ what, ground: opts?.ground, resolve, prev: picking ? picking.prev : tool });
       setToolState({ kind: 'pick', what });
     });
   const endPick = (v: string | null) => {
@@ -3228,6 +3231,7 @@ ${ltNetlistText(sim.built.lt)}
             stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
             running={running}
             picker={picker}
+            onPickCancel={() => endPick(null)}
             control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
             onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}

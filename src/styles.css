@@ -536,6 +536,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 4px 12px; }
 .iconbar button.primary:hover:not(:disabled), .iconbar button.primary.open { background: color-mix(in srgb, var(--accent) 85%, #000); }
 .iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
+.iconbar button.run-off { background: transparent; border-color: var(--border); color: inherit; opacity: 0.55; }
 .iconbar .status { flex: 1 1 auto; min-width: 0; margin-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Simular partido: acción principal + flecha con los tipos de análisis */
 .split { display: inline-flex; align-items: stretch; }

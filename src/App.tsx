@@ -2930,7 +2930,7 @@ ${ltNetlistText(sim.built.lt)}
             />
             <span className="tb-sep" />
             {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
-            <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className="labeled" openRef={simMenu}>
+            <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className={canRun ? "labeled" : "primary"} openRef={simMenu}>
               {t('New simulation')} <Icon name="caret" size={14} />
             </MenuButton>
             {running ? (
@@ -2939,7 +2939,7 @@ ${ltNetlistText(sim.built.lt)}
               </button>
             ) : (
               <button
-                className="primary"
+                className={canRun ? "primary" : "run-off"}
                 onClick={simulate}
                 disabled={status.kind === 'loading' || !!curSub}
                 aria-label={t('Run|verb')}

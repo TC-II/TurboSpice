@@ -25,7 +25,15 @@ const rel = (base, p) => relative(base, p).split('\\').join('/');
  * Normaliza un SVG del skin para insertarlo en línea: las reglas de <style> por clase pasan
  * a atributos style de cada elemento (las clases .st0/.st1 de distintos SVG chocarían), el
  * negro pasa a currentColor y el blanco de relleno al color de fondo del esquemático.
+ *
+ * Los trazos del esquemático usan vector-effect: non-scaling-stroke (styles.css), así que el
+ * stroke-width de un skin se mide en píxeles de pantalla, no en unidades del símbolo. Los SVG
+ * traen contornos finos (.33 a .95) pensados en unidades; en pantalla quedan por debajo de
+ * 1 px y, alrededor de rellenos de 1 unidad de ancho (signos + y −, flechas), el anti-aliasing
+ * los dibuja entrecortados con zoom chico (#231). Se fija un mínimo de 1 px.
  */
+export const MIN_SKIN_STROKE = 1;
+
 export function normalizeSkin(svg) {
   const viewBox = /viewBox="([^"]+)"/.exec(svg)?.[1] ?? '0 0 0 0';
   const rules = new Map();
@@ -50,6 +58,8 @@ export function normalizeSkin(svg) {
   body = body
     .replace(/#000(000)?\b/gi, 'currentColor')
     .replace(/(fill:\s*)#fff(fff)?\b/gi, '$1var(--sch-bg)')
+    .replace(/(stroke-width:\s*)(\d*\.?\d+)(px)?/gi, (m, pre, n) =>
+      Number(n) < MIN_SKIN_STROKE ? `${pre}${MIN_SKIN_STROKE}px` : m)
     .replace(/\s+/g, ' ')
     .trim();
   return { viewBox, body };

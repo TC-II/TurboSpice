@@ -277,14 +277,58 @@ export const inlineEditable = (t: SchText | undefined) => !!t && t.kind === 'com
 export const nearestFontIndex = (fs: number) => FONT_SIZE.reduce((best, _, i) => (Math.abs(fontSize(i) - fs) < Math.abs(fontSize(best) - fs) ? i : best), 0);
 export const illegibleSizes = (scale: number) => FONT_SIZE.filter((_, i) => fontSize(i) * scale < MIN_TEXT_PX).length;
 
-/** Caja aproximada de un texto libre (TEXT) */
-export function textBox(t: { x: number; y: number; size: number; text: string; align: string }): Box {
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+/** Ancho de una línea con la letra del esquemático (sin DOM, como en los tests: 0,6·fs por carácter) */
+export function textWidth(s: string, fs: number): number {
+  if (measureCtx === undefined) measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return s.length * fs * 0.6;
+  measureCtx.font = `100px system-ui, sans-serif`;
+  return (measureCtx.measureText(s).width * fs) / 100;
+}
+
+type TextLike = { x: number; y: number; size: number; text: string; align: string; box?: { w: number; h: number } };
+
+/** Líneas que se dibujan: con caja fija, el texto partido para entrar en su ancho */
+export function textLines(t: TextLike): string[] {
+  if (!t.box) return t.text.split('\\n');
+  const fs = fontSize(t.size);
+  return wrapText(t.text, t.box.w, (s) => textWidth(s, fs)).split('\\n');
+}
+
+/** Caja de un texto libre (TEXT): la fija si tiene, si no la que ocupa el texto */
+export function textBox(t: TextLike): Box {
   const fs = fontSize(t.size);
   const lines = t.text.split('\\n');
-  const w = Math.max(...lines.map((l) => l.length)) * fs * 0.6;
-  const h = lines.length * fs * 1.2;
+  const w = t.box ? t.box.w : Math.max(...lines.map((l) => textWidth(l, fs)));
+  const h = t.box ? t.box.h : lines.length * fs * 1.2;
   const x1 = t.align === 'Right' ? t.x - w : t.align === 'Center' ? t.x - w / 2 : t.x;
   return { x1, y1: t.y - fs / 2, x2: x1 + w, y2: t.y - fs / 2 + h };
+}
+
+/**
+ * Parte el texto (líneas separadas por `\n` literal) para que ninguna línea mida más de `max`
+ * según `width` (por defecto, en caracteres), cortando en espacios; una palabra más larga se corta.
+ */
+export function wrapText(text: string, max: number, width: (s: string) => number = (s) => s.length): string {
+  const fits = (s: string) => width(s) <= max;
+  const out: string[] = [];
+  for (const para of text.split('\\n')) {
+    let line = '';
+    for (const word of para.split(' ')) {
+      let w = word;
+      if (line && fits(line + ' ' + w)) { line += ' ' + w; continue; }
+      if (line) out.push(line);
+      while (w.length > 1 && !fits(w)) {
+        let n = 1;
+        while (n < w.length - 1 && fits(w.slice(0, n + 1))) n++;
+        out.push(w.slice(0, n));
+        w = w.slice(n);
+      }
+      line = w;
+    }
+    out.push(line);
+  }
+  return out.join('\\n');
 }
 
 /** Distancia (unidades) hasta la que un cable le gana a un símbolo bajo el cursor (#196) */

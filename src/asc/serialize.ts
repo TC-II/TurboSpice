@@ -32,6 +32,7 @@ export function serializeAsc(doc: AscDoc): string {
   }
   for (const t of doc.texts) {
     out.push(`TEXT ${t.x} ${t.y} ${t.align} ${t.size} ${t.kind === 'directive' ? '!' : ';'}${t.text}`);
+    if (t.box) out.push(`TEXTBOX ${t.box.w} ${t.box.h}`);
   }
   const shapes = [...doc.shapes].sort((a, b) => SHAPE_ORDER.indexOf(a.kind) - SHAPE_ORDER.indexOf(b.kind));
   for (const s of shapes) out.push(shapeLine(s));

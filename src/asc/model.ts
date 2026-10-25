@@ -75,6 +75,11 @@ export interface SchText {
   kind: 'directive' | 'comment';
   /** Contenido; los saltos de línea se guardan como "\n" literal en el archivo */
   text: string;
+  /**
+   * Caja fija (propia de TurboSpice, línea `TEXTBOX w h` tras el TEXT): el texto se parte para
+   * entrar en el ancho y lo que no entra en el alto se recorta. Sin caja, la caja es la del texto.
+   */
+  box?: { w: number; h: number };
 }
 
 /** Figuras que se dibujan con clicks (las de LTspice) */

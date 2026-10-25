@@ -72,10 +72,13 @@ export function parseAsc(text: string): AscDoc {
   const doc = emptyDoc();
   const bad: string[] = [];
   let sym: SymbolInst | null = null;
+  let lastKw = '';
 
   for (const line of splitLines(text)) {
     if (!line.trim()) continue;
     const kw = line.trim().split(/\s/, 1)[0];
+    const prevKw = lastKw;
+    lastKw = kw;
     if (kw !== 'WINDOW' && kw !== 'SYMATTR') sym = null;
 
     try {
@@ -144,6 +147,14 @@ export function parseAsc(text: string): AscDoc {
           const [, x, y, align, size, rest] = fields(line, 5);
           const kind = rest.startsWith('!') ? 'directive' : 'comment';
           doc.texts.push({ x: num(x), y: num(y), align, size: num(size), kind, text: rest.replace(/^[!;]/, '') });
+          break;
+        }
+        case 'TEXTBOX': {
+          // TurboSpice: caja fija del TEXT anterior
+          const [, w, h] = fields(line, 2);
+          const last = doc.texts.at(-1);
+          if (last && prevKw === 'TEXT') last.box = { w: num(w), h: num(h) };
+          else doc.unknown.push(line);
           break;
         }
         default:

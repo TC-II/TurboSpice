@@ -1,5 +1,5 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
-import { memo, type ReactNode } from 'react';
+import { memo, useId, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
 import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type PinDef, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
@@ -8,7 +8,7 @@ import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, visibleText, type ItemRef } from './geometry.ts';
+import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
@@ -243,6 +243,7 @@ export interface CanvasProps {
 }
 
 export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+  const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
   const isSel = (r: ItemRef) => selected.has(`${r.kind}:${r.index}`);
@@ -326,11 +327,21 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             key={i}
             className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}${diff?.texts.has(i) ? ' diff-changed' : ''}`}
           >
-            {t.text.split('\\n').map((line, j) => (
-              <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
-                {line}
-              </AlignedText>
-            ))}
+            {t.box && (
+              <clipPath id={`${clipId}t${i}`}>
+                {(() => {
+                  const b = textBox(t);
+                  return <rect x={b.x1} y={b.y1} width={b.x2 - b.x1} height={b.y2 - b.y1} />;
+                })()}
+              </clipPath>
+            )}
+            <g clipPath={t.box ? `url(#${clipId}t${i})` : undefined}>
+              {textLines(t).map((line, j) => (
+                <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
+                  {line}
+                </AlignedText>
+              ))}
+            </g>
           </g>
           );
         })}

@@ -25,7 +25,6 @@ import {
   textBox,
   fontSize,
   inlineEditable,
-  nearestFontIndex,
   visibleText,
   wireVertexAt,
   fixedPoints,
@@ -167,7 +166,7 @@ type Drag =
   /** `editText`: click en un comentario ya seleccionado; si no se mueve, se edita en el lugar */
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean; editText?: number }
   /** agrandar o achicar un comentario desde la esquina de su caja (cambia el tamaño de letra) */
-  | { mode: 'textsize'; index: number }
+  | { mode: 'textsize'; index: number; left: boolean; top: boolean; box: Box }
   /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
@@ -191,10 +190,11 @@ interface InlineText {
   align: string;
   size: number;
   value: string;
+  box?: { w: number; h: number };
 }
 
 /** Caja de un comentario sin justificación vertical (las verticales no se agrandan con la esquina) */
-const resizableBox = (t: AscDoc['texts'][number] | undefined) => (t && inlineEditable(t) && !t.align.startsWith('V') && t.align !== 'Invisible' ? textBox(t) : null);
+const resizableBox =(t: AscDoc['texts'][number] | undefined) => (t && inlineEditable(t) && !t.align.startsWith('V') && t.align !== 'Invisible' ? textBox(t) : null);
 
 function docBox(doc: AscDoc, lib: Library, showSim: boolean): Box | null {
   const boxes: Box[] = [];
@@ -623,7 +623,7 @@ export function SchematicEditor(props: Props) {
     const tt = doc.texts[index];
     if (!inlineEditable(tt)) return false;
     setSelection([{ kind: 'text', index }]);
-    setInline({ index, x: tt.x, y: tt.y, align: tt.align, size: tt.size, value: tt.text.split('\\n').join('\n') });
+    setInline({ index, x: tt.x, y: tt.y, align: tt.align, size: tt.size, value: tt.text.split('\\n').join('\n'), box: tt.box });
     return true;
   };
 
@@ -705,9 +705,16 @@ export function SchematicEditor(props: Props) {
         // la esquina de la caja del comentario seleccionado: arrastrarla cambia el tamaño de letra
         const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
         const rb = only >= 0 ? resizableBox(doc.texts[only]) : null;
-        if (rb && Math.abs(p.x - rb.x2) <= 6 / view.scale && Math.abs(p.y - rb.y2) <= 6 / view.scale) {
-          setDrag({ mode: 'textsize', index: only });
-          return;
+        if (rb) {
+          const hr = 6 / view.scale;
+          for (const cx of [rb.x1, rb.x2]) {
+            for (const cy of [rb.y1, rb.y2]) {
+              if (Math.abs(p.x - cx) <= hr && Math.abs(p.y - cy) <= hr) {
+                setDrag({ mode: 'textsize', index: only, left: cx === rb.x1, top: cy === rb.y1, box: rb });
+                return;
+              }
+            }
+          }
         }
         // un rótulo se arrastra directamente; con su componente seleccionado junto a otros, se
         // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
@@ -999,15 +1006,19 @@ export function SchematicEditor(props: Props) {
       if (!drag.moved && Math.hypot(dx, dy) > tol) setDrag({ ...drag, moved: true });
       setPreview(setWindows(doc, edits));
     } else if (drag.mode === 'textsize') {
-      // el tamaño de letra cuya caja llega más cerca de la esquina arrastrada (alto o ancho)
+      // la esquina arrastrada sigue al cursor y la opuesta queda fija: la caja pasa a tener tamaño
+      // propio; el texto se parte para entrar en el ancho y lo que no entra en el alto se recorta
       const tt = doc.texts[drag.index];
-      const lines = tt.text.split('\\n');
-      const chars = Math.max(1, ...lines.map((l) => l.length));
-      const byH = (p.y - tt.y) / (lines.length * 1.2 - 0.5);
-      const w = tt.align === 'Right' ? tt.x - p.x : tt.align === 'Center' ? 2 * Math.abs(p.x - tt.x) : p.x - tt.x;
-      const byW = w / (chars * 0.6);
-      const size = nearestFontIndex(Math.max(byH, byW, 0));
-      setPreview(size === tt.size ? null : setText(doc, drag.index, { size }));
+      const fs = fontSize(tt.size);
+      const b = drag.box;
+      const min = fs;
+      const x1 = drag.left ? Math.min(p.x, b.x2 - min) : b.x1;
+      const x2 = drag.left ? b.x2 : Math.max(p.x, b.x1 + min);
+      const y1 = drag.top ? Math.min(p.y, b.y2 - min) : b.y1;
+      const y2 = drag.top ? b.y2 : Math.max(p.y, b.y1 + min);
+      const x = tt.align === 'Right' ? x2 : tt.align === 'Center' ? (x1 + x2) / 2 : x1;
+      const box = { w: Math.round(x2 - x1), h: Math.round(y2 - y1) };
+      setPreview(setText(doc, drag.index, { box, x: Math.round(x), y: Math.round(y1 + fs / 2) }));
     } else if (drag.mode === 'move') {
       const g = snapPoint(p);
       const dx = g.x - drag.start.x;
@@ -1208,7 +1219,8 @@ export function SchematicEditor(props: Props) {
     if (drag?.mode === 'textsize') return true;
     const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
     const rb = only >= 0 && !drag ? resizableBox(doc.texts[only]) : null;
-    return !!rb && Math.abs(cursor.x - rb.x2) <= 6 / view.scale && Math.abs(cursor.y - rb.y2) <= 6 / view.scale;
+    const hr = 6 / view.scale;
+    return !!rb && [rb.x1, rb.x2].some((cx) => Math.abs(cursor.x - cx) <= hr) && [rb.y1, rb.y2].some((cy) => Math.abs(cursor.y - cy) <= hr);
   })();
   const gridR = Math.min(1.75, 1.35 / view.scale);
   // Nivel de detalle (#195): los textos ilegibles se ocultan con una clase en el svg, que cambia
@@ -1301,7 +1313,9 @@ export function SchematicEditor(props: Props) {
         return (
           <g className="text-bbox">
             <rect x={rb.x1 - 2} y={rb.y1 - 2} width={rb.x2 - rb.x1 + 4} height={rb.y2 - rb.y1 + 4} />
-            <rect className="handle" x={rb.x2 - k / 2} y={rb.y2 - k / 2} width={k} height={k} />
+            {[rb.x1, rb.x2].flatMap((cx) => [rb.y1, rb.y2].map((cy) => (
+              <rect key={`${cx},${cy}`} className="handle" x={cx - k / 2} y={cy - k / 2} width={k} height={k} />
+            )))}
           </g>
         );
       })()}
@@ -1366,17 +1380,18 @@ function InlineEditor({ it, onChange, onDone }: { it: InlineText; onChange(v: st
   }, []);
   const fs = fontSize(it.size);
   const lines = it.value.split('\n');
-  const w = (Math.max(4, ...lines.map((l) => l.length)) + 2) * fs * 0.6;
-  const h = lines.length * fs * 1.2 + fs * 0.4;
+  // con caja fija se escribe dentro de la caja, partiendo las líneas como al dibujarlo
+  const w = it.box ? it.box.w + fs * 0.2 : (Math.max(4, ...lines.map((l) => l.length)) + 2) * fs * 0.6;
+  const h = it.box ? it.box.h + fs * 0.4 : lines.length * fs * 1.2 + fs * 0.4;
   const x = it.align === 'Right' ? it.x - w : it.align === 'Center' ? it.x - w / 2 : it.x;
-  const y = it.align === 'Top' ? it.y : it.align === 'Bottom' ? it.y - h : it.y - fs * 0.6 - fs * 0.2;
+  const y = it.box ? it.y - fs / 2 - fs * 0.2 : it.align === 'Top' ? it.y : it.align === 'Bottom' ? it.y - h : it.y - fs * 0.6 - fs * 0.2;
   return (
     <foreignObject x={x} y={y} width={w} height={h} className="inline-text">
       <textarea
         ref={ta}
         value={it.value}
         spellCheck={false}
-        wrap="off"
+        wrap={it.box ? 'soft' : 'off'}
         style={{ fontSize: fs, lineHeight: 1.2, textAlign: it.align === 'Right' ? 'right' : it.align === 'Center' ? 'center' : 'left' }}
         onPointerDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}

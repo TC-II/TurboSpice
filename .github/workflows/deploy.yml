@@ -69,23 +69,60 @@ jobs:
         env:
           # OAuth Client ID público (Settings → Variables); vacío = sin inicio de sesión con Google
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
-      - name: E2E en Chrome
+      # dist/ ya trae el motor (npm run assets lo copia a public/engine). El nombre no empieza
+      # con «site-» para que el deploy (pattern: site-*) no lo tome por un sitio.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: e2e-dist
+          path: dist
+          retention-days: 1
+
+  e2e:
+    name: E2E ${{ matrix.suite }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [features, save, panes, verilog, examples, simulation, editor]
+        include:
+          - suite: examples
+            out: test-results
+          - suite: editor
+            out: test-results
+          - suite: simulation
+            out: test-results
+          - suite: features
+            out: test-results
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: e2e-dist
+          path: dist
+      - name: E2E ${{ matrix.suite }} en Chrome
         env:
           CHROMIUM: /usr/bin/google-chrome
         run: |
           npx vite preview --port 4173 --strictPort &
           timeout 30 bash -c 'until curl -sf http://localhost:4173/TurboSpice/ >/dev/null; do sleep 1; done'
-          node tests/e2e/examples.mjs http://localhost:4173/TurboSpice/ test-results
-          node tests/e2e/editor.mjs http://localhost:4173/TurboSpice/ test-results
-          node tests/e2e/simulation.mjs http://localhost:4173/TurboSpice/ test-results
-          node tests/e2e/features.mjs http://localhost:4173/TurboSpice/ test-results
-          node tests/e2e/save.mjs http://localhost:4173/TurboSpice/
-          node tests/e2e/verilog.mjs http://localhost:4173/TurboSpice/
-          node tests/e2e/panes.mjs http://localhost:4173/TurboSpice/
+          node tests/e2e/${{ matrix.suite }}.mjs http://localhost:4173/TurboSpice/ ${{ matrix.out }}
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results-${{ matrix.suite }}
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   site:
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
-    needs: build
+    needs: [build, e2e]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

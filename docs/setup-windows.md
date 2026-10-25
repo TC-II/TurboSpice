@@ -14,8 +14,11 @@ TurboSpice tiene dos piezas:
 
 El `.bat` hace todo: `npm install` si hace falta, baja el motor ya compilado desde el sitio publicado
 (`https://tc-ii.github.io/TurboSpice/engine/`) si no está en `engine/dist-engine/`, levanta el servidor
-de desarrollo y abre <http://localhost:5173/TurboSpice/>. Dejá la ventana abierta mientras usás la
-app; cerrarla detiene el servidor. Si el puerto ya está en uso, sólo abre el navegador.
+de desarrollo y abre la app. Primero pregunta qué rama querés: **1** `main` en
+<http://localhost:5173/TurboSpice/>, o **2** `dev` en <http://localhost:5182/TurboSpice/>. La opción 2
+usa `.claude/worktrees/dev-local`, siempre en la última versión de `origin/dev`, sin tocar la rama de
+tu copia. Dejá la ventana abierta mientras usás la app; cerrarla detiene el servidor. Si el puerto ya
+está en uso, sólo abre el navegador.
 
 Equivalente a mano:
 

@@ -9,6 +9,7 @@ import { paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } f
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { extent, panBy, zoomAbout } from './scales.ts';
+import { decimator } from './decimate.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
@@ -82,6 +83,8 @@ const GRAB = 6;
 const PAN_SLOP = 4;
 
 const MAX_ROWS = 16;
+/** desde cuántos puntos se decima lo que se le pasa a uPlot (con menos, van todos) */
+const DECIMATE_FROM = 20_000;
 
 /** Rango de un eje Y; uno fijo si no hay datos finitos o son constantes */
 const safeRange: uPlot.Range.Function = (_u, min, max) => {
@@ -135,10 +138,19 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   // vistas anteriores (Shift+Z)
   const zoomHistory = useRef<{ x: Range | null; y: Record<number, Range> }[]>([]);
 
-  const data = useMemo(
-    () => panes.map((p) => paneCurves(p, { plot, runs, labels, resolver, mode })),
-    [panes, plot, runs, labels, resolver, mode],
-  );
+  // las curvas de cada panel, recordadas por panel: cambiar uno (una traza, un color, ocultar) no
+  // recalcula los demás ni recrea sus gráficos
+  const curveCache = useRef<{ key: unknown[]; byPane: WeakMap<Pane, PaneData> }>({ key: [], byPane: new WeakMap() });
+  const data = useMemo(() => {
+    const key = [plot, runs, labels, resolver, mode];
+    if (key.some((k, i) => k !== curveCache.current.key[i])) curveCache.current = { key, byPane: new WeakMap() };
+    const m = curveCache.current.byPane;
+    return panes.map((p) => {
+      let d = m.get(p);
+      if (!d) m.set(p, (d = paneCurves(p, { plot, runs, labels, resolver, mode })));
+      return d;
+    });
+  }, [panes, plot, runs, labels, resolver, mode]);
 
   // Otro tipo de análisis (otro eje X): volver al rango completo y sin cursores. Al volver
   // a simular el mismo análisis se mantienen el zoom y los cursores.
@@ -568,6 +580,8 @@ function PaneView(props: {
   const rRef = useRef(props.rRange);
   rRef.current = props.rRange;
   const programmatic = useRef(false);
+  /** lleva el eje X del gráfico a [min, max] (con los datos decimados para ese rango) */
+  const setX = useRef<((min: number, max: number) => void) | null>(null);
   /** el arrastre en curso empezó en este gráfico */
   const pressed = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
@@ -698,8 +712,9 @@ function PaneView(props: {
           (u) => {
             cancelAnimationFrame(raf);
             raf = requestAnimationFrame(() => {
-              setHover(u.cursor.idx ?? null);
               const l = u.cursor.left;
+              // (con los datos decimados el índice de uPlot no es el de data.x: se busca el punto más cercano)
+              setHover(!dec ? (u.cursor.idx ?? null) : l != null && l >= 0 ? nearestIndex(data.x, u.posToVal(l, 'x')) : null);
               live.current.onHoverX?.(l != null && l >= 0 ? u.posToVal(l, 'x') : undefined);
             });
           },
@@ -708,6 +723,11 @@ function PaneView(props: {
           (u, key) => {
             if (key !== 'x' || programmatic.current) return;
             const { min, max } = u.scales.x;
+            // uPlot cambió el eje por su cuenta (doble click): los datos decimados son de otro rango
+            if (dec) {
+              cancelAnimationFrame(redecimate);
+              redecimate = requestAnimationFrame(() => refresh());
+            }
             if (min != null && max != null) {
               const full = min <= data.x[0] && max >= data.x[data.x.length - 1];
               live.current.onZoom(full ? null : [min, max]);
@@ -820,8 +840,35 @@ function PaneView(props: {
     };
     // valores no finitos (dB de 0, divisiones por 0) como huecos: uPlot no los admite. Sin ellos
     // va el arreglo tal cual (copiarlo a un Array de JS costaba ~100 ms y decenas de MB por millón de puntos)
-    const ys = data.curves.map((c) => (allFinite(c.y) ? c.y : Array.from(c.y, (v) => (Number.isFinite(v) ? v : null))));
-    const u = new uPlot(opts, [data.x, ...ys] as uPlot.AlignedData, el);
+    const finite = data.curves.every((c) => allFinite(c.y));
+    const ys = data.curves.map((c) => (finite || allFinite(c.y) ? c.y : Array.from(c.y, (v) => (Number.isFinite(v) ? v : null))));
+    // muchos puntos: uPlot recibe sólo lo visible, a lo sumo 4 puntos por columna de píxeles (el
+    // mismo dibujo; si no, recorre todo en cada cuadro de la rueda o del paneo). Con huecos o
+    // escalones (digital) va todo.
+    const dec = data.x.length > DECIMATE_FROM && finite && !data.curves.some((c) => c.digital) ? decimator(data.x, data.curves.map((c) => c.y)) : null;
+    const firstX = opts.scales!.x;
+    let redecimate = 0;
+    // (antes de crear el gráfico no se sabe dónde queda el área: de sobra, el ancho entero)
+    const u: uPlot = new uPlot(
+      opts,
+      (dec ? dec.view(firstX.min ?? x0, firstX.max ?? x1, Math.max(100, el.clientWidth) * devicePixelRatio, data.log) : [data.x, ...ys]) as uPlot.AlignedData,
+      el,
+    );
+    /** lo visible en [min, max], en las columnas de píxeles del área del gráfico */
+    const view = (min: number, max: number) => dec!.view(min, max, u.bbox.width, data.log, u.bbox.left) as uPlot.AlignedData;
+    setX.current = (min, max) => {
+      programmatic.current = true;
+      u.batch(() => {
+        if (dec) u.setData(view(min, max), false);
+        u.setScale('x', { min, max });
+      });
+      programmatic.current = false;
+    };
+    /** vuelve a decimar para el rango que muestra el gráfico (otro ancho, o uPlot cambió el eje) */
+    const refresh = () => {
+      const { min, max } = u.scales.x;
+      if (dec && min != null && max != null) setX.current?.(min, max);
+    };
     chart.current = u;
     live.current.register(u);
     const { over, root } = u;
@@ -1010,11 +1057,20 @@ function PaneView(props: {
     root.addEventListener('pointercancel', up);
     root.addEventListener('contextmenu', context);
     root.addEventListener('wheel', wheel, { passive: false });
-    const ro = new ResizeObserver(() => u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) }));
+    const ro = new ResizeObserver(() => {
+      u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) });
+      // (el área nueva se conoce cuando uPlot aplica el tamaño)
+      if (dec) {
+        cancelAnimationFrame(redecimate);
+        redecimate = requestAnimationFrame(refresh);
+      }
+    });
     ro.observe(el);
     const reg = live.current.register;
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(redecimate);
+      setX.current = null;
       ro.disconnect();
       root.removeEventListener('pointerdown', selStart);
       window.removeEventListener('pointerup', selEnd);
@@ -1047,12 +1103,9 @@ function PaneView(props: {
 
   // (al fijar el eje X, uPlot vuelve a calcular el Y: el rango de yRef o la autoescala)
   useEffect(() => {
-    const u = chart.current;
-    if (!u) return;
-    programmatic.current = true;
     const home = data.home ?? [data.x[0], data.x[data.x.length - 1]];
-    u.setScale('x', xRange ? { min: xRange[0], max: xRange[1] } : { min: home[0], max: home[1] });
-    programmatic.current = false;
+    const [min, max] = xRange ?? home;
+    setX.current?.(min, max);
   }, [xRange, yRange, props.rRange, data, cursorMode, zoomMode, showGrid]);
 
   useEffect(() => {

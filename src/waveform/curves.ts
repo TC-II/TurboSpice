@@ -3,7 +3,7 @@
 import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { spectrum, thd } from './fft.ts';
-import { evalTrace, unwrapDeg, type Resolver } from './expr.ts';
+import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
 import { PALETTE, isFftPane, sameExpr, sameFft, traceColor, type Pane, type PaneFft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
@@ -54,6 +54,28 @@ export interface CurveContext {
   labels: Map<string, string>;
   resolver(p: SimPlot): Resolver;
   mode: ComplexMode;
+}
+
+/** Expresiones ya evaluadas, por resolvedor y plot (ocultar una traza o cambiarle el color no la recalcula) */
+const evaluated = new WeakMap<CurveContext['resolver'], WeakMap<SimPlot, Map<string, Wave | Error>>>();
+const EVAL_CACHE = 64;
+
+/** evalTrace de `expr` sobre el plot `r`, recordado; los errores se vuelven a lanzar */
+function evalOn(ctx: CurveContext, r: SimPlot, expr: string, scale: { real: Float64Array; name: string }): Wave {
+  const byPlot = evaluated.get(ctx.resolver) ?? evaluated.set(ctx.resolver, new WeakMap()).get(ctx.resolver)!;
+  const m = byPlot.get(r) ?? byPlot.set(r, new Map()).get(r)!;
+  let w = m.get(expr);
+  if (!w) {
+    try {
+      w = evalTrace(expr, { resolve: ctx.resolver(r), scale: scale.real, scaleName: scale.name });
+    } catch (e) {
+      w = e instanceof Error ? e : new Error(String(e));
+    }
+    if (m.size >= EVAL_CACHE) m.delete(m.keys().next().value!);
+    m.set(expr, w);
+  }
+  if (w instanceof Error) throw w;
+  return w;
 }
 
 /** Variación de un color para distinguir corridas de una misma traza */
@@ -110,7 +132,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       if (!rs) return;
       let w;
       try {
-        w = evalTrace(tt.expr, { resolve: ctx.resolver(r), scale: rs.real, scaleName: rs.name });
+        w = evalOn(ctx, r, tt.expr, rs);
       } catch (e) {
         if (ri === 0) errors.set(ti, (e as Error).message);
         return;
@@ -192,7 +214,7 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
     const to = Math.min(o.to ?? scale.real[scale.real.length - 1], scale.real[scale.real.length - 1]);
     let w;
     try {
-      w = evalTrace(tt.expr, { resolve: ctx.resolver(ctx.plot), scale: scale.real, scaleName: scale.name });
+      w = evalOn(ctx, ctx.plot, tt.expr, scale);
     } catch (e) {
       errors.set(ti, (e as Error).message);
       return;

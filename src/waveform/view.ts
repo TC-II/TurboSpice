@@ -18,8 +18,11 @@ export interface Trace {
 }
 
 /** FFT de una traza (#236): ventana y rango de tiempo usado (sin rango = todo) */
+/** Ventanas de la FFT (sus fórmulas y nombres están en fft.ts) */
+export const FFT_WINDOW_IDS = ['hann', 'hamming', 'blackman', 'blackmanharris', 'nuttall', 'blackmannuttall', 'flattop', 'bartlett', 'welch', 'cosine', 'gauss', 'kaiser', 'tukey', 'rect'] as const;
+
 export interface PaneFft {
-  window: 'rect' | 'hann' | 'hamming' | 'blackman' | 'flattop';
+  window: (typeof FFT_WINDOW_IDS)[number];
   from?: number;
   to?: number;
 }
@@ -181,10 +184,9 @@ export function asPlotView(v: unknown): PlotView | null {
   return Object.keys(out).length ? out : null;
 }
 
-const FFT_WINDOWS = ['rect', 'hann', 'hamming', 'blackman', 'flattop'];
 function asFft(v: unknown): { fft?: PaneFft } {
   const f = v as PaneFft | undefined;
-  if (!f || typeof f !== 'object' || !FFT_WINDOWS.includes(f.window)) return {};
+  if (!f || typeof f !== 'object' || !(FFT_WINDOW_IDS as readonly string[]).includes(f.window)) return {};
   const num = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
   return { fft: { window: f.window, ...(num(f.from) ? { from: f.from } : {}), ...(num(f.to) ? { to: f.to } : {}) } };
 }

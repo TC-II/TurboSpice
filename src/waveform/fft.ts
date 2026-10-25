@@ -5,17 +5,47 @@ import type { PaneFft } from './view.ts';
 
 export type FftWindow = PaneFft['window'];
 
-/** Ventanas con su nombre (en inglés: se traduce con t()) */
-export const WINDOWS: [FftWindow, string][] = [
-  ['hann', 'Hann Window'],
-  ['hamming', 'Hamming Window'],
-  ['blackman', 'Blackman Window'],
-  ['flattop', 'Flat Top Window'],
-  ['rect', 'Rectangular Window'],
+/** Ventanas con su nombre (en inglés: se traduce con t()) y el corto de la leyenda */
+export const WINDOWS: [FftWindow, string, string][] = [
+  ['hann', 'Hann Window', 'Hann'],
+  ['hamming', 'Hamming Window', 'Hamming'],
+  ['blackman', 'Blackman Window', 'Blackman'],
+  ['blackmanharris', 'Blackman-Harris Window', 'Blackman-Harris'],
+  ['nuttall', 'Nuttall Window', 'Nuttall'],
+  ['blackmannuttall', 'Blackman-Nuttall Window', 'Blackman-Nuttall'],
+  ['flattop', 'Flat Top Window', 'Flat top'],
+  ['bartlett', 'Bartlett (triangular) Window', 'Bartlett'],
+  ['welch', 'Welch Window', 'Welch'],
+  ['cosine', 'Cosine Window', 'Cosine'],
+  ['gauss', 'Gaussian Window (σ = 0.4)', 'Gauss'],
+  ['kaiser', 'Kaiser Window (β = 9)', 'Kaiser'],
+  ['tukey', 'Tukey Window (α = 0.5)', 'Tukey'],
+  ['rect', 'Rectangular Window', 'Rectangular'],
 ];
+
+/** Bessel modificada de primera especie, orden 0 (para la ventana de Kaiser) */
+function besselI0(x: number): number {
+  let sum = 1;
+  let term = 1;
+  for (let k = 1; k < 50; k++) {
+    term *= (x / (2 * k)) ** 2;
+    sum += term;
+    if (term < sum * 1e-16) break;
+  }
+  return sum;
+}
+const KAISER_BETA = 9;
+const KAISER_NORM = besselI0(KAISER_BETA);
+const GAUSS_SIGMA = 0.4;
+const TUKEY_ALPHA = 0.5;
+
+/** Suma de cosenos a0 − a1·cos(a) + a2·cos(2a) − a3·cos(3a) + … (familia Blackman) */
+const cosines = (a: number, c: number[]) => c.reduce((s, ck, k) => s + (k % 2 ? -1 : 1) * ck * Math.cos(k * a), 0);
 
 function windowFn(w: FftWindow, n: number, N: number): number {
   const a = (2 * Math.PI * n) / (N - 1);
+  // posición en la ventana, de −1 a 1
+  const u = (2 * n) / (N - 1) - 1;
   switch (w) {
     case 'rect':
       return 1;
@@ -25,8 +55,30 @@ function windowFn(w: FftWindow, n: number, N: number): number {
       return 0.54 - 0.46 * Math.cos(a);
     case 'blackman':
       return 0.42 - 0.5 * Math.cos(a) + 0.08 * Math.cos(2 * a);
+    case 'blackmanharris':
+      return cosines(a, [0.35875, 0.48829, 0.14128, 0.01168]);
+    case 'nuttall':
+      return cosines(a, [0.355768, 0.487396, 0.144232, 0.012604]);
+    case 'blackmannuttall':
+      return cosines(a, [0.3635819, 0.4891775, 0.1365995, 0.0106411]);
     case 'flattop':
       return 0.21557895 - 0.41663158 * Math.cos(a) + 0.277263158 * Math.cos(2 * a) - 0.083578947 * Math.cos(3 * a) + 0.006947368 * Math.cos(4 * a);
+    case 'bartlett':
+      return 1 - Math.abs(u);
+    case 'welch':
+      return 1 - u * u;
+    case 'cosine':
+      return Math.sin((Math.PI * n) / (N - 1));
+    case 'gauss':
+      return Math.exp(-0.5 * (u / GAUSS_SIGMA) ** 2);
+    case 'kaiser':
+      return besselI0(KAISER_BETA * Math.sqrt(Math.max(0, 1 - u * u))) / KAISER_NORM;
+    case 'tukey': {
+      const x = n / (N - 1);
+      if (x < TUKEY_ALPHA / 2) return 0.5 * (1 - Math.cos((2 * Math.PI * x) / TUKEY_ALPHA));
+      if (x > 1 - TUKEY_ALPHA / 2) return 0.5 * (1 - Math.cos((2 * Math.PI * (1 - x)) / TUKEY_ALPHA));
+      return 1;
+    }
   }
 }
 

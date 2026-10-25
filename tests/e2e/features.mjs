@@ -193,7 +193,8 @@ check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
 await page.mouse.click(outW.x, outW.y);
 await page.getByRole('button', { name: 'FFT', exact: true }).click();
 check(/Con todos los puntos/.test(await page.locator('.fft-tools .hint').last().textContent()), 'sin zoom, la FFT usa todos los puntos');
-check((await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents()).includes('Ventana de Hann'), 'ventanas con su nombre');
+const windows = await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents();
+check(windows.includes('Ventana de Hann') && windows.includes('Ventana de Kaiser (β = 9)') && windows.length === 14, `14 ventanas con su nombre (${windows.length})`);
 // #245: ⌖ y click en la cápsula de la leyenda; varias FFT en el mismo panel
 await page.locator('.expr-form input').fill('V(out)/2');
 await page.locator('.expr-form input').press('Enter');

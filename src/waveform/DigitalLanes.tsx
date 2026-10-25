@@ -58,7 +58,7 @@ function niceTicks(a: number, b: number, n = 6): number[] {
  * bajo, y X o Z como una raya al medio (X roja y cortada, Z gris y punteada); un bus, como tramos
  * con su valor en el radix de la traza. Comparte con los paneles analógicos el rango en X, el zoom y los cursores.
  */
-export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, pendingX, onHover }: {
+export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, pendingX, onHover, fill }: {
   x: Float64Array;
   curves: Curve[];
   /** radix de cada traza (por índice de traza del panel) */
@@ -73,18 +73,22 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
   pendingX?(): { v: Range | null } | undefined;
   /** índice del punto bajo el mouse (para los valores de la leyenda) */
   onHover(i: number | null): void;
+  /** el panel tiene un tamaño elegido: los carriles se estiran para llenarlo */
+  fill?: boolean;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const clip = `dl-clip-${useId().replace(/:/g, '')}`;
   const [width, setWidth] = useState(600);
+  const [height, setHeight] = useState(0);
   const [mouse, setMouse] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const ro = new ResizeObserver(() => (setWidth(el.clientWidth), setHeight(el.clientHeight)));
     ro.observe(el);
     setWidth(el.clientWidth);
+    setHeight(el.clientHeight);
     return () => ro.disconnect();
   }, []);
   const shown = curves.filter((c) => !c.hidden);
@@ -93,7 +97,9 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
   const W = Math.max(50, width - LABEL - RIGHT);
   const px = (v: number) => LABEL + ((v - x0) / (x1 - x0 || 1)) * W;
   const val = (p: number) => x0 + ((p - LABEL) / W) * (x1 - x0);
-  const H = shown.length * LANE + AXIS;
+  // alto de cada carril: el mínimo, o lo que toque para llenar el panel si se le eligió un tamaño
+  const lane = fill && shown.length ? Math.max(LANE, Math.floor((height - AXIS) / shown.length)) : LANE;
+  const H = shown.length * lane + AXIS;
   const ticks = useMemo(() => niceTicks(x0, x1, Math.max(2, Math.round(W / 110))), [x0, x1, W]);
   const nearest = (v: number) => {
     let lo = 0;
@@ -111,7 +117,7 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
     <div
       className={`pane-chart digital-lanes${cursorMode ? ' cursor-mode' : ''}`}
       ref={host}
-      style={{ height: H, flex: 'none' }}
+      style={fill ? { flex: '1 1 0', minHeight: shown.length * LANE + AXIS } : { height: H, flex: 'none' }}
       onPointerMove={(e) => {
         const p = local(e);
         if (p < LABEL) return (setMouse(null), onHover(null));
@@ -167,8 +173,8 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
           </g>
         ))}
         {shown.map((c, i) => {
-          const top = i * LANE + 4;
-          const bot = top + LANE - 8;
+          const top = i * lane + 4;
+          const bot = top + lane - 8;
           const mid = (top + bot) / 2;
           const bits = c.bits ?? 1;
           const segs = runs(x, c.y, x0, x1);

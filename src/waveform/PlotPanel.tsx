@@ -1,6 +1,6 @@
 // Visor de resultados: paneles apilados con eje X compartido, trazas como expresiones,
 // Bode (magnitud y fase), cursores, medidas rápidas y exportación a CSV/PNG.
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { Fragment, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -13,7 +13,7 @@ import { decimator } from './decimate.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
-import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
+import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { Icon } from '../ui/icons.tsx';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
@@ -240,6 +240,38 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     if (!tt || from === to || !acceptsTrace(panes[to], tt) || panes[to].traces.some((o) => sameTrace(o, tt))) return;
     setPanes(panes.map((p, k) => (k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { ...p, traces: [...p.traces, tt], digital: panes[from].digital } : p)));
   };
+  // Divisor entre paneles: arrastrarlo cambia la altura de los dos de al lado. Durante el
+  // arrastre sólo se toca el DOM; al soltar, cada panel guarda su alto (size) en la vista
+  const panesRef = useRef<HTMLDivElement>(null);
+  const paneEls = () => [...(panesRef.current?.children ?? [])].filter((el): el is HTMLElement => el.classList.contains('pane'));
+  const resizePanes = (i: number, dy: number, done: boolean, start?: number[]) => {
+    const els = paneEls();
+    const hs = start ?? els.map((el) => el.getBoundingClientRect().height);
+    const MIN = 70;
+    const pair = hs[i] + hs[i + 1];
+    const a = Math.max(MIN, Math.min(pair - MIN, hs[i] + dy));
+    const next = hs.map((h, k) => (k === i ? a : k === i + 1 ? pair - a : h));
+    els.forEach((el, k) => (el.style.flex = `${next[k]} 1 0`));
+    if (done) setPanes(panes.map((p, k) => ({ ...p, size: Math.round(next[k]) })));
+  };
+  const startSplit = (i: number, e: React.PointerEvent) => {
+    e.preventDefault();
+    const start = paneEls().map((el) => el.getBoundingClientRect().height);
+    const y0 = e.clientY;
+    const move = (ev: PointerEvent) => resizePanes(i, ev.clientY - y0, false, start);
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      resizePanes(i, ev.clientY - y0, true, start);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  /** doble clic en un divisor: todos los paneles vuelven a repartirse por igual */
+  const resetSizes = () => {
+    paneEls().forEach((el) => (el.style.flex = ''));
+    setPanes(panes.map(({ size: _, ...p }) => p));
+  };
   /** FFT de una traza: traza nueva en el panel de FFT del mismo rango y ventana, o en uno nuevo debajo */
   const addFft = (expr: string) => {
     const fft = { window: fftWindow, ...(xRange ? { from: xRange[0], to: xRange[1] } : {}) };
@@ -291,6 +323,12 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           label: t('Cursor {name} on this trace', { name }),
           onClick: () => (isF(i) ? (setCursorMode(true), setFCursors((c) => ({ ...c, [k]: label }))) : startCursors({ [k]: label })),
         });
+    // orden de dibujo: la última de la leyenda queda encima de las demás
+    const n = panes[i].traces.length;
+    if (n > 1) {
+      if (ti < n - 1) items.push({ label: t('Bring to front'), onClick: () => update(i, (p) => reorderTrace(p, ti, n - 1)) });
+      if (ti > 0) items.push({ label: t('Send to back'), onClick: () => update(i, (p) => reorderTrace(p, ti, 0)) });
+    }
     panes.forEach((p, j) => {
       if (j !== i && acceptsTrace(p, tt) && !p.traces.some((o) => sameTrace(o, tt))) items.push({ label: t('Move to pane {n}', { n: j + 1 }), onClick: () => moveTrace(i, ti, j) });
     });
@@ -469,10 +507,27 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       {/* cursores y medidas: a la derecha de los paneles con los resultados abajo (son anchos y
           bajos); debajo con los resultados al costado */}
       <div className={`plot-main${side ? '' : ' beside'}`}>
-      <div className="panes">
+      <div className="panes" ref={panesRef}>
         {panes.map((p, i) => (
+          <Fragment key={i}>
+          {i > 0 && (
+            <div
+              className="pane-split"
+              role="separator"
+              aria-orientation="horizontal"
+              aria-label={t('Resize panes {a} and {b}', { a: i, b: i + 1 })}
+              tabIndex={0}
+              title={t('Drag to change the height of the panes · double-click: equal heights')}
+              onPointerDown={(e) => startSplit(i - 1, e)}
+              onDoubleClick={resetSizes}
+              onKeyDown={(e) => {
+                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                e.preventDefault();
+                resizePanes(i - 1, e.key === 'ArrowUp' ? -16 : 16, true);
+              }}
+            />
+          )}
           <PaneView
-            key={i}
             index={i}
             pane={p}
             data={data[i]}
@@ -527,6 +582,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
                 : undefined
             }
           />
+          </Fragment>
         ))}
       </div>
       {(cursorMode || (showStats && allVisible.length > 0)) && (
@@ -1180,6 +1236,8 @@ function PaneView(props: {
   return (
     <div
       className={`pane${pane.digital ? ' digital' : ''}${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
+      // con un tamaño elegido (divisor entre paneles), la altura es proporcional a él
+      style={pane.size ? { flex: `${pane.size} 1 0` } : undefined}
       onPointerDown={props.onActivate}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/x-trace')) {
@@ -1213,13 +1271,25 @@ function PaneView(props: {
                 props.onPickTrace(tt.expr);
               }}
               onDragStart={(e) => e.dataTransfer.setData('application/x-trace', JSON.stringify({ pane: index, trace: ti }))}
+              // soltar otra traza del mismo panel sobre esta: pasa a este lugar (cambia el orden
+              // de dibujo); de otro panel, sigue de largo al panel (se mueve)
+              onDrop={(e) => {
+                const raw = e.dataTransfer.getData('application/x-trace');
+                if (!raw) return;
+                const { pane: from, trace } = JSON.parse(raw) as { pane: number; trace: number };
+                if (from !== index) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setDragOver(false);
+                props.onChange((p) => reorderTrace(p, trace, ti));
+              }}
               onPointerEnter={() => props.onHoverExpr?.(tt.expr)}
               onPointerLeave={() => props.onHoverExpr?.(undefined)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ at: { x: e.clientX, y: e.clientY }, ti });
               }}
-              title={err ?? t('Click: show/hide · drag to another pane · color in the square')}
+              title={err ?? t('Click: show/hide · drag onto another trace to reorder, or to another pane · color in the square')}
             >
               <label className="swatch" style={{ background: traceColor(tt, ti) }}>
                 <input
@@ -1306,6 +1376,7 @@ function PaneView(props: {
           onWheelZoom={props.onWheelZoom}
           pendingX={() => props.wheelPending().x}
           onHover={setHover}
+          fill={!!pane.size}
         />
       ) : data.curves.length ? (
         <div

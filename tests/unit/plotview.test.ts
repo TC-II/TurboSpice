@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { siFixed } from '../../src/waveform/series.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
-import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE, parsePlt, serializePlt, type Pane } from '../../src/waveform/view.ts';
+import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE, parsePlt, reorderTrace, serializePlt, traceColor, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
   it('seno: pico a pico, eficaz, frecuencia', () => {
@@ -149,5 +149,18 @@ describe('valores de ancho fijo (#54)', () => {
     ];
     for (const [x, s] of cases) expect(siFixed(x), String(x)).toBe(s);
     expect(new Set([...cases.map(([x]) => siFixed(x)), siFixed(NaN)].map((s) => s.length))).toEqual(new Set([7]));
+  });
+});
+
+describe('orden de las trazas de un panel', () => {
+  it('reorderTrace mueve una traza y deja fijos los colores', () => {
+    const p = { traces: [{ expr: 'V(a)' }, { expr: 'V(b)', color: '#123456' }, { expr: 'V(c)' }] };
+    const r = reorderTrace(p, 0, 2);
+    expect(r.traces.map((t) => t.expr)).toEqual(['V(b)', 'V(c)', 'V(a)']);
+    // V(a) y V(c) conservan el color que tenían por su posición
+    expect(r.traces[2].color).toBe(traceColor(p.traces[0], 0));
+    expect(r.traces[1].color).toBe(traceColor(p.traces[2], 2));
+    expect(reorderTrace(p, 1, 1)).toBe(p);
+    expect(reorderTrace(p, 0, 5)).toBe(p);
   });
 });

@@ -142,6 +142,8 @@ const REPO = 'https://github.com/TC-II/TurboSpice';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
+/** simulación mixta (#209): integrador RC + ADC sigma-delta en Verilog + DAC R-2R */
+const SIGMA_DELTA = 'ADC sigma-delta.turbo';
 const EXAMPLES_TURBO = 'Examples.turbo';
 const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
 
@@ -2885,6 +2887,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           label: t('Examples'),
           items: [
             { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
+            { label: 'ADC sigma-delta', title: t('Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC'), onClick: () => doExample(SIGMA_DELTA) },
             'sep',
             ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
           ],

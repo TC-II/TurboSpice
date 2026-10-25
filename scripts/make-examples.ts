@@ -4,6 +4,8 @@
 //   una repetida) y un opamp de TC2Lib modificado como archivos del proyecto (OA_Sample.asy +
 //   OA_Sample.sub, con saturación a ±Vsat).
 // - Examples.turbo: cada .asc de examples/ es una variante.
+// (ADC sigma-delta.turbo, el ejemplo de simulación mixta con Verilog, no sale de acá: es un proyecto
+//  guardado desde TurboSpice, con su módulo Verilog sintetizado)
 //   npx vite-node scripts/make-examples.ts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { AscDoc } from '../src/asc/model.ts';

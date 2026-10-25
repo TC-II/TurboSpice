@@ -603,8 +603,9 @@ await page.getByRole('button', { name: 'Cursores' }).click();
 {
   // markers como en ViVA: M sobre la traza bajo el mouse, V y H con sus cortes, A/D con sus diferencias
   const names = () => page.locator('.pane-chart .uplot').first().evaluate((u) => u.dataset.markers ?? '');
-  const card = page.locator('section.readout-card[aria-label="Markers"]');
-  const rowsOf = async (name) => (await card.locator('tbody tr').allTextContents()).filter((r) => r.startsWith(name));
+  const readings = async () => ((await page.locator('.plot-panel').getAttribute('data-marker-readings')) ?? '').split('\n').filter(Boolean);
+  const rowsOf = async (name) => (await readings()).filter((r) => r.startsWith(`${name}|`));
+  check((await page.locator('section.readout-card[aria-label="Markers"]').count()) === 0, 'sin tabla de markers (las lecturas están en el gráfico)');
   await page.getByRole('button', { name: 'Markers', exact: true }).click();
   let r = await page.locator('.pane-chart').first().boundingBox();
   await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5, { steps: 3 });
@@ -625,7 +626,7 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   await page.mouse.move(r.x + r.width * 0.7, r.y + r.height * 0.5, { steps: 3 });
   await page.keyboard.press('d');
   await page.waitForTimeout(100);
-  const deltaRow = await card.locator('tr.delta').textContent().catch(() => '');
+  const deltaRow = (await rowsOf('D − A'))[0] ?? '';
   check((await names()).endsWith('A|D') && /D − A/.test(deltaRow) && /Hz/.test(deltaRow), `A y D con sus diferencias (${deltaRow})`);
   check(!(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), 'con Markers activo, A no va a la caja de expresiones');
   // un click (modo Markers) pone otro; Supr borra el seleccionado; arrastrar mueve una línea
@@ -664,7 +665,7 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   }
   await page.keyboard.press('Shift+M');
   await page.waitForTimeout(100);
-  check((await names()) === '' && (await card.count()) === 0, 'Shift+M borra todos los markers');
+  check((await names()) === '' && (await readings()).length === 0, 'Shift+M borra todos los markers');
   await page.getByRole('button', { name: 'Markers', exact: true }).click();
   await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5);
   await page.keyboard.press('a');

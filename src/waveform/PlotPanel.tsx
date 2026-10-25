@@ -696,7 +696,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
   return (
-    <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`}>
+    <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`} data-marker-readings={markers.length ? markerReadings(markers, data).join('\n') : undefined}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
       {(zoomMode || removing) && (
         <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
@@ -796,14 +796,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           </Fragment>
         ))}
       </div>
-      {(cursorMode || markers.length > 0 || (showStats && allVisible.length > 0)) && (
+      {(cursorMode || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
-          {markers.length > 0 && (
-            <section className="readout-card" aria-label={t('Markers')}>
-              <h4>{t('Markers')}</h4>
-              <MarkerTable markers={markers} data={data} sel={selMarker} onSelect={setSelMarker} onClear={() => setMarkers([])} />
-            </section>
-          )}
           {cursorMode && (
             <section className="readout-card" aria-label={t('Cursors')}>
               <h4>{t('Cursors')}</h4>
@@ -2084,8 +2078,9 @@ async function exportPng(panes: Pane[], data: PaneData[], charts: Map<number, uP
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
 }
 
-/** Lecturas de los markers: cada punto, los cortes de cada línea y las diferencias A/D */
-function MarkerTable({ markers, data, sel, onSelect, onClear }: { markers: Marker[]; data: PaneData[]; sel: Pick<Marker, 'kind' | 'id'> | null; onSelect(m: Marker): void; onClear(): void }) {
+/** Lecturas de los markers (cada punto, los cortes de cada línea y D − A): las dibuja el gráfico; acá van
+ * en texto a data-marker-readings, para los e2e (el canvas no se puede leer) */
+function markerReadings(markers: Marker[], data: PaneData[]): string[] {
   const rows: { m: Marker; trace: string; color?: string; x: string; y: string }[] = [];
   const unitOf = (d: PaneData, axis: MarkerAxis) => (axis === 'ph' ? '°' : axis === 'i' ? d.iUnit : d.yUnit);
   let a: { x: number; y: number; d: PaneData; axis: MarkerAxis } | undefined;
@@ -2110,39 +2105,7 @@ function MarkerTable({ markers, data, sel, onSelect, onClear }: { markers: Marke
   }
   const dd = a && dm ? delta(a, dm) : null;
   const xu = dm ? xUnit(dm.d.xName) : '';
-  return (
-    <div className="marker-readout">
-      <table className="scalars readout">
-        <thead>
-          <tr>
-            <th>{t('Marker')}</th>
-            <th>{t('Trace')}</th>
-            <th>X</th>
-            <th>Y</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.slice(0, MAX_ROWS * 2).map((r, i) => (
-            <tr key={i} className={sel && sameMarker(r.m, sel) ? 'followed' : undefined} onClick={() => onSelect(r.m)}>
-              <td>{markerName(r.m)}</td>
-              <td style={{ color: r.color }}>{r.trace}</td>
-              <td>{r.x}</td>
-              <td>{r.y}</td>
-            </tr>
-          ))}
-          {dd && dm && (
-            <tr className="delta">
-              <td>D − A</td>
-              <td>{t('slope')} {fix(dd.slope)}</td>
-              <td>{fix(dd.dx, xu)}</td>
-              <td>{fix(dd.dy, unitOf(dm.d, dm.axis))}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      <div className="cursor-tools">
-        <button onClick={onClear}>{t('Clear the markers')}</button>
-      </div>
-    </div>
-  );
+  const out = rows.map((r) => [markerName(r.m), r.trace, r.x.trim(), r.y.trim()].join('|'));
+  if (dd && dm) out.push(['D − A', fix(dd.slope).trim(), fix(dd.dx, xu).trim(), fix(dd.dy, unitOf(dm.d, dm.axis)).trim()].join('|'));
+  return out;
 }

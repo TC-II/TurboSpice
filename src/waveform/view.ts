@@ -4,6 +4,7 @@
 import { readData, writeData } from '../asc/dataText.ts';
 import type { AscDoc } from '../asc/model.ts';
 import { isDigitalExpr, type Radix } from './digital.ts';
+import type { Marker } from './markers.ts';
 
 export interface Trace {
   /** expresión con nombres de LTspice: "V(out)", "I(R1)", "V(out)/V(in)" */
@@ -107,6 +108,9 @@ export interface PlotState {
   yRanges?: Record<number, [number, number]>;
   cursors: Cursors;
   cursorMode: boolean;
+  /** markers (M, V, H, A, D); faltan en lo guardado antes de que existieran */
+  markers?: Marker[];
+  markerMode?: boolean;
 }
 
 /** Paleta por defecto (se distingue en fondo claro y oscuro) */

@@ -14,6 +14,7 @@ import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
 import { PALETTE, acceptsTrace, colorFor, sameDft, cursorForClick, isDftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace, type TraceDft } from './view.ts';
+import { addMarker, asMarkers, delta, horizontalCuts, markerName, markerValue, pickCurve, remapPanes, sameMarker, verticalCuts, type Marker, type MarkerAxis, type MarkerKind } from './markers.ts';
 import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
 import { Icon } from '../ui/icons.tsx';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
@@ -34,12 +35,23 @@ export type PlotAction =
   | 'removeTraces' // Backspace
   | 'cursor' // C
   | 'clearCursors' // Shift+C
+  | 'markPoint' // M
+  | 'markV' // V
+  | 'markH' // H
+  | 'markA' // A (con los markers activos)
+  | 'markD' // D (con los markers activos)
+  | 'clearMarkers' // Shift+M
+  | 'deleteMarker' // Supr
   | 'cancel'; // Esc
 
 export interface PlotPanelHandle {
   csv(): string;
   png(): Promise<Blob | null>;
   action(a: PlotAction): void;
+  /** ¿está activo el modo Markers? (A y D ponen markers en vez de sus atajos de siempre) */
+  markerMode(): boolean;
+  /** ¿hay un marker seleccionado? (Supr lo borra) */
+  markerSelected(): boolean;
   /** agrega la DFT de esa expresión (la punta de prueba en modo ⌖) */
   addDft(expr: string): void;
 }
@@ -137,6 +149,12 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [cursorMode, setCursorMode] = useState(init?.cursorMode ?? false);
   const [cursors, setCursors] = useState<Cursors>(init?.cursors ?? {});
   const [showStats, setShowStats] = useState(false);
+  // markers como en ViVA (M, V, H, A, D): se guardan con la simulación, como los cursores
+  const [markerMode, setMarkerMode] = useState(init?.markerMode ?? false);
+  const [markers, setMarkers] = useState<Marker[]>(() => asMarkers(init?.markers));
+  const [selMarker, setSelMarker] = useState<Pick<Marker, 'kind' | 'id'> | null>(null);
+  /** dónde está el mouse (panel y px dentro del área del gráfico): ahí ponen los markers las teclas */
+  const pointer = useRef<{ pane: number; px: number; py: number } | null>(null);
   // cursores activos y todavía sin ubicar: el A sigue al mouse (línea y tabla preliminares)
   const [hoverX, setHoverX] = useState<number>();
   const charts = useRef(new Map<number, uPlot>());
@@ -177,10 +195,15 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     setRRanges({});
     zoomHistory.current = [];
     setCursors({});
+    setMarkers([]);
   }, [scaleName]);
   useEffect(() => {
-    onState?.({ scale: scaleName, xRange, yRanges, cursors, cursorMode });
-  }, [scaleName, xRange, yRanges, cursors, cursorMode, onState]);
+    onState?.({ scale: scaleName, xRange, yRanges, cursors, cursorMode, ...(markers.length ? { markers } : {}), ...(markerMode ? { markerMode } : {}) });
+  }, [scaleName, xRange, yRanges, cursors, cursorMode, markers, markerMode, onState]);
+  // (un marker seleccionado que ya no está, deja de estarlo)
+  useEffect(() => {
+    if (selMarker && !markers.some((m) => sameMarker(m, selMarker))) setSelMarker(null);
+  }, [markers, selMarker]);
   useEffect(() => {
     const xs = scale?.real;
     if (!xs?.length) return;
@@ -367,6 +390,38 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     return () => window.removeEventListener('keydown', onKey, true);
   }, [dftPicking, dftEdit]);
   const isF = (i: number) => isDftPane(panes[i]);
+  /**
+   * Marker nuevo donde está el mouse (o en `at`). M, A y D van sobre la curva bajo el mouse (o la
+   * más cercana); V y H, sin mouse sobre un gráfico, al medio del panel activo.
+   */
+  const placeMarker = (kind: MarkerKind, at = pointer.current) => {
+    let p = at;
+    if (!p && (kind === 'v' || kind === 'h')) {
+      const u = charts.current.get(Math.min(active, panes.length - 1));
+      if (u) p = { pane: Math.min(active, panes.length - 1), px: u.bbox.width / devicePixelRatio / 2, py: u.bbox.height / devicePixelRatio / 2 };
+    }
+    if (!p) return;
+    const u = charts.current.get(p.pane);
+    const d = data[p.pane];
+    if (!u || !d?.curves.length || panes[p.pane]?.digital) return;
+    const x = u.posToVal(p.px, 'x');
+    const toPy = (v: number, a: MarkerAxis) => u.valToPos(v, a);
+    let m: Omit<Marker, 'id'>;
+    if (kind === 'v') m = { kind, pane: p.pane, x };
+    else if (kind === 'h') {
+      // la escala de la curva más cercana (corrientes o fase van en el eje derecho)
+      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity);
+      const axis = k >= 0 ? d.curves[k].axis : 'y';
+      m = { kind, pane: p.pane, y: u.posToVal(p.py, axis), axis };
+    } else {
+      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity);
+      if (k < 0) return;
+      m = { kind, pane: p.pane, x, trace: d.curves[k].label };
+    }
+    const r = addMarker(markers, m);
+    setMarkers(r.list);
+    setSelMarker(r.added);
+  };
   /** cursores activos, con el A en el medio de lo que se ve si no estaba */
   const startCursors = (extra: Cursors = {}) => {
     setCursorMode(true);
@@ -467,6 +522,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           const next = [...panes];
           [next[i], next[j]] = [next[j], next[i]];
           setPanes(next);
+          setMarkers(remapPanes(markers, { swap: [i, j] }));
           return setActive(j);
         }
         case 'removeTraces':
@@ -478,11 +534,29 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           setFCursors({});
           setCursors({});
           return setCursorMode(false);
+        case 'markPoint':
+          return placeMarker('m');
+        case 'markV':
+          return placeMarker('v');
+        case 'markH':
+          return placeMarker('h');
+        case 'markA':
+          return placeMarker('a');
+        case 'markD':
+          return placeMarker('d');
+        case 'clearMarkers':
+          return setMarkers([]);
+        case 'deleteMarker':
+          if (selMarker) setMarkers(markers.filter((m) => !sameMarker(m, selMarker)));
+          return setSelMarker(null);
         case 'cancel':
+          setSelMarker(null);
           setZoomMode(false);
           return setRemoving(false);
       }
     },
+    markerMode: () => markerMode,
+    markerSelected: () => !!selMarker,
   }));
 
   const range: Range | null = xRange;
@@ -516,6 +590,13 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
         title={t('Cursors: first click = cursor A, second = cursor B, then a click moves the nearest one; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)')}
       >
         {t('Cursors')}
+      </button>
+      <button
+        className={markerMode ? 'active' : ''}
+        onClick={() => setMarkerMode((v) => !v)}
+        title={t('Markers: a click puts a marker on the trace. With the mouse over the plot: M marker, V and H vertical and horizontal lines (select one to read where it cuts the traces), A and D two markers and their differences; drag them to move them (Delete removes the selected one, Shift+M all of them)')}
+      >
+        {t('Markers')}
       </button>
       <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title={t('Maximum, minimum, peak-to-peak, average, RMS and frequency in the visible range')}>
         {t('Stats')}
@@ -655,6 +736,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             canRemove={panes.length > 1}
             onRemove={() => {
               setPanes(panes.filter((_, k) => k !== i));
+              setMarkers((old) => remapPanes(old, { remove: i }));
               // (el zoom de los paneles de DFT que siguen se corre con ellos)
               setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
             }}
@@ -693,6 +775,17 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onHoverExpr={onHoverExpr}
             marks={marks}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
+            markerMode={markerMode}
+            markers={markers.filter((m) => m.pane === i)}
+            allMarkers={markers}
+            selMarker={selMarker}
+            onSelectMarker={setSelMarker}
+            onMoveMarker={(m, patch) => setMarkers((old) => old.map((o) => (sameMarker(o, m) ? { ...o, ...patch } : o)))}
+            onPlaceMarker={(px, py) => placeMarker('m', { pane: i, px, py })}
+            onPointer={(p) => {
+              if (p) pointer.current = { pane: i, ...p };
+              else if (pointer.current?.pane === i) pointer.current = null;
+            }}
             onAddBelow={
               i === panes.length - 1
                 ? () => {
@@ -705,8 +798,14 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           </Fragment>
         ))}
       </div>
-      {(cursorMode || (showStats && allVisible.length > 0)) && (
+      {(cursorMode || markers.length > 0 || (showStats && allVisible.length > 0)) && (
         <div className="readouts">
+          {markers.length > 0 && (
+            <section className="readout-card" aria-label={t('Markers')}>
+              <h4>{t('Markers')}</h4>
+              <MarkerTable markers={markers} data={data} sel={selMarker} onSelect={setSelMarker} onClear={() => setMarkers([])} />
+            </section>
+          )}
           {cursorMode && (
             <section className="readout-card" aria-label={t('Cursors')}>
               <h4>{t('Cursors')}</h4>
@@ -778,6 +877,18 @@ function PaneView(props: {
   onHoverX?(x: number | undefined): void;
   /** grupo de sincronización del cursor de uPlot (los paneles de DFT tienen otro eje X) */
   syncKey: string;
+  /** modo Markers: un click pone un marker sobre la curva */
+  markerMode: boolean;
+  /** markers de este panel */
+  markers: Marker[];
+  /** todos (A y D pueden estar en paneles distintos) */
+  allMarkers: Marker[];
+  selMarker: Pick<Marker, 'kind' | 'id'> | null;
+  onSelectMarker(m: Pick<Marker, 'kind' | 'id'> | null): void;
+  onMoveMarker(m: Marker, patch: Partial<Marker>): void;
+  onPlaceMarker(px: number, py: number): void;
+  /** mouse sobre el área del gráfico (px desde su esquina) o afuera (null) */
+  onPointer(p: { px: number; py: number } | null): void;
 }) {
   const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
@@ -859,6 +970,126 @@ function PaneView(props: {
     const toX = (lo: number, hi: number): Range | null => (!data.home && lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     let raf = 0;
     const stepped = uPlot.paths.stepped!({ align: 1 });
+    /** markers de este panel (puntos, líneas V y H, el par A/D) con sus lecturas */
+    const drawMarkers = (u: uPlot, ctx: CanvasRenderingContext2D, k: { fg: string; bg: string; accent: string; unitOf(c: Curve): string }) => {
+      const L = live.current;
+      const list = L.markers;
+      // (para los e2e: el canvas no se puede leer)
+      u.root.dataset.markers = list.map(markerName).join('|');
+      if (!list.length) return;
+      const dpr = devicePixelRatio;
+      const { left, top, width, height } = u.bbox;
+      const xu = xUnit(data.xName);
+      const inX = (px: number) => px >= left && px <= left + width;
+      const inY = (py: number) => py >= top && py <= top + height;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(left, top, width, height);
+      ctx.clip();
+      ctx.font = `${11 * dpr}px system-ui`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      /** recuadro con texto junto a (x, y): arriba a la derecha si entra */
+      const label = (lines: string[], x: number, y: number, color: string) => {
+        const lh = 14 * dpr;
+        const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 8 * dpr;
+        const h = lh * lines.length + 4 * dpr;
+        let bx = x + 6 * dpr;
+        if (bx + w > left + width) bx = x - w - 6 * dpr;
+        let by = y - h - 6 * dpr;
+        if (by < top) by = y + 6 * dpr;
+        by = Math.min(by, top + height - h);
+        ctx.globalAlpha = 0.9;
+        ctx.fillStyle = k.bg;
+        ctx.fillRect(bx, by, w, h);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = dpr;
+        ctx.setLineDash([]);
+        ctx.strokeRect(bx, by, w, h);
+        ctx.fillStyle = k.fg;
+        lines.forEach((l, n) => ctx.fillText(l, bx + 4 * dpr, by + lh * (n + 1) - dpr));
+      };
+      const dot = (x: number, y: number, color: string, r = 3.5) => {
+        if (!inX(x) || !inY(y)) return;
+        ctx.beginPath();
+        ctx.arc(x, y, r * dpr, 0, 2 * Math.PI);
+        ctx.fillStyle = k.bg;
+        ctx.fill();
+        ctx.lineWidth = 2 * dpr;
+        ctx.strokeStyle = color;
+        ctx.setLineDash([]);
+        ctx.stroke();
+      };
+      const stroke = (x0: number, y0: number, x1: number, y1: number, color: string, w: number, dash: number[]) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = w * dpr;
+        ctx.setLineDash(dash.map((d) => d * dpr));
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      };
+      const curveOf = (m: Marker) => data.curves.find((c) => c.label === m.trace && !c.hidden);
+      /** posición en el canvas de un marker de punto (M, A, D) */
+      const pointOf = (m: Marker) => {
+        const c = curveOf(m);
+        if (!c || m.x === undefined) return null;
+        const y = valueAt(data.x, c.y, m.x);
+        return { c, y, px: u.valToPos(m.x, 'x', true), py: u.valToPos(y, c.axis, true) };
+      };
+      for (const m of list) {
+        const sel = !!L.selMarker && sameMarker(m, L.selMarker);
+        const color = sel ? k.accent : k.fg;
+        if (m.kind === 'v') {
+          const px = u.valToPos(m.x!, 'x', true);
+          if (!inX(px)) continue;
+          stroke(px, top, px, top + height, color, sel ? 2 : 1.25, [6, 3]);
+          label([`${markerName(m)}  ${fmt(m.x!, xu)}`], px, top, color);
+          for (const cut of verticalCuts(m.x!, data.x, data.curves)) {
+            const c = data.curves.find((o) => o.label === cut.label)!;
+            const py = u.valToPos(cut.y, cut.axis, true);
+            dot(px, py, c.color);
+            if (sel && inY(py)) label([fmt(cut.y, k.unitOf(c))], px, py, c.color);
+          }
+        } else if (m.kind === 'h') {
+          const axis = m.axis ?? 'y';
+          const py = u.valToPos(m.y!, axis, true);
+          if (!inY(py)) continue;
+          stroke(left, py, left + width, py, color, sel ? 2 : 1.25, [6, 3]);
+          const unit = axis === 'ph' ? '°' : axis === 'i' ? data.iUnit : data.yUnit;
+          // (el nombre a la derecha: a la izquierda suelen estar los cortes)
+          label([`${markerName(m)}  ${fmt(m.y!, unit)}`], left + width, py, color);
+          for (const cut of horizontalCuts(m.y!, axis, data.x, data.curves, 32)) {
+            const c = data.curves.find((o) => o.label === cut.label)!;
+            const px = u.valToPos(cut.x, 'x', true);
+            dot(px, py, c.color);
+            if (sel && inX(px)) label([fmt(cut.x, xu)], px, py, c.color);
+          }
+        } else {
+          const p = pointOf(m);
+          if (!p) continue;
+          dot(p.px, p.py, p.c.color, sel ? 5 : 4);
+          if (inX(p.px) && inY(p.py)) label([`${markerName(m)}: ${fmt(m.x!, xu)}, ${fmt(p.y, k.unitOf(p.c))}`], p.px, p.py, sel ? k.accent : p.c.color);
+        }
+      }
+      // A y D en este panel: la recta entre los dos y las diferencias
+      const a = list.find((m) => m.kind === 'a');
+      const d = list.find((m) => m.kind === 'd');
+      const pa = a && pointOf(a);
+      const pd = d && pointOf(d);
+      if (pa && pd && a.x !== undefined && d.x !== undefined) {
+        stroke(pa.px, pa.py, pd.px, pd.py, k.accent, 1.25, [2, 3]);
+        const dd = delta({ x: a.x, y: pa.y }, { x: d.x, y: pd.y });
+        label(
+          [`Δx ${fmt(dd.dx, xu)}`, `Δy ${fmt(dd.dy, k.unitOf(pd.c))}`, `${t('slope')} ${fmt(dd.slope)}`, ...(xu === 's' ? [`1/Δx ${fmt(dd.inv, 'Hz')}`] : [])],
+          (pa.px + pd.px) / 2,
+          (pa.py + pd.py) / 2,
+          k.accent,
+        );
+      }
+      ctx.restore();
+    };
     const opts: uPlot.Options = {
       width: Math.max(100, el.clientWidth),
       height: Math.max(80, el.clientHeight),
@@ -900,12 +1131,12 @@ function PaneView(props: {
         sync: { key: props.syncKey },
         // Arrastrar = siempre el recuadro entre los dos puntos, en X e Y (lo aplica setSelect). Con los
         // cursores activos no hay zoom por arrastre (Z lo fuerza). Se cambia en vivo, sin recrear el gráfico.
-        drag: { x: live.current.zoomMode || !live.current.cursorMode, y: live.current.zoomMode || !live.current.cursorMode, setScale: false },
+        drag: { x: live.current.zoomMode || !(live.current.cursorMode || live.current.markerMode), y: live.current.zoomMode || !(live.current.cursorMode || live.current.markerMode), setScale: false },
         points: { size: 6 },
         bind: {
           // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
           dblclick: (_u, _t, handler) => (e) => {
-            if (e.button === 0 && !live.current.cursorMode) handler(e);
+            if (e.button === 0 && !live.current.cursorMode && !live.current.markerMode) handler(e);
             return null;
           },
         },
@@ -913,7 +1144,7 @@ function PaneView(props: {
       hooks: {
         setSelect: [
           (u) => {
-            if (live.current.cursorMode && !live.current.zoomMode) return;
+            if ((live.current.cursorMode || live.current.markerMode) && !live.current.zoomMode) return;
             // (los demás paneles reciben el mismo arrastre por la sincronización: lo aplica sólo el que lo empezó)
             if (!pressed.current) return;
             const s = u.select;
@@ -1040,6 +1271,7 @@ function PaneView(props: {
                 ctx.fillText(m.kind === 'pole' ? '×' : '○', px, u.bbox.top + u.bbox.height - 4 * devicePixelRatio);
                 ctx.restore();
               }
+            drawMarkers(u, ctx, { fg, bg, accent: markColor.zero, unitOf });
             if (!live.current.cursorMode) return;
             const dpr = devicePixelRatio;
             const { left, top, width, height } = u.bbox;
@@ -1140,6 +1372,70 @@ function PaneView(props: {
     chart.current = u;
     live.current.register(u);
     const { over, root } = u;
+
+    // Markers: se toman (y se arrastran) con el botón izquierdo en cualquier modo; con el modo
+    // Markers, un click en otro lado pone uno sobre la curva. Van en captura, antes que el zoom y
+    // los cursores.
+    const posY = (e: PointerEvent) => {
+      const r = over.getBoundingClientRect();
+      return Math.min(Math.max(e.clientY - r.top, 0), r.height);
+    };
+    const hitMarker = (e: PointerEvent): Marker | undefined => {
+      const r = over.getBoundingClientRect();
+      const px = e.clientX - r.left;
+      const py = e.clientY - r.top;
+      if (px < 0 || py < 0 || px > r.width || py > r.height) return undefined;
+      let best: Marker | undefined;
+      let dist = GRAB + 2;
+      for (const m of live.current.markers) {
+        let d = Infinity;
+        if (m.kind === 'v') d = Math.abs(u.valToPos(m.x!, 'x') - px);
+        else if (m.kind === 'h') d = Math.abs(u.valToPos(m.y!, m.axis ?? 'y') - py);
+        else {
+          const c = data.curves.find((o) => o.label === m.trace && !o.hidden);
+          if (!c) continue;
+          d = Math.hypot(u.valToPos(m.x!, 'x') - px, u.valToPos(valueAt(data.x, c.y, m.x!), c.axis) - py);
+        }
+        if (d <= dist) [best, dist] = [m, d];
+      }
+      return best;
+    };
+    let mdrag: Marker | null = null;
+    let onMark = false;
+    const markDown = (e: PointerEvent) => {
+      if (e.button !== 0 || live.current.zoomMode || axisAt(e)) return;
+      const m = hitMarker(e);
+      const L = live.current;
+      if (!m && L.selMarker) L.onSelectMarker(null);
+      if (!m && !L.markerMode) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      el.focus({ preventScroll: true });
+      L.onActivate();
+      if (!m) return L.onPlaceMarker(posX(e), posY(e));
+      L.onSelectMarker(m);
+      mdrag = m;
+      root.setPointerCapture(e.pointerId);
+    };
+    const markMove = (e: PointerEvent) => {
+      const r = over.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      live.current.onPointer(inside ? { px: e.clientX - r.left, py: e.clientY - r.top } : null);
+      if (mdrag) {
+        e.stopImmediatePropagation();
+        live.current.onMoveMarker(mdrag, mdrag.kind === 'h' ? { y: u.posToVal(posY(e), mdrag.axis ?? 'y') } : { x: valX(e) });
+        return;
+      }
+      const m = hitMarker(e);
+      onMark = !!m;
+      if (m) over.style.cursor = m.kind === 'h' ? 'ns-resize' : m.kind === 'v' ? 'ew-resize' : 'move';
+    };
+    const markUp = (e: PointerEvent) => {
+      if (!mdrag) return;
+      mdrag = null;
+      e.stopImmediatePropagation();
+      if (root.hasPointerCapture(e.pointerId)) root.releasePointerCapture(e.pointerId);
+    };
 
     // Cursores con eventos de puntero (no 'click'): se ubican al apretar, se arrastran y
     // también se puede apretar sobre los ejes (se toma el borde del área del gráfico)
@@ -1253,10 +1549,10 @@ function PaneView(props: {
     const move = (e: PointerEvent) => {
       if (pan) return panMove(e);
       if (dragging) live.current.onCursor({ [dragging]: valX(e) });
-      else over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : '';
+      else if (!onMark) over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : live.current.markerMode ? 'crosshair' : '';
       if (!dragging) hoverAxis(axisAt(e));
     };
-    const leave = () => hoverAxis(null);
+    const leave = () => (hoverAxis(null), live.current.onPointer(null));
     const up = (e: PointerEvent) => {
       if (panEnd(e) || !dragging) return;
       dragging = null;
@@ -1331,6 +1627,10 @@ function PaneView(props: {
       // (uPlot cierra el arrastre en el mouseup, que llega después del pointerup)
       setTimeout(() => (pressed.current = false), 0);
     };
+    root.addEventListener('pointerdown', markDown, true);
+    root.addEventListener('pointermove', markMove, true);
+    root.addEventListener('pointerup', markUp, true);
+    root.addEventListener('pointercancel', markUp, true);
     root.addEventListener('pointerdown', selStart);
     window.addEventListener('pointerup', selEnd);
     window.addEventListener('pointercancel', selEnd);
@@ -1356,6 +1656,10 @@ function PaneView(props: {
       cancelAnimationFrame(redecimate);
       setX.current = null;
       ro.disconnect();
+      root.removeEventListener('pointerdown', markDown, true);
+      root.removeEventListener('pointermove', markMove, true);
+      root.removeEventListener('pointerup', markUp, true);
+      root.removeEventListener('pointercancel', markUp, true);
       root.removeEventListener('pointerdown', selStart);
       window.removeEventListener('pointerup', selEnd);
       window.removeEventListener('pointercancel', selEnd);
@@ -1379,11 +1683,11 @@ function PaneView(props: {
     const u = chart.current;
     if (!u) return;
     if (zoomMode) return;
-    u.cursor.drag!.x = !cursorMode;
-    u.cursor.drag!.y = !cursorMode;
+    u.cursor.drag!.x = !(cursorMode || props.markerMode);
+    u.cursor.drag!.y = !(cursorMode || props.markerMode);
     if (!cursorMode) u.over.style.cursor = '';
     u.redraw(false);
-  }, [cursorMode, zoomMode]);
+  }, [cursorMode, zoomMode, props.markerMode]);
 
   // (al fijar el eje X, uPlot vuelve a calcular el Y: el rango de yRef o la autoescala)
   useEffect(() => {
@@ -1394,7 +1698,7 @@ function PaneView(props: {
 
   useEffect(() => {
     chart.current?.redraw(false);
-  }, [cursors, props.marks, props.previewX, props.samples?.from, props.samples?.fs, props.samples?.n]);
+  }, [cursors, props.markers, props.selMarker, props.marks, props.previewX, props.samples?.from, props.samples?.fs, props.samples?.n]);
 
   // corridas (pasos de .step, barridos .dc anidados) con el color de la primera traza
   const runLegend = data.curves.filter((c) => c.trace === data.curves[0]?.trace && c.axis === data.curves[0]?.axis && c.runLabel);
@@ -1730,4 +2034,67 @@ async function exportPng(panes: Pane[], data: PaneData[], charts: Map<number, uP
     y += u.ctx.canvas.height;
   });
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
+/** Lecturas de los markers: cada punto, los cortes de cada línea y las diferencias A/D */
+function MarkerTable({ markers, data, sel, onSelect, onClear }: { markers: Marker[]; data: PaneData[]; sel: Pick<Marker, 'kind' | 'id'> | null; onSelect(m: Marker): void; onClear(): void }) {
+  const rows: { m: Marker; trace: string; color?: string; x: string; y: string }[] = [];
+  const unitOf = (d: PaneData, axis: MarkerAxis) => (axis === 'ph' ? '°' : axis === 'i' ? d.iUnit : d.yUnit);
+  let a: { x: number; y: number; d: PaneData; axis: MarkerAxis } | undefined;
+  let dm: typeof a;
+  for (const m of markers) {
+    const d = data[m.pane];
+    if (!d) continue;
+    const xu = xUnit(d.xName);
+    if (m.kind === 'v')
+      for (const c of verticalCuts(m.x!, d.x, d.curves))
+        rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(m.x!, xu), y: fix(c.y, unitOf(d, c.axis)) });
+    else if (m.kind === 'h') {
+      const cuts = horizontalCuts(m.y!, m.axis ?? 'y', d.x, d.curves, 8);
+      if (!cuts.length) rows.push({ m, trace: '—', x: '—', y: fix(m.y!, unitOf(d, m.axis ?? 'y')) });
+      for (const c of cuts) rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(c.x, xu), y: fix(m.y!, unitOf(d, m.axis ?? 'y')) });
+    } else {
+      const c = d.curves.find((o) => o.label === m.trace);
+      const y = markerValue(m, d.x, d.curves);
+      rows.push({ m, trace: m.trace ?? '', color: c?.color, x: fix(m.x!, xu), y: fix(y, c ? unitOf(d, c.axis) : '') });
+      if (c && (m.kind === 'a' || m.kind === 'd')) (m.kind === 'a' ? (a = { x: m.x!, y, d, axis: c.axis }) : (dm = { x: m.x!, y, d, axis: c.axis }));
+    }
+  }
+  const dd = a && dm ? delta(a, dm) : null;
+  const xu = dm ? xUnit(dm.d.xName) : '';
+  return (
+    <div className="marker-readout">
+      <table className="scalars readout">
+        <thead>
+          <tr>
+            <th>{t('Marker')}</th>
+            <th>{t('Trace')}</th>
+            <th>X</th>
+            <th>Y</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, MAX_ROWS * 2).map((r, i) => (
+            <tr key={i} className={sel && sameMarker(r.m, sel) ? 'followed' : undefined} onClick={() => onSelect(r.m)}>
+              <td>{markerName(r.m)}</td>
+              <td style={{ color: r.color }}>{r.trace}</td>
+              <td>{r.x}</td>
+              <td>{r.y}</td>
+            </tr>
+          ))}
+          {dd && dm && (
+            <tr className="delta">
+              <td>D − A</td>
+              <td>{t('slope')} {fix(dd.slope)}</td>
+              <td>{fix(dd.dx, xu)}</td>
+              <td>{fix(dd.dy, unitOf(dm.d, dm.axis))}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      <div className="cursor-tools">
+        <button onClick={onClear}>{t('Clear the markers')}</button>
+      </div>
+    </div>
+  );
 }

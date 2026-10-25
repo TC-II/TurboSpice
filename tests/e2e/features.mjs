@@ -600,6 +600,61 @@ await page.getByRole('button', { name: 'Borrar B' }).click();
 check((await headB()) === undefined && (await headA()) === b2, 'borrar el cursor B');
 await page.getByRole('button', { name: 'Cursores' }).click();
 
+{
+  // markers como en ViVA: M sobre la traza bajo el mouse, V y H con sus cortes, A/D con sus diferencias
+  const names = () => page.locator('.pane-chart .uplot').first().evaluate((u) => u.dataset.markers ?? '');
+  const card = page.locator('section.readout-card[aria-label="Markers"]');
+  const rowsOf = async (name) => (await card.locator('tbody tr').allTextContents()).filter((r) => r.startsWith(name));
+  await page.getByRole('button', { name: 'Markers', exact: true }).click();
+  let r = await page.locator('.pane-chart').first().boundingBox();
+  await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5, { steps: 3 });
+  await page.keyboard.press('m');
+  await page.waitForTimeout(100);
+  check((await names()) === 'M1' && (await rowsOf('M1')).length === 1, `M pone un marker sobre la traza (${await names()})`);
+  r = await page.locator('.pane-chart').first().boundingBox();
+  await page.mouse.move(r.x + r.width * 0.5, r.y + r.height * 0.5, { steps: 3 });
+  await page.keyboard.press('v');
+  await page.keyboard.press('h');
+  await page.waitForTimeout(100);
+  check((await names()) === 'M1|V1|H1', `V y H ponen líneas (${await names()})`);
+  check((await rowsOf('V1')).length >= 2, `la línea V mide cada traza (${(await rowsOf('V1')).length} cortes)`);
+  check((await rowsOf('H1')).length >= 1, `la línea H mide dónde la cruzan (${await rowsOf('H1')})`);
+  // con Markers activo, A y D son markers (no la caja de expresiones ni bajar el panel)
+  await page.mouse.move(r.x + r.width * 0.2, r.y + r.height * 0.5, { steps: 3 });
+  await page.keyboard.press('a');
+  await page.mouse.move(r.x + r.width * 0.7, r.y + r.height * 0.5, { steps: 3 });
+  await page.keyboard.press('d');
+  await page.waitForTimeout(100);
+  const deltaRow = await card.locator('tr.delta').textContent().catch(() => '');
+  check((await names()).endsWith('A|D') && /D − A/.test(deltaRow) && /Hz/.test(deltaRow), `A y D con sus diferencias (${deltaRow})`);
+  check(!(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), 'con Markers activo, A no va a la caja de expresiones');
+  // un click (modo Markers) pone otro; Supr borra el seleccionado; arrastrar mueve una línea
+  r = await page.locator('.pane-chart').first().boundingBox();
+  // (lejos de la línea H, que está a media altura: un click sobre ella la selecciona)
+  await page.mouse.click(r.x + r.width * 0.85, r.y + r.height * 0.25);
+  await page.waitForTimeout(100);
+  check((await names()).includes('M2'), `un click con Markers pone un marker (${await names()})`);
+  await page.keyboard.press('Delete');
+  await page.waitForTimeout(100);
+  check(!(await names()).includes('M2') && (await page.locator('.pane').count()) >= 1, `Supr borra el marker seleccionado (${await names()})`);
+  const v0 = (await rowsOf('V1'))[0];
+  const ov = await page.locator('.pane-chart .uplot .u-over').first().boundingBox();
+  // (la línea V1 quedó a la mitad del área del gráfico)
+  await page.mouse.move(ov.x + ov.width * 0.5, ov.y + ov.height * 0.2);
+  await page.mouse.down();
+  await page.mouse.move(ov.x + ov.width * 0.6, ov.y + ov.height * 0.2, { steps: 5 });
+  await page.mouse.up();
+  check((await rowsOf('V1'))[0] !== v0, `arrastrar la línea V la mueve (${v0} → ${(await rowsOf('V1'))[0]})`);
+  await page.keyboard.press('Shift+M');
+  await page.waitForTimeout(100);
+  check((await names()) === '' && (await card.count()) === 0, 'Shift+M borra todos los markers');
+  await page.getByRole('button', { name: 'Markers', exact: true }).click();
+  await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5);
+  await page.keyboard.press('a');
+  check(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement), 'sin Markers, A vuelve a ir a la caja de expresiones');
+  await page.getByLabel('Expresión').blur();
+}
+
 const csv = await downloaded(() => resultsMenu(page, 'Exportar', 'Trazas a CSV'));
 check(csv.text.startsWith('frequency,V(out),V(out) (fase),V(out)/V(n001),V(out)/V(n001) (fase)\n'), `CSV (${csv.name}): ${csv.text.split('\n')[0]}`);
 const png = await downloaded(() => resultsMenu(page, 'Exportar', 'Gráfico a PNG'));

@@ -2580,8 +2580,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           switch (lk) {
             case 'z':
               return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
+            // con los markers activos, A y D ponen los markers A y D (como en ViVA)
             case 'a':
-              return act('addTrace');
+              return act(plotPanel.current?.markerMode() ? 'markA' : 'addTrace');
             case 'p':
               return act('addPane');
             case 'b':
@@ -2589,7 +2590,16 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             case 'u':
               return act('paneUp');
             case 'd':
-              return act('paneDown');
+              return act(plotPanel.current?.markerMode() ? 'markD' : 'paneDown');
+            case 'm':
+              return act(e.shiftKey ? 'clearMarkers' : 'markPoint');
+            case 'v':
+              return act('markV');
+            case 'h':
+              return act('markH');
+            case 'Delete':
+              if (plotPanel.current?.markerSelected()) return act('deleteMarker');
+              break;
             case 'Backspace':
               return act('removeTraces');
             case 'c':

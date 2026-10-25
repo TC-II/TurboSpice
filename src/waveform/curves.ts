@@ -2,7 +2,7 @@
 // lleva al eje X del plot mostrado. Separado del componente para poder testearlo.
 import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceExprUnit } from '../sim/deviceParams.ts';
-import { spectrum, thd } from './fft.ts';
+import { spectrum, thd, WINDOWS } from './fft.ts';
 import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
 import { PALETTE, isFftPane, sameExpr, sameFft, traceColor, type Pane, type PaneFft, type Trace } from './view.ts';
@@ -174,7 +174,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
 }
 
-const WINDOW_LABEL: Record<PaneFft['window'], string> = { hann: 'Hann', hamming: 'Hamming', blackman: 'Blackman', flattop: 'Flat top', rect: 'Rectangular' };
+const WINDOW_LABEL = Object.fromEntries(WINDOWS.map(([w, , short]) => [w, short])) as Record<PaneFft['window'], string>;
 
 /**
  * Nombre de una traza en la leyenda (#260): "FFT(I(R1))" para una FFT; si otra FFT de la misma

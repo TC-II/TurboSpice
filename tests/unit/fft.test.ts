@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { spectrum, thd } from '../../src/waveform/fft.ts';
+import { spectrum, thd, WINDOWS } from '../../src/waveform/fft.ts';
 
 // 20 ciclos de 1 kHz con paso no uniforme (como un transitorio)
 const t: number[] = [];
@@ -125,5 +125,30 @@ describe('identidad de las trazas y tipo de los paneles (#260)', async () => {
     const n = addTraceTo([{ traces: [hann] }], 0, 'V(b)');
     expect(n).toHaveLength(2);
     expect(n[1].traces[0].expr).toBe('V(b)');
+  });
+});
+
+describe('ventanas de la FFT', () => {
+  // 1 kHz de amplitud 1, muestreado parejo durante 10 ms (justo en un bin)
+  const N = 4096;
+  const x = Float64Array.from({ length: N }, (_, k) => (k * 10e-3) / N);
+  const sine = (f: number) => Float64Array.from(x, (tt) => Math.sin(2 * Math.PI * f * tt));
+  it('todas miden bien la amplitud de un seno', () => {
+    for (const [w] of WINDOWS) {
+      const s = spectrum(x, sine(1000), { window: w });
+      const peak = Math.max(...s.amp);
+      expect(peak, w).toBeGreaterThan(0.97);
+      expect(peak, w).toBeLessThan(1.03);
+    }
+  });
+  it('las de bajo derrame lo dejan muy por debajo de la rectangular', () => {
+    // 1050 Hz: entre dos bins, así la rectangular derrama a todo el espectro (más de 40 dB menos)
+    const far = (w: (typeof WINDOWS)[number][0]) => {
+      const s = spectrum(x, sine(1050), { window: w });
+      // lejos del tono (más de 20 kHz)
+      return Math.max(...s.amp.filter((_, k) => s.freq[k] > 20e3));
+    };
+    const rect = far('rect');
+    for (const w of ['blackmanharris', 'nuttall', 'blackmannuttall', 'kaiser'] as const) expect(far(w), w).toBeLessThan(rect / 100);
   });
 });

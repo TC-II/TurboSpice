@@ -72,7 +72,9 @@ await page.keyboard.press('Escape');
 await page.setViewportSize({ width: 375, height: 760 });
 await page.waitForTimeout(300);
 const overflow = await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector('.appbar .iconbar').scrollWidth, document.querySelector('.appbar').scrollWidth]);
-check(overflow.every((w) => w <= 375), `en 375 px no hay desborde (${overflow.join(', ')})`);
+// (si desborda, qué elementos de la barra pasan del borde)
+const past = await page.evaluate(() => [...document.querySelectorAll('.appbar *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => `${e.tagName.toLowerCase()}.${e.className}@${Math.round(e.getBoundingClientRect().left)}-${Math.round(e.getBoundingClientRect().right)}`).slice(0, 8));
+check(overflow.every((w) => w <= 375), `en 375 px no hay desborde (${overflow.join(', ')}${past.length ? `: ${past.join(' ')}` : ''})`);
 await page.getByRole('button', { name: 'Más herramientas' }).click();
 await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exact: true }).click();
 check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');

@@ -4,6 +4,7 @@ import type { Resolver, Wave } from '../waveform/expr.ts';
 import { deviceVector, elementVector, netVector, type BuiltSimulation } from './schematicSim.ts';
 import { blockInstances, hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
 import { deviceParams, deviceTraceName, parseDeviceVector } from './deviceParams.ts';
+import { busRange, joinBits } from '../waveform/digital.ts';
 
 /** Parámetro de dispositivo de ngspice para Ic, Ib, Id… */
 const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id', ig: 'ig', is: 'is' };
@@ -49,8 +50,15 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
   };
   return (fn, args) => {
     const f = fn.toLowerCase();
-    // nodo digital (#209): Dig(q), con el mismo alcance de nombres que V()
-    if (f === 'dig') return wave(findDigital(plot, netVector(args[0])) ?? findDigital(plot, args[0]));
+    // nodo digital (#209): Dig(q), con el mismo alcance de nombres que V(); Dig(x1.q[3:0]) es el bus
+    // de los bits x1.q_3_d … x1.q_0_d
+    if (f === 'dig') {
+      const one = (n: string) => findDigital(plot, netVector(n)) ?? findDigital(plot, n);
+      const bus = busRange(args[0]);
+      if (!bus) return wave(one(args[0]));
+      const bits = bus.bits.map((b) => one(`${bus.base}_${b}_d`));
+      return bits.every((b) => b) ? { re: joinBits(bits.map((b) => b!.real)) } : null;
+    }
     if (f === 'v') {
       const a = node(args[0]);
       if (!a || args.length < 2) return a;

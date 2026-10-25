@@ -10,6 +10,8 @@ import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { extent, panBy, zoomAbout } from './scales.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
+import { DigitalLanes } from './DigitalLanes.tsx';
+import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
 import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
 import { WINDOWS, type FftWindow } from './fft.ts';
 import { Icon } from '../ui/icons.tsx';
@@ -181,10 +183,11 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? { ...p, ...f(p) } : p)));
   const moveTrace = (from: number, ti: number, to: number) => {
-    // (entre un panel de tiempo y uno de FFT no: la traza cambiaría de significado; a uno vacío sí, #260)
+    // (entre un panel de tiempo y uno de FFT no: la traza cambiaría de significado; a uno vacío sí, #260;
+    // lo digital no comparte ejes con lo analógico, #209)
     const tt = panes[from]?.traces[ti];
     if (!tt || from === to || !acceptsTrace(panes[to], tt) || panes[to].traces.some((o) => sameTrace(o, tt))) return;
-    setPanes(panes.map((p, k) => (k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { ...p, traces: [...p.traces, tt] } : p)));
+    setPanes(panes.map((p, k) => (k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { ...p, traces: [...p.traces, tt], digital: panes[from].digital } : p)));
   };
   /** FFT de una traza: traza nueva en el panel de FFT del mismo rango y ventana, o en uno nuevo debajo */
   const addFft = (expr: string) => {
@@ -1075,7 +1078,7 @@ function PaneView(props: {
 
   return (
     <div
-      className={`pane${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
+      className={`pane${pane.digital ? ' digital' : ''}${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
       onPointerDown={props.onActivate}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/x-trace')) {
@@ -1136,8 +1139,30 @@ function PaneView(props: {
               >
                 {props.labelOf(tt)}
               </button>
+              {/* un bus (#209): en qué radix se muestra */}
+              {pane.digital && (c?.bits ?? 1) > 1 && (
+                <select
+                  className="radix"
+                  value={tt.radix ?? 'hex'}
+                  aria-label={t('Radix of {expr}', { expr: tt.expr })}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, radix: e.target.value as Radix } : x)) }))}
+                >
+                  {RADIXES.map((r) => (
+                    <option key={r} value={r}>
+                      {radixLabel[r]}
+                    </option>
+                  ))}
+                </select>
+              )}
               {/* el lugar del valor queda reservado aunque el mouse no esté sobre el gráfico */}
-          {err ? <span className="err">{err}</span> : <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>}
+          {err ? (
+            <span className="err">{err}</span>
+          ) : pane.digital ? (
+            <span className={`val${hover === null ? ' idle' : ''}`}>{hover === null ? ' ' : formatRadix(v, c?.bits ?? 1, tt.radix)}</span>
+          ) : (
+            <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>
+          )}
               <button className="x" aria-label={t('Remove {expr}', { expr: props.labelOf(tt) })} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
                 ✕
               </button>
@@ -1167,7 +1192,20 @@ function PaneView(props: {
       {data.info?.map((l) => (
         <p key={l} className="hint plot-info fft-info">{l}</p>
       ))}
-      {data.curves.length ? (
+      {pane.digital && data.curves.length ? (
+        <DigitalLanes
+          x={data.x}
+          curves={data.curves}
+          radix={(i) => pane.traces[i]?.radix}
+          xRange={xRange}
+          cursors={cursors}
+          cursorMode={cursorMode}
+          onCursor={onCursor}
+          onZoom={props.onZoom}
+          onWheelZoom={props.onWheelZoom}
+          onHover={setHover}
+        />
+      ) : data.curves.length ? (
         <div
           className={`pane-chart${cursorMode ? ' cursor-mode' : ''}`}
           ref={host}

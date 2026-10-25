@@ -823,11 +823,10 @@ export interface UserFileInfo {
 }
 
 /** Símbolos, modelos y bloques propios del usuario (guardados en el navegador) */
-export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose, project, onEditVerilog, onNewVerilog }: {
+export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose, project, onEditVerilog }: {
   files: UserFileInfo[];
-  /** Verilog del proyecto (#209): editar uno o crear uno nuevo */
+  /** módulo Verilog del proyecto (#209): abrirlo (código y síntesis) */
   onEditVerilog?(name: string): void;
-  onNewVerilog?(): void;
   /** los del proyecto (#155): se guardan en el .turbo, sin bloques .asc */
   project?: string;
   hasSymbol(name: string): boolean;
@@ -866,7 +865,7 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
                 {kind === 'verilog' && (
                   <div className="uf-items">
                     <span className="hint">{f.items.length ? t('Pins: {pins}', { pins: f.items.join(' ') }) : t('Not synthesized yet')}</span>
-                    {onEditVerilog && <button onClick={() => onEditVerilog(f.name)}>{t('Edit')}</button>}
+                    {onEditVerilog && <button onClick={() => onEditVerilog(f.name)}>{t('Open')}</button>}
                   </div>
                 )}
                 {kind === 'schematic' && (
@@ -903,7 +902,6 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
       )}
       <div className="buttons left">
         <button className="primary" onClick={() => input.current?.click()}>{t('Add files…')}</button>
-        {onNewVerilog && <button onClick={onNewVerilog} title={t('A digital block described in Verilog, simulated with XSPICE')}>{t('New Verilog file…')}</button>}
         <input
           ref={input}
           type="file"
@@ -919,7 +917,7 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
       </div>
       {section('symbol', t('Symbols'), t('None yet.'))}
       {section('model', t('Models and subcircuits'), t('None yet.'))}
-      {project && section('verilog', t('Verilog (digital blocks)'), t('None yet.'))}
+      {project && section('verilog', t('Verilog modules'), t('None yet: create one with «+ New» in the project panel.'))}
       {!project && section('schematic', t('Hierarchical blocks (.asc)'), t('None yet.'))}
       <div className="buttons">
         <button className="primary" onClick={onClose}>{t('Close')}</button>

@@ -179,7 +179,7 @@ export class Library implements SymbolSource {
   }
 
   /** Símbolos y modelos del proyecto abierto (reemplazan a los anteriores) */
-  setProjectFiles(files: { name: string; kind: 'symbol' | 'model' | 'schematic' | 'verilog'; text: string }[]): void {
+  setProjectFiles(files: { name: string; kind: 'symbol' | 'model' | 'schematic' | 'verilog'; text: string; synth?: { subckt: string } }[]): void {
     for (const k of this.projSymbols.keys()) this.cache.delete(`project:${k}`);
     this.projSymbols.clear();
     this.projModels.clear();
@@ -189,8 +189,12 @@ export class Library implements SymbolSource {
     for (const f of files) {
       if (f.kind === 'symbol') this.projSymbols.set(f.name.replace(/\.asy$/i, '').toLowerCase(), f.text);
       else if (f.kind === 'schematic') this.projSchematics.set(f.name.replace(/\.asc$/i, '').toLowerCase(), { name: f.name, text: f.text });
-      // el Verilog (#209) se simula por el .sub que genera
-      else if (f.kind === 'verilog') continue;
+      // un módulo Verilog (#209) se simula con su síntesis: es el <módulo>.sub que nombra su símbolo
+      else if (f.kind === 'verilog') {
+        if (!f.synth) continue;
+        const name = `${f.name.replace(/\.s?v$/i, '')}.sub`;
+        this.projModels.set(name.toLowerCase(), { name, text: f.synth.subckt, ...scanModels(f.synth.subckt) });
+      }
       else this.projModels.set(f.name.toLowerCase(), { name: f.name, text: f.text, ...scanModels(f.text) });
     }
   }

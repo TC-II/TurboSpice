@@ -1,0 +1,141 @@
+diff --git a/vvp/lib_main.cc b/vvp/lib_main.cc
+index 3e1832b..d116a98 100644
+--- a/vvp/lib_main.cc
++++ b/vvp/lib_main.cc
+@@ -329,6 +329,52 @@ void vvp_init(const char *logfile_name, int argc, char*argv[])
+       compile_init();
+ }
+ 
++/* TurboSpice (#209): vvp_run() en partes, para correr sin hilos dentro de otro simulador (el
++ * d_cosim de ngspice en WebAssembly): vvp_run_begin() compila y prepara, vvp_run_resume() corre
++ * hasta que un callback pide una pausa (vvp_request_yield) o termina, vvp_run_end() cierra. */
++extern "C" int vvp_run_begin(const char *design_path)
++{
++      int ret_cd;
++
++      if (vvp_used++ != 1) {
++          if (vvp_used == 1)
++              fprintf(stderr, "vvp_init() has not been called\n");
++          else
++              report_used();
++          return 1;
++      }
++      ++vvp_used;
++
++      ret_cd = compile_design(design_path);
++      destroy_lexor();
++      print_vpi_call_errors();
++      if (ret_cd) return ret_cd;
++
++      compile_cleanup();
++
++      if (compile_errors > 0) {
++	    vpi_mcd_printf(1, "%s: Program not runnable, %u errors.\n",
++		    design_path, compile_errors);
++	    final_cleanup();
++	    return compile_errors;
++      }
++      schedule_simulate_begin();
++      return 0;
++}
++
++/* 1: pausado; 0: terminó */
++extern "C" int vvp_run_resume(void)
++{
++      return schedule_simulate_step() ? 1 : 0;
++}
++
++extern "C" int vvp_run_end(void)
++{
++      schedule_simulate_end();
++      final_cleanup();
++      return vvp_return_value;
++}
++
+ int vvp_run(const char *design_path)
+ {
+       struct rusage cycles[3];
+diff --git a/vvp/schedule.cc b/vvp/schedule.cc
+index d15672a..b85cc34 100644
+--- a/vvp/schedule.cc
++++ b/vvp/schedule.cc
+@@ -1126,9 +1126,18 @@ static void run_rosync(struct event_time_s*ctim)
+       }
+ }
+ 
+-void schedule_simulate(void)
++/* TurboSpice (#209): la simulación se puede correr por partes, sin hilos. Un callback de VPI pide
++ * una pausa con vvp_request_yield(); schedule_simulate_step() vuelve después del evento que la
++ * pidió y la próxima llamada sigue desde ahí. schedule_simulate() hace lo mismo que antes. */
++static bool vvp_yield_requested = false;
++static bool run_finals;
++extern "C" void vvp_request_yield(void)
++{
++      vvp_yield_requested = true;
++}
++
++void schedule_simulate_begin(void)
+ {
+-      bool run_finals;
+       sim_started = false;
+ 
+       schedule_time = 0;
+@@ -1174,7 +1183,11 @@ void schedule_simulate(void)
+       // If there were no compiletf, etc. errors then we are going to
+       // process events and when done run the final blocks.
+       run_finals = schedule_runnable;
++}
+ 
++/* true: pausado (vvp_request_yield); false: terminó */
++bool schedule_simulate_step(void)
++{
+       if (schedule_runnable) while (sched_list) {
+ 
+ 	    if (schedule_stopped_flag) {
+@@ -1264,8 +1277,17 @@ void schedule_simulate(void)
+ 	    cur->run_run();
+ 
+ 	    delete (cur);
++
++	    if (vvp_yield_requested) {
++		  vvp_yield_requested = false;
++		  return true;
++	    }
+       }
++      return false;
++}
+ 
++void schedule_simulate_end(void)
++{
+ 	// Execute final events.
+       schedule_runnable = run_finals;
+       while (schedule_runnable && schedule_final_list) {
+@@ -1292,6 +1314,13 @@ void schedule_simulate(void)
+ #endif
+ }
+ 
++void schedule_simulate(void)
++{
++      schedule_simulate_begin();
++      while (schedule_simulate_step()) ;
++      schedule_simulate_end();
++}
++
+ #ifdef CHECK_WITH_VALGRIND
+ void schedule_delete(void)
+ {
+diff --git a/vvp/schedule.h b/vvp/schedule.h
+index 6a8749c..e32cffe 100644
+--- a/vvp/schedule.h
++++ b/vvp/schedule.h
+@@ -171,6 +171,10 @@ struct vvp_gen_event_s
+  * the simulation is otherwise finished.
+  */
+ extern void schedule_simulate(void);
++/* TurboSpice: la misma simulación por partes (ver schedule.cc) */
++extern void schedule_simulate_begin(void);
++extern bool schedule_simulate_step(void);
++extern void schedule_simulate_end(void);
+ 
+ /*
+  * Get the current absolute simulation time. This is not used

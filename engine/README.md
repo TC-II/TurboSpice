@@ -32,7 +32,7 @@ y los `.cm` en `/usr/local/lib/ngspice/` del FS virtual antes de `ngSpice_Init`.
 - **`-fPIC`** en C y C++ (HICUM es C++) porque el módulo principal usa enlace dinámico.
 - **Sin hilos**: sin `-pthread` → no se necesitan headers COOP/COEP (GitHub Pages no los permite).
   Se usa `run` sincrónico dentro de un Web Worker; nunca `bg_run`. Abortar = `worker.terminate()`.
-- **Excluido**: `src/xspice/verilog` (puente con Icarus para `d_cosim`, plugin nativo).
+- **Icarus** (#209): en `engine/icarus/`, ver `docs/mixed-signal.md` (el `src/xspice/verilog` de ngspice usa hilos: se reemplaza).
 - **OSDI (Verilog-A)**: anda en wasm. Un `.osdi` compilado como side module wasm32 se carga con
   `pre_osdi` como los `.cm`. `engine/osdi/build-openvaf.sh` compila OpenVAF-Reloaded con el parche
   `openvaf-wasm32.patch` (destino `wasm32-unknown-emscripten`; necesita Rust, LLVM 21 y emsdk):

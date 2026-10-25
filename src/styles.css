@@ -705,8 +705,11 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
 @media (max-width: 720px) {
   .appbar { gap: 8px; padding: 6px 8px; }
   .appbar .tabs button { padding: 4px 6px; }
-  /* las herramientas no se achican por debajo del botón «Más herramientas»: si no entran, pasan de fila */
-  .appbar-tools { min-width: max-content; }
+  /* las herramientas no se achican por debajo de lo que nunca se esconde (el grupo fijo y «Más
+     herramientas», 76 px): si no entran, pasan de fila. (.appbar adelante: si no, la regla general
+     .appbar-tools { min-width: 0 }, que está más abajo, la pisa; max-content tampoco alcanza: el
+     contenido de la barra no tiene ancho propio) */
+  .appbar .appbar-tools { min-width: 80px; }
   .share-btn { padding: 4px 6px; }
   .iconbar { padding: 4px 8px; }
   .iconbar .txt, .share-btn .txt { display: none; }

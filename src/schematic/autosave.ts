@@ -6,7 +6,9 @@ import type { AscEncoding } from '../asc/encoding.ts';
 import type { SimList } from '../sim/simList.ts';
 import type { PlotView } from '../waveform/view.ts';
 
-const DB = 'turbospice';
+// la versión dev (tc-ii.github.io/TurboSpice/dev/) comparte el origen con la estable: base propia
+// para que su autoguardado y sus recientes no pisen los de la estable
+const DB = import.meta.env.VITE_CHANNEL === 'dev' ? 'turbospice-dev' : 'turbospice';
 const STORE = 'kv';
 const SESSION = 'session';
 const RECENT = 'recent';

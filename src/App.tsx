@@ -1966,6 +1966,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const first = nav?.firstElementChild;
       if (!nav || !first) return;
       nav.style.marginLeft = '';
+      // en pantallas angostas la barra se reacomoda: correrlas la haría desbordar
+      if (matchMedia('(max-width: 700px)').matches) return;
       const treeW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tree-w'));
       const gap = parseFloat(getComputedStyle(nav).columnGap) || 0;
       const shift = treeW - (first.getBoundingClientRect().right + gap / 2);
@@ -1973,6 +1975,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     };
     align();
     document.fonts?.ready.then(align);
+    addEventListener('resize', align);
+    return () => removeEventListener('resize', align);
   });
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 

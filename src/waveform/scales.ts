@@ -42,3 +42,13 @@ export function panBy(min: number, max: number, f: number, log = false, bounds?:
   return log ? [10 ** a, 10 ** b] : [a, b];
 }
 
+
+/**
+ * Factor de zoom de un evento de la rueda (<1 acerca): proporcional a cuánto giró, así una rueda
+ * fina (muchos eventos chicos) y una con muescas (pocos grandes) acercan lo mismo por vuelta.
+ * Las líneas (Firefox) y las páginas se pasan a píxeles. `delta` reemplaza a deltaY.
+ */
+export function wheelZoom(e: { deltaY: number; deltaMode: number }, delta = e.deltaY): number {
+  const px = delta * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1);
+  return Math.exp(px * 0.0015);
+}

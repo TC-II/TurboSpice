@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Curve } from './curves.ts';
 import { formatRadix, type Radix } from './digital.ts';
 import { si } from './series.ts';
+import { wheelZoom } from './scales.ts';
 import { cursorForClick, type Cursors } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -57,7 +58,7 @@ function niceTicks(a: number, b: number, n = 6): number[] {
  * bajo (desconocido o Z: una raya al medio); un bus, como tramos con su valor en el radix de la
  * traza. Comparte con los paneles analógicos el rango en X, el zoom y los cursores.
  */
-export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, onHover }: {
+export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, pendingX, onHover }: {
   x: Float64Array;
   curves: Curve[];
   /** radix de cada traza (por índice de traza del panel) */
@@ -68,6 +69,8 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
   onCursor(c: Partial<Cursors>): void;
   onZoom(r: Range | null): void;
   onWheelZoom(r: Range | null): void;
+  /** rango de X pedido por la rueda y todavía no aplicado (v: null = sin zoom) */
+  pendingX?(): { v: Range | null } | undefined;
   /** índice del punto bajo el mouse (para los valores de la leyenda) */
   onHover(i: number | null): void;
 }) {
@@ -136,10 +139,13 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
       onWheel={(e) => {
         const p = local(e);
         if (p < LABEL) return;
-        const c = val(p);
-        const k = e.deltaY > 0 ? 1.25 : 0.8;
-        const a = c - (c - x0) * k;
-        const b = c + (x1 - c) * k;
+        // (parte de lo pedido y todavía no aplicado: varios eventos por cuadro se acumulan)
+        const pend = pendingX?.();
+        const [s0, s1] = pend ? (pend.v ?? full) : [x0, x1];
+        const c = s0 + ((p - LABEL) / W) * (s1 - s0);
+        const k = wheelZoom(e);
+        const a = c - (c - s0) * k;
+        const b = c + (s1 - c) * k;
         onWheelZoom(a <= full[0] && b >= full[1] ? null : [Math.max(full[0], a), Math.min(full[1], b)]);
       }}
     >

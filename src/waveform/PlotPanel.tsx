@@ -1,14 +1,14 @@
 // Visor de resultados: paneles apilados con eje X compartido, trazas como expresiones,
 // Bode (magnitud y fase), cursores, medidas rápidas y exportación a CSV/PNG.
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { extent, panBy, zoomAbout } from './scales.ts';
+import { extent, panBy, wheelZoom, zoomAbout } from './scales.ts';
 import { decimator } from './decimate.ts';
 import { axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
@@ -178,8 +178,47 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   // (los gráficos guardan los callbacks de cuando se crearon: el zoom actual va por refs)
   const zoomNow = useRef({ x: xRange, y: yRanges });
   zoomNow.current = { x: xRange, y: yRanges };
+  // Rueda y paneo: muchos eventos seguidos (una rueda fina manda varios por cuadro) se acumulan y
+  // se aplican una vez por cuadro; si no, cada uno redibujaba todos los paneles
+  const wheel = useRef<{ raf: number; x?: { v: Range | null }; y: Record<number, Range>; r: Record<number, Range>; f: Record<number, Range | null> }>({ raf: 0, y: {}, r: {}, f: {} });
+  const flushWheel = () => {
+    const w = wheel.current;
+    cancelAnimationFrame(w.raf);
+    const { x, y, r, f } = w;
+    wheel.current = { raf: 0, y: {}, r: {}, f: {} };
+    // (flushSync: React y uPlot dibujan en este cuadro)
+    flushSync(() => {
+      if (x) {
+        zoomNow.current = { ...zoomNow.current, x: x.v };
+        setXRange(x.v);
+      }
+      if (Object.keys(y).length) {
+        zoomNow.current = { ...zoomNow.current, y: { ...zoomNow.current.y, ...y } };
+        setYRanges(zoomNow.current.y);
+      }
+      if (Object.keys(r).length) setRRanges((old) => ({ ...old, ...r }));
+      for (const [k, v] of Object.entries(f)) setFRange(+k, v);
+    });
+  };
+  const queueWheel = (f: (w: typeof wheel.current) => void) => {
+    f(wheel.current);
+    wheel.current.raf ||= requestAnimationFrame(flushWheel);
+  };
+  /** lo acumulado y sin aplicar del panel i (los manejadores de la rueda parten de ahí) */
+  const wheelPending = (i: number) => {
+    const w = wheel.current;
+    return { x: isF(i) ? (i in w.f ? { v: w.f[i] } : undefined) : w.x, y: w.y[i], r: w.r[i] };
+  };
+  /** otro cambio de zoom (recuadro, ajustar, deshacer): lo acumulado ya no vale */
+  const dropWheel = () => {
+    cancelAnimationFrame(wheel.current.raf);
+    wheel.current = { raf: 0, y: {}, r: {}, f: {} };
+  };
+  useEffect(() => () => cancelAnimationFrame(wheel.current.raf), []);
+
   /** Cambio de zoom que se deshace con Shift+Z */
   const zoomTo = (x: Range | null, y: Record<number, Range> = zoomNow.current.y) => {
+    dropWheel();
     const cur = zoomNow.current;
     const same = (a: Range | null, b: Range | null) => (a && b ? a[0] === b[0] && a[1] === b[1] : a === b);
     if (same(x, cur.x) && y === cur.y) return;
@@ -286,6 +325,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           return setZoomMode(true);
         case 'zoomPrev': {
           const prev = zoomHistory.current.pop();
+          dropWheel();
           if (prev) {
             zoomNow.current = prev;
             setXRange(prev.x);
@@ -450,16 +490,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             yRange={yRanges[i] ?? null}
             rRange={rRanges[i] ?? null}
             onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : (setRRanges({}), zoomTo(null, {})))}
-            onWheelZoom={(r) => {
-              if (isF(i)) return setFRange(i, r);
-              zoomNow.current = { ...zoomNow.current, x: r };
-              setXRange(r);
-            }}
-            onWheelY={(r) => {
-              zoomNow.current = { ...zoomNow.current, y: { ...zoomNow.current.y, [i]: r } };
-              setYRanges(zoomNow.current.y);
-            }}
-            onWheelR={(r) => setRRanges((old) => ({ ...old, [i]: r }))}
+            onWheelZoom={(r) => queueWheel((w) => (isF(i) ? (w.f[i] = r) : (w.x = { v: r })))}
+            onWheelY={(r) => queueWheel((w) => (w.y[i] = r))}
+            onWheelR={(r) => queueWheel((w) => (w.r[i] = r))}
+            wheelPending={() => wheelPending(i)}
             onBoxZoom={(x, y) => {
               setZoomMode(false);
               if (isF(i)) {
@@ -539,6 +573,8 @@ function PaneView(props: {
   /** eje derecho (corrientes o fase) fijo por la rueda sobre él; null = todo el rango */
   rRange: Range | null;
   onWheelR(r: Range): void;
+  /** rangos pedidos por la rueda o el paneo que todavía no se aplicaron (x: null = sin zoom) */
+  wheelPending(): { x?: { v: Range | null }; y?: Range; r?: Range };
   /** recuadro arrastrado */
   onBoxZoom(x: Range, y: Range): void;
   zoomMode: boolean;
@@ -999,39 +1035,51 @@ function PaneView(props: {
     };
     // rueda: zoom en X alrededor del cursor; sobre el eje Y (o con Shift), zoom en Y de este panel;
     // Ctrl+rueda: desplaza en X
+    /** rango de una escala contando lo pedido y todavía no aplicado */
+    const now = (k: 'x' | 'y' | 'r'): Range | null => {
+      const p = live.current.wheelPending();
+      if (k === 'x' && p.x) return p.x.v ?? home;
+      if (k !== 'x' && p[k]) return p[k]!;
+      const { min, max } = u.scales[k === 'r' ? rightScale : k] ?? {};
+      return min != null && max != null ? [min, max] : null;
+    };
+    /** valor a la fracción f del rango (en escala log, en décadas) */
+    const lerp = ([lo, hi]: Range, f: number, log = false) => (log ? 10 ** (Math.log10(lo) + (Math.log10(hi) - Math.log10(lo)) * f) : lo + (hi - lo) * f);
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = over.getBoundingClientRect();
-      const k = Math.exp(e.deltaY * 0.0015);
+      const k = wheelZoom(e);
+      // (fracción del área bajo el mouse: desde abajo en Y, desde la izquierda en X)
+      const fy = r.height > 0 ? 1 - Math.min(Math.max(e.clientY - r.top, 0), r.height) / r.height : 0.5;
+      const fx = r.width > 0 ? Math.min(Math.max(e.clientX - r.left, 0), r.width) / r.width : 0.5;
       const onYAxis = e.clientX < r.left;
       if (e.ctrlKey) {
         // Ctrl+rueda: desplaza la vista en X sin cambiar el zoom (y sin el zoom del navegador)
-        const { min, max } = u.scales.x;
-        if (min == null || max == null) return;
-        const [lo, hi] = panBy(min, max, (e.deltaY || e.deltaX) * 0.001, data.log, [x0, x1]);
-        if (lo !== min || hi !== max) live.current.onWheelZoom(toX(lo, hi));
+        const cur = now('x');
+        if (!cur) return;
+        const [lo, hi] = panBy(cur[0], cur[1], Math.log(wheelZoom(e, e.deltaY || e.deltaX)) / 1.5, data.log, [x0, x1]);
+        if (lo !== cur[0] || hi !== cur[1]) live.current.onWheelZoom(toX(lo, hi));
         return;
       }
       if (axisAt(e) === 'right') {
         // eje derecho (corrientes o fase): su propia escala
-        const { min, max } = u.scales[rightScale];
-        if (min == null || max == null) return;
-        const [lo, hi] = zoomAbout(min, max, u.posToVal(Math.min(Math.max(e.clientY - r.top, 0), r.height), rightScale), k);
+        const cur = now('r');
+        if (!cur) return;
+        const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fy), k);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelR([lo, hi]);
         return;
       }
       if (e.clientX > r.right) return; // a la derecha, sin eje derecho: nada
       if (onYAxis || e.shiftKey) {
-        const { min, max } = u.scales.y;
-        if (min == null || max == null) return;
-        const [lo, hi] = zoomAbout(min, max, u.posToVal(Math.min(Math.max(e.clientY - r.top, 0), r.height), 'y'), k);
+        const cur = now('y');
+        if (!cur) return;
+        const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fy), k);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
         return;
       }
-      const { min, max } = u.scales.x;
-      if (min == null || max == null) return;
-      const at = u.posToVal(Math.min(Math.max(e.clientX - r.left, 0), r.width), 'x');
-      const [lo, hi] = zoomAbout(min, max, at, k, data.log);
+      const cur = now('x');
+      if (!cur) return;
+      const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fx, data.log), k, data.log);
       live.current.onWheelZoom(toX(lo, hi));
     };
     // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece
@@ -1256,6 +1304,7 @@ function PaneView(props: {
           onCursor={onCursor}
           onZoom={props.onZoom}
           onWheelZoom={props.onWheelZoom}
+          pendingX={() => props.wheelPending().x}
           onHover={setHover}
         />
       ) : data.curves.length ? (

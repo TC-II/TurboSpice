@@ -57,10 +57,12 @@ export const withParams = (text: string, ps: [string, string][]) =>
 
 /** Símbolo nuevo del módulo: entradas a la izquierda; inout y salidas a la derecha */
 export function verilogSymbol(name: string, block: Pick<HdlBlock, 'pins' | 'params'>): string {
+  // un pin por puerto: los buses en un solo pin (q[3:0]), como en LTspice
+  const ports = portsOf(block.pins);
   const text = makeSymbol({
     name,
-    pins: block.pins.map((p) => p.name),
-    leftCount: block.pins.filter((p) => p.dir === 'in').length,
+    pins: ports.map((p) => p.name),
+    leftCount: ports.filter((p) => p.dir === 'in').length,
     modelFile: `${name}.sub`,
     description: t('Verilog module {name}', { name }),
   });
@@ -81,8 +83,9 @@ export function applySynth(p: Project, name: string, text: string, block: HdlBlo
   // repartidos); uno editado conserva su dibujo y la posición de los pines que siguen
   const noParams = (text: string) => text.split('\n').filter((l) => !/^SYMATTR SpiceLine /.test(l)).join('\n');
   const generated = !!sym && !!file.synth && noParams(sym.text) === noParams(verilogSymbol(name, file.synth));
+  const symPins = verilogSymbolPorts(block.pins, sym?.text);
   const nextSym = sym && !generated
-    ? withParams(syncPins(sym.text, block.pins.map((x) => ({ name: x.name, dir: IOPIN[x.dir] }))), symbolParams(symParams(sym.text), block))
+    ? withParams(syncPins(sym.text, symPins), symbolParams(symParams(sym.text), block))
     : withParams(verilogSymbol(name, block), symbolParams(sym ? symParams(sym.text) : [], block));
   const files = p.files.map((f) => (f === file ? { ...f, text, synth } : f === sym ? { ...f, text: nextSym } : f));
   if (!sym) files.push({ name: asyName, kind: 'symbol', text: nextSym });
@@ -122,8 +125,20 @@ export function addVerilogModule(p: Project, name: string, text = verilogTemplat
   return { ...p, modified: Date.now(), files: [...p.files, { name: `${name}.v`, kind: 'verilog', text }] };
 }
 
-/** Pines del módulo (de su última síntesis) con la dirección como la de un puerto de esquemático */
-export const verilogPorts = (f: ProjectFile) => (f.synth?.pins ?? []).map((x) => ({ name: x.name, dir: IOPIN[x.dir] }));
+/**
+ * Pines del símbolo de un módulo (de su última síntesis), con la dirección como la de un puerto de
+ * esquemático: un pin por bus (q[3:0]), como en LTspice. Un símbolo de antes, con un pin por bit
+ * (q_3 … q_0), los conserva así para no desconectar las instancias que ya están cableadas.
+ */
+export function verilogSymbolPorts(pins: { name: string; dir: PinDir }[], symText?: string): { name: string; dir: string }[] {
+  const ports = portsOf(pins);
+  const symPins = new Set(symText ? [...symText.matchAll(/^PINATTR PinName (.*)$/gm)].map((m) => m[1].trim()) : []);
+  const perBit = ports.length < pins.length && pins.every((x) => symPins.has(x.name));
+  return (perBit ? pins : ports).map((x) => ({ name: x.name, dir: IOPIN[x.dir] }));
+}
+
+/** Pines del símbolo de un módulo Verilog del proyecto (ver verilogSymbolPorts) */
+export const verilogPorts = (f: ProjectFile, symText?: string) => verilogSymbolPorts(f.synth?.pins ?? [], symText);
 
 /**
  * Módulo de más arriba de un archivo Verilog: el que ningún otro del archivo instancia (si hay
@@ -141,3 +156,19 @@ export function topModuleOf(text: string): string | undefined {
   return tops.at(-1) ?? names.at(-1);
 }
 
+/**
+ * Puertos del módulo (para mostrarlos y para los pines del símbolo): los bits de un bus (q_3 … q_0, como los deja la síntesis)
+ * (del más alto al más bajo) vuelven a juntarse en q[3:0].
+ */
+export function portsOf(pins: { name: string; dir: 'in' | 'out' | 'inout' }[]): { name: string; dir: 'in' | 'out' | 'inout'; bits: number }[] {
+  const out: { name: string; dir: 'in' | 'out' | 'inout'; bits: number; base?: string; hi?: number; lo?: number }[] = [];
+  for (const p of pins) {
+    const m = /^(.+)_(\d+)$/.exec(p.name);
+    const last = out.at(-1);
+    if (m && last?.base === m[1] && last.dir === p.dir && last.lo !== undefined && +m[2] === last.lo - 1) {
+      last.lo = +m[2];
+      last.bits++;
+    } else out.push(m ? { name: p.name, dir: p.dir, bits: 1, base: m[1], hi: +m[2], lo: +m[2] } : { name: p.name, dir: p.dir, bits: 1 });
+  }
+  return out.map(({ base, hi, lo, ...p }) => (base !== undefined && p.bits > 1 ? { ...p, name: `${base}[${hi}:${lo}]` } : p));
+}

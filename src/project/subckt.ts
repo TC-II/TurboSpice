@@ -46,7 +46,7 @@ export function symbolOutdated(p: Project, name: string): boolean {
   const sch = moduleFile(p, name);
   const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(name));
   // (un módulo Verilog tiene símbolo desde que se sintetiza, y la síntesis lo pone al día)
-  if (sch?.kind === 'verilog') return !!sym && !!sch.synth?.pins.length && portsDiffer(verilogPorts(sch).map((x) => x.name), symbolPins(sym.text));
+  if (sch?.kind === 'verilog') return !!sym && !!sch.synth?.pins.length && portsDiffer(verilogPorts(sch, sym.text).map((x) => x.name), symbolPins(sym.text));
   if (!sch || !sym) return !!sch;
   return portsDiffer(subcktPorts(parseAsc(sch.text)), symbolPins(sym.text));
 }
@@ -70,7 +70,7 @@ export const updateSymbol = (p: Project, name: string): Project => {
   const v = moduleFile(p, name);
   if (v?.kind === 'verilog') {
     const sym = p.files.find((x) => x.kind === 'symbol' && key(x.name) === key(name));
-    return sym ? { ...p, modified: Date.now(), files: replaceFile(p.files, { ...sym, text: syncPins(sym.text, verilogPorts(v)) }) } : p;
+    return sym ? { ...p, modified: Date.now(), files: replaceFile(p.files, { ...sym, text: syncPins(sym.text, verilogPorts(v, sym.text)) }) } : p;
   }
   const f = subcktFile(p, name);
   if (!f) return p;

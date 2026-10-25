@@ -6,7 +6,7 @@ import { applyVariants, renameSubckt, withSubckts } from '../../src/hdl/variants
 import { busNames, busRange, formatRadix, joinBits, LOGIC_X, LOGIC_Z, logicState } from '../../src/waveform/digital.ts';
 import { addTraceTo } from '../../src/waveform/view.ts';
 import { newProject } from '../../src/project/turbo.ts';
-import { portsOf } from '../../src/hdl/VerilogModule.tsx';
+import { portsOf } from '../../src/hdl/project.ts';
 
 // Netlist de Yosys de: module m #(parameter W = 2) (input [1:0] a, input clk, output y, output reg q);
 //   assign y = a[1] & a[0]; always @(posedge clk) q <= y;

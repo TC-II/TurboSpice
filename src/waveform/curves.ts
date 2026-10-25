@@ -2,10 +2,10 @@
 // lleva al eje X del plot mostrado. Separado del componente para poder testearlo.
 import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceExprUnit } from '../sim/deviceParams.ts';
-import { spectrum, thd, WINDOWS } from './fft.ts';
+import { analyze, defaultFs, spectrum, WINDOWS } from './dft.ts';
 import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
-import { PALETTE, isFftPane, sameExpr, sameFft, traceColor, type Pane, type PaneFft, type Trace } from './view.ts';
+import { PALETTE, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 import { digitalWidth, isDigitalExpr } from './digital.ts';
 
@@ -41,10 +41,9 @@ export interface PaneData {
   /** unidades de los ejes izquierdo y derecho */
   yUnit: string;
   iUnit: string;
-  /** panel de FFT: fundamental y THD de cada traza */
   /** de cada traza (por su índice): fundamental y THD de una DFT; se ve al pasar por su cápsula */
   info?: string[];
-  /** vista en X sin zoom, si no es todo `x` (FFT de distintas grillas: hasta la menor frecuencia máxima) */
+  /** vista en X sin zoom, si no es todo `x` (DFT de distintas grillas: hasta la menor frecuencia máxima) */
   home?: [number, number];
 }
 
@@ -112,7 +111,7 @@ export function sweepSegments(x: Float64Array): [number, number][] {
 }
 
 export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
-  if (isFftPane(pane)) return fftCurves(pane, ctx);
+  if (isDftPane(pane)) return dftCurves(pane, ctx);
   const scale = scaleOf(ctx.plot)!;
   const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
   const segs = all.length === 1 ? sweepSegments(scale.real) : [[0, scale.real.length] as [number, number]];
@@ -175,29 +174,42 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
 }
 
-const WINDOW_LABEL = Object.fromEntries(WINDOWS.map(([w, , short]) => [w, short])) as Record<PaneFft['window'], string>;
+const WINDOW_LABEL = Object.fromEntries(WINDOWS.map(([w, , short]) => [w, short])) as Record<TraceDft['window'], string>;
 
 /**
  * Nombre de una traza en la leyenda (#260): para una DFT, la expresión y la ventana, "I(R1)-Hann",
- * "V(out)-Rec"; si otra DFT de la misma señal (en `others`) difiere en el rango, se agrega:
- * "I(R1)-Hann 1ms…2ms".
+ * "V(out)-Rec"; si otra DFT de la misma señal (en `others`) difiere en el rango o en la frecuencia
+ * de muestreo, se agrega: "I(R1)-Hann 1ms…2ms", "I(R1)-Hann 10MHz".
  */
 export function traceLabel(tt: Trace, others: Trace[] = []): string {
-  const f = tt.fft;
+  const f = tt.dft;
   if (!f) return tt.expr;
-  const twins = others.filter((o) => o !== tt && o.fft && sameExpr(o.expr, tt.expr) && !sameFft(o.fft, f));
-  const range = twins.some((o) => o.fft!.from !== f.from || o.fft!.to !== f.to)
+  const twins = others.filter((o) => o !== tt && o.dft && sameExpr(o.expr, tt.expr) && !sameDft(o.dft, f));
+  const range = twins.some((o) => o.dft!.from !== f.from || o.dft!.to !== f.to)
     ? ` ${f.from !== undefined && f.to !== undefined ? `${si(f.from)}s…${si(f.to)}s` : t('all points')}`
     : '';
-  return `${tt.expr}-${f.window === 'rect' ? 'Rec' : t(WINDOW_LABEL[f.window])}${range}`;
+  const rate = twins.some((o) => o.dft!.fs !== f.fs) ? ` ${f.fs !== undefined ? `${si(f.fs)}Hz` : t('automatic sample rate')}` : '';
+  return `${tt.expr}-${f.window === 'rect' ? 'Rec' : t(WINDOW_LABEL[f.window])}${range}${rate}`;
 }
 
 /**
- * Panel de FFT (#236): espectro (en dB) de cada traza del plot mostrado, cada una con su ventana
- * y rango de tiempo (#260); el eje X es la frecuencia: la unión de las grillas de todas, cada
- * una vacía fuera de la suya. Sin zoom se ve hasta la menor de las frecuencias máximas.
+ * Muestreo de una DFT sobre el eje de tiempo: rango dentro del transitorio y frecuencia de
+ * muestreo (sin fs: la densidad de puntos simulados en el rango)
  */
-export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
+export function dftSampling(o: TraceDft, time: Float64Array): { from: number; to: number; fs: number } {
+  const t0 = time[0];
+  const t1 = time[time.length - 1];
+  const from = Math.max(o.from ?? t0, t0);
+  const to = Math.min(o.to ?? t1, t1);
+  return { from, to, fs: o.fs ?? defaultFs(time, from, to) };
+}
+
+/**
+ * Panel de DFT (#236): espectro (en dB) de cada traza del plot mostrado, cada una con su ventana
+ * y muestreo (#260); el eje X es la frecuencia: la unión de las grillas de todas, cada una vacía
+ * fuera de la suya. Sin zoom se ve hasta la menor de las frecuencias máximas.
+ */
+export function dftCurves(pane: Pane, ctx: CurveContext): PaneData {
   const scale = scaleOf(ctx.plot);
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
@@ -209,10 +221,8 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
   }
   const spectra: { ti: number; label: string; freq: Float64Array; db: Float64Array }[] = [];
   pane.traces.forEach((tt, ti) => {
-    const o = tt.fft;
+    const o = tt.dft;
     if (!o) return errors.set(ti, t('The DFT needs a transient analysis'));
-    const from = Math.max(o.from ?? scale.real[0], scale.real[0]);
-    const to = Math.min(o.to ?? scale.real[scale.real.length - 1], scale.real[scale.real.length - 1]);
     let w;
     try {
       w = evalOn(ctx, ctx.plot, tt.expr, scale);
@@ -220,11 +230,25 @@ export function fftCurves(pane: Pane, ctx: CurveContext): PaneData {
       errors.set(ti, (e as Error).message);
       return;
     }
-    const sp = spectrum(scale.real, w.re, { from, to, window: o.window });
-    const th = thd(sp);
+    let sp;
+    try {
+      sp = spectrum(scale.real, w.re, { ...dftSampling(o, scale.real), window: o.window });
+    } catch (e) {
+      errors.set(ti, t((e as Error).message));
+      return;
+    }
+    const a = analyze(sp);
     const label = traceLabel(tt, pane.traces);
-    info[ti] = t('fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} points', { p1: si(th.fundamental), p2: si(th.amplitude), p3: th.thd.toFixed(3), p4: th.harmonics.length + 1, n: sp.n });
-    spectra.push({ ti, label, freq: sp.freq, db: sp.amp.map((a) => 20 * Math.log10(a)) });
+    info[ti] = t('fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} samples at {fs}Hz (Δf = {df}Hz)', {
+      p1: si(a.fundamental),
+      p2: si(a.amplitude),
+      p3: Number.isFinite(a.thd) ? a.thd.toPrecision(3) : '—',
+      p4: a.harmonics.length + 1,
+      n: sp.n,
+      fs: si(sp.fs),
+      df: si(sp.fs / sp.n),
+    });
+    spectra.push({ ti, label, freq: sp.freq, db: sp.amp.map((v) => 20 * Math.log10(v)) });
   });
   // (otra ventana da la misma grilla; otro rango u otro paso, otra)
   const same = (a: Float64Array, b: Float64Array) => a === b || (a.length === b.length && a[1] === b[1] && a[a.length - 1] === b[b.length - 1]);

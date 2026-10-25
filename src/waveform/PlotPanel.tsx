@@ -5,7 +5,7 @@ import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
-import { paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
+import { dftSampling, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { extent, panBy, wheelZoom, zoomAbout } from './scales.ts';
@@ -13,11 +13,11 @@ import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
-import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
-import { WINDOWS, type FftWindow } from './fft.ts';
+import { PALETTE, acceptsTrace, colorFor, sameDft, cursorForClick, isDftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace, type TraceDft } from './view.ts';
+import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
 import { Icon } from '../ui/icons.tsx';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
-import { t } from '../i18n/i18n.ts';
+import { locale, t } from '../i18n/i18n.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
 export type PlotAction =
@@ -41,7 +41,7 @@ export interface PlotPanelHandle {
   png(): Promise<Blob | null>;
   action(a: PlotAction): void;
   /** agrega la DFT de esa expresión (la punta de prueba en modo ⌖) */
-  addFft(expr: string): void;
+  addDft(expr: string): void;
 }
 
 interface Props {
@@ -58,12 +58,12 @@ interface Props {
   /** traza bajo el mouse (para resaltar su red en el esquemático) */
   onHoverExpr?(expr: string | undefined): void;
   handle?: Ref<PlotPanelHandle>;
-  /** lugar de la barra de resultados donde van Cursores, FFT, Medidas y Ajustar */
+  /** lugar de la barra de resultados donde van Cursores, DFT, Medidas y Ajustar */
   toolsHost?: HTMLElement | null;
   /** A: ir a la caja de expresiones (está en la barra de resultados) */
   onFocusTrace?(): void;
   /** avisa cuando se entra o sale del modo ⌖ de la DFT (el esquemático pasa a la punta de prueba) */
-  onFftPicking?(on: boolean): void;
+  onDftPicking?(on: boolean): void;
   /** resultados al costado del esquemático: cursores y medidas van debajo de los paneles (si
    * no, a la derecha) */
   side?: boolean;
@@ -111,12 +111,16 @@ const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curv
 const AXIS_X_BAND = 28;
 const AXIS_Y_BAND = 44;
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, onFftPicking, side, toolsHost }: Props) {
-  const [fftOpen, setFftOpen] = useState(false);
-  // ⌖: elegir con un click en su cápsula la traza cuya FFT se agrega (#245)
-  const [fftPicking, setFftPicking] = useState(false);
-  const [fftWindow, setFftWindow] = useState<FftWindow>('hann');
-  // los paneles de FFT (#236) tienen eje de frecuencias: cursores propios y zoom en X propio de
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, onDftPicking, side, toolsHost }: Props) {
+  const [dftOpen, setDftOpen] = useState(false);
+  // ⌖: elegir con un click en su cápsula la traza cuya DFT se agrega (#245)
+  const [dftPicking, setDftPicking] = useState(false);
+  const [dftWindow, setDftWindow] = useState<DftWindow>('hann');
+  // muestreo escrito en la barra de la DFT; vacío = automático (el zoom y la densidad de la simulación)
+  const [dftText, setDftText] = useState({ from: '', to: '', fs: '' });
+  // DFT que se está editando desde la barra (su menú › Editar la DFT); null: la barra agrega una nueva
+  const [dftEdit, setDftEdit] = useState<{ pane: number; trace: number } | null>(null);
+  // los paneles de DFT (#236) tienen eje de frecuencias: cursores propios y zoom en X propio de
   // cada panel (#260; los de tiempo comparten el eje X: es el mismo tiempo para todos)
   const [fRanges, setFRanges] = useState<Record<number, Range>>({});
   const setFRange = (i: number, r: Range | null) =>
@@ -242,7 +246,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? { ...p, ...f(p) } : p)));
   const moveTrace = (from: number, ti: number, to: number) => {
-    // (entre un panel de tiempo y uno de FFT no: la traza cambiaría de significado; a uno vacío sí, #260;
+    // (entre un panel de tiempo y uno de DFT no: la traza cambiaría de significado; a uno vacío sí, #260;
     // lo digital no comparte ejes con lo analógico, #209)
     const tt = panes[from]?.traces[ti];
     if (!tt || from === to || !acceptsTrace(panes[to], tt) || panes[to].traces.some((o) => sameTrace(o, tt))) return;
@@ -280,15 +284,44 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     paneEls().forEach((el) => (el.style.flex = ''));
     setPanes(panes.map(({ size: _, ...p }) => p));
   };
-  /** FFT de una traza: traza nueva en el panel de FFT del mismo rango y ventana, o en uno nuevo debajo */
-  const addFft = (expr: string) => {
-    const fft = { window: fftWindow, ...(xRange ? { from: xRange[0], to: xRange[1] } : {}) };
-    const tr = { expr, fft };
-    const i = panes.findIndex((p) => isFftPane(p) && p.traces.every((tt) => sameFft(tt.fft, fft)));
+  // --- DFT: muestreo de la barra (lo escrito o, vacío, lo automático: el zoom y la densidad de lo simulado)
+  const typed = { from: parseSi(dftText.from), to: parseSi(dftText.to), fs: parseSi(dftText.fs) };
+  const badField = (k: 'from' | 'to' | 'fs') => dftText[k].trim() !== '' && (typed[k] === null || (k === 'fs' && !(typed.fs! > 0)));
+  /** la DFT que agrega (o aplica, al editar) la barra */
+  const dftConfig = (): TraceDft => {
+    const from = typed.from ?? xRange?.[0];
+    const to = typed.to ?? xRange?.[1];
+    return { window: dftWindow, ...(from !== undefined ? { from } : {}), ...(to !== undefined ? { to } : {}), ...(typed.fs ? { fs: typed.fs } : {}) };
+  };
+  const time = scale?.name === 'time' ? scale.real : undefined;
+  // (la frecuencia automática recorre la simulación: sólo cuando cambia lo que la define)
+  const dftPreview = useMemo(
+    () => (time && dftOpen ? dftSampling(dftConfig(), time) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [time, dftOpen, dftText, xRange],
+  );
+  const dftN = dftPreview ? sampleCount(dftPreview.from, dftPreview.to, dftPreview.fs) : 0;
+  const dftError = !dftPreview
+    ? ''
+    : badField('from') || badField('to') || badField('fs')
+      ? t('Write a number, with an SI prefix if you want (1m, 2.5µ, 10M)')
+      : dftPreview.to <= dftPreview.from
+        ? t('The end time has to be after the start time')
+        : dftN < 2
+          ? t('Too few samples for the DFT: raise the sample rate or widen the range')
+          : dftN > MAX_SAMPLES
+            ? t('Too many samples for the DFT (more than 4 million): lower the sample rate or narrow the range')
+            : '';
+  /** DFT de una traza: traza nueva en el panel de DFT del mismo muestreo y ventana, o en uno nuevo debajo */
+  const addDft = (expr: string) => {
+    if (dftError) return;
+    const dft = dftConfig();
+    const tr = { expr, dft };
+    const i = panes.findIndex((p) => isDftPane(p) && p.traces.every((tt) => sameDft(tt.dft, dft)));
     let color = colorFor(panes, expr);
-    // otra FFT de la misma señal (otra ventana o rango): otro color, para distinguirlas
+    // otra DFT de la misma señal (otra ventana o muestreo): otro color, para distinguirlas
     const all = panes.flatMap((p) => p.traces.map((tt, k) => ({ tt, c: traceColor(tt, k).toLowerCase() })));
-    if (all.some(({ tt, c }) => tt.fft && c === color && !sameTrace(tt, tr))) color = PALETTE.find((c) => !all.some((o) => o.c === c)) ?? color;
+    if (all.some(({ tt, c }) => tt.dft && c === color && !sameTrace(tt, tr))) color = PALETTE.find((c) => !all.some((o) => o.c === c)) ?? color;
     if (i >= 0) {
       if (!panes[i].traces.some((tt) => sameTrace(tt, tr))) update(i, (p) => ({ ...p, traces: [...p.traces, { ...tr, color }] }));
       setActive(i);
@@ -296,22 +329,44 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       setPanes([...panes, { traces: [{ ...tr, color }] }]);
       setActive(panes.length);
     }
-    setFftPicking(false);
+    setDftPicking(false);
   };
-  useEffect(() => onFftPicking?.(fftPicking), [fftPicking]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => onFftPicking?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => onDftPicking?.(dftPicking), [dftPicking]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDftPicking?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  /** Editar la DFT: la barra toma su ventana y su muestreo, y «Aplicar» los guarda en la traza */
+  const startDftEdit = (i: number, ti: number) => {
+    const d = panes[i]?.traces[ti]?.dft;
+    if (!d) return;
+    const txt = (v: number | undefined) => (v === undefined ? '' : si(v, 12));
+    setDftOpen(true);
+    setDftPicking(false);
+    setDftWindow(d.window);
+    setDftText({ from: txt(d.from), to: txt(d.to), fs: txt(d.fs) });
+    setDftEdit({ pane: i, trace: ti });
+  };
+  const applyDftEdit = () => {
+    if (!dftEdit || dftError) return;
+    const dft = dftConfig();
+    update(dftEdit.pane, (p) => ({ ...p, traces: p.traces.map((x, k) => (k === dftEdit.trace ? { ...x, dft } : x)) }));
+    setDftEdit(null);
+  };
+  // (si la traza que se editaba ya no está, se deja de editar)
   useEffect(() => {
-    if (!fftPicking) return;
+    if (dftEdit && !panes[dftEdit.pane]?.traces[dftEdit.trace]?.dft) setDftEdit(null);
+  }, [panes, dftEdit]);
+  useEffect(() => {
+    if (!dftPicking && !dftEdit) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation();
-        setFftPicking(false);
+        setDftPicking(false);
+        setDftEdit(null);
       }
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [fftPicking]);
-  const isF = (i: number) => isFftPane(panes[i]);
+  }, [dftPicking, dftEdit]);
+  const isF = (i: number) => isDftPane(panes[i]);
   /** cursores activos, con el A en el medio de lo que se ve si no estaba */
   const startCursors = (extra: Cursors = {}) => {
     setCursorMode(true);
@@ -325,7 +380,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     const tt = panes[i]?.traces[ti];
     if (!tt) return [];
     const items: ContextItem[] = [];
-    if (isTran && !isF(i)) items.push({ label: t('DFT of this trace'), onClick: () => (setFftOpen(true), addFft(tt.expr)) });
+    if (isTran && !isF(i)) items.push({ label: t('DFT of this trace'), onClick: () => (setDftOpen(true), addDft(tt.expr)) });
+    if (isTran && tt.dft) items.push({ label: t('Edit the DFT (window and sampling)'), onClick: () => startDftEdit(i, ti) });
     const label = data[i]?.curves.find((c) => c.trace === ti)?.label;
     if (label !== undefined)
       for (const [k, name] of [['ta', 'A'], ['tb', 'B']] as const)
@@ -354,7 +410,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   };
 
   useImperativeHandle(handle, () => ({
-    addFft,
+    addDft,
     csv: () => {
       const d = data[0];
       if (!d) return '';
@@ -431,7 +487,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const range: Range | null = xRange;
   const isTran = scaleName === 'time';
-  const windowName: Record<FftWindow, string> = {
+  const windowName: Record<DftWindow, string> = {
     hann: t('Hann Window'),
     hamming: t('Hamming Window'),
     blackman: t('Blackman Window'),
@@ -479,49 +535,90 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       {isTran && <span className="tool-sep" aria-hidden />}
       {isTran && (
         <button
-          className={fftOpen ? 'active' : ''}
+          className={dftOpen ? 'active' : ''}
           onClick={() => {
             // al abrirla ya se elige la traza (⌖)
-            setFftOpen(!fftOpen);
-            setFftPicking(!fftOpen);
+            setDftOpen(!dftOpen);
+            setDftPicking(!dftOpen);
+            setDftEdit(null);
           }}
           title={t('Spectrum (DFT) and harmonic distortion of a trace')}
         >
           DFT
         </button>
       )}
-      {fftOpen && isTran && (
-        <span className="fft-tools">
-          <select value={fftWindow} aria-label={t('Window')} onChange={(e) => setFftWindow(e.target.value as FftWindow)}>
+      {dftOpen && isTran && (
+        <span className="dft-tools">
+          <select value={dftWindow} aria-label={t('Window')} onChange={(e) => setDftWindow(e.target.value as DftWindow)}>
             {WINDOWS.map(([w]) => (
               <option key={w} value={w}>{windowName[w]}</option>
             ))}
           </select>
-          <button
-            className={`pick-btn fft-pick${fftPicking ? ' active' : ''}`}
-            aria-label={t('Signal for the DFT')}
-            title={t('Pick the signal for the DFT: a trace in the legend, or a wire or component with the probe (Esc cancels)')}
-            onClick={() => setFftPicking((v) => !v)}
-          >
-            ⌖
-          </button>
-          <span className="hint">
-            {range
-              ? t('Computed only over the current range: ({p0}s … {p1}s)', { p0: si(range[0]), p1: si(range[1]) })
-              : t('Using all the points (zoom in to compute over a range)')}
-          </span>
+          {(
+            [
+              ['from', 't₀', 's', t('Start of the sampling (empty: the start of the zoom, or of the simulation)'), t('DFT start time')],
+              ['to', 't₁', 's', t('End of the sampling (empty: the end of the zoom, or of the simulation)'), t('DFT end time')],
+              ['fs', 'fs', 'Hz', t('Sample rate (empty: the density of the simulated points, rounded up to 1, 2 or 5 × 10ⁿ)'), t('DFT sample rate')],
+            ] as const
+          ).map(([k, name, unit, title, aria]) => (
+            <label key={k} className={`dft-field${badField(k) ? ' bad' : ''}`} title={title}>
+              {name}
+              <input
+                aria-label={aria}
+                value={dftText[k]}
+                spellCheck={false}
+                placeholder={dftPreview ? si(dftPreview[k]) : ''}
+                onChange={(e) => setDftText((old) => ({ ...old, [k]: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && dftEdit && applyDftEdit()}
+              />
+              {unit}
+            </label>
+          ))}
+          {dftEdit ? (
+            <>
+              <button className="primary" disabled={!!dftError} onClick={applyDftEdit}>
+                {t('Apply')}
+              </button>
+              <button onClick={() => setDftEdit(null)}>{t('Cancel')}</button>
+            </>
+          ) : (
+            <button
+              className={`pick-btn dft-pick${dftPicking ? ' active' : ''}`}
+              aria-label={t('Signal for the DFT')}
+              title={t('Pick the signal for the DFT: a trace in the legend, or a wire or component with the probe (Esc cancels)')}
+              disabled={!!dftError}
+              onClick={() => setDftPicking((v) => !v)}
+            >
+              ⌖
+            </button>
+          )}
         </span>
       )}
     </>
   );
+  const editedTrace = dftEdit ? panes[dftEdit.pane]?.traces[dftEdit.trace] : undefined;
   const allTraces = panes.flatMap((p) => p.traces);
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
   return (
-    <div className={`plot-panel${fftPicking ? ' fft-picking' : ''}`}>
+    <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
-      {fftPicking && <p className="hint plot-info">{t('Click a trace in the legend, or a wire or component in the schematic, to add its DFT · Esc cancels')}</p>}
+      {dftOpen && isTran && dftPreview && (
+        <p className={`hint plot-info dft-sampling${dftError ? ' err' : ''}`}>
+          {editedTrace ? `${t('Editing {name}', { name: traceLabel(editedTrace, allTraces) })} · ` : ''}
+          {dftError ||
+            t('{n} samples from {p0}s to {p1}s at {fs}Hz · resolution Δf = {df}Hz · up to {ny}Hz (Nyquist)', {
+              n: dftN.toLocaleString(locale()),
+              p0: si(dftPreview.from),
+              p1: si(dftPreview.to),
+              fs: si(dftPreview.fs),
+              df: si(dftPreview.fs / dftN),
+              ny: si(dftPreview.fs / 2),
+            })}
+        </p>
+      )}
+      {dftPicking && !dftError && <p className="hint plot-info">{t('Click a trace in the legend, or a wire or component in the schematic, to add its DFT · Esc cancels')}</p>}
       {(zoomMode || removing) && (
         <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
       )}
@@ -558,7 +655,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             canRemove={panes.length > 1}
             onRemove={() => {
               setPanes(panes.filter((_, k) => k !== i));
-              // (el zoom de los paneles de FFT que siguen se corre con ellos)
+              // (el zoom de los paneles de DFT que siguen se corre con ellos)
               setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
             }}
             onChange={(f) => update(i, f)}
@@ -582,7 +679,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             }}
             zoomMode={zoomMode}
             removing={removing}
-            onPickTrace={fftPicking && !isF(i) ? addFft : undefined}
+            onPickTrace={dftPicking && !isF(i) && !dftError ? addDft : undefined}
+            samples={dftPreview && !dftError && !isF(i) && !p.digital ? { ...dftPreview, n: dftN } : undefined}
             labelOf={(tt) => traceLabel(tt, allTraces)}
             traceActions={(ti) => traceActions(i, ti)}
             showGrid={showGrid}
@@ -591,7 +689,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             onCursor={(c) => (isF(i) ? setFCursors : setCursors)((old) => ({ ...old, ...c }))}
             previewX={isF(i) ? undefined : previewX}
             onHoverX={unplaced && !isF(i) ? setHoverX : undefined}
-            syncKey={isF(i) ? 'turbospice-fft' : 'turbospice'}
+            syncKey={isF(i) ? 'turbospice-dft' : 'turbospice'}
             onHoverExpr={onHoverExpr}
             marks={marks}
             register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
@@ -657,12 +755,14 @@ function PaneView(props: {
   onBoxZoom(x: Range, y: Range): void;
   zoomMode: boolean;
   removing: boolean;
-  /** nombre de la traza en la leyenda (FFT(…), #260) */
+  /** nombre de la traza en la leyenda (DFT(…), #260) */
   labelOf(tt: Trace): string;
-  /** acciones de la traza para su menú del botón derecho (FFT, cursores, mover de panel) */
+  /** acciones de la traza para su menú del botón derecho (DFT, cursores, mover de panel) */
   traceActions(ti: number): ContextItem[];
-  /** modo ⌖ de la FFT: un click en la cápsula elige la traza */
+  /** modo ⌖ de la DFT: un click en la cápsula elige la traza */
   onPickTrace?(expr: string): void;
+  /** muestreo de la DFT que se está armando: se marcan el rango y, si se distinguen, las muestras */
+  samples?: { from: number; to: number; fs: number; n: number };
   showGrid: boolean;
   cursorMode: boolean;
   cursors: Cursors;
@@ -676,7 +776,7 @@ function PaneView(props: {
   previewX?: number;
   /** posición del mouse en X (mientras haya cursores sin ubicar) */
   onHoverX?(x: number | undefined): void;
-  /** grupo de sincronización del cursor de uPlot (los paneles de FFT tienen otro eje X) */
+  /** grupo de sincronización del cursor de uPlot (los paneles de DFT tienen otro eje X) */
   syncKey: string;
 }) {
   const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
@@ -751,7 +851,7 @@ function PaneView(props: {
       const e = fullY(scale);
       return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
     };
-    // X sin zoom: todo, o hasta donde llegan todas las FFT (con zoom out se ve el resto)
+    // X sin zoom: todo, o hasta donde llegan todas las DFT (con zoom out se ve el resto)
     const x0 = data.x[0];
     const x1 = data.x[data.x.length - 1];
     const home = data.home ?? [x0, x1];
@@ -870,6 +970,55 @@ function PaneView(props: {
               if (axisHover === 'left') ctx.fillRect(left - AXIS_Y_BAND * px, top, AXIS_Y_BAND * px, height);
               else if (axisHover === 'bottom') ctx.fillRect(left, top + height, width, AXIS_X_BAND * px);
               else ctx.fillRect(left + width, top, AXIS_Y_BAND * px, height);
+              ctx.restore();
+            }
+            // muestreo de la DFT que se está armando: lo que queda afuera, sombreado; adentro, un
+            // punto en cada muestra de cada curva (si están a más de 4 px una de otra)
+            const sm = live.current.samples;
+            u.root.dataset.samples = '';
+            if (sm && data.xName === 'time') {
+              const { left, top, width, height } = u.bbox;
+              const dpr = devicePixelRatio;
+              const clampX = (v: number) => Math.min(left + width, Math.max(left, u.valToPos(v, 'x', true)));
+              const a = clampX(sm.from);
+              const b = clampX(sm.from + (sm.n - 1) / sm.fs);
+              ctx.save();
+              ctx.fillStyle = fg;
+              ctx.globalAlpha = 0.07;
+              ctx.fillRect(left, top, a - left, height);
+              ctx.fillRect(b, top, left + width - b, height);
+              ctx.globalAlpha = 0.8;
+              ctx.strokeStyle = markColor.zero;
+              ctx.lineWidth = dpr;
+              ctx.setLineDash([4 * dpr, 3 * dpr]);
+              for (const x of [a, b]) {
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, top + height);
+                ctx.stroke();
+              }
+              ctx.setLineDash([]);
+              const { min, max } = u.scales.x;
+              if (min != null && max != null) {
+                const k0 = Math.max(0, Math.ceil((min - sm.from) * sm.fs));
+                const k1 = Math.min(sm.n - 1, Math.floor((max - sm.from) * sm.fs));
+                const gap = width / ((max - min) * sm.fs);
+                if (k1 >= k0 && gap >= 4 * dpr) {
+                  u.root.dataset.samples = String(k1 - k0 + 1);
+                  for (const c of data.curves) {
+                    if (c.hidden) continue;
+                    ctx.fillStyle = c.color;
+                    for (let k = k0; k <= k1; k++) {
+                      const tk = sm.from + k / sm.fs;
+                      const py = u.valToPos(valueAt(data.x, c.y, tk), c.axis, true);
+                      if (!Number.isFinite(py) || py < top || py > top + height) continue;
+                      ctx.beginPath();
+                      ctx.arc(u.valToPos(tk, 'x', true), py, Math.min(3, gap / (3 * dpr)) * dpr, 0, 2 * Math.PI);
+                      ctx.fill();
+                    }
+                  }
+                }
+              }
               ctx.restore();
             }
             // f₀ de polos (×) y ceros (○): líneas verticales punteadas
@@ -1245,7 +1394,7 @@ function PaneView(props: {
 
   useEffect(() => {
     chart.current?.redraw(false);
-  }, [cursors, props.marks, props.previewX]);
+  }, [cursors, props.marks, props.previewX, props.samples?.from, props.samples?.fs, props.samples?.n]);
 
   // corridas (pasos de .step, barridos .dc anidados) con el color de la primera traza
   const runLegend = data.curves.filter((c) => c.trace === data.curves[0]?.trace && c.axis === data.curves[0]?.axis && c.runLabel);
@@ -1373,7 +1522,7 @@ function PaneView(props: {
         })}
         {/* la DFT bajo el mouse: su fundamental y THD, en el lugar del valor de X */}
         {chipHover !== null && data.info?.[chipHover] ? (
-          <span className="xval fft-info">{data.info[chipHover]}</span>
+          <span className="xval dft-info">{data.info[chipHover]}</span>
         ) : data.x.length > 0 && (
           <span className={`xval${hover === null || data.x[hover] === undefined ? ' idle' : ''}`}>
             {data.xName} = {fix(hover !== null ? (data.x[hover] ?? NaN) : NaN, xUnit(data.xName))}

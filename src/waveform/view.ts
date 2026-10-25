@@ -13,26 +13,31 @@ export interface Trace {
   hidden?: boolean;
   /** bus digital (#209): cómo se muestra su valor */
   radix?: Radix;
-  /** traza de espectro (#236, #260): la FFT de la expresión del transitorio, con su ventana y rango */
-  fft?: PaneFft;
+  /** traza de espectro (#236, #260): la DFT de la expresión del transitorio, con su ventana y muestreo */
+  dft?: TraceDft;
 }
 
-/** FFT de una traza (#236): ventana y rango de tiempo usado (sin rango = todo) */
-/** Ventanas de la FFT (sus fórmulas y nombres están en fft.ts) */
-export const FFT_WINDOW_IDS = ['hann', 'hamming', 'blackman', 'blackmanharris', 'nuttall', 'blackmannuttall', 'flattop', 'bartlett', 'welch', 'cosine', 'gauss', 'kaiser', 'tukey', 'rect'] as const;
+/** Ventanas de la DFT (sus fórmulas y nombres están en dft.ts) */
+export const DFT_WINDOW_IDS = ['hann', 'hamming', 'blackman', 'blackmanharris', 'nuttall', 'blackmannuttall', 'flattop', 'bartlett', 'welch', 'cosine', 'gauss', 'kaiser', 'tukey', 'rect'] as const;
 
-export interface PaneFft {
-  window: (typeof FFT_WINDOW_IDS)[number];
+/**
+ * DFT de una traza (#236): ventana y muestreo. Se toman muestras cada 1/fs desde `from` hasta
+ * `to` (sin rango: todo el transitorio; sin fs: la densidad de puntos de la simulación).
+ */
+export interface TraceDft {
+  window: (typeof DFT_WINDOW_IDS)[number];
   from?: number;
   to?: number;
+  /** frecuencia de muestreo en Hz */
+  fs?: number;
 }
 
 export interface Pane {
   traces: Trace[];
   /** panel digital (#209): un carril por traza Dig(…); no comparte ejes con las analógicas */
   digital?: boolean;
-  /** @deprecated (#245) la FFT era del panel; ahora va en cada traza. Sólo se lee de vistas viejas */
-  fft?: PaneFft;
+  /** @deprecated (#245) el espectro era del panel; ahora va en cada traza. Sólo se lee de vistas viejas */
+  fft?: TraceDft;
   /**
    * Tamaño elegido arrastrando el divisor entre paneles: el reparto de la altura es proporcional
    * a esto (el alto en px de cuando se eligió). Sin él, los paneles se reparten por igual.
@@ -54,20 +59,20 @@ export function reorderTrace(p: Pane, from: number, to: number): Pane {
   return { ...p, traces };
 }
 
-/** Tipo de un panel según sus trazas (#260): de espectro si tiene FFT, null si está vacío */
-export const paneKind = (p: Pane): 'fft' | 'time' | null => (p.traces.length ? (p.traces.some((tt) => tt.fft) ? 'fft' : 'time') : null);
-export const isFftPane = (p: Pane | undefined) => !!p && paneKind(p) === 'fft';
+/** Tipo de un panel según sus trazas (#260): de espectro si tiene DFT, null si está vacío */
+export const paneKind = (p: Pane): 'dft' | 'time' | null => (p.traces.length ? (p.traces.some((tt) => tt.dft) ? 'dft' : 'time') : null);
+export const isDftPane = (p: Pane | undefined) => !!p && paneKind(p) === 'dft';
 /** ¿La traza puede ir a ese panel? Uno vacío acepta cualquiera; si no, del mismo tipo */
 export const acceptsTrace = (p: Pane, tt: Trace) => {
   const k = paneKind(p);
   // lo digital no comparte ejes con lo analógico (#209); un panel vacío acepta cualquiera
   if (p.traces.length && !!p.digital !== isDigitalExpr(tt.expr)) return false;
-  return k === null || k === (tt.fft ? 'fft' : 'time');
+  return k === null || k === (tt.dft ? 'dft' : 'time');
 };
 
-export const sameFft = (a?: PaneFft, b?: PaneFft) => (!a || !b ? !a && !b : a.window === b.window && a.from === b.from && a.to === b.to);
-/** Identidad de una traza (#260): la expresión y, si es FFT, su ventana y rango */
-export const sameTrace = (a: Trace, b: Trace) => sameExpr(a.expr, b.expr) && sameFft(a.fft, b.fft);
+export const sameDft = (a?: TraceDft, b?: TraceDft) => (!a || !b ? !a && !b : a.window === b.window && a.from === b.from && a.to === b.to && a.fs === b.fs);
+/** Identidad de una traza (#260): la expresión y, si es DFT, su ventana y muestreo */
+export const sameTrace = (a: Trace, b: Trace) => sameExpr(a.expr, b.expr) && sameDft(a.dft, b.dft);
 
 /** Paneles por tipo de análisis ("tran", "ac", "dc", "noise"…) */
 export type PlotView = Record<string, Pane[]>;
@@ -134,7 +139,7 @@ export function colorFor(panes: Pane[], expr: string): string {
 export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
   let k = Math.max(0, Math.min(i, panes.length - 1));
   let base = panes.length ? panes : emptyPanes();
-  // en un panel de FFT no (#260), y una señal digital sólo en uno digital (#209): al primer panel
+  // en un panel de DFT no (#260), y una señal digital sólo en uno digital (#209): al primer panel
   // que la acepte, o a uno nuevo
   const tt: Trace = { expr };
   if (!acceptsTrace(base[k], tt)) {
@@ -147,7 +152,7 @@ export function addTraceTo(panes: Pane[], i: number, expr: string): Pane[] {
   // un panel vacío toma el tipo de la primera traza
   if (!base[k].traces.length && !!base[k].digital !== isDigitalExpr(expr))
     base = base.map((p, n) => (n !== k ? p : isDigitalExpr(expr) ? { ...p, digital: true } : (({ digital: _, ...rest }) => rest)(p)));
-  if (base[k].traces.some((t) => !t.fft && sameExpr(t.expr, expr))) return base === panes ? panes : base;
+  if (base[k].traces.some((t) => !t.dft && sameExpr(t.expr, expr))) return base === panes ? panes : base;
   const color = colorFor(base, expr);
   return base.map((p, j) => (j === k ? { ...p, traces: [...p.traces, { expr, color }] } : p));
 }
@@ -169,14 +174,15 @@ export function asPlotView(v: unknown): PlotView | null {
   for (const [kind, panes] of Object.entries(v as Record<string, unknown>)) {
     if (!Array.isArray(panes)) continue;
     out[kind] = panes.map((p) => {
-      // (vistas de #245: la FFT del panel pasa a cada una de sus trazas)
-      const paneFft = asFft(p?.fft).fft;
+      // (vistas de #245: el espectro del panel pasa a cada una de sus trazas)
+      const paneDft = asDft(p?.fft);
       return {
         traces: (Array.isArray(p?.traces) ? (p.traces as unknown[]) : [])
           .filter((t): t is Trace => !!t && typeof (t as Trace).expr === 'string')
           .map((t) => {
-            const fft = asFft(t.fft).fft ?? paneFft;
-            return { expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}), ...(fft ? { fft } : {}) };
+            // (antes de la DFT se guardaba como `fft`)
+            const dft = asDft(t.dft) ?? asDft((t as { fft?: unknown }).fft) ?? paneDft;
+            return { expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}), ...(dft ? { dft } : {}) };
           }),
       };
     });
@@ -184,11 +190,11 @@ export function asPlotView(v: unknown): PlotView | null {
   return Object.keys(out).length ? out : null;
 }
 
-function asFft(v: unknown): { fft?: PaneFft } {
-  const f = v as PaneFft | undefined;
-  if (!f || typeof f !== 'object' || !(FFT_WINDOW_IDS as readonly string[]).includes(f.window)) return {};
+function asDft(v: unknown): TraceDft | undefined {
+  const f = v as TraceDft | undefined;
+  if (!f || typeof f !== 'object' || !(DFT_WINDOW_IDS as readonly string[]).includes(f.window)) return undefined;
   const num = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
-  return { fft: { window: f.window, ...(num(f.from) ? { from: f.from } : {}), ...(num(f.to) ? { to: f.to } : {}) } };
+  return { window: f.window, ...(num(f.from) ? { from: f.from } : {}), ...(num(f.to) ? { to: f.to } : {}), ...(num(f.fs) && f.fs! > 0 ? { fs: f.fs } : {}) };
 }
 
 /** Vista guardada en el documento (comentario ";.plot …"), o null */
@@ -284,8 +290,8 @@ const isCurrent = (expr: string) => /^I[a-z]?\(/i.test(expr.trim());
 export function serializePlt(view: PlotView): string {
   const out: string[] = [];
   for (const [kind, title] of SECTIONS) {
-    // (LTspice no tiene trazas de FFT en el .plt del transitorio)
-    const panes = view[kind]?.map((p) => ({ ...p, traces: p.traces.filter((t) => !t.fft) })).filter((p) => p.traces.length);
+    // (LTspice no tiene trazas de espectro en el .plt del transitorio)
+    const panes = view[kind]?.map((p) => ({ ...p, traces: p.traces.filter((t) => !t.dft) })).filter((p) => p.traces.length);
     if (!panes?.length) continue;
     out.push(`[${title}]`, '{', `   Npanes: ${panes.length}`);
     panes.forEach((p, pi) => {

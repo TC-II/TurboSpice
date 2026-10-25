@@ -45,7 +45,7 @@ src/library/     catálogo, buscador, modelos del usuario
 | `.op` | Anotación sobre el esquemático + tabla |
 | `.dc` (anidado) | Curvas vs. variable de barrido |
 | `.ac` | Bode (dB/fase), Nyquist |
-| `.tran` (+ `.four`, FFT) | Formas de onda, FFT |
+| `.tran` (+ `.four`, FFT) | Formas de onda; DFT del visor con t₀, t₁ y fs elegibles (cualquier N, Bluestein) y THD |
 | `.noise` | Densidad espectral + ruido integrado |
 | `.tf` | Tabla: ganancia, Rin, Rout |
 | `.sens` | Tabla de sensibilidades |

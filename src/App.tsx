@@ -2125,15 +2125,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // ⌖ de la DFT: mientras se elige, el esquemático está en la punta de prueba y lo que se pinche
   // (esté graficado o no) va a la DFT; al terminar vuelve a la herramienta de antes
-  const fftPick = useRef<Tool | null>(null);
-  const onFftPicking = (on: boolean) => {
-    if (on === !!fftPick.current) return;
+  const dftPick = useRef<Tool | null>(null);
+  const onDftPicking = (on: boolean) => {
+    if (on === !!dftPick.current) return;
     if (on) {
-      fftPick.current = tool;
+      dftPick.current = tool;
       if (sim) setTool({ kind: 'probe' });
     } else {
-      const back = fftPick.current;
-      fftPick.current = null;
+      const back = dftPick.current;
+      dftPick.current = null;
       setToolState((cur) => (cur.kind === 'probe' && back ? back : cur));
     }
   };
@@ -2142,7 +2142,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
     if (!scaleOf(plot) && op) return setOpPins((p) => toggleOpPin(p, target));
     // un cable de bus (f[10:0]): una traza por bit, en el testbench
-    if (target.net && isBusName(target.net) && !pathRef.current.length && !fftPick.current) {
+    if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
       const sc = scaleOf(plot);
       if (!sc) return;
       const exprs = busBits(target.net)
@@ -2177,14 +2177,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       }
     }
     if (!expr) return;
-    if (fftPick.current) {
+    if (dftPick.current) {
       const sc = scaleOf(plot);
       try {
         if (sc) evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
       } catch {
         return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
       }
-      return plotPanel.current?.addFft(expr);
+      return plotPanel.current?.addDft(expr);
     }
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
     if (traceBox.current?.focused()) return traceBox.current.insert(expr);
@@ -2192,7 +2192,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
     const i = Math.min(activePane, panes.length - 1);
-    if (panes[i]?.traces.some((tt) => !tt.fft && sameExpr(tt.expr, expr))) return;
+    if (panes[i]?.traces.some((tt) => !tt.dft && sameExpr(tt.expr, expr))) return;
     const sc = scaleOf(plot);
     if (!sc) return setMessage(t('{name} has no X axis: choose another analysis to plot', { name: plot.name }));
     try {
@@ -3655,7 +3655,7 @@ ${ltNetlistText(sim.built.lt)}
               {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={traceHints} onAdd={addExpr} />}
               {panel === 'plot' && (
                 <>
-                  {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, FFT, gráficos x-y */}
+                  {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, fft de ngspice, gráficos x-y */}
                   {sim.result.plots.length > 1 && (
                     <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label={t('Result plot')} title={t('Result to view (the simulation returned several)')}>
                       {sim.result.plots.map((p) => (
@@ -3676,7 +3676,7 @@ ${ltNetlistText(sim.built.lt)}
                       <option value="smith">{t('Smith chart')}</option>
                     </select>
                   )}
-                  {/* Cursores, FFT, Medidas y Ajustar (los pone el visor) */}
+                  {/* Cursores, DFT, Medidas y Ajustar (los pone el visor) */}
                   <span className="viewer-tools" ref={setViewerTools} />
                   {withPz && (
                     <label className="check inline" title={t('Pole-zero map (.pz) next to the plot; its f₀ are marked on the axis')}>
@@ -3718,7 +3718,7 @@ ${ltNetlistText(sim.built.lt)}
                   active={activePane}
                   setActive={setActivePane}
                   onFocusTrace={() => traceBox.current?.focus()}
-                  onFftPicking={onFftPicking}
+                  onDftPicking={onDftPicking}
                   side={resultsSide}
                   toolsHost={viewerTools}
                   marks={withPz && pzSide ? marks : undefined}

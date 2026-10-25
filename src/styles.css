@@ -769,11 +769,16 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .study-control { min-height: 140px; }
 .study-code textarea { width: 100%; font: 13px/1.5 var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 240px; }
 .plot-info { margin: 0; }
-.fft-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.fft-tools .hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.plot-tools button.fft-pick, .fft-tools .fft-pick { padding: 2px 8px; }
-/* ⌖ de la FFT (#245): cursor de mira como el ícono y la cápsula bajo el mouse resaltada */
-.plot-panel.fft-picking, .plot-panel.fft-picking *, body:has(.plot-panel.fft-picking) .fft-pick { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='3.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23fff' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23222' stroke-width='1.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23222' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair !important; }
+.dft-tools { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.plot-tools button.dft-pick, .dft-tools .dft-pick { padding: 2px 8px; }
+/* t₀, t₁ y fs de la DFT: vacíos muestran lo automático (gris); uno que no se entiende, en rojo */
+.dft-tools .dft-field { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--fg-muted); white-space: nowrap; }
+.dft-tools .dft-field input { width: 5.5em; font: 12px var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); }
+.dft-tools .dft-field input::placeholder { color: var(--fg-muted); opacity: 0.8; }
+.dft-tools .dft-field.bad input { border-color: var(--err); color: var(--err); }
+.plot-info.dft-sampling.err { color: var(--err); }
+/* ⌖ de la DFT (#245): cursor de mira como el ícono y la cápsula bajo el mouse resaltada */
+.plot-panel.dft-picking, .plot-panel.dft-picking *, body:has(.plot-panel.dft-picking) .dft-pick { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='3.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23fff' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23222' stroke-width='1.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23222' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair !important; }
 .trace-chip.pickable:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }
 .study-blocks { height: min(60vh, 520px); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 
@@ -1312,7 +1317,7 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .iconbar.sim-row div.proj-capsule { display: flex; align-items: center; }
 .iconbar.sim-row div.proj-capsule .name-input { flex: 1 1 auto; min-width: 0; height: 22px; padding: 0 4px; font-size: 13px; line-height: 20px; box-sizing: border-box; }
 .tool-sep { flex: none; align-self: stretch; width: 1px; margin: 2px 4px; background: var(--border); }
-.xval.fft-info { color: var(--fg); }
+.xval.dft-info { color: var(--fg); }
 .simbar .sb-checks.inline { flex-direction: row; gap: 10px; }
 .simbar .sb-box { display: inline-flex; align-items: center; gap: 4px; }
 /* varias filas (DC, ruido…): grilla de etiqueta | cuadro, con los cuadros alineados por columna */

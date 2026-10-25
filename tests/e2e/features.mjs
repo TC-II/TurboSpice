@@ -189,37 +189,37 @@ const outW = await at(320, 128);
 await page.mouse.move(outW.x, outW.y);
 const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
 check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
-// FFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
+// DFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
 await page.mouse.click(outW.x, outW.y);
 await page.getByRole('button', { name: 'DFT', exact: true }).click();
-check(/Con todos los puntos/.test(await page.locator('.fft-tools .hint').last().textContent()), 'sin zoom, la FFT usa todos los puntos');
+check(/ muestras de 0s a .*Nyquist/.test(await page.locator('.dft-sampling').textContent()), `sin zoom, la DFT toma todo el transitorio (${await page.locator('.dft-sampling').textContent()})`);
 const windows = await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents();
 check(windows.includes('Ventana de Hann') && windows.includes('Ventana de Kaiser (β = 9)') && windows.length === 14, `14 ventanas con su nombre (${windows.length})`);
-// #245: ⌖ y click en la cápsula de la leyenda; varias FFT en el mismo panel
+// #245: ⌖ y click en la cápsula de la leyenda; varias DFT en el mismo panel
 await page.locator('.expr-form input').fill('V(out)/2');
 await page.locator('.expr-form input').press('Enter');
-const fftPick = page.locator('.fft-tools .fft-pick');
-// la FFT arranca eligiendo traza: el ⌖ sólo hace falta si no está en ese modo
-if (!(await page.locator('.plot-panel.fft-picking').count())) await fftPick.click();
-check((await page.locator('.plot-panel.fft-picking').count()) === 1 && (await page.locator('.trace-chip.pickable').count()) === 2, 'el ⌖ entra en modo de elegir traza');
+const fftPick = page.locator('.dft-tools .dft-pick');
+// la DFT arranca eligiendo traza: el ⌖ sólo hace falta si no está en ese modo
+if (!(await page.locator('.plot-panel.dft-picking').count())) await fftPick.click();
+check((await page.locator('.plot-panel.dft-picking').count()) === 1 && (await page.locator('.trace-chip.pickable').count()) === 2, 'el ⌖ entra en modo de elegir traza');
 await page.keyboard.press('Escape');
-check((await page.locator('.plot-panel.fft-picking').count()) === 0, 'Esc cancela el ⌖');
+check((await page.locator('.plot-panel.dft-picking').count()) === 0, 'Esc cancela el ⌖');
 await fftPick.click();
 await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
 await page.locator('.trace-chip', { hasText: 'Hann' }).first().hover();
-const fftInfo = await page.locator('.fft-info').first().textContent();
-check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)-Hann', 'la FFT queda como una traza en un panel debajo');
-check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la FFT tiene eje de frecuencias desde 0');
+const fftInfo = await page.locator('.dft-info').first().textContent();
+check(/fundamental 1kHz/.test(fftInfo) && /THD [\d.]+ %/.test(fftInfo), `DFT y THD de V(out): ${fftInfo}`);
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)-Hann', 'la DFT queda como una traza en un panel debajo');
+check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la DFT tiene eje de frecuencias desde 0');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: 'V(out)/2' }).click();
 const fftNames = (k) => page.locator('.pane').nth(k).locator('.trace-chip .name').allTextContents().then((v) => v.join());
-check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', 'dos FFT a la vez en el panel de FFT');
-// #260: otra ventana, otro panel; el nombre dice la ventana; zoom propio de cada panel de FFT
+check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', 'dos DFT a la vez en el panel de DFT');
+// #260: otra ventana, otro panel; el nombre dice la ventana; zoom propio de cada panel de DFT
 await page.getByLabel('Ventana', { exact: true }).selectOption('rect');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
-check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann' && (await fftNames(2)) === 'V(out)-Rec', 'FFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
+check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann' && (await fftNames(2)) === 'V(out)-Rec', 'DFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
 {
 const rangeX = (k) => page.locator('.pane').nth(k).locator('.uplot').getAttribute('data-range-x');
 const r1 = await rangeX(1);
@@ -231,7 +231,7 @@ const r2 = await rangeX(2);
   await page.mouse.wheel(0, -300);
   await page.waitForTimeout(200);
 }
-check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de FFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
+check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de DFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
 }
 // (arrastre de HTML5 con eventos: el del mouse de Playwright no siempre llega a un panel vacío)
 const dnd = async (src, dst) => {
@@ -241,22 +241,57 @@ const dnd = async (src, dst) => {
   await dst.dispatchEvent('drop', { dataTransfer: dt });
   await src.dispatchEvent('dragend', { dataTransfer: dt }).catch(() => {});
 };
-// las dos FFT de V(out) en el mismo panel: dos curvas y dos nombres
+// las dos DFT de V(out) en el mismo panel: dos curvas y dos nombres
 await dnd(page.locator('.pane').nth(2).locator('.trace-chip').first(), page.locator('.pane').nth(1).locator('.pane-chart'));
-check((await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann,V(out)-Rec' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos FFT de la misma señal en un panel: ${await fftNames(1)}`);
-// el panel que quedó vacío acepta una traza de tiempo; uno de FFT, no
+check((await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann,V(out)-Rec' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos DFT de la misma señal en un panel: ${await fftNames(1)}`);
+// el panel que quedó vacío acepta una traza de tiempo; uno de DFT, no
 await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(1).locator('.pane-chart'));
-check((await fftNames(0)) === 'V(out),V(out)/2', 'una traza de tiempo no va a un panel de FFT');
+check((await fftNames(0)) === 'V(out),V(out)/2', 'una traza de tiempo no va a un panel de DFT');
 await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(2).locator('.pane-empty'));
-check((await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2', `el panel vacío (antes de FFT) acepta una traza de tiempo: ${await fftNames(0)} | ${await fftNames(1)} | ${await fftNames(2)} (${await page.locator('.pane').count()})`);
-// y una FFT a un panel nuevo vacío
+check((await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2', `el panel vacío (antes de DFT) acepta una traza de tiempo: ${await fftNames(0)} | ${await fftNames(1)} | ${await fftNames(2)} (${await page.locator('.pane').count()})`);
+// y una DFT a un panel nuevo vacío
 await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
 await page.locator('.pane-add button').click();
-await dnd(page.locator('.pane').nth(1).locator('.trace-chip', { hasText: 'Rectangular' }), page.locator('.pane').nth(2).locator('.pane-empty'));
-check((await fftNames(2)) === 'V(out)-Rec' && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', `una FFT a un panel nuevo vacío: ${await fftNames(1)} | ${await fftNames(2)}`);
+await dnd(page.locator('.pane').nth(1).locator('.trace-chip', { hasText: 'V(out)-Rec' }), page.locator('.pane').nth(2).locator('.pane-empty'));
+check((await fftNames(2)) === 'V(out)-Rec' && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', `una DFT a un panel nuevo vacío: ${await fftNames(1)} | ${await fftNames(2)}`);
 await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
 await page.locator('.pane').nth(1).getByRole('button', { name: 'Quitar panel' }).click();
-check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la FFT queda el transitorio');
+check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la DFT queda el transitorio');
+// muestreo elegido: t₀, t₁ y fs; las muestras se marcan sobre la traza de tiempo
+{
+  const field = (name) => page.getByLabel(name, { exact: true });
+  const sampling = () => page.locator('.dft-sampling').textContent();
+  await field('Tiempo inicial de la DFT').fill('1m');
+  await field('Tiempo final de la DFT').fill('5m');
+  await field('Frecuencia de muestreo de la DFT').fill('2k');
+  await page.waitForTimeout(300);
+  check(/^8 muestras de 1ms a 5ms a 2kHz · resolución Δf = 250Hz · hasta 1kHz \(Nyquist\)$/.test(await sampling()), `muestreo elegido: ${await sampling()}`);
+  check((await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '8', `las 8 muestras se marcan sobre la traza (${await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')})`);
+  // un valor que no se entiende: en rojo, sin ⌖
+  await field('Frecuencia de muestreo de la DFT').fill('abc');
+  check((await page.locator('.dft-field.bad').count()) === 1 && (await page.locator('.dft-tools .dft-pick').isDisabled()) && /^Escribí un número/.test(await sampling()), 'un valor que no se entiende se marca y no deja agregar');
+  // 1000 muestras: no hace falta una potencia de 2
+  await field('Frecuencia de muestreo de la DFT').fill('250k');
+  await page.waitForTimeout(300);
+  check(/^1\.000 muestras de 1ms a 5ms a 250kHz/.test(await sampling()), `1000 muestras: ${await sampling()}`);
+  if (!(await page.locator('.plot-panel.dft-picking').count())) await fftPick.click();
+  await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
+  await page.locator('.pane').nth(1).locator('.trace-chip').first().hover();
+  const info = await page.locator('.dft-info').first().textContent();
+  check(/fundamental 1kHz/.test(info) && /1000 muestras a 250kHz \(Δf = 250Hz\)/.test(info), `DFT de 1000 muestras (no es potencia de 2): ${info}`);
+  // Editar la DFT: la barra toma su muestreo; Aplicar lo cambia
+  await page.locator('.pane').nth(1).locator('.trace-chip').first().click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Editar la DFT (ventana y muestreo)' }).click();
+  check((await field('Frecuencia de muestreo de la DFT').inputValue()) === '250k' && /^Editando V\(out\)-Rec/.test(await sampling()), `al editar, la barra toma su muestreo (${await field('Frecuencia de muestreo de la DFT').inputValue()} · ${await sampling()})`);
+  await field('Frecuencia de muestreo de la DFT').fill('500k');
+  await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+  await page.waitForTimeout(300);
+  await page.locator('.pane').nth(1).locator('.trace-chip').first().hover();
+  check(/2000 muestras a 500kHz \(Δf = 250Hz\)/.test(await page.locator('.dft-info').first().textContent()), `Aplicar cambia la DFT: ${await page.locator('.dft-info').first().textContent()}`);
+  await page.locator('.pane').nth(1).getByRole('button', { name: 'Quitar panel' }).click();
+  await page.getByRole('button', { name: 'DFT', exact: true }).click();
+  check((await page.locator('.dft-tools').count()) === 0 && (await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '', 'al cerrar la DFT no quedan marcas de muestras');
+}
 // #193: con zoom en un tramo chico las marcas del eje Y no se repiten
 {
   const cb = await page.locator('.pane-chart').first().boundingBox();

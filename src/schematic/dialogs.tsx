@@ -779,6 +779,11 @@ export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }
           {t('Circuit simulator that runs the')}{' '}<strong>ngspice</strong>{' '}{t('engine, compiled in WebAssembly. Compatible with LTspice .ASC file format.')}
         </p>
         <p>{t('Designed and developed by Agustín Gullino and Javier Petrucci.')}</p>
+        <p>
+          {t('Free software under the')}{' '}
+          <a href={`${repo.replace(/\/$/, '')}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">{'GNU GPL v3.0'}</a>{' '}
+          {t('or later.')}
+        </p>
         <p className="about-links">
           <a href={repo} target="_blank" rel="noopener noreferrer">{t('Source code and bug reports')}</a>
           <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">{t('Privacy policy')}</a>

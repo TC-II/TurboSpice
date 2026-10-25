@@ -60,9 +60,13 @@ Para crear el Client ID (no hay secreto: el ID es público y va en el JavaScript
    - deploy: en el repo, *Settings → Secrets and variables → Actions → Variables*, crear la variable
      `VITE_GOOGLE_CLIENT_ID` (el workflow de deploy la pasa al build).
 
-## Licencias
+## Licencia
 
-ngspice se distribuye bajo su licencia BSD modificada (ver `COPYING` en las fuentes de ngspice).
-Los modelos en `library/` llevan su origen y licencia en `library/LICENSES.md`.
-Dependencias de la interfaz: React (MIT), uPlot (MIT) y Blockly (Apache 2.0, se carga sólo al abrir
-el editor de bloques).
+TurboSpice es software libre: se distribuye bajo la **GNU General Public License v3.0 o
+posterior** (`GPL-3.0-or-later`, ver [`LICENSE`](LICENSE)). Copyright © 2026 Javier Petrucci,
+Agustín Gullino y los demás autores de TurboSpice.
+
+Los componentes de terceros (ngspice, Icarus Verilog, Yosys, React, uPlot, Blockly) conservan
+sus licencias, todas compatibles con la GPL-3.0: ver [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+La librería de componentes (`library/`) y los casos de prueba (`tests/fixtures/`) no están bajo la
+GPL: tienen su origen y sus condiciones en [`library/LICENSES.md`](library/LICENSES.md).

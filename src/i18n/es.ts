@@ -886,6 +886,8 @@ export const es: Record<string, string> = {
   'source {name} doesn\'t exist': 'no existe la fuente {name}',
   'source {s}': 'fuente {s}',
   'Source code and bug reports': 'Código fuente y reporte de problemas',
+  'Free software under the': 'Software libre bajo la',
+  'or later.': 'o posterior.',
   'Source to sweep': 'Fuente a barrer',
   'Source value': 'Valor de la fuente',
   'Space': 'Espacio',

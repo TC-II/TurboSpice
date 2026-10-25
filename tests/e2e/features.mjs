@@ -44,7 +44,7 @@ await page.keyboard.press('Escape');
 check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  toolbarNames.slice(0, 17).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Mover' && toolbarNames.includes('Borrar'),
+  toolbarNames.slice(0, 18).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Mover' && toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');

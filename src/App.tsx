@@ -1684,7 +1684,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       check: () => null,
       onOk: (n) => {
         setDialog(null);
-        editProject(addGroup(snapshot(), n).project);
+        // un workbench nuevo viene con un testbench vacío adentro
+        const g = addGroup(leave(), n);
+        const r = addProjectSim(g.project, EMPTY_ASC);
+        if (!r) return editProject(g.project);
+        enter(setBenchGroup(r.project, r.id, g.id), true);
+        markDirty();
       },
     });
   const uniqueGroupName = () => {
@@ -1963,8 +1968,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const expr = probeExpr(sim.built, target, simScope);
       return expr ? traces.find((x) => sameExpr(x.t.expr, expr))?.color : undefined;
     };
-    return currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements).map((a) => {
-      const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? colorOf({ symbol: a.sym });
+    const all = currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements);
+    const perSym = new Map<number, number>();
+    for (const a of all) perSym.set(a.sym, (perSym.get(a.sym) ?? 0) + 1);
+    return all.map((a) => {
+      // la corriente del componente (sin pin) sólo colorea la flecha si es la única: en uno con
+      // varios terminales (Q, M, X…) pintaría todas, y es la de un solo terminal
+      const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? (perSym.get(a.sym) === 1 ? colorOf({ symbol: a.sym }) : undefined);
       return color ? { ...a, color } : a;
     });
   }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope]);
@@ -1993,7 +2003,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [panes, tool.kind, path]);
   // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla
   // no llega el pointerleave)
-  const traceNetShown = traceNet && panes.some((p) => p.traces.some((tt) => sameExpr(tt.expr, `V(${traceNet})`))) ? traceNet : undefined;
+  // (tampoco si el renglón de la leyenda se reacomoda o se pasa a otro panel bajo el cursor, ni si
+  // la ventana pierde el foco: el pointerleave de un elemento que desaparece nunca llega)
+  useEffect(() => setTraceNet(undefined), [panes]);
+  useEffect(() => {
+    const off = () => setTraceNet(undefined);
+    window.addEventListener('blur', off);
+    return () => window.removeEventListener('blur', off);
+  }, []);
+  const traceNetShown =traceNet && panes.some((p) => p.traces.some((tt) => sameExpr(tt.expr, `V(${traceNet})`))) ? traceNet : undefined;
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color

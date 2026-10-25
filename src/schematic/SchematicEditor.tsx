@@ -1033,7 +1033,14 @@ export function SchematicEditor(props: Props) {
     }
   };
 
+  // sin ratón no hay «pasar por arriba»: al levantar el dedo o el lápiz se suelta la red resaltada
+  useEffect(() => {
+    const off = () => setHoverNet(undefined);
+    window.addEventListener('blur', off);
+    return () => window.removeEventListener('blur', off);
+  }, []);
   const onPointerUp = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') setHoverNet(undefined);
     if (e.pointerType === 'touch') {
       touches.current.delete(e.pointerId);
       clearTimeout(longPress.current);

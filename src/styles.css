@@ -706,7 +706,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
   .appbar { gap: 8px; padding: 6px 8px; }
   .appbar .tabs button { padding: 4px 6px; }
   /* las herramientas no se achican por debajo del botón «Más herramientas»: si no entran, pasan de fila */
-  .appbar-tools { min-width: 64px; }
+  .appbar-tools { min-width: max-content; }
   .share-btn { padding: 4px 6px; }
   .iconbar { padding: 4px 8px; }
   .iconbar .txt, .share-btn .txt { display: none; }

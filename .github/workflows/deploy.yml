@@ -1,8 +1,12 @@
 name: Build y deploy a GitHub Pages
 
+# main se publica en tc-ii.github.io/TurboSpice/ y dev en tc-ii.github.io/TurboSpice/dev/.
+# Pages tiene un solo sitio por repo y cada deploy lo reemplaza entero: por eso el job «site»
+# compila las dos ramas (cada una con su ruta base) y «deploy» las sube juntas.
+
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
   workflow_dispatch:
 
@@ -79,18 +83,104 @@ jobs:
           node tests/e2e/verilog.mjs http://localhost:4173/TurboSpice/
           node tests/e2e/panes.mjs http://localhost:4173/TurboSpice/
 
-      - uses: actions/upload-pages-artifact@v3
-        if: github.event_name != 'pull_request'
-        with:
-          path: dist
-
-  deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+  site:
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
     needs: build
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: main
+            base: /TurboSpice/
+            channel: ''
+          - branch: dev
+            base: /TurboSpice/dev/
+            channel: dev
+    # si dev no compila, el sitio sale sin /dev/ en vez de frenar el deploy de main
+    continue-on-error: ${{ matrix.branch == 'dev' }}
+    steps:
+      - name: ¿Existe la rama?
+        id: ref
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" "${{ matrix.branch }}" >/dev/null; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "La rama ${{ matrix.branch }} no existe: no se publica"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.ref.outputs.ok == 'true'
+        with:
+          ref: ${{ matrix.branch }}
+
+      - name: Caché del motor
+        if: steps.ref.outputs.ok == 'true'
+        id: engine-cache
+        uses: actions/cache@v4
+        with:
+          path: engine/dist-engine
+          key: engine-${{ env.EMSDK_VERSION }}-${{ hashFiles('engine/build.sh', 'engine/spinit', 'engine/osdi/imports.c', 'engine/icarus/**') }}
+
+      - name: Setup emsdk
+        if: steps.ref.outputs.ok == 'true' && steps.engine-cache.outputs.cache-hit != 'true'
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ env.EMSDK_VERSION }}
+
+      - name: Compilar ngspice a WASM
+        if: steps.ref.outputs.ok == 'true' && steps.engine-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update && sudo apt-get install -y bison flex gperf autoconf
+          bash engine/build.sh
+
+      - uses: actions/setup-node@v4
+        if: steps.ref.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - if: steps.ref.outputs.ok == 'true'
+        run: npm ci
+      - if: steps.ref.outputs.ok == 'true'
+        run: npm run build
+        env:
+          BASE_PATH: ${{ matrix.base }}
+          VITE_CHANNEL: ${{ matrix.channel }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+
+      - uses: actions/upload-artifact@v4
+        if: steps.ref.outputs.ok == 'true'
+        with:
+          name: site-${{ matrix.branch }}
+          path: dist
+          retention-days: 1
+
+  deploy:
+    needs: site
+    runs-on: ubuntu-latest
+    # un deploy por vez; el último en correr junta las puntas de las dos ramas
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: site-*
+          path: sites
+      - name: Juntar main en / y dev en /dev/
+        run: |
+          # sin main no se publica nada: el sitio estable no puede quedar vacío
+          test -d sites/site-main || { echo "Falta el build de main"; exit 1; }
+          mkdir -p site
+          cp -r sites/site-main/. site/
+          if [ -d sites/site-dev ]; then mkdir -p site/dev && cp -r sites/site-dev/. site/dev/; else echo "Sin build de dev: no se publica /dev/"; fi
+          ls site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4

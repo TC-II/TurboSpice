@@ -10,7 +10,7 @@ import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { extent, panBy, wheelZoom, zoomAbout } from './scales.ts';
 import { decimator } from './decimate.ts';
-import { axisTicks, scaleOf, si, siFixed } from './series.ts';
+import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
 import { PALETTE, acceptsTrace, colorFor, sameFft, cursorForClick, isFftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace } from './view.ts';
@@ -40,6 +40,8 @@ export interface PlotPanelHandle {
   csv(): string;
   png(): Promise<Blob | null>;
   action(a: PlotAction): void;
+  /** agrega la DFT de esa expresión (la punta de prueba en modo ⌖) */
+  addFft(expr: string): void;
 }
 
 interface Props {
@@ -60,6 +62,8 @@ interface Props {
   toolsHost?: HTMLElement | null;
   /** A: ir a la caja de expresiones (está en la barra de resultados) */
   onFocusTrace?(): void;
+  /** avisa cuando se entra o sale del modo ⌖ de la DFT (el esquemático pasa a la punta de prueba) */
+  onFftPicking?(on: boolean): void;
   /** resultados al costado del esquemático: cursores y medidas van debajo de los paneles (si
    * no, a la derecha) */
   side?: boolean;
@@ -102,8 +106,12 @@ const allFinite = (y: Float64Array) => {
 const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName === 'frequency' ? 'Hz' : '');
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
+/** franjas de los ejes que responden a la rueda y al arrastre (px): sólo las marcas y los números
+ * (abajo) y la columna de números (a los costados), no toda la caja del eje */
+const AXIS_X_BAND = 28;
+const AXIS_Y_BAND = 44;
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, side, toolsHost }: Props) {
+export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, onFftPicking, side, toolsHost }: Props) {
   const [fftOpen, setFftOpen] = useState(false);
   // ⌖: elegir con un click en su cápsula la traza cuya FFT se agrega (#245)
   const [fftPicking, setFftPicking] = useState(false);
@@ -134,7 +142,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [rRanges, setRRanges] = useState<Record<number, Range>>({});
   const [zoomMode, setZoomMode] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   // vistas anteriores (Shift+Z)
   const zoomHistory = useRef<{ x: Range | null; y: Record<number, Range> }[]>([]);
 
@@ -290,6 +298,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     }
     setFftPicking(false);
   };
+  useEffect(() => onFftPicking?.(fftPicking), [fftPicking]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onFftPicking?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!fftPicking) return;
     const onKey = (e: KeyboardEvent) => {
@@ -315,7 +325,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     const tt = panes[i]?.traces[ti];
     if (!tt) return [];
     const items: ContextItem[] = [];
-    if (isTran && !isF(i)) items.push({ label: t('FFT of this trace'), onClick: () => (setFftOpen(true), addFft(tt.expr)) });
+    if (isTran && !isF(i)) items.push({ label: t('DFT of this trace'), onClick: () => (setFftOpen(true), addFft(tt.expr)) });
     const label = data[i]?.curves.find((c) => c.trace === ti)?.label;
     if (label !== undefined)
       for (const [k, name] of [['ta', 'A'], ['tb', 'B']] as const)
@@ -344,6 +354,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   };
 
   useImperativeHandle(handle, () => ({
+    addFft,
     csv: () => {
       const d = data[0];
       if (!d) return '';
@@ -464,6 +475,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       >
         <Icon name="fit" />
       </button>
+      {/* la DFT es un grupo aparte */}
+      {isTran && <span className="tool-sep" aria-hidden />}
       {isTran && (
         <button
           className={fftOpen ? 'active' : ''}
@@ -472,9 +485,9 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             setFftOpen(!fftOpen);
             setFftPicking(!fftOpen);
           }}
-          title={t('Spectrum (FFT) and harmonic distortion of a trace')}
+          title={t('Spectrum (DFT) and harmonic distortion of a trace')}
         >
-          FFT
+          DFT
         </button>
       )}
       {fftOpen && isTran && (
@@ -486,8 +499,8 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           </select>
           <button
             className={`pick-btn fft-pick${fftPicking ? ' active' : ''}`}
-            aria-label={t('Trace for the FFT')}
-            title={t('Pick the trace for the FFT: click its name in the legend (Esc cancels)')}
+            aria-label={t('Signal for the DFT')}
+            title={t('Pick the signal for the DFT: a trace in the legend, or a wire or component with the probe (Esc cancels)')}
             onClick={() => setFftPicking((v) => !v)}
           >
             ⌖
@@ -508,7 +521,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   return (
     <div className={`plot-panel${fftPicking ? ' fft-picking' : ''}`}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
-      {fftPicking && <p className="hint plot-info">{t('Click a trace in the legend to add its FFT · Esc cancels')}</p>}
+      {fftPicking && <p className="hint plot-info">{t('Click a trace in the legend, or a wire or component in the schematic, to add its DFT · Esc cancels')}</p>}
       {(zoomMode || removing) && (
         <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
       )}
@@ -689,6 +702,8 @@ function PaneView(props: {
   const [dragOver, setDragOver] = useState(false);
   // menú del botón derecho sobre una traza de la leyenda
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number } | null>(null);
+  /** cápsula bajo el mouse (muestra la información de su DFT) */
+  const [chipHover, setChipHover] = useState<number | null>(null);
   const colorInputs = useRef(new Map<number, HTMLInputElement>());
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
   // la grilla del tema oscuro queda sobre el fondo claro)
@@ -756,7 +771,8 @@ function PaneView(props: {
       },
       axes: [
         {
-          values: (_u, tt) => tt.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
+          space: (_u, _i, min, max) => (data.log ? 50 : axisSpace(min, max)),
+          values: (_u, tt) => !data.log ? axisTicks(tt) : tt.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
@@ -846,12 +862,14 @@ function PaneView(props: {
             // el eje que acerca la rueda, levemente resaltado
             if (axisHover) {
               const { left, top, width, height } = u.bbox;
+              // (la franja resaltada es la misma que responde a la rueda; el bbox va en píxeles del canvas)
+              const px = uPlot.pxRatio;
               ctx.save();
               ctx.fillStyle = fg;
               ctx.globalAlpha = 0.08;
-              if (axisHover === 'left') ctx.fillRect(0, top, left, height);
-              else if (axisHover === 'bottom') ctx.fillRect(left, top + height, width, u.ctx.canvas.height - top - height);
-              else ctx.fillRect(left + width, top, u.ctx.canvas.width - left - width, height);
+              if (axisHover === 'left') ctx.fillRect(left - AXIS_Y_BAND * px, top, AXIS_Y_BAND * px, height);
+              else if (axisHover === 'bottom') ctx.fillRect(left, top + height, width, AXIS_X_BAND * px);
+              else ctx.fillRect(left + width, top, AXIS_Y_BAND * px, height);
               ctx.restore();
             }
             // f₀ de polos (×) y ceros (○): líneas verticales punteadas
@@ -1071,9 +1089,10 @@ function PaneView(props: {
     /** sobre qué eje está el mouse (a la altura del área del gráfico) */
     const axisAt = (e: { clientX: number; clientY: number }): 'left' | 'right' | 'bottom' | null => {
       const r = over.getBoundingClientRect();
-      if (e.clientY > r.bottom && e.clientX >= r.left && e.clientX <= r.right) return 'bottom';
-      if (e.clientY < r.top || e.clientY > r.bottom) return null;
-      return e.clientX < r.left ? 'left' : e.clientX > r.right && hasRight ? 'right' : null;
+      if (e.clientY > r.bottom) return e.clientX >= r.left && e.clientX <= r.right && e.clientY <= r.bottom + AXIS_X_BAND ? 'bottom' : null;
+      if (e.clientY < r.top) return null;
+      if (e.clientX < r.left) return r.left - e.clientX <= AXIS_Y_BAND ? 'left' : null;
+      return e.clientX - r.right > 0 && hasRight && e.clientX - r.right <= AXIS_Y_BAND ? 'right' : null;
     };
     const hoverAxis = (a: 'left' | 'right' | 'bottom' | null) => {
       if (a === axisHover) return;
@@ -1126,7 +1145,10 @@ function PaneView(props: {
         if (lo !== cur[0] || hi !== cur[1]) live.current.onWheelZoom(toX(lo, hi));
         return;
       }
-      if (axisAt(e) === 'right') {
+      const zone = axisAt(e);
+      // fuera de las franjas de los ejes (debajo del gráfico o más allá de sus números): la rueda no hace nada
+      if (!zone && (e.clientY > r.bottom || e.clientX < r.left || e.clientX > r.right)) return;
+      if (zone === 'right') {
         // eje derecho (corrientes o fase): su propia escala
         const cur = now('r');
         if (!cur) return;
@@ -1292,8 +1314,8 @@ function PaneView(props: {
                 setDragOver(false);
                 props.onChange((p) => reorderTrace(p, trace, ti));
               }}
-              onPointerEnter={() => props.onHoverExpr?.(tt.expr)}
-              onPointerLeave={() => props.onHoverExpr?.(undefined)}
+              onPointerEnter={() => (props.onHoverExpr?.(tt.expr), setChipHover(ti))}
+              onPointerLeave={() => (props.onHoverExpr?.(undefined), setChipHover(null))}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ at: { x: e.clientX, y: e.clientY }, ti });
@@ -1349,7 +1371,10 @@ function PaneView(props: {
             </span>
           );
         })}
-        {data.x.length > 0 && (
+        {/* la DFT bajo el mouse: su fundamental y THD, en el lugar del valor de X */}
+        {chipHover !== null && data.info?.[chipHover] ? (
+          <span className="xval fft-info">{data.info[chipHover]}</span>
+        ) : data.x.length > 0 && (
           <span className={`xval${hover === null || data.x[hover] === undefined ? ' idle' : ''}`}>
             {data.xName} = {fix(hover !== null ? (data.x[hover] ?? NaN) : NaN, xUnit(data.xName))}
           </span>
@@ -1369,9 +1394,6 @@ function PaneView(props: {
           </button>
         )}
       </div>
-      {data.info?.map((l) => (
-        <p key={l} className="hint plot-info fft-info">{l}</p>
-      ))}
       {pane.digital && data.curves.length ? (
         <DigitalLanes
           x={data.x}

@@ -101,6 +101,9 @@ const PIN_TERMINALS: [RegExp, string[]][] = [
   [/^J/, ['d', 'g', 's']],
 ];
 
+/** Terminal de ese pin (SpiceOrder) de un transistor: 'c', 'b', 'e', 'd', 'g', 's'… */
+export const pinTerminal = (prefix: string, pin: number): string | undefined => PIN_TERMINALS.find(([re]) => re.test(prefix.toUpperCase()))?.[1][pin - 1];
+
 /** ¿Componente de varios pines? (la corriente se mide en cada pin, no en el cuerpo) */
 export const multiPinPrefix = (prefix: string) => PIN_TERMINALS.some(([re]) => re.test(prefix.toUpperCase()));
 

@@ -16,7 +16,7 @@ type BarField =
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
   /** casillas una debajo de la otra */
-  | { kind: 'checks'; label: string; checks: Extract<BarField, { kind: 'check' }>[] };
+  | { kind: 'checks'; label: string; checks: Extract<BarField, { kind: 'check' }>[]; /** una al lado de la otra (si no, apiladas) */ inline?: boolean };
 
 const UIC_TITLE =
   t('UIC (use initial conditions): doesn\'t compute the operating point. It starts with everything at 0 except the initial conditions (IC= on capacitors and inductors, .ic); sources are already at their value from t=0.');
@@ -66,9 +66,10 @@ function barRows(a: Analysis): BarField[][] {
           {
             kind: 'checks',
             label: t('options'),
+            inline: true,
             checks: [
               { kind: 'check', label: 'UIC', value: a.uic, set: (uic) => ({ ...a, uic }), title: UIC_TITLE },
-              { kind: 'check', label: 'startup', value: a.startup, set: (startup) => ({ ...a, startup }), title: STARTUP_TITLE },
+              { kind: 'check', label: '.startup', value: a.startup, set: (startup) => ({ ...a, startup }), title: STARTUP_TITLE },
             ],
           },
         ],
@@ -195,6 +196,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
     picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
   const rows = sim && draft && control === undefined ? barRows(draft) : [];
+  /** columnas de la grilla con varias filas (0: sin grilla) */
+  const gridCols = rows.length > 1 && !(draft && COLUMNS.has(draft.kind)) ? Math.max(...rows.map((r) => r.length)) : 0;
 
   // el indicador de estado vive bajo el widget del usuario (#213)
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -224,14 +227,15 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
         </span>
       )}
       {sim && control === undefined && (
-        <div className={draft && COLUMNS.has(draft.kind) ? 'sb-rows sb-cols' : 'sb-rows'}>
+        // varias filas (DC, ruido…): en grilla, para que los cuadros queden alineados en columnas
+        <div className={draft && COLUMNS.has(draft.kind) ? 'sb-rows sb-cols' : gridCols ? 'sb-rows sb-grid' : 'sb-rows'} style={gridCols ? { gridTemplateColumns: `repeat(${gridCols}, auto auto)` } : undefined}>
           {!draft && <code className="sb-line">{line}</code>}
-          {draft && !rows.length && <span className="sb-hint">{t('No parameters')}</span>}
+          {draft && !rows.length && <span className="sb-hint">{draft.kind === 'op' ? t('Run and pick to inspect the nodes') : t('No parameters')}</span>}
           {rows.map((r, i) => (
             <div className="sb-row" key={i}>
               {r.map((f) =>
                 f.kind === 'checks' ? (
-                  <div key={f.label} className="sb-checks">
+                  <div key={f.label} className={`sb-checks${f.inline ? ' inline' : ''}`}>
                     {f.checks.map((c) => (
                       <label key={c.label} className="sb-check" title={c.title}>
                         <input type="checkbox" checked={c.value} onChange={(e) => change(c.set(e.target.checked))} /> {c.label}
@@ -245,15 +249,18 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                 ) : f.kind === 'select' ? (
                   <label key={f.label} className="sb-field">
                     <span>{f.label}</span>
+                    <span className="sb-box">
                     <select value={f.value} aria-label={f.label} onChange={(e) => change(f.set(e.target.value))}>
                       {f.options.map(([v, l]) => (
                         <option key={v} value={v}>{l}</option>
                       ))}
                     </select>
+                    </span>
                   </label>
                 ) : (
                   <label key={f.label} className="sb-field">
                     <span>{f.label}</span>
+                    <span className="sb-box">
                     <input
                       value={f.value}
                       aria-label={f.label}
@@ -293,9 +300,12 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                         ⌖
                       </button>
                     )}
+                    </span>
                   </label>
                 ),
               )}
+              {/* en la grilla, una fila más corta se completa para que la siguiente empiece abajo */}
+              {gridCols > r.length && Array.from({ length: 2 * (gridCols - r.length) }, (_, k) => <span key={`pad${k}`} />)}
             </div>
           ))}
         </div>

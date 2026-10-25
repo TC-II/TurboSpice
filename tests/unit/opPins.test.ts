@@ -5,7 +5,9 @@ describe('punta de prueba sobre el OP (#228)', () => {
   it('claves por red y por componente', () => {
     expect(opPinKey({ net: 'Out' })).toBe('n:out');
     expect(opPinKey({ net: '0' })).toBeUndefined();
-    expect(opPinKey({ symbol: 3, pin: 1 })).toBe('s:3');
+    // el pin de un transistor es su propia anotación: cada uno con su corriente
+    expect(opPinKey({ symbol: 3, pin: 1 })).toBe('s:3:1');
+    expect(opPinKey({ symbol: 3 })).toBe('s:3');
     expect(opPinKey({})).toBeUndefined();
   });
   it('se acumulan y otro clic las quita', () => {

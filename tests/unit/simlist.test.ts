@@ -19,7 +19,6 @@ import {
   emptySims,
   followLine,
   keepResult,
-  MAX_SIMS,
   removeSim,
   renameSim,
   selectSim,
@@ -84,11 +83,11 @@ describe('lista de simulaciones', () => {
     expect(l.active).toBe(a);
     expect(removeSim(l, a)).toEqual(emptySims());
   });
-  it('tiene un límite', () => {
+  it('no tiene límite', () => {
     let l = emptySims();
-    for (let i = 0; i < MAX_SIMS + 3; i++) l = addSim(l, `.tran ${i + 1}m`);
-    expect(l.items.length).toBe(MAX_SIMS);
-    expect(duplicateSim(l, l.active)).toBe(l);
+    for (let i = 0; i < 50; i++) l = addSim(l, `.tran ${i + 1}m`);
+    expect(l.items.length).toBe(50);
+    expect(duplicateSim(l, l.active).items.length).toBe(51);
   });
   it('sigue al comando del esquemático', () => {
     let l = followLine(emptySims(), '.tran 1m');

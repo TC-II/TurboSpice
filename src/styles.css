@@ -1,4 +1,6 @@
 :root {
+  /* ancho del panel del proyecto: el botón del proyecto de la barra mide lo mismo */
+  --tree-w: 260px;
   --bg: #ffffff;
   --bg-alt: #f4f5f7;
   --fg: #1d2025;
@@ -144,9 +146,14 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .tabs button.active { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }
 .tabs button:disabled { opacity: 0.45; cursor: default; }
 /* vistas (#55): la que se muestra va en azul; las demás, oscuras (un click las agrega) */
-.view-tabs button { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }
+.view-tabs button { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); display: inline-flex; align-items: center; border-radius: 6px 6px 0 0; }
 .view-tabs button.active { background: var(--accent); color: #fff; box-shadow: none; }
+.view-tabs button.alone { cursor: default; }
 .view-tabs button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+/* segmento de la cruz o la flechita: ancho fijo (con o sin ícono), así el botón no cambia de tamaño;
+   el click es el del botón entero */
+.view-act { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; width: 22px; height: 18px; margin-left: 6px; margin-right: -3px; border-radius: 4px; background: color-mix(in srgb, currentColor 18%, transparent); }
+.view-act.idle { background: transparent; }
 /* disposición de los resultados (al costado o abajo), al lado de las vistas */
 .layout-btns { display: flex; gap: 2px; }
 .layout-btns button { display: inline-flex; padding: 3px; border-color: transparent; background: transparent; border-radius: 5px; color: var(--fg-muted); }
@@ -592,7 +599,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar { display: flex; align-items: center; flex-wrap: nowrap; padding: 4px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
 /* grupos separados por una línea; el ancho de cada uno incluye su separador (se mide para colapsar) */
 .iconbar .group { display: flex; align-items: center; gap: 2px; flex: none; position: relative; padding: 0 6px 0 7px; }
-.iconbar .group::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 22px; margin-top: -11px; background: var(--border); }
+.iconbar .group::before { content: ''; position: absolute; left: 0; top: 50%; width: 1px; height: 22px; margin-top: -11px; background: color-mix(in srgb, var(--fg) 24%, transparent); }
 .iconbar .group:first-child { padding-left: 0; }
 .iconbar .group:first-child::before { display: none; }
 .iconbar .group.more { padding-left: 0; }
@@ -937,14 +944,15 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .editable-name { cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ---------- Cápsula Proyecto · Variante (#150) ---------- */
-.capsule { position: relative; z-index: 25; display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); font-size: 13px; max-width: min(46ch, 50vw); }
-.appbar-right .capsule { position: absolute; left: 50%; transform: translateX(-50%); }
-@media (max-width: 1000px) { .appbar-right .capsule { position: relative; left: auto; transform: none; } }
-.capsule-names { display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 12px; min-width: 0; }
-.capsule-project { color: var(--fg-muted); max-width: 20ch; }
-.capsule-variant { font-weight: 600; max-width: 22ch; }
+/* el botón del proyecto: una caja como «Nueva simulación», con los nombres (sólo para ver) */
+.iconbar .proj-capsule { gap: 8px; box-sizing: border-box; flex: none; width: var(--tree-w); min-width: 0; overflow: hidden; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); font-size: 13px; }
+.iconbar .proj-capsule.on { border-color: var(--accent); }
+.capsule-names { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.capsule-project { color: var(--fg-muted); max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.capsule-variant { font-weight: 600; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .capsule-dot { color: var(--fg-muted); }
-.capsule-dirty { color: var(--accent); }
+/* sin guardar: el naranja de la simulación en curso */
+.capsule-dirty { color: #f08c00; }
 .capsule-caret { display: inline-flex; align-items: center; border: 0; border-left: 1px solid var(--border); border-radius: 0 999px 999px 0; background: transparent; padding: 0 8px; }
 .capsule-caret:hover, .capsule-caret.open { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .capsule-pop { position: absolute; top: calc(100% + 4px); left: 50%; transform: translateX(-50%); z-index: 20; min-width: 280px; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 22%); }
@@ -1009,12 +1017,12 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 /* Jerarquía (#180): barra con pestañas y migas, panel de proyecto, buscador rápido */
 .canvas-wrap.with-hier { padding-top: 31px; }
 .canvas-wrap { overflow: hidden; isolation: isolate; }
-.canvas-wrap.with-tree { padding-left: 260px; }
-.canvas-wrap.with-tree .hint-bar { left: 260px; }
+.canvas-wrap.with-tree { padding-left: var(--tree-w); }
+.canvas-wrap.with-tree .hint-bar { left: var(--tree-w); }
 .canvas-wrap.with-hier > .pick-banner { top: 41px; z-index: 6; }
 .canvas-wrap.with-crumbs > .pick-banner { top: 74px; }
 .sub-hint { --sub-mode: #f59f00; position: absolute; top: 0; left: 0; right: 0; height: 31px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 6px 0 12px; background: color-mix(in srgb, var(--sub-mode) 22%, var(--bg-alt)); border-bottom: 2px solid var(--sub-mode); z-index: 5; font-size: 13px; color: var(--fg); white-space: nowrap; }
-.canvas-wrap.with-tree > .sub-hint { left: 260px; }
+.canvas-wrap.with-tree > .sub-hint { left: var(--tree-w); }
 .sub-hint.verilog { --sub-mode: #c4a7f5; }
 .sub-hint strong { color: var(--sub-mode); text-transform: uppercase; letter-spacing: .04em; font-size: 12px; }
 .sub-hint-name { font-family: var(--mono); font-weight: 600; }
@@ -1040,7 +1048,7 @@ button.hier-tab { padding-right: 10px; }
 .hier-sep { color: var(--fg-muted); margin: 0 6px; }
 .hier-crumbs button.link, .project-tree button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; cursor: pointer; }
 .hier-crumbs button.link:hover, .project-tree button.link:hover { text-decoration: underline; }
-.project-tree { position: absolute; top: 0; left: 0; bottom: 0; width: 260px; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
+.project-tree { position: absolute; top: 0; left: 0; bottom: 0; width: var(--tree-w); overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; background: var(--bg-alt); border-right: 1px solid var(--border); z-index: 4; font-size: 13px; }
 .project-tree header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 8px 12px; border-bottom: 1px solid var(--border); }
 .project-tree header strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-tree h4 { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: space-between; margin: 12px 0 4px; padding: 0 8px 0 12px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--fg-muted); }
@@ -1178,8 +1186,7 @@ button.hier-tab { padding-right: 10px; }
 .appbar-tools { flex: 1 1 0; min-width: 0; }
 .appbar .iconbar { flex: 1 1 0; border-bottom: 0; padding: 0; justify-content: center; }
 .appbar-sep { flex: none; width: 1px; height: 22px; margin: 0 12px; background: var(--border); }
-.sim-row .capsule { margin: 0 4px; }
-.sim-row .proj-toggle { margin-left: 0; }
+.sim-row .proj-capsule { margin: 0 4px; }
 
 /* Panel de proyecto: proyecto › grupos › testbenches unidos con líneas de árbol */
 .project-tree header .tree-add { margin-left: auto; }
@@ -1199,7 +1206,6 @@ button.hier-tab { padding-right: 10px; }
   .sim-row { flex-wrap: wrap; row-gap: 4px; }
   .sim-row > .group.fixed { flex-wrap: wrap; row-gap: 4px; flex: 1 1 100%; }
   .appbar-sep { flex: none; width: 1px; height: 22px; margin: 0 12px; background: var(--border); }
-.sim-row .capsule { max-width: 60vw; }
   .sim-row > .bar-after { flex-basis: 100%; }
   .sim-row .simbar .sb-row { flex-wrap: nowrap; }
   .sim-row .simbar .sb-rows { flex: none; }
@@ -1208,7 +1214,7 @@ button.hier-tab { padding-right: 10px; }
 /* Módulo Verilog (#209): código, sintetizar e interfaz eléctrica en lugar del esquemático */
 .verilog-module { position: absolute; inset: 0; display: flex; flex-direction: column; background: var(--bg); z-index: 1; }
 .canvas-wrap.with-sym .verilog-module { right: var(--sym-wc, 420px); }
-.canvas-wrap.with-tree .verilog-module { left: 260px; }
+.canvas-wrap.with-tree .verilog-module { left: var(--tree-w); }
 .canvas-wrap.with-hier .verilog-module { top: 31px; }
 .vm-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
 .vm-bar strong { font-family: var(--mono); font-size: 13px; }
@@ -1262,7 +1268,7 @@ svg.editor.tool-pencil { cursor: crosshair; }
 
 /* Editor de módulos «Modelo»: netlist y atributos a la izquierda, símbolo a la derecha */
 .model-editor { position: absolute; inset: 0; z-index: 7; background: var(--bg); }
-.canvas-wrap.with-tree > .model-editor { left: 260px; }
+.canvas-wrap.with-tree > .model-editor { left: var(--tree-w); }
 .model-editor > .sub-hint { --sub-mode: #4dabf7; left: 0; }
 .model-editor > .sym-pane { top: 31px; }
 .model-left { position: absolute; top: 31px; left: 0; bottom: 0; right: var(--sym-wc, 420px); display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; overflow: auto; box-sizing: border-box; font-size: 13px; }
@@ -1282,3 +1288,35 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .tree-menu button { display: flex; gap: 6px; align-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; text-align: left; padding: 4px 8px; white-space: nowrap; }
 .tree-menu button:hover, .tree-menu button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 @media (max-width: 700px) { .canvas-wrap.with-tree > .model-editor { left: 0; } .model-left { right: 0; } }
+
+/* Cápsula del proyecto: ocupa el ancho del panel de proyecto, todo el alto de la barra, y con el
+   panel abierto toma su fondo y tapa el borde inferior para quedar unida a él */
+.iconbar.sim-row { padding-left: 0; }
+.sim-row > .group:first-child { align-self: stretch; box-sizing: border-box; width: var(--tree-w); padding: 0; margin: -4px 0 -5px; border-right: 1px solid var(--border); position: relative; z-index: 5; }
+.sim-row > .group:first-child:has(.proj-capsule.on) { background: var(--bg-alt); }
+.sim-row > .group:first-child + .group::before { display: none; }
+.iconbar.sim-row .proj-capsule { width: 100%; height: 100%; margin: 0; padding: 0 12px; border: 0; border-radius: 0; background: transparent; }
+.iconbar.sim-row .proj-capsule:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+/* New simulation y Run con aire entre sí; Probe y los suyos, separados de Run */
+.sim-row > .group.fixed { gap: 8px; padding-right: 10px; }
+.sim-row > .group.fixed + .group { padding-left: 10px; }
+.tree-row.tree-new-group .tree-name { font-weight: 400; color: var(--fg-muted); }
+.tree-row.tree-new-group .tree-name:hover { color: var(--accent); }
+/* camino hasta el testbench activo: ramas en el color de acento */
+.tree-branch > li.path-above::after { border-left-color: var(--accent); }
+.tree-branch > li.on-path::before { border-top-color: var(--accent); }
+.tree-branch > li.on-path::after { border-left: 0; background: linear-gradient(var(--accent) 0 14px, color-mix(in srgb, var(--fg) 22%, transparent) 14px); width: 1px; }
+.tree-branch > li.on-path:last-child::after { background: var(--accent); }
+.tree-branch > li.on-path > .tree-row.tree-group .tree-name { color: var(--accent); }
+/* renombrando el proyecto: el campo ocupa el lugar del nombre, a la derecha del ícono */
+.iconbar.sim-row div.proj-capsule { display: flex; align-items: center; }
+.iconbar.sim-row div.proj-capsule .name-input { flex: 1 1 auto; min-width: 0; height: 22px; padding: 0 4px; font-size: 13px; line-height: 20px; box-sizing: border-box; }
+.tool-sep { flex: none; align-self: stretch; width: 1px; margin: 2px 4px; background: var(--border); }
+.xval.fft-info { color: var(--fg); }
+.simbar .sb-checks.inline { flex-direction: row; gap: 10px; }
+.simbar .sb-box { display: inline-flex; align-items: center; gap: 4px; }
+/* varias filas (DC, ruido…): grilla de etiqueta | cuadro, con los cuadros alineados por columna */
+.simbar .sb-rows.sb-grid { display: grid; gap: 2px 4px; justify-content: start; align-items: center; }
+.simbar .sb-grid .sb-row, .simbar .sb-grid .sb-field { display: contents; }
+.simbar .sb-grid .sb-field > span:first-child { justify-self: end; color: var(--fg-muted); white-space: nowrap; }
+.simbar .sb-grid .sb-box { margin-right: 8px; }

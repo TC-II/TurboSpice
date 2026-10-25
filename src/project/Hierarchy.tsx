@@ -61,7 +61,7 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ project, benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onRenameProject, onNewGroup, onGroupAction, onMoveBench, onBenchAction, onOpen, onNew, onNewModel, onNewVerilog, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onClose, onLeave, onEnter }: {
+export function ProjectTree({ benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onRenameGroup, onMoveBench, onBenchAction, onRenameBench, onOpen, onNew, onNewModel, onNewVerilog, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onLeave, onEnter }: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -79,11 +79,17 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   /** abrir una parte de un testbench: su simulación, su esquemático o sus parámetros */
   onBenchItem(id: string, item: BenchItem): void;
   onNewBench(group?: string): void;
-  onNewGroup(): void;
-  onGroupAction(id: string, action: 'rename' | 'delete'): void;
+  /** devuelve el id del workbench creado, que queda con el nombre en edición */
+  onNewGroup(): string;
+  /** borra un grupo (sus testbenches pasan a otro) */
+  onGroupAction(id: string): void;
+  /** renombra un grupo (el campo se edita en su misma fila) */
+  onRenameGroup(id: string, name: string): void;
   /** mover a un grupo; con `before`, justo antes de ese testbench (#218), si no al final */
   onMoveBench(id: string, group: string, before?: string): void;
-  onBenchAction(id: string, action: 'rename' | 'duplicate' | 'delete'): void;
+  onBenchAction(id: string, action: 'duplicate' | 'delete'): void;
+  /** renombra un testbench (el campo se edita en su misma fila) */
+  onRenameBench(id: string, name: string): void;
   onOpen(name: string): void;
   onNew(): void;
   /** módulo nuevo de tipo Modelo (netlist .subckt/.model + símbolo) */
@@ -102,14 +108,14 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   onRenameProject(name: string): void;
   onDelete(name: string): void;
   onUpdateSymbol(name: string): void;
-  onClose(): void;
   /** el mouse salió del panel (para esconderlo si se mostró al acercarlo) */
   onLeave(): void;
   /** el mouse entró al panel (para expandirlo desde el borde) */
   onEnter?(): void;
 }) {
   // grupos, testbenches y sus parámetros plegados (los testbenches arrancan plegados: una línea)
-  const [renamingProject, setRenamingProject] = useState(false);
+  // fila que se renombra en su lugar: «b:<id>» (testbench) o «g:<id>» (workbench)
+  const [renaming, setRenaming] = useState('');
   const [newMenu, setNewMenu] = useState(false);
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const [openBench, setOpenBench] = useState<Set<string>>(() => new Set());
@@ -187,21 +193,27 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   // el foco sigue al testbench activo (para seguir con las flechas)
   useEffect(() => {
     const tree = treeRef.current;
-    if (!tree?.contains(document.activeElement)) return;
+    // (no si se está escribiendo un nombre: un workbench nuevo cambia el activo y deja su nombre en edición)
+    if (!tree?.contains(document.activeElement) || document.activeElement?.tagName === 'INPUT') return;
     tree.querySelector<HTMLElement>(`[data-bench="${activeBench}"] .tree-name`)?.focus();
   }, [activeBench]);
-  const bench = (b: TreeBench) => {
+  // camino del árbol hasta el testbench activo: sus ramas se colorean (también con el workbench plegado)
+  const activeGroup = benches.find((b) => b.id === activeBench)?.group;
+  const activeGi = groups.findIndex((g) => g.id === activeGroup);
+  const activeBi = benches.filter((b) => b.group === activeGroup).findIndex((b) => b.id === activeBench);
+  const pathClass = (i: number, at: number) => (at < 0 ? '' : i < at ? 'path-above' : i === at ? 'on-path' : '');
+  const bench = (b: TreeBench, i = -1) => {
     const open = openBench.has(b.id);
     const pOpen = openParams.has(b.id);
     const active = !current && b.id === activeBench;
     const nVars = b.params.length + b.steps.length;
     return (
-      <li key={b.id}>
+      <li key={b.id} className={b.group === activeGroup ? pathClass(i, activeBi) : undefined}>
         <div
           className={`tree-row${active ? ' active' : ''}${dragging === b.id ? ' dragging' : ''}${insertAt?.id === b.id ? (insertAt.after ? ' insert-after' : ' insert-before') : ''}`}
           data-bench={b.id}
           {...reorder(b)}
-          draggable
+          draggable={renaming !== `b:${b.id}`}
           onDragStart={(e) => {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', b.name);
@@ -213,11 +225,23 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
           <button className="tree-caret" onClick={() => toggleIn(setOpenBench, b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
             {open ? '▾' : '▸'}
           </button>
-          <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={`${b.detail} — ${t('↑ ↓ to go through the testbenches')}`}>
-            {b.name}
-          </button>
+          {renaming === `b:${b.id}` ? (
+            <NameInput
+              value={b.name}
+              taken={benches.filter((x) => x.id !== b.id).map((x) => x.name)}
+              label={t('Testbench name')}
+              onDone={(n) => {
+                setRenaming('');
+                if (n) onRenameBench(b.id, n);
+              }}
+            />
+          ) : (
+            <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={`${b.detail} — ${t('↑ ↓ to go through the testbenches')}`}>
+              {b.name}
+            </button>
+          )}
           <span className="tree-actions">
-            <button onClick={() => onBenchAction(b.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
+            <button onClick={() => setRenaming(`b:${b.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
             <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
               <Icon name="copy" size={13} />
             </button>
@@ -370,44 +394,34 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
   );
   return (
     <aside className={`project-tree${peek ? ' peek' : ''}${edgeOnly ? ' collapsed' : ''}`} aria-label={t('Project')} aria-hidden={edgeOnly || undefined} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
-      <header>
-        {renamingProject ? (
-          <NameInput
-            value={project}
-            label={t('Project name')}
-            onDone={(n) => {
-              setRenamingProject(false);
-              if (n) onRenameProject(n);
-            }}
-          />
-        ) : (
-          <strong className="tree-project" role="button" tabIndex={0} title={t('{project} (click to rename)', { project })} style={{ cursor: 'text' }} onClick={() => setRenamingProject(true)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'F2') setRenamingProject(true); }}>{project}</strong>
-        )}
-        <button className="tree-add" onClick={onNewGroup} title={t('New workbench of testbenches')}>
-          + {t('Workbench')}
-        </button>
-        {!renamingProject && (
-          <button className="icon-btn" onClick={onClose} title={t('Hide the project panel')} aria-label={t('Hide the project panel')}>
-            <Icon name="close" size={14} />
-          </button>
-        )}
-      </header>
       <ul className="tree-branch tree-groups">
-        {groups.map((g) => {
+        {groups.map((g, gi) => {
           const fold = collapsed.has(g.id);
           const inGroup = benches.filter((b) => b.group === g.id);
           return (
-            <li key={g.id}>
+            <li key={g.id} className={pathClass(gi, activeGi)}>
               <div className={`tree-row tree-group${dropOn === g.id ? ' drop' : ''}`} {...drop(g.id)}>
                 <button className="tree-caret" onClick={() => toggleGroup(g.id)} aria-label={fold ? t('Expand {name}', { name: g.name }) : t('Collapse {name}', { name: g.name })} aria-expanded={!fold}>
                   {fold ? '▸' : '▾'}
                 </button>
-                <button className="tree-name" onClick={() => toggleGroup(g.id)}>
-                  <span className="tree-glyph">▤</span> {g.name}
-                </button>
+                {renaming === `g:${g.id}` ? (
+                  <NameInput
+                    value={g.name}
+                    taken={groups.filter((x) => x.id !== g.id).map((x) => x.name)}
+                    label={t('Workbench name')}
+                    onDone={(n) => {
+                      setRenaming('');
+                      if (n) onRenameGroup(g.id, n);
+                    }}
+                  />
+                ) : (
+                  <button className="tree-name" onClick={() => toggleGroup(g.id)}>
+                    <span className="tree-glyph">▤</span> {g.name}
+                  </button>
+                )}
                 <span className="tree-actions">
-                  <button onClick={() => onGroupAction(g.id, 'rename')} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
-                  <button onClick={() => onGroupAction(g.id, 'delete')} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the workbench (its testbenches stay)') : t('A project always has at least one workbench')} aria-label={t('Delete {name}', { name: g.name })}>
+                  <button onClick={() => setRenaming(`g:${g.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
+                  <button onClick={() => onGroupAction(g.id)} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the workbench (its testbenches stay)') : t('A project always has at least one workbench')} aria-label={t('Delete {name}', { name: g.name })}>
                     <Icon name="trash" size={13} />
                   </button>
                 </span>
@@ -415,10 +429,18 @@ export function ProjectTree({ project, benches, groups, activeBench, subs, curre
                   + {t('Testbench')}
                 </button>
               </div>
-              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b) => bench(b)) : <li className="tree-meta tree-empty">{t('Empty: create or drag a Testbench')}</li>}</ul>}
+              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b, i) => bench(b, i)) : <li className="tree-meta tree-empty">{t('Empty: create or drag a Testbench')}</li>}</ul>}
             </li>
           );
         })}
+        {/* la última rama termina en el botón para agregar otro workbench */}
+        <li>
+          <div className="tree-row tree-group tree-new-group">
+            <button className="tree-name" onClick={() => setRenaming(`g:${onNewGroup()}`)} title={t('New workbench of testbenches')}>
+              <span className="tree-glyph">▤</span> + {t('Workbench')}
+            </button>
+          </div>
+        </li>
       </ul>
       {/* módulos (subcircuitos y modelos), abajo de todo */}
       <section className="tree-modules">

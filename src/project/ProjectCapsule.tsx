@@ -1,26 +1,45 @@
-// Cápsula de la barra superior (#150, #180): «Proyecto · Testbench». Cada parte se renombra con
-// doble clic. Los testbenches se eligen, crean, duplican y borran en el panel del proyecto.
-import { EditableName } from '../ui/EditableName.tsx';
+// Botón de la barra del proyecto (#150, #180): «Proyecto · Testbench», con el ícono del panel del
+// proyecto. Sólo muestra los nombres y, si hay cambios sin guardar, un punto naranja; al tocarlo
+// abre o cierra el panel; doble click en el nombre del proyecto lo renombra (en el panel se renombran, eligen, crean y borran los testbenches).
+import { Icon } from '../ui/icons.tsx';
+import { useState } from 'react';
 import { t } from '../i18n/i18n.ts';
+import { NameInput } from '../ui/EditableName.tsx';
 
-export function ProjectCapsule({ project, bench, taken, dirty, onRenameProject, onRenameBench }: {
+export function ProjectCapsule({ project, bench, dirty, open, onToggle, onRename }: {
   project: string;
   /** testbench que se ve */
   bench: string;
-  /** nombres de los otros testbenches (no se pueden repetir) */
-  taken: string[];
   dirty: boolean;
-  onRenameProject(name: string): void;
-  onRenameBench(name: string): void;
+  /** el panel del proyecto está abierto */
+  open: boolean;
+  onToggle(): void;
+  onRename(name: string): void;
 }) {
+  const [renaming, setRenaming] = useState(false);
+  if (renaming)
+    return (
+      <div className={`proj-capsule${open ? ' on' : ''}`}>
+        <Icon name="tree" />
+        <NameInput
+          value={project}
+          label={t('Project name')}
+          onDone={(n) => {
+            setRenaming(false);
+            if (n && n !== project) onRename(n);
+          }}
+        />
+      </div>
+    );
   return (
-    <div className="capsule">
+    <button className={`proj-capsule${open ? ' on' : ''}`} onClick={onToggle} aria-pressed={open} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
+      <Icon name="tree" />
       <span className="capsule-names">
-        <EditableName value={project} onRename={onRenameProject} label={t('Project name')} className="capsule-project" title={t('Project «{project}» (double-click to rename)', { project })} />
+        <span className="capsule-project" title={t('{project} (double-click to rename)', { project })} onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); }}>{project}</span>
         <span className="capsule-dot">·</span>
-        <EditableName value={bench} taken={taken} onRename={onRenameBench} label={t('Testbench name')} className="capsule-variant" title={t('Testbench «{name}» (double-click to rename)', { name: bench })} />
+        <span className="capsule-variant">{bench}</span>
         {dirty && <span className="capsule-dirty" title={t('There are unsaved changes')}>•</span>}
       </span>
-    </div>
+    </button>
   );
 }

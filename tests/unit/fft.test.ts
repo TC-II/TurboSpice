@@ -61,12 +61,12 @@ describe('panel de FFT (#236)', async () => {
 
   it('dos FFT de la misma señal con distinta ventana en un panel: dos curvas y dos nombres (#260)', () => {
     const d = paneCurves({ traces: [{ expr: 'V(out)', fft: { window: 'hann' } }, { expr: 'V(out)', fft: { window: 'rect' } }] }, ctx);
-    expect(d.curves.map((c) => c.label)).toEqual(['FFT(V(out), Hann)', 'FFT(V(out), Rectangular)']);
+    expect(d.curves.map((c) => c.label)).toEqual(['V(out)-Hann', 'V(out)-Rec']);
     expect(d.curves[0].y).not.toEqual(d.curves[1].y);
     // con otro rango, la segunda se lleva a la grilla de frecuencias de la primera
     const r = paneCurves({ traces: [{ expr: 'V(out)', fft: { window: 'hann' } }, { expr: 'V(out)', fft: { window: 'hann', from: 10e-3, to: 20e-3 } }] }, ctx);
     expect(r.curves[1].y.length).toBe(r.x.length);
-    expect(r.curves[1].label).toMatch(/^FFT\(V\(out\), 10(\.0+)?ms…20(\.0+)?ms\)$/);
+    expect(r.curves[1].label).toMatch(/^V\(out\)-Hann 10(\.0+)?ms…20(\.0+)?ms$/);
   });
 
   it('FFT de distintas grillas: el eje llega hasta la mayor frecuencia, cada una vacía fuera de la suya y sin zoom hasta la menor', async () => {
@@ -101,10 +101,10 @@ describe('identidad de las trazas y tipo de los paneles (#260)', async () => {
     expect(sameTrace({ expr: 'V( a )' }, { expr: 'v(a)' })).toBe(true);
   });
 
-  it('nombre: FFT(…), con la ventana si hace falta distinguir', () => {
-    expect(traceLabel(hann)).toBe('FFT(I(R1))');
-    expect(traceLabel(hann, [hann, { expr: 'V(x)', fft: { window: 'rect' } }])).toBe('FFT(I(R1))');
-    expect(traceLabel(hann, [hann, rect])).toBe('FFT(I(R1), Hann)');
+  it('nombre: la expresión y la ventana', () => {
+    expect(traceLabel(hann)).toBe('I(R1)-Hann');
+    expect(traceLabel(hann, [hann, { expr: 'V(x)', fft: { window: 'rect' } }])).toBe('I(R1)-Hann');
+    expect(traceLabel(rect, [hann, rect])).toBe('i(r1)-Rec');
     expect(traceLabel({ expr: 'V(a)' })).toBe('V(a)');
   });
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
-import { axisTicks, displayName, isLogScale, project, resample, scaleOf, si, type ComplexView } from './series.ts';
+import { axisSpace, axisTicks, displayName, isLogScale, project, resample, scaleOf, si, type ComplexView } from './series.ts';
 
 const PALETTE = ['#2f6fdb', '#d9480f', '#2b8a3e', '#ae3ec9', '#e67700', '#0b7285', '#c2255c', '#5c940d'];
 
@@ -59,9 +59,10 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
       scales: { x: { time: false, distr: log ? 3 : 1 } },
       axes: [
         {
+          space: (_u, _i, min, max) => (log ? 50 : axisSpace(min, max)),
           // en escala log uPlot pasa null en las marcas sin etiqueta; etiquetamos sólo décadas
           values: (_u, ticks) =>
-            ticks.map((t) =>
+            !log ? axisTicks(ticks) : ticks.map((t) =>
               t == null || (log && Math.abs(Math.log10(t) - Math.round(Math.log10(t))) > 1e-9) ? '' : si(t, 3),
             ),
           stroke: muted,

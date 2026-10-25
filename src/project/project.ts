@@ -5,7 +5,7 @@ import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { removeAnalysis } from '../schematic/directivesEdit.ts';
 import { simLine } from '../sim/complexSim.ts';
-import { analysisLabel, MAX_SIMS, type SimView } from '../sim/simList.ts';
+import { analysisLabel, type SimView } from '../sim/simList.ts';
 import { EMPTY_ASC, newId, type Project, type ProjectFile, type Run, type Sim, type Variant } from './turbo.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -73,10 +73,9 @@ export const selectSim = (p: Project, simId: string): Project => {
   return { ...p, variants: p.variants.map((x) => (x.id === v.id ? { ...x, activeSim: simId } : x)) };
 };
 
-/** Simulación nueva con ese circuito, a continuación de la activa, y activa (null si la lista está llena) */
-export function addSim(p: Project, asc: string, name?: string): { project: Project; id: string } | null {
+/** Simulación nueva con ese circuito, a continuación de la activa, y activa */
+export function addSim(p: Project, asc: string, name?: string): { project: Project; id: string } {
   const v = variantOf(p);
-  if (v.sims.length >= MAX_SIMS) return null;
   const i = v.sims.findIndex((x) => x.id === v.activeSim);
   // cae en el grupo del testbench activo
   const group = v.sims[i]?.group ?? p.groups[0]?.id;
@@ -89,7 +88,7 @@ export function addSim(p: Project, asc: string, name?: string): { project: Proje
 export function duplicateSim(p: Project, simId: string): { project: Project; id: string } | null {
   const v = variantOf(p);
   const src = simOf(v, simId);
-  if (!src || v.sims.length >= MAX_SIMS) return null;
+  if (!src) return null;
   // con nombre propio, la copia lo lleva con «(copia)»; con el automático, sigue siendo automático
   const name = src.name ? t('{name} (copy)', { name: src.name }) : undefined;
   const s: Sim = { id: newId('s'), ...(name ? { name } : {}), asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };

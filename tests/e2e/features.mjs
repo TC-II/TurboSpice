@@ -191,7 +191,7 @@ const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
 check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
 // FFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
 await page.mouse.click(outW.x, outW.y);
-await page.getByRole('button', { name: 'FFT', exact: true }).click();
+await page.getByRole('button', { name: 'DFT', exact: true }).click();
 check(/Con todos los puntos/.test(await page.locator('.fft-tools .hint').last().textContent()), 'sin zoom, la FFT usa todos los puntos');
 const windows = await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents();
 check(windows.includes('Ventana de Hann') && windows.includes('Ventana de Kaiser (β = 9)') && windows.length === 14, `14 ventanas con su nombre (${windows.length})`);
@@ -206,19 +206,20 @@ await page.keyboard.press('Escape');
 check((await page.locator('.plot-panel.fft-picking').count()) === 0, 'Esc cancela el ⌖');
 await fftPick.click();
 await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
+await page.locator('.trace-chip', { hasText: 'Hann' }).first().hover();
 const fftInfo = await page.locator('.fft-info').first().textContent();
 check(/fundamental 1kHz/.test(fftInfo) && /THD \d+\.\d+ %/.test(fftInfo), `FFT y THD de V(out): ${fftInfo}`);
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,FFT(V(out))', 'la FFT queda como una traza en un panel debajo');
+check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)-Hann', 'la FFT queda como una traza en un panel debajo');
 check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la FFT tiene eje de frecuencias desde 0');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: 'V(out)/2' }).click();
 const fftNames = (k) => page.locator('.pane').nth(k).locator('.trace-chip .name').allTextContents().then((v) => v.join());
-check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'FFT(V(out)),FFT(V(out)/2)', 'dos FFT a la vez en el panel de FFT');
+check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', 'dos FFT a la vez en el panel de FFT');
 // #260: otra ventana, otro panel; el nombre dice la ventana; zoom propio de cada panel de FFT
 await page.getByLabel('Ventana', { exact: true }).selectOption('rect');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
-check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2)' && (await fftNames(2)) === 'FFT(V(out), Rectangular)', 'FFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
+check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann' && (await fftNames(2)) === 'V(out)-Rec', 'FFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
 {
 const rangeX = (k) => page.locator('.pane').nth(k).locator('.uplot').getAttribute('data-range-x');
 const r1 = await rangeX(1);
@@ -242,7 +243,7 @@ const dnd = async (src, dst) => {
 };
 // las dos FFT de V(out) en el mismo panel: dos curvas y dos nombres
 await dnd(page.locator('.pane').nth(2).locator('.trace-chip').first(), page.locator('.pane').nth(1).locator('.pane-chart'));
-check((await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2),FFT(V(out), Rectangular)' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos FFT de la misma señal en un panel: ${await fftNames(1)}`);
+check((await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann,V(out)-Rec' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos FFT de la misma señal en un panel: ${await fftNames(1)}`);
 // el panel que quedó vacío acepta una traza de tiempo; uno de FFT, no
 await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(1).locator('.pane-chart'));
 check((await fftNames(0)) === 'V(out),V(out)/2', 'una traza de tiempo no va a un panel de FFT');
@@ -252,7 +253,7 @@ check((await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2', `e
 await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
 await page.locator('.pane-add button').click();
 await dnd(page.locator('.pane').nth(1).locator('.trace-chip', { hasText: 'Rectangular' }), page.locator('.pane').nth(2).locator('.pane-empty'));
-check((await fftNames(2)) === 'FFT(V(out), Rectangular)' && (await fftNames(1)) === 'FFT(V(out), Hann),FFT(V(out)/2)', `una FFT a un panel nuevo vacío: ${await fftNames(1)} | ${await fftNames(2)}`);
+check((await fftNames(2)) === 'V(out)-Rec' && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', `una FFT a un panel nuevo vacío: ${await fftNames(1)} | ${await fftNames(2)}`);
 await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
 await page.locator('.pane').nth(1).getByRole('button', { name: 'Quitar panel' }).click();
 check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)', 'al quitar el panel de la FFT queda el transitorio');

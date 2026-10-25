@@ -195,3 +195,16 @@ export function stepSweepPlots(plots: SimPlot[], steps?: StepRuns): SimPlot[] {
   }
   return out;
 }
+
+/**
+ * Separación mínima (px) entre marcas de un eje X lineal, estimada por el largo de las etiquetas
+ * de axisTicks: con mucho zoom piden más cifras y se espacian más (una de cada dos…) para no pisarse.
+ */
+export function axisSpace(min: number, max: number): number {
+  const span = Math.abs(max - min);
+  const mag = Math.max(Math.abs(min), Math.abs(max));
+  if (!(span > 0) || !(mag > 0)) return 50;
+  // cifras ≈ las que separan marcas a ~1/10 del rango, más signo, punto y prefijo
+  const chars = Math.max(4, Math.ceil(Math.log10(mag / span)) + 2) + 3;
+  return Math.max(50, chars * 7 + 16);
+}

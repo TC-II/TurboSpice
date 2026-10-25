@@ -243,12 +243,12 @@ await page.waitForTimeout(1000); // autoguardado
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await items()).length === 2, 'al recargar se recuperan los testbenches');
-// renombrar: doble click en el nombre de la cápsula
-await page.locator('.capsule-variant').dblclick();
-await page.getByLabel('Nombre del testbench').fill('Curva corta');
-await page.getByLabel('Nombre del testbench').press('Enter');
-check((await benchName()) === 'Curva corta', 'click en el nombre lo renombra');
+// renombrar: el ✎ del panel lo cambia en su misma fila (sin ventana)
 await openPanel();
+await page.getByRole('button', { name: `Renombrar ${await benchName()}`, exact: true }).click();
+await page.locator('.project-tree input.name-input').fill('Curva corta');
+await page.locator('.project-tree input.name-input').press('Enter');
+check((await benchName()) === 'Curva corta', 'el ✎ del panel lo renombra en su misma fila');
 await page.locator('.project-tree .tree-row[data-bench]', { hasText: 'Curva corta' }).first().hover();
 await page.getByRole('button', { name: 'Borrar Curva corta', exact: true }).click();
 await slideToDelete(page);

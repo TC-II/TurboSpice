@@ -40,8 +40,6 @@ export interface SimList {
   active: string;
 }
 
-/** Cuántas simulaciones puede tener la lista */
-export const MAX_SIMS = 20;
 /** Resultados de otras simulaciones (no la activa) que se conservan en memoria */
 export const MAX_KEPT = 4;
 
@@ -172,9 +170,8 @@ const replace = (l: SimList, id: string, f: (s: SimInstance) => SimInstance): Si
   items: l.items.map((s) => (s.id === id ? f(s) : s)),
 });
 
-/** Agrega una simulación con ese comando y la deja activa (si la lista no está llena) */
+/** Agrega una simulación con ese comando y la deja activa */
 export function addSim(l: SimList, line: string): SimList {
-  if (l.items.length >= MAX_SIMS) return l;
   const s: SimInstance = { id: newId(), line };
   return { items: [...l.items, s], active: s.id };
 }
@@ -182,7 +179,7 @@ export function addSim(l: SimList, line: string): SimList {
 /** Copia de una simulación (con su vista), a continuación de ella y activa */
 export function duplicateSim(l: SimList, id: string): SimList {
   const i = l.items.findIndex((s) => s.id === id);
-  if (i < 0 || l.items.length >= MAX_SIMS) return l;
+  if (i < 0) return l;
   const src = l.items[i];
   const copy: SimInstance = { ...structuredClone(src), id: newId(), ...(src.name ? { name: t('{name} (copy)', { name: src.name }) } : {}) };
   return { items: [...l.items.slice(0, i + 1), copy, ...l.items.slice(i + 1)], active: copy.id };

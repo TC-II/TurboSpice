@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -8,8 +8,8 @@ import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from '
 import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
-import { biasCommand, biasParams, elementBias, netBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
-import { symbolBox, visibleText } from './schematic/geometry.ts';
+import { biasCommand, biasParams, elementBias, netBias, pinBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
+import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
@@ -33,7 +33,7 @@ import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type Pi
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, MAX_SIMS, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -102,7 +102,7 @@ import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { sameExceptData } from './asc/dataText.ts';
-import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { opPinShown, toggleOpPin } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
@@ -696,7 +696,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   // elemento bajo el mouse: la barra de estado muestra sus propiedades (el estado vive en
   // HintBar: guardarlo acá re-renderizaba toda la vista al mover el mouse, #187)
   const hoverSink = useRef<((h: Hover) => void) | undefined>(undefined);
@@ -1630,7 +1630,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const p0 = projectRef.current;
     const v = variantOf(p0);
     const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
-    if (r) editProject(r.project);
+    editProject(r.project);
   }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
   /** Simulación nueva de ese tipo, con el circuito que está en pantalla */
   // Cada testbench tiene una configuración de simulación: elegir un análisis la cambia
@@ -1648,70 +1648,36 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!docLine) return commit(setAnalysisLine(doc, line));
     const p1 = leave();
     const r = addProjectSim(p1, ascText(setAnalysisLine(doc, line)));
-    if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(r.project);
     markDirty();
   };
   /** Testbench nuevo, vacío, con el nombre automático (sigue a su análisis hasta que se lo renombra) */
   const newEmptyBench = (group?: string) => {
     const r = addProjectSim(leave(), EMPTY_ASC);
-    if (!r) return setMessage(t('There are already {MAX_SIMS} testbenches: delete one to add another', { MAX_SIMS }));
     enter(group ? setBenchGroup(r.project, r.id, group) : r.project, true);
     markDirty();
   };
-  const renameBench = (id: string) => {
-    const cur = sims.items.find((x) => x.id === id);
-    if (!cur) return;
-    setDialog({
-      kind: 'name',
-      title: t('Rename testbench'),
-      label: t('Name'),
-      initial: simName(cur) || '',
-      check: (n) => (sims.items.some((x) => x.id !== id && (simName(x) || '').toLowerCase() === n.toLowerCase()) ? t('There is already a testbench called {name}', { name: n }) : null),
-      onOk: (n) => {
-        setDialog(null);
-        editProject(renameProjectSim(projectRef.current, id, n));
-      },
-    });
-  };
+  // (el nombre se edita en su misma fila del panel: el campo ya valida que no se repita)
+  const renameBench = (id: string, n: string) => editProject(renameProjectSim(projectRef.current, id, n));
   // Grupos de testbenches y partes de cada uno (#180)
-  const newGroup = () =>
-    setDialog({
-      kind: 'name',
-      title: t('New workbench'),
-      label: t('Name'),
-      initial: uniqueGroupName(),
-      check: () => null,
-      onOk: (n) => {
-        setDialog(null);
-        // un workbench nuevo viene con un testbench vacío adentro
-        const g = addGroup(leave(), n);
-        const r = addProjectSim(g.project, EMPTY_ASC);
-        if (!r) return editProject(g.project);
-        enter(setBenchGroup(r.project, r.id, g.id), true);
-        markDirty();
-      },
-    });
+  // se crea con el nombre sugerido y el panel deja el campo listo para renombrarlo
+  const newGroup = () => {
+    // un workbench nuevo viene con un testbench vacío adentro
+    const g = addGroup(leave(), uniqueGroupName());
+    const r = addProjectSim(g.project, EMPTY_ASC);
+    enter(setBenchGroup(r.project, r.id, g.id), true);
+    markDirty();
+    return g.id;
+  };
   const uniqueGroupName = () => {
     const names = new Set(projectRef.current.groups.map((g) => g.name.toLowerCase()));
     for (let i = 1; ; i++) if (!names.has(t('Workbench {n}', { n: i }).toLowerCase())) return t('Workbench {n}', { n: i });
   };
-  const groupAction = (id: string, action: 'rename' | 'delete') => {
+  const renameGroupTo = (id: string, n: string) => editProject(renameGroup(snapshot(), id, n));
+  const groupAction = (id: string) => {
     const g = projectRef.current.groups.find((x) => x.id === id);
     if (!g) return;
-    if (action === 'delete' && projectRef.current.groups.length < 2) return setMessage(t('A project always has at least one workbench'));
-    if (action === 'rename')
-      return setDialog({
-        kind: 'name',
-        title: t('Rename workbench'),
-        label: t('Name'),
-        initial: g.name,
-        check: () => null,
-        onOk: (n) => {
-          setDialog(null);
-          editProject(renameGroup(snapshot(), id, n));
-        },
-      });
+    if (projectRef.current.groups.length < 2) return setMessage(t('A project always has at least one workbench'));
     setDialog({
       kind: 'slide',
       title: t('Delete the workbench {name}?', { name: g.name }),
@@ -1791,8 +1757,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (item === 'study') return setTimeout(openStudy, 0);
     if (item !== 'schematic') setTimeout(() => (item === 'sim' ? openSimulation() : setDialog({ kind: 'benchParams' })), 0);
   };
-  const benchAction = (id: string, action: 'rename' | 'duplicate' | 'delete') =>
-    action === 'rename' ? renameBench(id) : action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
+  const benchAction = (id: string, action: 'duplicate' | 'delete') =>
+    action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
   const deleteSim = (id: string) => {
     const p0 = leave();
     stacks.current.delete(`${variantOf(p0).id}/${id}`);
@@ -1803,7 +1769,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
   const duplicateSim = (id: string) => {
     const r = duplicateProjectSim(leave(), id);
-    if (!r) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
+    if (!r) return;
     enter(r.project);
     markDirty();
   };
@@ -1854,7 +1820,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const r = curRuns.find((x) => x.id === id);
     if (!r || !curSim) return;
     const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString(locale())})`);
-    if (!res) return setMessage(t('There are already {MAX_SIMS} simulations: delete one to add another', { MAX_SIMS }));
     enter(res.project);
     markDirty();
   };
@@ -1949,6 +1914,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
     }
     for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
+      // transistores: la corriente de cada pin, junto al pin (como la punta de prueba en los demás análisis)
+      if (multiPinPrefix(el.prefix)) {
+        const s = doc.symbols[el.sym];
+        const def = s && lib.symbol(s.type);
+        if (!def) continue;
+        pinPoints(s, def).forEach((at, k) => {
+          const pin = Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1);
+          if (!opPinShown(pins, { symbol: el.sym, pin })) return;
+          const text = pinBias(built, bias, el, pin, scope);
+          if (text) out.push({ at: { x: at.x + 4, y: at.y - 4 }, text, kind: 'i' });
+        });
+        continue;
+      }
       if (!/^[RLVIDQMJ]/i.test(el.prefix) || !opPinShown(pins, { symbol: el.sym })) continue;
       const b = elementBias(built, bias, el, scope);
       const s = doc.symbols[el.sym];
@@ -1979,6 +1957,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     });
   }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope]);
 
+  // Schematic | Results: la unión entre las dos pestañas cae sobre el borde derecho de la cápsula
+  // del proyecto (que mide --tree-w), sea cual sea el ancho del logo o del texto en cada idioma
+  const viewTabs = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const align = () => {
+      const nav = viewTabs.current;
+      const first = nav?.firstElementChild;
+      if (!nav || !first) return;
+      nav.style.marginLeft = '';
+      const treeW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tree-w'));
+      const gap = parseFloat(getComputedStyle(nav).columnGap) || 0;
+      const shift = treeW - (first.getBoundingClientRect().right + gap / 2);
+      if (shift > 0) nav.style.marginLeft = `${shift}px`;
+    };
+    align();
+    document.fonts?.ready.then(align);
+  });
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
   // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
@@ -2128,12 +2123,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setTreePref(!treeOpen);
   };
 
+  // ⌖ de la DFT: mientras se elige, el esquemático está en la punta de prueba y lo que se pinche
+  // (esté graficado o no) va a la DFT; al terminar vuelve a la herramienta de antes
+  const fftPick = useRef<Tool | null>(null);
+  const onFftPicking = (on: boolean) => {
+    if (on === !!fftPick.current) return;
+    if (on) {
+      fftPick.current = tool;
+      if (sim) setTool({ kind: 'probe' });
+    } else {
+      const back = fftPick.current;
+      fftPick.current = null;
+      setToolState((cur) => (cur.kind === 'probe' && back ? back : cur));
+    }
+  };
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot) return;
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
     if (!scaleOf(plot) && op) return setOpPins((p) => toggleOpPin(p, target));
     // un cable de bus (f[10:0]): una traza por bit, en el testbench
-    if (target.net && isBusName(target.net) && !pathRef.current.length) {
+    if (target.net && isBusName(target.net) && !pathRef.current.length && !fftPick.current) {
       const sc = scaleOf(plot);
       if (!sc) return;
       const exprs = busBits(target.net)
@@ -2168,6 +2177,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       }
     }
     if (!expr) return;
+    if (fftPick.current) {
+      const sc = scaleOf(plot);
+      try {
+        if (sc) evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+      } catch {
+        return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
+      }
+      return plotPanel.current?.addFft(expr);
+    }
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
     if (traceBox.current?.focused()) return traceBox.current.insert(expr);
     setPanel('plot');
@@ -2836,10 +2854,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const schematicShown = !sim || expanded !== 'results';
   const resultsShown = !!sim && expanded !== 'schematic';
   const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
-  // Botones de vista (#55): un click siempre suma. Si la vista no está, se agrega en pantalla
-  // partida; si ya está junto con la otra, queda a pantalla completa
-  const showSchematicView = () => sim && setExpanded(!schematicShown ? '' : resultsShown ? 'schematic' : expanded);
-  const showResultsView = () => sim && setExpanded(!resultsShown ? '' : schematicShown ? 'results' : expanded);
+  // Botones de vista (#55): el botón entero hace lo mismo. Si la vista no está, se agrega en
+  // pantalla partida; si ya están las dos, la cruz la cierra; si es la única, no hace nada
+  const viewsBoth = schematicShown && resultsShown;
+  const showSchematicView = () => {
+    if (!sim) return;
+    if (!schematicShown) setExpanded('');
+    else if (resultsShown) setExpanded('results');
+  };
+  const showResultsView = () => {
+    if (!sim) return;
+    if (!resultsShown) setExpanded('');
+    else if (schematicShown) setExpanded('schematic');
+  };
+  const viewCls = (shown: boolean) => [shown && 'active', shown && !viewsBoth && 'alone'].filter(Boolean).join(' ');
+  // segmento de la derecha del botón: cruz si la vista se ve, flechita si no. Siempre está (con
+  // el mismo ancho) para que el botón no cambie de tamaño al presionarlo
+  const viewAct = (shown: boolean, enabled: boolean) => {
+    const on = enabled && !(shown && !viewsBoth);
+    return <span className={on ? 'view-act' : 'view-act idle'} aria-hidden="true">{on && <Icon name={shown ? 'close' : 'caret'} size={12} />}</span>;
+  };
   const setSide = (side: boolean) => {
     lsSet('turbospice.resultsSide', side ? '1' : '0');
     setResultsSide(side);
@@ -3175,18 +3209,20 @@ ${ltNetlistText(sim.built.lt)}
         createPortal(
           <>
             {/* vistas: con las dos prendidas, pantalla partida */}
-            <nav className="tabs view-tabs" aria-label={t('Views')}>
-              <button className={schematicShown ? 'active' : ''} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? t('Schematic') : schematicShown && resultsShown ? t('Schematic full screen (Ctrl+1)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}>
+            <nav className="tabs view-tabs" aria-label={t('Views')} ref={viewTabs}>
+              <button className={viewCls(schematicShown)} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? t('Schematic') : viewsBoth ? t('Close the schematic (the results stay full screen)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}>
                 {t('Schematic')}
+                {viewAct(schematicShown, true)}
               </button>
               <button
-                className={resultsShown ? 'active' : ''}
+                className={viewCls(resultsShown)}
                 aria-pressed={resultsShown}
                 disabled={!sim}
                 onClick={showResultsView}
-                title={!sim ? t('No results yet: simulate first') : schematicShown && resultsShown ? t('Results full screen (Ctrl+2)') : resultsShown ? t('Results') : t('Add the results in split screen (Ctrl+0)')}
+                title={!sim ? t('No results yet: simulate first') : viewsBoth ? t('Close the results (the schematic stays full screen)') : resultsShown ? t('Results') : t('Add the results in split screen (Ctrl+0)')}
               >
                 {t('Results')}
+                {viewAct(resultsShown, !!sim)}
               </button>
             </nav>
             <div className="layout-btns" role="group" aria-label={t('Results layout')}>
@@ -3197,25 +3233,22 @@ ${ltNetlistText(sim.built.lt)}
                 <Icon name="layoutStack" size={16} />
               </button>
             </div>
-            <span className="appbar-sep" />
           </>,
           slots.tabs,
         )}
       {/* segunda barra: el proyecto (árbol y cápsula) y la simulación */}
       <div className="iconbar sim-row" role="toolbar" aria-label={t('Simulation')}>
-        <div className="group fixed">
-            <button className={`proj-toggle${treeOpen ? ' on' : ''}`} onClick={toggleTree} aria-pressed={treeOpen} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
-              <Icon name="tree" />
-            </button>
+        <div className="group">
             <ProjectCapsule
               project={project.name}
               bench={(curSim && simName(curSim)) || t('No analysis')}
-              taken={sims.items.filter((x) => x.id !== sims.active).map((x) => simName(x))}
               dirty={dirty}
-              onRenameProject={renameProject}
-              onRenameBench={(name) => editProject(renameProjectSim(projectRef.current, sims.active, name))}
+              open={treeOpen}
+              onToggle={toggleTree}
+              onRename={renameProject}
             />
-            <span className="tb-sep" />
+        </div>
+        <div className="group fixed">
             {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
             <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className={canRun ? "labeled" : "primary"} openRef={simMenu}>
               {t('New simulation')} <Icon name="caret" size={14} />
@@ -3236,8 +3269,9 @@ ${ltNetlistText(sim.built.lt)}
                 <Icon name="run" /> {t('Run|verb')}
               </button>
             )}
-            {/* siempre a la vista, separados de Simular; se habilitan cuando hay resultados (y punto de operación) */}
-            <span className="tb-sep" />
+        </div>
+        {/* siempre a la vista, en su propio grupo (separado de Simular); se habilitan cuando hay resultados (y punto de operación) */}
+        <div className="group">
             <button
               className={tool.kind === 'probe' ? 'active' : ''}
               aria-label={t('Measure')}
@@ -3329,6 +3363,7 @@ ${ltNetlistText(sim.built.lt)}
               onBenchItem={benchItem}
               onNewGroup={newGroup}
               onGroupAction={groupAction}
+              onRenameGroup={renameGroupTo}
               onMoveBench={moveBench}
               onLeave={() => setTreePeek(false)}
               activeBench={sims.active}
@@ -3339,6 +3374,7 @@ ${ltNetlistText(sim.built.lt)}
               onNewBench={newEmptyBench}
               onRenameProject={renameProject}
               onBenchAction={benchAction}
+              onRenameBench={renameBench}
               onOpen={(n) => {
                 if (modelModuleFile(projectRef.current, n)) setCurModel(n);
                 else openSub(n);
@@ -3357,7 +3393,6 @@ ${ltNetlistText(sim.built.lt)}
                 projectRef.current = p;
                 editProject(p);
               }}
-              onClose={() => (treeOpen ? toggleTree() : setTreePeek(false))}
             />
           )}
           {quickOpen &&
@@ -3683,6 +3718,7 @@ ${ltNetlistText(sim.built.lt)}
                   active={activePane}
                   setActive={setActivePane}
                   onFocusTrace={() => traceBox.current?.focus()}
+                  onFftPicking={onFftPicking}
                   side={resultsSide}
                   toolsHost={viewerTools}
                   marks={withPz && pzSide ? marks : undefined}

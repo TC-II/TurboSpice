@@ -3,10 +3,10 @@
 
 export type OpPinTarget = { net?: string; symbol?: number; pin?: number };
 
-/** clave del elemento anotado: la red (sin distinguir mayúsculas) o el componente */
+/** clave del elemento anotado: la red (sin distinguir mayúsculas), el componente o el pin de un transistor */
 export function opPinKey(target: OpPinTarget): string | undefined {
   if (target.net) return target.net === '0' ? undefined : `n:${target.net.toLowerCase()}`;
-  if (target.symbol !== undefined) return `s:${target.symbol}`;
+  if (target.symbol !== undefined) return target.pin !== undefined ? `s:${target.symbol}:${target.pin}` : `s:${target.symbol}`;
   return undefined;
 }
 

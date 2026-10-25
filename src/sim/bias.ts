@@ -7,13 +7,14 @@ import { deviceVector, netVector, type BuiltSimulation } from './schematicSim.ts
 import { blockInstances, scopeElement, scopeNet, hierDevice, type InstScope } from './context.ts';
 import { ANALYSIS_LINE } from './analyses.ts';
 import { t } from '../i18n/i18n.ts';
+import { pinTerminal } from './traces.ts';
 
 export type Bias = Record<string, number>;
 
 const PARAMS: Record<string, string[]> = {
   q: ['gm', 'vbe', 'vbc', 'ic', 'ib', 'ie'],
-  m: ['id', 'vgs', 'vds', 'gm', 'gds', 'von', 'vdsat'],
-  j: ['id', 'vgs', 'vgd', 'gm'],
+  m: ['id', 'ig', 'is', 'ib', 'vgs', 'vds', 'gm', 'gds', 'von', 'vdsat'],
+  j: ['id', 'ig', 'is', 'vgs', 'vgd', 'gm'],
   d: ['id', 'vd'],
   r: ['p'],
   v: ['p'],
@@ -100,6 +101,18 @@ function bjtRegion(vbe: number, vbc: number, s: number): string {
 function mosRegion(vgs: number, vds: number, von: number, vdsat: number, s: number): string {
   if (s * vgs < s * von) return t('cutoff');
   return Math.abs(vds) < Math.abs(vdsat) ? t('triode (linear)') : t('saturation');
+}
+
+/**
+ * Corriente del OP en un pin de un transistor (`pin` = SpiceOrder), como la mide la punta de
+ * prueba en los demás análisis: "Ib = 12.3µA". null si el elemento no es de varios pines.
+ */
+export function pinBias(sim: BuiltSimulation, bias: Bias, el: Element, pin: number, scope?: InstScope): string | null {
+  const term = pinTerminal(el.prefix, pin);
+  const local = scope ? scopeElement(scope, el.name) : sim.ng.names.get(el.name)?.toLowerCase();
+  const ng = local && (scope ? hierDevice(local) : local);
+  if (!term || !ng) return null;
+  return `I${term} = ${fmt(bias[`@${ng}[i${term}]`], 'A')}`;
 }
 
 /** `scope`: el elemento es de adentro de esa instancia (#199) */

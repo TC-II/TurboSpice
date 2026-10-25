@@ -1716,6 +1716,7 @@ export const es: Record<string, string> = {
   'subcir': 'subcir',
   'New Verilog module': 'Módulo Verilog nuevo',
   'Verilog Editor': 'Editor Verilog',
+  'Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC': 'Simulación mixta: un integrador RC, un ADC sigma-delta en Verilog y un DAC R-2R',
   '{inst}: pin {pin} ({w} bits) does not fit the bus {bus} ({n} bits)': '{inst}: el pin {pin} ({w} bits) no encaja con el bus {bus} ({n} bits)',
   'Extra output delay (tpd)': 'Retardo extra de las salidas (tpd)',
   'Added to every output, on top of the # delays of the code. Usually 0 or small.': 'Se suma a cada salida, además de los retardos # del código. Normalmente 0 o chico.',

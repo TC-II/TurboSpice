@@ -79,7 +79,7 @@ import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { parseSource } from './sim/sources.ts';
-import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
@@ -853,6 +853,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (shared === undefined && !/[#&]c=/.test(location.hash)) return false;
     window.history.replaceState(null, '', location.pathname + location.search);
     if (!shared) return false;
+    if (/\.turbo$/i.test(shared.name) || isTurboText(new TextDecoder().decode(shared.bytes))) {
+      await openBytes(shared.bytes, shared.name);
+      return true;
+    }
     const f = readAsc(shared.bytes, shared.name);
     // links viejos: la vista venía aparte (&v=…); ahora va dentro del .asc
     const view = asPlotView(shared.view);
@@ -1165,9 +1169,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // el link y el PDF llevan el circuito que se está viendo, como .asc
   const ascName = () => `${project.name}.asc`;
+  // el link lleva el proyecto entero (.turbo): variantes, simulaciones, archivos del proyecto
   const doShare = async () => {
-    const { bytes } = ascBytes(doc, lib);
-    const hash = await shareHash(bytes, ascName());
+    const { bytes } = await turboBytes(`${project.name}${EXT}`);
+    const hash = await shareHash(bytes, `${project.name}${EXT}`);
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 

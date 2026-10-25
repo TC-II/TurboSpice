@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Curve } from './curves.ts';
-import { formatRadix, type Radix } from './digital.ts';
+import { formatRadix, logicState, type Radix } from './digital.ts';
 import { si } from './series.ts';
 import { wheelZoom } from './scales.ts';
 import { cursorForClick, type Cursors } from './view.ts';
@@ -15,7 +15,7 @@ const AXIS = 22;
 const LABEL = 72;
 const RIGHT = 25;
 
-/** Tramos en que el valor no cambia: [desde, hasta, valor] (NaN y 0,5 son desconocido o Z) */
+/** Tramos en que el valor no cambia: [desde, hasta, valor] (0,5 es X y NaN es Z, ver digital.ts) */
 function runs(x: Float64Array, y: Float64Array, from: number, to: number): [number, number, number][] {
   const out: [number, number, number][] = [];
   const n = Math.min(x.length, y.length);
@@ -55,8 +55,8 @@ function niceTicks(a: number, b: number, n = 6): number[] {
 
 /**
  * Panel digital (#209): un carril por señal, como un analizador lógico. Un bit se dibuja alto o
- * bajo (desconocido o Z: una raya al medio); un bus, como tramos con su valor en el radix de la
- * traza. Comparte con los paneles analógicos el rango en X, el zoom y los cursores.
+ * bajo, y X o Z como una raya al medio (X roja y cortada, Z gris y punteada); un bus, como tramos
+ * con su valor en el radix de la traza. Comparte con los paneles analógicos el rango en X, el zoom y los cursores.
  */
 export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, pendingX, onHover }: {
   x: Float64Array;
@@ -181,23 +181,37 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
               </text>
               <g clipPath={`url(#${clip})`} stroke={c.color} fill="none" strokeWidth={1.5}>
                 {bits === 1 ? (
-                  <path
-                    d={segs
-                      .map(([a, b, v], k) => {
-                        const y = v === 1 ? top : v === 0 ? bot : mid;
-                        return `${k ? 'L' : 'M'}${px(a)},${y}H${px(b)}`;
-                      })
-                      .join('')}
-                  />
+                  (() => {
+                    // la señal (con las transiciones hasta la raya del medio) y aparte los tramos X y Z
+                    let d = '';
+                    const odd = { x: '', z: '' };
+                    segs.forEach(([a, b, v], k) => {
+                      const st = logicState(v);
+                      const y = st !== 'v' ? mid : v === 1 ? top : bot;
+                      d += `${k ? 'L' : 'M'}${px(a)},${y}`;
+                      if (st === 'v') d += `H${px(b)}`;
+                      else {
+                        odd[st] += `M${px(a)},${mid}H${px(b)}`;
+                        d += `M${px(b)},${mid}`;
+                      }
+                    });
+                    return (
+                      <>
+                        <path d={d} />
+                        {odd.x && <path className="dl-x" d={odd.x} />}
+                        {odd.z && <path className="dl-z" d={odd.z} />}
+                      </>
+                    );
+                  })()
                 ) : (
                   segs.map(([a, b, v], k) => {
                     const xa = px(a);
                     const xb = px(b);
                     const s = Math.min(3, (xb - xa) / 2);
                     const label = formatRadix(v, bits, c.trace >= 0 ? (radix(c.trace) ?? 'hex') : 'hex');
-                    const unknown = !Number.isFinite(v);
+                    const st = logicState(v);
                     return (
-                      <g key={k} className={unknown ? 'dl-x' : undefined}>
+                      <g key={k} className={st === 'v' ? undefined : `dl-${st}`}>
                         <path d={`M${xa},${mid}L${xa + s},${top}H${xb - s}L${xb},${mid}L${xb - s},${bot}H${xa + s}Z`} />
                         {xb - xa > label.length * 7 + 6 && (
                           <text className="dl-value" x={(xa + xb) / 2} y={mid + 4} textAnchor="middle">

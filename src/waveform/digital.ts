@@ -1,10 +1,22 @@
 // Señales digitales en el visor (#209): nodos de XSPICE y buses. Van en paneles propios
 // (Pane.digital), con un carril por traza: no comparten ejes con las analógicas.
 //
-// Trazas: Dig(x1.q_0_d) es un bit (0, 1; 0,5 = desconocido o alta impedancia) y Dig(x1.q[3:0]) un
-// bus armado con los bits x1.q_3_d … x1.q_0_d (los nodos de un puerto o reg q[3:0] de un bloque
-// Verilog). Un bus vale el número que forman sus bits (NaN si alguno no está en 0 ni en 1) y se
-// muestra en el radix de la traza.
+// Trazas: Dig(x1.q_0_d) es un bit y Dig(x1.q[3:0]) un bus armado con los bits x1.q_3_d … x1.q_0_d
+// (los nodos de un puerto o reg q[3:0] de un bloque Verilog). Un bus vale el número que forman sus
+// bits y se muestra en el radix de la traza.
+//
+// Valores, iguales para bits y buses: 0, 1 (o el número del bus), X = 0,5 (desconocido: un
+// conflicto, un flip-flop sin inicializar) y Z = NaN (alta impedancia: nadie maneja el nodo; en un
+// gráfico analógico queda como hueco). Un bus es Z si todos sus bits lo son, y X si alguno es X
+// o si hay bits en Z junto a otros manejados.
+
+/** Valor desconocido (X) */
+export const LOGIC_X = 0.5;
+/** Alta impedancia (Z) */
+export const LOGIC_Z = NaN;
+
+/** Estado de un valor digital: conocido, X o Z */
+export const logicState = (v: number): 'v' | 'x' | 'z' => (Number.isNaN(v) ? 'z' : Number.isInteger(v) ? 'v' : 'x');
 
 export type Radix = 'hex' | 'dec' | 'sdec' | 'oct' | 'bin';
 export const RADIXES: Radix[] = ['hex', 'dec', 'sdec', 'oct', 'bin'];
@@ -29,28 +41,28 @@ export function digitalWidth(expr: string): number {
   return (m && busRange(m[1])?.bits.length) || 1;
 }
 
-/** Junta los bits (del más significativo al menos) en un número por punto; NaN si alguno es X o Z */
+/** Junta los bits (del más significativo al menos) en un número por punto: Z si todos están en Z, X si alguno no es 0 ni 1 */
 export function joinBits(bits: Float64Array[]): Float64Array {
   const len = bits[0]?.length ?? 0;
   const out = new Float64Array(len);
   for (let k = 0; k < len; k++) {
     let v = 0;
+    let z = 0;
     for (const b of bits) {
       const x = b[k];
-      if (x !== 0 && x !== 1) {
-        v = NaN;
-        break;
-      }
-      v = v * 2 + x;
+      if (x === 0 || x === 1) v = v * 2 + x;
+      else if (Number.isNaN(x)) z++;
+      else v = NaN;
     }
-    out[k] = v;
+    out[k] = z === bits.length ? LOGIC_Z : z || Number.isNaN(v) ? LOGIC_X : v;
   }
   return out;
 }
 
-/** Valor de un bus en el radix: "0x3A", "58", "-6", "0o72", "0b111010"; "X" si no se conoce */
+/** Valor de un bus en el radix: "0x3A", "58", "-6", "0o72", "0b111010"; "X" si no se conoce, "Z" en alta impedancia */
 export function formatRadix(v: number, bits: number, radix: Radix = 'hex'): string {
-  if (!Number.isFinite(v)) return 'X';
+  const st = logicState(v);
+  if (st !== 'v' || !Number.isFinite(v)) return st === 'z' ? 'Z' : 'X';
   if (bits === 1) return String(v);
   const digits = (base: number) => Math.ceil(bits / Math.log2(base));
   switch (radix) {

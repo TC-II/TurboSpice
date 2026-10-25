@@ -1237,7 +1237,9 @@ button.hier-tab { padding-right: 10px; }
 .digital-lanes text { font: 11px var(--mono); fill: var(--fg-muted); }
 .digital-lanes .dl-name { font-size: 11px; }
 .digital-lanes .dl-value { fill: var(--fg); stroke: none; font-size: 11px; }
-.digital-lanes .dl-x path { stroke: var(--err); stroke-dasharray: 3 2; }
+/* X (desconocido) rojo y cortado; Z (alta impedancia) gris y punteado */
+.digital-lanes .dl-x path, .digital-lanes path.dl-x { stroke: var(--err); stroke-dasharray: 3 2; }
+.digital-lanes .dl-z path, .digital-lanes path.dl-z { stroke: var(--fg-muted); stroke-dasharray: 1 3; }
 .digital-lanes .dl-tick line { stroke: var(--grid); }
 .digital-lanes .dl-cursor line { stroke: var(--accent); stroke-dasharray: 4 3; }
 .digital-lanes .dl-cursor text { fill: var(--accent); }

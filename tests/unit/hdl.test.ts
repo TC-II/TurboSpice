@@ -3,7 +3,7 @@ import { addVerilogModule, applySynth, isStale, looksBehavioral, setHdlMode, top
 import { parseVvp, vvpForEngine } from '../../src/hdl/icarus.ts';
 import { cosimSubckt, yosysToSubckt, type YosysJson } from '../../src/hdl/synth.ts';
 import { applyVariants, renameSubckt, withSubckts } from '../../src/hdl/variants.ts';
-import { busNames, busRange, formatRadix, joinBits } from '../../src/waveform/digital.ts';
+import { busNames, busRange, formatRadix, joinBits, LOGIC_X, LOGIC_Z, logicState } from '../../src/waveform/digital.ts';
 import { addTraceTo } from '../../src/waveform/view.ts';
 import { newProject } from '../../src/project/turbo.ts';
 import { portsOf } from '../../src/hdl/VerilogModule.tsx';
@@ -126,13 +126,25 @@ describe('señales digitales en el visor (#209)', () => {
     expect(busRange('x1.q[3:0]')).toEqual({ base: 'x1.q', bits: [3, 2, 1, 0] });
     expect(busRange('x1.q_0_d')).toBeNull();
     const v = joinBits([new Float64Array([1, 1, 0.5]), new Float64Array([0, 1, 1])]);
-    expect([...v.slice(0, 2)]).toEqual([2, 3]);
-    expect(v[2]).toBeNaN();
+    expect([...v]).toEqual([2, 3, LOGIC_X]);
     expect(formatRadix(58, 8, 'hex')).toBe('0x3A');
     expect(formatRadix(5, 4, 'bin')).toBe('0b0101');
     expect(formatRadix(14, 4, 'sdec')).toBe('-2');
-    expect(formatRadix(NaN, 4, 'hex')).toBe('X');
+    expect(formatRadix(LOGIC_X, 4, 'hex')).toBe('X');
     expect(busNames(['x1.q_3_d', 'x1.q_2_d', 'x1.q_1_d', 'x1.q_0_d', 'x1.clk_d'])).toEqual(['Dig(x1.q[3:0])']);
+  });
+  it('X y Z se distinguen en bits y buses', () => {
+    // bus de 2 bits: todos en Z → Z; Z junto a un bit manejado → X; un bit X → X
+    const v = joinBits([new Float64Array([NaN, NaN, 0.5, 1]), new Float64Array([NaN, 1, 1, NaN])]);
+    expect(v[0]).toBeNaN();
+    expect([...v.slice(1)]).toEqual([LOGIC_X, LOGIC_X, LOGIC_X]);
+    expect([0, 1, 7].map(logicState)).toEqual(['v', 'v', 'v']);
+    expect(logicState(LOGIC_X)).toBe('x');
+    expect(logicState(LOGIC_Z)).toBe('z');
+    expect(formatRadix(LOGIC_Z, 4, 'hex')).toBe('Z');
+    expect(formatRadix(LOGIC_Z, 1)).toBe('Z');
+    expect(formatRadix(LOGIC_X, 1)).toBe('X');
+    expect(formatRadix(1, 1)).toBe('1');
   });
   it('una señal digital va a un panel digital, y una analógica nunca a uno digital', () => {
     let panes = addTraceTo([{ traces: [{ expr: 'V(out)' }] }], 0, 'Dig(x1.q[3:0])');

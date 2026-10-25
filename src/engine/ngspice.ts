@@ -20,7 +20,7 @@ export interface SimVector {
 
 /**
  * Tipo propio (no de ngspice) de los nodos digitales de XSPICE (#209), llevados al eje de
- * tiempo del transitorio: 0, 1 o 0.5 (desconocido o alta impedancia), en escalones.
+ * tiempo del transitorio, en escalones: 0, 1, 0.5 (desconocido, X) o NaN (alta impedancia, Z).
  */
 export const DIGITAL_TYPE = 2000;
 
@@ -347,10 +347,11 @@ export class Ngspice {
       for (let i = 0; i < n && digital; i++) {
         const e = m.getValue(data + 4 * i, 'i32');
         steps[i] = m.getValue(e + 8, 'double');
-        // "0s", "1r", "Uz"…: nivel y fuerza; con fuerza z (alta impedancia) el nivel no vale
+        // "0s", "1r", "Uz"…: nivel y fuerza; con fuerza z (alta impedancia) el nivel no vale:
+        // Z = NaN; nivel U (desconocido) = X = 0.5 (como LOGIC_X y LOGIC_Z de waveform/digital.ts)
         const v = m.UTF8ToString(m.getValue(e + 16, 'i32'));
         if (!/^[01U][srzu]$/.test(v)) digital = false;
-        levels[i] = v[1] === 'z' || v[0] === 'U' ? 0.5 : v[0] === '1' ? 1 : 0;
+        levels[i] = v[1] === 'z' ? NaN : v[0] === 'U' ? 0.5 : v[0] === '1' ? 1 : 0;
       }
       if (!digital) continue;
       const real = new Float64Array(time.length);

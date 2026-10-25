@@ -5,8 +5,11 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
 ## Nodos digitales (XSPICE) y el visor
 
 - Después de un transitorio, `Ngspice.readEventNodes` lee los nodos de eventos (`ngGet_Evt_NodeInfo`)
-  y los agrega al plot como vectores `DIGITAL_TYPE` (0, 1; 0,5 = desconocido o Z), en los tiempos del
-  transitorio (los eventos caen en sus puntos: los flancos quedan exactos).
+  y los agrega al plot como vectores `DIGITAL_TYPE`, en los tiempos del transitorio (los eventos
+  caen en sus puntos: los flancos quedan exactos). Valores: 0, 1, X = 0,5 (desconocido) y Z = `NaN`
+  (alta impedancia). Un bus vale el número de sus bits, Z si todos están en Z y X si alguno es X o
+  hay Z mezclado con bits manejados (`LOGIC_X`, `LOGIC_Z` y `logicState` en `waveform/digital.ts`).
+  En el panel digital X va en rojo con raya cortada y Z en gris punteado; en la leyenda, «X» y «Z».
 - Trazas: `Dig(x1.q_0_d)` un bit; `Dig(x1.q[3:0])` un bus con los bits `x1.q_3_d … x1.q_0_d`
   (`D()` es la derivada, como en LTspice). La caja de trazas sugiere los buses que encuentra.
 - **Paneles digitales** (`Pane.digital`, `waveform/DigitalLanes.tsx`): un carril por señal, como un

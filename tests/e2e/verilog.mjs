@@ -154,6 +154,33 @@ const chip = page.locator('.pane:not(.digital) .trace-chip').first();
 await chip.dragTo(page.locator('.pane.digital'));
 check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q1)', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), 'una traza analógica no se puede pasar a un panel digital');
 
+// --- tri-state: la alta impedancia (Z) se ve distinta de lo desconocido (X) ---
+await newModule('tri2', 'Verilog');
+await code.fill(`module tri2 (input clk, input en, output [1:0] y);
+  reg [1:0] q = 0;
+  always @(posedge clk) q <= q + 1;
+  assign y = en ? q : 2'bz;
+endmodule
+`);
+await synthesize();
+// (mismo lugar de los pines que div4: dos entradas y un bus de dos bits)
+await page.evaluate((asc) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([asc], 'tri tb.asc'));
+  dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+}, CIRCUIT.replace('SYMBOL div4', 'SYMBOL tri2').replace(/\brst\b/g, 'en').replace('PWL(0 5 20n 5 21n 0)', 'PWL(0 0 300n 0 301n 5 600n 5 601n 0)'));
+await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'tri tb' }).click();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
+await simulate();
+check(await addTrace('Dig(x1.y[1:0])'), 'Dig(x1.y[1:0]): un bus tri-state');
+check(await addTrace('Dig(x1.y_0_d)'), 'Dig(x1.y_0_d): uno de sus bits');
+const triValues = await page.locator('.digital-lanes .dl-value').allTextContents();
+check(triValues.slice(0, 3).join() === 'Z,0x0,0x1', `el bus en alta impedancia muestra Z y después sus valores (${triValues.slice(0, 3)})`);
+check((await page.locator('.digital-lanes g.dl-z').count()) === 2 && (await page.locator('.digital-lanes g.dl-x').count()) === 0, 'los tramos Z del bus se dibujan como Z, no como X');
+check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await page.locator('.digital-lanes path.dl-x').count()) === 0, 'y los del bit también');
+
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
 await code.fill('`timescale 1ns/1ps\nmodule pulso(input clk, output reg y);\n  initial y = 0;\n  always @(posedge clk) begin\n    #20 y = 1;\n    #10 y = 0;\n    $display("pulso");\n  end\nendmodule\n');

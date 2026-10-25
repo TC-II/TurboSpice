@@ -561,26 +561,29 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
 
   const range: Range | null = xRange;
   const isTran = scaleName === 'time';
+  // el nombre corto alcanza: el título «Window» va como encabezado de la lista
   const windowName: Record<DftWindow, string> = {
-    hann: t('Hann Window'),
-    hamming: t('Hamming Window'),
-    blackman: t('Blackman Window'),
-    blackmanharris: t('Blackman-Harris Window'),
-    nuttall: t('Nuttall Window'),
-    blackmannuttall: t('Blackman-Nuttall Window'),
-    flattop: t('Flat Top Window'),
-    bartlett: t('Bartlett (triangular) Window'),
-    welch: t('Welch Window'),
-    cosine: t('Cosine Window'),
-    gauss: t('Gaussian Window (σ = 0.4)'),
-    kaiser: t('Kaiser Window (β = 9)'),
-    tukey: t('Tukey Window (α = 0.5)'),
-    rect: t('Rectangular Window'),
+    hann: t('Hann'),
+    hamming: t('Hamming'),
+    blackman: t('Blackman'),
+    blackmanharris: t('Blackman-Harris'),
+    nuttall: t('Nuttall'),
+    blackmannuttall: t('Blackman-Nuttall'),
+    flattop: t('Flat top'),
+    bartlett: t('Bartlett (triangular)'),
+    welch: t('Welch'),
+    cosine: t('Cosine'),
+    gauss: t('Gaussian (σ = 0.4)'),
+    kaiser: t('Kaiser (β = 9)'),
+    tukey: t('Tukey (α = 0.5)'),
+    rect: t('Rectangular'),
   };
   const timeData = data.filter((_, k) => !isF(k));
   const freqData = data.filter((_, k) => isF(k));
   const unplaced = cursorMode && cursors.a === undefined && cursors.b === undefined;
   const previewX = unplaced ? hoverX : undefined;
+  const editedTrace = dftEdit ? panes[dftEdit.pane]?.traces[dftEdit.trace] : undefined;
+  const allTraces = panes.flatMap((p) => p.traces);
   // en este orden, en la barra de resultados (toolsHost) o arriba de los paneles
   const tools = (
     <>
@@ -631,9 +634,11 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       {dftOpen && isTran && (
         <span className="dft-tools">
           <select value={dftWindow} aria-label={t('Window')} onChange={(e) => setDftWindow(e.target.value as DftWindow)}>
-            {WINDOWS.map(([w]) => (
-              <option key={w} value={w}>{windowName[w]}</option>
-            ))}
+            <optgroup label={t('Window')}>
+              {WINDOWS.map(([w]) => (
+                <option key={w} value={w}>{windowName[w]}</option>
+              ))}
+            </optgroup>
           </select>
           {(
             [
@@ -673,33 +678,26 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
               ⌖
             </button>
           )}
+          {dftPreview && (
+            <span className={`hint plot-info dft-sampling${dftError ? ' err' : ''}`}>
+              {editedTrace ? `${t('Editing {name}', { name: traceLabel(editedTrace, allTraces) })} · ` : ''}
+              {dftError ||
+                t('{n} samples · Δf = {df}Hz', {
+                  n: dftN.toLocaleString(locale()),
+                  df: si(dftPreview.fs / dftN),
+                })}
+            </span>
+          )}
         </span>
       )}
     </>
   );
-  const editedTrace = dftEdit ? panes[dftEdit.pane]?.traces[dftEdit.trace] : undefined;
-  const allTraces = panes.flatMap((p) => p.traces);
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
   return (
     <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
-      {dftOpen && isTran && dftPreview && (
-        <p className={`hint plot-info dft-sampling${dftError ? ' err' : ''}`}>
-          {editedTrace ? `${t('Editing {name}', { name: traceLabel(editedTrace, allTraces) })} · ` : ''}
-          {dftError ||
-            t('{n} samples from {p0}s to {p1}s at {fs}Hz · resolution Δf = {df}Hz · up to {ny}Hz (Nyquist)', {
-              n: dftN.toLocaleString(locale()),
-              p0: si(dftPreview.from),
-              p1: si(dftPreview.to),
-              fs: si(dftPreview.fs),
-              df: si(dftPreview.fs / dftN),
-              ny: si(dftPreview.fs / 2),
-            })}
-        </p>
-      )}
-      {dftPicking && !dftError && <p className="hint plot-info">{t('Click a trace in the legend, or a wire or component in the schematic, to add its DFT · Esc cancels')}</p>}
       {(zoomMode || removing) && (
         <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
       )}

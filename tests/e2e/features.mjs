@@ -194,9 +194,9 @@ check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
 // DFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
 await page.mouse.click(outW.x, outW.y);
 await page.getByRole('button', { name: 'DFT', exact: true }).click();
-check(/ muestras de 0s a .*Nyquist/.test(await page.locator('.dft-sampling').textContent()), `sin zoom, la DFT toma todo el transitorio (${await page.locator('.dft-sampling').textContent()})`);
+check(/^\d[\d,.]* muestras · Δf = /.test(await page.locator('.dft-sampling').textContent()), `sin zoom, la DFT toma todo el transitorio (${await page.locator('.dft-sampling').textContent()})`);
 const windows = await page.getByLabel('Ventana', { exact: true }).locator('option').allTextContents();
-check(windows.includes('Ventana de Hann') && windows.includes('Ventana de Kaiser (β = 9)') && windows.length === 14, `14 ventanas con su nombre (${windows.length})`);
+check(windows.includes('Hann') && windows.includes('Kaiser (β = 9)') && windows.length === 14, `14 ventanas con su nombre (${windows.length})`);
 // #245: ⌖ y click en la cápsula de la leyenda; varias DFT en el mismo panel
 await page.locator('.expr-form input').fill('V(out)/2');
 await page.locator('.expr-form input').press('Enter');
@@ -267,7 +267,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   await field('Tiempo final de la DFT').fill('5m');
   await field('Frecuencia de muestreo de la DFT').fill('2k');
   await page.waitForTimeout(300);
-  check(/^8 muestras de 1ms a 5ms a 2kHz · resolución Δf = 250Hz · hasta 1kHz \(Nyquist\)$/.test(await sampling()), `muestreo elegido: ${await sampling()}`);
+  check(/^8 muestras · Δf = 250Hz$/.test(await sampling()), `muestreo elegido: ${await sampling()}`);
   check((await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '8', `las 8 muestras se marcan sobre la traza (${await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')})`);
   // un valor que no se entiende: en rojo, sin ⌖
   await field('Frecuencia de muestreo de la DFT').fill('abc');
@@ -275,7 +275,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   // 1000 muestras: no hace falta una potencia de 2
   await field('Frecuencia de muestreo de la DFT').fill('250k');
   await page.waitForTimeout(300);
-  check(/^1\.000 muestras de 1ms a 5ms a 250kHz/.test(await sampling()), `1000 muestras: ${await sampling()}`);
+  check(/^1\.000 muestras · Δf = 250Hz$/.test(await sampling()), `1000 muestras: ${await sampling()}`);
   if (!(await page.locator('.plot-panel.dft-picking').count())) await fftPick.click();
   await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
   await page.locator('.pane').nth(1).locator('.trace-chip').first().hover();

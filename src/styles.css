@@ -781,7 +781,10 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .dft-tools .dft-field input { width: 5.5em; font: 12px var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--fg); }
 .dft-tools .dft-field input::placeholder { color: var(--fg-muted); opacity: 0.8; }
 .dft-tools .dft-field.bad input { border-color: var(--err); color: var(--err); }
+.plot-info.dft-sampling { white-space: nowrap; }
 .plot-info.dft-sampling.err { color: var(--err); }
+/* el título «Window» de la lista de ventanas: no se elige, va en gris y en negrita */
+.dft-tools select optgroup { color: var(--fg-muted); font-weight: 600; }
 /* ⌖ de la DFT (#245): cursor de mira como el ícono y la cápsula bajo el mouse resaltada */
 .plot-panel.dft-picking, .plot-panel.dft-picking *, body:has(.plot-panel.dft-picking) .dft-pick { cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23fff' stroke-width='3.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23fff' stroke-width='3.5'/%3E%3Ccircle cx='12' cy='12' r='6.5' fill='none' stroke='%23222' stroke-width='1.5'/%3E%3Cpath d='M12 1v22M1 12h22' stroke='%23222' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, crosshair !important; }
 .trace-chip.pickable:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, var(--bg)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent); }

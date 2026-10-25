@@ -1,5 +1,6 @@
 import { DIGITAL_TYPE, type SimPlot, type SimVector } from '../engine/ngspice.ts';
 import type { StepRuns } from '../netlist/step.ts';
+import { bitNodeName } from '../netlist/bus.ts';
 import { deviceTraceName, parseDeviceVector } from '../sim/deviceParams.ts';
 
 /** Tipo de vector propio (no de ngspice) para el eje X de los barridos de .step */
@@ -52,7 +53,8 @@ export function project(v: SimVector, view: ComplexView): Float64Array {
 
 /** Nombre al estilo LTspice: "out" → "V(out)", "v1#branch" → "I(v1)" */
 export function displayName(v: SimVector): string {
-  const n = v.name;
+  // bits de bus: f__3__ en ngspice, f[3] para el usuario
+  const n = bitNodeName(v.name);
   const br = /^(.*)#branch(.*)$/i.exec(n);
   if (br) return `I(${br[1].toUpperCase()}${br[2]})`;
   // corrientes de dispositivos (.options savecurrents): @r1[i], @q1[ic], @d1[id]

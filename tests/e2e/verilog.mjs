@@ -28,22 +28,20 @@ const VERILOG = `module div4 (input clk, input rst, output reg [1:0] q);
     else q <= q + 1;
 endmodule
 `;
-// clk y rst a los pines del símbolo generado (div4 en 448,400: 64 de ancho y dos filas, así que las
-// entradas quedan en x=416 y las salidas en x=480, a y=384 y 416)
+// clk y rst a los pines del símbolo generado (div4 en 448,400: 96 de ancho por el nombre q[1:0] y
+// dos filas, así que las entradas quedan en x=400, a y=384 y 416, y el bus q[1:0] en x=496, y=384)
 const CIRCUIT = `Version 4
 SHEET 1 880 680
-WIRE 384 384 416 384
-WIRE 384 416 416 416
-WIRE 480 384 512 384
-WIRE 480 416 512 416
+WIRE 384 384 400 384
+WIRE 384 416 400 416
+WIRE 496 384 512 384
 FLAG 96 240 clk
 FLAG 96 320 0
 FLAG 304 240 rst
 FLAG 304 320 0
 FLAG 384 384 clk
 FLAG 384 416 rst
-FLAG 512 384 q1
-FLAG 512 416 q0
+FLAG 512 384 q[1:0]
 SYMBOL voltage 96 224 R0
 SYMATTR InstName V1
 SYMATTR Value PULSE(0 5 0 1n 1n 49n 100n)
@@ -123,7 +121,8 @@ await page.evaluate((asc) => {
 }, CIRCUIT);
 await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'div4 tb' }).click();
 await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
-check((await page.locator('svg.editor .pinname', { hasText: 'q_1' }).count()) === 1, 'el símbolo muestra el nombre de sus pines');
+check((await page.locator('svg.editor .pinname', { hasText: 'q[1:0]' }).count()) === 1 && (await page.locator('svg.editor .buspin').count()) === 1, 'el símbolo muestra sus pines, con el bus q[1:0] marcado');
+check((await page.locator('svg.editor .wires line.bus').count()) === 1, 'el cable del bus se dibuja grueso');
 if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
 check((await page.locator('svg.editor .loose rect').count()) === 0, 'todos los pines quedan conectados');
 
@@ -138,11 +137,11 @@ await page.waitForFunction(() => !document.querySelector('.verilog-module'));
 
 // --- simular: la salida analógica, y los nodos digitales en un panel aparte ---
 await simulate();
-check((await page.locator('.status.ok').count()) === 1, 'la simulación con el bloque Verilog anda');
-check(await addTrace('V(q1)'), 'V(q1): la salida analógica del bloque');
+check((await page.locator('.status.ok').count()) === 1, `la simulación con el bloque Verilog anda (${await page.locator('.status').first().textContent()} ${await page.locator('.errors, .sim-errors, .log .err').first().textContent().catch(() => '')})`);
+check(await addTrace('V(q[1])'), 'V(q[1]): un bit del bus de salida, analógico');
 check(await addTrace('Dig(x1.q[1:0])'), 'Dig(x1.q[1:0]): el bus de los nodos digitales');
 check(await addTrace('Dig(x1.q_0_d)'), 'Dig(x1.q_0_d): un bit');
-check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q1)', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), `lo digital va en un panel propio (${(await panes()).join(' | ')})`);
+check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q[1])', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), `lo digital va en un panel propio (${(await panes()).join(' | ')})`);
 const values = await page.locator('.digital-lanes .dl-value').allTextContents();
 check(values.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `el bus muestra los valores en hex (${values.slice(0, 4)})`);
 await page.getByRole('combobox', { name: 'Base de Dig(x1.q[1:0])' }).selectOption('bin');
@@ -152,7 +151,7 @@ check(!(await addTrace('Dig(x1.no_existe)')), 'un nodo digital que no existe da 
 // arrastrar una traza analógica a un panel digital no hace nada
 const chip = page.locator('.pane:not(.digital) .trace-chip').first();
 await chip.dragTo(page.locator('.pane.digital'));
-check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q1)', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), 'una traza analógica no se puede pasar a un panel digital');
+check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q[1])', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), 'una traza analógica no se puede pasar a un panel digital');
 
 // --- tri-state: la alta impedancia (Z) se ve distinta de lo desconocido (X) ---
 await newModule('tri2', 'Verilog');

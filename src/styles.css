@@ -229,6 +229,12 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .shapes > * { stroke: var(--sch-drawing); stroke-width: 1.4; }
 .shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
+/* buses: cables más gruesos y pines de bus con una barra y la cantidad de bits */
+.wires line.bus { stroke-width: 4.5; }
+.wires line.bus.sel { stroke-width: 5.5; }
+.bustaps line { stroke: var(--sch-sym); stroke-width: 3; }
+.buspin line { stroke: var(--sch-sym); stroke-width: 1.6; }
+.buspin .buswidth { fill: var(--sch-sym); stroke: none; }
 .junctions circle { fill: var(--sch-sym); stroke: none; }
 .wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
 .sym { color: var(--sch-sym); stroke: currentColor; }

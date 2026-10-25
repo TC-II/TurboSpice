@@ -6,6 +6,7 @@ import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
+import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
@@ -171,10 +172,24 @@ function PinName({ pin }: { pin: PinDef }) {
   const name = pin.attrs.get('PinName');
   const t = PIN_TEXT[pin.align.toUpperCase()];
   if (!name || !t) return null;
-  return (
+  const text = (
     <AlignedText x={pin.x + t.dx * pin.offset} y={pin.y + t.dy * pin.offset} align={t.align} size={1} className="pinname">
       {name}
     </AlignedText>
+  );
+  if (!isBusName(name)) return text;
+  // pin de bus: una barra cruzada con la cantidad de bits, del lado de afuera
+  const [ox, oy] = [-t.dx * 8, -t.dy * 8];
+  return (
+    <>
+      {text}
+      <g className="buspin">
+        <line x1={pin.x + ox - 4} y1={pin.y + oy + 4} x2={pin.x + ox + 4} y2={pin.y + oy - 4} />
+        <AlignedText x={pin.x + ox + (t.dy ? 6 : 0)} y={pin.y + oy - (t.dx ? 6 : 0)} align={t.dx ? 'Bottom' : 'Left'} size={1} className="buswidth">
+          {String(busWidth(name))}
+        </AlignedText>
+      </g>
+    </>
   );
 }
 
@@ -252,6 +267,8 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
   }
 
   const hl = highlightNet ? conn.nets.find((n) => n.name === highlightNet) : undefined;
+  // cables de bus (más de un bit): más gruesos, como en LTspice
+  const busWires = new Set(conn.nets.filter((n) => n.bits.length > 1).flatMap((n) => n.wires));
 
   return (
     <g className="schematic">
@@ -266,10 +283,18 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             y1={w.y1}
             x2={w.x2}
             y2={w.y2}
-            className={isSel({ kind: 'wire', index: i }) ? 'sel' : diff?.wires.has(i) ? `diff-${diff.wires.get(i)}` : undefined}
+            className={[busWires.has(i) && 'bus', isSel({ kind: 'wire', index: i }) ? 'sel' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
             style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined}
           />
         ))}
+      </g>
+      {/* derivaciones de bus de LTspice (BUSTAP x1 y1 x2 y2: del bus al extremo del bit); sólo
+          dibujo: el bit se une al bus por el nombre de su etiqueta */}
+      <g className="bustaps">
+        {doc.unknown.map((l, i) => {
+          const m = /^BUSTAP\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/.exec(l);
+          return m && <line key={i} x1={+m[1]} y1={+m[2]} x2={+m[3]} y2={+m[4]} />;
+        })}
       </g>
       {hl && (
         <g className="net-hl">

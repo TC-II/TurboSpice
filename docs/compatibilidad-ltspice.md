@@ -104,6 +104,33 @@ original en 29/30 casos de muestra (el restante LTspice no lo procesa ni siquier
   `NMOS`/`PMOS` + `standard.mos`; `NJF`/`PJF` + `standard.jft`.
 - Comentarios `;x` → `* x`; directivas multilínea se separan; al final `.backanno` y `.end`.
 
+### Buses (`netlist/bus.ts`)
+
+Como en LTspice (sintaxis de la wiki «Undocumented LTspice»; no verificado contra `LTspice -netlist`
+porque falta `xvfb-run` en la máquina de desarrollo):
+- **Etiqueta de bus**: `d[7:0]` son las redes `d[7]` … `d[0]`, en el orden escrito (`d[0:7]` las da al
+  revés). Varias partes separadas por comas se concatenan: `f[9:0],in` son 11 redes. Una etiqueta con
+  un solo índice (`d[3]`) es una red simple: el bit 3, que se une con el del bus por el nombre (no
+  hace falta derivación).
+- **Componente en arreglo**: `InstName` con rango (`R1[10:0]`) son 11 componentes, `R1[10]` … `R1[0]`.
+  Cada pin toma el bit que le toca del bus de su red, por posición; si la red es simple (p. ej.
+  tierra), va a todas las copias. Si los anchos no encajan, avisa y reparte en ronda.
+- **Pin de bus** en un símbolo: `PinName q[3:0]` son 4 nodos seguidos en la línea `X`. Los símbolos que
+  genera TurboSpice los usan: un puerto `d[3:0]` de un subcircuito esquemático (los puertos del
+  `.subckt` son `d[3]` … `d[0]`) y los buses de un módulo Verilog (`q[3:0]`, con los puertos `q_3` …
+  `q_0` del `.subckt` sintetizado). Un símbolo Verilog de antes, con un pin por bit, se conserva así
+  para no desconectar instancias.
+- **Red sin etiqueta** entre pines de bus o de componentes en arreglo: es un bus con el ancho de los
+  pines, con los bits `N001[k]`.
+- Dos etiquetas de bus del mismo ancho en la misma red son los mismos bits (queda un nombre por bit).
+- **Dibujo**: los cables de bus son más gruesos; un pin de bus lleva una barra cruzada con la cantidad
+  de bits. Las derivaciones `BUSTAP x1 y1 x2 y2` de LTspice se conservan y se dibujan (son sólo dibujo:
+  el bit se une por el nombre de su etiqueta); todavía no hay herramienta para colocarlas.
+- **Punta de prueba** sobre un cable de bus: una traza por bit.
+- **En ngspice** un bit va como `f__3__`: los corchetes son la sintaxis de los vectores de conexión de
+  XSPICE y rompen las compuertas cuando el nodo entra a un subcircuito (`[f[3]]`). `V(f[3])` encuentra
+  su vector igual (`ngNodeName`) y la lista de vectores lo muestra como `f[3]`.
+
 ## Símbolos, modelos y jerarquía del usuario
 
 En LTspice los `.asy` y `.lib` propios suelen estar junto al `.asc`. En TurboSpice se agregan en

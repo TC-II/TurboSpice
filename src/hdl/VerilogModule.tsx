@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '../i18n/i18n.ts';
+import { portsOf } from './project.ts';
 import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
 import type { SynthResult } from './yosys.ts';
 
@@ -242,21 +243,4 @@ function ParamField({ label, help, unit, name, value, onChange }: { label: strin
       </span>
     </label>
   );
-}
-
-/**
- * Puertos del módulo para mostrarlos: los bits de un bus (q_3 … q_0, como los deja la síntesis)
- * (del más alto al más bajo) vuelven a juntarse en q[3:0].
- */
-export function portsOf(pins: { name: string; dir: 'in' | 'out' | 'inout' }[]): { name: string; dir: 'in' | 'out' | 'inout'; bits: number }[] {
-  const out: { name: string; dir: 'in' | 'out' | 'inout'; bits: number; base?: string; hi?: number; lo?: number }[] = [];
-  for (const p of pins) {
-    const m = /^(.+)_(\d+)$/.exec(p.name);
-    const last = out.at(-1);
-    if (m && last?.base === m[1] && last.dir === p.dir && last.lo !== undefined && +m[2] === last.lo - 1) {
-      last.lo = +m[2];
-      last.bits++;
-    } else out.push(m ? { name: p.name, dir: p.dir, bits: 1, base: m[1], hi: +m[2], lo: +m[2] } : { name: p.name, dir: p.dir, bits: 1 });
-  }
-  return out.map(({ base, hi, lo, ...p }) => (base !== undefined && p.bits > 1 ? { ...p, name: `${base}[${hi}:${lo}]` } : p));
 }

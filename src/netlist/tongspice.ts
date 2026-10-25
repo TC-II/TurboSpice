@@ -6,6 +6,7 @@
 //  - ".lib archivo" (sin sección) → ".include", y rutas resueltas contra la librería;
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
+import { busBitNode } from './bus.ts';
 import { translateDigital } from './digital.ts';
 import { fixFloatingNodes } from './floating.ts';
 import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
@@ -698,11 +699,14 @@ function convertElements(
  * En las fuentes B de ngspice temp y temper son variables: un nodo con ese nombre rompe V(temp)
  * ("no such function 'v'" o malloc enorme). LTspice lo acepta; en ngspice el nodo se llama temp_.
  */
-export const ngNodeName = (net: string): string => (/^(temp|temper)$/i.test(net) ? `${net}_` : net);
+export const ngNodeName = (net: string): string => (/^(temp|temper)$/i.test(net) ? `${net}_` : busBitNode(net));
+
 
 function renameReservedNodes(lt: LtNetlist): LtNetlist {
+  // los bloques jerárquicos también (sus puertos y elementos)
+  const blocks = lt.blocks.map((b) => ({ ...b, ports: b.ports.map(ngNodeName), lt: renameReservedNodes(b.lt) }));
   const used = lt.elements.some((e) => e.nodes.some((n) => ngNodeName(n) !== n));
-  if (!used) return lt;
+  if (!used) return blocks.some((b, i) => b.lt !== lt.blocks[i].lt || b.ports.some((x, k) => x !== lt.blocks[i].ports[k])) ? { ...lt, blocks } : lt;
   const expr = (tt: string) =>
     tt.replace(/\b([vV])\(\s*([^()]*?)\s*\)/g, (m, f: string, a: string) => {
       const args = a.split(',').map((x) => ngNodeName(x.trim()));
@@ -710,6 +714,7 @@ function renameReservedNodes(lt: LtNetlist): LtNetlist {
     });
   return {
     ...lt,
+    blocks,
     elements: lt.elements.map((e) => ({ ...e, nodes: e.nodes.map(ngNodeName), value: expr(e.value) })),
     texts: lt.texts.map((tt) => ({ ...tt, text: expr(tt.text) })),
   };

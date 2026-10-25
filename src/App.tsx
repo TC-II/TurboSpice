@@ -128,6 +128,7 @@ import { addVerilogModule, looksBehavioral, setHdlMode, vvpFileOf, withParams, a
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
 import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
+import { busBits, isBusName } from './netlist/bus.ts';
 import { NewModuleDialog } from './project/NewModuleDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
 
@@ -1994,7 +1995,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // (un módulo Verilog, #209: en lugar del esquemático se ve su código; sus pines son los de la síntesis)
   const curModule = curSub ? moduleFile(project, curSub) : undefined;
   const curVerilog = curModule?.kind === 'verilog' ? curModule : undefined;
-  const subPorts = useMemo(() => (curVerilog ? verilogPorts(curVerilog).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []), [curSub, curVerilog, liveDoc]);
+  const subPorts = useMemo(() => (curVerilog ? verilogPorts(curVerilog, subcktSymbolText(project, curSub)).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []), [curSub, curVerilog, liveDoc, project]);
   const subPortsKey = subPorts.join(',');
   useEffect(() => {
     if (!curSub || curVerilog) return;
@@ -2055,7 +2056,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (f.kind === 'verilog')
         return {
           name,
-          ports: f.synth?.pins.length ?? 0,
+          ports: verilogPorts(f, subcktSymbolText(p, name)).length,
           uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
           children: [],
           outdated: false,
@@ -2106,6 +2107,27 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (!sim || !plot) return;
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
     if (!scaleOf(plot) && op) return setOpPins((p) => toggleOpPin(p, target));
+    // un cable de bus (f[10:0]): una traza por bit, en el testbench
+    if (target.net && isBusName(target.net) && !pathRef.current.length) {
+      const sc = scaleOf(plot);
+      if (!sc) return;
+      const exprs = busBits(target.net)
+        .map((b) => probeExpr(sim.built, { net: b }))
+        .filter((e): e is string => {
+          if (!e) return false;
+          try {
+            evalTrace(e, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+            return true;
+          } catch {
+            return false;
+          }
+        });
+      if (!exprs.length) return setMessage(t('No data for {expr} in {name}', { expr: target.net, name: plot.name }));
+      setPanel('plot');
+      if (expanded === 'schematic') setExpanded('');
+      const i = Math.min(activePane, panes.length - 1);
+      return editPanes(exprs.reduce((ps, e) => addTraceTo(ps, i, e), panes));
+    }
     let expr = probeExpr(sim.built, target);
     // adentro de un subcircuito (#180): la red de esta instancia en la netlist del testbench
     const lv = pathRef.current[pathRef.current.length - 1];

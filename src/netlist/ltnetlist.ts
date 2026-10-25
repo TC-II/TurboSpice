@@ -3,6 +3,7 @@
 import { baseName, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { connectivity, type Connectivity } from './connectivity.ts';
+import { busBits, busWidth, instArray, isBusName, pinNodes } from './bus.ts';
 import { t } from '../i18n/i18n.ts';
 
 export interface Element {
@@ -89,9 +90,11 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     // puertos: nombres de los pines del símbolo, escritos como la etiqueta del .asc
     const ports = [...def.pins]
       .sort((a, b) => Number(a.attrs.get('SpiceOrder') ?? 0) - Number(b.attrs.get('SpiceOrder') ?? 0))
-      .map((p) => {
+      .flatMap((p) => {
         const pin = p.attrs.get('PinName') ?? '';
-        return sub.flags.find((f) => f.name.toLowerCase() === pin.toLowerCase())?.name ?? pin;
+        const name = sub.flags.find((f) => f.name.toLowerCase() === pin.toLowerCase())?.name ?? pin;
+        // un pin de bus (d[3:0]) son tantos puertos como bits: d[3] … d[0]
+        return busBits(name);
       });
     warnings.push(...lt.warnings.map((w) => `${name}: ${w}`));
     for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
@@ -136,39 +139,73 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     if (!prefix || !def.pins.length) return;
     const instName = attrs.get('InstName') ?? '';
 
-    // Nodos por SpiceOrder; órdenes faltantes → MP_xx
-    const byOrder = new Map<number, { node: string; name: string; key: string }>();
-    def.pins.forEach((p, pi) => {
-      const net = conn.pinNet.get(`${si}:${pi}`);
-      const order = Number(p.attrs.get('SpiceOrder') ?? pi + 1);
-      byOrder.set(order, { node: net?.name || '', name: p.attrs.get('PinName') ?? '', key: `${si}:${pi}` });
-    });
-    const maxOrder = Math.max(0, ...byOrder.keys());
-    const nodes: string[] = [];
-    const pinNames: string[] = [];
+    const P = prefix.toUpperCase();
     // dispositivos A (compuertas digitales): los pines sueltos y los que faltan van a 0, sin
     // gastar números NC_xx
-    const digital = prefix.toUpperCase() === 'A';
-    for (let o = 1; o <= maxOrder; o++) {
-      const p = byOrder.get(o);
-      if (p && !p.node) {
-        if (digital) p.node = '0';
-        else ncNames.set(p.key, (p.node = nc('NC')));
+    const digital = P === 'A';
+    // componentes en arreglo (R1[10:0]) y pines de bus (q[3:0]): una línea por copia, cada pin
+    // con sus bits
+    const copies = instArray(instName);
+    const bussed = copies || def.pins.some((p) => isBusName(p.attrs.get('PinName') ?? ''));
+    const lines: { name: string; nodes: string[]; pinNames: string[] }[] = [];
+    if (bussed) {
+      const names = copies ?? [instName];
+      const pins = def.pins.map((p, pi) => ({ p, pi, order: Number(p.attrs.get('SpiceOrder') ?? pi + 1) })).sort((a, b) => a.order - b.order);
+      names.forEach((nm, c) => {
+        const nodes: string[] = [];
+        const pinNames: string[] = [];
+        for (const { p, pi } of pins) {
+          const pinName = p.attrs.get('PinName') ?? '';
+          const w = busWidth(pinName);
+          const net = conn.pinNet.get(`${si}:${pi}`);
+          let ns = net?.name ? pinNodes(net.bits, w, c, names.length) : null;
+          if (net?.name && !ns) {
+            warnings.push(t('{inst}: pin {pin} ({w} bits) does not fit the bus {bus} ({n} bits)', { inst: instName, pin: pinName, w: w * names.length, bus: net.name, n: net.bits.length }));
+            ns = Array.from({ length: w }, (_, b) => net.bits[(c * w + b) % net.bits.length]);
+          }
+          if (!ns) {
+            ns = Array.from({ length: w }, () => (digital ? '0' : nc('NC')));
+            if (c === 0 && !digital) ncNames.set(`${si}:${pi}`, ns[0]);
+          }
+          nodes.push(...ns);
+          pinNames.push(...(w > 1 ? busBits(pinName) : [pinName]));
+        }
+        if ((P === 'QN' || P === 'QP') && nodes.length === 3) nodes.push('0'), pinNames.push('');
+        else if ((P === 'MN' || P === 'MP') && nodes.length === 3) nodes.push(nodes[2]), pinNames.push('');
+        lines.push({ name: nm, nodes, pinNames });
+      });
+    } else {
+      // Nodos por SpiceOrder; órdenes faltantes → MP_xx
+      const byOrder = new Map<number, { node: string; name: string; key: string }>();
+      def.pins.forEach((p, pi) => {
+        const net = conn.pinNet.get(`${si}:${pi}`);
+        const order = Number(p.attrs.get('SpiceOrder') ?? pi + 1);
+        byOrder.set(order, { node: net?.name || '', name: p.attrs.get('PinName') ?? '', key: `${si}:${pi}` });
+      });
+      const maxOrder = Math.max(0, ...byOrder.keys());
+      const nodes: string[] = [];
+      const pinNames: string[] = [];
+      for (let o = 1; o <= maxOrder; o++) {
+        const p = byOrder.get(o);
+        if (p && !p.node) {
+          if (digital) p.node = '0';
+          else ncNames.set(p.key, (p.node = nc('NC')));
+        }
+        nodes.push(p ? p.node : digital ? '0' : nc('MP'));
+        pinNames.push(p?.name ?? '');
       }
-      nodes.push(p ? p.node : digital ? '0' : nc('MP'));
-      pinNames.push(p?.name ?? '');
-    }
-    // Nodos implícitos: sustrato del BJT a tierra, bulk del MOSFET de 3 pines a la fuente
-    const P = prefix.toUpperCase();
-    if ((P === 'QN' || P === 'QP') && nodes.length === 3) {
-      nodes.push('0');
-      pinNames.push('');
-    } else if ((P === 'MN' || P === 'MP') && nodes.length === 3) {
-      // si la fuente está suelta, el bulk es otro nodo suelto (el nombre de la fuente ya es
-      // NC_xx y LTspice usa uno nuevo)
-      const src = byOrder.get(3);
-      nodes.push(src && !ncNames.has(src.key) ? src.node : nc('NC'));
-      pinNames.push('');
+      // Nodos implícitos: sustrato del BJT a tierra, bulk del MOSFET de 3 pines a la fuente
+      if ((P === 'QN' || P === 'QP') && nodes.length === 3) {
+        nodes.push('0');
+        pinNames.push('');
+      } else if ((P === 'MN' || P === 'MP') && nodes.length === 3) {
+        // si la fuente está suelta, el bulk es otro nodo suelto (el nombre de la fuente ya es
+        // NC_xx y LTspice usa uno nuevo)
+        const src = byOrder.get(3);
+        nodes.push(src && !ncNames.has(src.key) ? src.node : nc('NC'));
+        pinNames.push('');
+      }
+      lines.push({ name: instName, nodes, pinNames });
     }
     if (FAMILIES[P]) families.add(P);
 
@@ -195,7 +232,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     const modelFile = attrs.get('ModelFile') || libModel;
     if (modelFile && !modelFiles.includes(modelFile)) modelFiles.push(modelFile);
 
-    elements.push({ sym: si, name: blockNoPrefix ? `X§${instName}` : elementName(prefix, instName), prefix, nodes, pinNames, value, attrs });
+    for (const l of lines) elements.push({ sym: si, name: blockNoPrefix ? `X§${l.name}` : elementName(prefix, l.name), prefix, nodes: l.nodes, pinNames: l.pinNames, value, attrs });
   });
 
   const implicitModels: string[] = [];

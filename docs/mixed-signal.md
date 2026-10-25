@@ -30,6 +30,9 @@ Un módulo Verilog es `<nombre>.v` + `<nombre>.asy`, como un subcircuito esquem�
   (`ProjectFile.synth`: `.subckt`, pines, parameter, y el `.vvp` en comportamiento); la librería la usa
   como el `<nombre>.sub` que nombra el símbolo. Si el código (o el modo) cambió, se vuelve a sintetizar
   antes de simular. El símbolo se genera solo; si se editó, conserva su dibujo.
+- Los buses del módulo son un solo pin del símbolo (`q[3:0]`, con la barra de bus): se conectan con un
+  cable con una etiqueta de bus (`q[3:0]`) y cada bit se mide como `V(q[1])`. Ver «Buses» en
+  [compatibilidad-ltspice.md](compatibilidad-ltspice.md).
 - Proyectos de antes (un `.sub` generado visible) se migran al abrir.
 
 ### Modos

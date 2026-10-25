@@ -7,6 +7,7 @@
 //   numeradas según el primer cable de cada red en el archivo.
 import { toWorld } from '../asc/transform.ts';
 import type { AscDoc, Point, SymbolDef } from '../asc/model.ts';
+import { busBits, busWidth, instArray, isBusName } from './bus.ts';
 
 export interface PinRef {
   /** índice del símbolo en doc.symbols */
@@ -26,6 +27,12 @@ export interface Net {
   points: Point[];
   /** índices de cables que pertenecen a la red */
   wires: number[];
+  /**
+   * Redes de cada bit (buses, como en LTspice): ["f[10]", …, "f[0]"] en un cable con la etiqueta
+   * f[10:0]; [name] en una red simple. Un bus sin etiqueta (entre pines de bus o de componentes en
+   * arreglo) se llama N001[k]…
+   */
+  bits: string[];
 }
 
 export interface Connectivity {
@@ -131,7 +138,7 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
   const netOf = (k: string) => {
     const r = uf.find(k);
     let n = byRoot.get(r);
-    if (!n) byRoot.set(r, (n = { name: '', pins: [], labels: [], points: [], wires: [] }));
+    if (!n) byRoot.set(r, (n = { name: '', pins: [], labels: [], points: [], wires: [], bits: [] }));
     return n;
   };
   for (const [k, p] of points) netOf(k).points.push(p);
@@ -174,6 +181,11 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
     .sort(([, a], [, b]) => a.sym - b.sym || a.order - b.order)
     .forEach(([n], i) => (n.name = `P${String(i + 1).padStart(3, '0')}`));
 
+  resolveBits(nets, chosen, (p) => {
+    const s = doc.symbols[p.sym];
+    return busWidth(p.name) * (instArray(s.attrs.get('InstName') ?? '')?.length ?? 1);
+  });
+
   const pinNet = new Map<string, Net>();
   for (const n of nets) for (const p of n.pins) pinNet.set(`${p.sym}:${p.pin}`, n);
 
@@ -187,4 +199,42 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
       return w === undefined ? undefined : byRoot.get(uf.find(key(doc.wires[w].x1, doc.wires[w].y1)));
     },
   };
+}
+
+/**
+ * Bits de cada red. Una red con una etiqueta de bus tiene sus bits; sin etiqueta, toma el ancho de
+ * los pines (de bus o de componentes en arreglo) que llegan a ella. Si en una red hay dos etiquetas
+ * de bus del mismo ancho, sus bits son los mismos (como dos etiquetas en una red simple): cada uno
+ * queda con un solo nombre en toda la hoja (tierra si alguno es "0").
+ */
+function resolveBits(nets: Net[], chosen: Map<Net, { name: string }>, pinWidth: (p: PinRef) => number) {
+  const uf = new UnionFind();
+  for (const n of nets) {
+    const label = chosen.get(n)?.name;
+    if (label !== undefined && isBusName(label)) n.bits = busBits(label);
+    else if (label !== undefined || n.name === '' || n.name === '0') n.bits = [n.name];
+    else {
+      const w = Math.max(1, ...n.pins.map(pinWidth));
+      n.bits = w > 1 ? Array.from({ length: w }, (_, i) => `${n.name}[${w - 1 - i}]`) : [n.name];
+    }
+    n.bits.forEach((b) => uf.add(b));
+    // otras etiquetas de bus del mismo ancho en la misma red: los mismos bits
+    for (const l of n.labels)
+      if (l !== label && isBusName(l)) {
+        const other = busBits(l);
+        if (other.length === n.bits.length) other.forEach((b, i) => (uf.add(b), uf.union(n.bits[i], b)));
+      }
+  }
+  // nombre de cada grupo de bits: tierra, si no el primero que aparece
+  const rep = new Map<string, string>();
+  for (const n of nets)
+    for (const b of n.bits) {
+      const r = uf.find(b);
+      if (!rep.has(r) || b === '0') rep.set(r, b);
+    }
+  for (const n of nets) {
+    if (!n.bits.length) continue;
+    n.bits = n.bits.map((b) => rep.get(uf.find(b)) ?? b);
+    if (n.bits.length === 1 && n.name !== '') n.name = n.bits[0];
+  }
 }

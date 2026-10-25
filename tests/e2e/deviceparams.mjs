@@ -18,7 +18,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Correr' }).click();
+  await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
   await page.waitForTimeout(300);
 };

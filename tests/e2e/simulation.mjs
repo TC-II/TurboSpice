@@ -78,7 +78,7 @@ await page.getByRole('button', { name: 'Aceptar' }).click();
 const free = await at(128, 48); // lugar libre dentro del circuito (siempre visible)
 await page.mouse.click(free.x, free.y);
 check((await page.locator('.texts .ngspice').count()) === 1, 'el bloque .control queda en el esquemático (comentario activo)');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const plots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(plots.join() === 'tran1,tran2,tran3', `el barrido genera tres corridas (${plots.join(', ')})`);
@@ -138,9 +138,12 @@ await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
 // sin nombre propio, el testbench se llama como su análisis
 check((await benchName()) === 'Barrido DC', `un tipo nuevo crea otro testbench, con el nombre de su análisis (${await benchName()})`);
-await page.locator('.capsule-variant').dblclick();
-await page.getByLabel('Nombre del testbench').fill('DC');
-await page.getByLabel('Nombre del testbench').press('Enter');
+// renombrar con el ✎ de su fila en el panel del proyecto
+if (!(await page.locator('.project-tree').count())) await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
+await page.locator('.project-tree .tree-row[data-bench]', { hasText: 'Barrido DC' }).first().hover();
+await page.getByRole('button', { name: 'Renombrar Barrido DC', exact: true }).click();
+await page.locator('.project-tree input.name-input').fill('DC');
+await page.locator('.project-tree input.name-input').press('Enter');
 check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálogo: los parámetros van en la barra');
 check((await directive()) === '.dc V1 0 5 0.1', `elegir un tipo configura la simulación del testbench, con la fuente del circuito (${await directive()})`);
 check((await benchName()) === 'DC', `la barra muestra el nombre del testbench (${await benchName()})`);
@@ -245,7 +248,9 @@ await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await items()).length === 2, 'al recargar se recuperan los testbenches');
 // renombrar: el ✎ del panel lo cambia en su misma fila (sin ventana)
 await openPanel();
-await page.getByRole('button', { name: `Renombrar ${await benchName()}`, exact: true }).click();
+const before = await benchName();
+await page.locator('.project-tree .tree-row[data-bench]', { hasText: before }).first().hover();
+await page.getByRole('button', { name: `Renombrar ${before}`, exact: true }).click();
 await page.locator('.project-tree input.name-input').fill('Curva corta');
 await page.locator('.project-tree input.name-input').press('Enter');
 check((await benchName()) === 'Curva corta', 'el ✎ del panel lo renombra en su misma fila');

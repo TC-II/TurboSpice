@@ -36,7 +36,7 @@ async function template(name) {
   check(await page.locator('.study-template legend', { hasText: title }).isVisible(), `${title}: el asistente aparece`);
 }
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Correr' }).click();
+  await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
   return (await page.locator('.status.err').count()) === 0;
 };

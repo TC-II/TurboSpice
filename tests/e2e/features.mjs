@@ -104,7 +104,7 @@ await openExample(page, 'RLC Bode');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByRole('button', { name: 'Compartir' }).click();
 const link = await page.locator('.modal input[aria-label="Enlace"]').inputValue();
-check(/#c=[\w-]+&n=Examples\.asc$/.test(link), `genera el link (${link.length} caracteres)`);
+check(/#c=[\w-]+(&z=1)?(&k=1)?&n=[^&]+$/.test(link), `genera el link (${link.length} caracteres)`);
 check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ bytes/) !== null, 'el diálogo dice cuántos bytes ocupa el circuito comprimido');
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
 check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
@@ -123,7 +123,7 @@ check((await other.locator('.capsule-project').textContent()) === 'Examples', 'e
 check(!(await other.evaluate(() => location.hash)), 'y limpia el hash');
 const symsA = await page.locator('svg.editor .sym').count();
 check((await other.locator('svg.editor .sym').count()) === symsA, 'con los mismos componentes');
-await other.getByRole('button', { name: 'Correr' }).click();
+await other.getByLabel('Correr', { exact: true }).click();
 await other.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await other.locator('.status.ok').count()) === 1, 'y simula');
 await other.close();
@@ -161,7 +161,7 @@ const at = async (x, y) => {
 };
 await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await page.waitForTimeout(300);
 const q1 = await at(236, 208);
@@ -423,7 +423,7 @@ await page.getByRole('button', { name: 'Cancelar' }).click();
 // --- #7: .step ---
 await openExample(page, 'RC Sweep (.step)');
 await page.locator('svg.editor .sym').first().waitFor();
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await resultsView(page)) === 'Mediciones', 'con .meas y nada graficado, abre en Mediciones');
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
@@ -463,7 +463,7 @@ const downloaded = async (action) => {
 await page.setViewportSize({ width: 1600, height: 1100 }); // lugar para dos paneles sin scroll
 await openExample(page, 'RLC Bode');
 await page.locator('svg.editor .sym').first().waitFor();
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await page.waitForTimeout(300);
 const outAc = await at(272, -32);
@@ -605,7 +605,7 @@ check(png.name === 'Examples.png' && png.text.length > 1000, 'gráfico a PNG');
 
 // #51: ya no hay "Recordar vista" (la vista se guarda siempre con la simulación)
 check((await page.getByRole('button', { name: /Recordar vista|Vista recordada/ }).count()) === 0, 'sin botón Recordar vista');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.waitForTimeout(500);
 check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `al volver a simular se conserva la vista (${await paneChips(0)})`);
 const plt = await downloaded(() => resultsMenu(page, 'Exportar', 'Vista a .plt (LTspice)'));
@@ -631,7 +631,7 @@ await page.getByRole('button', { name: 'Listo', exact: true }).click();
   await op.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
   await op.locator('svg.editor .sym').first().waitFor();
   check((await op.locator('svg.editor text', { hasText: '.plot ' }).count()) === 0, 'el comentario ;.plot no se dibuja');
-  await op.getByRole('button', { name: 'Correr' }).click();
+  await op.getByLabel('Correr', { exact: true }).click();
   await op.locator('.pane').nth(1).waitFor({ timeout: 30000 });
   const chips = (i) => op.locator('.pane').nth(i).locator('.trace-chip .name').allTextContents();
   check((await op.locator('.pane').count()) === 2 && (await chips(1)).join() === 'V(n002)', `en otro navegador, el link trae la vista (${await chips(0)} | ${await chips(1)})`);
@@ -655,7 +655,7 @@ await pzField('Entrada −').fill('0');
 await pzField('Salida +').fill('out');
 await pzField('Salida −').fill('0');
 await page.getByRole('button', { name: 'Aceptar' }).click();
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.pz-plane').waitFor({ timeout: 30000 });
 const pzRows = await page.locator('.pz-view tbody tr').allTextContents();
 check(pzRows.length === 2 && pzRows.every((r) => /polo/.test(r) && /5\.03\d*kHz/.test(r) && /3\.16/.test(r)), `.pz: dos polos con f0 = 5.03 kHz y Q = 3.16 (${pzRows.join(' | ')})`);
@@ -685,7 +685,7 @@ const dropAsc = (name, text) =>
   }, [name, text]);
 await dropAsc('RLC pz.asc', rlcAsc([]));
 await pzp.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'RLC pz');
-await pzp.getByRole('button', { name: 'Correr' }).click();
+await pzp.getByLabel('Correr', { exact: true }).click();
 await pzp.locator('.pz-plane').waitFor({ timeout: 30000 });
 check((await pzp.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'pz1', 'con .ac y .pz se abre el mapa de polos y ceros');
 const pole = await pzp.locator('.pz-plane path.pole').first().boundingBox();
@@ -710,7 +710,7 @@ check((await pzp.getByRole('checkbox', { name: 'Polos y ceros' }).isChecked()) &
 await pzp.screenshot({ path: `${OUT}/pz-bode.png` });
 await dropAsc('RLC pz step.asc', rlcAsc(['!.step param R list 10 20 40'], '{R}'));
 await pzp.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'RLC pz step');
-await pzp.getByRole('button', { name: 'Correr' }).click();
+await pzp.getByLabel('Correr', { exact: true }).click();
 await pzp.locator('.pz-legend li').first().waitFor({ timeout: 30000 });
 const legend = await pzp.locator('.pz-legend li').allTextContents();
 check(legend.length === 3 && /R=20/.test(legend[1]), `.pz con .step: corridas superpuestas con leyenda (${legend.join(', ')})`);
@@ -718,7 +718,7 @@ check((await pzp.locator('.pz-table tbody tr').count()) === 6, 'dos polos por co
 await pzp.screenshot({ path: `${OUT}/pz-step.png` });
 await pzp.close();
 await page.keyboard.press('Control+z');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.pane-chart').first().waitFor({ timeout: 30000 });
 await page.getByRole('combobox', { name: 'Vista' }).selectOption('smith');
 check((await page.locator('.smith polyline.trace').count()) === 2, 'carta de Smith con las trazas complejas');
@@ -748,20 +748,20 @@ check((await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'a
 await viewBtn('Resultados').click();
 await page.locator('.results-panel').waitFor();
 check((await resultsState()) === shownBefore, `al mostrarlos de nuevo, los resultados siguen intactos (${shownBefore})`);
-// #55: un click siempre suma. Con las dos vistas, click en una la deja a pantalla completa…
+// #55: con las dos vistas, click en una la cierra (la otra queda a pantalla completa)…
 await viewBtn('Resultados').click();
-check((await page.locator('.workspace.expand-results').count()) === 1 && (await viewBtn('Esquemático').getAttribute('aria-pressed')) === 'false', 'con las dos, click en Resultados la deja a pantalla completa');
-await viewBtn('Resultados').click();
-check((await page.locator('.workspace.expand-results').count()) === 1, 'otro click en la que está sola no cambia nada');
+check((await page.locator('.workspace.expand-schematic').count()) === 1 && (await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'con las dos, click en Resultados la cierra');
+await viewBtn('Esquemático').click();
+check((await page.locator('.workspace.expand-schematic').count()) === 1, 'click en la que está sola no cambia nada');
 // …y click en la que no se ve la agrega en pantalla partida
-await viewBtn('Esquemático').click();
-check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'click en Esquemático (oculto) vuelve a pantalla partida');
-await viewBtn('Esquemático').click();
-check((await page.locator('.workspace.expand-schematic').count()) === 1 && (await viewBtn('Resultados').getAttribute('aria-pressed')) === 'false', 'click en Esquemático lo deja a pantalla completa');
-const blue = await viewBtn('Esquemático').evaluate((b) => getComputedStyle(b).backgroundColor);
-const dark = await viewBtn('Resultados').evaluate((b) => getComputedStyle(b).backgroundColor);
-check(blue !== dark, `la vista que se muestra se distingue por color (${blue} / ${dark})`);
 await viewBtn('Resultados').click();
+check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'click en Resultados (oculto) vuelve a pantalla partida');
+await viewBtn('Esquemático').click();
+check((await page.locator('.workspace.expand-results').count()) === 1 && (await viewBtn('Esquemático').getAttribute('aria-pressed')) === 'false', 'click en Esquemático lo cierra');
+const blue = await viewBtn('Resultados').evaluate((b) => getComputedStyle(b).backgroundColor);
+const dark = await viewBtn('Esquemático').evaluate((b) => getComputedStyle(b).backgroundColor);
+check(blue !== dark, `la vista que se muestra se distingue por color (${blue} / ${dark})`);
+await viewBtn('Esquemático').click();
 check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'con los dos prendidos, pantalla partida');
 await page.getByRole('button', { name: 'Resultados al costado' }).click();
 check((await page.locator('.workspace.side').count()) === 1 && (await page.getByRole('button', { name: 'Resultados al costado' }).getAttribute('aria-pressed')) === 'true', 'el botón de disposición pone los resultados al costado');
@@ -828,7 +828,7 @@ await page.keyboard.press('r');
 const free2 = await at(400, 64);
 await page.mouse.click(free2.x, free2.y);
 await page.keyboard.press('Escape');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await resultsMenu(page, /^Errores/);
 const prob = page.locator('.problems li', { hasText: 'R2 no tiene valor asignado' });
@@ -872,7 +872,7 @@ for (const where of ['al costado', 'abajo']) {
 }
 // simular con el esquemático expandido muestra los resultados
 await page.keyboard.press('Control+1');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await page.locator('.results-panel').waitFor({ timeout: 10000 });
 check(await page.locator('.results-panel').isVisible(), 'simular con el esquemático expandido muestra los resultados');
@@ -899,7 +899,7 @@ const top = 'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nW
 await page.getByRole('button', { name: 'Nuevo' }).click();
 await page.evaluate((t) => navigator.clipboard.writeText(t), top);
 await page.keyboard.press('Control+v');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const opRows = await page.locator('.result-table tbody tr').allTextContents();
 check(opRows.includes('V(b)2') && opRows.includes('V(c)6'), `jerarquía y subcircuito propio simulan (${opRows.filter((r) => /^V\((b|c)\)/.test(r)).join(', ')})`);
@@ -932,7 +932,7 @@ const code = await page.getByLabel('Código del estudio').inputValue();
 check(code.startsWith('.param R1=1k\n.step param R1 list 500 1k 2k\n.meas tran m1'), `ver código (${code.split('\n').length} líneas)`);
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check((await page.locator('svg.editor .sym text.win', { hasText: '{R1}' }).count()) === 1, 'R1 pasa a valer {R1}');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await resultsMenu(page, /^Mediciones/);
 const studyRows = await page.locator('.meas-table tbody tr').allTextContents();
@@ -949,7 +949,7 @@ check(await page.getByText('30 corridas en total').isVisible(), 'el barrido desa
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check((await page.locator('svg.editor .sym text.win', { hasText: '{mc(1u,0.1)}' }).count()) === 1, 'C1 con tolerancia: {mc(1u,0.1)}');
 check((await page.locator('svg.editor .texts .comment', { hasText: '.step param R1 list 500 1k 2k' }).count()) === 1, 'el barrido desactivado queda como comentario');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await resultsMenu(page, /^Mediciones/);
 const mcRows = await page.locator('.meas-table tbody tr').allTextContents();
@@ -999,7 +999,7 @@ check((await page.locator('svg.editor .texts .directive', { hasText: '.tran 20m'
 check((await page.locator('svg.editor .texts .ngspice', { hasText: 'análisis adicionales' }).count()) === 1, 'el .ac queda como comentario que sólo corre TurboSpice');
 await menu(page, 'Ver', 'Mostrar las directivas en el esquemático');
 check((await page.locator('svg.editor .texts text', { hasText: /^\.(tran|ac) / }).count()) === 0, 'y se vuelve a ocultar');
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const studyPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(studyPlots.some((p) => /^tran/.test(p)) && studyPlots.some((p) => /^ac/.test(p)), `corren el .tran y el .ac con el barrido (${studyPlots.join(', ')})`);
@@ -1058,7 +1058,7 @@ const prog = {
 await page.locator('.study-blocks').evaluate((el, json) => el.loadProgram(json), prog);
 check(/\.control/.test(await page.locator('.modal .hint').last().textContent()), 'con lógica se guarda como .control');
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
-await page.getByRole('button', { name: 'Correr' }).click();
+await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await page.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'trise vs R', 'el gráfico trise vs R aparece solo');
 await page.getByRole('button', { name: 'Medidas' }).click();
@@ -1101,7 +1101,7 @@ await page.keyboard.press('Escape');
     await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });
     await page.locator('.study-blocks').evaluate((el, j) => el.loadProgram(j), json);
     await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
-    await page.getByRole('button', { name: 'Correr' }).click();
+    await page.getByLabel('Correr', { exact: true }).click();
     await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
   };
   const v = (n) => ({ id: `v_${n}` });
@@ -1261,7 +1261,7 @@ await fp.keyboard.press('Escape');
 await menu(fp, 'Archivo', 'Ejemplos', 'Common Emitter');
 await fp.locator('svg.editor .sym').first().waitFor();
 await fp.waitForTimeout(500);
-check((await fp.locator('.capsule').textContent()) === 'Examples·Common Emitter', `abre el ejemplo desde el menú (${await fp.locator('.capsule').textContent()})`);
+check((await fp.locator('.capsule-names').textContent()).startsWith('Examples·Common Emitter'), `abre el ejemplo desde el menú (${await fp.locator('.capsule-names').textContent()})`);
 await fresh.close();
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);

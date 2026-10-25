@@ -54,7 +54,7 @@ TEXT 96 528 Left 2 !.tran 1u
 `;
 
 const simulate = async () => {
-  await page.getByRole('button', { name: 'Correr' }).click();
+  await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
   await page.waitForTimeout(400);
 };

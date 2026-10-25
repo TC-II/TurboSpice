@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -b",
-    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs && node tests/e2e/features.mjs && node tests/e2e/templates.mjs && node tests/e2e/wires.mjs && node tests/e2e/shortcuts.mjs && node tests/e2e/rotate.mjs && node tests/e2e/shapes.mjs && node tests/e2e/placing.mjs && node tests/e2e/dialogs.mjs && node tests/e2e/save.mjs && node tests/e2e/hierarchy.mjs && node tests/e2e/deviceparams.mjs && node tests/e2e/verilog.mjs && node tests/e2e/performance.mjs",
+    "e2e": "node tests/e2e/examples.mjs && node tests/e2e/editor.mjs && node tests/e2e/simulation.mjs && node tests/e2e/features.mjs && node tests/e2e/templates.mjs && node tests/e2e/wires.mjs && node tests/e2e/shortcuts.mjs && node tests/e2e/rotate.mjs && node tests/e2e/shapes.mjs && node tests/e2e/placing.mjs && node tests/e2e/dialogs.mjs && node tests/e2e/save.mjs && node tests/e2e/hierarchy.mjs && node tests/e2e/deviceparams.mjs && node tests/e2e/verilog.mjs && node tests/e2e/panes.mjs && node tests/e2e/performance.mjs",
     "e2e:firefox": "npm run e2e --browser=firefox",
     "windows:import": "node scripts/import-window-positions.mjs",
     "assets": "node scripts/copy-engine.mjs && node scripts/build-library.mjs",

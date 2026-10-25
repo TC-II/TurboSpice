@@ -30,6 +30,25 @@ export interface Pane {
   digital?: boolean;
   /** @deprecated (#245) la FFT era del panel; ahora va en cada traza. Sólo se lee de vistas viejas */
   fft?: PaneFft;
+  /**
+   * Tamaño elegido arrastrando el divisor entre paneles: el reparto de la altura es proporcional
+   * a esto (el alto en px de cuando se eligió). Sin él, los paneles se reparten por igual.
+   */
+  size?: number;
+}
+
+/**
+ * Mueve la traza `from` a la posición `to` del panel. Las de más adelante se dibujan encima de
+ * las anteriores, así que esto cambia qué señal tapa a cuál. Los colores quedan fijos (los que
+ * venían de su posición también).
+ */
+export function reorderTrace(p: Pane, from: number, to: number): Pane {
+  const n = p.traces.length;
+  if (from === to || from < 0 || from >= n || to < 0 || to >= n) return p;
+  const traces = p.traces.map((t, i) => (t.color ? t : { ...t, color: traceColor(t, i) }));
+  const [tt] = traces.splice(from, 1);
+  traces.splice(to, 0, tt);
+  return { ...p, traces };
 }
 
 /** Tipo de un panel según sus trazas (#260): de espectro si tiene FFT, null si está vacío */

@@ -54,3 +54,14 @@ describe('markers', () => {
     expect(asMarkers([{ kind: 'h', id: 1, pane: 0, y: 2 }, { kind: 'm', id: 1, pane: 0, x: 1 }, { kind: 'z' }, null])).toEqual([{ kind: 'h', id: 1, pane: 0, y: 2, axis: 'y' }]);
   });
 });
+
+import { parseSi } from '../../src/waveform/dft.ts';
+describe('valores escritos a mano en las etiquetas', () => {
+  it('acepta prefijo SI y unidad', () => {
+    expect(parseSi('2.5m')).toBeCloseTo(2.5e-3);
+    expect(parseSi('1.2V')).toBeCloseTo(1.2);
+    expect(parseSi('10kHz')).toBe(10000);
+    expect(parseSi('-3dB')).toBe(-3);
+    expect(parseSi('abc')).toBeNull();
+  });
+});

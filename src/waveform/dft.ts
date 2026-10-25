@@ -200,7 +200,7 @@ const SI_PREFIX: Record<string, number> = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6
  * "2.5µs", "100kHz", "1e-3". La unidad (s, Hz) es opcional. null si no se entiende.
  */
 export function parseSi(text: string): number | null {
-  const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(meg|MEG|Meg|[fpnuµμmkKMGT]?)\s*(s|Hz|hz|S)?\s*$/.exec(text);
+  const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(meg|MEG|Meg|[fpnuµμmkKMGT]?)\s*(s|Hz|hz|S|V|A|dB|°)?\s*$/.exec(text);
   if (!m) return null;
   const v = parseFloat(m[1]) * SI_PREFIX[m[2]];
   return Number.isFinite(v) ? v : null;

@@ -645,6 +645,23 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   await page.mouse.move(ov.x + ov.width * 0.6, ov.y + ov.height * 0.2, { steps: 5 });
   await page.mouse.up();
   check((await rowsOf('V1'))[0] !== v0, `arrastrar la línea V la mueve (${v0} → ${(await rowsOf('V1'))[0]})`);
+  {
+    // un click en la etiqueta de la línea V permite escribir su x
+    const o = await page.locator('.pane-chart .uplot .u-over').first().boundingBox();
+    const xs = (await rowsOf('V1'))[0];
+    // (la etiqueta va arriba, a la derecha de la línea: se busca barriendo la franja de arriba)
+    let opened = false;
+    for (let f = 0.5; f < 0.75 && !opened; f += 0.02) {
+      await page.mouse.click(o.x + o.width * f, o.y + 14);
+      opened = (await page.locator('input.label-edit').count()) > 0;
+    }
+    if (opened) {
+      await page.locator('input.label-edit').fill('1k');
+      await page.keyboard.press('Enter');
+    }
+    const now = (await rowsOf('V1'))[0];
+    check(opened && /1\.000kHz/.test(now), `la x de la línea V se escribe a mano (${xs} → ${now})`);
+  }
   await page.keyboard.press('Shift+M');
   await page.waitForTimeout(100);
   check((await names()) === '' && (await card.count()) === 0, 'Shift+M borra todos los markers');

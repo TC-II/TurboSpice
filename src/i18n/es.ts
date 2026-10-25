@@ -296,6 +296,7 @@ export const es: Record<string, string> = {
   'Markers': 'Markers',
   'Marker': 'Marker',
   'Clear the markers': 'Borrar los markers',
+  'Write the value (SI prefixes: 2.5m, 10k) · Enter applies, Esc cancels': 'Escribí el valor (prefijos SI: 2.5m, 10k) · Enter aplica, Esc cancela',
   'Markers: a click puts a marker on the trace. With the mouse over the plot: M marker, V and H vertical and horizontal lines (select one to read where it cuts the traces), A and D two markers and their differences; drag them to move them (Delete removes the selected one, Shift+M all of them)': 'Markers: un click pone un marker sobre la traza. Con el mouse sobre el gráfico: M marker, V y H líneas vertical y horizontal (seleccionando una se leen sus cortes con las trazas), A y D dos markers y sus diferencias; se mueven arrastrándolos (Supr borra el seleccionado, Shift+M todos)',
   'Marker on the trace under the mouse · vertical line · horizontal line (they show where they cut the traces)': 'Marker sobre la traza bajo el mouse · línea vertical · línea horizontal (muestran dónde cortan las trazas)',
   'With Markers on: markers A and D, with their differences': 'Con Markers activo: markers A y D, con sus diferencias',

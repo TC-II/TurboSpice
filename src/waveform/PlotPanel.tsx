@@ -910,6 +910,8 @@ function PaneView(props: {
   /** el arrastre en curso empezó en este gráfico */
   const pressed = useRef(false);
   const [hover, setHover] = useState<number | null>(null);
+  // valor escrito a mano en la etiqueta de una línea (V, H) o de un cursor: dónde va la caja y qué hace
+  const [edit, setEdit] = useState<{ x: number; y: number; w: number; text: string; commit(v: number): void } | null>(null);
   const [dragOver, setDragOver] = useState(false);
   // menú del botón derecho sobre una traza de la leyenda
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number } | null>(null);
@@ -969,6 +971,8 @@ function PaneView(props: {
     /** rango de X pedido por la rueda o el paneo, dentro de los datos (null: sin zoom) */
     const toX = (lo: number, hi: number): Range | null => (!data.home && lo <= x0 && hi >= x1 ? null : [Math.max(lo, x0), Math.min(hi, x1)]);
     let raf = 0;
+    /** etiquetas que se editan con un click (en px del canvas): las de las líneas V y H y las de los cursores */
+    let labelHits: { x: number; y: number; w: number; h: number; value: number; commit(v: number): void }[] = [];
     const stepped = uPlot.paths.stepped!({ align: 1 });
     /** markers de este panel (puntos, líneas V y H, el par A/D) con sus lecturas */
     const drawMarkers = (u: uPlot, ctx: CanvasRenderingContext2D, k: { fg: string; bg: string; accent: string; unitOf(c: Curve): string }) => {
@@ -990,7 +994,7 @@ function PaneView(props: {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
       /** recuadro con texto junto a (x, y): arriba a la derecha si entra */
-      const label = (lines: string[], x: number, y: number, color: string) => {
+      const label = (lines: string[], x: number, y: number, color: string, edit?: { value: number; commit(v: number): void }) => {
         const lh = 14 * dpr;
         const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 8 * dpr;
         const h = lh * lines.length + 4 * dpr;
@@ -1009,6 +1013,7 @@ function PaneView(props: {
         ctx.strokeRect(bx, by, w, h);
         ctx.fillStyle = k.fg;
         lines.forEach((l, n) => ctx.fillText(l, bx + 4 * dpr, by + lh * (n + 1) - dpr));
+        if (edit) labelHits.push({ x: bx, y: by, w, h, ...edit });
       };
       const dot = (x: number, y: number, color: string, r = 3.5) => {
         if (!inX(x) || !inY(y)) return;
@@ -1045,7 +1050,7 @@ function PaneView(props: {
           const px = u.valToPos(m.x!, 'x', true);
           if (!inX(px)) continue;
           stroke(px, top, px, top + height, color, sel ? 2 : 1.25, [6, 3]);
-          label([`${markerName(m)}  ${fmt(m.x!, xu)}`], px, top, color);
+          label([`${markerName(m)}  ${fmt(m.x!, xu)}`], px, top, color, { value: m.x!, commit: (x) => L.onMoveMarker(m, { x }) });
           for (const cut of verticalCuts(m.x!, data.x, data.curves)) {
             const c = data.curves.find((o) => o.label === cut.label)!;
             const py = u.valToPos(cut.y, cut.axis, true);
@@ -1059,7 +1064,7 @@ function PaneView(props: {
           stroke(left, py, left + width, py, color, sel ? 2 : 1.25, [6, 3]);
           const unit = axis === 'ph' ? '°' : axis === 'i' ? data.iUnit : data.yUnit;
           // (el nombre a la derecha: a la izquierda suelen estar los cortes)
-          label([`${markerName(m)}  ${fmt(m.y!, unit)}`], left + width, py, color);
+          label([`${markerName(m)}  ${fmt(m.y!, unit)}`], left + width, py, color, { value: m.y!, commit: (y) => L.onMoveMarker(m, { y }) });
           for (const cut of horizontalCuts(m.y!, axis, data.x, data.curves, 32)) {
             const c = data.curves.find((o) => o.label === cut.label)!;
             const px = u.valToPos(cut.x, 'x', true);
@@ -1186,6 +1191,7 @@ function PaneView(props: {
           (u) => {
             // (rangos visibles de X e Y, para leerlos en los e2e: el canvas no se puede leer)
             u.root.dataset.rangeX = `${u.scales.x.min}|${u.scales.x.max}`;
+            labelHits = [];
             u.root.dataset.rangeY = `${u.scales.y?.min}|${u.scales.y?.max}`;
             u.root.dataset.rangeR = `${u.scales[rightScale]?.min}|${u.scales[rightScale]?.max}`;
             const c = cursorsRef.current;
@@ -1328,6 +1334,9 @@ function PaneView(props: {
                 ctx.globalAlpha = 0.85;
                 ctx.fillStyle = bg;
                 ctx.fillRect(bx, boxY, w, lh * lines.length + 4 * dpr);
+                // (el preliminar, que sigue al mouse, no se edita)
+                const key = name === 'A' ? 'a' : 'b';
+                if (c[key] !== undefined) labelHits.push({ x: bx, y: boxY, w, h: lh * lines.length + 4 * dpr, value: v, commit: (x) => live.current.onCursor({ [key]: x, sel: key }) });
                 ctx.globalAlpha = 1;
                 ctx.fillStyle = fg;
                 lines.forEach((l, k) => ctx.fillText(l, bx + 4 * dpr, boxY + lh * (k + 1) - 2 * dpr));
@@ -1402,8 +1411,24 @@ function PaneView(props: {
     };
     let mdrag: Marker | null = null;
     let onMark = false;
+    /** etiqueta editable bajo el mouse (en px del canvas) */
+    const hitLabel = (e: PointerEvent) => {
+      const r = u.ctx.canvas.getBoundingClientRect();
+      const dpr = devicePixelRatio;
+      const px = (e.clientX - r.left) * dpr;
+      const py = (e.clientY - r.top) * dpr;
+      const h = labelHits.findLast((l) => px >= l.x && px <= l.x + l.w && py >= l.y && py <= l.y + l.h);
+      return h && { ...h, cx: r.left + h.x / dpr, cy: r.top + h.y / dpr };
+    };
     const markDown = (e: PointerEvent) => {
       if (e.button !== 0 || live.current.zoomMode || axisAt(e)) return;
+      const lab = hitLabel(e);
+      if (lab) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setEdit({ x: lab.cx, y: lab.cy, w: Math.max(90, lab.w / devicePixelRatio), text: si(lab.value, 6), commit: lab.commit });
+        return;
+      }
       const m = hitMarker(e);
       const L = live.current;
       if (!m && L.selMarker) L.onSelectMarker(null);
@@ -1427,7 +1452,8 @@ function PaneView(props: {
         return;
       }
       const m = hitMarker(e);
-      onMark = !!m;
+      onMark = !!m || !!hitLabel(e);
+      if (!m && onMark) over.style.cursor = 'text';
       if (m) over.style.cursor = m.kind === 'h' ? 'ns-resize' : m.kind === 'v' ? 'ew-resize' : 'move';
     };
     const markUp = (e: PointerEvent) => {
@@ -1882,6 +1908,30 @@ function PaneView(props: {
           {pane.traces.length ? t('No trace can be plotted in this analysis.') : t('Empty pane: probe with the probe tool, type an expression or drag a trace here.')}
         </p>
       )}
+      {edit &&
+        createPortal(
+          <input
+            className="label-edit"
+            autoFocus
+            aria-label={t('Value')}
+            title={t('Write the value (SI prefixes: 2.5m, 10k) · Enter applies, Esc cancels')}
+            style={{ position: 'fixed', left: edit.x, top: edit.y, width: edit.w, zIndex: 50 }}
+            value={edit.text}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => setEdit({ ...edit, text: e.target.value })}
+            onBlur={() => setEdit(null)}
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === 'Escape') return setEdit(null);
+              if (e.key !== 'Enter') return;
+              const v = parseSi(edit.text);
+              if (v === null) return;
+              edit.commit(v);
+              setEdit(null);
+            }}
+          />,
+          document.body,
+        )}
       {/* (en body: un ancestro del panel con transform haría que position: fixed no sea la ventana) */}
       {menu && pane.traces[menu.ti] && createPortal(<ContextMenu at={menu.at} onClose={() => setMenu(null)} items={traceMenu(menu.ti, pane.traces[menu.ti])} />, document.body)}
       {props.onAddBelow && (

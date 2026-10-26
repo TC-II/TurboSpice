@@ -244,7 +244,7 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
     <Modal title={t('Component')} onClose={onClose} wide hidden={!!legacy}>
       {(dir === LEGACY_OPAMPS || dir.startsWith(`${LEGACY_OPAMPS}/`)) && (
         <p className="hint warn picker-legacy">
-          {t('These are SPICE default op amps, kept for compatibility: they have no model. For new designs use the TCLib op amps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
+          {t('These are the SPICE default OpAmps, kept for compatibility: they have no model. For new designs use the TCLib OpAmps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
           <button type="button" className="link" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>
         </p>
       )}
@@ -287,7 +287,7 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
     {legacy && (
       <SlideConfirm
         title={t('{name} has no model', { name: legacy.split('/').pop() ?? legacy })}
-        message={t('This op amp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib op amps.')}
+        message={t('This OpAmp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib OpAmps.')}
         action={t('Slide to use it anyway')}
         releaseLabel={t('Release to use it')}
         extra={<button className="primary" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>}

@@ -1355,3 +1355,4 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .simbar .sb-grid .sb-field > span:first-child { justify-self: end; color: var(--fg-muted); white-space: nowrap; }
 .simbar .sb-grid .sb-box { margin-right: 8px; }
 .label-edit { font: 12px var(--mono); padding: 2px 4px; border: 1px solid var(--accent); border-radius: 4px; background: var(--bg); color: var(--fg); box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
+.swdlg { display: flex; flex-direction: column; gap: 8px; min-width: min(460px, 90vw); }

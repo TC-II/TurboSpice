@@ -71,6 +71,7 @@ import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetli
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
+import { isTcSwitch, SwitchDialog } from './schematic/SwitchDialog.tsx';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
 import { diffCircuits } from './project/diff.ts';
@@ -154,6 +155,7 @@ const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectif
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
   | { kind: 'attrs'; index: number; label?: number }
+  | { kind: 'switch'; index: number }
   | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
   | { kind: 'flag'; index?: number; at?: Point; ioPin?: string }
@@ -2327,7 +2329,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // las fuentes independientes (V, I) tienen su ventana de configuración
       const s = doc.symbols[ref.index];
       const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
-      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : { kind: 'attrs', index: ref.index });
+      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
     }
     else if (ref.kind === 'text') {
       const tt = doc.texts[ref.index];
@@ -3892,6 +3894,18 @@ ${ltNetlistText(sim.built.lt)}
             if (type && type !== s.type) d = setWindows(setSymbolType(d, dialog.index, type, lib), [...s.windows.keys()].map((win) => ({ sym: dialog.index, win, w: null })));
             if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
             if (d !== doc) commit(d);
+          }}
+        />
+      )}
+      {dialog?.kind === 'switch' && doc.symbols[dialog.index] && (
+        <SwitchDialog
+          inst={doc.symbols[dialog.index]}
+          def={lib.symbol(doc.symbols[dialog.index].type)}
+          onClose={() => setDialog(null)}
+          onAttributes={() => setDialog({ kind: 'attrs', index: dialog.index })}
+          onApply={(attrs) => {
+            setDialog(null);
+            if (Object.keys(attrs).length) commit(setSymbolAttrs(doc, dialog.index, attrs));
           }}
         />
       )}

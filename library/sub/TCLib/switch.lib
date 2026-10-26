@@ -1,13 +1,18 @@
 *Component Created by Javier Petrucci and Agustin Gullino
 * jpetrucc@itba.edu.ar / agullino@itba.edu.ar
 *
+* Rs: resistencia cerrada (Ron); Roff: abierta; Vt: umbral de V(Vc+,Vc-); Vh: histéresis
+* (cierra por encima de Vt+Vh, abre por debajo de Vt-Vh).
+* Con trapezoidal, cerrar el switch sobre un capacitor da oscilaciones numéricas de decenas de
+* volts (Ron*C mucho menor que el paso): con Gear la descarga sale bien.
 
-.SUBCKT switch N1 N2 Vc+ Vc- PARAMS: Rs=1u
+.options method=gear
+
+.SUBCKT switch N1 N2 Vc+ Vc- PARAMS: Rs=1m Roff=1G Vt=1m Vh=0
 
 sw1 N1 N2 Vc+ Vc- SW
 
-.model SW SW(Ron={Rs} Vt=1m Vh=0)
+.model SW SW(Ron={Rs} Roff={Roff} Vt={Vt} Vh={Vh})
 
 .ENDS
-
 

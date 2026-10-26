@@ -14,7 +14,7 @@ LINE Normal -47 42 -41 42
 LINE Normal 8 56 -21 56 2
 CIRCLE Normal -32 24 32 88
 WINDOW 123 32 88 Left 0
-SYMATTR Value2 Rs=1p
+SYMATTR Value2 Rs=1m
 SYMATTR Prefix X
 SYMATTR SpiceModel switch
 SYMATTR ModelFile TCLib/switch.lib

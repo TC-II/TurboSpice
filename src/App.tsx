@@ -3817,7 +3817,7 @@ ${ltNetlistText(sim.built.lt)}
                 <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
               )}
               {panel === 'plot' && plot && !scale &&
-                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} onHoverRow={setRowHover} />)}
+                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} />)}
               </ErrorBoundary>
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}

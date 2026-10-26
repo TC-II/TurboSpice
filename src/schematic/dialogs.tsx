@@ -351,6 +351,14 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     const next = defaults.map(([n, d]): [string, string] => [n, n === k ? v : (cur.get(n.toLowerCase()) ?? d)]).filter(([n, x], i) => x.trim() && x !== defaults[i][1] && n);
     setVals({ ...vals, SpiceLine: formatParamList(next) });
   };
+  // capacitor e inductor (#310): la condición inicial es el IC= de su SpiceLine
+  const icUnit = /^c$/i.test(prefix) ? 'V' : /^l$/i.test(prefix) ? 'A' : undefined;
+  const IC_RE = /(^|\s)ic\s*=\s*(\{[^}]*\}|\S+)/i;
+  const icVal = IC_RE.exec(vals.SpiceLine ?? '')?.[2] ?? '';
+  const setIc = (v: string) => {
+    const rest = (vals.SpiceLine ?? '').replace(IC_RE, ' ').replace(/\s+/g, ' ').trim();
+    setVals({ ...vals, SpiceLine: [rest, v.trim() && `IC=${v.trim()}`].filter(Boolean).join(' ') });
+  };
   const setVisible = (win: number, visible: boolean) => {
     setPatches(new Map(patches).set(win, { ...patches.get(win), visible }));
     setRows(rows.map((r) => (r.win === win ? { ...r, visible, moved: true } : r)));
@@ -445,6 +453,14 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
             </label>
           );
         })}
+        {icUnit && (
+          <label className="attr-row">
+            <span title={t('Generates IC= on the SPICE line: the initial {what} of the transient', { what: icUnit === 'V' ? t('voltage') : t('current') })}>{t('Initial condition')}</span>
+            <input value={icVal} spellCheck={false} placeholder={t('none ({u})', { u: icUnit })} onChange={(e) => setIc(e.target.value)} />
+            <span className="attr-vis" />
+            <small className="hint">{t('Initial {what} for .tran (IC=), in {u}.', { what: icUnit === 'V' ? t('voltage') : t('current'), u: icUnit })}</small>
+          </label>
+        )}
         {passive && (
           <details className="src-adv" open={partsOpen} onToggle={(e) => setPartsOpen(e.currentTarget.open)}>
             <summary>{t('Advanced: manufacturer model')}</summary>

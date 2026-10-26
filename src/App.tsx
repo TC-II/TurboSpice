@@ -1736,6 +1736,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         quick
           ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: v })) } }
           : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
+        // capacitor e inductor (#310): la condición inicial se escribe en su ventana, sin recordar IC=
+        ...(/^[LC]$/.test(prefix)
+          ? [{ label: t('Initial condition (IC=)…'), title: t('Set the initial {what} for the transient', { what: prefix === 'C' ? t('voltage') : t('current') }), onClick: () => editItem({ kind: 'symbol', index }) }]
+          : []),
         {
           // con el valor que se está escribiendo (#229): se aplica primero y después se propaga
           label: (v = value) =>

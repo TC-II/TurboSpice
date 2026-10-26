@@ -234,6 +234,8 @@ export interface CanvasProps {
   hoverSymbol?: number;
   /** etiqueta de red o masa bajo el puntero */
   hoverFlag?: number;
+  /** cable bajo el puntero */
+  hoverWire?: number;
   /** color de los cables de las redes con traza (nombre en minúsculas) */
   netColors?: Map<string, string>;
   /** marcas de pines sueltos (Ctrl+U) */
@@ -244,7 +246,7 @@ export interface CanvasProps {
   diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, hoverFlag, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, hoverFlag, hoverWire, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -286,7 +288,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             y1={w.y1}
             x2={w.x2}
             y2={w.y2}
-            className={[busWires.has(i) && 'bus', isSel({ kind: 'wire', index: i }) ? 'sel' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
+            className={[busWires.has(i) && 'bus', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
             style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined}
           />
         ))}

@@ -419,6 +419,7 @@ export function SchematicEditor(props: Props) {
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
   const [hoverFlag, setHoverFlag] = useState<number | undefined>();
+  const [hoverWire, setHoverWire] = useState<number | undefined>();
   // después de arrastrar, lo movido sigue seleccionado mientras el puntero esté encima; al alejarse se deselecciona
   const deselectOnLeave = useRef(false);
   const [labelNet, setLabelNet] = useState<string | undefined>();
@@ -963,7 +964,9 @@ export function SchematicEditor(props: Props) {
     if (hs !== hoverSym) setHoverSym(hs);
     const hf = body?.kind === 'flag' ? body.index : undefined;
     if (hf !== hoverFlag) setHoverFlag(hf);
-    if (deselectOnLeave.current && !drag && !selection.some((r) => (r.kind === 'symbol' && r.index === hs) || (r.kind === 'flag' && r.index === hf))) {
+    const hw = body?.kind === 'wire' ? body.index : undefined;
+    if (hw !== hoverWire) setHoverWire(hw);
+    if (deselectOnLeave.current && !drag && !selection.some((r) => (r.kind === 'symbol' && r.index === hs) || (r.kind === 'flag' && r.index === hf) || (r.kind === 'wire' && r.index === hw))) {
       deselectOnLeave.current = false;
       setSelection([]);
     }
@@ -1287,6 +1290,7 @@ export function SchematicEditor(props: Props) {
         setHoverLabel(undefined);
         setHoverSym(undefined);
         setHoverFlag(undefined);
+        setHoverWire(undefined);
         setPickHover(null);
         lastHover.current = '';
         onHover?.(null);
@@ -1308,6 +1312,7 @@ export function SchematicEditor(props: Props) {
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverSym}
         hoverFlag={hoverFlag}
+        hoverWire={hoverWire}
         netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}

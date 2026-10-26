@@ -92,6 +92,16 @@ export function ltspiceDefaultAs(w: TextWindow, lt: TextWindow | undefined, pref
   return null;
 }
 
+/**
+ * Alineación (local) con la que vuelve a verse un rótulo oculto: un WINDOW «Invisible» no guarda
+ * la que tenía. La del símbolo por defecto si la hay; si no, la de otro rótulo visible (valor o
+ * nombre), que ya está girada como el componente; recién al final 'Left' (sin girar).
+ */
+export function shownAlign(win: number, eff: Map<number, TextWindow>, dflt: Map<number, TextWindow>): string {
+  const visible = (w: TextWindow | undefined) => (w && w.align !== 'Invisible' ? w.align : undefined);
+  return visible(dflt.get(win)) ?? visible(eff.get(3)) ?? visible(eff.get(0)) ?? visible(dflt.get(3)) ?? visible(dflt.get(0)) ?? 'Left';
+}
+
 /** Ventanas efectivas: las del .asc ganan; el resto, las por defecto para la orientación */
 export function effectiveWindows(inst: SymbolInst, def: SymbolDef | undefined, table: WindowDefaults) {
   const out = def ? defaultWindows(def, inst.orient, table) : new Map<number, TextWindow>();

@@ -7,7 +7,7 @@ import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
 import { cmpApply, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
-import { defaultWindows, effectiveAttrs, effectiveWindows, type WindowDefaults } from '../asc/resolve.ts';
+import { defaultWindows, effectiveAttrs, effectiveWindows, shownAlign, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
 import type { LabelPatch } from './edit.ts';
 import type { Library } from '../library/library.ts';
@@ -327,7 +327,7 @@ export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: W
     const d = dflt.get(win);
     const hidden = w.align === 'Invisible';
     // un rótulo oculto se muestra con la alineación por defecto
-    const local = hidden ? (d && d.align !== 'Invisible' ? d.align : 'Left') : w.align;
+    const local = hidden ? shownAlign(win, eff, dflt) : w.align;
     rows.push({ win, attr, visible: !hidden, align: transformAlign(local, inst.orient), size: w.size, moved: !sameWin(w, d) });
   }
   return rows;

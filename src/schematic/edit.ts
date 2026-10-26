@@ -1,6 +1,6 @@
 // Operaciones de edición como funciones puras sobre AscDoc (para deshacer/rehacer).
 import type { AscDoc, Flag, Orient, Point, SchText, Shape, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
-import { defaultWindows, effectiveWindows, ltspiceDefaultAs, ltspiceWindows } from '../asc/resolve.ts';
+import { defaultWindows, effectiveWindows, ltspiceDefaultAs, ltspiceWindows, shownAlign } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
@@ -863,7 +863,7 @@ export function patchLabels(doc: AscDoc, syms: number[], patches: Map<number, La
       let align = base.align;
       if (!visible) align = 'Invisible';
       else if (p.align) align = localAlign(p.align, inst.orient);
-      else if (hidden) align = dflt.get(win)?.align !== 'Invisible' ? (dflt.get(win)?.align ?? 'Left') : 'Left';
+      else if (hidden) align = shownAlign(win, eff, dflt);
       const w = { ...base, align, size: p.size ?? base.size };
       // igual a la posición por defecto: sin WINDOW explícito, como si nunca se hubiera tocado
       const d = dflt.get(win);

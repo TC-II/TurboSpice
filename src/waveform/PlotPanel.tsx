@@ -732,9 +732,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
             data={data[i]}
             active={i === active && panes.length > 1}
             onActivate={() => setActive(i)}
-            canRemove={panes.length > 1}
+            // el único panel también se borra (#312): queda uno vacío, donde cae lo próximo que se mida
+            canRemove={panes.length > 1 || p.traces.length > 0}
             onRemove={() => {
-              setPanes(panes.filter((_, k) => k !== i));
+              setPanes(panes.length > 1 ? panes.filter((_, k) => k !== i) : [{ traces: [] }]);
               setMarkers((old) => remapPanes(old, { remove: i }));
               // (el zoom de los paneles de DFT que siguen se corre con ellos)
               setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));

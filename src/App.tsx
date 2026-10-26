@@ -71,7 +71,8 @@ import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetli
 import { readZip, type ZipEntry } from './project/zip.ts';
 import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
-import { isTcSwitch, SwitchDialog } from './schematic/SwitchDialog.tsx';
+import { isNativeSwitch, isTcSwitch, SwitchDialog } from './schematic/SwitchDialog.tsx';
+import { setSwModel } from './schematic/switchModel.ts';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
 import { diffCircuits } from './project/diff.ts';
@@ -2360,7 +2361,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // las fuentes independientes (V, I) tienen su ventana de configuración
       const s = doc.symbols[ref.index];
       const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
-      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
+      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) || isNativeSwitch(prefix) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
     }
     else if (ref.kind === 'text') {
       const tt = doc.texts[ref.index];
@@ -3933,12 +3934,19 @@ ${ltNetlistText(sim.built.lt)}
         <SwitchDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}
+          doc={doc}
           windowDefaults={lib.windowDefaults}
           onClose={() => setDialog(null)}
-          onApply={(attrs, labels) => {
+          onApply={(attrs, labels, model) => {
             setDialog(null);
             let d = Object.keys(attrs).length ? setSymbolAttrs(doc, dialog.index, attrs) : doc;
             if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
+            // el switch nativo: su .model (si no estaba, una directiva nueva abajo del componente)
+            if (model) {
+              const s = doc.symbols[dialog.index];
+              const next = setSwModel(d, model.name, model.params, { x: s.x - 48, y: s.y + 136 });
+              if (JSON.stringify(next.texts) !== JSON.stringify(d.texts)) d = next;
+            }
             if (d !== doc) commit(d);
           }}
         />

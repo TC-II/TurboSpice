@@ -164,7 +164,7 @@ check(path.endsWith('.turbo'), `se guarda como proyecto (${download.suggestedFil
 const saved = parseAsc(activeAsc(variantOf((await parseTurbo(readFileSync(path, 'utf8'))).project)));
 check(saved.symbols.length === 3 && saved.flags.length === 2 && saved.texts.length === 1, 'proyecto guardado con 3 símbolos, 2 tierras y 1 directiva');
 // Exportar a LTspice (#157): el .asc del zip, todo explícito
-const [zipDl] = await Promise.all([page.waitForEvent('download'), menu(page, 'Archivo', 'Exportar proyecto')]);
+const [zipDl] = await Promise.all([page.waitForEvent('download'), menu(page, 'Archivo', 'Exportar .zip para LTspice')]);
 const entries = await readZip(new Uint8Array(readFileSync(await zipDl.path())));
 const ascEntry = entries.find((e) => e.path.endsWith('.asc'));
 const doc = parseAsc(decode(ascEntry?.data ?? new Uint8Array()).text);

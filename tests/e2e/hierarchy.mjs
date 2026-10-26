@@ -173,7 +173,7 @@ check(dl.suggestedFilename() === 'DIV.sub' && /^\.subckt DIV in\b/m.test(subText
 await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();
 await page.getByRole('button', { name: 'Copiar DIV a Mis símbolos y modelos' }).click();
 check((await page.getByText('Copiado a Mis símbolos y modelos: DIV.asc, DIV.asy').count()) > 0, 'copiar DIV a Mis símbolos y modelos');
-await menu(page, 'Archivo', 'Mis símbolos y modelos…');
+await menu(page, 'Archivos y bibliotecas', 'Mis símbolos y modelos…');
 const mine = await page.locator('.modal').textContent();
 check(/DIV\.asc/.test(mine) && /DIV\.asy/.test(mine), 'y aparece en Mis símbolos y modelos');
 await page.getByRole('button', { name: 'Cerrar', exact: true }).click();

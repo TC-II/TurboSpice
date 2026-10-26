@@ -25,7 +25,6 @@ await page.goto(URL);
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 // el ejemplo de simulación mixta: un panel analógico (V(vin), V(out), V(int)) y uno digital
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-await page.getByRole('menu').getByRole('menuitem', { name: 'Archivo', exact: true }).hover();
 await page.getByRole('menu').getByRole('menuitem', { name: 'Ejemplos' }).hover();
 await page.getByRole('menu', { name: 'Ejemplos' }).getByRole('menuitem', { name: 'ADC sigma-delta' }).click();
 await page.waitForTimeout(2000);

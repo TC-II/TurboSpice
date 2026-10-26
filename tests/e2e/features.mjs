@@ -37,7 +37,7 @@ await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el p
 // --- #38: barra de herramientas y menú colapsado ---
 check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración▸,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
 await page.keyboard.press('ArrowRight');
 check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
 await page.keyboard.press('Escape');
@@ -160,7 +160,6 @@ check((await page.locator('.capsule-project').textContent()) === 'Examples' && (
 await page.keyboard.press('Control+z');
 check((await flags()) === before + 1, 'la pila de deshacer empieza vacía después de recargar');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-await page.getByRole('menu').getByRole('menuitem', { name: 'Archivo', exact: true }).hover();
 await page.getByRole('menu').getByRole('menuitem', { name: 'Recientes' }).hover();
 const recents = await page.getByRole('menu', { name: 'Recientes' }).getByRole('menuitem').allTextContents();
 await page.keyboard.press('Escape');
@@ -725,9 +724,9 @@ await page.getByRole('button', { name: 'Listo', exact: true }).click();
   await other.close();
 }
 
-const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar esquemático a SVG'));
+const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar', 'Exportar esquemático a SVG'));
 check(svgOut.name === 'Examples.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
-const net = await downloaded(() => menu(page, 'Archivo', 'Exportar netlist de LTspice (.net)'));
+const net = await downloaded(() => menu(page, 'Archivo', 'Exportar', 'Exportar netlist de LTspice (.net)'));
 check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `netlist de LTspice (.net): ${net.text.split('\n')[1]}`);
 await resultsMenu(page, 'Netlist');
 const cir = await downloaded(() => resultsMenu(page, 'Exportar', 'Netlist .cir (ngspice)'));
@@ -965,7 +964,7 @@ await page.locator('.results-panel').waitFor({ timeout: 10000 });
 check(await page.locator('.results-panel').isVisible(), 'simular con el esquemático expandido muestra los resultados');
 
 // --- #11: símbolos, modelos y bloques del usuario ---
-await menu(page, 'Archivo', 'Mis símbolos y modelos…');
+await menu(page, 'Archivos y bibliotecas', 'Mis símbolos y modelos…');
 const block = 'Version 4\nSHEET 1 880 680\nWIRE 16 96 16 112\nFLAG 16 16 in\nIOPIN 16 16 In\nFLAG 16 112 out\nIOPIN 16 112 Out\nFLAG 16 192 0\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k\nSYMBOL res 0 96 R0\nSYMATTR InstName R2\nSYMATTR Value {R}\nTEXT 0 240 Left 2 !.param R=2k\n';
 const libText = '* amplificador de ganancia 3\n.subckt amp3 in out\nE1 out 0 in 0 3\n.ends amp3\n';
 await page.getByLabel('Archivos de símbolos y modelos').setInputFiles([
@@ -1345,7 +1344,7 @@ check((await fp.locator('.capsule-project').textContent()) === 'Sample Project',
 await menu(fp, 'Acerca de TurboSpice');
 check(await fp.getByRole('dialog', { name: 'Acerca de TurboSpice' }).waitFor({ timeout: 5000 }).then(() => true, () => false), 'Menú › Acerca de abre el diálogo');
 await fp.keyboard.press('Escape');
-await menu(fp, 'Archivo', 'Ejemplos', 'Common Emitter');
+await menu(fp, 'Ejemplos', 'Common Emitter');
 await fp.locator('svg.editor .sym').first().waitFor();
 await fp.waitForTimeout(500);
 check((await fp.locator('.capsule-names').textContent()).startsWith('Examples·Common Emitter'), `abre el ejemplo desde el menú (${await fp.locator('.capsule-names').textContent()})`);

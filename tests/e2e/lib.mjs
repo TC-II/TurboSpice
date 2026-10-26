@@ -24,7 +24,7 @@ async function pick(page, path) {
   }
 }
 
-/** Elige un ítem del menú principal (el botón junto al nombre): menu(page, 'Archivo', 'Ejemplos', 'Bode RLC') */
+/** Elige un ítem del menú principal (el botón junto al nombre): menu(page, 'Ejemplos', 'Bode RLC') */
 export async function menu(page, ...path) {
   await page.getByRole('button', { name: 'Menú', exact: true }).click();
   await pick(page, path);
@@ -54,7 +54,7 @@ export async function simCommand(page, label) {
 /** Abre un ejemplo (una variante del proyecto Examples) y espera a que esté cargado */
 export async function openExample(page, name) {
   const variant = name.replace(/\.asc$/, '');
-  await menu(page, 'Archivo', 'Ejemplos', variant);
+  await menu(page, 'Ejemplos', variant);
   await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.capsule-variant')?.textContent === v, variant);
 }
 

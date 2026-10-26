@@ -2936,61 +2936,50 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     { label: t('Studio…'), shortcut: 'Alt+E', onClick: openStudy },
     { label: t('.control block…'), shortcut: 'Alt+C', onClick: openControl },
   ];
+  // Lo que no entra en Archivo (#303): archivos del proyecto, símbolos y modelos, biblioteca de LTspice
+  const libraryItems: MenuItem[] = [
+    ...(google.account ? [{ label: t('Import from computer…'), onClick: () => doImport() }] : []),
+    { label: t('Project files…'), title: t('Subcircuits, symbols and models saved in the .turbo, for all testbenches'), onClick: () => setDialog({ kind: 'projectfiles' }) },
+    { label: t('My symbols and models…'), onClick: () => setDialog({ kind: 'userfiles' }) },
+    {
+      label: ltIndex ? t('LTspice library') : t('Import LTspice library…'),
+      items: [
+        { label: ltIndex ? t('Import again…') : t('Choose the lib folder…'), onClick: () => ltInput.current?.click() },
+        ...(ltIndex
+          ? [
+              { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString(locale()) }), disabled: true, onClick: () => {} },
+              { label: t('Remove'), onClick: doRemoveLtspice },
+            ]
+          : []),
+      ],
+    },
+  ];
   const menus: MenuDef[] = [
     {
       label: t('File'),
       items: [
         { label: t('New project'), onClick: doNew },
-        { label: t('Open…'), title: t('Import: .turbo, .zip, .asc, .asy, .lib, .sub'), shortcut: 'Ctrl+O', onClick: doOpen },
         ...(google.account ? [{ label: t('My simulations (Google Drive)…'), onClick: () => setDialog({ kind: 'drive' }) }] : []),
-        ...(google.account ? [{ label: t('Import from computer…'), onClick: () => doImport() }] : []),
+        { label: t('Open/Import…'), title: t('.turbo, .zip, .asc (each one, a testbench), .asy, .lib, .sub'), shortcut: 'Ctrl+O', onClick: doOpen },
         { label: t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { label: t('Save as…'), shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
-        ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
+        'sep',
+        { label: t('Export .turbo file'), title: t('Saves the project (.turbo) on this computer'), onClick: () => doSaveLocal(true) },
+        { label: t('Export .zip for LTspice'), title: t('A .zip for LTspice: an .asc per testbench and the project files they use'), onClick: () => exportZip(true) },
+        { label: t('Share link…'), onClick: doShare },
+        { label: t('Import symbols and models'), title: t('Pending: not implemented yet (#{n})', { n: 304 }), disabled: true, onClick: () => {} },
+        'sep',
         { label: t('Export to PDF (Pro)'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdfPro },
         { label: t('Export to PDF (Fast)'), title: t('Downloads a PDF of the current view of the schematic'), onClick: doExportPdf },
-        'sep',
-        { label: t('Import into this project…'), title: t('.zip, .asc (each one, a testbench), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
-        { label: t('Export project'), title: t('A .zip for LTspice: an .asc per testbench and the project files they use'), onClick: () => exportZip(true) },
-        'sep',
-        { label: t('Share link…'), onClick: doShare },
-        { label: t('Project files…'), title: t('Subcircuits, symbols and models saved in the .turbo, for all testbenches'), onClick: () => setDialog({ kind: 'projectfiles' }) },
-        { label: t('My symbols and models…'), onClick: () => setDialog({ kind: 'userfiles' }) },
         {
-          label: ltIndex ? t('LTspice library') : t('Import LTspice library…'),
+          label: t('Export'),
           items: [
-            { label: ltIndex ? t('Import again…') : t('Choose the lib folder…'), onClick: () => ltInput.current?.click() },
-            ...(ltIndex
-              ? [
-                  { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString(locale()) }), disabled: true, onClick: () => {} },
-                  { label: t('Remove'), onClick: doRemoveLtspice },
-                ]
-              : []),
+            { label: t('Export schematic to SVG'), onClick: () => exportImage('svg') },
+            { label: t('Export schematic to PNG'), onClick: () => exportImage('png') },
+            { label: t('Export LTspice netlist (.net)'), onClick: () => exportNetlist('net') },
+            { label: t('Export ngspice netlist (.cir)'), onClick: () => exportNetlist('cir') },
           ],
         },
-        'sep',
-        {
-          label: t('Examples'),
-          items: [
-            { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
-            { label: 'ADC sigma-delta', title: t('Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC'), onClick: () => doExample(SIGMA_DELTA) },
-            'sep',
-            ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
-          ],
-        },
-        {
-          label: t('Recent'),
-          items: recent.map((r, i) => ({
-            label: `${r.name.replace(/\.(asc|turbo)$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
-            title: new Date(r.time).toLocaleString(locale()),
-            onClick: () => doRecent(i),
-          })),
-        },
-        'sep',
-        { label: t('Export schematic to SVG'), onClick: () => exportImage('svg') },
-        { label: t('Export schematic to PNG'), onClick: () => exportImage('png') },
-        { label: t('Export LTspice netlist (.net)'), onClick: () => exportNetlist('net') },
-        { label: t('Export ngspice netlist (.cir)'), onClick: () => exportNetlist('cir') },
       ],
     },
     {
@@ -3071,6 +3060,24 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Show the project panel when the mouse approaches the edge (in select mode)'), onClick: () => setHoverReveal(!hoverReveal), checked: hoverReveal },
       ],
     },
+    {
+      label: t('Examples'),
+      items: [
+        { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
+        { label: 'ADC sigma-delta', title: t('Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC'), onClick: () => doExample(SIGMA_DELTA) },
+        'sep',
+        ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
+      ],
+    },
+    {
+      label: t('Recent'),
+      items: recent.map((r, i) => ({
+        label: `${r.name.replace(/\.(asc|turbo)$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
+        title: new Date(r.time).toLocaleString(locale()),
+        onClick: () => doRecent(i),
+      })),
+    },
+    { label: t('Files and libraries'), items: libraryItems },
     {
       label: t('Help'),
       items: [

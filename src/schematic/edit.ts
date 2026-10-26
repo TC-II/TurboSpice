@@ -837,6 +837,8 @@ export interface LabelPatch {
   visible?: boolean;
   align?: string;
   size?: number;
+  /** si el símbolo no tiene ese rótulo, dónde ponerlo al mostrarlo (p. ej. la SpiceLine de un C) */
+  create?: TextWindow;
 }
 
 /** Aplica los mismos cambios de rótulos (por índice de WINDOW) a varios símbolos */
@@ -851,6 +853,10 @@ export function patchLabels(doc: AscDoc, syms: number[], patches: Map<number, La
     for (const [win, p] of patches) {
       const cur = eff.get(win);
       const base = p.reset ? dflt.get(win) : cur;
+      if (!cur && p.create && p.visible !== false) {
+        edits.push({ sym: si, win, w: { ...p.create } });
+        continue;
+      }
       if (!cur || !base) continue;
       const hidden = base.align === 'Invisible';
       const visible = p.visible ?? !hidden;

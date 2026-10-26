@@ -1,7 +1,7 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
 import { SlideConfirm } from '../ui/SlideConfirm.tsx';
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
@@ -350,7 +350,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
-  const keys = ['InstName', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2', 'SpiceModel'].filter(
+  const keys = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2'].filter(
     (k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine',
   );
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
@@ -386,7 +386,23 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   const icVal = IC_RE.exec(vals.SpiceLine ?? '')?.[2] ?? '';
   const setIc = (v: string) => {
     const rest = (vals.SpiceLine ?? '').replace(IC_RE, ' ').replace(/\s+/g, ' ').trim();
-    setVals({ ...vals, SpiceLine: [rest, v.trim() && `IC=${v.trim()}`].filter(Boolean).join(' ') });
+    setLine([rest, v.trim() && `IC=${v.trim()}`].filter(Boolean).join(' '));
+  };
+  // SpiceLine sin rótulo en el símbolo (R, L, C): se puede mostrar igual, debajo del valor; al
+  // escribirle algo por primera vez se muestra sola, salvo que se haya elegido ocultarla
+  const lineRow = rows.find((r) => r.attr === 'SpiceLine');
+  const lineAt = useMemo((): TextWindow | undefined => {
+    const w = effectiveWindows(inst, def, windowDefaults).get(3);
+    if (!w || w.align === 'Invisible') return undefined;
+    const vertical = /^V/.test(w.align);
+    return { ...w, x: w.x + (vertical ? 24 : 0), y: w.y + (vertical ? 0 : 24) };
+  }, []);
+  const lineShown = patches.get(39)?.visible ?? false;
+  const showLine = (visible: boolean) => setPatches(new Map(patches).set(39, { visible, create: lineAt }));
+  const lineTouched = useRef(false);
+  const setLine = (line: string) => {
+    if (!lineRow && lineAt && !lineTouched.current && line.trim() && !(vals.SpiceLine ?? '').trim()) showLine(true);
+    setVals({ ...vals, SpiceLine: line });
   };
   const setVisible = (win: number, visible: boolean) => {
     setPatches(new Map(patches).set(win, { ...patches.get(win), visible }));
@@ -457,16 +473,25 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
         )}
         {keys.filter((k) => !(defaults.length && k === 'SpiceLine')).map((k) => {
           const row = rows.find((r) => r.attr === k);
-          return (
+          const field = (
             <label key={k} className="attr-row">
               <span>{k}</span>
               <input
                 ref={k === focusAttr ? first : undefined}
                 value={vals[k]}
                 spellCheck={false}
-                onChange={(e) => (setVals({ ...vals, [k]: e.target.value }), k === 'Value' && setPicked(undefined))}
+                onChange={(e) => (k === 'SpiceLine' ? setLine(e.target.value) : setVals({ ...vals, [k]: e.target.value }), k === 'Value' && setPicked(undefined))}
               />
-              {row ? (
+              {k === 'SpiceLine' && !row && lineAt ? (
+                <input
+                  type="checkbox"
+                  className="attr-vis"
+                  checked={lineShown}
+                  title={t('Visible on the schematic')}
+                  aria-label={t('{k} visible on the schematic', { k })}
+                  onChange={(e) => ((lineTouched.current = true), showLine(e.target.checked))}
+                />
+              ) : row ? (
                 <input
                   type="checkbox"
                   className="attr-vis"
@@ -481,15 +506,20 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
               {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
             </label>
           );
+          // capacitor e inductor: la condición inicial va justo después del valor
+          if (k !== 'Value' || !icUnit) return field;
+          return (
+            <Fragment key={k}>
+              {field}
+              <label className="attr-row">
+                <span title={t('Generates IC= on the SPICE line: the initial {what} of the transient', { what: icUnit === 'V' ? t('voltage') : t('current') })}>{t('Initial condition')}</span>
+                <input value={icVal} spellCheck={false} placeholder={t('none ({u})', { u: icUnit })} onChange={(e) => setIc(e.target.value)} />
+                <span className="attr-vis" />
+                <small className="hint">{t('Initial {what} for .tran (IC=), in {u}.', { what: icUnit === 'V' ? t('voltage') : t('current'), u: icUnit })}</small>
+              </label>
+            </Fragment>
+          );
         })}
-        {icUnit && (
-          <label className="attr-row">
-            <span title={t('Generates IC= on the SPICE line: the initial {what} of the transient', { what: icUnit === 'V' ? t('voltage') : t('current') })}>{t('Initial condition')}</span>
-            <input value={icVal} spellCheck={false} placeholder={t('none ({u})', { u: icUnit })} onChange={(e) => setIc(e.target.value)} />
-            <span className="attr-vis" />
-            <small className="hint">{t('Initial {what} for .tran (IC=), in {u}.', { what: icUnit === 'V' ? t('voltage') : t('current'), u: icUnit })}</small>
-          </label>
-        )}
         {passive && (
           <details className="src-adv" open={partsOpen} onToggle={(e) => setPartsOpen(e.currentTarget.open)}>
             <summary>{t('Advanced: manufacturer model')}</summary>

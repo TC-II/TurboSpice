@@ -100,7 +100,7 @@ import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { TRACE_WIDTHS, setTraceWidth, useTraceWidth } from './waveform/lineWidth.ts';
 import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
-import { paneCurves, type ComplexMode } from './waveform/curves.ts';
+import { paneCurves, placeTrace, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
@@ -2255,12 +2255,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     } catch {
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
-    editPanes(addTraceTo(panes, i, expr));
+    addProbed(i, expr);
+  };
+  /** traza medida con la punta: a un eje con su unidad o libre del panel activo, o a uno nuevo (#308) */
+  const addProbed = (i: number, expr: string) => {
+    if (isComplex) return editPanes(addTraceTo(panes, i, expr));
+    const r = placeTrace(panes, i, expr);
+    editPanes(r.panes);
+    if (r.index !== i) setActivePane(r.index);
   };
 
   /**
    * Punta de prueba arrastrada de un punto a otro (#308): V−V o I−I es la resta; V/I (Ω) o I/V (S)
-   * el cociente, que va en otro panel (salvo que el activo esté vacío): no comparte eje con V ni A
+   * el cociente
    */
   const onProbePair = (from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot || pathRef.current.length || dftPick.current) return onProbe(from);
@@ -2282,11 +2289,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setPanel('plot');
     if (expanded === 'schematic') setExpanded('');
     const i = Math.min(activePane, panes.length - 1);
-    if (!ratio || !panes[i] || !panes[i].traces.length) return editPanes(addTraceTo(panes, i, expr));
-    const own = panes.findIndex((p) => p.traces.length > 0 && p.traces.every((tt) => !tt.dft && /^\s*[VI]\w*\([^)]*\)\s*\/\s*[VI]\w*\([^)]*\)\s*$/i.test(tt.expr) && /^\s*V/i.test(tt.expr) === /^\s*V/i.test(expr)));
-    if (own >= 0) return editPanes(addTraceTo(panes, own, expr));
-    editPanes(addTraceTo([...panes, { traces: [] }], panes.length, expr));
-    setActivePane(panes.length);
+    addProbed(i, expr);
   };
 
   // Caja de trazas de la barra de resultados

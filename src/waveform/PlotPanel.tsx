@@ -1749,7 +1749,7 @@ function PaneView(props: {
 
   // valor de cada traza en la posición del mouse (la primera curva de cada traza)
   const firstCurve = (ti: number) => data.curves.find((c) => c.trace === ti);
-  const unitOf = (c: Curve | undefined) => (c?.axis === 'ph' ? '°' : c?.axis === 'i' ? 'A' : data.yUnit);
+  const unitOf = (c: Curve | undefined) => (c?.axis === 'ph' ? '°' : c?.axis === 'i' ? data.iUnit : data.yUnit);
 
   /** menú del botón derecho de una traza: lo de la leyenda y lo que agrega el visor */
   const setTrace = (ti: number, f: (x: Trace) => Trace) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? f(x) : x)) }));

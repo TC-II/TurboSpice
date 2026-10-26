@@ -5,7 +5,7 @@ import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { analyze, defaultFs, spectrum, WINDOWS } from './dft.ts';
 import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
 import { isLogScale, resample, scaleOf, si } from './series.ts';
-import { PALETTE, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
+import { PALETTE, addTraceTo, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 import { digitalWidth, isDigitalExpr } from './digital.ts';
 
@@ -93,12 +93,30 @@ const V_TERM = String.raw`\s*V\([^)]*\)\s*`;
 // una corriente o la resta de dos (la punta de prueba arrastrada de un componente a otro, #308)
 const isCurrentExpr = (e: string) => new RegExp(`^${I_TERM}(-${I_TERM})?$`, 'i').test(e) || deviceExprUnit(e) === 'A';
 /** Unidad de una traza simple: V(…), I(…), V/I (Ω), I/V (S) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
-const exprUnit = (e: string) =>
-  new RegExp(`^${V_TERM}/${I_TERM}$`, 'i').test(e) ? 'Ω' : new RegExp(`^${I_TERM}/${V_TERM}$`, 'i').test(e) ? 'S' : /^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? '');
+export const exprUnit = (e: string) =>
+  new RegExp(`^${V_TERM}/${I_TERM}$`, 'i').test(e) ? 'Ω' : new RegExp(`^${I_TERM}/${V_TERM}$`, 'i').test(e) ? 'S' : new RegExp(`^${V_TERM}(-${V_TERM})?$`, 'i').test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? '');
 
+/**
+ * Unidades de los dos ejes Y de un panel (#308): por orden de aparición, la corriente a la derecha
+ * si comparte panel con otra cosa (como siempre). Una expresión sin unidad conocida es «arbitraria» ('').
+ */
+export function paneUnits(traces: { expr: string; hidden?: boolean; dft?: unknown }[]): string[] {
+  const units = [...new Set(traces.filter((tt) => !tt.hidden && !tt.dft).map((tt) => exprUnit(tt.expr)))];
+  if (units.length > 1 && units[0] === 'A') units.push(units.shift()!);
+  return units;
+}
 
-/** La unidad común de las trazas, o "" si no la hay */
-const sameUnit = (units: string[]) => (units.length && units.every((u) => u === units[0]) ? units[0] : '');
+/**
+ * Dónde va una traza nueva (#308): al panel activo si tiene un eje con su unidad o uno libre; si
+ * ya tiene dos ejes con otras unidades, a un panel nuevo. Devuelve los paneles y el índice usado.
+ */
+export function placeTrace(panes: Pane[], active: number, expr: string): { panes: Pane[]; index: number } {
+  const i = Math.max(0, Math.min(active, panes.length - 1));
+  const units = panes[i] ? paneUnits(panes[i].traces) : [];
+  if (isDigitalExpr(expr) || units.length < 2 || units.includes(exprUnit(expr))) return { panes: addTraceTo(panes, i, expr), index: i };
+  return { panes: addTraceTo([...panes, { traces: [] }], panes.length, expr), index: panes.length };
+}
+
 
 /** Tramos de un eje X que retrocede (barrido .dc anidado): [inicio, fin) de cada uno */
 export function sweepSegments(x: Float64Array): [number, number][] {
@@ -123,8 +141,8 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
   const visible = pane.traces.filter((tt) => !tt.hidden);
-  const hasV = visible.some((tt) => !isCurrentExpr(tt.expr));
-  const hasI = visible.some((tt) => isCurrentExpr(tt.expr));
+  // los dos ejes Y, por unidad (#308): izquierda y derecha
+  const [leftUnit = '', rightUnit] = paneUnits(visible);
   let complex = false;
   // con una sola traza y varias corridas, cada corrida con un color de la paleta
   const perRunColor = pane.traces.length === 1 && all.length > 1;
@@ -157,7 +175,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
         else if (ctx.mode === 'mag') parts.push({ y: mag, axis: 'y', dash: false, suffix: '' });
         else parts.push({ y: w.re, axis: 'y', dash: false, suffix: ' (re)' }, { y: w.im, axis: 'y', dash: true, suffix: ' (im)' });
       } else {
-        parts.push({ y: w.re, axis: isCurrentExpr(tt.expr) && hasV ? 'i' : 'y', dash: false, suffix: '' });
+        parts.push({ y: w.re, axis: rightUnit !== undefined && exprUnit(tt.expr) === rightUnit ? 'i' : 'y', dash: false, suffix: '' });
       }
       const digital = isDigitalExpr(tt.expr) ? { digital: true, bits: digitalWidth(tt.expr) } : {};
       for (const p of parts) {
@@ -174,8 +192,8 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
     });
   });
 
-  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : hasV ? sameUnit(visible.map((tt) => exprUnit(tt.expr))) : hasI ? 'A' : '';
-  return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : 'A' };
+  const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : leftUnit;
+  return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : (rightUnit ?? 'A') };
 }
 
 const WINDOW_LABEL = Object.fromEntries(WINDOWS.map(([w, , short]) => [w, short])) as Record<TraceDft['window'], string>;

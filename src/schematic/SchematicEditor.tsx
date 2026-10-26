@@ -416,6 +416,10 @@ export function SchematicEditor(props: Props) {
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
+  // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
+  const [hoverSym, setHoverSym] = useState<number | undefined>();
+  // después de arrastrar, lo movido sigue seleccionado mientras el puntero esté encima; al alejarse se deselecciona
+  const deselectOnLeave = useRef(false);
   const [labelNet, setLabelNet] = useState<string | undefined>();
   // nombre de red y tensión del OP en el mismo punto: se acomodan para no pisarse
   const paired = useMemo(() => (netNames && annotations ? pairedPoints(netNames, annotations) : undefined), [netNames, annotations]);
@@ -716,12 +720,12 @@ export function SchematicEditor(props: Props) {
             }
           }
         }
-        // un rótulo se arrastra directamente; con su componente seleccionado junto a otros, se
-        // mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
+        // un rótulo se arrastra sólo con su componente ya seleccionado; si hay otros seleccionados,
+        // se mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
         const label = labelAt(doc, p, lib, tol, lod);
-        if (label) {
-          const selSyms = selection.filter((r) => r.kind === 'symbol' && doc.symbols[r.index]).map((r) => r.index);
-          const syms = selSyms.includes(label.sym) ? selSyms : [label.sym];
+        const selSyms = selection.filter((r) => r.kind === 'symbol' && doc.symbols[r.index]).map((r) => r.index);
+        if (label && selSyms.includes(label.sym)) {
+          const syms = selSyms;
           const items = syms.flatMap((si) => {
             const inst = doc.symbols[si];
             const w = si === label.sym ? label.w : effectiveWindows(inst, lib.symbol(inst.type), lib.windowDefaults).get(label.win);
@@ -952,6 +956,13 @@ export function SchematicEditor(props: Props) {
     }
     const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol, lod)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
+    const body = tool.kind === 'select' && !drag && lh === undefined ? hitTest(doc, p, lib, tol, showSimCommand) : null;
+    const hs = lh ?? (body?.kind === 'symbol' ? body.index : undefined);
+    if (hs !== hoverSym) setHoverSym(hs);
+    if (deselectOnLeave.current && !drag && !selection.some((r) => r.kind === 'symbol' && r.index === hs)) {
+      deselectOnLeave.current = false;
+      setSelection([]);
+    }
     // la punta de prueba mide la corriente por pin en los transistores; la información del punto
     // de operación (describe) sigue saliendo sobre el cuerpo
     const probe = tool.kind === 'probe' && !drag ? probeTarget(p, true) : null;
@@ -1066,6 +1077,7 @@ export function SchematicEditor(props: Props) {
       setTimeout(() => window.removeEventListener('contextmenu', block, { capture: true }), 300);
       rightClick(toDoc(e), { x: e.clientX, y: e.clientY });
     }
+    if ((drag.mode === 'label' || drag.mode === 'move') && drag.moved) deselectOnLeave.current = true;
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
     if (drag.mode === 'textsize' && preview) commit(preview);
     if (drag.mode === 'move' && !drag.moved && drag.editText !== undefined) editInline(drag.editText);
@@ -1268,6 +1280,8 @@ export function SchematicEditor(props: Props) {
       onPointerLeave={() => {
         setTip(null);
         setHoverNet(undefined);
+        setHoverLabel(undefined);
+        setHoverSym(undefined);
         setPickHover(null);
         lastHover.current = '';
         onHover?.(null);
@@ -1287,7 +1301,7 @@ export function SchematicEditor(props: Props) {
         conn={conn}
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
-        hoverSymbol={hoverLabel}
+        hoverSymbol={hoverSym}
         netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}

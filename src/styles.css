@@ -258,7 +258,8 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .sym text, .flag text, .texts text { stroke: none; font-family: system-ui, sans-serif; }
 .sym text.win { fill: var(--sch-label); }
 .sym.sel text.win { fill: var(--sch-sel); }
-.sym.hover:not(.sel) { color: var(--sch-hl); }
+.sym.hover:not(.sel) { color: var(--sch-sel); }
+.sym.hover:not(.sel) text.win { fill: var(--sch-sel); }
 .loose rect { stroke: var(--err); stroke-width: 1; fill: none; }
 .flag { color: var(--sch-sym); stroke: currentColor; }
 .flag .flagdot { fill: var(--sch-bg); stroke: currentColor; }

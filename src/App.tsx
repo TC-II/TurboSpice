@@ -3114,7 +3114,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { icon: 'new', label: t('New'), title: t('New project'), onClick: doNew },
         { icon: 'save', label: t('Save'), title: google.account ? t('Save to Google Drive') : t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { icon: 'pdf', label: t('Export to PDF'), title: t('Export the current view to PDF'), onClick: doExportPdf },
-        { icon: 'open', label: t('Open'), title: t('Open (import .turbo, .zip, .asc…)'), shortcut: 'Ctrl+O', onClick: doOpen },
+        // con la sesión de Google, Abrir muestra «Mis simulaciones»; sin sesión, Abrir/Importar
+        google.account
+          ? { icon: 'open', label: t('Open'), title: t('My simulations (Google Drive)'), onClick: () => setDialog({ kind: 'drive' }) }
+          : { icon: 'open', label: t('Open'), title: t('Open (import .turbo, .zip, .asc…)'), shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },
     {

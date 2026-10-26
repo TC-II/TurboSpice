@@ -1248,7 +1248,7 @@ export function SchematicEditor(props: Props) {
     drag?.mode === 'pan' && (!drag.right || drag.moved)
       ? 'grabbing'
       : tool.kind === 'select'
-        ? hoverLabel !== undefined ? 'label' : resizeHover ? 'resize' : ''
+        ? resizeHover ? 'resize' : ''
         : tool.kind === 'probe' && probeKind ? `probe tool-probe-${probeKind}` : tool.kind;
 
   return (

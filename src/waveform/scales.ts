@@ -52,3 +52,31 @@ export function wheelZoom(e: { deltaY: number; deltaMode: number }, delta = e.de
   const px = delta * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1);
   return Math.exp(px * 0.0015);
 }
+
+/**
+ * Rango del eje X tal cual (uPlot, en escala log, lo redondea hacia afuera a la década o a la
+ * cifra entera: simulado hasta 3,7 MHz terminaba en 4 o 10 MHz, y cada zoom con la rueda saltaba).
+ * Si min y max coinciden, media década a cada lado (log) o ±1 (lineal).
+ */
+export function exactRange(min: number | null, max: number | null, log = false): [number | null, number | null] {
+  if (min == null || max == null) return [null, null];
+  if (min !== max) return [min, max];
+  return log ? [min / Math.sqrt(10), max * Math.sqrt(10)] : [min - 1, max + 1];
+}
+
+/**
+ * Qué marcas de un eje log llevan número: las décadas; si en lo visible hay menos de dos,
+ * también las de 2 y 5 (y si aun así hay menos de dos, todas), para que un zoom dentro de una
+ * década no quede sin números.
+ */
+export function logLabeled(ticks: (number | null)[]): boolean[] {
+  const mant = (t: number) => Math.round(t / 10 ** Math.floor(Math.log10(t) + 1e-9));
+  const valid = (t: number | null): t is number => t != null && t > 0 && Number.isFinite(t);
+  const isDec = (t: number) => Math.abs(Math.log10(t) - Math.round(Math.log10(t))) < 1e-9;
+  const pick = (f: (t: number) => boolean) => ticks.map((t) => valid(t) && f(t));
+  const count = (b: boolean[]) => b.filter(Boolean).length;
+  const dec = pick(isDec);
+  if (count(dec) >= 2) return dec;
+  const d125 = pick((t) => isDec(t) || [2, 5].includes(mant(t)));
+  return count(d125) >= 2 ? d125 : pick(() => true);
+}

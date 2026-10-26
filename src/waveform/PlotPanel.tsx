@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { dftSampling, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { extent, panBy, wheelZoom, zoomAbout } from './scales.ts';
+import { exactRange, extent, logLabeled, panBy, wheelZoom, zoomAbout } from './scales.ts';
 import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
@@ -1092,7 +1092,7 @@ function PaneView(props: {
       height: Math.max(80, el.clientHeight),
       legend: { show: false },
       scales: {
-        x: { time: false, distr: data.log ? 3 : 1, ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}) },
+        x: { time: false, distr: data.log ? 3 : 1, range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax, ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}) },
         y: { range: (u, min, max) => yRef.current ?? whole('y')(u, min, max, 'y') },
         i: { range: (u, min, max) => rRef.current ?? whole('i')(u, min, max, 'i') },
         ph: { range: (u, min, max) => rRef.current ?? whole('ph')(u, min, max, 'ph') },
@@ -1100,7 +1100,11 @@ function PaneView(props: {
       axes: [
         {
           space: (_u, _i, min, max) => (data.log ? 50 : axisSpace(min, max)),
-          values: (_u, tt) => !data.log ? axisTicks(tt) : tt.map((v) => (v == null || (data.log && Math.abs(Math.log10(v) - Math.round(Math.log10(v))) > 1e-9) ? '' : si(v, 3))),
+          values: (_u, tt) => {
+            if (!data.log) return axisTicks(tt);
+            const lab = logLabeled(tt);
+            return tt.map((v, i) => (lab[i] ? si(v!, 3) : ''));
+          },
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },

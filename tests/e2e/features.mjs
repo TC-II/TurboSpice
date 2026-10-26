@@ -135,8 +135,10 @@ await context.route('https://javierpetrucci.github.io/**', (r) => r.fulfill({ bo
 await page.getByRole('button', { name: 'Exportar a PDF' }).click();
 const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('menuitem', { name: 'Pro' }).click()]);
 await pdfTab.waitForURL(/ASC-Parser\/#c=/).catch(() => {});
+await pdfTab.waitForLoadState('load').catch(() => {});
 check(/^https:\/\/javierpetrucci\.github\.io\/ASC-Parser\/#c=[\w-]+.*&n=[^&]+\.asc$/.test(pdfTab.url()), `Exportar a PDF › Pro abre ASC-Parser con el circuito en el hash (${pdfTab.url().slice(0, 60)}…)`);
 await pdfTab.close();
+await context.unroute('https://javierpetrucci.github.io/**');
 const other = await context.newPage();
 watch(other);
 await other.goto(link);

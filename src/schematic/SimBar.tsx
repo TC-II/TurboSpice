@@ -94,15 +94,19 @@ function barRows(a: Analysis): BarField[][] {
           text(t('Increment {n}', { n }), s.step, (step) => upd({ step }), { required: !i || !!s.src, numeric: true }),
         ];
       });
-    case 'noise':
+    case 'noise': {
+      // en columnas (ver COLUMNS): fuente; salida y referencia; F start y F stop; barrido y puntos
+      const [fstart, fstop, points, sweep] = sweepFields(a.sweep, (sw) => ({ ...a, sweep: sw }));
       return [
+        [text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true })],
         [
           text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }),
           text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') }),
-          text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true }),
         ],
-        sweepFields(a.sweep, (sweep) => ({ ...a, sweep })),
+        [fstart, fstop],
+        [sweep, points],
       ];
+    }
     case 'op':
       return [];
     case 'tf':
@@ -136,7 +140,7 @@ function barRows(a: Analysis): BarField[][] {
 }
 
 /** Análisis cuyos grupos de campos van en columnas (uno debajo del otro) en vez de en filas */
-const COLUMNS = new Set<Analysis['kind']>(['pz']);
+const COLUMNS = new Set<Analysis['kind']>(['pz', 'noise']);
 
 /** Estado de la simulación elegida: sin correr, corriendo, lista o con error */
 export type SimState = 'idle' | 'running' | 'ok' | 'err';

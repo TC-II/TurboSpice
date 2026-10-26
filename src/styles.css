@@ -654,8 +654,8 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .simbar .sb-rows { display: flex; flex-direction: column; gap: 2px; }
 .simbar .sb-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 /* grupos en columnas (polos y ceros): cada grupo, un campo debajo del otro con los cuadros alineados */
-.simbar .sb-rows.sb-cols { flex-direction: row; align-items: flex-start; gap: 14px; }
-.simbar .sb-cols .sb-row { flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: 2px; }
+.simbar .sb-rows.sb-cols { flex-direction: row; align-items: stretch; gap: 14px; }
+.simbar .sb-cols .sb-row { flex-direction: column; align-items: flex-end; flex-wrap: nowrap; gap: 2px; justify-content: center; }
 .simbar .sb-field { display: inline-flex; align-items: center; gap: 4px; color: var(--fg-muted); }
 .simbar .sb-field input, .simbar .sb-field select { font: 12px var(--mono); padding: 1px 4px; color: var(--fg); }
 .simbar .sb-checks { display: inline-flex; flex-direction: column; line-height: 1.15; }

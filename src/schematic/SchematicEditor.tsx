@@ -422,8 +422,9 @@ export function SchematicEditor(props: Props) {
   // para el Ctrl+R de la ventana con un rótulo agarrado (fuera del ciclo de render)
   const dragNow = useRef(drag);
   dragNow.current = drag;
-  // dónde terminaron los cables seleccionados en el fantasma de un movimiento (moveItems los
-  // reordena y fusiona): con el documento al que corresponden, para no usarlos con otro
+  // dónde terminaron los cables seleccionados en el fantasma de un movimiento o del arrastre de
+  // un tramo o un codo (se reordenan y fusionan): con el documento al que corresponden, para no
+  // usarlos con otro
   const [previewMoved, setPreviewMoved] = useState<{ doc: AscDoc; wires: Wire[] } | null>(null);
   const previewMove = (refs: ItemRef[], dx: number, dy: number, stretch: boolean) => {
     const wires: Wire[] = [];
@@ -921,12 +922,18 @@ export function SchematicEditor(props: Props) {
   // Con Ctrl (apretado en cualquier momento del arrastre) va en línea recta, sin codos.
   const wirePreview = (d: Drag & { mode: 'vertex' | 'segment' }, g: Point, straight: boolean) => {
     const from = d.mode === 'vertex' ? d.base : doc;
+    // dónde termina el cable agarrado, para que el naranja no pase a los tramos nuevos (#315)
+    const wires: Wire[] = [];
+    const sel = selection.find((r) => r.kind === 'wire');
     const nd =
       d.mode === 'vertex'
-        ? (straight ? moveVertexStraight : moveVertex)(d.base, d.at, g, lib)
-        : (straight ? dragSegmentStraight : dragSegment)(doc, d.index, g.x - d.start.x, g.y - d.start.y, lib);
+        ? (straight ? moveVertexStraight : moveVertex)(d.base, d.at, g, lib, sel && d.base === doc ? { index: sel.index, out: wires } : undefined)
+        : (straight ? dragSegmentStraight : dragSegment)(doc, d.index, g.x - d.start.x, g.y - d.start.y, lib, wires);
     if (nd === from) setPreview(null);
-    else if ((d.mode === 'vertex' && d.free) || sameConnections(doc, nd, lib)) setPreview(nd);
+    else if ((d.mode === 'vertex' && d.free) || sameConnections(doc, nd, lib)) {
+      setPreview(nd);
+      setPreviewMoved({ doc: nd, wires });
+    }
   };
   const wirePreviewRef = useRef(wirePreview);
   wirePreviewRef.current = wirePreview;

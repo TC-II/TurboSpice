@@ -507,4 +507,25 @@ describe('selección del fantasma al mover cables (#315)', () => {
     expect(c.nets.find((n) => n.name === 'b')?.wires).toEqual([2]);
     expect(c.nets.find((n) => n.name === 'a')?.wires).toEqual([0]);
   });
+
+  it('al arrastrar un tramo se agregan cables nuevos: el naranja sigue al tramo arrastrado, no a los nuevos', () => {
+    // el cable vertical va de la etiqueta a una T con el horizontal: al correrlo de costado se
+    // agregan dos cables nuevos (uno en cada extremo)
+    const d = asc('WIRE 0 0 0 64\nWIRE -64 64 64 64\nFLAG 0 0 a\n');
+    const sel = [{ kind: 'wire' as const, index: 0 }];
+    const moved: Wire[] = [];
+    const p = dragSegment(d, 0, 32, 0, lib, moved);
+    expect(p.wires.length).toBeGreaterThan(d.wires.length);
+    const r = previewSelection(sel, d, p, moved);
+    expect(r.map((x) => ws(p)[x.index])).toEqual([[32, 0, 32, 64]]);
+    // codo: el cable agarrado termina en el tramo que llega al codo movido
+    const out: Wire[] = [];
+    const v = moveVertex(d, { x: 0, y: 0 }, { x: 32, y: 0 }, lib, { index: 0, out });
+    expect(previewSelection(sel, d, v, out).map((x) => ws(v)[x.index])).toEqual([
+      [32, 0, 0, 0],
+      [0, 0, 0, 64],
+    ]);
+    // sin dónde terminó, el cable reemplazado no se marca (antes quedaba el mismo índice: otro cable)
+    expect(previewSelection(sel, d, p)).toEqual([]);
+  });
 });

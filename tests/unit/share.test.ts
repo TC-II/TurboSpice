@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { deflateRawSync } from 'node:zlib';
-import { compactTurbo, readShareHash, shareHash } from '../../src/schematic/share.ts';
+import { compactTurbo, plainHash, readShareHash, shareHash } from '../../src/schematic/share.ts';
 import { parseTurbo, serializeTurbo } from '../../src/project/turbo.ts';
 
 const turbo = readFileSync('public/examples/Sample Project.turbo');
@@ -29,6 +29,13 @@ describe('links de Compartir', () => {
     const asc = Buffer.from('Version 4\r\nSHEET 1 880 680\r\n');
     const hash = await shareHash(asc, 'a.asc');
     expect(hash).not.toMatch(/k=1/);
+    expect(Buffer.from((await readShareHash(`#${hash}`))!.bytes).equals(asc)).toBe(true);
+  });
+
+  it('el hash de ASC-Parser (Exportar a PDF, Pro) es deflate solo, sin z ni k', async () => {
+    const asc = Buffer.from('Version 4\r\nSHEET 1 880 680\r\n');
+    const hash = await plainHash(asc, 'a b.asc');
+    expect(hash).toMatch(/^c=[\w-]+&n=a%20b\.asc$/);
     expect(Buffer.from((await readShareHash(`#${hash}`))!.bytes).equals(asc)).toBe(true);
   });
 

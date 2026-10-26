@@ -24,7 +24,7 @@ import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts'
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
-import { readShareHash, shareHash } from './schematic/share.ts';
+import { plainHash, readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
@@ -79,7 +79,8 @@ import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setWindows, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { parseSource } from './sim/sources.ts';
-import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { schematicPdf } from './schematic/pdf.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
@@ -138,6 +139,8 @@ const DEFAULT_NAME = /^project( \d+)?$/i;
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
+/** Conversor de .asc a PDF vectorial (Exportar a PDF, Pro): recibe el circuito comprimido en el hash (#c=…&n=…) */
+const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
 /** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
@@ -1176,21 +1179,32 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
-  // Exportar a PDF: la vista actual del esquemático (lo que se ve en pantalla), en una pestaña
-  // que abre el diálogo de impresión (Guardar como PDF); nada viaja a un servidor
-  const doExportPdf = () => {
+  // Exportar a PDF (Pro): abre ASC-Parser con el circuito en el hash, en el mismo formato del
+  // link de compartir (nunca viaja a un servidor), como en 548bdd8
+  const doExportPdfPro = async () => {
+    // la pestaña se abre ya, dentro del click, para que no la bloquee el navegador
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    const { bytes } = ascBytes(doc, lib);
+    // ASC-Parser lee el .asc con deflate solo (sin el diccionario de los links de compartir)
+    const hash = await plainHash(bytes, ascName());
+    const url = `${PDF_TOOL}#${hash}`;
+    if (tab) tab.location.href = url;
+    else setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
+  };
+
+  // Exportar a PDF (rápido): la vista actual del esquemático (lo que se ve en pantalla), como
+  // un .pdf que se descarga (sin el diálogo de impresión); nada viaja a un servidor
+  const doExportPdf = async () => {
     const svg = editor.current?.svg();
     const vb = svg?.getAttribute('viewBox')?.split(/\s+/).map(Number);
     if (!svg || !vb || vb.length !== 4) return;
-    const text = schematicSvg(svg, { x1: vb[0], y1: vb[1], x2: vb[0] + vb[2], y2: vb[1] + vb[3] }).replace(/^<\?xml[^>]*>\s*/, '');
-    const tab = window.open('', '_blank');
-    if (!tab) return setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
-    const title = project.name.replace(/[<&]/g, '');
-    tab.document.write(`<!doctype html><title>${title}</title><style>@page{size:${vb[2] >= vb[3] ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0;height:100%}svg{width:100%;height:100%;display:block}</style>${text}`);
-    tab.document.close();
-    tab.focus();
-    // después del click: en Firefox print() bloquea hasta cerrar el diálogo de impresión
-    tab.setTimeout(() => tab.print(), 50);
+    const text = schematicSvg(svg, { x1: vb[0], y1: vb[1], x2: vb[0] + vb[2], y2: vb[1] + vb[3] });
+    try {
+      download(`${project.name}.pdf`, await schematicPdf(text));
+    } catch (e) {
+      setMessage(t('Could not export to PDF: {p0}', { p0: (e as Error).message }));
+    }
   };
 
   const doRecent = async (i: number) => {
@@ -2933,7 +2947,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { label: t('Save as…'), shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },
         ...(google.account ? [{ label: t('Export to computer…'), onClick: () => doSaveLocal(true) }] : []),
-        { label: t('Export to PDF'), title: t('The current view of the schematic'), onClick: doExportPdf },
+        { label: t('Export to PDF (Pro)'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdfPro },
+        { label: t('Export to PDF (Fast)'), title: t('Downloads a PDF of the current view of the schematic'), onClick: doExportPdf },
         'sep',
         { label: t('Import into this project…'), title: t('.zip, .asc (each one, a testbench), .asy, .lib, .sub'), onClick: () => setDialog({ kind: 'importinfo' }) },
         { label: t('Export project'), title: t('A .zip for LTspice: an .asc per testbench and the project files they use'), onClick: () => exportZip(true) },
@@ -3113,7 +3128,15 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       tools: [
         { icon: 'new', label: t('New'), title: t('New project'), onClick: doNew },
         { icon: 'save', label: t('Save'), title: google.account ? t('Save to Google Drive') : t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
-        { icon: 'pdf', label: t('Export to PDF'), title: t('Export the current view to PDF'), onClick: doExportPdf },
+        {
+          icon: 'pdf',
+          label: t('Export to PDF'),
+          title: t('Export to PDF'),
+          items: [
+            { label: 'Pro', title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdfPro },
+            { label: t('Fast'), title: t('Downloads a PDF of the current view of the schematic'), onClick: doExportPdf },
+          ],
+        },
         // con la sesión de Google, Abrir muestra «Mis simulaciones»; sin sesión, Abrir/Importar
         google.account
           ? { icon: 'open', label: t('Open'), title: t('My simulations (Google Drive)'), onClick: () => setDialog({ kind: 'drive' }) }

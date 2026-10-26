@@ -79,6 +79,14 @@ export async function expandTurbo(text: string): Promise<string> {
   return JSON.stringify(fix(raw));
 }
 
+/**
+ * Hash en el formato original, sin diccionario (#c=<deflate-raw, base64url>&n=nombre): el que lee
+ * ASC-Parser (Exportar a PDF, Pro), que no conoce z=1
+ */
+export async function plainHash(bytes: Uint8Array, name: string): Promise<string> {
+  return `c=${toBase64Url(await pipe(bytes, new CompressionStream('deflate-raw')))}&n=${encodeURIComponent(name)}`;
+}
+
 /** Hash (sin "#") para compartir el archivo (la vista de resultados va dentro del .asc) */
 export async function shareHash(bytes: Uint8Array, name: string): Promise<string> {
   const { deflateSync, dictionary } = await dict1();

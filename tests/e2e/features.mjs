@@ -111,10 +111,22 @@ check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ by
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
 check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
-// Exportar a PDF: la vista actual del esquemático, en una pestaña para imprimir
-const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('button', { name: 'Exportar a PDF' }).click()]);
-const pdfSyms = await pdfTab.locator('svg g').count().catch(() => 0);
-check(pdfSyms > 0, `Exportar a PDF abre la vista actual del esquemático para imprimir (${pdfSyms} grupos)`);
+// Exportar a PDF: el botón despliega Pro (ASC-Parser con el circuito en el hash) y Rápido
+// (descarga un .pdf de la vista actual, sin imprimir)
+await page.getByRole('button', { name: 'Exportar a PDF' }).click();
+const [pdfDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'Rápido' }).click()]);
+const pdfHead = await new Promise(async (res) => {
+  const chunks = [];
+  const st = await pdfDl.createReadStream();
+  st.on('data', (c) => chunks.push(c));
+  st.on('end', () => res(Buffer.concat(chunks).subarray(0, 8).toString('latin1')));
+});
+check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'), `Exportar a PDF › Rápido descarga un .pdf (${pdfDl.suggestedFilename()})`);
+await context.route('https://javierpetrucci.github.io/**', (r) => r.fulfill({ body: '<!doctype html><title>ASC-Parser</title>', contentType: 'text/html' }));
+await page.getByRole('button', { name: 'Exportar a PDF' }).click();
+const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('menuitem', { name: 'Pro' }).click()]);
+await pdfTab.waitForURL(/ASC-Parser\/#c=/).catch(() => {});
+check(/^https:\/\/javierpetrucci\.github\.io\/ASC-Parser\/#c=[\w-]+.*&n=[^&]+\.asc$/.test(pdfTab.url()), `Exportar a PDF › Pro abre ASC-Parser con el circuito en el hash (${pdfTab.url().slice(0, 60)}…)`);
 await pdfTab.close();
 const other = await context.newPage();
 watch(other);

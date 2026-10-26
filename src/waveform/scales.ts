@@ -25,6 +25,17 @@ export function zoomAbout(min: number, max: number, at: number, k: number, log =
 }
 
 /**
+ * Zoom de la rueda: rango [min, max] escalado por `k` alrededor del punto a la fracción `f` del
+ * área (0 = izquierda o abajo). En escala log todo va en décadas: el valor bajo el mouse queda
+ * en el mismo lugar y el factor es el mismo en cualquier parte del eje (#299).
+ */
+export function zoomAt([min, max]: Range, f: number, k: number, log = false): Range {
+  const t = (v: number) => (log ? Math.log10(v) : v);
+  const at = t(min) + (t(max) - t(min)) * f;
+  return zoomAbout(min, max, log ? 10 ** at : at, k, log);
+}
+
+/**
  * Rango [min, max] desplazado una fracción `f` de su ancho (paneo; en escala log, en décadas).
  * Con `bounds` no sale de esos límites: se frena en el borde manteniendo el ancho.
  */

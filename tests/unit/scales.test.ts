@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exactRange, extent, logLabeled, panBy, zoomAbout } from '../../src/waveform/scales.ts';
+import { exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
 
 describe('escalas del visor', () => {
   it('extent: sólo valores finitos dentro del rango de X', () => {
@@ -44,5 +44,17 @@ describe('escalas del visor', () => {
     expect(logLabeled([10, 20, 50, 100, 200, 1000])).toEqual([true, false, false, true, false, true]);
     expect(logLabeled([2000, 3000, 5000, 10000, 20000])).toEqual([true, false, true, true, true]);
     expect(logLabeled([3000, 4000, null])).toEqual([true, true, false]);
+  });
+
+  it('zoomAt: en escala log el punto bajo el mouse queda fijo y el factor es uniforme (#299)', () => {
+    const r: [number, number] = [10, 3.7e6];
+    const pos = ([lo, hi]: number[], v: number) => (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo));
+    for (const f of [0.05, 0.3, 0.5, 0.9]) {
+      const at = 10 ** (1 + Math.log10(3.7e5) * f);
+      const z = zoomAt(r, f, 0.5, true);
+      expect(pos(z, at)).toBeCloseTo(f, 9);
+      expect(Math.log10(z[1] / z[0])).toBeCloseTo(Math.log10(r[1] / r[0]) * 0.5, 9);
+    }
+    expect(zoomAt([0, 10], 0.25, 0.5)).toEqual([1.25, 6.25]);
   });
 });

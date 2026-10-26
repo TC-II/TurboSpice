@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { dftSampling, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { exactRange, extent, logLabeled, panBy, wheelZoom, zoomAbout } from './scales.ts';
+import { exactRange, extent, logLabeled, panBy, wheelZoom, zoomAt } from './scales.ts';
 import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
@@ -1594,8 +1594,6 @@ function PaneView(props: {
       const { min, max } = u.scales[k === 'r' ? rightScale : k] ?? {};
       return min != null && max != null ? [min, max] : null;
     };
-    /** valor a la fracción f del rango (en escala log, en décadas) */
-    const lerp = ([lo, hi]: Range, f: number, log = false) => (log ? 10 ** (Math.log10(lo) + (Math.log10(hi) - Math.log10(lo)) * f) : lo + (hi - lo) * f);
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = over.getBoundingClientRect();
@@ -1619,7 +1617,7 @@ function PaneView(props: {
         // eje derecho (corrientes o fase): su propia escala
         const cur = now('r');
         if (!cur) return;
-        const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fy), k);
+        const [lo, hi] = zoomAt(cur, fy, k);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelR([lo, hi]);
         return;
       }
@@ -1627,13 +1625,13 @@ function PaneView(props: {
       if (onYAxis || e.shiftKey) {
         const cur = now('y');
         if (!cur) return;
-        const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fy), k);
+        const [lo, hi] = zoomAt(cur, fy, k);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
         return;
       }
       const cur = now('x');
       if (!cur) return;
-      const [lo, hi] = zoomAbout(cur[0], cur[1], lerp(cur, fx, data.log), k, data.log);
+      const [lo, hi] = zoomAt(cur, fx, k, data.log);
       live.current.onWheelZoom(toX(lo, hi));
     };
     // mientras se arrastra un zoom, el recuadro se resalta y el resto del gráfico se oscurece

@@ -27,7 +27,8 @@ export function opPinShown(pins: ReadonlySet<string> | undefined, target: OpPinT
   return !!k && pins.has(k);
 }
 
-// Etiquetas del OP movibles y persistentes (#306): por documento, sólo en la sesión (no van al .asc)
+// Etiquetas del OP movibles y persistentes (#306): las fijadas y las movidas se guardan en el
+// documento (comentario ";.optags …", va en el .turbo); las borradas, sólo en la sesión
 export interface OpTags {
   /** fijadas con la punta de prueba */
   pins: ReadonlySet<string>;
@@ -73,3 +74,22 @@ export function hideOpTag(tags: OpTags, key: string, hide = true): OpTags {
 
 /** al volver a activar «Anotar el OP» reaparecen las borradas */
 export const unhideOpTags = (tags: OpTags): OpTags => (tags.hidden.size ? { ...tags, hidden: new Set() } : tags);
+
+/** Lo que se guarda en el documento: las fijadas y las movidas (undefined si no hay ninguna) */
+export function opTagsData(tags: OpTags): { pins?: string[]; moved?: Record<string, [number, number]> } | undefined {
+  if (!tags.pins.size && !tags.moved.size) return undefined;
+  return {
+    ...(tags.pins.size ? { pins: [...tags.pins] } : {}),
+    ...(tags.moved.size ? { moved: Object.fromEntries([...tags.moved].map(([k, m]) => [k, [m.dx, m.dy]])) } : {}),
+  };
+}
+
+/** Etiquetas guardadas en el documento (lo ilegible se ignora) */
+export function opTagsFromData(v: unknown, hidden: ReadonlySet<string> = new Set()): OpTags {
+  const d = (v && typeof v === 'object' ? v : {}) as { pins?: unknown; moved?: unknown };
+  const pins = new Set(Array.isArray(d.pins) ? d.pins.filter((k): k is string => typeof k === 'string') : []);
+  const moved = new Map<string, { dx: number; dy: number }>();
+  if (d.moved && typeof d.moved === 'object')
+    for (const [k, m] of Object.entries(d.moved)) if (Array.isArray(m) && Number.isFinite(m[0]) && Number.isFinite(m[1])) moved.set(k, { dx: m[0], dy: m[1] });
+  return { pins, moved, hidden };
+}

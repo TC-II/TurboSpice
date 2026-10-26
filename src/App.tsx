@@ -102,10 +102,10 @@ import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
-import { sameExceptData } from './asc/dataText.ts';
+import { readData, sameExceptData, writeData } from './asc/dataText.ts';
 import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
-import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
+import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -1917,11 +1917,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [op]);
   // valores del OP fijados con la punta de prueba (#228); se borran con otro punto de operación
   // #306: siguen entre corridas, se pueden mover y borrar; se reinician al abrir otro circuito
-  const [opTags, setOpTags] = useState<OpTags>(noOpTags);
+  // las fijadas y las movidas van en el documento (y así en el .turbo); las borradas, sólo en la sesión
+  const [opHidden, setOpHidden] = useState<ReadonlySet<string>>(() => new Set());
+  const opTags = useMemo(() => opTagsFromData(readData(doc, 'optags'), opHidden), [doc, opHidden]);
+  const setOpTags = (f: (t: OpTags) => OpTags) => {
+    const next = f(opTags);
+    if (next.hidden !== opTags.hidden) setOpHidden(next.hidden);
+    const data = opTagsData(next);
+    if (JSON.stringify(data) !== JSON.stringify(opTagsData(opTags))) commit(writeData(doc, 'optags', data));
+  };
   const [opSel, setOpSel] = useState<string>();
-  useEffect(() => (setOpTags(noOpTags()), setOpSel(undefined)), [docKey]);
+  useEffect(() => (setOpHidden(new Set()), setOpSel(undefined)), [docKey]);
   useEffect(() => {
-    if (showOp) setOpTags(unhideOpTags);
+    if (showOp) setOpHidden((h) => unhideOpTags({ ...noOpTags(), hidden: h }).hidden);
   }, [showOp]);
   useEffect(() => {
     if (selection.length) setOpSel(undefined);

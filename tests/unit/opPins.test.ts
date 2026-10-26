@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hideOpTag, moveOpTag, noOpTags, opPinKey, opPinShown, opTagVisible, toggleOpPin, toggleOpTag, unhideOpTags } from '../../src/sim/opPins.ts';
+import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opPinShown, opTagVisible, toggleOpPin, toggleOpTag, unhideOpTags } from '../../src/sim/opPins.ts';
 
 describe('punta de prueba sobre el OP (#228)', () => {
   it('claves por red y por componente', () => {
@@ -52,5 +52,17 @@ describe('etiquetas del OP movibles y persistentes (#306)', () => {
     t = toggleOpTag(t, { net: 'a' });
     expect(opTagVisible(t, 'n:a', false)).toBe(false);
     expect(t.hidden.has('n:a')).toBe(false);
+  });
+});
+describe('etiquetas del OP en el documento (#306)', () => {
+  it('ida y vuelta: fijadas y movidas', () => {
+    const t = moveOpTag(toggleOpTag(noOpTags(), { net: 'out' }), 's:3', 16, -8);
+    const back = opTagsFromData(JSON.parse(JSON.stringify(opTagsData(t))));
+    expect([...back.pins]).toEqual(['n:out']);
+    expect(back.moved.get('s:3')).toEqual({ dx: 16, dy: -8 });
+  });
+  it('sin etiquetas no se guarda nada; lo ilegible se ignora', () => {
+    expect(opTagsData(noOpTags())).toBeUndefined();
+    expect(opTagsFromData({ pins: [1, 'n:a'], moved: { x: 'no' } })).toMatchObject({ pins: new Set(['n:a']), moved: new Map() });
   });
 });

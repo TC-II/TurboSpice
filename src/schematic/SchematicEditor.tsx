@@ -100,6 +100,8 @@ export interface EditorHandle {
   setView(v: View): void;
   /** escribir en el lugar un comentario existente (false si no es un comentario común) */
   editText(index: number): boolean;
+  /** Ctrl+R con un rótulo agarrado: gira el rótulo, no el componente (false si no hay ninguno) */
+  rotateLabel(): boolean;
 }
 
 interface Props {
@@ -417,6 +419,11 @@ export function SchematicEditor(props: Props) {
   cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
   const [preview, setPreview] = useState<AscDoc | null>(null);
+  // para el Ctrl+R de la ventana con un rótulo agarrado (fuera del ciclo de render)
+  const dragNow = useRef(drag);
+  dragNow.current = drag;
+  const previewNow = useRef(preview);
+  previewNow.current = preview;
   // fuera la traslación de mover todo en el mismo cuadro en que llega el documento movido
   useLayoutEffect(() => {
     if (!(drag?.mode === 'move' && drag.whole)) shiftWhole(0, 0);
@@ -498,6 +505,19 @@ export function SchematicEditor(props: Props) {
         if (v) setView(v);
       },
       spacePanned: () => spaceUsed.current,
+      rotateLabel: () => {
+        const d = dragNow.current;
+        if (d?.mode !== 'label') return false;
+        // horizontal ↔ vertical, con el mismo anclaje (Left ↔ VLeft…)
+        const turn = (a: string) => (a.startsWith('V') ? a.slice(1) : `V${a}`);
+        const items = d.items.map((it) => ({ ...it, w: { ...it.w, align: turn(it.w.align) } }));
+        const nd = { ...d, items, moved: true };
+        dragNow.current = nd;
+        setDrag(nd);
+        const base = previewNow.current ?? doc;
+        setPreview(setWindows(base, items.map((it) => ({ sym: it.sym, win: it.win, w: { ...(base.symbols[it.sym]?.windows.get(it.win) ?? it.w), align: it.w.align } }))));
+        return true;
+      },
       view: () => viewRef.current,
       setView: (v: View) => setView(v),
       editText: (index: number) => editInline(index),

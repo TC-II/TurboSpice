@@ -2346,6 +2346,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   };
 
   const rotateOrMirror = (op: 'rotate' | 'mirror') => {
+    if (op === 'rotate' && editor.current?.rotateLabel()) return;
     if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
     else if (selection.length) commit(transformItems(doc, selection, op, lib));
   };

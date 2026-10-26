@@ -97,6 +97,7 @@ import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
+import { TRACE_WIDTHS, setTraceWidth, useTraceWidth } from './waveform/lineWidth.ts';
 import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
@@ -396,6 +397,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [, setSubTabs] = useState<string[]>([]);
   // el panel se muestra al acercar el mouse al borde izquierdo (si se tildó, en modo selección)
   const [hoverReveal, setHoverRevealState] = useState(() => lsGet('turbospice.treeHover') === '1');
+  const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
   const [treePeek, setTreePeek] = useState(false);
   // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos
@@ -4042,6 +4044,18 @@ ${ltNetlistText(sim.built.lt)}
             {
               title: t('Project panel'),
               rows: [{ kind: 'checkbox', label: t('Show the project panel when the mouse approaches the edge (in select mode)'), checked: hoverReveal, onChange: setHoverReveal }],
+            },
+            {
+              title: t('Plotter'),
+              rows: [
+                {
+                  kind: 'choice',
+                  label: t('Trace thickness'),
+                  value: String(traceW),
+                  options: TRACE_WIDTHS.map((w, i) => ({ value: String(w), label: [t('Thin'), t('Medium'), t('Thick')][i] })),
+                  onChange: (v) => setTraceWidth(Number(v)),
+                },
+              ],
             },
           ]}
           onClose={() => setDialog(null)}

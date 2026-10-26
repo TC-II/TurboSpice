@@ -16,6 +16,7 @@ import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
 import { PALETTE, acceptsTrace, colorFor, sameDft, cursorForClick, isDftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace, type TraceDft } from './view.ts';
 import { addMarker, asMarkers, delta, horizontalCuts, markerName, markerValue, pickCurve, remapPanes, sameMarker, verticalCuts, type Marker, type MarkerAxis, type MarkerKind } from './markers.ts';
 import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
+import { useTraceWidth } from './lineWidth.ts';
 import { Icon } from '../ui/icons.tsx';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
 import { locale, t } from '../i18n/i18n.ts';
@@ -913,6 +914,7 @@ function PaneView(props: {
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
   // la grilla del tema oscuro queda sobre el fondo claro)
   const [scheme, setScheme] = useState(0);
+  const lineW = useTraceWidth();
   useEffect(() => {
     const bump = () => setScheme((n) => n + 1);
     const mo = new MutationObserver(bump);
@@ -1141,7 +1143,7 @@ function PaneView(props: {
           label: c.label,
           scale: c.axis,
           stroke: c.color,
-          width: 1.5,
+          width: lineW,
           dash: c.dash ? [6, 4] : undefined,
           // nodos digitales (#209): cada valor vale hasta el punto siguiente
           ...(c.digital ? { paths: stepped } : {}),
@@ -1718,7 +1720,7 @@ function PaneView(props: {
     // el gráfico se recrea sólo si cambian los datos, la grilla, el tema o el modo zoom (Z, el
     // recuadro en X e Y se configura al crearlo); xRange y los cursores se aplican aparte
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, showGrid, zoomMode, scheme, props.syncKey]);
+  }, [data, showGrid, zoomMode, scheme, lineW, props.syncKey]);
 
   useEffect(() => {
     const u = chart.current;

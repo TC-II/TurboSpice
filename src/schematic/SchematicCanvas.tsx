@@ -201,9 +201,9 @@ const FLAG_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
   right: { align: 'Right', dx: -8, dy: 0 },
 };
 
-export function FlagView({ flag, doc, lib, selected, mark }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean; mark?: Mark }) {
+export function FlagView({ flag, doc, lib, selected, hover, mark }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean; hover?: boolean; mark?: Mark }) {
   const dir = flagDirection(doc, flag);
-  const cls = `flag${selected ? ' sel' : ''}${mark ? ` diff-${mark}` : ''}`;
+  const cls = `flag${selected ? ' sel' : ''}${hover ? ' hover' : ''}${mark ? ` diff-${mark}` : ''}`;
   if (flag.name === '0') {
     const gnd = lib.skin('GND');
     return (
@@ -232,6 +232,8 @@ export interface CanvasProps {
   highlightNet?: string;
   /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
   hoverSymbol?: number;
+  /** etiqueta de red o masa bajo el puntero */
+  hoverFlag?: number;
   /** color de los cables de las redes con traza (nombre en minúsculas) */
   netColors?: Map<string, string>;
   /** marcas de pines sueltos (Ctrl+U) */
@@ -242,7 +244,7 @@ export interface CanvasProps {
   diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, hoverFlag, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -347,7 +349,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
         })}
       </g>
       <g className="flags">
-        {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} mark={diff?.flags.get(i)} />)}
+        {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} hover={hoverFlag === i} mark={diff?.flags.get(i)} />)}
       </g>
     </g>
   );

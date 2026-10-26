@@ -418,6 +418,7 @@ export function SchematicEditor(props: Props) {
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
+  const [hoverFlag, setHoverFlag] = useState<number | undefined>();
   // después de arrastrar, lo movido sigue seleccionado mientras el puntero esté encima; al alejarse se deselecciona
   const deselectOnLeave = useRef(false);
   const [labelNet, setLabelNet] = useState<string | undefined>();
@@ -743,7 +744,8 @@ export function SchematicEditor(props: Props) {
         const again = !onVertex && !!lc && Math.hypot(lc.p.x - p.x, lc.p.y - p.y) < tol && all.length > 1 && e.timeStamp - lc.t > 350;
         const pickIdx = again ? (lc!.i + 1) % all.length : 0;
         lastClick.current = { p, i: pickIdx, t: e.timeStamp };
-        const hit = all[pickIdx] ?? null;
+        // el rótulo de un componente sin seleccionar es parte del componente: lo selecciona y lo mueve
+        const hit: ItemRef | null = label ? { kind: 'symbol', index: label.sym } : (all[pickIdx] ?? null);
         if (again && hit && !e.shiftKey) {
           setSelection([hit]);
           setDrag({ mode: 'move', start: g, refs: [hit], detach: e.ctrlKey || e.metaKey, moved: false });
@@ -959,7 +961,9 @@ export function SchematicEditor(props: Props) {
     const body = tool.kind === 'select' && !drag && lh === undefined ? hitTest(doc, p, lib, tol, showSimCommand) : null;
     const hs = lh ?? (body?.kind === 'symbol' ? body.index : undefined);
     if (hs !== hoverSym) setHoverSym(hs);
-    if (deselectOnLeave.current && !drag && !selection.some((r) => r.kind === 'symbol' && r.index === hs)) {
+    const hf = body?.kind === 'flag' ? body.index : undefined;
+    if (hf !== hoverFlag) setHoverFlag(hf);
+    if (deselectOnLeave.current && !drag && !selection.some((r) => (r.kind === 'symbol' && r.index === hs) || (r.kind === 'flag' && r.index === hf))) {
       deselectOnLeave.current = false;
       setSelection([]);
     }
@@ -1282,6 +1286,7 @@ export function SchematicEditor(props: Props) {
         setHoverNet(undefined);
         setHoverLabel(undefined);
         setHoverSym(undefined);
+        setHoverFlag(undefined);
         setPickHover(null);
         lastHover.current = '';
         onHover?.(null);
@@ -1302,6 +1307,7 @@ export function SchematicEditor(props: Props) {
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverSym}
+        hoverFlag={hoverFlag}
         netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}

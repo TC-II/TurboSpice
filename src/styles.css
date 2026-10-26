@@ -265,6 +265,8 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .flag text { fill: var(--sch-label); }
 .flag.sel { color: var(--sch-sel); }
 .flag.sel text { fill: var(--sch-sel); }
+.flag.hover:not(.sel) { color: var(--sch-sel); }
+.flag.hover:not(.sel) text { fill: var(--sch-sel); }
 .texts .directive text { fill: var(--sch-directive); font-weight: 600; }
 .texts .comment text { fill: var(--sch-drawing); }
 .texts .sel text { fill: var(--sch-sel); }

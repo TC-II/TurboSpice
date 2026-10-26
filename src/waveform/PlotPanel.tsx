@@ -8,7 +8,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { dftSampling, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
-import { exactRange, extent, logLabeled, panBy, wheelZoom, zoomAt } from './scales.ts';
+import { alignScales, exactRange, extent, logLabeled, mapTicks, niceTicks, panBy, wheelZoom, zoomAt, type Aligned } from './scales.ts';
 import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
@@ -164,7 +164,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   const [rRanges, setRRanges] = useState<Record<number, Range>>({});
   const [zoomMode, setZoomMode] = useState(false);
   const [removing, setRemoving] = useState(false);
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   // vistas anteriores (Shift+Z)
   const zoomHistory = useRef<{ x: Range | null; y: Record<number, Range> }[]>([]);
 
@@ -956,6 +956,27 @@ function PaneView(props: {
       const e = fullY(scale);
       return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
     };
+    // Dos escalas Y sin zoom: rangos y marcas elegidos para que las dos usen la misma grilla (#300).
+    // Con zoom en alguna, las marcas de la derecha van a la altura de las de la izquierda.
+    let aligned: Aligned | null | undefined;
+    const alignedY = () => {
+      if (aligned === undefined) {
+        const full = (scale: string) => safeRange(null as unknown as uPlot, fullY(scale)?.[0] ?? null, fullY(scale)?.[1] ?? null, scale) as Range;
+        const most = Math.max(3, Math.floor(el.clientHeight / 40));
+        const divs = [4, 5, 6, 7, 8].filter((n) => n <= most);
+        aligned = hasRight ? alignScales(full('y'), full(rightScale), divs.length ? divs : [3]) : null;
+      }
+      return yRef.current || rRef.current ? null : aligned;
+    };
+    const divsOf = (u: uPlot) => Math.max(2, Math.round(u.bbox.height / devicePixelRatio / 45));
+    const leftSplits = (u: uPlot, _i: number, min: number, max: number) => alignedY()?.leftTicks ?? niceTicks(min, max, divsOf(u));
+    const rightSplits = (u: uPlot, _i: number, min: number, max: number) => {
+      const a = alignedY();
+      if (a) return a.rightTicks;
+      const { min: y0, max: y1 } = u.scales.y;
+      if (y0 == null || y1 == null || !(y1 > y0)) return niceTicks(min, max, divsOf(u));
+      return mapTicks(niceTicks(y0, y1, divsOf(u)), [y0, y1], [min, max]);
+    };
     // X sin zoom: todo, o hasta donde llegan todas las DFT (con zoom out se ve el resto)
     const x0 = data.x[0];
     const x1 = data.x[data.x.length - 1];
@@ -1093,9 +1114,9 @@ function PaneView(props: {
       legend: { show: false },
       scales: {
         x: { time: false, distr: data.log ? 3 : 1, range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax, ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}) },
-        y: { range: (u, min, max) => yRef.current ?? whole('y')(u, min, max, 'y') },
-        i: { range: (u, min, max) => rRef.current ?? whole('i')(u, min, max, 'i') },
-        ph: { range: (u, min, max) => rRef.current ?? whole('ph')(u, min, max, 'ph') },
+        y: { range: (u, min, max) => yRef.current ?? alignedY()?.left ?? whole('y')(u, min, max, 'y') },
+        i: { range: (u, min, max) => rRef.current ?? (rightScale === 'i' ? alignedY()?.right : null) ?? whole('i')(u, min, max, 'i') },
+        ph: { range: (u, min, max) => rRef.current ?? (rightScale === 'ph' ? alignedY()?.right : null) ?? whole('ph')(u, min, max, 'ph') },
       },
       axes: [
         {
@@ -1109,9 +1130,9 @@ function PaneView(props: {
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
         },
-        { scale: 'y', values: ticks('Y'), stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
+        { scale: 'y', values: ticks('Y'), ...(hasRight ? { splits: leftSplits } : {}), stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
         ...(hasRight
-          ? [{ scale: rightScale, side: 1, values: ticks('R'), stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
+          ? [{ scale: rightScale, side: 1, values: ticks('R'), splits: rightSplits, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
           : []),
       ],
       series: [

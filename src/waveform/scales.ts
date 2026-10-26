@@ -91,3 +91,83 @@ export function logLabeled(ticks: (number | null)[]): boolean[] {
   const d125 = pick((t) => isDec(t) || [2, 5].includes(mant(t)));
   return count(d125) >= 2 ? d125 : pick(() => true);
 }
+
+/** Paso «lindo» (1, 2, 2,5 o 5 por una potencia de 10) mayor o igual que `raw` */
+export function niceStep(raw: number): number {
+  if (!(raw > 0) || !Number.isFinite(raw)) return 1;
+  const p = 10 ** Math.floor(Math.log10(raw));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw * (1 - 1e-12)) return m * p;
+  return 10 * p;
+}
+
+/** sin el ruido de la coma flotante (0.30000000000000004 → 0.3) */
+const clean = (v: number) => parseFloat(v.toPrecision(12));
+
+/** Marcas cada `step` desde `from`: n divisiones, n + 1 marcas */
+const steps = (from: number, step: number, n: number) => Array.from({ length: n + 1 }, (_, i) => clean(from + i * step));
+
+export interface Aligned {
+  /** divisiones de la grilla (iguales en las dos escalas) */
+  n: number;
+  left: Range;
+  right: Range;
+  leftTicks: number[];
+  rightTicks: number[];
+}
+
+/**
+ * Dos escalas Y (izquierda y derecha) con una sola grilla (#300): elige un número de divisiones
+ * común y, para cada escala, un paso lindo y un rango (que contiene al pedido) de exactamente esas
+ * divisiones, así las marcas de las dos caen en las mismas líneas. Entre las opciones, la que menos
+ * agranda los rangos.
+ */
+export function alignScales(left: Range, right: Range, divs = [4, 5, 6, 7, 8]): Aligned {
+  const fit = ([a, b]: Range, n: number) => {
+    let s = niceStep((b - a) / n);
+    for (let guard = 0; guard < 20; guard++) {
+      const lo = Math.floor(clean(a / s)) * s;
+      if (lo + n * s >= b - Math.abs(s) * 1e-9) {
+        // lo que sobra, repartido (en pasos enteros) a los dos lados, sin cruzar el 0 si los
+        // datos no lo cruzan
+        const extra = Math.max(0, Math.floor((lo + n * s - b) / s / 2 + 1e-9));
+        let from = lo - extra * s;
+        if (a >= 0) from = Math.max(from, 0);
+        if (b <= 0) from = Math.min(from, -n * s);
+        return { from, s, waste: (n * s - (b - a)) / (n * s) };
+      }
+      s = niceStep(s * 1.000001);
+    }
+    return { from: a, s: (b - a) / n, waste: 0 };
+  };
+  let best: (Aligned & { score: number }) | null = null;
+  for (const n of divs) {
+    const l = fit(left, n);
+    const r = fit(right, n);
+    const score = l.waste + r.waste + 0.01 * Math.abs(n - 5);
+    if (!best || score < best.score - 1e-12)
+      best = {
+        n,
+        score,
+        left: [clean(l.from), clean(l.from + n * l.s)],
+        right: [clean(r.from), clean(r.from + n * r.s)],
+        leftTicks: steps(l.from, l.s, n),
+        rightTicks: steps(r.from, r.s, n),
+      };
+  }
+  const { score: _s, ...out } = best!;
+  return out;
+}
+
+/** Marcas lindas dentro de [min, max], unas `n` divisiones */
+export function niceTicks(min: number, max: number, n: number): number[] {
+  if (!(max > min)) return [min];
+  const s = niceStep((max - min) / Math.max(1, n));
+  const from = Math.ceil(clean(min / s)) * s;
+  return steps(from, s, Math.floor(clean((max - from) / s)));
+}
+
+/** Las marcas `ticks` de la escala `from`, en las mismas posiciones de la escala `to` */
+export function mapTicks(ticks: number[], from: Range, to: Range): number[] {
+  const k = (to[1] - to[0]) / (from[1] - from[0]);
+  return ticks.map((t) => clean(to[0] + (t - from[0]) * k));
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
+import { alignScales, mapTicks, niceStep, niceTicks, exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
 
 describe('escalas del visor', () => {
   it('extent: sólo valores finitos dentro del rango de X', () => {
@@ -56,5 +56,43 @@ describe('escalas del visor', () => {
       expect(Math.log10(z[1] / z[0])).toBeCloseTo(Math.log10(r[1] / r[0]) * 0.5, 9);
     }
     expect(zoomAt([0, 10], 0.25, 0.5)).toEqual([1.25, 6.25]);
+  });
+
+  it('niceStep y niceTicks: pasos 1, 2, 2,5, 5', () => {
+    expect(niceStep(0.3)).toBe(0.5);
+    expect(niceStep(2)).toBe(2);
+    expect(niceStep(21)).toBe(25);
+    expect(niceStep(60)).toBe(100);
+    expect(niceTicks(-0.05, 1.03, 5)).toEqual([0, 0.25, 0.5, 0.75, 1]);
+  });
+
+  it('alignScales: las dos escalas con la misma cantidad de divisiones y pasos lindos (#300)', () => {
+    const nice = (v: number) => [1, 2, 2.5, 5].some((m) => Math.abs(v / 10 ** Math.floor(Math.log10(v)) - m) < 1e-9);
+    const cases: [number, number][][] = [
+      [[-60, 3], [-180, 0]],
+      [[0, 1.2], [-0.003, 0.0045]],
+      [[-1.1, 1.1], [0, 270]],
+      [[12, 13], [-5e-6, 5e-6]],
+    ];
+    for (const [l, r] of cases) {
+      const a = alignScales(l, r);
+      expect(a.leftTicks.length).toBe(a.n + 1);
+      expect(a.rightTicks.length).toBe(a.n + 1);
+      expect(a.left[0]).toBeLessThanOrEqual(l[0]);
+      expect(a.left[1]).toBeGreaterThanOrEqual(l[1]);
+      expect(a.right[0]).toBeLessThanOrEqual(r[0]);
+      expect(a.right[1]).toBeGreaterThanOrEqual(r[1]);
+      expect(a.leftTicks[0]).toBe(a.left[0]);
+      expect(a.leftTicks[a.n]).toBe(a.left[1]);
+      expect(a.rightTicks[a.n]).toBe(a.right[1]);
+      expect(nice(a.leftTicks[1] - a.leftTicks[0])).toBe(true);
+      expect(nice(a.rightTicks[1] - a.rightTicks[0])).toBe(true);
+    }
+    // datos positivos: el rango no baja de 0
+    expect(alignScales([0, 1.2], [0, 270]).left[0]).toBe(0);
+  });
+
+  it('mapTicks: las marcas de una escala a la misma altura en la otra', () => {
+    expect(mapTicks([0, 5, 10], [0, 10], [-180, 0])).toEqual([-180, -90, 0]);
   });
 });

@@ -403,11 +403,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
   const [treePeek, setTreePeek] = useState(false);
-  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos
+  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto para quien entra por
+  // primera vez (así ve los testbenches del proyecto de ejemplo) y, si no, abierto si hay subcircuitos
   const [treePref, setTreePref] = useState<boolean | null>(() => {
     const v = lsGet('turbospice.tree');
-    return v === '1' ? true : v === '0' ? false : null;
+    return v === '1' ? true : v === '0' ? false : lsGet('turbospice.welcomed') ? null : true;
   });
+  // (desde la segunda visita ya no cuenta como primera)
+  useEffect(() => lsSet('turbospice.welcomed', '1'), []);
   const hasSubs = project.files.some((f) => f.kind === 'schematic' || isModelModule(f));
   // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
   const [curModel, setCurModel] = useState('');
@@ -3362,7 +3365,12 @@ ${ltNetlistText(sim.built.lt)}
               bench={(curSim && simName(curSim)) || t('No analysis')}
               dirty={dirty}
               open={treeOpen}
-              onToggle={toggleTree}
+              // en Resultados sin el esquemático: vuelve el esquemático (y el panel, abierto)
+              onToggle={() => {
+                if (schematicShown) return toggleTree();
+                setExpanded('');
+                if (!treeOpen) toggleTree();
+              }}
               onRename={renameProject}
             />
         </div>

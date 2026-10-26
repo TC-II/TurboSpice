@@ -1,6 +1,6 @@
 {
  "format": "turbospice",
- "version": 1,
+ "version": 2,
  "name": "Sample Project",
  "created": "2026-10-22T17:00:00.000Z",
  "modified": "2026-10-22T20:00:00.000Z",
@@ -16,138 +16,154 @@
    "text": "* OA_Sample: TC2Lib OA_Ideal (Javier Petrucci and Agustin Gullino, ITBA) modified to show\n* the project files: one pole (GBWP) and the output limited to ±Vsat.\n.SUBCKT OA_Sample 1 2 5\nE1 N001 0 1 2 1\nRF1 N002 N001 1\nCF1 N002 0 {CF1}\nB3 5 0 V=limit({Av}*V(N002), -{Vsat}, {Vsat})\n.param Av={Avol}\n.param f1={GBWP/Avol}\n.param CF1={1/(2*PI*f1)}\n.ends OA_Sample\n"
   }
  ],
- "activeVariant": "vmvjpk87d2",
- "variants": [
+ "activeTestbench": "smvpojnf31",
+ "groups": [
   {
-   "id": "vmvjpk87d2",
-   "name": "RC low-pass",
-   "base": "sha256:a5fb4dd855dec76fb0293b6a354965972d5012d9448acc7f3eeeb59c4e328039",
-   "activeSim": "smvjpk87d1",
-   "sims": [
+   "id": "g_vmvpojnf32",
+   "name": "RC low-pass"
+  },
+  {
+   "id": "g_vmvpojnf59",
+   "name": "Inverter (project opamp)"
+  },
+  {
+   "id": "g_vmvpojnf5f",
+   "name": "RLC"
+  },
+  {
+   "id": "g_vmvpojnf6l",
+   "name": "Common emitter"
+  }
+ ],
+ "testbenches": [
+  {
+   "id": "smvpojnf31",
+   "group": "g_vmvpojnf32",
+   "current": "sha256:1d79311a0527070a94f5312c6f7454a8f67ad5e178cb6d7711eee989cd9dbace",
+   "runs": [
     {
-     "id": "smvjpk87d1",
-     "current": "sha256:1d79311a0527070a94f5312c6f7454a8f67ad5e178cb6d7711eee989cd9dbace",
-     "runs": [
-      {
-       "id": "rmvjpk87d3",
-       "time": "2026-10-22T17:00:00.000Z",
-       "asc": "sha256:a5fb4dd855dec76fb0293b6a354965972d5012d9448acc7f3eeeb59c4e328039"
-      },
-      {
-       "id": "rmvjpk87d4",
-       "time": "2026-10-22T17:10:00.000Z",
-       "asc": "sha256:dac047236c8332af11c1a74f9ae770d2af793679e759024818aaeb1af032eaf2",
-       "summary": "R1 1k→2k2"
-      },
-      {
-       "id": "rmvjpk87d5",
-       "time": "2026-10-22T17:30:00.000Z",
-       "asc": "sha256:1d79311a0527070a94f5312c6f7454a8f67ad5e178cb6d7711eee989cd9dbace",
-       "summary": "C1 1µ→470n"
-      }
-     ]
+     "id": "rmvpojnf33",
+     "time": "2026-10-22T17:00:00.000Z",
+     "asc": "sha256:a5fb4dd855dec76fb0293b6a354965972d5012d9448acc7f3eeeb59c4e328039"
     },
     {
-     "id": "smvjpk87e6",
-     "name": "Bode",
-     "current": "sha256:06f2034c21a091026decf2424a514b2ae04d7cfc88e82270569eb4ab37fe8f97",
-     "runs": [
-      {
-       "id": "rmvjpk87e7",
-       "time": "2026-10-22T18:00:00.000Z",
-       "asc": "sha256:06f2034c21a091026decf2424a514b2ae04d7cfc88e82270569eb4ab37fe8f97"
-      }
-     ]
+     "id": "rmvpojnf44",
+     "time": "2026-10-22T17:10:00.000Z",
+     "asc": "sha256:dac047236c8332af11c1a74f9ae770d2af793679e759024818aaeb1af032eaf2",
+     "summary": "R1 1k→2k2"
+    },
+    {
+     "id": "rmvpojnf45",
+     "time": "2026-10-22T17:30:00.000Z",
+     "asc": "sha256:1d79311a0527070a94f5312c6f7454a8f67ad5e178cb6d7711eee989cd9dbace",
+     "summary": "C1 1µ→470n"
     }
    ]
   },
   {
-   "id": "vmvjpk87e9",
-   "name": "Inverter (project opamp)",
-   "base": "sha256:b07e55100405e1f0fdb6c8aba95372aee000e563d72bcff9380a39e12d7d81c5",
-   "activeSim": "smvjpk87ed",
-   "sims": [
+   "id": "smvpojnf46",
+   "name": "Bode",
+   "group": "g_vmvpojnf32",
+   "current": "sha256:83561a397f83c99df4476f96b55cd1e7faf544dd37e2031f5c857838a5ddd62d",
+   "runs": [
     {
-     "id": "smvjpk87e8",
-     "name": "Saturates at ±5 V",
-     "current": "sha256:2dc036eac83f7ec6ebd5be9575adc9bcfc64d9247491fcfc5466057e5051e017",
-     "runs": [
-      {
-       "id": "rmvjpk87ea",
-       "time": "2026-10-22T19:00:00.000Z",
-       "asc": "sha256:5ed8fccd913bdbcd1773f06872e1d7fdfb9973f7abf326519de53a011e1431a7"
-      },
-      {
-       "id": "rmvjpk87eb",
-       "time": "2026-10-22T19:10:00.000Z",
-       "asc": "sha256:b07e55100405e1f0fdb6c8aba95372aee000e563d72bcff9380a39e12d7d81c5",
-       "summary": "R2 4k7→10k"
-      },
-      {
-       "id": "rmvjpk87ec",
-       "time": "2026-10-22T19:20:00.000Z",
-       "asc": "sha256:2dc036eac83f7ec6ebd5be9575adc9bcfc64d9247491fcfc5466057e5051e017",
-       "summary": "R2 10k→22k"
-      }
-     ]
-    },
-    {
-     "id": "smvjpk87ed",
-     "name": "Bandwidth",
-     "current": "sha256:1f5a315f9f7765d05fa27465e3c9229cd99aa3a40916bb5c0dd2523b3a6f69aa",
-     "runs": []
+     "id": "rmvpojnf47",
+     "time": "2026-10-22T18:00:00.000Z",
+     "asc": "sha256:83561a397f83c99df4476f96b55cd1e7faf544dd37e2031f5c857838a5ddd62d"
     }
    ]
   },
   {
-   "id": "vmvjpk87ff",
-   "name": "RLC",
-   "base": "sha256:df94ce57e06aa8561289a674906419e7c3cfbd7a81ee1e922c7b76ada7b91ead",
-   "activeSim": "smvjpk87fe",
-   "sims": [
+   "id": "smvpojnf58",
+   "name": "Saturates at ±5 V",
+   "group": "g_vmvpojnf59",
+   "current": "sha256:2dc036eac83f7ec6ebd5be9575adc9bcfc64d9247491fcfc5466057e5051e017",
+   "runs": [
     {
-     "id": "smvjpk87fe",
-     "current": "sha256:df94ce57e06aa8561289a674906419e7c3cfbd7a81ee1e922c7b76ada7b91ead",
-     "runs": []
+     "id": "rmvpojnf5a",
+     "time": "2026-10-22T19:00:00.000Z",
+     "asc": "sha256:5ed8fccd913bdbcd1773f06872e1d7fdfb9973f7abf326519de53a011e1431a7"
     },
     {
-     "id": "smvjpk87fg",
-     "name": "Step response",
-     "current": "sha256:7ab3ee251d0f0a39187a31af37b513e40383981426f80da970a87c9a0f06fd06",
-     "runs": [
-      {
-       "id": "rmvjpk87fh",
-       "time": "2026-10-22T20:00:00.000Z",
-       "asc": "sha256:7ab3ee251d0f0a39187a31af37b513e40383981426f80da970a87c9a0f06fd06"
-      },
-      {
-       "id": "rmvjpk87fi",
-       "time": "2026-10-22T20:10:00.000Z",
-       "asc": "sha256:65dd888b2c0d6dd56e9571bbd7fe3ce13a6d4144581fb8c0cbf358794cff35c0",
-       "summary": "−R1"
-      },
-      {
-       "id": "rmvjpk87fj",
-       "time": "2026-10-22T20:20:00.000Z",
-       "asc": "sha256:7ab3ee251d0f0a39187a31af37b513e40383981426f80da970a87c9a0f06fd06",
-       "summary": "+R1"
-      }
-     ]
+     "id": "rmvpojnf5b",
+     "time": "2026-10-22T19:10:00.000Z",
+     "asc": "sha256:b07e55100405e1f0fdb6c8aba95372aee000e563d72bcff9380a39e12d7d81c5",
+     "summary": "R2 4k7→10k"
+    },
+    {
+     "id": "rmvpojnf5c",
+     "time": "2026-10-22T19:20:00.000Z",
+     "asc": "sha256:2dc036eac83f7ec6ebd5be9575adc9bcfc64d9247491fcfc5466057e5051e017",
+     "summary": "R2 10k→22k"
     }
    ]
+  },
+  {
+   "id": "smvpojnf5d",
+   "name": "Bandwidth",
+   "group": "g_vmvpojnf59",
+   "current": "sha256:1f5a315f9f7765d05fa27465e3c9229cd99aa3a40916bb5c0dd2523b3a6f69aa",
+   "runs": []
+  },
+  {
+   "id": "smvpojnf5e",
+   "group": "g_vmvpojnf5f",
+   "current": "sha256:df94ce57e06aa8561289a674906419e7c3cfbd7a81ee1e922c7b76ada7b91ead",
+   "runs": []
+  },
+  {
+   "id": "smvpojnf5g",
+   "name": "Step response",
+   "group": "g_vmvpojnf5f",
+   "current": "sha256:3c3664e9b693b5b03f71cdbe82f226dcda5b6ebf2b659929ee6911d63a5e0f0c",
+   "runs": [
+    {
+     "id": "rmvpojnf5h",
+     "time": "2026-10-22T20:00:00.000Z",
+     "asc": "sha256:3c3664e9b693b5b03f71cdbe82f226dcda5b6ebf2b659929ee6911d63a5e0f0c"
+    },
+    {
+     "id": "rmvpojnf6i",
+     "time": "2026-10-22T20:10:00.000Z",
+     "asc": "sha256:74bb4f6ca616544b1b6efbf5c79369d46938c0b6cc85526bae310e34a5266d68",
+     "summary": "−R1"
+    },
+    {
+     "id": "rmvpojnf6j",
+     "time": "2026-10-22T20:20:00.000Z",
+     "asc": "sha256:3c3664e9b693b5b03f71cdbe82f226dcda5b6ebf2b659929ee6911d63a5e0f0c",
+     "summary": "+R1"
+    }
+   ]
+  },
+  {
+   "id": "smvpojnf6k",
+   "name": "Amplifier",
+   "group": "g_vmvpojnf6l",
+   "current": "sha256:aa12debd4301b3e2e5d88fb08f667a64abd49172b0bb3970b88fb03eccda98a5",
+   "runs": []
+  },
+  {
+   "id": "smvpojnf6m",
+   "name": "Bias point",
+   "group": "g_vmvpojnf6l",
+   "current": "sha256:ad91071eb474450420231731dd97e02b98f0de532a19077a562fb0aeae6809a7",
+   "runs": []
   }
  ],
  "blobs": {
   "sha256:a5fb4dd855dec76fb0293b6a354965972d5012d9448acc7f3eeeb59c4e328039": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 80 -32\r\nWIRE 160 -32 240 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 0 96 0 112\r\nWIRE 240 -32 240 16\r\nWIRE 240 112 240 80\r\nFLAG 304 -32 out\r\nFLAG 0 112 0\r\nFLAG 240 112 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 5m 10m)\r\nSYMATTR Prefix V\r\nSYMBOL res 64 -48 M90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL cap 224 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 48 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -208 176 Left 2 !.tran 20m\r\nTEXT -208 208 Left 2 ;RC low-pass filter: τ = RC = 1 ms\r\n",
   "sha256:dac047236c8332af11c1a74f9ae770d2af793679e759024818aaeb1af032eaf2": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 80 -32\r\nWIRE 160 -32 240 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 0 96 0 112\r\nWIRE 240 -32 240 16\r\nWIRE 240 112 240 80\r\nFLAG 304 -32 out\r\nFLAG 0 112 0\r\nFLAG 240 112 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 5m 10m)\r\nSYMATTR Prefix V\r\nSYMBOL res 64 -48 M90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 2k2\r\nSYMATTR Prefix R\r\nSYMBOL cap 224 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 48 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -208 176 Left 2 !.tran 20m\r\nTEXT -208 208 Left 2 ;RC low-pass filter: τ = RC = 1 ms\r\n",
   "sha256:1d79311a0527070a94f5312c6f7454a8f67ad5e178cb6d7711eee989cd9dbace": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 80 -32\r\nWIRE 160 -32 240 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 0 96 0 112\r\nWIRE 240 -32 240 16\r\nWIRE 240 112 240 80\r\nFLAG 304 -32 out\r\nFLAG 0 112 0\r\nFLAG 240 112 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 5m 10m)\r\nSYMATTR Prefix V\r\nSYMBOL res 64 -48 M90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 2k2\r\nSYMATTR Prefix R\r\nSYMBOL cap 224 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 48 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 470n\r\nSYMATTR Prefix C\r\nTEXT -208 176 Left 2 !.tran 20m\r\nTEXT -208 208 Left 2 ;RC low-pass filter: τ = RC = 1 ms\r\n",
-  "sha256:06f2034c21a091026decf2424a514b2ae04d7cfc88e82270569eb4ab37fe8f97": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 80 -32\r\nWIRE 160 -32 240 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 0 96 0 112\r\nWIRE 240 -32 240 16\r\nWIRE 240 112 240 80\r\nFLAG 304 -32 out\r\nFLAG 0 112 0\r\nFLAG 240 112 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 5m 10m)\r\nSYMATTR Prefix V\r\nSYMBOL res 64 -48 M90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 2k2\r\nSYMATTR Prefix R\r\nSYMBOL cap 224 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 48 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 470n\r\nSYMATTR Prefix C\r\nTEXT -208 176 Left 2 !.ac dec 50 10 100k\r\nTEXT -208 208 Left 2 ;RC low-pass filter: τ = RC = 1 ms\r\n",
+  "sha256:83561a397f83c99df4476f96b55cd1e7faf544dd37e2031f5c857838a5ddd62d": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 80 -32\r\nWIRE 160 -32 240 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 0 96 0 112\r\nWIRE 240 -32 240 16\r\nWIRE 240 112 240 80\r\nFLAG 304 -32 out\r\nFLAG 0 112 0\r\nFLAG 240 112 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 5m 10m) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 64 -48 M90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 2k2\r\nSYMATTR Prefix R\r\nSYMBOL cap 224 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 48 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 470n\r\nSYMATTR Prefix C\r\nTEXT -208 176 Left 2 !.ac dec 50 10 100k\r\nTEXT -208 208 Left 2 ;RC low-pass filter: τ = RC = 1 ms\r\n",
   "sha256:5ed8fccd913bdbcd1773f06872e1d7fdfb9973f7abf326519de53a011e1431a7": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 4k7\r\nSYMATTR Prefix R\r\nSYMBOL OA_Sample 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg Vsat=5\r\nSYMATTR Value2 GBWP=10Meg\r\nTEXT 0 224 Left 2 !.tran 3m\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n",
   "sha256:b07e55100405e1f0fdb6c8aba95372aee000e563d72bcff9380a39e12d7d81c5": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL OA_Sample 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg Vsat=5\r\nSYMATTR Value2 GBWP=10Meg\r\nTEXT 0 224 Left 2 !.tran 3m\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n",
   "sha256:2dc036eac83f7ec6ebd5be9575adc9bcfc64d9247491fcfc5466057e5051e017": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 22k\r\nSYMATTR Prefix R\r\nSYMBOL OA_Sample 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg Vsat=5\r\nSYMATTR Value2 GBWP=10Meg\r\nTEXT 0 224 Left 2 !.tran 3m\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n",
   "sha256:1f5a315f9f7765d05fa27465e3c9229cd99aa3a40916bb5c0dd2523b3a6f69aa": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL OA_Sample 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg Vsat=5\r\nSYMATTR Value2 GBWP=10Meg\r\nTEXT 0 224 Left 2 !.ac dec 20 10 10meg\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n",
   "sha256:df94ce57e06aa8561289a674906419e7c3cfbd7a81ee1e922c7b76ada7b91ead": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 304 -32 352 -32\r\nWIRE 0 96 0 128\r\nWIRE 304 -32 304 16\r\nWIRE 304 128 304 80\r\nFLAG 352 -32 out\r\nFLAG 0 128 0\r\nFLAG 304 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 10\r\nSYMATTR Prefix R\r\nSYMBOL ind 144 -16 R270\r\nWINDOW 0 32 56 VTop 2\r\nWINDOW 3 5 56 VBottom 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 1m\r\nSYMATTR Prefix L\r\nSYMBOL cap 288 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -304 160 Left 2 !.ac dec 100 100 100k\r\nTEXT -304 192 Left 2 ;2nd-order RLC low-pass (f0 ≈ 5 kHz)\r\n",
-  "sha256:7ab3ee251d0f0a39187a31af37b513e40383981426f80da970a87c9a0f06fd06": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 304 -32 352 -32\r\nWIRE 0 96 0 128\r\nWIRE 304 -32 304 16\r\nWIRE 304 128 304 80\r\nFLAG 352 -32 out\r\nFLAG 0 128 0\r\nFLAG 304 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 10\r\nSYMATTR Prefix R\r\nSYMBOL ind 144 -16 R270\r\nWINDOW 0 32 56 VTop 2\r\nWINDOW 3 5 56 VBottom 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 1m\r\nSYMATTR Prefix L\r\nSYMBOL cap 288 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -304 160 Left 2 !.tran 5m\r\nTEXT -304 192 Left 2 ;2nd-order RLC low-pass (f0 ≈ 5 kHz)\r\n",
-  "sha256:65dd888b2c0d6dd56e9571bbd7fe3ce13a6d4144581fb8c0cbf358794cff35c0": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 304 -32 352 -32\r\nWIRE 0 96 0 128\r\nWIRE 304 -32 304 16\r\nWIRE 304 128 304 80\r\nFLAG 352 -32 out\r\nFLAG 0 128 0\r\nFLAG 304 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMATTR Prefix V\r\nSYMBOL ind 144 -16 R270\r\nWINDOW 0 32 56 VTop 2\r\nWINDOW 3 5 56 VBottom 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 1m\r\nSYMATTR Prefix L\r\nSYMBOL cap 288 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -304 160 Left 2 !.tran 5m\r\nTEXT -304 192 Left 2 ;2nd-order RLC low-pass (f0 ≈ 5 kHz)\r\n"
+  "sha256:3c3664e9b693b5b03f71cdbe82f226dcda5b6ebf2b659929ee6911d63a5e0f0c": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 304 -32 352 -32\r\nWIRE 0 96 0 128\r\nWIRE 304 -32 304 16\r\nWIRE 304 128 304 80\r\nFLAG 352 -32 out\r\nFLAG 0 128 0\r\nFLAG 304 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 1m 2m)\r\nSYMATTR Prefix V\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 10\r\nSYMATTR Prefix R\r\nSYMBOL ind 144 -16 R270\r\nWINDOW 0 32 56 VTop 2\r\nWINDOW 3 5 56 VBottom 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 1m\r\nSYMATTR Prefix L\r\nSYMBOL cap 288 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -304 160 Left 2 !.tran 2m\r\nTEXT -304 192 Left 2 ;2nd-order RLC low-pass (f0 ≈ 5 kHz)\r\n",
+  "sha256:74bb4f6ca616544b1b6efbf5c79369d46938c0b6cc85526bae310e34a5266d68": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 304 -32\r\nWIRE 304 -32 352 -32\r\nWIRE 0 96 0 128\r\nWIRE 304 -32 304 16\r\nWIRE 304 128 304 80\r\nFLAG 352 -32 out\r\nFLAG 0 128 0\r\nFLAG 304 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1u 1u 1m 2m)\r\nSYMATTR Prefix V\r\nSYMBOL ind 144 -16 R270\r\nWINDOW 0 32 56 VTop 2\r\nWINDOW 3 5 56 VBottom 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 1m\r\nSYMATTR Prefix L\r\nSYMBOL cap 288 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 1µ\r\nSYMATTR Prefix C\r\nTEXT -304 160 Left 2 !.tran 2m\r\nTEXT -304 192 Left 2 ;2nd-order RLC low-pass (f0 ≈ 5 kHz)\r\n",
+  "sha256:aa12debd4301b3e2e5d88fb08f667a64abd49172b0bb3970b88fb03eccda98a5": "Version 4\r\nSHEET 1 880 680\r\nWIRE 256 96 256 128\r\nWIRE 256 160 256 128\r\nWIRE 256 128 384 128\r\nWIRE 256 256 256 272\r\nWIRE 128 96 128 208\r\nWIRE 128 208 192 208\r\nWIRE 128 208 128 272\r\nWIRE 64 208 128 208\r\nWIRE -80 208 -80 240\r\nWIRE -80 208 0 208\r\nWIRE 128 -32 128 16\r\nWIRE 128 352 128 400\r\nWIRE 256 352 256 400\r\nWIRE -80 320 -80 400\r\nWIRE 256 16 256 -32\r\nWIRE -304 160 -304 96\r\nWIRE -304 224 -304 288\r\nFLAG 256 -32 vcc\r\nFLAG 384 128 out\r\nFLAG 256 400 0\r\nFLAG 128 -32 vcc\r\nFLAG 128 400 0\r\nFLAG -80 208 in\r\nFLAG -80 400 0\r\nFLAG -304 96 vcc\r\nFLAG -304 288 0\r\nSYMBOL npn 192 160 R0\r\nWINDOW 0 56 32 Left 2\r\nWINDOW 3 56 68 Left 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value QBC548\r\nSYMATTR Prefix QN\r\nSYMBOL res 240 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RC\r\nSYMATTR Value 4.7k\r\nSYMATTR Prefix R\r\nSYMBOL res 240 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RE\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 47k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL cap 64 192 R90\r\nWINDOW 0 -8 32 VBottom 2\r\nWINDOW 3 48 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 10u\r\nSYMATTR Prefix C\r\nSYMBOL voltage -80 224 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vin\r\nSYMATTR Value SINE(0 10m 1k)\r\nSYMATTR Prefix V\r\nSYMBOL TCLib/v_cell -304 160 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName V2\r\nSYMATTR Value 12\r\nSYMATTR Prefix V\r\nTEXT -128 552 Left 2 !.tran 5m\r\nTEXT -128 584 Left 2 !.model QBC548 NPN(IS=1.8e-14 BF=290 VAF=63 BR=7.6 RB=10 RC=1 CJE=11.5p CJC=5.25p TF=410p)\r\nTEXT -128 624 Left 2 ;Common-emitter amplifier: hover over Q1 to see its operating point\r\n",
+  "sha256:ad91071eb474450420231731dd97e02b98f0de532a19077a562fb0aeae6809a7": "Version 4\r\nSHEET 1 880 680\r\nWIRE 256 96 256 128\r\nWIRE 256 160 256 128\r\nWIRE 256 128 384 128\r\nWIRE 256 256 256 272\r\nWIRE 128 96 128 208\r\nWIRE 128 208 192 208\r\nWIRE 128 208 128 272\r\nWIRE 64 208 128 208\r\nWIRE -80 208 -80 240\r\nWIRE -80 208 0 208\r\nWIRE 128 -32 128 16\r\nWIRE 128 352 128 400\r\nWIRE 256 352 256 400\r\nWIRE -80 320 -80 400\r\nWIRE 256 16 256 -32\r\nWIRE -304 160 -304 96\r\nWIRE -304 224 -304 288\r\nFLAG 256 -32 vcc\r\nFLAG 384 128 out\r\nFLAG 256 400 0\r\nFLAG 128 -32 vcc\r\nFLAG 128 400 0\r\nFLAG -80 208 in\r\nFLAG -80 400 0\r\nFLAG -304 96 vcc\r\nFLAG -304 288 0\r\nSYMBOL npn 192 160 R0\r\nWINDOW 0 56 32 Left 2\r\nWINDOW 3 56 68 Left 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value QBC548\r\nSYMATTR Prefix QN\r\nSYMBOL res 240 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RC\r\nSYMATTR Value 4.7k\r\nSYMATTR Prefix R\r\nSYMBOL res 240 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RE\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 47k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL cap 64 192 R90\r\nWINDOW 0 -8 32 VBottom 2\r\nWINDOW 3 48 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 10u\r\nSYMATTR Prefix C\r\nSYMBOL voltage -80 224 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vin\r\nSYMATTR Value SINE(0 10m 1k)\r\nSYMATTR Prefix V\r\nSYMBOL TCLib/v_cell -304 160 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName V2\r\nSYMATTR Value 12\r\nSYMATTR Prefix V\r\nTEXT -128 552 Left 2 !.op\r\nTEXT -128 584 Left 2 !.model QBC548 NPN(IS=1.8e-14 BF=290 VAF=63 BR=7.6 RB=10 RC=1 CJE=11.5p CJC=5.25p TF=410p)\r\nTEXT -128 624 Left 2 ;Common-emitter amplifier: hover over Q1 to see its operating point\r\n"
  }
 }

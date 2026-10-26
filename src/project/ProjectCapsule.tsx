@@ -40,6 +40,10 @@ export function ProjectCapsule({ project, bench, dirty, open, onToggle, onRename
         <span className="capsule-variant">{bench}</span>
         {dirty && <span className="capsule-dirty" title={t('There are unsaved changes')}>•</span>}
       </span>
+      {/* sólo indica que se abre (abajo) o se cierra (arriba) */}
+      <svg className={`capsule-arrow${open ? ' up' : ''}`} viewBox="0 0 20 5" width="20" height="5" aria-hidden="true">
+        <path d="M1 0.75l9 3.5 9-3.5" />
+      </svg>
     </button>
   );
 }

@@ -118,7 +118,9 @@ const v1 = variantFromAsc(rc, 'RC low-pass');
 p = { ...p, variants: [v1], activeVariant: v1.id };
 p = runs(p, [rc, setVal(rc, 'R1', '2k2'), setVal(setVal(rc, 'R1', '2k2'), 'C1', '470n'), setVal(setVal(rc, 'R1', '2k2'), 'C1', '470n')], t0);
 p = { ...p, variants: p.variants.map((v) => ({ ...v, sims: v.sims.map((s) => ({ ...s, asc: serializeAsc(setVal(setVal(rc, 'R1', '2k2'), 'C1', '470n')) })) })) };
-p = addSim(p, serializeAsc(setAnalysisLine(setVal(setVal(rc, 'R1', '2k2'), 'C1', '470n'), '.ac dec 50 10 100k')), 'Bode')!.project;
+// (el Bode necesita excitación AC: la fuente sigue con su pulso y suma AC 1)
+const rcAc = setVal(setVal(setVal(rc, 'R1', '2k2'), 'C1', '470n'), 'V1', 'PULSE(0 1 0 1u 1u 5m 10m) AC 1');
+p = addSim(p, serializeAsc(setAnalysisLine(rcAc, '.ac dec 50 10 100k')), 'Bode')!.project;
 p = runs(p, [parseAsc(variantOf(p).sims[1].asc)], t0 + 3600e3);
 // se abre en el transitorio (la primera simulación)
 p = selectSim(p, variantOf(p).sims[0].id);
@@ -150,10 +152,20 @@ const rlc = example('RLC Bode.asc');
 const v3 = variantFromAsc(rlc, 'RLC');
 p = { ...p, variants: [...p.variants, v3], activeVariant: v3.id };
 const sim3 = variantOf(p).activeSim;
-p = addSim(p, serializeAsc(setAnalysisLine(rlc, '.tran 5m')), 'Step response')!.project;
+// la respuesta al escalón con un pulso (la fuente del Bode es sólo AC 1: en el transitorio no excita)
+const step = setAnalysisLine(hideWaveValues(setVal(rlc, 'V1', 'PULSE(0 1 0 1u 1u 1m 2m)')), '.tran 2m');
+p = addSim(p, serializeAsc(step), 'Step response')!.project;
 const firstR = rlc.symbols.find((s) => /^R/i.test(s.attrs.get('InstName') ?? ''))?.attrs.get('InstName') ?? 'R1';
-p = runs(p, [setAnalysisLine(rlc, '.tran 5m'), setAnalysisLine(without(rlc, firstR), '.tran 5m'), setAnalysisLine(rlc, '.tran 5m')], t0 + 10800e3);
+p = runs(p, [step, without(step, firstR), step], t0 + 10800e3);
 p = selectSim(p, sim3);
+
+// 4. Emisor común: el transitorio que amplifica y el punto de operación
+const ce = example('Common Emitter.asc');
+const v4 = variantFromAsc(ce, 'Common emitter');
+p = { ...p, variants: [...p.variants, v4], activeVariant: v4.id };
+p = renameSim(p, variantOf(p).activeSim, 'Amplifier');
+p = addSim(p, serializeAsc(setAnalysisLine(ce, '.op')), 'Bias point')!.project;
+p = selectSim(p, variantOf(p).sims[0].id);
 
 p = { ...p, activeVariant: p.variants[0].id, files: [{ name: 'OA_Sample.asy', kind: 'symbol', text: OA_ASY }, { name: 'OA_Sample.sub', kind: 'model', text: OA_SUB }] };
 const sample = await serializeTurbo({ ...p, created: t0, modified: t0 + 10800e3 });

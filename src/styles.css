@@ -141,6 +141,8 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .appbar { position: relative; display: flex; align-items: center; gap: 16px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
 .appbar h1 { font-size: 16px; margin: 0; display: flex; align-items: center; gap: 8px; }
 .logo { color: var(--accent); flex: none; }
+/* el sitio de prueba (/dev/) se distingue por el logo blanco */
+.logo.logo-dev { color: #fff; }
 .tabs { display: flex; gap: 2px; }
 .tabs button { border: 0; background: transparent; border-radius: 6px; padding: 4px 10px; color: var(--fg-muted); }
 .tabs button.active { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); }

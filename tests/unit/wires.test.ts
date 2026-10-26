@@ -7,6 +7,7 @@ import { decode } from '../../src/asc/encoding.ts';
 import type { AscDoc, Wire } from '../../src/asc/model.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { Library } from '../../src/library/library.ts';
+import { connectivity } from '../../src/netlist/connectivity.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import {
   addWire,
@@ -21,6 +22,7 @@ import {
   moveVertexStraight,
   pasteItems,
   placeSymbol,
+  previewSelection,
   removeVertex,
   sameConnections,
   setSymbolType,
@@ -482,5 +484,27 @@ describe('puntos de unión', () => {
     expect(junctionPoints(asc('WIRE 0 0 64 0\nWIRE 64 0 128 0\nWIRE 64 0 64 64\n'), lib)).toEqual([{ x: 64, y: 0 }]);
     expect(junctionPoints(asc('WIRE 0 0 128 0\nWIRE 64 0 64 64\n'), lib)).toEqual([{ x: 64, y: 0 }]);
     expect(junctionPoints(asc('WIRE 0 0 128 0\nWIRE 64 -64 64 64\n'), lib)).toEqual([]);
+  });
+});
+
+describe('selección del fantasma al mover cables (#315)', () => {
+  it('los cables cambian de índice al limpiar: la selección sigue al cable movido y la conectividad es la del fantasma', () => {
+    // el cable 2 se mueve encima del 0 y se fusionan: el 3 pasa a ser el 2
+    const d = asc('WIRE 0 0 64 0\nWIRE 200 200 264 200\nWIRE 0 100 64 100\nWIRE 300 0 364 0\nFLAG 0 0 a\nFLAG 300 0 b\n');
+    const sel = [{ kind: 'wire' as const, index: 2 }];
+    const moved: Wire[] = [];
+    const p = moveItems(d, sel, 0, -100, true, lib, moved);
+    expect(p.wires.length).toBe(3);
+    // con `moved`: el cable que se movió (ahora fusionado con el 0)
+    const r = previewSelection(sel, d, p, moved);
+    expect(r).toEqual([{ kind: 'wire', index: 0 }]);
+    // sin `moved`: lo que ya no está se descarta en vez de caer en otro cable
+    expect(previewSelection(sel, d, p)).toEqual([]);
+    // el índice viejo apuntaría a otro cable del fantasma
+    expect(ws(p)[2]).toEqual([300, 0, 364, 0]);
+    // la conectividad se calcula sobre el fantasma: el cable del flag b es el 2
+    const c = connectivity(p, (t) => lib.symbol(t));
+    expect(c.nets.find((n) => n.name === 'b')?.wires).toEqual([2]);
+    expect(c.nets.find((n) => n.name === 'a')?.wires).toEqual([0]);
   });
 });

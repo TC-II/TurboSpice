@@ -516,6 +516,27 @@ export function wiresOn(doc: AscDoc, segs: Wire[]): number[] {
 }
 
 /**
+ * La selección de `doc` vista sobre `preview` (el fantasma de un movimiento o de un arrastre),
+ * donde los cables cambian de índice. Con `moved` (los tramos donde terminaron los cables
+ * seleccionados, de moveItems) se buscan ahí; si no, cada cable seleccionado se busca por
+ * identidad (los que no se tocaron conservan el objeto) y, si no está, se queda el mismo índice
+ * siempre que el fantasma tenga los mismos cables en el mismo orden de largo.
+ */
+export function previewSelection(selection: ItemRef[], doc: AscDoc, preview: AscDoc, moved?: Wire[]): ItemRef[] {
+  const others = selection.filter((r) => r.kind !== 'wire');
+  const wires = selection.filter((r) => r.kind === 'wire');
+  if (!wires.length) return selection;
+  let idx: number[];
+  if (moved) idx = wiresOn(preview, moved);
+  else if (preview.wires.length === doc.wires.length) idx = wires.map((r) => r.index);
+  else {
+    const at = new Map(preview.wires.map((w, i) => [w, i]));
+    idx = wires.flatMap((r) => at.get(doc.wires[r.index]) ?? []);
+  }
+  return [...others, ...idx.map((index) => ({ kind: 'wire' as const, index }))];
+}
+
+/**
  * ¿Las dos versiones tienen la misma conectividad? (los mismos pines y etiquetas en cada
  * red). Editar codos y tramos la usa para no crear ni romper uniones por accidente.
  */

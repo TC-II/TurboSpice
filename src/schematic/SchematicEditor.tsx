@@ -5,8 +5,8 @@ import { flushSync } from 'react-dom';
 import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Orient, type Point, type Shape, type DrawnShapeKind, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
-import type { Connectivity } from '../netlist/connectivity.ts';
-import { addFlag, addText, addWire, deleteItems, setText, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, splitWire, wiresOn } from './edit.ts';
+import { connectivity, type Connectivity } from '../netlist/connectivity.ts';
+import { addFlag, addText, addWire, deleteItems, setText, instLetter, nextInstName, dragSegment, dragSegmentStraight, moveItems, moveVertex, moveVertexStraight, placeSymbol, removeVertex, sameConnections, setWindows, previewSelection, splitWire, wiresOn } from './edit.ts';
 import { inverseOffset, toWorld } from '../asc/transform.ts';
 import { effectiveWindows } from '../asc/resolve.ts';
 import type { TextWindow } from '../asc/model.ts';
@@ -422,6 +422,15 @@ export function SchematicEditor(props: Props) {
   // para el Ctrl+R de la ventana con un rótulo agarrado (fuera del ciclo de render)
   const dragNow = useRef(drag);
   dragNow.current = drag;
+  // dónde terminaron los cables seleccionados en el fantasma de un movimiento (moveItems los
+  // reordena y fusiona): con el documento al que corresponden, para no usarlos con otro
+  const [previewMoved, setPreviewMoved] = useState<{ doc: AscDoc; wires: Wire[] } | null>(null);
+  const previewMove = (refs: ItemRef[], dx: number, dy: number, stretch: boolean) => {
+    const wires: Wire[] = [];
+    const next = moveItems(doc, refs, dx, dy, stretch, lib, wires);
+    setPreview(next);
+    setPreviewMoved({ doc: next, wires });
+  };
   const previewNow = useRef(preview);
   previewNow.current = preview;
   // fuera la traslación de mover todo en el mismo cuadro en que llega el documento movido
@@ -940,7 +949,7 @@ export function SchematicEditor(props: Props) {
   useEffect(() => {
     if (drag?.mode !== 'move') return;
     const g = snapPoint(cursorRef.current);
-    setPreview(moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib));
+    previewMove(drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach);
   }, [doc]);
 
   // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta
@@ -1026,7 +1035,7 @@ export function SchematicEditor(props: Props) {
     } else if (tip) setTip(null);
     if (tool.kind === 'move' && tool.refs && tool.start && !drag) {
       const g = snapPoint(p);
-      setPreview(moveItems(doc, tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, lib));
+      previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch);
     }
     if (!drag) return;
     if (drag.mode === 'pencil') {
@@ -1077,7 +1086,7 @@ export function SchematicEditor(props: Props) {
       const dy = g.y - drag.start.y;
       if ((dx || dy) && !drag.moved) setDrag({ ...drag, moved: true });
       if (drag.whole) shiftWhole(dx, dy);
-      else setPreview(moveItems(doc, drag.refs, dx, dy, !drag.detach, lib));
+      else previewMove(drag.refs, dx, dy, !drag.detach);
     } else if (drag.mode === 'vertex' || drag.mode === 'segment') {
       wirePreview(drag, snapPoint(p), e.ctrlKey || e.metaKey);
     } else {
@@ -1214,6 +1223,15 @@ export function SchematicEditor(props: Props) {
     if (hit) onEdit(hit);
   };
 
+  // Con un fantasma (mover, arrastrar un tramo…) los cables cambian de índice, pero conn, la
+  // selección, el hover y el diff son del documento: se recalcula la conectividad del fantasma y
+  // se reubica la selección, si no los estilos por índice (bus, naranja) caen en otros cables (#315)
+  const previewing = !!preview && preview.wires !== doc.wires;
+  const shownConn = useMemo(() => (previewing ? connectivity(preview!, (t) => lib.symbol(t)) : conn), [previewing, preview, conn, lib]);
+  const shownSelection = useMemo(
+    () => (previewing ? previewSelection(selection, doc, preview!, previewMoved?.doc === preview ? previewMoved.wires : undefined) : selection),
+    [previewing, selection, doc, preview, previewMoved],
+  );
   // el comentario que se edita en el lugar no se dibuja (lo reemplaza el cuadro de texto)
   const shown = inline?.index != null ? setText(preview ?? doc, inline.index, { text: '' }) : (preview ?? doc);
   const g = snapPoint(cursor);
@@ -1347,16 +1365,16 @@ export function SchematicEditor(props: Props) {
       <SchematicCanvas
         doc={shown}
         lib={lib}
-        conn={conn}
-        selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : selection}
+        conn={shownConn}
+        selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : shownSelection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverSym}
         hoverFlag={hoverFlag}
-        hoverWire={hoverWire}
+        hoverWire={previewing ? undefined : hoverWire}
         netColors={netColors}
         showLoose={showLoose}
         showSimCommand={showSimCommand}
-        diff={diff}
+        diff={previewing ? undefined : diff}
       />
       <g className="schematic placing">{ghost}</g>
       {drag?.mode === 'pencil' && (

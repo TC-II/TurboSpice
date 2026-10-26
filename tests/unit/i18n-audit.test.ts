@@ -50,7 +50,7 @@ const SPANISH_OK = [
   /^generation:/, // opciones de Icarus Verilog (-g…), no son de la interfaz
 ];
 // Textos de la interfaz que son iguales en los dos idiomas (siglas, unidades, sintaxis de SPICE)
-const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Ron', 'Roff', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);
+const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Ron', 'Roff', 'InstName', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);
 
 describe('idioma de la interfaz: sin mezclar inglés y español', () => {
   it('cada t("…") tiene su traducción en es.ts', () => {

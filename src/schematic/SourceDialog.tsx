@@ -244,22 +244,26 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
 
   // rótulos del nombre y del valor: si se ven en el esquemático (#71)
   const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
-  // en una fuente recién puesta (sin valor) el valor se ve por defecto sólo en DC (en las formas
-  // de onda el dibujito del símbolo ya dice qué es); una fuente ya editada muestra lo que hay
-  const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && blankSrc && !r.moved && !current;
-  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, valueAuto(r) ? kind === 'dc' : r.visible])));
+  // el valor se ve por defecto sólo en DC (en las formas de onda el dibujito del símbolo ya dice
+  // qué es): así arranca una fuente recién puesta y así queda al cambiar el tipo; una fuente ya
+  // editada que se abre sin cambiar el tipo muestra lo que hay
+  const [openKind] = useState(kind);
+  const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && !current;
+  const autoVisible = (r: (typeof shown)[number], k: SourceKind) => (valueAuto(r) && (blankSrc || k !== openKind) ? k === 'dc' : r.visible);
+  const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, autoVisible(r, kind)])));
   const valueTouched = useRef(false);
-  const firstKind = useRef<SourceKind | ''>(kind);
   useEffect(() => {
-    if (valueTouched.current || kind === firstKind.current) return;
-    firstKind.current = '';
+    if (valueTouched.current) return;
     setVisible((v) => {
       const out = new Map(v);
-      for (const r of shown) if (valueAuto(r)) out.set(r.win, kind === 'dc');
+      for (const r of shown) if (valueAuto(r)) out.set(r.win, autoVisible(r, kind));
       return out;
     });
   }, [kind]);
-  const labels = () => new Map(shown.filter((r) => visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
+  // con otro símbolo los rótulos vuelven a la posición por defecto del símbolo nuevo, así que
+  // se manda lo que se ve de todos (no sólo lo que cambió respecto del símbolo de antes)
+  const labels = (newType?: string) =>
+    new Map(shown.filter((r) => (newType && newType !== inst.type) || visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
   const showToggles = shown.length > 0 && (
     <span className="src-show" role="group" aria-label={t('Show on the schematic')}>
       {t('Show:')}
@@ -285,10 +289,10 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   const submit = () => {
     if (text !== null) {
       const p = parseSource({ Value: text });
-      if (p) return onApply(writeSource(p), labels(), symbolFor(p.kind));
+      if (p) return onApply(writeSource(p), labels(symbolFor(p.kind)), symbolFor(p.kind));
       return onApply({ Value: text.trim(), Value2: null, SpiceLine: null }, labels());
     }
-    onApply(writeSource(full), labels(), symbolFor(kind));
+    onApply(writeSource(full), labels(symbolFor(kind)), symbolFor(kind));
   };
 
   const name = eff.get('InstName') ?? baseName(inst.type);

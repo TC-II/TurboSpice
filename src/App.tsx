@@ -77,7 +77,7 @@ import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setWindows, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { parseSource } from './sim/sources.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import type { ItemRef } from './schematic/geometry.ts';
@@ -3812,7 +3812,8 @@ ${ltNetlistText(sim.built.lt)}
             const s = doc.symbols[dialog.index];
             const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => v !== (s.attrs.get(k) ?? null)));
             let d = Object.keys(changed).length ? setSymbolAttrs(doc, dialog.index, changed) : doc;
-            if (type && type !== s.type) d = setSymbolType(d, dialog.index, type, lib);
+            // con otro símbolo (DC ↔ forma de onda) los rótulos van a la posición por defecto del nuevo
+            if (type && type !== s.type) d = setWindows(setSymbolType(d, dialog.index, type, lib), [...s.windows.keys()].map((win) => ({ sym: dialog.index, win, w: null })));
             if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
             if (d !== doc) commit(d);
           }}

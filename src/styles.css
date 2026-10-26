@@ -283,6 +283,7 @@ svg.editor:not(:hover) .delete-cursor { display: none; }
 .wire-crosshair line { stroke: var(--sch-sym); stroke-opacity: 0.28; stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
 svg.editor:not(:hover) .wire-crosshair { display: none; }
 .selbox { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+.probe-drag { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; pointer-events: none; }
 
 /* centrado horizontal; la altura la fija Modal (se abre centrado y no salta si cambia de alto) */
 .modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 35%); display: grid; place-items: start center; z-index: 10; padding: 16px; }

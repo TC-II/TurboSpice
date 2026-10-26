@@ -88,9 +88,13 @@ export function shade(hex: string, k: number, n: number): string {
   return `#${out.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
-const isCurrentExpr = (e: string) => /^\s*I[bcdegsx]?\([^)]*\)\s*$/i.test(e) || deviceExprUnit(e) === 'A';
-/** Unidad de una traza simple: V(…), I(…) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
-const exprUnit = (e: string) => (/^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? ''));
+const I_TERM = String.raw`\s*I[bcdegsx]?\([^)]*\)\s*`;
+const V_TERM = String.raw`\s*V\([^)]*\)\s*`;
+// una corriente o la resta de dos (la punta de prueba arrastrada de un componente a otro, #308)
+const isCurrentExpr = (e: string) => new RegExp(`^${I_TERM}(-${I_TERM})?$`, 'i').test(e) || deviceExprUnit(e) === 'A';
+/** Unidad de una traza simple: V(…), I(…), V/I (Ω), I/V (S) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
+const exprUnit = (e: string) =>
+  new RegExp(`^${V_TERM}/${I_TERM}$`, 'i').test(e) ? 'Ω' : new RegExp(`^${I_TERM}/${V_TERM}$`, 'i').test(e) ? 'S' : /^\s*V\(/i.test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? '');
 
 
 /** La unidad común de las trazas, o "" si no la hay */

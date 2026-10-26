@@ -2262,6 +2262,37 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     editPanes(addTraceTo(panes, i, expr));
   };
 
+  /**
+   * Punta de prueba arrastrada de un punto a otro (#308): V−V o I−I es la resta; V/I (Ω) o I/V (S)
+   * el cociente, que va en otro panel (salvo que el activo esté vacío): no comparte eje con V ni A
+   */
+  const onProbePair = (from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }) => {
+    if (!sim || !plot || pathRef.current.length || dftPick.current) return onProbe(from);
+    const sc = scaleOf(plot);
+    if (!sc) return onProbe(from);
+    const isV = (x: typeof from) => x.net !== undefined;
+    const ea = probeExpr(sim.built, from);
+    const eb = probeExpr(sim.built, to);
+    // contra tierra, la resta es la propia tensión
+    if (isV(from) && isV(to) && (from.net === '0' || to.net === '0')) return onProbe(from.net === '0' ? to : from);
+    if (!ea || !eb) return;
+    const ratio = isV(from) !== isV(to);
+    const expr = ratio ? `${ea}/${eb}` : `${ea}-${eb}`;
+    try {
+      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+    } catch {
+      return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
+    }
+    setPanel('plot');
+    if (expanded === 'schematic') setExpanded('');
+    const i = Math.min(activePane, panes.length - 1);
+    if (!ratio || !panes[i] || !panes[i].traces.length) return editPanes(addTraceTo(panes, i, expr));
+    const own = panes.findIndex((p) => p.traces.length > 0 && p.traces.every((tt) => !tt.dft && /^\s*[VI]\w*\([^)]*\)\s*\/\s*[VI]\w*\([^)]*\)\s*$/i.test(tt.expr) && /^\s*V/i.test(tt.expr) === /^\s*V/i.test(expr)));
+    if (own >= 0) return editPanes(addTraceTo(panes, own, expr));
+    editPanes(addTraceTo([...panes, { traces: [] }], panes.length, expr));
+    setActivePane(panes.length);
+  };
+
   // Caja de trazas de la barra de resultados
   const traceBox = useRef<TraceBoxHandle>(null);
   const [viewerTools, setViewerTools] = useState<HTMLElement | null>(null);
@@ -3606,6 +3637,7 @@ ${ltNetlistText(sim.built.lt)}
             onEdit={editItem}
             onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
             onProbe={onProbe}
+            onProbePair={onProbePair}
             onDropSubckt={(name) => {
               const m = modelModuleFile(projectRef.current, name);
               if (m) return viewRun ? null : modelModuleName(m);

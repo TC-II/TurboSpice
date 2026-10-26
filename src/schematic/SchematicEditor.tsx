@@ -123,6 +123,8 @@ interface Props {
   /** editar un rótulo (InstName, Value…) de un símbolo: botón derecho o doble click sobre el texto */
   onEditLabel?(sym: number, win: number): void;
   onProbe?(ref: { net?: string; symbol?: number; pin?: number }): void;
+  /** punta de prueba arrastrada de un punto a otro (#308): la resta o el cociente de los dos */
+  onProbePair?(from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }): void;
   highlightNet?: string;
   /** color de los cables de cada red (nombre en minúsculas) con una traza en el gráfico */
   netColors?: Map<string, string>;
@@ -176,6 +178,8 @@ type Drag =
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
   | { mode: 'zoom'; start: Point }
+  /** punta de prueba apretada sobre `from`: al soltar en otro lugar, la resta o el cociente (#308) */
+  | { mode: 'probe'; start: Point; from: { net?: string; symbol?: number; pin?: number } }
   /** trazo del lápiz en curso */
   | { mode: 'pencil'; pts: Point[] }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
@@ -314,7 +318,7 @@ export function tipStyle(tip: { x: number; y: number; w: number; h: number }): {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, selectedAnnotation, onSelectAnnotation, onMoveAnnotation, currentArrows, pickValue, onPicked } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, onProbePair, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, selectedAnnotation, onSelectAnnotation, onMoveAnnotation, currentArrows, pickValue, onPicked } = props;
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -866,8 +870,12 @@ export function SchematicEditor(props: Props) {
         setBoxEnd(p);
         return;
       case 'probe': {
+        // se mide al soltar: en el mismo lugar es una traza; en otro, la resta o el cociente
         const target = probeTarget(p, true);
-        if (target) onProbe?.(target);
+        if (target) {
+          setDrag({ mode: 'probe', start: p, from: target });
+          setBoxEnd(p);
+        }
         return;
       }
       case 'pick': {
@@ -978,7 +986,7 @@ export function SchematicEditor(props: Props) {
     }
     // la punta de prueba mide la corriente por pin en los transistores; la información del punto
     // de operación (describe) sigue saliendo sobre el cuerpo
-    const probe = tool.kind === 'probe' && !drag ? probeTarget(p, true) : null;
+    const probe = tool.kind === 'probe' && (!drag || drag.mode === 'probe') ? probeTarget(p, true) : null;
     const target = describe && !drag ? probeTarget(p) : null;
     if (tool.kind === 'probe') {
       setHoverNet(probe?.net);
@@ -1136,6 +1144,12 @@ export function SchematicEditor(props: Props) {
         setSelection(found);
         if (found.length) setTool({ ...tool, refs: found, start: snapPoint(boxEnd) });
       } else if (!drag.erase) setSelection(drag.additive ? [...selection, ...found] : found);
+    }
+    if (drag.mode === 'probe') {
+      const to = boxEnd && probeTarget(boxEnd, true);
+      const same = (a: typeof to, b: typeof to) => !!a && !!b && a.net === b.net && a.symbol === b.symbol && a.pin === b.pin;
+      if (to && !same(to, drag.from) && onProbePair) onProbePair(drag.from, to);
+      else onProbe?.(drag.from);
     }
     if (drag.mode === 'zoom' && boxEnd) {
       const b = { x1: Math.min(drag.start.x, boxEnd.x), y1: Math.min(drag.start.y, boxEnd.y), x2: Math.max(drag.start.x, boxEnd.x), y2: Math.max(drag.start.y, boxEnd.y) };
@@ -1362,6 +1376,9 @@ export function SchematicEditor(props: Props) {
       {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} paired={paired} scale={view.scale} selected={selectedAnnotation} onSelect={tool.kind === 'select' || tool.kind === 'probe' ? onSelectAnnotation : undefined} onMove={tool.kind === 'select' || tool.kind === 'probe' ? onMoveAnnotation : undefined} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} paired={paired} avoid={annotations} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
+      )}
+      {drag?.mode === 'probe' && boxEnd && (Math.abs(boxEnd.x - drag.start.x) + Math.abs(boxEnd.y - drag.start.y)) * view.scale > 4 && (
+        <line className="probe-drag" x1={drag.start.x} y1={drag.start.y} x2={boxEnd.x} y2={boxEnd.y} />
       )}
       {(drag?.mode === 'box' || drag?.mode === 'zoom') && boxEnd && (
         <rect

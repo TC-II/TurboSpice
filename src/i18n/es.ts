@@ -1368,6 +1368,7 @@ export const es: Record<string, string> = {
   'Rename workbench': 'Renombrar workbench',
   'Show the project panel when the mouse approaches the edge (in select mode)': 'Mostrar el panel del proyecto al acercar el mouse al borde (en modo selección)',
   'Settings': 'Configuración',
+  'Settings…': 'Configuración…',
   'Simulation settings': 'Configuración de simulación',
   'Value of {name}': 'Valor de {name}',
   'Variables (swept with .step):': 'Variables (barridas con .step):',

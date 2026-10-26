@@ -689,6 +689,9 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .shortcuts th { text-align: left; font-weight: 400; padding: 4px 16px 4px 0; white-space: nowrap; }
 .shortcuts td { padding: 4px 0; color: var(--fg-muted); }
 .modal h3 { font-size: 13px; margin: 14px 0 4px; color: var(--fg-muted); font-weight: 600; }
+.settings { display: flex; flex-direction: column; gap: 12px; }
+.settings section { display: flex; flex-direction: column; gap: 6px; }
+.settings h4 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
 .runs-list { display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow: auto; }
 kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-alt); }
 .welcome p, .welcome li { font-size: 14px; line-height: 1.5; }

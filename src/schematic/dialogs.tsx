@@ -799,6 +799,37 @@ export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }
   );
 }
 
+/** Una opción de Configuración; por ahora sólo casillas (se agregan otros tipos acá) */
+export type SettingRow = { kind: 'checkbox'; label: string; hint?: string; checked: boolean; onChange(checked: boolean): void };
+/** Un grupo de opciones con su título */
+export interface SettingsSection {
+  title: string;
+  rows: SettingRow[];
+}
+
+/** Configuración (#305): las opciones por secciones; cada cambio se aplica en el momento */
+export function SettingsDialog({ sections, onClose }: { sections: SettingsSection[]; onClose(): void }) {
+  return (
+    <Modal title={t('Settings')} onClose={onClose}>
+      <div className="settings">
+        {sections.map((sec) => (
+          <section key={sec.title} aria-label={sec.title}>
+            <h4>{sec.title}</h4>
+            {sec.rows.map((r) => (
+              <label key={r.label} className="check" title={r.hint}>
+                <input type="checkbox" checked={r.checked} onChange={(e) => r.onChange(e.target.checked)} /> {r.label}
+              </label>
+            ))}
+          </section>
+        ))}
+      </div>
+      <div className="buttons">
+        <button className="primary" onClick={onClose} autoFocus>{t('Close')}</button>
+      </div>
+    </Modal>
+  );
+}
+
 /** Archivo › Importar en este proyecto: qué se puede traer y cómo armar el .zip, antes de elegir */
 export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onClose(): void }) {
   return (

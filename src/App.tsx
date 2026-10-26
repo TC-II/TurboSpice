@@ -16,7 +16,7 @@ import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.t
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, ImportInfoDialog, type UserFileInfo } from './schematic/dialogs.tsx';
+import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, ImportInfoDialog, SettingsDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
@@ -165,6 +165,7 @@ type Dialog =
   | { kind: 'study' }
   | { kind: 'runs' }
   | { kind: 'about' }
+  | { kind: 'settings' }
   | { kind: 'drive' }
   /** borrar una simulación (con el control deslizante) */
   | { kind: 'deleteSim'; id: string }
@@ -3054,12 +3055,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Dark theme'), onClick: () => setTheme('dark'), checked: theme === 'dark' },
       ],
     },
-    {
-      label: t('Settings'),
-      items: [
-        { label: t('Show the project panel when the mouse approaches the edge (in select mode)'), onClick: () => setHoverReveal(!hoverReveal), checked: hoverReveal },
-      ],
-    },
+    { label: t('Settings…'), onClick: () => setDialog({ kind: 'settings' }) },
     {
       label: t('Examples'),
       items: [
@@ -3997,6 +3993,17 @@ ${ltNetlistText(sim.built.lt)}
             setConflict(null);
             conflict.resolve(c);
           }}
+        />
+      )}
+      {dialog?.kind === 'settings' && (
+        <SettingsDialog
+          sections={[
+            {
+              title: t('Project panel'),
+              rows: [{ kind: 'checkbox', label: t('Show the project panel when the mouse approaches the edge (in select mode)'), checked: hoverReveal, onChange: setHoverReveal }],
+            },
+          ]}
+          onClose={() => setDialog(null)}
         />
       )}
       {dialog?.kind === 'about' && <AboutDialog repo={REPO} onClose={() => setDialog(null)} />}

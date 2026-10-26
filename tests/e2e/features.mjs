@@ -37,11 +37,20 @@ await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el p
 // --- #38: barra de herramientas y menú colapsado ---
 check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración▸,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración…,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
 await page.keyboard.press('ArrowRight');
 check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
 await page.keyboard.press('Escape');
 check((await page.getByRole('menu').count()) === 0, 'Esc cierra el menú');
+// Configuración (#305): una ventana con las opciones como casillas, que se aplican en el momento
+await menu(page, 'Configuración…');
+const hoverBox = page.locator('.modal').getByRole('checkbox', { name: /panel del proyecto/ });
+const hoverWas = await hoverBox.isChecked();
+await hoverBox.click();
+check((await hoverBox.isChecked()) !== hoverWas && (await page.evaluate(() => localStorage.getItem('turbospice.treeHover'))) === (hoverWas ? '0' : '1'), 'Configuración abre una ventana con la opción como casilla, que se guarda');
+await hoverBox.click();
+await page.locator('.modal').getByRole('button', { name: 'Cerrar', exact: true }).click();
+check((await page.locator('.modal').count()) === 0, 'y se cierra con Cerrar');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
   toolbarNames.slice(0, 18).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Mover' && toolbarNames.includes('Borrar'),

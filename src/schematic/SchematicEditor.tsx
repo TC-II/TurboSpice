@@ -134,6 +134,11 @@ interface Props {
   describe?(target: { net?: string; symbol?: number }): BiasInfo | null;
   /** valores anotados sobre el esquemático */
   annotations?: Annotation[];
+  /** etiqueta del OP elegida (#306): Delete la borra */
+  selectedAnnotation?: string;
+  onSelectAnnotation?(key: string | undefined): void;
+  /** se arrastró una etiqueta del OP (desplazamiento en unidades del esquemático) */
+  onMoveAnnotation?(key: string, dx: number, dy: number): void;
   /** flechitas con el sentido positivo de la corriente en los pines */
   currentArrows?: CurrentArrow[];
   /** herramienta pick: valor que se elegiría en ese lugar (nombre de red o de fuente) */
@@ -309,7 +314,7 @@ export function tipStyle(tip: { x: number; y: number; w: number; h: number }): {
 }
 
 export function SchematicEditor(props: Props) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, currentArrows, pickValue, onPicked } = props;
+  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, onEdit, onEditLabel, onProbe, highlightNet, netColors, handle, docKey, netNames, onNameNet, describe, annotations, selectedAnnotation, onSelectAnnotation, onMoveAnnotation, currentArrows, pickValue, onPicked } = props;
   const { showGrid = true, showLoose = true, showSimCommand = false, onHover, diff } = props;
   const lastHover = useRef('');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -667,6 +672,7 @@ export function SchematicEditor(props: Props) {
       finishInline(true);
       return;
     }
+    if (selectedAnnotation) onSelectAnnotation?.(undefined);
     svgRef.current!.setPointerCapture(e.pointerId);
     if (e.pointerType === 'touch') {
       touches.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1353,7 +1359,7 @@ export function SchematicEditor(props: Props) {
       })()}
       {inline && <InlineEditor it={inline} onChange={(value) => setInline({ ...inline, value })} onDone={finishInline} />}
       {currentArrows && currentArrows.length > 0 && <CurrentArrowsLayer items={currentArrows} />}
-      {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} paired={paired} scale={view.scale} />}
+      {annotations && annotations.length > 0 && <AnnotationLayer items={annotations} paired={paired} scale={view.scale} selected={selectedAnnotation} onSelect={tool.kind === 'select' || tool.kind === 'probe' ? onSelectAnnotation : undefined} onMove={tool.kind === 'select' || tool.kind === 'probe' ? onMoveAnnotation : undefined} />}
       {netNames && netNames.length > 0 && !drag && (
         <NetNamesLayer names={netNames} paired={paired} avoid={annotations} scale={view.scale} onHover={setLabelNet} onName={tool.kind === 'select' || tool.kind === 'probe' ? onNameNet : undefined} />
       )}

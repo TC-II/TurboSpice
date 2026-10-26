@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opPinKey, opPinShown, toggleOpPin } from '../../src/sim/opPins.ts';
+import { hideOpTag, moveOpTag, noOpTags, opPinKey, opPinShown, opTagVisible, toggleOpPin, toggleOpTag, unhideOpTags } from '../../src/sim/opPins.ts';
 
 describe('punta de prueba sobre el OP (#228)', () => {
   it('claves por red y por componente', () => {
@@ -21,5 +21,36 @@ describe('punta de prueba sobre el OP (#228)', () => {
   });
   it('sin filtro se muestran todas', () => {
     expect(opPinShown(undefined, { net: 'x' })).toBe(true);
+  });
+});
+
+describe('etiquetas del OP movibles y persistentes (#306)', () => {
+  it('con «Anotar el OP» se ven todas; sin, sólo las fijadas y las movidas', () => {
+    let t = toggleOpTag(noOpTags(), { net: 'out' });
+    expect(opTagVisible(t, 'n:out', false)).toBe(true);
+    expect(opTagVisible(t, 'n:in', false)).toBe(false);
+    expect(opTagVisible(t, 'n:in', true)).toBe(true);
+    t = moveOpTag(t, 's:2', 10, 0);
+    t = moveOpTag(t, 's:2', 5, -4);
+    expect(t.moved.get('s:2')).toEqual({ dx: 15, dy: -4 });
+    expect(opTagVisible(t, 's:2', false)).toBe(true);
+  });
+  it('Delete la oculta hasta volver a activar el OP', () => {
+    let t = moveOpTag(noOpTags(), 'n:a', 3, 3);
+    t = hideOpTag(t, 'n:a');
+    expect(opTagVisible(t, 'n:a', true)).toBe(false);
+    expect(t.moved.has('n:a')).toBe(false);
+    t = unhideOpTags(t);
+    expect(opTagVisible(t, 'n:a', true)).toBe(true);
+    expect(opTagVisible(t, 'n:a', false)).toBe(false);
+  });
+  it('la punta de prueba la vuelve a mostrar o la quita', () => {
+    let t = hideOpTag(noOpTags(), 'n:a');
+    t = toggleOpTag(t, { net: 'A' });
+    expect(opTagVisible(t, 'n:a', false)).toBe(true);
+    t = moveOpTag(t, 'n:a', 1, 1);
+    t = toggleOpTag(t, { net: 'a' });
+    expect(opTagVisible(t, 'n:a', false)).toBe(false);
+    expect(t.hidden.has('n:a')).toBe(false);
   });
 });

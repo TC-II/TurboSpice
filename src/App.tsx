@@ -105,7 +105,7 @@ import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameE
 import { sameExceptData } from './asc/dataText.ts';
 import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
-import { opPinShown, toggleOpPin } from './sim/opPins.ts';
+import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -1916,17 +1916,30 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     };
   }, [op]);
   // valores del OP fijados con la punta de prueba (#228); se borran con otro punto de operación
-  const [opPins, setOpPins] = useState<Set<string>>(() => new Set());
-  useEffect(() => setOpPins(new Set()), [op?.bias]);
+  // #306: siguen entre corridas, se pueden mover y borrar; se reinician al abrir otro circuito
+  const [opTags, setOpTags] = useState<OpTags>(noOpTags);
+  const [opSel, setOpSel] = useState<string>();
+  useEffect(() => (setOpTags(noOpTags()), setOpSel(undefined)), [docKey]);
+  useEffect(() => {
+    if (showOp) setOpTags(unhideOpTags);
+  }, [showOp]);
+  useEffect(() => {
+    if (selection.length) setOpSel(undefined);
+  }, [selection]);
   const annotations = useMemo((): Annotation[] | undefined => {
-    if (!op || (!showOp && !opPins.size)) return undefined;
-    const pins = showOp ? undefined : opPins;
+    if (!op || (!showOp && !opTags.pins.size && !opTags.moved.size)) return undefined;
     const { built, bias, scope } = op;
     const out: Annotation[] = [];
+    const shown = (target: OpPinTarget) => {
+      const key = opPinKey(target);
+      return opTagVisible(opTags, key, showOp) ? key : undefined;
+    };
+    const push = (a: Omit<Annotation, 'offset'>) => out.push({ ...a, offset: opTags.moved.get(a.key) });
     for (const n of netNames(doc, conn, new Map())) {
-      if (!opPinShown(pins, { net: n.name })) continue;
+      const key = shown({ net: n.name });
+      if (!key) continue;
       const b = scope ? scopedNetBias(bias, scope, n.name) : netBias(bias, n.name);
-      if (b?.short) out.push({ at: n.at, text: b.short, kind: 'v' });
+      if (b?.short) push({ key, at: n.at, text: b.short, kind: 'v' });
     }
     for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
       // transistores: la corriente de cada pin, junto al pin (como la punta de prueba en los demás análisis)
@@ -1936,21 +1949,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         if (!def) continue;
         pinPoints(s, def).forEach((at, k) => {
           const pin = Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1);
-          if (!opPinShown(pins, { symbol: el.sym, pin })) return;
+          const key = shown({ symbol: el.sym, pin });
+          if (!key) return;
           const text = pinBias(built, bias, el, pin, scope);
-          if (text) out.push({ at: { x: at.x + 4, y: at.y - 4 }, text, kind: 'i' });
+          if (text) push({ key, at: { x: at.x + 4, y: at.y - 4 }, text, kind: 'i' });
         });
         continue;
       }
-      if (!/^[RLVIDQMJ]/i.test(el.prefix) || !opPinShown(pins, { symbol: el.sym })) continue;
+      const key = /^[RLVIDQMJ]/i.test(el.prefix) ? shown({ symbol: el.sym }) : undefined;
+      if (!key) continue;
       const b = elementBias(built, bias, el, scope);
       const s = doc.symbols[el.sym];
       if (!b?.short || !s) continue;
       const box = symbolBox(s, lib.symbol(s.type), lib);
-      out.push({ at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
+      push({ key, at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
     }
     return out;
-  }, [showOp, opPins, op, doc, conn, lib]);
+  }, [showOp, opTags, op, doc, conn, lib]);
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   const arrows = useMemo(() => {
@@ -2159,7 +2174,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
     if (!sim || !plot) return;
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
-    if (!scaleOf(plot) && op) return setOpPins((p) => toggleOpPin(p, target));
+    if (!scaleOf(plot) && op) return setOpTags((p) => toggleOpTag(p, target));
     // un cable de bus (f[10:0]): una traza por bit, en el testbench
     if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
       const sc = scaleOf(plot);
@@ -2460,7 +2475,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setSelection(r.refs);
   };
   const deleteSelection = () => {
-    if (selection.length) {
+    if (opSel) {
+      setOpTags((p) => hideOpTag(p, opSel, showOp));
+      setOpSel(undefined);
+    } else if (selection.length) {
       commit(deleteItems(doc, selection, lib));
       setSelection([]);
     } else setTool({ kind: 'delete' });
@@ -3575,6 +3593,12 @@ ${ltNetlistText(sim.built.lt)}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
             describe={describe}
             annotations={annotations}
+            selectedAnnotation={opSel}
+            onSelectAnnotation={(key) => {
+              setOpSel(key);
+              if (key) setSelection([]);
+            }}
+            onMoveAnnotation={(key, dx, dy) => setOpTags((p) => moveOpTag(p, key, dx, dy))}
             currentArrows={arrows}
             pickValue={pickValue}
             onPicked={endPick}

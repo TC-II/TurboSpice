@@ -3,6 +3,7 @@
 import type { AscDoc, Point } from '../asc/model.ts';
 import type { Connectivity, Net } from '../netlist/connectivity.ts';
 import { snap } from './geometry.ts';
+import { useState } from 'react';
 import { t } from '../i18n/i18n.ts';
 
 export interface NetName {
@@ -86,15 +87,16 @@ function annotationBox(a: Annotation, scale: number, paired?: Paired): Box {
   return { x, y, w, h };
 }
 
-/** Recuadros de todos los valores: las tensiones se suben si pisan la corriente de un componente */
+/** Recuadros de todos los valores: las tensiones se suben si pisan la corriente de un componente;
+ * las que se movieron a mano van corridas desde ese lugar (#306) */
 function layoutAnnotations(items: Annotation[], scale: number, paired?: Paired): Box[] {
   const boxes = items.map((a) => annotationBox(a, scale, paired));
   const currents = boxes.filter((_, i) => items[i].kind === 'i');
   return boxes.map((b, i) => {
-    if (items[i].kind !== 'v') return b;
     let y = b.y;
-    for (let k = 0; k < 4 && currents.some((c) => overlaps(c, { ...b, y })); k++) y -= b.h + 2 / scale;
-    return { ...b, y };
+    if (items[i].kind === 'v') for (let k = 0; k < 4 && currents.some((c) => overlaps(c, { ...b, y })); k++) y -= b.h + 2 / scale;
+    const o = items[i].offset;
+    return o ? { ...b, x: b.x + o.dx, y: y + o.dy } : { ...b, y };
   });
 }
 
@@ -149,21 +151,64 @@ export function NetNamesLayer({ names, paired, avoid, scale, onHover, onName }: 
 }
 
 export interface Annotation {
+  /** clave de la etiqueta (la de la punta de prueba: red, componente o pin) */
+  key: string;
   at: Point;
   text: string;
   kind: 'v' | 'i';
+  /** corrida a mano desde su lugar automático */
+  offset?: { dx: number; dy: number };
 }
 
-/** Valores del punto de operación sobre el esquemático (como el .op de LTspice) */
-export function AnnotationLayer({ items, paired, scale }: { items: Annotation[]; paired?: Paired; scale: number }) {
+interface LayerProps {
+  items: Annotation[];
+  paired?: Paired;
+  scale: number;
+  selected?: string;
+  onSelect?(key: string): void;
+  onMove?(key: string, dx: number, dy: number): void;
+}
+
+/** Valores del punto de operación sobre el esquemático (como el .op de LTspice); se pueden
+ * arrastrar y elegir para borrarlos con Delete (#306) */
+export function AnnotationLayer({ items, paired, scale, selected, onSelect, onMove }: LayerProps) {
   const fs = 11 / scale;
-  const boxes = layoutAnnotations(items, scale, paired);
+  // arrastre en curso: la etiqueta y el desplazamiento (en pantalla) desde donde se agarró
+  const [drag, setDrag] = useState<{ key: string; x0: number; y0: number; dx: number; dy: number } | null>(null);
+  const shown = drag ? items.map((a) => (a.key === drag.key ? { ...a, offset: { dx: (a.offset?.dx ?? 0) + drag.dx / scale, dy: (a.offset?.dy ?? 0) + drag.dy / scale } } : a)) : items;
+  const boxes = layoutAnnotations(shown, scale, paired);
   return (
     <g className="op-annotations">
-      {items.map((a, i) => {
+      {shown.map((a, i) => {
         const { x, y, w, h } = boxes[i];
+        const movable = !!(onSelect || onMove);
         return (
-          <g key={i} className={`op-annotation ${a.kind}`}>
+          <g
+            key={a.key}
+            className={`op-annotation ${a.kind}${movable ? ' movable' : ''}${selected === a.key ? ' selected' : ''}`}
+            data-key={a.key}
+            onPointerDown={(e) => {
+              if (e.button !== 0 || !movable) return;
+              e.stopPropagation();
+              e.currentTarget.setPointerCapture(e.pointerId);
+              setDrag({ key: a.key, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0 });
+            }}
+            onPointerMove={(e) => {
+              if (drag?.key !== a.key) return;
+              e.stopPropagation();
+              setDrag({ ...drag, dx: e.clientX - drag.x0, dy: e.clientY - drag.y0 });
+            }}
+            onPointerUp={(e) => {
+              if (drag?.key !== a.key) return;
+              e.stopPropagation();
+              setDrag(null);
+              // un click sin moverse sólo la elige
+              if (Math.hypot(drag.dx, drag.dy) > 3) onMove?.(a.key, drag.dx / scale, drag.dy / scale);
+              onSelect?.(a.key);
+            }}
+            onPointerCancel={() => setDrag(null)}
+          >
+            {a.offset && <line x1={a.at.x} y1={a.at.y} x2={x + w / 2} y2={y + h / 2} />}
             <rect x={x} y={y} width={w} height={h} rx={3 / scale} />
             <text x={x + w / 2} y={y + h / 2} fontSize={fs} textAnchor="middle" dominantBaseline="central">
               {a.text}

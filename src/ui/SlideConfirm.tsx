@@ -1,13 +1,17 @@
 // Confirmación de borrado (#150, #151): hay que arrastrar el control de punta a punta. Si se
 // suelta antes del final vuelve al principio; con el teclado, flecha derecha / Fin hasta 100.
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 
-export function SlideConfirm({ title, message, action = t('Slide to delete'), onConfirm, onClose }: {
+export function SlideConfirm({ title, message, action = t('Slide to delete'), releaseLabel = t('Release to delete'), extra, onConfirm, onClose }: {
   title: string;
   message: string;
   action?: string;
+  /** el rótulo cuando el control llegó al final */
+  releaseLabel?: string;
+  /** botones además de Cancelar (p. ej. ir a la alternativa recomendada) */
+  extra?: ReactNode;
   onConfirm(): void;
   onClose(): void;
 }) {
@@ -32,7 +36,7 @@ export function SlideConfirm({ title, message, action = t('Slide to delete'), on
     <Modal title={title} onClose={onClose}>
       <p>{message}</p>
       <div className={`slide-confirm${dragging ? ' dragging' : ''}`} ref={track} style={{ ['--slide-f' as string]: v / 100 }}>
-        <span className="slide-label">{v >= 100 ? t('Release to delete') : action}</span>
+        <span className="slide-label">{v >= 100 ? releaseLabel : action}</span>
         <div
           className="slide-knob"
           onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x0: e.clientX, v0: v }; setDragging(true); }}
@@ -54,6 +58,7 @@ export function SlideConfirm({ title, message, action = t('Slide to delete'), on
       </div>
       <div className="buttons">
         <button onClick={onClose} autoFocus>{t('Cancel')}</button>
+        {extra}
       </div>
     </Modal>
   );

@@ -1,5 +1,6 @@
 // Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
+import { SlideConfirm } from '../ui/SlideConfirm.tsx';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
@@ -119,8 +120,12 @@ const SymbolPreview = memo(function SymbolPreview({ path, lib, className, labels
   );
 });
 
-/** Carpetas que no aparecen en la búsqueda ni en el listado (sólo entrando a mano) */
-const HIDDEN_DIRS = ['TCLib/Special/Characters'];
+/** Carpetas que no aparecen en la búsqueda ni en el listado (sólo entrando a mano); van al fondo */
+const HIDDEN_DIRS = ['TCLib/Special/Characters', 'OpAmps'];
+/** OpAmps de SPICE sin modelo (#309): están por compatibilidad; para diseños nuevos, los de la TCLib */
+export const LEGACY_OPAMPS = 'OpAmps';
+const LEGACY_ALT = 'TCLib/OA_Ideal';
+export const isLegacyOpAmp = (path: string) => path.startsWith(`${LEGACY_OPAMPS}/`);
 const hiddenIn = (path: string, dir: string) => HIDDEN_DIRS.some((h) => (path === h || path.startsWith(`${h}/`)) && !(dir === h || dir.startsWith(`${h}/`)));
 
 /**
@@ -167,7 +172,10 @@ export function pickerItems(paths: string[], dir: string, query: string, descOf:
   const dirs = [...new Set(inside.map((p) => p.slice(prefix.length)).filter((r) => r.includes('/')).map((r) => prefix + r.split('/')[0]))];
   const loose = inside.filter((p) => !p.slice(prefix.length).includes('/'));
   const nested = visible.filter((p) => p.startsWith(prefix) && p.slice(prefix.length).includes('/'));
-  return [...(dir ? [{ kind: 'up' } as const] : []), ...dirs.map((d): PickerItem => ({ kind: 'dir', path: d })), ...loose.map(sym), ...nested.map(sym)];
+  // las carpetas ocultas van al fondo de la lista
+  const folder = (d: string): PickerItem => ({ kind: 'dir', path: d });
+  const hid = (d: string) => HIDDEN_DIRS.includes(d);
+  return [...(dir ? [{ kind: 'up' } as const] : []), ...dirs.filter((d) => !hid(d)).map(folder), ...loose.map(sym), ...nested.map(sym), ...dirs.filter(hid).map(folder)];
 }
 
 /** Una fila del explorador; memo: al mover el mouse sólo se redibujan las dos que cambian */
@@ -226,11 +234,20 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   const up = () => go(dir.split('/').slice(0, -1).join('/'));
   // estable entre renders: las filas (memo) no se redibujan al mover el mouse
   const chooseRef = useRef<(it: PickerItem) => void>(() => {});
-  chooseRef.current = (it) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : onPick(it.path));
+  // un OpAmp sin modelo se pide confirmar arrastrando (#309)
+  const [legacy, setLegacy] = useState<string | null>(null);
+  chooseRef.current = (it) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : isLegacyOpAmp(it.path) ? setLegacy(it.path) : onPick(it.path));
   const choose = useCallback((it: PickerItem) => chooseRef.current(it), []);
   return (
     // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
-    <Modal title={t('Component')} onClose={onClose} wide>
+    <>
+    <Modal title={t('Component')} onClose={onClose} wide hidden={!!legacy}>
+      {(dir === LEGACY_OPAMPS || dir.startsWith(`${LEGACY_OPAMPS}/`)) && (
+        <p className="hint warn picker-legacy">
+          {t('These are SPICE default op amps, kept for compatibility: they have no model. For new designs use the TCLib op amps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
+          <button type="button" className="link" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>
+        </p>
+      )}
       <div className="picker">
         <div className="picker-list">
           <input
@@ -267,6 +284,18 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
         </div>
       </div>
     </Modal>
+    {legacy && (
+      <SlideConfirm
+        title={t('{name} has no model', { name: legacy.split('/').pop() ?? legacy })}
+        message={t('This op amp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib op amps.')}
+        action={t('Slide to use it anyway')}
+        releaseLabel={t('Release to use it')}
+        extra={<button className="primary" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>}
+        onConfirm={() => onPick(legacy)}
+        onClose={() => setLegacy(null)}
+      />
+    )}
+    </>
   );
 }
 

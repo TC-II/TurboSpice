@@ -3929,11 +3929,13 @@ ${ltNetlistText(sim.built.lt)}
         <SwitchDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}
+          windowDefaults={lib.windowDefaults}
           onClose={() => setDialog(null)}
-          onAttributes={() => setDialog({ kind: 'attrs', index: dialog.index })}
-          onApply={(attrs) => {
+          onApply={(attrs, labels) => {
             setDialog(null);
-            if (Object.keys(attrs).length) commit(setSymbolAttrs(doc, dialog.index, attrs));
+            let d = Object.keys(attrs).length ? setSymbolAttrs(doc, dialog.index, attrs) : doc;
+            if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
+            if (d !== doc) commit(d);
           }}
         />
       )}

@@ -3,9 +3,10 @@
 // Value2 ("Rs=1m Roff=1G Vt=1m Vh=0"), que es lo que recibe el subcircuito.
 import { useState } from 'react';
 import type { SymbolDef, SymbolInst } from '../asc/model.ts';
-import { effectiveAttrs } from '../asc/resolve.ts';
+import { effectiveAttrs, type WindowDefaults } from '../asc/resolve.ts';
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
-import { Modal } from './dialogs.tsx';
+import type { LabelPatch } from './edit.ts';
+import { labelRows, Modal } from './dialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** El símbolo de la TCLib que abre esta ventana */
@@ -21,16 +22,31 @@ const FIELDS: { key: Key; label: string; unit: string; hint: string }[] = [
   { key: 'Vh', label: t('Hysteresis Vh'), unit: 'V', hint: t('Closes above Vt+Vh and opens below Vt−Vh') },
 ];
 
-export function SwitchDialog({ inst, def, onApply, onAttributes, onClose }: {
+export function SwitchDialog({ inst, def, windowDefaults, onApply, onClose }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
-  /** atributos a escribir */
-  onApply(attrs: Record<string, string>): void;
-  onAttributes(): void;
+  windowDefaults: WindowDefaults;
+  /** atributos a escribir y rótulos que se muestran u ocultan */
+  onApply(attrs: Record<string, string>, labels: Map<number, LabelPatch>): void;
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
-  const name = eff.get('InstName') ?? '';
+  const [name, setName] = useState(eff.get('InstName') ?? '');
+  // rótulos del símbolo: el nombre (0) y los parámetros (Value2, 123)
+  const rows = labelRows(inst, def, windowDefaults);
+  // (en el símbolo los parámetros vienen con tamaño 0: se ven sólo si se los muestra)
+  const seen = (r: (typeof rows)[number]) => r.visible && r.size > 0;
+  const [shown, setShown] = useState(() => new Map(rows.map((r) => [r.win, seen(r)])));
+  const vis = (win: number) => (
+    <input
+      type="checkbox"
+      className="attr-vis"
+      checked={shown.get(win) ?? false}
+      title={t('Visible on the schematic')}
+      aria-label={t('Visible on the schematic')}
+      onChange={(e) => setShown(new Map(shown).set(win, e.target.checked))}
+    />
+  );
   const initial = parseParamList(eff.get('Value2') ?? '');
   const get = (k: Key) => initial.find(([n]) => n.toLowerCase() === k.toLowerCase())?.[1] ?? DEFAULTS[k];
   const [vals, setVals] = useState<Record<Key, string>>(() => ({ Rs: get('Rs'), Roff: get('Roff'), Vt: get('Vt'), Vh: get('Vh') }));
@@ -40,10 +56,17 @@ export function SwitchDialog({ inst, def, onApply, onAttributes, onClose }: {
     const others = initial.filter(([n]) => !FIELDS.some((f) => f.key.toLowerCase() === n.toLowerCase()));
     const ps: [string, string][] = FIELDS.map((f): [string, string] => [f.key, vals[f.key].trim() || DEFAULTS[f.key]]);
     const Value2 = formatParamList([...ps, ...others]);
-    onApply(Value2 !== (eff.get('Value2') ?? '') ? { Value2 } : {});
+    const attrs: Record<string, string> = {};
+    if (Value2 !== (eff.get('Value2') ?? '')) attrs.Value2 = Value2;
+    if (name.trim() && name.trim() !== eff.get('InstName')) attrs.InstName = name.trim();
+    const labels = new Map<number, LabelPatch>();
+    for (const r of rows) if (shown.get(r.win) !== seen(r)) labels.set(r.win, shown.get(r.win) ? { visible: true, size: r.size || 2 } : { visible: false });
+    // el símbolo no trae rótulo para el nombre: al mostrarlo va arriba a la derecha del círculo
+    if (shown.get(0) && !rows.some((r) => r.win === 0)) labels.set(0, { visible: true, create: { x: 36, y: 16, align: 'Left', size: 2 } });
+    onApply(attrs, labels);
   };
   return (
-    <Modal title={`${t('Switch')} — ${name}`} onClose={onClose}>
+    <Modal title={`${t('Switch')} — ${name}`} onClose={onClose} wide>
       <form className="swdlg" onSubmit={(e) => (e.preventDefault(), submit())}>
         <SwitchDrawing focus={focus} />
         <div className="src-row sw-row">
@@ -63,10 +86,21 @@ export function SwitchDialog({ inst, def, onApply, onAttributes, onClose }: {
           ))}
         </div>
         <small className="hint">{t('Closes when V(Vc+, Vc−) goes above Vt+Vh and opens when it goes below Vt−Vh.')}</small>
+        <details className="src-adv attrs">
+          <summary>{t('Attributes')}</summary>
+          <label className="attr-row">
+            <span>InstName</span>
+            <input value={name} spellCheck={false} onChange={(e) => setName(e.target.value)} />
+            {vis(0)}
+          </label>
+          <label className="attr-row">
+            <span>{t('Parameters')}</span>
+            <code className="src-line">{FIELDS.map((f) => `${f.key}=${vals[f.key].trim() || DEFAULTS[f.key]}`).join(' ')}</code>
+            {vis(123)}
+          </label>
+        </details>
         <code className="src-line">{`${name} … switch ${FIELDS.map((f) => `${f.key}=${vals[f.key].trim() || DEFAULTS[f.key]}`).join(' ')}`}</code>
         <div className="buttons">
-          <button type="button" onClick={onAttributes}>{t('Attributes…')}</button>
-          <span style={{ flex: 1 }} />
           <button type="button" onClick={onClose}>{t('Cancel')}</button>
           <button type="submit" className="primary">{t('OK')}</button>
         </div>

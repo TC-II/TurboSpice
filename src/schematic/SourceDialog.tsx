@@ -244,10 +244,9 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
 
   // rótulos del nombre y del valor: si se ven en el esquemático (#71)
   const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
-  // el valor se ve por defecto sólo en DC (en las formas de onda el dibujito del símbolo ya dice
-  // qué es) al cambiar el tipo; al abrir se respeta lo que hay, y si el usuario movió el rótulo
-  // o tocó la casilla, también
-  const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && !r.moved && !current && !inst.windows.has(r.win);
+  // en una fuente recién puesta (sin valor) el valor se ve por defecto sólo en DC (en las formas
+  // de onda el dibujito del símbolo ya dice qué es); una fuente ya editada muestra lo que hay
+  const valueAuto = (r: (typeof shown)[number]) => r.attr === 'Value' && blankSrc && !r.moved && !current;
   const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, valueAuto(r) ? kind === 'dc' : r.visible])));
   const valueTouched = useRef(false);
   const firstKind = useRef<SourceKind | ''>(kind);
@@ -260,14 +259,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
       return out;
     });
   }, [kind]);
-  // lo elegido en un valor «sin tocar» queda como WINDOW explícito (aunque sea el de por defecto),
-  // para que al volver a editar la casilla muestre lo que el usuario dejó y no se recalcule
-  const labels = () =>
-    new Map(
-      shown
-        .filter((r) => visible.get(r.win) !== r.visible || valueAuto(r))
-        .map((r): [number, LabelPatch] => [r.win, { visible: visible.get(r.win), keep: valueAuto(r) }]),
-    );
+  const labels = () => new Map(shown.filter((r) => visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
   const showToggles = shown.length > 0 && (
     <span className="src-show" role="group" aria-label={t('Show on the schematic')}>
       {t('Show:')}

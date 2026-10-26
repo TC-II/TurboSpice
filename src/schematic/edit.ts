@@ -837,8 +837,6 @@ export interface LabelPatch {
   visible?: boolean;
   align?: string;
   size?: number;
-  /** dejar un WINDOW explícito aunque coincida con el por defecto (marca que el usuario lo eligió) */
-  keep?: boolean;
 }
 
 /** Aplica los mismos cambios de rótulos (por índice de WINDOW) a varios símbolos */
@@ -864,9 +862,7 @@ export function patchLabels(doc: AscDoc, syms: number[], patches: Map<number, La
       // igual a la posición por defecto: sin WINDOW explícito, como si nunca se hubiera tocado
       const d = dflt.get(win);
       if (d && sameWindow(w, d)) {
-        if (p.keep) {
-          if (!inst.windows.has(win)) edits.push({ sym: si, win, w });
-        } else if (inst.windows.has(win)) edits.push({ sym: si, win, w: null });
+        if (inst.windows.has(win)) edits.push({ sym: si, win, w: null });
       } else if (!sameWindow(w, cur)) edits.push({ sym: si, win, w });
     }
   }

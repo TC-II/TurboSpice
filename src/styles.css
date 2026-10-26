@@ -417,6 +417,8 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .current-arrow { pointer-events: none; color: var(--sch-sym); }
 .current-arrow line { stroke: currentColor; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .current-arrow polygon { fill: currentColor; stroke: none; }
+.current-arrow.hl { color: var(--sch-sel) !important; }
+.current-arrow.hl line { stroke-width: 2.5; }
 
 /* ---------- Elegir en el esquemático desde un diálogo ---------- */
 .modal-backdrop.picking { display: none; }
@@ -520,6 +522,11 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .results-body > .code { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .results-body > .problems { flex: 0 1 auto; min-height: 0; overflow: auto; }
 .result-table { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
+.result-cols { display: flex; gap: 12px; align-items: flex-start; min-height: 0; }
+.result-cols .pz-table { flex: 1 1 0; }
+.result-cols .pz-table tbody tr:hover > * { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.result-cols .sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.sort-mark { display: inline-block; width: 1.2em; text-align: center; }
 .result-table .filter { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; width: 200px; }
 button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-muted); font: inherit; font-weight: 500; }
 .pz-view { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; min-width: 0; overflow: hidden; }

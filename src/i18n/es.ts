@@ -450,7 +450,7 @@ export const es: Record<string, string> = {
   'hand-written .meas': '.meas escrito a mano',
   'harmonics only': 'sólo armónicos',
   'Help': 'Ayuda',
-  'Hide zeros': 'Ocultar ceros',
+  'Sort by |x|': 'Ordenar por |x|',
   'Hierarchical blocks (.asc)': 'Bloques jerárquicos (.asc)',
   'Histogram of {label}': 'Histograma de {label}',
   'History': 'Historial',

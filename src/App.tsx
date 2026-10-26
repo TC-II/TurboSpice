@@ -1976,8 +1976,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   }, [showOp, opTags, op, doc, conn, lib]);
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
+  // fila de la tabla de resultados bajo el mouse: su red o sus flechas se resaltan en el esquemático
+  const [rowHover, setRowHover] = useState<string | null>(null);
+  const rowNet = rowHover ? /^V\(([^,()]+)\)$/i.exec(rowHover)?.[1] : undefined;
   const arrows = useMemo(() => {
-    if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe')) return undefined;
+    const rowCurrent = !!rowHover && /^I/i.test(rowHover);
+    if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
     const traces = panes.flatMap((p) => p.traces.map((tt, i) => ({ t: tt, color: traceColor(tt, i) }))).filter((x) => !x.t.hidden);
     // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
     const colorOf = (target: { symbol: number; pin?: number }) => {
@@ -1991,9 +1995,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // la corriente del componente (sin pin) sólo colorea la flecha si es la única: en uno con
       // varios terminales (Q, M, X…) pintaría todas, y es la de un solo terminal
       const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? (perSym.get(a.sym) === 1 ? colorOf({ symbol: a.sym }) : undefined);
-      return color ? { ...a, color } : a;
-    });
-  }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope]);
+      const isRow = (target: { symbol: number; pin?: number }) => {
+        const expr = rowCurrent ? probeExpr(sim.built, target, simScope) : undefined;
+        return !!expr && sameExpr(expr, rowHover!);
+      };
+      const hl = isRow({ symbol: a.sym, pin: a.pin }) || (perSym.get(a.sym) === 1 && isRow({ symbol: a.sym }));
+      return { ...a, ...(color ? { color } : {}), ...(hl ? { hl } : {}) };
+    }).filter((a) => showOp || tool.kind === 'probe' || a.hl);
+  }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope, rowHover]);
 
   // Schematic | Results: la unión entre las dos pestañas cae sobre el borde derecho de la cápsula
   // del proyecto (que mide --tree-w), sea cual sea el ancho del logo o del texto en cada idioma
@@ -3595,7 +3604,7 @@ ${ltNetlistText(sim.built.lt)}
               const f = moduleFile(projectRef.current, name);
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
-            highlightNet={traceNetShown}
+            highlightNet={rowNet ?? traceNetShown}
             netColors={netColors}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
@@ -3808,7 +3817,7 @@ ${ltNetlistText(sim.built.lt)}
                 <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
               )}
               {panel === 'plot' && plot && !scale &&
-                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} />)}
+                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} onHoverRow={setRowHover} />)}
               </ErrorBoundary>
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}

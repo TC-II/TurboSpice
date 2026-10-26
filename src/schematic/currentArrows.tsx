@@ -20,6 +20,8 @@ export interface CurrentArrow {
   pin: number;
   /** color de la traza de esa corriente, si está graficada */
   color?: string;
+  /** resaltada (su fila de la tabla de resultados está bajo el mouse) */
+  hl?: boolean;
 }
 
 const TWO_TERMINAL = /^[RCLVIDB]/i;
@@ -89,7 +91,7 @@ export function CurrentArrowsLayer({ items }: { items: CurrentArrow[] }) {
         const uy = Math.sign(to.y - from.y);
         const head = `${to.x - 4 * ux - 2.5 * uy},${to.y - 4 * uy - 2.5 * ux} ${to.x},${to.y} ${to.x - 4 * ux + 2.5 * uy},${to.y - 4 * uy + 2.5 * ux}`;
         return (
-          <g key={i} className="current-arrow" style={a.color ? { color: a.color } : undefined}>
+          <g key={i} className={a.hl ? 'current-arrow hl' : 'current-arrow'} style={a.color ? { color: a.color } : undefined}>
             <line x1={from.x} y1={from.y} x2={to.x - 2 * ux} y2={to.y - 2 * uy} />
             <polygon points={head} />
           </g>

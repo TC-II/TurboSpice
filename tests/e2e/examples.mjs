@@ -31,7 +31,7 @@ for (const scheme of ['light', 'dark']) {
     await status.waitFor({ timeout: 30000 });
     const text = await status.textContent();
     const ok = (await status.getAttribute('class')).includes('ok');
-    const hasOutput = (await page.locator('.plot canvas, .scalars').count()) > 0;
+    const hasOutput = (await page.locator('.plot canvas, .result-table table').count()) > 0;
     if (!ok || !hasOutput) failed++;
     console.log(`${ok && hasOutput ? '✓' : '✗'} [${scheme}] ${name}: ${text}${hasOutput ? '' : ' (sin gráfico/tabla)'}`);
     if (scheme === 'light' || i === 1) await page.screenshot({ path: `${OUT}/${scheme}-${i}.png` });

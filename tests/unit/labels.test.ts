@@ -40,6 +40,15 @@ describe('rótulos de componentes', () => {
     expect(save(shown)).toEqual(save(parseAsc(R1)));
   });
 
+  it('keep: mostrar el valor en su posición por defecto deja un WINDOW explícito (#297)', () => {
+    const plain = patchLabels(parseAsc(R1), [0], new Map([[3, { visible: true }]]), lib);
+    expect(plain.symbols[0].windows.has(3)).toBe(false);
+    const kept = patchLabels(parseAsc(R1), [0], new Map([[3, { visible: true, keep: true }]]), lib);
+    expect(kept.symbols[0].windows.has(3)).toBe(true);
+    // y un patch posterior sin keep vuelve a dejarlo como por defecto
+    expect(patchLabels(kept, [0], new Map([[3, { visible: true }]]), lib).symbols[0].windows.has(3)).toBe(false);
+  });
+
   it('alineación (como se ve) y tamaño, también para varios componentes a la vez', () => {
     const doc = parseAsc(`${R1}SYMBOL res 256 96 R90\nSYMATTR InstName R2\n`);
     const out = patchLabels(doc, [0, 1], new Map([[3, { align: 'Right', size: 3 }]]), lib);

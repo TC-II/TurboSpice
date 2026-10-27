@@ -2209,7 +2209,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const sc = scaleOf(plot);
       if (!sc) return;
       // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
-      const dig = digitalProbeExpr(sim.built, busBits(target.net));
+      const dig = digitalProbeExpr(sim.built, busBits(target.net), target.net);
       if (dig && hasData(dig)) return addDigitalProbe(dig);
       const exprs = busBits(target.net)
         .map((b) => probeExpr(sim.built, { net: b }))

@@ -18,6 +18,17 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
   El eje de tiempo usa los mismos márgenes que uPlot y comparte zoom y cursores.
 - Buses: valor en el radix de la traza (`Trace.radix`: hex, dec, ±dec, oct, bin); X/Z en rojo punteado.
 - Sólo se leen los nodos digitales del último análisis (con `.step`, la última corrida).
+- **Redes entre bloques, digitales** (`hdl/digitalLinks.ts`): una red que une sólo pines de bloques
+  Verilog (una salida y entradas de otros, nada más en la netlist: ni otro elemento, ni `.meas`, ni
+  una fuente B, ni `.control`) se simula como nodo de eventos, sin pasar por lo analógico: la
+  instancia usa una copia de su `.subckt` (`NOMBRE__digN`) sin los puentes de esos pines y con el
+  nodo de adentro como puerto. Si una entrada sale tal cual por una salida (`g[7] = b[7]`), el nodo
+  es la entrada y la salida sale por un `d_buffer`. Las tri-state e inout siguen analógicas. Se
+  pierde la rampa y el cruce de umbral (del orden de `tr/2`). Medido con ngspice nativo: un contador
+  de 8 bits → Gray → registro con reloj de 10 MHz, 200 µs, pasa de 1,66 s a 0,58 s; el sigma-delta
+  del ejemplo (una sola red entre bloques), de 1,26 s a 1,12 s. La netlist lo dice en un comentario
+  antes del `.end`. Esas redes se grafican como `Dig(red)` (`V(red)` da su valor lógico) y un
+  `Dig(x1.q_0_d)` guardado de antes sigue andando (`digitalAliases`).
 - **Punta de prueba** en una red que sale de un bloque Verilog (un pin de salida o inout): grafica su
   versión digital, `Dig(x1.d_0_d)`, y en un cable de bus con todos los bits del mismo puerto, el bus
   entero (`Dig(x1.d[2:0])`). El nodo sale del puente `ab_<pin>` del `.subckt` generado

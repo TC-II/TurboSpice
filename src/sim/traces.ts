@@ -39,7 +39,8 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       return { re: new Float64Array(len) };
     }
     // V(onoise)/V(inoise) de LTspice son los espectros de ruido de ngspice
-    return wave(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`));
+    // (una red entre bloques Verilog que se simuló digital: su valor lógico, 0 o 1)
+    return wave(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`) ?? findDigital(plot, netVector(name)));
   };
   const element = (name: string) => sim?.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
   /** Nombre de ngspice de un dispositivo escrito en una traza ("Q1", "x_u1.q1") */
@@ -53,10 +54,12 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     // nodo digital (#209): Dig(q), con el mismo alcance de nombres que V(); Dig(x1.q[3:0]) es el bus
     // de los bits x1.q_3_d … x1.q_0_d
     if (f === 'dig') {
-      const one = (n: string) => findDigital(plot, netVector(n)) ?? findDigital(plot, n);
+      const alias = (n: string) => sim?.digitalAliases?.get(n.toLowerCase());
+      const one = (n: string) => findDigital(plot, netVector(n)) ?? findDigital(plot, n) ?? (alias(n) ? findDigital(plot, alias(n)!) : undefined);
       const bus = busRange(args[0]);
       if (!bus) return wave(one(args[0]));
-      const bits = bus.bits.map((b) => one(`${bus.base}_${b}_d`));
+      // (o los bits de un bus de nivel superior que se simuló digital: d[2] → d__2__)
+      const bits = bus.bits.map((b) => one(`${bus.base}_${b}_d`) ?? one(`${bus.base}[${b}]`));
       return bits.every((b) => b) ? { re: joinBits(bits.map((b) => b!.real)) } : null;
     }
     if (f === 'v') {
@@ -175,7 +178,13 @@ function subcktOf(sim: BuiltSimulation, name: string): { pins: string[]; body: s
  * `bits`: las redes de lo que se clickeó (una sola, o los bits de un cable de bus). null si alguna
  * no sale de un bloque Verilog.
  */
-export function digitalProbeExpr(sim: BuiltSimulation, bits: string[]): string | null {
+export function digitalProbeExpr(sim: BuiltSimulation, bits: string[], bus?: string): string | null {
+  // una red entre bloques que se simuló digital (digitalLinks.ts) es un nodo de eventos con su nombre
+  const linked = (b: string) => sim.digitalNets?.has(netVector(b));
+  if (bits.length && bits.every(linked)) {
+    if (bits.length === 1) return `Dig(${bits[0]})`;
+    return bus && busRange(bus) ? `Dig(${bus})` : null;
+  }
   const nodes = bits.map((b) => verilogDigitalNode(sim, b));
   if (!nodes.length || nodes.some((x) => !x)) return null;
   if (nodes.length === 1) return `Dig(${nodes[0]})`;

@@ -84,6 +84,8 @@ export const SUBCKT_DRAG = 'application/x-turbospice-subckt';
 
 export interface EditorHandle {
   fit(): void;
+  /** encuadra sólo si no se ve nada del circuito (al pasar a otro testbench, que no guarda su vista) */
+  fitIfLost(): void;
   /** Posición del cursor en el esquemático (para pegar/duplicar) */
   cursor(): Point;
   /** Elemento SVG y caja del contenido (para exportar) */
@@ -518,6 +520,12 @@ export function SchematicEditor(props: Props) {
     handle,
     () => ({
       fit,
+      fitIfLost: () => {
+        const b = docBox(doc, lib, showSimCommand);
+        const v = viewRef.current;
+        const [hw, hh] = [size.w / 2 / v.scale, size.h / 2 / v.scale];
+        if (b && (b.x2 < v.cx - hw || b.x1 > v.cx + hw || b.y2 < v.cy - hh || b.y1 > v.cy + hh)) fit();
+      },
       cursor: () => snapPoint(cursor),
       svg: () => svgRef.current,
       contentBox: () => docBox(doc, lib, showSimCommand),
@@ -547,7 +555,7 @@ export function SchematicEditor(props: Props) {
       setView: (v: View) => setView(v),
       editText: (index: number) => editInline(index),
     }),
-    [fit, cursor, doc, lib, size.w],
+    [fit, cursor, doc, lib, size.w, size.h],
   );
 
   // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)

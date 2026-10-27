@@ -1446,6 +1446,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setValueOffer(null);
     setViewRun('');
     if (refit) setDocKey((k) => k + 1);
+    // (sin encuadrar, la vista sigue la del testbench anterior: si su circuito no se ve, se encuadra)
+    else setTimeout(() => editor.current?.fitIfLost(), 50);
     if (s && !r) restoreCached(s.id, s.asc);
   };
   /** Pasa a otra simulación de la variante ('' = el circuito base) */

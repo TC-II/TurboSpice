@@ -1,0 +1,568 @@
+{
+ "format": "turbospice",
+ "version": 2,
+ "name": "Transfer functions",
+ "created": "2026-10-22T17:00:00.000Z",
+ "modified": "2026-10-22T17:00:00.000Z",
+ "files": [
+  {
+   "name": "OA_NoPole.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nLINE Normal -192 -8 -80 48\nLINE Normal -192 -8 -192 104\nLINE Normal -181 16 -173 16\nLINE Normal -180 80 -172 80\nLINE Normal -176 84 -176 76\nLINE Normal -80 48 -192 104\nWINDOW 0 -113 80 Left 2\nWINDOW 3 -176 32 Left 0\nSYMATTR Value Avol=1Meg\nSYMATTR SpiceModel OA_NoPole\nSYMATTR ModelFile OA_NoPole.sub\nSYMATTR Prefix X\nSYMATTR Description Op amp without poles: only a gain Avol (TCLib OA_Ideal drawing; a project file)\nPIN -192 80 NONE 0\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN -192 16 NONE 0\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN -80 48 NONE 0\nPINATTR PinName OUT\nPINATTR SpiceOrder 3\n"
+  },
+  {
+   "name": "OA_NoPole.sub",
+   "kind": "model",
+   "text": "* OA_NoPole: an op amp without poles, only its open-loop gain Avol (the drawing is TCLib's\n* OA_Ideal, by Javier Petrucci and Agustin Gullino, ITBA). OA_Ideal has one pole (GBWP), and in\n* a pole-zero map that pole shows up far away, at about −2π·GBWP/2, and squeezes the others.\n.SUBCKT OA_NoPole 1 2 3\nE1 3 0 1 2 {Avol}\n.ends OA_NoPole\n"
+  }
+ ],
+ "activeTestbench": "smvq15o811f",
+ "groups": [
+  {
+   "id": "gmvq15o8017",
+   "name": "1st order low-pass"
+  },
+  {
+   "id": "gmvq15o8018",
+   "name": "1st order high-pass"
+  },
+  {
+   "id": "gmvq15o8019",
+   "name": "1st order all-pass"
+  },
+  {
+   "id": "gmvq15o801a",
+   "name": "2nd order low-pass"
+  },
+  {
+   "id": "gmvq15o801b",
+   "name": "2nd order high-pass"
+  },
+  {
+   "id": "gmvq15o801c",
+   "name": "2nd order band-pass"
+  },
+  {
+   "id": "gmvq15o801d",
+   "name": "2nd order band-stop (notch)"
+  },
+  {
+   "id": "gmvq15o801e",
+   "name": "2nd order all-pass"
+  }
+ ],
+ "testbenches": [
+  {
+   "id": "smvq15o811f",
+   "name": "Step response",
+   "group": "gmvq15o8017",
+   "current": "sha256:9a3d6e6ea03f3cebb4503e479eab2dda917cc122d610be889d81d3aaf81b4023",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811g",
+   "name": "Bode",
+   "group": "gmvq15o8017",
+   "current": "sha256:bd066352326317f5fff568973814c3613ffeb54078bceee3622fb9ccacf398c8",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811h",
+   "name": "Poles and zeros",
+   "group": "gmvq15o8017",
+   "current": "sha256:32c9a45b93d157bef1c0ae3571f5bd703d2f7ce84d64b8c62530b0ff607e3f0d",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811i",
+   "name": "Step, R stepped (.step)",
+   "group": "gmvq15o8017",
+   "current": "sha256:4eb6cb5c0d5e039b63af4cab7eaea73a2a1ea3bc3a5eed2320f43a0cf9ac078b",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811j",
+   "name": "Step response",
+   "group": "gmvq15o8018",
+   "current": "sha256:dece81707e60d490bcee7e8cbe63897880b324f979f0be968d740f2b59bf565b",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811k",
+   "name": "Bode",
+   "group": "gmvq15o8018",
+   "current": "sha256:5f4c04e8082c6350355c69a13728142f2ac0532e5cb4db0217dfee6c5374932c",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811l",
+   "name": "Poles and zeros",
+   "group": "gmvq15o8018",
+   "current": "sha256:ea732d5a2d763478de9dc083c454e303fa6cf5348009a25aaae89c0cd3dbee27",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811m",
+   "name": "Step response",
+   "group": "gmvq15o8019",
+   "current": "sha256:9c4ccfe1afb7a77aa8c2c4ac5fdfff0afa22fe267f220066441f865f584909a5",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811n",
+   "name": "Bode",
+   "group": "gmvq15o8019",
+   "current": "sha256:6499df82004c1451130d1d65d0f8bbc43c7b3021d10d3e503f1ec7a58201231c",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811o",
+   "name": "Poles and zeros",
+   "group": "gmvq15o8019",
+   "current": "sha256:f19e06faf69811ef63ddd9875ef4cc34c531d22b045892ebae41bb3f12d73add",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811p",
+   "name": "Step response",
+   "group": "gmvq15o801a",
+   "current": "sha256:8b3a2e083e627932825499b5d1cea2131e93d90f5951d7c4a65db368ff408021",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811q",
+   "name": "Bode",
+   "group": "gmvq15o801a",
+   "current": "sha256:8feaed3fef7087ba149e6cef4d7ca025db6df1841724b1102bba40d3f1795d92",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811r",
+   "name": "Poles and zeros",
+   "group": "gmvq15o801a",
+   "current": "sha256:f7f175b7607b762f93c29976b64274f72d2acf350311d2ffb8557f2a0abaf896",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811s",
+   "name": "Step response",
+   "group": "gmvq15o801b",
+   "current": "sha256:9c2edadcad543839655cf90001715b39e1edf373562823d3b9e4b1b87cff759b",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811t",
+   "name": "Bode",
+   "group": "gmvq15o801b",
+   "current": "sha256:e60256ad61552795ae0f132c41a49f66994ffa96198275c769e6f0f66c2b1ba2",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811u",
+   "name": "Poles and zeros",
+   "group": "gmvq15o801b",
+   "current": "sha256:470bfdd0d16edf2be2b82cd8d35b310cacb24f2eba6486f5233eafb808e2ab5a",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811v",
+   "name": "Step response",
+   "group": "gmvq15o801c",
+   "current": "sha256:5ecde83b6d1ab2dae693096b8c9ea17d774902e72021126bc9ea5627bc163851",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811w",
+   "name": "Bode",
+   "group": "gmvq15o801c",
+   "current": "sha256:691d49b4cb193ae2a5f69eed6e66e0c1f2c7d23416e689b6a8c513400475f572",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811x",
+   "name": "Poles and zeros",
+   "group": "gmvq15o801c",
+   "current": "sha256:dfe3e9444c874a4e4511d3fd1e8737aacd02419945f7a9e56cd7ad66227c35a8",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811y",
+   "name": "Step response",
+   "group": "gmvq15o801d",
+   "current": "sha256:ac1d19ea09190f4b00a6a01f4f2c28ce5103344fea2810b4ffa9f2b225ef4819",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o811z",
+   "name": "Bode",
+   "group": "gmvq15o801d",
+   "current": "sha256:8db2cc029c303225d29579f83e04fff3639d96b64d6eb921b5d7b31e1afe65d0",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o8120",
+   "name": "Poles and zeros",
+   "group": "gmvq15o801d",
+   "current": "sha256:08d1f92ef1e0ca4b04ceb87d991a172ad279f36d9d2f6afcf74da40d9a25cfc3",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o8121",
+   "name": "Step response",
+   "group": "gmvq15o801e",
+   "current": "sha256:6db3ea0e5f52ecaa21d56dc9840c6236b14ee498fdbc2c47a701f86c6cd54cf1",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o8122",
+   "name": "Bode",
+   "group": "gmvq15o801e",
+   "current": "sha256:6fd3c5012f1823983a61dacb920814f5d1c652e6056123403b7571509f923210",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "ac1",
+    "mode": "bode"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvq15o8123",
+   "name": "Poles and zeros",
+   "group": "gmvq15o801e",
+   "current": "sha256:28cc735af3295da9653825e0377d0e594ad83109e58c49201f691c479328c7d3",
+   "view": {
+    "panes": [],
+    "plot": "pz1"
+   },
+   "runs": []
+  }
+ ],
+ "blobs": {
+  "sha256:9a3d6e6ea03f3cebb4503e479eab2dda917cc122d610be889d81d3aaf81b4023": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 80 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 192 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;First-order low-pass (RC): H(s) = 1 / (1 + sRC) = ωc / (s + ωc)\\nτ = RC = 100 µs and fc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC = −10 krad/s and no finite zero.\\nStep: out rises as 1 − e^(−t/τ) (63 % at t = τ). Bode: −3 dB at fc and then −20 dB/decade; the phase goes from 0 to −90°.\r\nTEXT 0 192 Left 2 !.tran 1m\r\n",
+  "sha256:bd066352326317f5fff568973814c3613ffeb54078bceee3622fb9ccacf398c8": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 80 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 192 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;First-order low-pass (RC): H(s) = 1 / (1 + sRC) = ωc / (s + ωc)\\nτ = RC = 100 µs and fc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC = −10 krad/s and no finite zero.\\nStep: out rises as 1 − e^(−t/τ) (63 % at t = τ). Bode: −3 dB at fc and then −20 dB/decade; the phase goes from 0 to −90°.\r\nTEXT 0 192 Left 2 !.ac dec 100 10 100k\r\n",
+  "sha256:32c9a45b93d157bef1c0ae3571f5bd703d2f7ce84d64b8c62530b0ff607e3f0d": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 80 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 192 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;First-order low-pass (RC): H(s) = 1 / (1 + sRC) = ωc / (s + ωc)\\nτ = RC = 100 µs and fc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC = −10 krad/s and no finite zero.\\nStep: out rises as 1 − e^(−t/τ) (63 % at t = τ). Bode: −3 dB at fc and then −20 dB/decade; the phase goes from 0 to −90°.\r\nTEXT 0 192 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:4eb6cb5c0d5e039b63af4cab7eaea73a2a1ea3bc3a5eed2320f43a0cf9ac078b": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 80 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value {R}\r\nSYMBOL cap 192 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;First-order low-pass (RC): H(s) = 1 / (1 + sRC) = ωc / (s + ωc)\\nτ = RC = 100 µs and fc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC = −10 krad/s and no finite zero.\\nStep: out rises as 1 − e^(−t/τ) (63 % at t = τ). Bode: −3 dB at fc and then −20 dB/decade; the phase goes from 0 to −90°.\r\nTEXT 0 256 Left 2 !.step param R list 500 1k 2k\\n.meas tran trise TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1\r\nTEXT 0 352 Left 2 ;With .step, one run per value of R (500, 1k and 2k); the .meas gives the rise time, 2.2 RC.\r\nTEXT 0 408 Left 2 !.tran 1m\r\n",
+  "sha256:dece81707e60d490bcee7e8cbe63897880b324f979f0be968d740f2b59bf565b": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 112 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL cap 112 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 192 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nTEXT 0 -224 Left 2 ;First-order high-pass (CR): H(s) = sRC / (1 + sRC) = s / (s + ωc)\\nfc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC and a zero at s = 0.\\nStep: out jumps to 1 and decays as e^(−t/τ). Bode: +20 dB/decade below fc and flat above; the phase goes from +90° to 0.\r\nTEXT 0 192 Left 2 !.tran 1m\r\n",
+  "sha256:5f4c04e8082c6350355c69a13728142f2ac0532e5cb4db0217dfee6c5374932c": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 112 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL cap 112 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 192 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nTEXT 0 -224 Left 2 ;First-order high-pass (CR): H(s) = sRC / (1 + sRC) = s / (s + ωc)\\nfc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC and a zero at s = 0.\\nStep: out jumps to 1 and decays as e^(−t/τ). Bode: +20 dB/decade below fc and flat above; the phase goes from +90° to 0.\r\nTEXT 0 192 Left 2 !.ac dec 100 10 100k\r\n",
+  "sha256:ea732d5a2d763478de9dc083c454e303fa6cf5348009a25aaae89c0cd3dbee27": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 112 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 128 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL cap 112 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 192 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nTEXT 0 -224 Left 2 ;First-order high-pass (CR): H(s) = sRC / (1 + sRC) = s / (s + ωc)\\nfc = 1 / (2π RC) ≈ 1.59 kHz: one pole at s = −1/RC and a zero at s = 0.\\nStep: out jumps to 1 and decays as e^(−t/τ). Bode: +20 dB/decade below fc and flat above; the phase goes from +90° to 0.\r\nTEXT 0 192 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:9c4ccfe1afb7a77aa8c2c4ac5fdfff0afa22fe267f220066441f865f584909a5": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 224 -32\r\nWIRE 288 -32 224 -32\r\nWIRE 224 -32 224 -128\r\nWIRE 224 -128 304 -128\r\nWIRE 384 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 400 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 80 32 112 32\r\nWIRE 192 32 224 32\r\nWIRE 224 32 288 32\r\nWIRE 224 32 224 64\r\nWIRE 224 128 224 160\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 224 160 0\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 400 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 480 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 208 64 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;First-order all-pass with an op amp: R1-C1 is a low-pass into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in = in · (2 / (1 + sRC) − 1), that is, H(s) = V(out) / V(in) = (1 − sRC) / (1 + sRC).\\n|H| = 1 at every frequency and the phase goes from 0 to −180° (−90° at 1.59 kHz). The pole is at s = −1/RC and the zero at s = +1/RC,\\nits mirror image on the right half-plane. Step: out starts at −1 (C1 holds + at 0) and goes to +1.\r\nTEXT 0 224 Left 2 !.tran 1m\r\n",
+  "sha256:6499df82004c1451130d1d65d0f8bbc43c7b3021d10d3e503f1ec7a58201231c": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 224 -32\r\nWIRE 288 -32 224 -32\r\nWIRE 224 -32 224 -128\r\nWIRE 224 -128 304 -128\r\nWIRE 384 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 400 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 80 32 112 32\r\nWIRE 192 32 224 32\r\nWIRE 224 32 288 32\r\nWIRE 224 32 224 64\r\nWIRE 224 128 224 160\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 224 160 0\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 400 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 480 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 208 64 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;First-order all-pass with an op amp: R1-C1 is a low-pass into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in = in · (2 / (1 + sRC) − 1), that is, H(s) = V(out) / V(in) = (1 − sRC) / (1 + sRC).\\n|H| = 1 at every frequency and the phase goes from 0 to −180° (−90° at 1.59 kHz). The pole is at s = −1/RC and the zero at s = +1/RC,\\nits mirror image on the right half-plane. Step: out starts at −1 (C1 holds + at 0) and goes to +1.\r\nTEXT 0 224 Left 2 !.ac dec 100 10 100k\r\n",
+  "sha256:f19e06faf69811ef63ddd9875ef4cc34c531d22b045892ebae41bb3f12d73add": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 224 -32\r\nWIRE 288 -32 224 -32\r\nWIRE 224 -32 224 -128\r\nWIRE 224 -128 304 -128\r\nWIRE 384 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 400 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 80 32 112 32\r\nWIRE 192 32 224 32\r\nWIRE 224 32 288 32\r\nWIRE 224 32 224 64\r\nWIRE 224 128 224 160\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 224 160 0\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 400 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 480 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL cap 208 64 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;First-order all-pass with an op amp: R1-C1 is a low-pass into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in = in · (2 / (1 + sRC) − 1), that is, H(s) = V(out) / V(in) = (1 − sRC) / (1 + sRC).\\n|H| = 1 at every frequency and the phase goes from 0 to −180° (−90° at 1.59 kHz). The pole is at s = −1/RC and the zero at s = +1/RC,\\nits mirror image on the right half-plane. Step: out starts at −1 (C1 holds + at 0) and goes to +1.\r\nTEXT 0 224 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:8b3a2e083e627932825499b5d1cea2131e93d90f5951d7c4a65db368ff408021": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 80 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 256 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 304 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order low-pass (series RLC, output on C): H(s) = ω0² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nStep: it overshoots (about 46 %) and rings at f0 while it settles. Bode: a peak of about Q (6.7 dB) near f0 and then −40 dB/decade; the phase goes from 0 to −180°.\r\nTEXT 0 192 Left 2 !.tran 1m\r\n",
+  "sha256:8feaed3fef7087ba149e6cef4d7ca025db6df1841724b1102bba40d3f1795d92": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 80 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 256 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 304 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order low-pass (series RLC, output on C): H(s) = ω0² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nStep: it overshoots (about 46 %) and rings at f0 while it settles. Bode: a peak of about Q (6.7 dB) near f0 and then −40 dB/decade; the phase goes from 0 to −180°.\r\nTEXT 0 192 Left 2 !.ac dec 100 100 100k\r\n",
+  "sha256:f7f175b7607b762f93c29976b64274f72d2acf350311d2ffb8557f2a0abaf896": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 240 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 80 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 256 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 304 16 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order low-pass (series RLC, output on C): H(s) = ω0² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nStep: it overshoots (about 46 %) and rings at f0 while it settles. Bode: a peak of about Q (6.7 dB) near f0 and then −40 dB/decade; the phase goes from 0 to −180°.\r\nTEXT 0 192 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:9c2edadcad543839655cf90001715b39e1edf373562823d3b9e4b1b87cff759b": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL ind 304 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nTEXT 0 -224 Left 2 ;Second-order high-pass (series RLC, output on L): H(s) = s² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A double zero at s = 0.\\nStep: out jumps to 1, rings and decays to 0. Bode: +40 dB/decade below f0, a peak near f0 and flat above; the phase goes from +180° to 0.\r\nTEXT 0 192 Left 2 !.tran 1m\r\n",
+  "sha256:e60256ad61552795ae0f132c41a49f66994ffa96198275c769e6f0f66c2b1ba2": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL ind 304 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nTEXT 0 -224 Left 2 ;Second-order high-pass (series RLC, output on L): H(s) = s² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A double zero at s = 0.\\nStep: out jumps to 1, rings and decays to 0. Bode: +40 dB/decade below f0, a peak near f0 and flat above; the phase goes from +180° to 0.\r\nTEXT 0 192 Left 2 !.ac dec 100 100 100k\r\n",
+  "sha256:470bfdd0d16edf2be2b82cd8d35b310cacb24f2eba6486f5233eafb808e2ab5a": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL ind 304 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nTEXT 0 -224 Left 2 ;Second-order high-pass (series RLC, output on L): H(s) = s² / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A double zero at s = 0.\\nStep: out jumps to 1, rings and decays to 0. Bode: +40 dB/decade below f0, a peak near f0 and flat above; the phase goes from +180° to 0.\r\nTEXT 0 192 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:5ecde83b6d1ab2dae693096b8c9ea17d774902e72021126bc9ea5627bc163851": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL ind 144 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 304 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nTEXT 0 -224 Left 2 ;Second-order band-pass (series RLC, output on R): H(s) = s ω0/Q / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A zero at s = 0.\\nGain 1 (0 dB) at f0 and a bandwidth f0/Q ≈ 2.4 kHz between the −3 dB points; ±20 dB/decade far from f0 and a phase from +90° to −90°.\\nStep: a damped oscillation that starts and ends at 0.\r\nTEXT 0 192 Left 2 !.tran 1m\r\n",
+  "sha256:691d49b4cb193ae2a5f69eed6e66e0c1f2c7d23416e689b6a8c513400475f572": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL ind 144 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 304 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nTEXT 0 -224 Left 2 ;Second-order band-pass (series RLC, output on R): H(s) = s ω0/Q / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A zero at s = 0.\\nGain 1 (0 dB) at f0 and a bandwidth f0/Q ≈ 2.4 kHz between the −3 dB points; ±20 dB/decade far from f0 and a phase from +90° to −90°.\\nStep: a damped oscillation that starts and ends at 0.\r\nTEXT 0 192 Left 2 !.ac dec 100 100 100k\r\n",
+  "sha256:dfe3e9444c874a4e4511d3fd1e8737aacd02419945f7a9e56cd7ad66227c35a8": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 160 -32\r\nWIRE 224 -32 320 -32\r\nWIRE 320 -32 368 -32\r\nWIRE 320 -32 320 16\r\nWIRE 320 96 320 128\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 320 128 0\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL ind 144 -48 R90\r\nWINDOW 0 5 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 224 -48 R90\r\nWINDOW 0 0 32 VBottom 2\r\nWINDOW 3 32 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nSYMBOL res 304 0 R0\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nTEXT 0 -224 Left 2 ;Second-order band-pass (series RLC, output on R): H(s) = s ω0/Q / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²). A zero at s = 0.\\nGain 1 (0 dB) at f0 and a bandwidth f0/Q ≈ 2.4 kHz between the −3 dB points; ±20 dB/decade far from f0 and a phase from +90° to −90°.\\nStep: a damped oscillation that starts and ends at 0.\r\nTEXT 0 192 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:ac1d19ea09190f4b00a6a01f4f2c28ce5103344fea2810b4ffa9f2b225ef4819": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 112\r\nWIRE 208 176 208 208\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 208 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 192 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 192 112 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order band-stop or notch (output on the series LC): H(s) = (s² + ω0²) / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nThe zeros are on the jω axis, at ±jω0: at f0 the LC is a short circuit and the output is 0. Bode: 0 dB far from f0 and a deep notch at f0, where the phase jumps 180°.\\nStep: out jumps to 1 (at first L is an open circuit), dips with a damped ring and goes back to 1.\r\nTEXT 0 272 Left 2 !.tran 1m\r\n",
+  "sha256:8db2cc029c303225d29579f83e04fff3639d96b64d6eb921b5d7b31e1afe65d0": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 112\r\nWIRE 208 176 208 208\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 208 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 192 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 192 112 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order band-stop or notch (output on the series LC): H(s) = (s² + ω0²) / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nThe zeros are on the jω axis, at ±jω0: at f0 the LC is a short circuit and the output is 0. Bode: 0 dB far from f0 and a deep notch at f0, where the phase jumps 180°.\\nStep: out jumps to 1 (at first L is an open circuit), dips with a damped ring and goes back to 1.\r\nTEXT 0 272 Left 2 !.ac dec 100 100 100k\r\n",
+  "sha256:08d1f92ef1e0ca4b04ceb87d991a172ad279f36d9d2f6afcf74da40d9a25cfc3": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 -32 48 -32\r\nWIRE 128 -32 208 -32\r\nWIRE 208 -32 256 -32\r\nWIRE 208 -32 208 16\r\nWIRE 208 96 208 112\r\nWIRE 208 176 208 208\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nFLAG 208 208 0\r\nFLAG 256 -32 out\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 144 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 192 0 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 192 112 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -224 Left 2 ;Second-order band-stop or notch (output on the series LC): H(s) = (s² + ω0²) / (s² + s ω0/Q + ω0²)\\nω0 = 1/√(LC) = 31.6 krad/s (f0 ≈ 5.03 kHz) and Q = √(L/C) / R ≈ 2.1: two complex poles at −ω0/2Q ± jω0√(1 − 1/4Q²).\\nThe zeros are on the jω axis, at ±jω0: at f0 the LC is a short circuit and the output is 0. Bode: 0 dB far from f0 and a deep notch at f0, where the phase jumps 180°.\\nStep: out jumps to 1 (at first L is an open circuit), dips with a damped ring and goes back to 1.\r\nTEXT 0 272 Left 2 ;.pz in 0 out 0 vol pz\r\n",
+  "sha256:6db3ea0e5f52ecaa21d56dc9840c6236b14ee498fdbc2c47a701f86c6cd54cf1": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 256 -32\r\nWIRE 304 -32 256 -32\r\nWIRE 256 -32 256 -128\r\nWIRE 320 -128 256 -128\r\nWIRE 400 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 416 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 112 32 80 32\r\nWIRE 192 32 256 32\r\nWIRE 256 32 304 32\r\nWIRE 256 32 256 64\r\nWIRE 256 144 256 160\r\nWIRE 256 224 256 256\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 256 256 0\r\nSYMBOL voltage 0 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 1 0 1n 1n 1 2)\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 416 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 496 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 240 48 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 240 160 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;Second-order all-pass with an op amp: R1 and the series L1-C1 are a notch into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in, that is, H(s) = V(out) / V(in) = (s² − s ω0/Q + ω0²) / (s² + s ω0/Q + ω0²) with ω0 = 1/√(LC) and Q = √(L/C) / R1 ≈ 2.1.\\n|H| = 1 at every frequency and the phase goes from 0 to −360° (−180° at f0 ≈ 5.03 kHz). The zeros are the poles mirrored on the right half-plane.\\nStep: out jumps to 1 (at first L1 is an open circuit), dips to about 0.3, rings and settles back at 1.\r\nTEXT 0 320 Left 2 !.tran 1m\r\n",
+  "sha256:6fd3c5012f1823983a61dacb920814f5d1c652e6056123403b7571509f923210": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 256 -32\r\nWIRE 304 -32 256 -32\r\nWIRE 256 -32 256 -128\r\nWIRE 320 -128 256 -128\r\nWIRE 400 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 416 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 112 32 80 32\r\nWIRE 192 32 256 32\r\nWIRE 256 32 304 32\r\nWIRE 256 32 256 64\r\nWIRE 256 144 256 160\r\nWIRE 256 224 256 256\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 256 256 0\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 416 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 496 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 240 48 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 240 160 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;Second-order all-pass with an op amp: R1 and the series L1-C1 are a notch into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in, that is, H(s) = V(out) / V(in) = (s² − s ω0/Q + ω0²) / (s² + s ω0/Q + ω0²) with ω0 = 1/√(LC) and Q = √(L/C) / R1 ≈ 2.1.\\n|H| = 1 at every frequency and the phase goes from 0 to −360° (−180° at f0 ≈ 5.03 kHz). The zeros are the poles mirrored on the right half-plane.\\nStep: out jumps to 1 (at first L1 is an open circuit), dips to about 0.3, rings and settles back at 1.\r\nTEXT 0 320 Left 2 !.ac dec 100 100 100k\r\n",
+  "sha256:28cc735af3295da9653825e0377d0e594ad83109e58c49201f691c479328c7d3": "Version 4\r\nSHEET 1 1200 800\r\nWIRE 0 16 0 -32\r\nWIRE 0 96 0 128\r\nWIRE 0 -32 80 -32\r\nWIRE 80 -32 112 -32\r\nWIRE 192 -32 256 -32\r\nWIRE 304 -32 256 -32\r\nWIRE 256 -32 256 -128\r\nWIRE 320 -128 256 -128\r\nWIRE 400 -128 464 -128\r\nWIRE 464 -128 464 0\r\nWIRE 416 0 464 0\r\nWIRE 464 0 512 0\r\nWIRE 80 -32 80 32\r\nWIRE 112 32 80 32\r\nWIRE 192 32 256 32\r\nWIRE 256 32 304 32\r\nWIRE 256 32 256 64\r\nWIRE 256 144 256 160\r\nWIRE 256 224 256 256\r\nFLAG 0 128 0\r\nFLAG 0 -32 in\r\nFLAG 512 0 out\r\nFLAG 256 256 0\r\nSYMBOL voltage 0 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 208 -48 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 416 -144 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R3\r\nSYMATTR Value 10k\r\nSYMBOL OA_NoPole 496 -48 R0\r\nSYMATTR InstName U1\r\nSYMBOL res 208 16 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 150\r\nSYMBOL ind 240 48 R0\r\nSYMATTR InstName L1\r\nSYMATTR Value 10m\r\nSYMATTR SpiceLine Rser=0\r\nSYMBOL cap 240 160 R0\r\nSYMATTR InstName C1\r\nSYMATTR Value 100n\r\nTEXT 0 -352 Left 2 ;Second-order all-pass with an op amp: R1 and the series L1-C1 are a notch into the + input, and R2 = R3 make the amplifier subtract the input (U1 has no poles: only its gain):\\nout = 2·V(+) − in, that is, H(s) = V(out) / V(in) = (s² − s ω0/Q + ω0²) / (s² + s ω0/Q + ω0²) with ω0 = 1/√(LC) and Q = √(L/C) / R1 ≈ 2.1.\\n|H| = 1 at every frequency and the phase goes from 0 to −360° (−180° at f0 ≈ 5.03 kHz). The zeros are the poles mirrored on the right half-plane.\\nStep: out jumps to 1 (at first L1 is an open circuit), dips to about 0.3, rings and settles back at 1.\r\nTEXT 0 320 Left 2 ;.pz in 0 out 0 vol pz\r\n"
+ }
+}

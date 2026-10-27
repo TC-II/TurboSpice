@@ -151,7 +151,11 @@ const SAMPLE = 'Sample Project.turbo';
 /** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
 const ADC = 'ADC.turbo';
 const EXAMPLES_TURBO = 'Examples.turbo';
-const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
+const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
+/** las transferencias de 1er y 2do orden con RC y RLC: un workbench cada una (scripts/make-examples.ts) */
+const TRANSFER = 'Transfer functions.turbo';
+/** emisor común, degenerado, colector común y base común, BJT contra MOSFET (scripts/make-examples.ts) */
+const AMPS = 'Transistor amplifiers.turbo';
 
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
@@ -3138,6 +3142,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Examples'),
       items: [
         { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
+        { label: 'Transfer functions', title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'), onClick: () => doExample(TRANSFER) },
+        { label: 'Transistor amplifiers', title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'), onClick: () => doExample(AMPS) },
         { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),

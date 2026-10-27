@@ -952,7 +952,14 @@ function PaneView(props: {
     // rueda o paneo, que con millones de puntos se notaba)
     const extents = new Map<string, Range | null>();
     const fullY = (scale: string) => {
-      if (!extents.has(scale)) extents.set(scale, extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y)));
+      if (!extents.has(scale)) {
+        const e = extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y));
+        // dB y grados que varían menos que el ruido numérico (un pasatodo: |H| = 0 dB ± 1e-15) son
+        // una recta (±1 dB o ±1° a su alrededor): sin esto el eje se estira hasta mostrar ese ruido
+        const flat = e && (scale === 'ph' || (scale === 'y' && data.yUnit === 'dB')) && e[1] - e[0] < 1e-6;
+        const mid = e ? Math.round((e[0] + e[1]) / 2 * 1e6) / 1e6 : 0;
+        extents.set(scale, flat ? [mid - 1, mid + 1] : e);
+      }
       return extents.get(scale)!;
     };
     const whole = (scale: string): uPlot.Range.Function => (u, min, max) => {

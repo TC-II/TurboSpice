@@ -1170,6 +1170,8 @@ function PaneView(props: {
         setSelect: [
           (u) => {
             if ((live.current.cursorMode || live.current.markerMode) && !live.current.zoomMode) return;
+            // (un recuadro cancelado con clic derecho o Esc se descarta al soltar)
+            if (el.classList.contains('zoom-cancelled')) return u.setSelect({ left: 0, top: 0, width: 0, height: 0 }, false);
             // (los demás paneles reciben el mismo arrastre por la sincronización: lo aplica sólo el que lo empezó)
             if (!pressed.current) return;
             const s = u.select;
@@ -1549,6 +1551,11 @@ function PaneView(props: {
       if (r.height > 0 && dy && axis !== 'bottom') {
         const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
+        // sobre el gráfico (no sobre el eje izquierdo) el eje derecho acompaña
+        if (!axis && pan.sr) {
+          const [rlo, rhi] = panBy(pan.sr[0], pan.sr[1], dy / r.height);
+          if (Number.isFinite(rlo) && Number.isFinite(rhi) && rhi > rlo) live.current.onWheelR([rlo, rhi]);
+        }
       }
     };
     const panEnd = (e: PointerEvent) => {
@@ -1669,7 +1676,24 @@ function PaneView(props: {
     const selEnd = () => {
       el.classList.remove('selecting');
       // (uPlot cierra el arrastre en el mouseup, que llega después del pointerup)
-      setTimeout(() => (pressed.current = false), 0);
+      setTimeout(() => {
+        pressed.current = false;
+        el.classList.remove('zoom-cancelled');
+      }, 0);
+    };
+    // clic derecho o Esc mientras se arrastra el recuadro: se cancela el zoom (sin abrir el menú)
+    const selCancel = (e: MouseEvent | KeyboardEvent) => {
+      if (!pressed.current || el.classList.contains('zoom-cancelled')) return;
+      if (e instanceof KeyboardEvent ? e.key !== 'Escape' : e.button !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove('selecting');
+      el.classList.add('zoom-cancelled');
+      if (e instanceof MouseEvent) {
+        const block = (ev: Event) => ev.preventDefault();
+        window.addEventListener('contextmenu', block, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener('contextmenu', block, { capture: true }), 500);
+      }
     };
     root.addEventListener('pointerdown', markDown, true);
     root.addEventListener('pointermove', markMove, true);
@@ -1678,6 +1702,8 @@ function PaneView(props: {
     root.addEventListener('pointerdown', selStart);
     window.addEventListener('pointerup', selEnd);
     window.addEventListener('pointercancel', selEnd);
+    window.addEventListener('mousedown', selCancel, true);
+    window.addEventListener('keydown', selCancel, true);
     root.addEventListener('pointerdown', down);
     root.addEventListener('pointermove', move);
     root.addEventListener('pointerleave', leave);
@@ -1707,6 +1733,8 @@ function PaneView(props: {
       root.removeEventListener('pointerdown', selStart);
       window.removeEventListener('pointerup', selEnd);
       window.removeEventListener('pointercancel', selEnd);
+      window.removeEventListener('mousedown', selCancel, true);
+      window.removeEventListener('keydown', selCancel, true);
       root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move);
       root.removeEventListener('pointerleave', leave);

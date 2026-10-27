@@ -507,6 +507,8 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .pane-chart .u-cursor-x, .pane-chart .u-cursor-y { border-color: var(--fg-muted); }
 .pane-chart .u-select { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .pane-chart.selecting .u-select { box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.28), inset 0 0 0 1px var(--accent); }
+/* zoom cancelado (clic derecho o Esc): el recuadro no se ve hasta soltar */
+.pane-chart.zoom-cancelled .u-select { display: none; }
 /* barra de resultados: la vista elegida en el menú y las herramientas del visor */
 .results-view { font-size: 13px; font-weight: 600; color: var(--fg); }
 .incomplete-badge { font-size: 12px; font-weight: 600; color: var(--err); border-color: var(--err); background: transparent; padding: 1px 8px; }

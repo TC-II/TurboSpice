@@ -38,7 +38,7 @@ import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type Net
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
-import { shapeBox, shapeInBox } from './shapes.ts';
+import { resizeShape, shapeBox, shapeHandles, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
 
 /**
@@ -176,6 +176,8 @@ type Drag =
   | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean; editText?: number }
   /** agrandar o achicar un comentario desde la esquina de su caja (cambia el tamaño de letra) */
   | { mode: 'textsize'; index: number; left: boolean; top: boolean; box: Box }
+  /** cambiar el tamaño de una figura desde una de sus manijas (shapeHandles) */
+  | { mode: 'shapesize'; index: number; handle: number }
   /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
   | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
   /** recuadro de la herramienta zoom */
@@ -702,6 +704,17 @@ export function SchematicEditor(props: Props) {
   const arcEnd = (t: Tool, p: Point): Point | null =>
     t.kind === 'shape' && t.shape === 'ARC' && t.pts.length >= 2 ? { x: Math.round(p.x), y: Math.round(p.y) } : null;
 
+  /** manija de la figura seleccionada (sola) bajo `p` */
+  const shapeHandleAt = (p: Point): { index: number; handle: number } | null => {
+    if (tool.kind !== 'select' || selection.length !== 1 || selection[0].kind !== 'shape') return null;
+    const index = selection[0].index;
+    const s = doc.shapes[index];
+    if (!s) return null;
+    const hr = 6 / view.scale;
+    const handle = shapeHandles(s).findIndex((c) => Math.abs(p.x - c.x) <= hr && Math.abs(p.y - c.y) <= hr);
+    return handle >= 0 ? { index, handle } : null;
+  };
+
   const onPointerDown = (e: React.PointerEvent) => {
     // click afuera del comentario que se escribe: lo deja (y ese click no hace otra cosa)
     if (inlineRef.current) {
@@ -751,6 +764,9 @@ export function SchematicEditor(props: Props) {
 
     switch (tool.kind) {
       case 'select': {
+        // una manija de la figura seleccionada: arrastrarla le cambia el tamaño
+        const sh = shapeHandleAt(p);
+        if (sh) return setDrag({ mode: 'shapesize', ...sh });
         // la esquina de la caja del comentario seleccionado: arrastrarla cambia el tamaño de letra
         const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
         const rb = only >= 0 ? resizableBox(doc.texts[only]) : null;
@@ -1073,6 +1089,9 @@ export function SchematicEditor(props: Props) {
       });
       if (!drag.moved && Math.hypot(dx, dy) > tol) setDrag({ ...drag, moved: true });
       setPreview(setWindows(doc, edits));
+    } else if (drag.mode === 'shapesize') {
+      const s = resizeShape(doc.shapes[drag.index], drag.handle, snapPoint(p));
+      if (s) setPreview({ ...doc, shapes: doc.shapes.map((x, i) => (i === drag.index ? s : x)) });
     } else if (drag.mode === 'textsize') {
       // la esquina arrastrada sigue al cursor y la opuesta queda fija: la caja pasa a tener tamaño
       // propio; el texto se parte para entrar en el ancho y lo que no entra en el alto se recorta
@@ -1136,7 +1155,7 @@ export function SchematicEditor(props: Props) {
     }
     if ((drag.mode === 'label' || drag.mode === 'move') && drag.moved) deselectOnLeave.current = true;
     if (drag.mode === 'label' && preview && drag.moved) commit(preview);
-    if (drag.mode === 'textsize' && preview) commit(preview);
+    if ((drag.mode === 'textsize' || drag.mode === 'shapesize') && preview) commit(preview);
     if (drag.mode === 'move' && !drag.moved && drag.editText !== undefined) editInline(drag.editText);
     if (drag.mode === 'label' && !drag.moved) {
       // click sobre un rótulo sin moverlo: selecciona su componente (Shift: agrega/quita)
@@ -1298,7 +1317,8 @@ export function SchematicEditor(props: Props) {
   }, [selection, doc, lib]);
 
   const resizeHover = (() => {
-    if (drag?.mode === 'textsize') return true;
+    if (drag?.mode === 'textsize' || drag?.mode === 'shapesize') return true;
+    if (!drag && shapeHandleAt(cursor)) return true;
     const only = selection.length === 1 && selection[0].kind === 'text' ? selection[0].index : -1;
     const rb = only >= 0 && !drag ? resizableBox(doc.texts[only]) : null;
     const hr = 6 / view.scale;
@@ -1404,6 +1424,16 @@ export function SchematicEditor(props: Props) {
             {[rb.x1, rb.x2].flatMap((cx) => [rb.y1, rb.y2].map((cy) => (
               <rect key={`${cx},${cy}`} className="handle" x={cx - k / 2} y={cy - k / 2} width={k} height={k} />
             )))}
+          </g>
+        );
+      })()}
+      {tool.kind === 'select' && (!drag || drag.mode === 'shapesize') && selection.length === 1 && selection[0].kind === 'shape' && shown.shapes[selection[0].index] && (() => {
+        const k = 6 / view.scale;
+        return (
+          <g className="text-bbox">
+            {shapeHandles(shown.shapes[selection[0].index]).map((c, i) => (
+              <rect key={i} className="handle" x={c.x - k / 2} y={c.y - k / 2} width={k} height={k} />
+            ))}
           </g>
         );
       })()}

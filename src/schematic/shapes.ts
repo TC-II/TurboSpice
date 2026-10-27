@@ -119,3 +119,47 @@ export function mapShape(s: Shape, f: (p: Point) => Point, mirrors = false): Sha
 }
 
 export const shiftShape = (s: Shape, dx: number, dy: number) => mapShape(s, (p) => ({ x: p.x + dx, y: p.y + dy }));
+
+/** Caja que se agarra para cambiar el tamaño: la guardada (rectángulo, círculo, arco, imagen) o la del trazo */
+function sizeBox(s: Shape): Box {
+  if (s.kind === 'PATH') return shapeBox(s);
+  const [x1, y1, x2, y2] = s.coords;
+  return { x1: Math.min(x1, x2), y1: Math.min(y1, y2), x2: Math.max(x1, x2), y2: Math.max(y1, y2) };
+}
+
+/** Manijas para cambiar el tamaño: los extremos de una línea; las cuatro esquinas de las demás */
+export function shapeHandles(s: Shape): Point[] {
+  if (s.kind === 'LINE') return shapePoints(s);
+  const b = sizeBox(s);
+  return [
+    { x: b.x1, y: b.y1 },
+    { x: b.x2, y: b.y1 },
+    { x: b.x2, y: b.y2 },
+    { x: b.x1, y: b.y2 },
+  ];
+}
+
+/**
+ * La figura con la manija `h` (de shapeHandles) llevada a `to`: en una línea se mueve ese extremo;
+ * en las demás, esa esquina, con la opuesta fija (todo lo de adentro se escala). null si la figura
+ * quedaría sin ancho o sin alto.
+ */
+export function resizeShape(s: Shape, h: number, to: Point): Shape | null {
+  if (s.kind === 'LINE') {
+    const pts = shapePoints(s);
+    pts[h] = to;
+    return pts[0].x === pts[1].x && pts[0].y === pts[1].y ? null : { ...s, coords: pts.flatMap((p) => [p.x, p.y]) };
+  }
+  const b = sizeBox(s);
+  const opp = shapeHandles(s)[(h + 2) % 4];
+  const nb = { x1: Math.min(opp.x, to.x), y1: Math.min(opp.y, to.y), x2: Math.max(opp.x, to.x), y2: Math.max(opp.y, to.y) };
+  if (nb.x1 === nb.x2 || nb.y1 === nb.y2) return null;
+  // (la esquina pasó al otro lado de la opuesta: la figura se da vuelta como el recuadro)
+  const fx = (to.x - opp.x) * (shapeHandles(s)[h].x - opp.x) < 0;
+  const fy = (to.y - opp.y) * (shapeHandles(s)[h].y - opp.y) < 0;
+  const map = (v: number, lo: number, hi: number, nlo: number, nhi: number, flip: boolean) => {
+    const t = hi === lo ? 0 : (v - lo) / (hi - lo);
+    return Math.round(nlo + (flip ? 1 - t : t) * (nhi - nlo));
+  };
+  return mapShape(s, (p) => ({ x: map(p.x, b.x1, b.x2, nb.x1, nb.x2, fx), y: map(p.y, b.y1, b.y2, nb.y1, nb.y2, fy) }), fx !== fy);
+}

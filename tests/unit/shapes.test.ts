@@ -6,7 +6,7 @@ import { Library } from '../../src/library/library.ts';
 import { allItems, deleteItems, duplicateItems, extractItems, moveItems, pasteItems, setShapeStyle, transformItems } from '../../src/schematic/edit.ts';
 import { hitTest, type ItemRef } from '../../src/schematic/geometry.ts';
 import { shapeFromClicks } from '../../src/schematic/SchematicEditor.tsx';
-import { arcAngles, shapeDist, shapeInBox } from '../../src/schematic/shapes.ts';
+import { arcAngles, resizeShape, shapeDist, shapeHandles, shapeInBox } from '../../src/schematic/shapes.ts';
 
 const lib = new Library(buildBundle());
 
@@ -107,5 +107,20 @@ describe('figuras de LTspice', () => {
     expect(shapeFromClicks('ARC', [a, b, { x: 64, y: 16 }])).toBe('more');
     // inicio a la derecha, fin arriba: en el archivo, primero el fin
     expect(shapeFromClicks('ARC', [a, b, { x: 64, y: 16 }, { x: 32, y: 0 }])).toEqual({ kind: 'ARC', coords: [0, 0, 64, 32, 32, 0, 64, 16] });
+  });
+});
+
+describe('cambiar el tamaño de una figura (#318)', () => {
+  it('rectángulo: la esquina arrastrada sigue al cursor y la opuesta queda', () => {
+    const r = { kind: 'RECTANGLE' as const, coords: [0, 0, 64, 32] };
+    expect(shapeHandles(r)).toEqual([{ x: 0, y: 0 }, { x: 64, y: 0 }, { x: 64, y: 32 }, { x: 0, y: 32 }]);
+    expect(resizeShape(r, 2, { x: 96, y: 48 })?.coords).toEqual([0, 0, 96, 48]);
+    expect(resizeShape(r, 0, { x: 64, y: 16 })).toBeNull();
+  });
+  it('línea: se mueve el extremo', () => {
+    expect(resizeShape({ kind: 'LINE', coords: [0, 0, 64, 0] }, 1, { x: 64, y: 32 })?.coords).toEqual([0, 0, 64, 32]);
+  });
+  it('arco: los puntos de inicio y fin se escalan con la caja', () => {
+    expect(resizeShape({ kind: 'ARC', coords: [0, 0, 64, 32, 32, 0, 64, 16] }, 2, { x: 128, y: 64 })?.coords).toEqual([0, 0, 128, 64, 64, 0, 128, 32]);
   });
 });

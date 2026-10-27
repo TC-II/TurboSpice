@@ -242,6 +242,18 @@ SYMBOL res 0 0 R0
     expect(net(m)).toBe(net(d));
   });
 
+  it('arrastrar a lo largo un componente con su cable hasta el pin de otro (o una etiqueta) no lo hace sobresalir (#317)', () => {
+    const d = asc(`WIRE 16 96 16 176
+WIRE 16 -64 16 16
+FLAG 16 -64 0
+SYMBOL res 0 0 R0
+SYMBOL res 0 160 R0
+`);
+    const m = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 0 }, { kind: 'wire', index: 1 }], 0, 32, true, lib);
+    expect(ws(m).sort()).toEqual([[16, -64, 16, 48], [16, 128, 16, 176]]);
+    expect(net(m)).toBe(net(d));
+  });
+
   it('arrastrar de costado un componente con sus cables hasta una T los traslada enteros', () => {
     const d = asc(`WIRE -64 -32 16 -32
 WIRE 16 -32 96 -32

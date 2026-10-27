@@ -270,6 +270,19 @@ function freeEnd(doc: AscDoc, p: Point): boolean {
   return at.length === 1 && !doc.wires.some((w) => w !== at[0] && distToSegment(p, w) === 0);
 }
 
+/** ¿El cable no toca nada en sus puntas (otro cable, un pin, una etiqueta)? */
+function looseWire(doc: AscDoc, index: number, lib: Library): boolean {
+  const w = doc.wires[index];
+  const pts = [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }];
+  const at = (p: Point, q: Point) => p.x === q.x && p.y === q.y;
+  return pts.every(
+    (p) =>
+      freeEnd(doc, p) &&
+      !doc.flags.some((f) => at(f, p)) &&
+      !doc.symbols.some((s) => pinPoints(s, lib.symbol(s.type)).some((q) => at(q, p))),
+  );
+}
+
 /**
  * Figura a partir de los clicks de la herramienta: 'more' si faltan clicks, 'invalid' si el
  * último no sirve (un punto repetido, una caja sin ancho o alto).
@@ -792,7 +805,9 @@ export function SchematicEditor(props: Props) {
         // un cable solo: se arrastra un codo o un tramo (Alt+click agrega un codo ahí);
         // con Ctrl, en línea recta (sin codos, puede quedar en diagonal); si es parte de una
         // selección se mueve todo junto
-        if (hit.kind === 'wire' && !e.shiftKey && !(already && selection.length > 1)) {
+        // (un cable suelto, sin nada en sus puntas, se traslada entero en cualquier dirección y
+        // puede apoyarse sobre un pin o un nodo)
+        if (hit.kind === 'wire' && !e.shiftKey && !(already && selection.length > 1) && !looseWire(doc, hit.index, lib)) {
           const straight = e.ctrlKey || e.metaKey;
           const v = wireVertexAt(doc, p, lib, tol * 1.5);
           const at = gridPointOnWire(doc.wires[hit.index], p);
@@ -937,10 +952,11 @@ export function SchematicEditor(props: Props) {
 
   // Rotar/espejar (Ctrl+R / Ctrl+E) mientras se mueve: App cambia el documento y el fantasma
   // se recalcula en el acto con la posición actual del cursor, sin esperar a mover el mouse
+  // (también con la herramienta Move, M, que mueve sin arrastrar)
   useEffect(() => {
-    if (drag?.mode !== 'move') return;
     const g = snapPoint(cursorRef.current);
-    setPreview(moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib));
+    if (drag?.mode === 'move') setPreview(moveItems(doc, drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach, lib));
+    else if (tool.kind === 'move' && tool.refs && tool.start) setPreview(moveItems(doc, tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, lib));
   }, [doc]);
 
   // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta

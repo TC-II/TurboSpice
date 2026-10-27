@@ -205,13 +205,15 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   const stayFlags = new Set<string>();
   doc.flags.forEach((fl, i) => (f.has(i) ? moving.set(key(fl), fl) : stayFlags.add(key(fl))));
   // Un cable seleccionado que se mueve a lo largo de sí mismo, con un extremo en un codo con un
-  // cable no seleccionado (y nada más lo mueve), no se traslada entero: se estira como si no
+  // cable no seleccionado, en el pin de un componente que queda, en una etiqueta (GND, nodo) o
+  // en una T (y nada más lo mueve), no se traslada entero: se estira como si no
   // estuviera seleccionado, así el codo queda en su lugar y el cable no sobresale (igual que al
   // mover sólo el componente). Si se mueve de costado se traslada entero y su extremo se desliza
   // por los cables que llegan ahí; en diagonal, el codo se desliza con la parte de costado del
   // movimiento y el cable se estira con la otra.
   const otherSelEnds = (i: number, p: Point) => doc.wires.some((o, j) => j !== i && w.has(j) && ends(o).some((e) => samePt(e, p)));
-  const unselEnd = (p: Point) => doc.wires.some((o, j) => !w.has(j) && ends(o).some((e) => samePt(e, p)));
+  const unselEnd = (p: Point) =>
+    stayPins.has(key(p)) || stayFlags.has(key(p)) || doc.wires.some((o, j) => !w.has(j) && onSegment(p, o));
   const pinned = (i: number, p: Point) => unselEnd(p) && !moving.has(key(p)) && !otherSelEnds(i, p);
   const stretchedSel = new Set<number>();
   const slide = new Map<string, Point>();
@@ -223,7 +225,9 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     w.delete(i);
     stretchedSel.add(i);
     const perp = wr.y1 === wr.y2 ? { x: 0, y: dy } : { x: dx, y: 0 };
-    if (perp.x || perp.y) for (const p of pins) slide.set(key(p), perp);
+    // (sólo un codo entre cables se desliza: un pin, una etiqueta o una T quedan donde están)
+    const elbow = (p: Point) => !stayPins.has(key(p)) && !stayFlags.has(key(p)) && !doc.wires.some((o, j) => !w.has(j) && inInterior(p, o));
+    if (perp.x || perp.y) for (const p of pins) if (elbow(p)) slide.set(key(p), perp);
   });
   doc.wires.forEach((wr, i) => w.has(i) && ends(wr).forEach((p) => moving.set(key(p), p)));
   // …y lo fijo que se apoya en el interior de un cable seleccionado (una T) también lo sigue

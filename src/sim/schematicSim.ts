@@ -11,7 +11,7 @@ import { ANALYSIS_LINE } from './analyses.ts';
 import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
 import { hierDevice } from './context.ts';
-import { deviceRefs } from './deviceParams.ts';
+import { deviceParams, deviceRefs } from './deviceParams.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -59,17 +59,19 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
     await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),
   );
   const prep = prepareSimulation(ng, (rel) => texts[rel]);
-  // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba
-  const saves = saveLine(prep.netlist, deviceSaves(traces, lt, ng));
-  const netlist = prep.netlist.replace(/\n\.end\s*$/i, `\n${saves}.options savecurrents\n.end`);
-  const control = lt.texts.find((tt) => isControlBlock(tt.text));
-  const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
-  // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
   const analyses = lt.texts
     .filter((tt) => (tt.kind === 'directive' || isNgspiceComment(tt.text)) && !isControlBlock(tt.text))
     .flatMap((tt) => tt.text.split('\\n'))
     .map((l) => l.trim())
     .filter((l) => ANALYSIS_LINE.test(l));
+  // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba (y, con .op,
+  // los parámetros de pequeña señal de transistores y diodos para la tabla)
+  const op = analyses.some((l) => /^\.op\b/i.test(l)) ? opDeviceSaves(lt, ng) : [];
+  const saves = saveLine(prep.netlist, [...deviceSaves(traces, lt, ng), ...op]);
+  const netlist = prep.netlist.replace(/\n\.end\s*$/i, `\n${saves}.options savecurrents\n.end`);
+  const control = lt.texts.find((tt) => isControlBlock(tt.text));
+  const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
+  // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
@@ -85,6 +87,21 @@ export function deviceSaves(traces: string[], lt: LtNetlist, ng: NgspiceNetlist)
     if (dev) out.add(`@${dev}[${r.param.toLowerCase()}]`);
   }
   return [...out];
+}
+
+/**
+ * Con .op, los parámetros de salida de los transistores y diodos del circuito (gm, gpi, go,
+ * capacidades, vth…) para listarlos en la tabla del punto de operación (#320). Las corrientes
+ * ya las guarda savecurrents.
+ */
+export function opDeviceSaves(lt: LtNetlist, ng: NgspiceNetlist): string[] {
+  return lt.elements.flatMap((el) => {
+    const dev = ng.names.get(el.name)?.toLowerCase();
+    if (!dev || !/^[qmjd]/.test(dev)) return [];
+    return deviceParams(dev)
+      .filter((p) => !/^i[bcdegs]?$/.test(p.name))
+      .map((p) => `@${dev}[${p.name}]`);
+  });
 }
 
 /**

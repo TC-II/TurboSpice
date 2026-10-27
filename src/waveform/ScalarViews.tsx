@@ -1,6 +1,7 @@
 // Resultados sin eje X: tabla ordenable (.op, .tf, .sens, ruido integrado); el plano s (.pz) está en PzPlane.
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { SimPlot } from '../engine/ngspice.ts';
+import { deviceParams, parseDeviceVector } from '../sim/deviceParams.ts';
 import { vectorExpr } from '../sim/traces.ts';
 import { complexText } from './pz.ts';
 import { si } from './series.ts';
@@ -26,6 +27,8 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; 
     const f = filter.trim().toLowerCase();
     const list = plot.vectors
       .map((v) => ({ name: vectorExpr(v), raw: v.name, v, mag: Math.max(...Array.from(v.real, (re, i) => Math.hypot(re, v.imag?.[i] ?? 0))) }))
+      // (un parámetro de dispositivo que el modelo no calcula, p. ej. vth en un MOSFET nivel 1, no se lista)
+      .filter((r) => !parseDeviceVector(r.raw) || Number.isFinite(r.mag))
       .filter((r) => !f || r.name.toLowerCase().includes(f));
     return sort === 'abs' ? list.sort((a, b) => b.mag - a.mag) : list.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   }, [plot, sort, filter]);
@@ -48,7 +51,7 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; 
         <tbody onMouseLeave={() => onHoverRow?.(null)}>
           {part.map(({ name, raw, v }) => (
             <tr key={raw} onMouseEnter={() => onHoverRow?.(name)}>
-              <th title={raw}>{name}</th>
+              <th title={paramTitle(raw)}>{name}</th>
               <td className="num">{Array.from(v.real, (re, i) => (v.imag ? complexText(re, v.imag[i]) : si(re))).join(', ')}</td>
             </tr>
           ))}
@@ -69,6 +72,13 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; 
       </div>
     </div>
   );
+}
+
+/** Vector y, si es un parámetro de dispositivo (@q1[gm]), qué es */
+function paramTitle(raw: string): string {
+  const d = parseDeviceVector(raw);
+  const label = d && deviceParams(d.device).find((p) => p.name === d.param.toLowerCase())?.label;
+  return label ? `${raw} — ${label}` : raw;
 }
 
 export { isPzPlot, pzRuns } from './pz.ts';

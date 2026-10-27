@@ -166,7 +166,11 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope
       };
     }
     case 'm': {
-      const [vgs, vds, von, vdsat] = [p('vgs'), p('vds'), p('von'), p('vdsat')];
+      const [vgs, vds, von] = [p('vgs'), p('vds'), p('von')];
+      // el VDMOS (los MOSFET discretos: 2N7000, IRF…) no da vdsat: es de nivel 1, cuadrático, así
+      // que en saturación Vds,sat = Vgs − Vth
+      const derived = p('vdsat') === undefined && vgs !== undefined && von !== undefined;
+      const vdsat = derived ? vgs - von : p('vdsat');
       return {
         title,
         lines: [
@@ -174,7 +178,7 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope
           `Vgs = ${fmt(vgs, 'V')}`,
           `Vds = ${fmt(vds, 'V')}`,
           `Vth = ${fmt(von, 'V')}`,
-          `Vds,sat = ${fmt(vdsat, 'V')}`,
+          `Vds,sat = ${derived ? 'Vgs − Vth = ' : ''}${fmt(vdsat, 'V')}`,
           `gm = ${fmt(p('gm'), 'S')}`,
           `gds = ${fmt(p('gds'), 'S')}`,
           ...(vgs !== undefined && vds !== undefined && von !== undefined && vdsat !== undefined

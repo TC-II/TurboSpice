@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { emptyDoc, type AscDoc, type SchText } from '../../src/asc/model.ts';
 import { setAnalysisLine } from '../../src/schematic/directivesEdit.ts';
-import { biasCommand, pinBias, sameCircuit } from '../../src/sim/bias.ts';
+import { biasCommand, elementBias, pinBias, sameCircuit } from '../../src/sim/bias.ts';
 import type { BuiltSimulation } from '../../src/sim/schematicSim.ts';
 import type { Element } from '../../src/netlist/ltnetlist.ts';
 
@@ -53,5 +53,21 @@ describe('corriente del OP en el pin de un transistor', () => {
   });
   it('un componente de dos terminales no tiene corriente por pin', () => {
     expect(pinBias(sim, bias, { name: 'R1', prefix: 'R', nodes: ['a', 'b'] } as unknown as Element, 1)).toBeNull();
+  });
+});
+
+describe('punto de operación de un MOSFET', () => {
+  const sim = { ng: { names: new Map([['M1', 'm1']]) } } as unknown as BuiltSimulation;
+  const m = { name: 'M1', prefix: 'MN', nodes: ['d', 'g', 's'], value: '2N7000' } as unknown as Element;
+  const lines = (bias: Record<string, number>) => elementBias(sim, bias, m)!.lines;
+  it('el VDMOS no da vdsat: se calcula como Vgs − Vth y con eso la región', () => {
+    const op = { '@m1[id]': 1.3e-3, '@m1[vgs]': 2.4, '@m1[vds]': 4.4, '@m1[von]': 2.1 };
+    expect(lines(op)).toContain('Vds,sat = Vgs − Vth = 300mV');
+    expect(lines(op)).toContain('Región: saturación');
+    expect(lines({ ...op, '@m1[vds]': 0.1 })).toContain('Región: triodo (lineal)');
+    expect(lines({ ...op, '@m1[vgs]': 1.5 })).toContain('Región: corte');
+  });
+  it('si ngspice da vdsat (BSIM, nivel 1…), usa ése', () => {
+    expect(lines({ '@m1[vgs]': 1.2, '@m1[vds]': 0.6, '@m1[von]': 0.5, '@m1[vdsat]': 0.45 })).toEqual(expect.arrayContaining(['Vds,sat = 450mV', 'Región: saturación']));
   });
 });

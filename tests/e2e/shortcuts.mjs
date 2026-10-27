@@ -158,10 +158,10 @@ const overResults = async () => {
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
 };
 await overResults();
-await page.keyboard.press('a');
-check(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement), 'A va al campo de expresión');
+await page.keyboard.press('t');
+check(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement), 'T va al campo de expresión');
 await page.keyboard.type('V(out)');
-check((await page.getByLabel('Expresión').inputValue()) === 'V(out)', 'sin escribir la "a"');
+check((await page.getByLabel('Expresión').inputValue()) === 'V(out)', 'sin escribir la "t"');
 await page.keyboard.press('Enter');
 await page.locator('.pane-chart').first().waitFor();
 // escribir en el campo no dispara atajos
@@ -175,11 +175,11 @@ await page.keyboard.press('p');
 check((await page.locator('.pane').count()) === 2, 'P agrega un panel');
 await page.keyboard.press('u');
 check((await page.locator('.pane').first().locator('.trace-chip').count()) === 0, 'U sube el panel activo (el nuevo, vacío)');
-await page.keyboard.press('d');
-check((await page.locator('.pane').first().locator('.trace-chip').count()) === 1, 'D lo vuelve a bajar');
-// deshacer: D, U y el panel agregado
+await page.keyboard.press('Shift+U');
+check((await page.locator('.pane').first().locator('.trace-chip').count()) === 1, 'Shift+U lo vuelve a bajar');
+// deshacer: Shift+U, U y el panel agregado
 for (let i = 0; i < 3; i++) await page.keyboard.press('Control+z');
-check((await page.locator('.pane').count()) === 1, 'Ctrl+Z deshace los cambios de la vista (D, U, P)');
+check((await page.locator('.pane').count()) === 1, 'Ctrl+Z deshace los cambios de la vista (Shift+U, U, P)');
 await page.keyboard.press('Control+Shift+z');
 check((await page.locator('.pane').count()) === 2, 'Ctrl+Shift+Z los rehace');
 await page.keyboard.press('Control+z');

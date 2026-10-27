@@ -51,10 +51,28 @@ export async function simCommand(page, label) {
   if (label) await page.locator('.analysis-list button', { hasText: label }).first().click();
 }
 
+/** Los ejemplos de antes que ya no están en el menú: se abren de tests/e2e/fixtures/Examples.turbo */
+const FIXTURE_EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)'];
+
 /** Abre un ejemplo (una variante del proyecto Examples) y espera a que esté cargado */
 export async function openExample(page, name) {
   const variant = name.replace(/\.asc$/, '');
-  await menu(page, 'Ejemplos', variant);
+  if (FIXTURE_EXAMPLES.includes(variant)) {
+    const { readFileSync } = await import('node:fs');
+    const buffer = readFileSync(new URL('./fixtures/Examples.turbo', import.meta.url));
+    await page.locator('input[type=file][accept*=".turbo"]').first().setInputFiles({ name: 'Examples.turbo', mimeType: 'application/json', buffer });
+    await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Examples');
+    // el testbench se elige en el panel del proyecto (y el panel queda como estaba)
+    const closed = !(await page.locator('.project-tree').count());
+    if (closed) await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
+    await page.locator('button.tree-name', { hasText: new RegExp(`^${variant.replace(/[.()]/g, '\\$&')}$`) }).click();
+    if (closed) {
+      await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
+      await page.locator('.project-tree').waitFor({ state: 'detached' });
+      // (el esquemático se reacomoda al cerrarse el panel)
+      await page.waitForTimeout(500);
+    }
+  } else await menu(page, 'Ejemplos', variant);
   await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.capsule-variant')?.textContent === v, variant);
 }
 

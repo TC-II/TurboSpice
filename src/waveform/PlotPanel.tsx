@@ -28,19 +28,19 @@ export type PlotAction =
   | 'zoomPrev' // Shift+Z
   | 'autoY' // Ctrl+Y
   | 'grid' // Ctrl+G
-  | 'addTrace' // A
+  | 'addTrace' // T
   | 'addPane' // P
   | 'addPaneBelow' // B
   | 'paneUp' // U
-  | 'paneDown' // D
+  | 'paneDown' // Shift+U
   | 'removeTraces' // Backspace
   | 'cursor' // C
   | 'clearCursors' // Shift+C
   | 'markPoint' // M
   | 'markV' // V
   | 'markH' // H
-  | 'markA' // A (con los markers activos)
-  | 'markD' // D (con los markers activos)
+  | 'markA' // A
+  | 'markD' // D
   | 'clearMarkers' // Shift+M
   | 'deleteMarker' // Supr
   | 'cancel'; // Esc
@@ -73,7 +73,7 @@ interface Props {
   handle?: Ref<PlotPanelHandle>;
   /** lugar de la barra de resultados donde van Cursores, DFT, Medidas y Ajustar */
   toolsHost?: HTMLElement | null;
-  /** A: ir a la caja de expresiones (está en la barra de resultados) */
+  /** T: ir a la caja de expresiones (está en la barra de resultados) */
   onFocusTrace?(): void;
   /** avisa cuando se entra o sale del modo ⌖ de la DFT (el esquemático pasa a la punta de prueba) */
   onDftPicking?(on: boolean): void;
@@ -952,7 +952,14 @@ function PaneView(props: {
     // rueda o paneo, que con millones de puntos se notaba)
     const extents = new Map<string, Range | null>();
     const fullY = (scale: string) => {
-      if (!extents.has(scale)) extents.set(scale, extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y)));
+      if (!extents.has(scale)) {
+        const e = extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y));
+        // dB y grados que varían menos que el ruido numérico (un pasatodo: |H| = 0 dB ± 1e-15) son
+        // una recta (±1 dB o ±1° a su alrededor): sin esto el eje se estira hasta mostrar ese ruido
+        const flat = e && (scale === 'ph' || (scale === 'y' && data.yUnit === 'dB')) && e[1] - e[0] < 1e-6;
+        const mid = e ? Math.round((e[0] + e[1]) / 2 * 1e6) / 1e6 : 0;
+        extents.set(scale, flat ? [mid - 1, mid + 1] : e);
+      }
       return extents.get(scale)!;
     };
     const whole = (scale: string): uPlot.Range.Function => (u, min, max) => {

@@ -250,7 +250,31 @@ Las diez partes están hechas (#149–#158). Detalles que se decidieron al imple
     primera vez. Tres variantes con corridas y un opamp como archivo del proyecto (`OA_Sample`); el
     inversor lleva `AC 1` en la fuente para que la simulación «Bandwidth» tenga excitación.
   - `public/examples/Examples.turbo`: los ejemplos sueltos, una variante cada uno. Archivo › Examples
-    abre el proyecto en la variante elegida.
+    abre el proyecto en la variante elegida. Los e2e usan `tests/e2e/fixtures/Examples.turbo`, que
+    además tiene RC Filter, RLC Bode y RC Sweep (.step), los que ya no están en el menú.
+  - `public/examples/Transfer functions.turbo` (también de `scripts/make-examples.ts`, desde
+    `examples/filters/`): las transferencias de 1er y 2do orden con RC y RLC (pasabajos, pasaaltos y
+    pasatodo; pasabanda y rechazabanda), un workbench cada una con respuesta al escalón, Bode y
+    polos y ceros. Los inductores llevan `Rser=0` (con el 1 mΩ de LTspice los ceros del notch dejan
+    el eje jω y el `.pz` de ngspice no los encuentra). Los pasatodo son los clásicos con operacional
+    (out = 2·V(+) − in, con el divisor en la entrada +), con `OA_NoPole`: el dibujo del `OA_Ideal` y
+    sólo su ganancia, como archivos del proyecto (el polo del `OA_Ideal` aparecería en el mapa,
+    lejísimos, y aplastaría a los demás).
+  - `public/examples/Transistor amplifiers.turbo` (también de `scripts/make-examples.ts`, desde
+    `examples/transistors/`): emisor común, emisor común degenerado, colector común y base común, un
+    workbench cada uno con formas de onda, respuesta en frecuencia y punto de operación. Cada
+    esquemático tiene el BJT (BC547C) y el MOSFET (2N7000) uno al lado del otro, con la misma entrada
+    y las mismas resistencias de colector/drenador y de emisor/surtidor, polarizados a la misma
+    corriente: así la diferencia de gm se ve directamente en la ganancia.
+  - `public/examples/ADC.turbo` (`npx vite-node scripts/make-adc.ts`, desde `examples/adc/`: los
+    esquemáticos de los testbenches son `.asc` ahí, editados en TurboSpice; el script arma el
+    proyecto y sintetiza el Verilog): simulación mixta, un workbench por convertidor. **Flash 3-bit**: escalera de 8 resistencias y 7
+    comparadores dibujados uno por uno, y el codificador en Verilog con su símbolo dibujado a mano.
+    **SAR 8-bit**: redistribución de carga (arreglo binario de capacitores y 25 llaves, en arreglos), el
+    comparador CMOS como subcircuito (`COMP`), la llave `ASW` como módulo «Modelo» (el `aswitch` de
+    XSPICE) y la lógica en Verilog. **Sigma-delta**: integrador RC y dos bloques Verilog, el modulador
+    (`MODULATOR`, cuantizador de 1 bit) y el downsampler (`DOWNSAMPLER`, cuenta los unos cada 64
+    ciclos). En el menú de ejemplos es una sola entrada, «ADCs».
 - **Exportar**: queda sólo «Export project» (una carpeta por variante); exportar una sola variante se
   sacó del menú.
 - **My symbols and models**: es uno solo para todos los proyectos. Con sesión de Google se guarda en

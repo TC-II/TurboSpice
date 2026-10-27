@@ -23,11 +23,13 @@ const chips = (i = 0) => page.locator('.panes > .pane').nth(i).locator('.trace-c
 
 await page.goto(URL);
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
-// el ejemplo de simulación mixta: un panel analógico (V(vin), V(out), V(int)) y uno digital
+// el sigma-delta del proyecto «ADC»: un panel analógico (V(vin), V(out), V(int)) y uno digital
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
 await page.getByRole('menu').getByRole('menuitem', { name: 'Ejemplos' }).hover();
-await page.getByRole('menu', { name: 'Ejemplos' }).getByRole('menuitem', { name: 'ADC sigma-delta' }).click();
+await page.getByRole('menu', { name: 'Ejemplos' }).getByRole('menuitem', { name: 'ADCs' }).click();
 await page.waitForTimeout(2000);
+await page.locator('button.tree-name', { hasText: 'Sine 250 Hz' }).click();
+await page.waitForTimeout(1000);
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 120000 });
 await page.waitForTimeout(800);

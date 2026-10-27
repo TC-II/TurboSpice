@@ -642,7 +642,7 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   check((await names()) === 'M1|V1|H1', `V y H ponen líneas (${await names()})`);
   check((await rowsOf('V1')).length >= 2, `la línea V mide cada traza (${(await rowsOf('V1')).length} cortes)`);
   check((await rowsOf('H1')).length >= 1, `la línea H mide dónde la cruzan (${await rowsOf('H1')})`);
-  // con Markers activo, A y D son markers (no la caja de expresiones ni bajar el panel)
+  // A y D son los markers A y D (con Markers activo o no)
   await page.mouse.move(r.x + r.width * 0.2, r.y + r.height * 0.5, { steps: 3 });
   await page.keyboard.press('a');
   await page.mouse.move(r.x + r.width * 0.7, r.y + r.height * 0.5, { steps: 3 });
@@ -650,7 +650,7 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   await page.waitForTimeout(100);
   const deltaRow = (await rowsOf('D − A'))[0] ?? '';
   check((await names()).endsWith('A|D') && /D − A/.test(deltaRow) && /Hz/.test(deltaRow), `A y D con sus diferencias (${deltaRow})`);
-  check(!(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), 'con Markers activo, A no va a la caja de expresiones');
+  check(!(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), 'A no va a la caja de expresiones');
   // un click (modo Markers) pone otro; Supr borra el seleccionado; arrastrar mueve una línea
   r = await page.locator('.pane-chart').first().boundingBox();
   // (lejos de la línea H, que está a media altura: un click sobre ella la selecciona)
@@ -691,7 +691,11 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   await page.getByRole('button', { name: 'Markers', exact: true }).click();
   await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5);
   await page.keyboard.press('a');
-  check(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement), 'sin Markers, A vuelve a ir a la caja de expresiones');
+  await page.waitForTimeout(100);
+  check((await names()) === 'A' && !(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), `sin Markers, A también pone el marker A (${await names()})`);
+  await page.keyboard.press('Shift+M');
+  await page.keyboard.press('t');
+  check(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement), 'T va a la caja de expresiones');
   await page.getByLabel('Expresión').blur();
 }
 

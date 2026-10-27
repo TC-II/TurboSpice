@@ -1,0 +1,555 @@
+{
+ "format": "turbospice",
+ "version": 2,
+ "name": "ADC",
+ "created": "2026-10-26T15:00:00.000Z",
+ "modified": "2026-10-26T15:00:00.000Z",
+ "files": [
+  {
+   "name": "FLASHENC.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal 32 -48 192 816\nLINE Normal 0 0 32 0\nTEXT 40 0 Left 1 t7\nLINE Normal 0 128 32 128\nTEXT 40 128 Left 1 t6\nLINE Normal 0 256 32 256\nTEXT 40 256 Left 1 t5\nLINE Normal 0 384 32 384\nTEXT 40 384 Left 1 t4\nLINE Normal 0 512 32 512\nTEXT 40 512 Left 1 t3\nLINE Normal 0 640 32 640\nTEXT 40 640 Left 1 t2\nLINE Normal 0 768 32 768\nTEXT 40 768 Left 1 t1\nLINE Normal 192 384 224 384\nLINE Normal 200 392 212 376\nTEXT 206 370 Center 1 3\nTEXT 184 384 Right 1 d\nLINE Normal 112 816 112 848\nLINE Normal 104 816 112 808\nLINE Normal 112 808 120 816\nTEXT 116 800 Left 1 clk\nTEXT 112 288 Center 2 thermometer\nTEXT 112 320 Center 2 → binary\nTEXT 112 352 Center 1 (priority encoder\nTEXT 112 368 Center 1 and output register)\nWINDOW 0 112 -88 Bottom 2\nWINDOW 3 112 -56 Bottom 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nSYMATTR Prefix X\nSYMATTR Value FLASHENC\nSYMATTR ModelFile FLASHENC.sub\nSYMATTR Description Verilog module FLASHENC\nPIN 112 848 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN 0 768 NONE 0\nPINATTR PinName t1\nPINATTR SpiceOrder 2\nPIN 0 640 NONE 0\nPINATTR PinName t2\nPINATTR SpiceOrder 3\nPIN 0 512 NONE 0\nPINATTR PinName t3\nPINATTR SpiceOrder 4\nPIN 0 384 NONE 0\nPINATTR PinName t4\nPINATTR SpiceOrder 5\nPIN 0 256 NONE 0\nPINATTR PinName t5\nPINATTR SpiceOrder 6\nPIN 0 128 NONE 0\nPINATTR PinName t6\nPINATTR SpiceOrder 7\nPIN 0 0 NONE 0\nPINATTR PinName t7\nPINATTR SpiceOrder 8\nPIN 224 384 NONE 0\nPINATTR PinName d[2:0]\nPINATTR SpiceOrder 9\n"
+  },
+  {
+   "name": "MODULATOR.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nLINE Normal -112 0 -64 -80\nLINE Normal -64 -80 112 -80\nLINE Normal 112 -80 112 80\nLINE Normal 112 80 -64 80\nLINE Normal -64 80 -112 0\nTEXT 24 -64 Center 2 ΣΔ modulator\nLINE Normal -144 0 -112 0\nLINE Normal -112 0 -92 0\nLINE Normal -92 0 -92 -8\nLINE Normal -92 -8 -76 -8\nLINE Normal -76 -24 -76 24\nLINE Normal -76 24 -44 0\nLINE Normal -44 0 -76 -24\nTEXT -73 -10 Left 1 +\nTEXT -73 10 Left 1 −\nLINE Normal -84 8 -76 8\nLINE Normal -84 8 -84 32\nLINE Normal -84 32 -72 32\nTEXT -68 32 Left 1 vcc/2\nLINE Normal -44 0 -24 0\nLINE Normal -24 0 -24 -16\nLINE Normal -24 -16 0 -16\nRECTANGLE Normal 0 -40 56 24\nTEXT 4 -16 Left 1 D\nTEXT 52 -32 Right 1 /Q\nTEXT 52 8 Right 1 Q\nTEXT 28 -32 Center 1 FF\nLINE Normal 22 24 28 16\nLINE Normal 28 16 34 24\nLINE Normal 56 -32 144 -32\nLINE Normal 56 8 80 8\nLINE Normal 80 8 80 32\nLINE Normal 80 32 144 32\nTEXT 128 -40 Center 1 fb\nTEXT 128 24 Center 1 y\nLINE Normal -16 112 -16 48\nLINE Normal -16 48 28 48\nLINE Normal 28 48 28 24\nTEXT -12 96 Left 1 clk\nWINDOW 0 0 -88 Bottom 2\nWINDOW 3 64 88 Top 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nSYMATTR Prefix X\nSYMATTR Value MODULATOR\nSYMATTR ModelFile MODULATOR.sub\nSYMATTR Description Verilog module MODULATOR\nPIN -16 112 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -144 0 NONE 0\nPINATTR PinName cmp\nPINATTR SpiceOrder 2\nPIN 144 32 NONE 0\nPINATTR PinName y\nPINATTR SpiceOrder 3\nPIN 144 -32 NONE 0\nPINATTR PinName fb\nPINATTR SpiceOrder 4\n"
+  },
+  {
+   "name": "DOWNSAMPLER.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -64 -48 64 48\nTEXT 0 -24 Center 2 Σ ÷64\nTEXT 0 24 Center 1 downsampler\nLINE Normal -96 0 -64 0\nTEXT -60 0 Left 1 y\nLINE Normal 64 0 96 0\nLINE Normal 72 8 84 -8\nTEXT 78 -14 Center 1 7\nTEXT 60 0 Right 1 value\nLINE Normal 0 80 0 48\nLINE Normal -6 48 0 40\nLINE Normal 0 40 6 48\nTEXT -4 72 Right 1 clk\nWINDOW 0 0 -56 Bottom 2\nWINDOW 3 24 56 Left 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nSYMATTR Prefix X\nSYMATTR Value DOWNSAMPLER\nSYMATTR ModelFile DOWNSAMPLER.sub\nSYMATTR Description Verilog module DOWNSAMPLER\nPIN 0 80 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -96 0 NONE 0\nPINATTR PinName y\nPINATTR SpiceOrder 2\nPIN 96 0 NONE 0\nPINATTR PinName value[6:0]\nPINATTR SpiceOrder 3\n"
+  },
+  {
+   "name": "FLASHENC.v",
+   "kind": "verilog",
+   "text": "// Encoder of the 3-bit flash ADC: thermometer code -> binary.\n// tk is comparator Uk: 1 when vin is above tap k of the ladder (k * Vref / 8).\n// The code is the highest k with tk = 1 (a priority encoder: a stray 1 below the top does not matter).\n// On each rising edge of clk the code goes to the output register d.\nmodule FLASHENC (\n  input clk,\n  input t1, t2, t3, t4, t5, t6, t7,\n  output reg [2:0] d\n);\n  wire [2:0] code = t7 ? 7 : t6 ? 6 : t5 ? 5 : t4 ? 4 : t3 ? 3 : t2 ? 2 : t1 ? 1 : 0;\n  initial d = 0;\n  always @(posedge clk) d <= code;\nendmodule\n",
+   "synth": {
+    "source": "// Encoder of the 3-bit flash ADC: thermometer code -> binary.\n// tk is comparator Uk: 1 when vin is above tap k of the ladder (k * Vref / 8).\n// The code is the highest k with tk = 1 (a priority encoder: a stray 1 below the top does not matter).\n// On each rising edge of clk the code goes to the output register d.\nmodule FLASHENC (\n  input clk,\n  input t1, t2, t3, t4, t5, t6, t7,\n  output reg [2:0] d\n);\n  wire [2:0] code = t7 ? 7 : t6 ? 6 : t5 ? 5 : t4 ? 4 : t3 ? 3 : t2 ? 2 : t1 ? 1 : 0;\n  initial d = 0;\n  always @(posedge clk) d <= code;\nendmodule\n",
+    "module": "flashenc",
+    "subckt": "* Generated by TurboSpice from FLASHENC.v (Yosys): edit the Verilog, not this file\n.subckt flashenc clk t1 t2 t3 t4 t5 t6 t7 d_2 d_1 d_0 vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nab_clk [clk] [clk_d] null hdl_in\nab_t1 [t1] [t1_d] null hdl_in\nab_t2 [t2] [t2_d] null hdl_in\nab_t3 [t3] [t3_d] null hdl_in\nab_t4 [t4] [t4_d] null hdl_in\nab_t5 [t5] [t5_d] null hdl_in\nab_t6 [t6] [t6_d] null hdl_in\nab_t7 [t7] [t7_d] null hdl_in\nab_d_2 [d_2_d] [d_2] hdl_dac\nab_d_1 [d_1_d] [d_1] hdl_dac\nab_d_0 [d_0_d] [d_0] hdl_dac\nag1 t2_d n13 hdl_inverter\nag2 [n13 t1_d] n14 hdl_and\nag3 [n15 n16] n17 hdl_nand\nag4 [n18 n17] n19 hdl_or\nag5 [n15 n19] n20 hdl_nand\nag6 [t3_d n14] n21 hdl_nor\nag7 [t4_d n21] n22 hdl_nor\nag8 [t5_d n22] n23 hdl_nor\nag9 [t6_d n23] n24 hdl_nor\nag10 [t7_d n24] n25 hdl_or\nag11 [t7_d t6_d] n15 hdl_nor\nag12 [t2_d t3_d] n18 hdl_nor\nag13 [t5_d t4_d] n16 hdl_nor\naf14 n17 clk_d null null d_2_d null hdl_dff0\naf15 n25 clk_d null null d_0_d null hdl_dff0\naf16 n20 clk_d null null d_1_d null hdl_dff0\n.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)\n.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})\n.model hdl_inverter d_inverter(rise_delay={tpd} fall_delay={tpd})\n.model hdl_and d_and(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nand d_nand(rise_delay={tpd} fall_delay={tpd})\n.model hdl_or d_or(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nor d_nor(rise_delay={tpd} fall_delay={tpd})\n.model hdl_dff0 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=0)\n.ends flashenc\n",
+    "pins": [
+     {
+      "name": "clk",
+      "dir": "in"
+     },
+     {
+      "name": "t1",
+      "dir": "in"
+     },
+     {
+      "name": "t2",
+      "dir": "in"
+     },
+     {
+      "name": "t3",
+      "dir": "in"
+     },
+     {
+      "name": "t4",
+      "dir": "in"
+     },
+     {
+      "name": "t5",
+      "dir": "in"
+     },
+     {
+      "name": "t6",
+      "dir": "in"
+     },
+     {
+      "name": "t7",
+      "dir": "in"
+     },
+     {
+      "name": "d_2",
+      "dir": "out"
+     },
+     {
+      "name": "d_1",
+      "dir": "out"
+     },
+     {
+      "name": "d_0",
+      "dir": "out"
+     }
+    ],
+    "params": {}
+   }
+  },
+  {
+   "name": "SARLOGIC.v",
+   "kind": "verilog",
+   "text": "// Control logic of the 8-bit SAR ADC (successive approximation register).\n// One conversion takes 10 clock cycles, in three phases that never overlap:\n//   1 sample: smp = 1 closes the top-plate switch (top on vcm) and the input switches (bottom\n//             plates on vin): each capacitor charges to vin − vcm.\n//   1 hold:   every switch opens: the floating top plate keeps that charge, which is the sample.\n//   8 trials: b is the code being tried, bit 7 first. The bits at 1 put their bottom plate on vref\n//             (up) and the ones at 0 on ground (dn); then cmp says whether vin is still above that\n//             trial voltage: if it is the bit stays, if not it goes back to 0, and the next bit is tried.\n// At the end the result goes to data, eoc is 1 for one cycle and the next sample starts.\nmodule SARLOGIC (\n  input clk,\n  input cmp,\n  output reg smp,\n  output reg [7:0] up,\n  output reg [7:0] dn,\n  output reg eoc,\n  output reg [7:0] data\n);\n  reg [7:0] b = 0;      // the successive-approximation register\n  reg [7:0] trial = 0;  // the bit being tried (one-hot)\n  reg hold = 0;\n  initial smp = 1;\n  initial up = 0;\n  initial dn = 0;\n  initial eoc = 0;\n  initial data = 0;\n  wire [7:0] decided = cmp ? b : b & ~trial;\n  wire [7:0] next = decided | (trial >> 1);\n  always @(posedge clk) begin\n    eoc <= 0;\n    if (smp) begin              // sample -> hold\n      smp <= 0;\n      hold <= 1;\n    end else if (hold) begin    // hold -> first trial\n      hold <= 0;\n      b <= 8'b1000_0000;\n      trial <= 8'b1000_0000;\n      up <= 8'b1000_0000;\n      dn <= 8'b0111_1111;\n    end else if (trial[0]) begin  // last trial -> result, and the next sample\n      data <= decided;\n      eoc <= 1;\n      smp <= 1;\n      up <= 0;\n      dn <= 0;\n    end else begin\n      b <= next;\n      trial <= trial >> 1;\n      up <= next;\n      dn <= ~next;\n    end\n  end\nendmodule\n",
+   "synth": {
+    "source": "// Control logic of the 8-bit SAR ADC (successive approximation register).\n// One conversion takes 10 clock cycles, in three phases that never overlap:\n//   1 sample: smp = 1 closes the top-plate switch (top on vcm) and the input switches (bottom\n//             plates on vin): each capacitor charges to vin − vcm.\n//   1 hold:   every switch opens: the floating top plate keeps that charge, which is the sample.\n//   8 trials: b is the code being tried, bit 7 first. The bits at 1 put their bottom plate on vref\n//             (up) and the ones at 0 on ground (dn); then cmp says whether vin is still above that\n//             trial voltage: if it is the bit stays, if not it goes back to 0, and the next bit is tried.\n// At the end the result goes to data, eoc is 1 for one cycle and the next sample starts.\nmodule SARLOGIC (\n  input clk,\n  input cmp,\n  output reg smp,\n  output reg [7:0] up,\n  output reg [7:0] dn,\n  output reg eoc,\n  output reg [7:0] data\n);\n  reg [7:0] b = 0;      // the successive-approximation register\n  reg [7:0] trial = 0;  // the bit being tried (one-hot)\n  reg hold = 0;\n  initial smp = 1;\n  initial up = 0;\n  initial dn = 0;\n  initial eoc = 0;\n  initial data = 0;\n  wire [7:0] decided = cmp ? b : b & ~trial;\n  wire [7:0] next = decided | (trial >> 1);\n  always @(posedge clk) begin\n    eoc <= 0;\n    if (smp) begin              // sample -> hold\n      smp <= 0;\n      hold <= 1;\n    end else if (hold) begin    // hold -> first trial\n      hold <= 0;\n      b <= 8'b1000_0000;\n      trial <= 8'b1000_0000;\n      up <= 8'b1000_0000;\n      dn <= 8'b0111_1111;\n    end else if (trial[0]) begin  // last trial -> result, and the next sample\n      data <= decided;\n      eoc <= 1;\n      smp <= 1;\n      up <= 0;\n      dn <= 0;\n    end else begin\n      b <= next;\n      trial <= trial >> 1;\n      up <= next;\n      dn <= ~next;\n    end\n  end\nendmodule\n",
+    "module": "sarlogic",
+    "subckt": "* Generated by TurboSpice from SARLOGIC.v (Yosys): edit the Verilog, not this file\n.subckt sarlogic clk cmp smp up_7 up_6 up_5 up_4 up_3 up_2 up_1 up_0 dn_7 dn_6 dn_5 dn_4 dn_3 dn_2 dn_1 dn_0 eoc data_7 data_6 data_5 data_4 data_3 data_2 data_1 data_0 vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nab_clk [clk] [clk_d] null hdl_in\nab_cmp [cmp] [cmp_d] null hdl_in\nab_smp [smp_d] [smp] hdl_dac\nab_up_7 [up_7_d] [up_7] hdl_dac\nab_up_6 [up_6_d] [up_6] hdl_dac\nab_up_5 [up_5_d] [up_5] hdl_dac\nab_up_4 [up_4_d] [up_4] hdl_dac\nab_up_3 [up_3_d] [up_3] hdl_dac\nab_up_2 [up_2_d] [up_2] hdl_dac\nab_up_1 [up_1_d] [up_1] hdl_dac\nab_up_0 [up_0_d] [up_0] hdl_dac\nab_dn_7 [dn_7_d] [dn_7] hdl_dac\nab_dn_6 [dn_6_d] [dn_6] hdl_dac\nab_dn_5 [dn_5_d] [dn_5] hdl_dac\nab_dn_4 [dn_4_d] [dn_4] hdl_dac\nab_dn_3 [dn_3_d] [dn_3] hdl_dac\nab_dn_2 [dn_2_d] [dn_2] hdl_dac\nab_dn_1 [dn_1_d] [dn_1] hdl_dac\nab_dn_0 [dn_0_d] [dn_0] hdl_dac\nab_eoc [eoc_d] [eoc] hdl_dac\nab_data_7 [data_7_d] [data_7] hdl_dac\nab_data_6 [data_6_d] [data_6] hdl_dac\nab_data_5 [data_5_d] [data_5] hdl_dac\nab_data_4 [data_4_d] [data_4] hdl_dac\nab_data_3 [data_3_d] [data_3] hdl_dac\nab_data_2 [data_2_d] [data_2] hdl_dac\nab_data_1 [data_1_d] [data_1] hdl_dac\nab_data_0 [data_0_d] [data_0] hdl_dac\nag1 smp_d n30 hdl_inverter\nag2 cmp_d n31 hdl_inverter\nag3 [n32 n33] n34 hdl_nand\nag4 n35 n36 hdl_inverter\nag5 [data_6_d n35] n37 hdl_nand\nag6 [n38 n36] n39 hdl_nand\nag7 [n37 n39] n40 hdl_nand\nag8 [data_5_d n35] n41 hdl_nand\nag9 [n42 n36] n43 hdl_nand\nag10 [n41 n43] n44 hdl_nand\nag11 [data_4_d n35] n45 hdl_nand\nag12 [n46 n36] n47 hdl_nand\nag13 [n45 n47] n48 hdl_nand\nag14 [dn_6_d smp_d] n49 hdl_nand\nag15 [data_3_d n35] n50 hdl_nand\nag16 [n51 n36] n52 hdl_nand\nag17 [n50 n52] n53 hdl_nand\nag18 [data_2_d n35] n54 hdl_nand\nag19 [n55 n36] n56 hdl_nand\nag20 [n54 n56] n57 hdl_nand\nag21 [data_1_d n35] n58 hdl_nand\nag22 [n59 n36] n60 hdl_nand\nag23 [n58 n60] n61 hdl_nand\nag24 [data_0_d n35] n62 hdl_nand\nag25 [n63 n49] n64 hdl_and\nag26 [n65 n36] n66 hdl_nand\nag27 [n62 n66] n67 hdl_nand\nag28 [b_6_d n69] n70 hdl_nand\nag29 [n33 n71] n72 hdl_or\nag30 [n70 n72] n73 hdl_nand\nag31 [b_5_d n69] n75 hdl_nand\nag32 [n76 n75] n77 hdl_nand\nag33 [b_4_d n69] n79 hdl_nand\nag34 [n80 n79] n81 hdl_nand\nag35 [b_3_d n69] n83 hdl_nand\nag36 [n34 n64] n84 hdl_nand\nag37 [n85 n83] n86 hdl_nand\nag38 [b_2_d n69] n88 hdl_nand\nag39 [n89 n88] n90 hdl_nand\nag40 [b_1_d n69] n92 hdl_nand\nag41 [n93 n92] n94 hdl_nand\nag42 [b_0_d n69] n96 hdl_nand\nag43 [n97 n96] n98 hdl_nand\nag44 [trial_7_d n31] n100 hdl_nand\nag45 [b_7_d n100] n102 hdl_and\nag46 [n71 n102] n103 hdl_or\nag47 [n30 trial_1_d] n105 hdl_and\nag48 [smp_d dn_7_d] n106 hdl_nand\nag49 [n103 n106] n107 hdl_nand\nag50 [smp_d up_6_d] n108 hdl_nand\nag51 [n72 n108] n109 hdl_nand\nag52 [smp_d up_7_d] n110 hdl_nand\nag53 [n32 n102] n111 hdl_nand\nag54 [n63 n111] n112 hdl_and\nag55 [n110 n112] n113 hdl_nand\nag56 [b_7_d n114] n115 hdl_nand\nag57 [n112 n115] n116 hdl_nand\nag58 [trial_0_d n105] n118 hdl_or\nag59 [data_7_d n35] n119 hdl_nand\nag60 [n36 n102] n120 hdl_nand\nag61 [n119 n120] n121 hdl_nand\nag62 [n63 n118] n122 hdl_and\nag63 [n63 n114] n69 hdl_and\nag64 [trial_6_d n69] n124 hdl_nand\nag65 [hold_d n114] n126 hdl_nor\nag66 [n30 hold_d] n63 hdl_nand\nag67 n126 n71 hdl_inverter\nag68 [trial_7_d n126] n127 hdl_nand\nag69 [n124 n127] n128 hdl_nand\nag70 [trial_5_d n69] n130 hdl_nand\nag71 [trial_6_d n126] n131 hdl_nand\nag72 [n130 n131] n132 hdl_nand\nag73 [trial_4_d n69] n134 hdl_nand\nag74 [trial_5_d n126] n135 hdl_nand\nag75 [n134 n135] n136 hdl_nand\nag76 [trial_3_d n69] n138 hdl_nand\nag77 [trial_0_d smp_d] n32 hdl_nor\nag78 [trial_4_d n126] n139 hdl_nand\nag79 [n138 n139] n140 hdl_nand\nag80 [trial_2_d n69] n142 hdl_nand\nag81 [trial_3_d n126] n143 hdl_nand\nag82 [n142 n143] n144 hdl_nand\nag83 [trial_1_d n69] n145 hdl_nand\nag84 [trial_2_d n126] n146 hdl_nand\nag85 [n145 n146] n147 hdl_nand\nag86 [trial_5_d n31] n148 hdl_nand\nag87 [b_5_d n148] n42 hdl_and\nag88 [trial_0_d smp_d] n114 hdl_or\nag89 [trial_6_d n42] n149 hdl_nor\nag90 [n32 n149] n150 hdl_nand\nag91 [smp_d dn_5_d] n151 hdl_nand\nag92 [n63 n151] n152 hdl_and\nag93 [n150 n152] n153 hdl_nand\nag94 [trial_4_d n31] n154 hdl_nand\nag95 [b_4_d n154] n46 hdl_and\nag96 [trial_5_d n46] n155 hdl_nor\nag97 [n32 n155] n156 hdl_nand\nag98 [smp_d dn_4_d] n157 hdl_nand\nag99 [trial_7_d n114] n158 hdl_nand\nag100 [n63 n157] n159 hdl_and\nag101 [n156 n159] n160 hdl_nand\nag102 [trial_3_d n31] n161 hdl_nand\nag103 [b_3_d n161] n51 hdl_and\nag104 [trial_4_d n51] n162 hdl_nor\nag105 [n32 n162] n163 hdl_nand\nag106 [smp_d dn_3_d] n164 hdl_nand\nag107 [n63 n164] n165 hdl_and\nag108 [n163 n165] n166 hdl_nand\nag109 [trial_2_d n31] n167 hdl_nand\nag110 [n63 n158] n168 hdl_nand\nag111 [b_2_d n167] n55 hdl_and\nag112 [trial_3_d n55] n169 hdl_nor\nag113 [n32 n169] n170 hdl_nand\nag114 [smp_d dn_2_d] n171 hdl_nand\nag115 [n63 n171] n172 hdl_and\nag116 [n170 n172] n173 hdl_nand\nag117 [trial_1_d n31] n174 hdl_nand\nag118 [b_1_d n174] n59 hdl_and\nag119 [trial_2_d n59] n175 hdl_nor\nag120 [n32 n175] n176 hdl_nand\nag121 [trial_6_d n31] n177 hdl_nand\nag122 [smp_d dn_1_d] n178 hdl_nand\nag123 [n63 n178] n179 hdl_and\nag124 [n176 n179] n180 hdl_nand\nag125 [trial_0_d n31] n181 hdl_nand\nag126 [b_0_d n181] n65 hdl_and\nag127 [trial_1_d n65] n182 hdl_nor\nag128 [n32 n182] n183 hdl_nand\nag129 [smp_d dn_0_d] n184 hdl_nand\nag130 [n63 n184] n185 hdl_and\nag131 [n183 n185] n186 hdl_nand\nag132 [b_6_d n177] n38 hdl_and\nag133 [n71 n149] n76 hdl_or\nag134 [smp_d up_5_d] n187 hdl_nand\nag135 [n76 n187] n188 hdl_nand\nag136 [n71 n155] n80 hdl_or\nag137 [smp_d up_4_d] n189 hdl_nand\nag138 [n80 n189] n190 hdl_nand\nag139 [n71 n162] n85 hdl_or\nag140 [smp_d up_3_d] n191 hdl_nand\nag141 [n85 n191] n192 hdl_nand\nag142 [n71 n169] n89 hdl_or\nag143 [trial_7_d n38] n33 hdl_nor\nag144 [smp_d up_2_d] n193 hdl_nand\nag145 [n89 n193] n194 hdl_nand\nag146 [n71 n175] n93 hdl_or\nag147 [smp_d up_1_d] n195 hdl_nand\nag148 [n93 n195] n196 hdl_nand\nag149 [n71 n182] n97 hdl_or\nag150 [smp_d up_0_d] n197 hdl_nand\nag151 [n97 n197] n198 hdl_nand\nag152 [trial_0_d n30] n199 hdl_nand\nag153 [hold_d n199] n35 hdl_or\naf154 n98 clk_d null null b_0_d null hdl_dff0\naf155 n94 clk_d null null b_1_d null hdl_dff0\naf156 n90 clk_d null null b_2_d null hdl_dff0\naf157 n86 clk_d null null b_3_d null hdl_dff0\naf158 n81 clk_d null null b_4_d null hdl_dff0\naf159 n77 clk_d null null b_5_d null hdl_dff0\naf160 n73 clk_d null null b_6_d null hdl_dff0\naf161 n116 clk_d null null b_7_d null hdl_dff0\naf162 n67 clk_d null null data_0_d null hdl_dff0\naf163 n61 clk_d null null data_1_d null hdl_dff0\naf164 n57 clk_d null null data_2_d null hdl_dff0\naf165 n53 clk_d null null data_3_d null hdl_dff0\naf166 n48 clk_d null null data_4_d null hdl_dff0\naf167 n44 clk_d null null data_5_d null hdl_dff0\naf168 n40 clk_d null null data_6_d null hdl_dff0\naf169 n121 clk_d null null data_7_d null hdl_dff0\naf170 n113 clk_d null null up_7_d null hdl_dff0\naf171 n198 clk_d null null up_0_d null hdl_dff0\naf172 n196 clk_d null null up_1_d null hdl_dff0\naf173 n194 clk_d null null up_2_d null hdl_dff0\naf174 n192 clk_d null null up_3_d null hdl_dff0\naf175 n190 clk_d null null up_4_d null hdl_dff0\naf176 n188 clk_d null null up_5_d null hdl_dff0\naf177 n109 clk_d null null up_6_d null hdl_dff0\naf178 n186 clk_d null null dn_0_d null hdl_dff0\naf179 n180 clk_d null null dn_1_d null hdl_dff0\naf180 n173 clk_d null null dn_2_d null hdl_dff0\naf181 n166 clk_d null null dn_3_d null hdl_dff0\naf182 n160 clk_d null null dn_4_d null hdl_dff0\naf183 n153 clk_d null null dn_5_d null hdl_dff0\naf184 n84 clk_d null null dn_6_d null hdl_dff0\naf185 n107 clk_d null null dn_7_d null hdl_dff0\naf186 n122 clk_d null null trial_0_d null hdl_dff0\naf187 n147 clk_d null null trial_1_d null hdl_dff0\naf188 n144 clk_d null null trial_2_d null hdl_dff0\naf189 n140 clk_d null null trial_3_d null hdl_dff0\naf190 n136 clk_d null null trial_4_d null hdl_dff0\naf191 n132 clk_d null null trial_5_d null hdl_dff0\naf192 n128 clk_d null null trial_6_d null hdl_dff0\naf193 n168 clk_d null null trial_7_d null hdl_dff0\naf194 n36 clk_d null null smp_d null hdl_dff1\naf195 n36 clk_d null null eoc_d null hdl_dff0\naf196 smp_d clk_d null null hold_d null hdl_dff0\n.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)\n.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})\n.model hdl_inverter d_inverter(rise_delay={tpd} fall_delay={tpd})\n.model hdl_and d_and(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nand d_nand(rise_delay={tpd} fall_delay={tpd})\n.model hdl_or d_or(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nor d_nor(rise_delay={tpd} fall_delay={tpd})\n.model hdl_dff0 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=0)\n.model hdl_dff1 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=1)\n.ends sarlogic\n",
+    "pins": [
+     {
+      "name": "clk",
+      "dir": "in"
+     },
+     {
+      "name": "cmp",
+      "dir": "in"
+     },
+     {
+      "name": "smp",
+      "dir": "out"
+     },
+     {
+      "name": "up_7",
+      "dir": "out"
+     },
+     {
+      "name": "up_6",
+      "dir": "out"
+     },
+     {
+      "name": "up_5",
+      "dir": "out"
+     },
+     {
+      "name": "up_4",
+      "dir": "out"
+     },
+     {
+      "name": "up_3",
+      "dir": "out"
+     },
+     {
+      "name": "up_2",
+      "dir": "out"
+     },
+     {
+      "name": "up_1",
+      "dir": "out"
+     },
+     {
+      "name": "up_0",
+      "dir": "out"
+     },
+     {
+      "name": "dn_7",
+      "dir": "out"
+     },
+     {
+      "name": "dn_6",
+      "dir": "out"
+     },
+     {
+      "name": "dn_5",
+      "dir": "out"
+     },
+     {
+      "name": "dn_4",
+      "dir": "out"
+     },
+     {
+      "name": "dn_3",
+      "dir": "out"
+     },
+     {
+      "name": "dn_2",
+      "dir": "out"
+     },
+     {
+      "name": "dn_1",
+      "dir": "out"
+     },
+     {
+      "name": "dn_0",
+      "dir": "out"
+     },
+     {
+      "name": "eoc",
+      "dir": "out"
+     },
+     {
+      "name": "data_7",
+      "dir": "out"
+     },
+     {
+      "name": "data_6",
+      "dir": "out"
+     },
+     {
+      "name": "data_5",
+      "dir": "out"
+     },
+     {
+      "name": "data_4",
+      "dir": "out"
+     },
+     {
+      "name": "data_3",
+      "dir": "out"
+     },
+     {
+      "name": "data_2",
+      "dir": "out"
+     },
+     {
+      "name": "data_1",
+      "dir": "out"
+     },
+     {
+      "name": "data_0",
+      "dir": "out"
+     }
+    ],
+    "params": {}
+   }
+  },
+  {
+   "name": "SARLOGIC.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -48 -80 48 80\nWINDOW 0 0 -88 Bottom 2\nWINDOW 3 0 88 Top 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nSYMATTR Prefix X\nSYMATTR Value SARLOGIC\nSYMATTR ModelFile SARLOGIC.sub\nSYMATTR Description Verilog module SARLOGIC\nPIN -48 -64 LEFT 8\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -48 -32 LEFT 8\nPINATTR PinName cmp\nPINATTR SpiceOrder 2\nPIN 48 -64 RIGHT 8\nPINATTR PinName smp\nPINATTR SpiceOrder 3\nPIN 48 -32 RIGHT 8\nPINATTR PinName up[7:0]\nPINATTR SpiceOrder 4\nPIN 48 0 RIGHT 8\nPINATTR PinName dn[7:0]\nPINATTR SpiceOrder 5\nPIN 48 32 RIGHT 8\nPINATTR PinName eoc\nPINATTR SpiceOrder 6\nPIN 48 64 RIGHT 8\nPINATTR PinName data[7:0]\nPINATTR SpiceOrder 7\n"
+  },
+  {
+   "name": "MODULATOR.v",
+   "kind": "verilog",
+   "text": "// Digital half of the first-order sigma-delta modulator (the RC integrator is in the schematic):\n// the 1-bit quantizer. On each rising edge of clk it samples cmp, the integrator voltage that the\n// input bridge compares with VIL/VIH (vcc/2):\n//   y:  the 1-bit stream (1 when the integrator was above vcc/2), to the downsampler.\n//   fb: its complement, the feedback that goes back to the integrator through a resistor.\nmodule MODULATOR (\n  input clk,\n  input cmp,\n  output reg y,\n  output reg fb\n);\n  initial y = 0;\n  initial fb = 1;\n  always @(posedge clk) begin\n    y <= cmp;\n    fb <= ~cmp;\n  end\nendmodule\n",
+   "synth": {
+    "source": "// Digital half of the first-order sigma-delta modulator (the RC integrator is in the schematic):\n// the 1-bit quantizer. On each rising edge of clk it samples cmp, the integrator voltage that the\n// input bridge compares with VIL/VIH (vcc/2):\n//   y:  the 1-bit stream (1 when the integrator was above vcc/2), to the downsampler.\n//   fb: its complement, the feedback that goes back to the integrator through a resistor.\nmodule MODULATOR (\n  input clk,\n  input cmp,\n  output reg y,\n  output reg fb\n);\n  initial y = 0;\n  initial fb = 1;\n  always @(posedge clk) begin\n    y <= cmp;\n    fb <= ~cmp;\n  end\nendmodule\n",
+    "module": "modulator",
+    "subckt": "* Generated by TurboSpice from MODULATOR.v (Yosys): edit the Verilog, not this file\n.subckt modulator clk cmp y fb vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nab_clk [clk] [clk_d] null hdl_in\nab_cmp [cmp] [cmp_d] null hdl_in\nab_y [y_d] [y] hdl_dac\nab_fb [fb_d] [fb] hdl_dac\nag1 cmp_d n6 hdl_inverter\naf2 cmp_d clk_d null null y_d null hdl_dff0\naf3 n6 clk_d null null fb_d null hdl_dff1\n.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)\n.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})\n.model hdl_inverter d_inverter(rise_delay={tpd} fall_delay={tpd})\n.model hdl_dff0 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=0)\n.model hdl_dff1 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=1)\n.ends modulator\n",
+    "pins": [
+     {
+      "name": "clk",
+      "dir": "in"
+     },
+     {
+      "name": "cmp",
+      "dir": "in"
+     },
+     {
+      "name": "y",
+      "dir": "out"
+     },
+     {
+      "name": "fb",
+      "dir": "out"
+     }
+    ],
+    "params": {}
+   }
+  },
+  {
+   "name": "DOWNSAMPLER.v",
+   "kind": "verilog",
+   "text": "// Downsampler (decimation filter) of the sigma-delta ADC: it counts the ones of the 1-bit stream y\n// and, every 64 clock cycles, puts the count on value (0…64 ≈ Vin/Vcc·64): a sinc (moving sum)\n// filter followed by taking one sample out of 64.\nmodule DOWNSAMPLER (\n  input clk,\n  input y,\n  output reg [6:0] value\n);\n  reg [5:0] cnt = 0;\n  reg [6:0] acc = 0;\n  initial value = 0;\n  always @(posedge clk) begin\n    cnt <= cnt + 1;\n    if (cnt == 63) begin\n      value <= acc + y;\n      acc <= 0;\n    end else\n      acc <= acc + y;\n  end\nendmodule\n",
+   "synth": {
+    "source": "// Downsampler (decimation filter) of the sigma-delta ADC: it counts the ones of the 1-bit stream y\n// and, every 64 clock cycles, puts the count on value (0…64 ≈ Vin/Vcc·64): a sinc (moving sum)\n// filter followed by taking one sample out of 64.\nmodule DOWNSAMPLER (\n  input clk,\n  input y,\n  output reg [6:0] value\n);\n  reg [5:0] cnt = 0;\n  reg [6:0] acc = 0;\n  initial value = 0;\n  always @(posedge clk) begin\n    cnt <= cnt + 1;\n    if (cnt == 63) begin\n      value <= acc + y;\n      acc <= 0;\n    end else\n      acc <= acc + y;\n  end\nendmodule\n",
+    "module": "downsampler",
+    "subckt": "* Generated by TurboSpice from DOWNSAMPLER.v (Yosys): edit the Verilog, not this file\n.subckt downsampler clk y value_6 value_5 value_4 value_3 value_2 value_1 value_0 vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n\nab_clk [clk] [clk_d] null hdl_in\nab_y [y] [y_d] null hdl_in\nab_value_6 [value_6_d] [value_6] hdl_dac\nab_value_5 [value_5_d] [value_5] hdl_dac\nab_value_4 [value_4_d] [value_4] hdl_dac\nab_value_3 [value_3_d] [value_3] hdl_dac\nab_value_2 [value_2_d] [value_2] hdl_dac\nab_value_1 [value_1_d] [value_1] hdl_dac\nab_value_0 [value_0_d] [value_0] hdl_dac\nag1 cnt_0_d n12 hdl_inverter\nag2 [cnt_0_d cnt_1_d] n14 hdl_and\nag3 [acc_3_d n16] n17 hdl_and\nag4 [acc_4_d n17] n19 hdl_and\nag5 [acc_5_d n19] n21 hdl_and\nag6 [acc_6_d n21] n23 hdl_xnor\nag7 [n24 n23] n25 hdl_or\nag8 [value_6_d n24] n26 hdl_nand\nag9 [n25 n26] n27 hdl_nand\nag10 [cnt_0_d cnt_1_d] n28 hdl_xor\nag11 [cnt_4_d n30] n31 hdl_xor\nag12 [value_0_d n24] n32 hdl_nand\nag13 [cnt_2_d n14] n34 hdl_and\nag14 [y_d acc_0_d] n36 hdl_xor\nag15 [n37 n36] n38 hdl_nand\nag16 [n32 n38] n39 hdl_nand\nag17 [cnt_2_d n14] n40 hdl_xor\nag18 [acc_5_d n19] n41 hdl_xnor\nag19 [n37 n41] n42 hdl_nor\nag20 [acc_4_d n17] n43 hdl_xnor\nag21 [n37 n43] n44 hdl_nor\nag22 [acc_3_d n16] n45 hdl_xnor\nag23 [n37 n45] n46 hdl_nor\nag24 [cnt_3_d n34] n30 hdl_and\nag25 [acc_2_d n49] n50 hdl_xnor\nag26 [n37 n50] n51 hdl_nor\nag27 [acc_1_d n53] n54 hdl_xnor\nag28 [n37 n54] n55 hdl_nor\nag29 [n24 n36] n56 hdl_and\nag30 [n24 n41] n57 hdl_or\nag31 [value_5_d n24] n58 hdl_nand\nag32 [n57 n58] n59 hdl_nand\nag33 [n24 n43] n60 hdl_or\nag34 [value_4_d n24] n61 hdl_nand\nag35 [cnt_4_d n30] n62 hdl_and\nag36 [n60 n61] n63 hdl_nand\nag37 [n24 n45] n64 hdl_or\nag38 [value_3_d n24] n65 hdl_nand\nag39 [n64 n65] n66 hdl_nand\nag40 [n24 n50] n67 hdl_or\nag41 [value_2_d n24] n68 hdl_nand\nag42 [n67 n68] n69 hdl_nand\nag43 [n24 n54] n70 hdl_or\nag44 [value_1_d n24] n71 hdl_nand\nag45 [n70 n71] n72 hdl_nand\nag46 [cnt_5_d n62] n37 hdl_and\nag47 [cnt_3_d n34] n74 hdl_xor\nag48 [cnt_5_d n62] n75 hdl_xor\nag49 [n37 n23] n76 hdl_nor\nag50 [cnt_5_d n62] n24 hdl_nand\nag51 [y_d acc_0_d] n53 hdl_and\nag52 [acc_1_d n53] n49 hdl_and\nag53 [acc_2_d n49] n16 hdl_and\naf54 n39 clk_d null null value_0_d null hdl_dff0\naf55 n72 clk_d null null value_1_d null hdl_dff0\naf56 n69 clk_d null null value_2_d null hdl_dff0\naf57 n66 clk_d null null value_3_d null hdl_dff0\naf58 n63 clk_d null null value_4_d null hdl_dff0\naf59 n59 clk_d null null value_5_d null hdl_dff0\naf60 n27 clk_d null null value_6_d null hdl_dff0\naf61 n56 clk_d null null acc_0_d null hdl_dff0\naf62 n55 clk_d null null acc_1_d null hdl_dff0\naf63 n51 clk_d null null acc_2_d null hdl_dff0\naf64 n46 clk_d null null acc_3_d null hdl_dff0\naf65 n44 clk_d null null acc_4_d null hdl_dff0\naf66 n42 clk_d null null acc_5_d null hdl_dff0\naf67 n76 clk_d null null acc_6_d null hdl_dff0\naf68 n12 clk_d null null cnt_0_d null hdl_dff0\naf69 n28 clk_d null null cnt_1_d null hdl_dff0\naf70 n40 clk_d null null cnt_2_d null hdl_dff0\naf71 n74 clk_d null null cnt_3_d null hdl_dff0\naf72 n31 clk_d null null cnt_4_d null hdl_dff0\naf73 n75 clk_d null null cnt_5_d null hdl_dff0\n.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)\n.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})\n.model hdl_inverter d_inverter(rise_delay={tpd} fall_delay={tpd})\n.model hdl_and d_and(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nand d_nand(rise_delay={tpd} fall_delay={tpd})\n.model hdl_or d_or(rise_delay={tpd} fall_delay={tpd})\n.model hdl_nor d_nor(rise_delay={tpd} fall_delay={tpd})\n.model hdl_xor d_xor(rise_delay={tpd} fall_delay={tpd})\n.model hdl_xnor d_xnor(rise_delay={tpd} fall_delay={tpd})\n.model hdl_dff0 d_dff(clk_delay={tpd} set_delay={tpd} reset_delay={tpd} ic=0)\n.ends downsampler\n",
+    "pins": [
+     {
+      "name": "clk",
+      "dir": "in"
+     },
+     {
+      "name": "y",
+      "dir": "in"
+     },
+     {
+      "name": "value_6",
+      "dir": "out"
+     },
+     {
+      "name": "value_5",
+      "dir": "out"
+     },
+     {
+      "name": "value_4",
+      "dir": "out"
+     },
+     {
+      "name": "value_3",
+      "dir": "out"
+     },
+     {
+      "name": "value_2",
+      "dir": "out"
+     },
+     {
+      "name": "value_1",
+      "dir": "out"
+     },
+     {
+      "name": "value_0",
+      "dir": "out"
+     }
+    ],
+    "params": {}
+   }
+  },
+  {
+   "name": "COMP.asc",
+   "kind": "schematic",
+   "text": "Version 4\r\nSHEET 1 1000 700\r\nWIRE 32 0 32 -16\r\nWIRE 80 16 112 16\r\nWIRE 32 96 32 128\r\nWIRE 32 128 32 160\r\nWIRE 32 240 32 256\r\nWIRE 320 0 320 -16\r\nWIRE 272 16 240 16\r\nWIRE 320 96 320 176\r\nWIRE 224 176 320 176\r\nWIRE 320 176 416 176\r\nWIRE 176 192 128 192\r\nWIRE 464 192 512 192\r\nWIRE 224 272 224 320\r\nWIRE 224 320 224 368\r\nWIRE 224 320 320 320\r\nWIRE 320 320 320 448\r\nWIRE 272 448 320 448\r\nWIRE 320 448 368 448\r\nWIRE 224 464 224 480\r\nWIRE 416 464 416 480\r\nWIRE 416 272 416 320\r\nWIRE 416 320 416 368\r\nWIRE 416 320 560 320\r\nWIRE 608 336 608 352\r\nWIRE 608 0 608 -16\r\nWIRE 560 16 528 16\r\nWIRE 608 96 608 176\r\nWIRE 608 176 608 240\r\nWIRE 800 0 800 -16\r\nWIRE 608 176 704 176\r\nWIRE 752 16 704 16\r\nWIRE 704 16 704 176\r\nWIRE 704 176 704 320\r\nWIRE 704 320 752 320\r\nWIRE 800 96 800 176\r\nWIRE 800 176 800 240\r\nWIRE 800 176 864 176\r\nWIRE 800 336 800 352\r\nFLAG 32 -16 vdd\r\nIOPIN 32 -16 In\r\nFLAG 112 16 bias\r\nFLAG 32 128 bias\r\nFLAG 32 256 0\r\nFLAG 320 -16 vdd\r\nFLAG 240 16 bias\r\nFLAG 128 192 inp\r\nIOPIN 128 192 In\r\nFLAG 512 192 inn\r\nIOPIN 512 192 In\r\nFLAG 224 480 0\r\nFLAG 416 480 0\r\nFLAG 608 352 0\r\nFLAG 608 -16 vdd\r\nFLAG 528 16 bias\r\nFLAG 800 -16 vdd\r\nFLAG 864 176 out\r\nIOPIN 864 176 Out\r\nFLAG 800 352 0\r\nSYMBOL pmos 80 96 R180\r\nSYMATTR InstName M8\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=10u\r\nSYMBOL res 16 144 R0\r\nSYMATTR InstName Rb\r\nSYMATTR Value 180k\r\nSYMBOL pmos 272 96 M180\r\nSYMATTR InstName M5\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=20u\r\nSYMBOL pmos 176 272 M180\r\nSYMATTR InstName M1\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=20u\r\nSYMBOL pmos 464 272 R180\r\nSYMATTR InstName M2\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=20u\r\nSYMBOL nmos 272 368 M0\r\nSYMATTR InstName M3\r\nSYMATTR Value NM\r\nSYMATTR Value2 l=1u w=5u\r\nSYMBOL nmos 368 368 R0\r\nSYMATTR InstName M4\r\nSYMATTR Value NM\r\nSYMATTR Value2 l=1u w=5u\r\nSYMBOL nmos 560 240 R0\r\nSYMATTR InstName M6\r\nSYMATTR Value NM\r\nSYMATTR Value2 l=1u w=10u\r\nSYMBOL pmos 560 96 M180\r\nSYMATTR InstName M7\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=20u\r\nSYMBOL pmos 752 96 M180\r\nSYMATTR InstName M9\r\nSYMATTR Value PM\r\nSYMATTR Value2 l=1u w=4u\r\nSYMBOL nmos 752 240 R0\r\nSYMATTR InstName M10\r\nSYMATTR Value NM\r\nSYMATTR Value2 l=1u w=2u\r\nTEXT 64 -176 Left 2 ;Comparator of the SAR ADC: out = vdd when inp > inn, 0 when inp < inn.\\nM1-M2 (PMOS pair) with the M3-M4 mirror, M6 common source and the M9-M10 inverter: a gain of about 40 000,\\nenough to resolve much less than 1 LSB (19.5 mV) in a fraction of the 1 µs clock cycle.\\nM8 and Rb set the bias current (about 20 µA) that M5 (tail, 2×) and M7 (2×) copy.\r\nTEXT 64 576 Left 2 !.model NM NMOS(LEVEL=1 VTO=0.7 KP=110u LAMBDA=0.04 TOX=10n CGSO=0.3n CGDO=0.3n CJ=0.5m)\r\nTEXT 64 608 Left 2 !.model PM PMOS(LEVEL=1 VTO=-0.7 KP=50u LAMBDA=0.05 TOX=10n CGSO=0.3n CGDO=0.3n CJ=0.5m)\r\n"
+  },
+  {
+   "name": "COMP.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType BLOCK\nLINE Normal -64 -64 64 0\nLINE Normal 64 0 -64 64\nLINE Normal -64 64 -64 -64\nLINE Normal -56 -32 -40 -32\nLINE Normal -48 -40 -48 -24\nLINE Normal -56 32 -40 32\nLINE Normal 0 -32 0 -64\nLINE Normal -28 12 -12 12\nLINE Normal -12 12 -12 -12\nLINE Normal -12 -12 4 -12\nWINDOW 0 8 -40 Left 2\nSYMATTR Prefix X\nSYMATTR Description CMOS comparator of the project: PMOS differential pair, common-source stage and an output inverter\nPIN -64 -32 NONE 8\nPINATTR PinName inp\nPINATTR SpiceOrder 1\nPIN -64 32 NONE 8\nPINATTR PinName inn\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 8\nPINATTR PinName out\nPINATTR SpiceOrder 3\nPIN 0 -64 NONE 8\nPINATTR PinName vdd\nPINATTR SpiceOrder 4\n"
+  },
+  {
+   "name": "ASW.lib",
+   "kind": "model",
+   "module": "model",
+   "text": "* ASW: analog switch of the ADC project, made with the XSPICE aswitch.\n* Between Vc = 1 V (open, roff) and Vc = 4 V (closed, ron) the resistance changes smoothly\n* (logarithmically): with the abrupt SPICE switch (S) and the digital bridges of the Verilog\n* blocks switching at the same time, ngspice cannot find the time step.\n.subckt ASW n1 n2 c+ c- params: ron=100 roff=1g\nA1 %vd(c+ c-) %gd(n1 n2) aswm\n.model aswm aswitch(cntl_off=1 cntl_on=4 r_off={roff} r_on={ron} log=TRUE)\n.ends ASW\n"
+  },
+  {
+   "name": "ASW.asy",
+   "kind": "symbol",
+   "text": "Version 4\nSymbolType CELL\nLINE Normal 0 40 0 24\nLINE Normal 0 88 0 73\nLINE Normal 17 67 0 40\nLINE Normal -48 32 -32 32\nLINE Normal -32 32 -23 37\nLINE Normal -48 80 -32 80\nLINE Normal -32 80 -23 75\nLINE Normal 0 16 0 24\nLINE Normal 0 96 0 88\nLINE Normal -44 45 -44 39\nLINE Normal -47 42 -41 42\nLINE Normal 8 56 -21 56 2\nCIRCLE Normal -32 24 32 88\nWINDOW 0 40 40 Left 2\nWINDOW 39 40 72 Left 0\nSYMATTR Prefix X\nSYMATTR SpiceModel ASW\nSYMATTR ModelFile ASW.lib\nSYMATTR SpiceLine ron=100 roff=1g\nSYMATTR Description Analog switch (XSPICE aswitch) of the project: closed when V(Vc+, Vc-) > 4 V, open below 1 V\nPIN 0 16 NONE 0\nPINATTR PinName Sw1\nPINATTR SpiceOrder 1\nPIN 0 96 NONE 0\nPINATTR PinName Sw2\nPINATTR SpiceOrder 2\nPIN -48 32 NONE 0\nPINATTR PinName Vc+\nPINATTR SpiceOrder 3\nPIN -48 80 NONE 0\nPINATTR PinName Vc-\nPINATTR SpiceOrder 4\n\n"
+  }
+ ],
+ "activeTestbench": "smvpz2m3x3",
+ "groups": [
+  {
+   "id": "gmvpz2m3x0",
+   "name": "Flash 3-bit"
+  },
+  {
+   "id": "gmvpz2m3x1",
+   "name": "SAR 8-bit"
+  },
+  {
+   "id": "gmvpz2m3x2",
+   "name": "Sigma-delta"
+  }
+ ],
+ "testbenches": [
+  {
+   "id": "smvpz2m3x3",
+   "name": "Ramp: every code",
+   "group": "gmvpz2m3x0",
+   "current": "sha256:c41e70a9f6d745e8b0de3a53ea61e737decf0d18e4722b0877b7e2f07c290a14",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(vin)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(dac)",
+        "color": "#1c7ed6"
+       }
+      ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "Dig(x1.d[2:0])",
+        "color": "#e03131",
+        "radix": "dec"
+       }
+      ],
+      "digital": true
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvpz2m3x4",
+   "name": "Sine 20 kHz",
+   "group": "gmvpz2m3x0",
+   "current": "sha256:e620e0bcbbf71f89c41117f2de280af13d0be7a5a24193d0e83843b35ec5f967",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(vin)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(dac)",
+        "color": "#1c7ed6"
+       }
+      ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "Dig(x1.d[2:0])",
+        "color": "#e03131",
+        "radix": "dec"
+       }
+      ],
+      "digital": true
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvpz2m3x5",
+   "name": "Comparator",
+   "group": "gmvpz2m3x1",
+   "current": "sha256:1c48af0452380bbca499346f96c8045a0a1a2cac145a80f32cdc2b9551c857a4",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out)",
+        "color": "#2f9e44"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "dc1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvpz2m3x6",
+   "name": "Two conversions",
+   "group": "gmvpz2m3x1",
+   "current": "sha256:dbfb72359d2de696b7152de5e9a124fed6df8b5502d1489bd758398076e04104",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(top)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(vcm)",
+        "color": "#1c7ed6"
+       }
+      ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "Dig(x2.smp_d)",
+        "color": "#e03131",
+        "radix": "dec"
+       },
+       {
+        "expr": "Dig(x2.cmp_d)",
+        "color": "#f08c00",
+        "radix": "dec"
+       },
+       {
+        "expr": "Dig(x2.up[7:0])",
+        "color": "#0c8599",
+        "radix": "bin"
+       },
+       {
+        "expr": "Dig(x2.data[7:0])",
+        "color": "#9c36b5",
+        "radix": "dec"
+       },
+       {
+        "expr": "Dig(x2.eoc_d)",
+        "color": "#2f9e44",
+        "radix": "dec"
+       }
+      ],
+      "digital": true
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvpz2m3x7",
+   "name": "Sine 1 kHz",
+   "group": "gmvpz2m3x1",
+   "current": "sha256:9d62b3d2a9ebaee64e760de0c883472d9779c5f62cfcfc732625c9d51f859c98",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(vin)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(dac)",
+        "color": "#1c7ed6"
+       }
+      ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "Dig(x2.data[7:0])",
+        "color": "#e03131",
+        "radix": "dec"
+       }
+      ],
+      "digital": true
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smvpz2m3x8",
+   "name": "Sine 250 Hz",
+   "group": "gmvpz2m3x2",
+   "current": "sha256:1eaf67ee43f5db11e6e5db95a9b79866d5eac086098ef2b1eb80ff153ef55ab9",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(vin)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out)",
+        "color": "#1c7ed6"
+       },
+       {
+        "expr": "V(int)",
+        "color": "#e03131"
+       }
+      ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "Dig(x2.value[6:0])",
+        "color": "#f08c00",
+        "radix": "dec"
+       }
+      ],
+      "digital": true
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  }
+ ],
+ "blobs": {
+  "sha256:c41e70a9f6d745e8b0de3a53ea61e737decf0d18e4722b0877b7e2f07c290a14": "Version 4\nSHEET 1 1800 1300\nWIRE 64 176 64 144\nWIRE 64 256 64 272\nWIRE 64 368 64 336\nWIRE 64 448 64 464\nWIRE 64 560 64 528\nWIRE 64 640 64 656\nWIRE 384 160 384 128\nWIRE 384 240 384 256\nWIRE 384 256 384 288\nWIRE 384 368 384 384\nWIRE 384 384 384 416\nWIRE 384 496 384 512\nWIRE 384 512 384 544\nWIRE 384 624 384 640\nWIRE 384 640 384 672\nWIRE 384 752 384 768\nWIRE 384 768 384 800\nWIRE 384 880 384 896\nWIRE 384 896 384 928\nWIRE 384 1008 384 1024\nWIRE 384 1024 384 1072\nWIRE 384 1152 384 1200\nWIRE 384 256 640 256\nWIRE 592 320 640 320\nWIRE 384 384 640 384\nWIRE 592 448 640 448\nWIRE 384 512 640 512\nWIRE 592 576 640 576\nWIRE 384 640 640 640\nWIRE 592 704 640 704\nWIRE 384 768 640 768\nWIRE 592 832 640 832\nWIRE 384 896 640 896\nWIRE 592 960 640 960\nWIRE 384 1024 640 1024\nWIRE 592 1088 640 1088\nWIRE 592 192 592 320\nWIRE 592 320 592 448\nWIRE 592 448 592 576\nWIRE 592 576 592 704\nWIRE 592 704 592 832\nWIRE 592 832 592 960\nWIRE 592 960 592 1088\nWIRE 752 288 896 288\nWIRE 752 416 896 416\nWIRE 752 544 896 544\nWIRE 752 672 896 672\nWIRE 752 800 896 800\nWIRE 752 928 896 928\nWIRE 752 1056 896 1056\nWIRE 1008 1136 1008 1168\nWIRE 1120 672 1184 672\nWIRE 1328 560 1328 528\nWIRE 1328 640 1408 640\nWIRE 1488 640 1584 640\nWIRE 1584 560 1584 528\nWIRE 1584 640 1664 640\nWIRE 1744 640 1840 640\nWIRE 1840 560 1840 528\nWIRE 1328 640 1328 656\nWIRE 1328 736 1328 752\nWIRE 1840 640 1904 640\nFLAG 64 144 vin\nFLAG 64 272 0\nFLAG 64 336 vref\nFLAG 64 464 0\nFLAG 64 528 clk\nFLAG 64 656 0\nFLAG 384 128 vref\nFLAG 384 1200 0\nFLAG 592 192 vin\nFLAG 1008 1168 clk\nFLAG 1184 672 d[2:0]\nFLAG 1328 528 d[0]\nFLAG 1584 528 d[1]\nFLAG 1840 528 d[2]\nFLAG 1328 752 0\nFLAG 1904 640 dac\nSYMBOL voltage 64 160 R0\nSYMATTR InstName Vin\nSYMATTR Value PWL(0 0 100n 0 10.1u 5)\nSYMBOL voltage 64 352 R0\nSYMATTR InstName Vref\nSYMATTR Value 5\nSYMBOL voltage 64 544 R0\nSYMATTR InstName Vclk\nSYMATTR Value PULSE(0 5 0 5n 5n 95n 200n)\nSYMBOL res 368 144 R0\nSYMATTR InstName R8\nSYMATTR Value 100\nSYMBOL res 368 272 R0\nSYMATTR InstName R7\nSYMATTR Value 100\nSYMBOL res 368 400 R0\nSYMATTR InstName R6\nSYMATTR Value 100\nSYMBOL res 368 528 R0\nSYMATTR InstName R5\nSYMATTR Value 100\nSYMBOL res 368 656 R0\nSYMATTR InstName R4\nSYMATTR Value 100\nSYMBOL res 368 784 R0\nSYMATTR InstName R3\nSYMATTR Value 100\nSYMBOL res 368 912 R0\nSYMATTR InstName R2\nSYMATTR Value 100\nSYMBOL res 368 1056 R0\nSYMATTR InstName R1\nSYMATTR Value 100\nSYMBOL TCLib\\Ideal_Comp 832 240 R0\nSYMATTR InstName U7\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 368 R0\nSYMATTR InstName U6\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 496 R0\nSYMATTR InstName U5\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 624 R0\nSYMATTR InstName U4\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 752 R0\nSYMATTR InstName U3\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 880 R0\nSYMATTR InstName U2\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 1008 R0\nSYMATTR InstName U1\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL FLASHENC 896 288 R0\nSYMATTR InstName X1\nSYMBOL res 1312 544 R0\nSYMATTR InstName Rb0\nSYMATTR Value 20k\nSYMBOL res 1504 624 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Rs0\nSYMATTR Value 10k\nSYMBOL res 1568 544 R0\nSYMATTR InstName Rb1\nSYMATTR Value 20k\nSYMBOL res 1760 624 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Rs1\nSYMATTR Value 10k\nSYMBOL res 1824 544 R0\nSYMATTR InstName Rb2\nSYMATTR Value 20k\nSYMBOL res 1312 640 R0\nSYMATTR InstName Rt\nSYMATTR Value 20k\nTEXT 96 -48 Left 2 ;3-bit flash ADC: a ladder of 8 equal resistors divides Vref in 8 steps (tap k = k · Vref / 8), and 7 comparators\\ncompare vin with every tap at the same time. Their outputs t7 … t1 are a thermometer code (all ones below vin,\\nzeros above): FLASHENC.v turns it into binary and registers it on each clock edge (5 MS/s).\\nAn n-bit flash needs 2^n resistors and 2^n − 1 comparators: fast (one clock per sample) but expensive.\nTEXT 1280 432 Left 2 ;R-2R DAC, only to see the code\\nas a voltage: dac = 5 V · d / 8\nTEXT 64 704 Left 2 !.tran 10.5u\n",
+  "sha256:e620e0bcbbf71f89c41117f2de280af13d0be7a5a24193d0e83843b35ec5f967": "Version 4\nSHEET 1 1800 1300\nWIRE 64 176 64 144\nWIRE 64 256 64 272\nWIRE 64 368 64 336\nWIRE 64 448 64 464\nWIRE 64 560 64 528\nWIRE 64 640 64 656\nWIRE 384 160 384 128\nWIRE 384 240 384 256\nWIRE 384 256 384 288\nWIRE 384 368 384 384\nWIRE 384 384 384 416\nWIRE 384 496 384 512\nWIRE 384 512 384 544\nWIRE 384 624 384 640\nWIRE 384 640 384 672\nWIRE 384 752 384 768\nWIRE 384 768 384 800\nWIRE 384 880 384 896\nWIRE 384 896 384 928\nWIRE 384 1008 384 1024\nWIRE 384 1024 384 1072\nWIRE 384 1152 384 1200\nWIRE 384 256 640 256\nWIRE 592 320 640 320\nWIRE 384 384 640 384\nWIRE 592 448 640 448\nWIRE 384 512 640 512\nWIRE 592 576 640 576\nWIRE 384 640 640 640\nWIRE 592 704 640 704\nWIRE 384 768 640 768\nWIRE 592 832 640 832\nWIRE 384 896 640 896\nWIRE 592 960 640 960\nWIRE 384 1024 640 1024\nWIRE 592 1088 640 1088\nWIRE 592 192 592 320\nWIRE 592 320 592 448\nWIRE 592 448 592 576\nWIRE 592 576 592 704\nWIRE 592 704 592 832\nWIRE 592 832 592 960\nWIRE 592 960 592 1088\nWIRE 752 288 896 288\nWIRE 752 416 896 416\nWIRE 752 544 896 544\nWIRE 752 672 896 672\nWIRE 752 800 896 800\nWIRE 752 928 896 928\nWIRE 752 1056 896 1056\nWIRE 1008 1136 1008 1168\nWIRE 1120 672 1184 672\nWIRE 1328 560 1328 528\nWIRE 1328 640 1408 640\nWIRE 1488 640 1584 640\nWIRE 1584 560 1584 528\nWIRE 1584 640 1664 640\nWIRE 1744 640 1840 640\nWIRE 1840 560 1840 528\nWIRE 1328 640 1328 656\nWIRE 1328 736 1328 752\nWIRE 1840 640 1904 640\nFLAG 64 144 vin\nFLAG 64 272 0\nFLAG 64 336 vref\nFLAG 64 464 0\nFLAG 64 528 clk\nFLAG 64 656 0\nFLAG 384 128 vref\nFLAG 384 1200 0\nFLAG 592 192 vin\nFLAG 1008 1168 clk\nFLAG 1184 672 d[2:0]\nFLAG 1328 528 d[0]\nFLAG 1584 528 d[1]\nFLAG 1840 528 d[2]\nFLAG 1328 752 0\nFLAG 1904 640 dac\nSYMBOL voltage 64 160 R0\nSYMATTR InstName Vin\nSYMATTR Value SINE(2.5 2.4 20k)\nSYMBOL voltage 64 352 R0\nSYMATTR InstName Vref\nSYMATTR Value 5\nSYMBOL voltage 64 544 R0\nSYMATTR InstName Vclk\nSYMATTR Value PULSE(0 5 0 5n 5n 95n 200n)\nSYMBOL res 368 144 R0\nSYMATTR InstName R8\nSYMATTR Value 100\nSYMBOL res 368 272 R0\nSYMATTR InstName R7\nSYMATTR Value 100\nSYMBOL res 368 400 R0\nSYMATTR InstName R6\nSYMATTR Value 100\nSYMBOL res 368 528 R0\nSYMATTR InstName R5\nSYMATTR Value 100\nSYMBOL res 368 656 R0\nSYMATTR InstName R4\nSYMATTR Value 100\nSYMBOL res 368 784 R0\nSYMATTR InstName R3\nSYMATTR Value 100\nSYMBOL res 368 912 R0\nSYMATTR InstName R2\nSYMATTR Value 100\nSYMBOL res 368 1056 R0\nSYMATTR InstName R1\nSYMATTR Value 100\nSYMBOL TCLib\\Ideal_Comp 832 240 R0\nSYMATTR InstName U7\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 368 R0\nSYMATTR InstName U6\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 496 R0\nSYMATTR InstName U5\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 624 R0\nSYMATTR InstName U4\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 752 R0\nSYMATTR InstName U3\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 880 R0\nSYMATTR InstName U2\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL TCLib\\Ideal_Comp 832 1008 R0\nSYMATTR InstName U1\nSYMATTR SpiceModel Ideal_Comp\nSYMATTR Value amp=2.5\nSYMATTR Value2 offset=2.5\nSYMBOL FLASHENC 896 288 R0\nSYMATTR InstName X1\nSYMBOL res 1312 544 R0\nSYMATTR InstName Rb0\nSYMATTR Value 20k\nSYMBOL res 1504 624 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Rs0\nSYMATTR Value 10k\nSYMBOL res 1568 544 R0\nSYMATTR InstName Rb1\nSYMATTR Value 20k\nSYMBOL res 1760 624 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Rs1\nSYMATTR Value 10k\nSYMBOL res 1824 544 R0\nSYMATTR InstName Rb2\nSYMATTR Value 20k\nSYMBOL res 1312 640 R0\nSYMATTR InstName Rt\nSYMATTR Value 20k\nTEXT 64 -112 Left 2 ;3-bit flash ADC: a ladder of 8 equal resistors divides Vref in 8 steps (tap k = k · Vref / 8), and 7 comparators\\ncompare vin with every tap at the same time. Their outputs t7 … t1 are a thermometer code (all ones below vin,\\nzeros above): FLASHENC.v turns it into binary and registers it on each clock edge (5 MS/s).\\nAn n-bit flash needs 2^n resistors and 2^n − 1 comparators: fast (one clock per sample) but expensive.\nTEXT 1280 432 Left 2 ;R-2R DAC, only to see the code\\nas a voltage: dac = 5 V · d / 8\nTEXT 64 704 Left 2 !.tran 100u\n",
+  "sha256:1c48af0452380bbca499346f96c8045a0a1a2cac145a80f32cdc2b9551c857a4": "Version 4\nSHEET 1 900 600\nWIRE 64 176 64 144\nWIRE 64 256 64 272\nWIRE 224 176 224 144\nWIRE 224 256 224 272\nWIRE 384 176 384 144\nWIRE 384 256 384 272\nWIRE 576 128 528 128\nWIRE 576 192 528 192\nWIRE 640 96 640 64\nWIRE 704 160 752 160\nFLAG 64 144 vdd\nFLAG 64 272 0\nFLAG 224 144 inp\nFLAG 224 272 0\nFLAG 384 144 inn\nFLAG 384 272 0\nFLAG 528 128 inp\nFLAG 528 192 inn\nFLAG 640 64 vdd\nFLAG 752 160 out\nSYMBOL voltage 64 160 R0\nSYMATTR InstName Vdd\nSYMATTR Value 5\nSYMBOL voltage 224 160 R0\nSYMATTR InstName Vp\nSYMATTR Value 2.5\nSYMBOL voltage 384 160 R0\nSYMATTR InstName Vn\nSYMATTR Value 2.5\nSYMBOL COMP 640 160 R0\nSYMATTR InstName X1\nTEXT 64 -64 Left 2 ;The comparator of the SAR on its own: inp at 2.5 V and inn swept ±1 mV around it.\\nThe output switches in less than 0.1 mV (a gain of about 40 000): far less than 1 LSB of the ADC (19.5 mV).\nTEXT 64 320 Left 2 !.dc Vn 2.499 2.501 1u\n",
+  "sha256:dbfb72359d2de696b7152de5e9a124fed6df8b5502d1489bd758398076e04104": "Version 4\nSHEET 1 1800 1100\nWIRE 64 896 64 864\nWIRE 64 976 64 992\nWIRE 224 896 224 864\nWIRE 224 976 224 992\nWIRE 384 896 384 864\nWIRE 384 976 384 992\nWIRE 544 896 544 864\nWIRE 544 976 544 992\nWIRE 704 896 704 864\nWIRE 704 976 704 992\nWIRE 128 288 128 320\nWIRE 224 288 224 320\nWIRE 320 288 320 320\nWIRE 416 288 416 320\nWIRE 512 288 512 320\nWIRE 608 288 608 320\nWIRE 704 288 704 320\nWIRE 800 288 800 320\nWIRE 896 288 896 320\nWIRE 128 192 224 192\nWIRE 128 224 128 192\nWIRE 224 224 224 192\nWIRE 224 192 320 192\nWIRE 320 224 320 192\nWIRE 320 192 416 192\nWIRE 416 224 416 192\nWIRE 416 192 512 192\nWIRE 512 192 512 128\nWIRE 512 224 512 192\nWIRE 512 192 608 192\nWIRE 608 224 608 192\nWIRE 608 192 704 192\nWIRE 704 224 704 192\nWIRE 704 192 800 192\nWIRE 800 224 800 192\nWIRE 800 192 896 192\nWIRE 896 224 896 192\nWIRE 96 640 96 672\nWIRE 96 560 96 512\nWIRE 48 576 16 576\nWIRE 48 624 48 640\nWIRE 384 640 384 672\nWIRE 384 560 384 512\nWIRE 384 512 384 464\nWIRE 336 576 304 576\nWIRE 336 624 336 640\nWIRE 672 560 672 512\nWIRE 672 640 672 672\nWIRE 624 576 592 576\nWIRE 624 624 624 640\nWIRE 960 560 960 528\nWIRE 960 640 960 672\nWIRE 912 576 880 576\nWIRE 912 624 912 640\nWIRE 1152 128 1104 128\nWIRE 896 192 1152 192\nWIRE 1216 96 1216 64\nWIRE 1280 160 1328 160\nWIRE 1344 896 1344 848\nWIRE 1344 976 1344 1024\nWIRE 1504 896 1504 848\nWIRE 1504 976 1504 1024\nWIRE 1664 896 1664 848\nWIRE 1664 976 1664 1024\nWIRE 672 512 384 512\nWIRE 96 512 384 512\nWIRE 1408 512 1360 512\nWIRE 1408 544 1360 544\nWIRE 1504 512 1552 512\nWIRE 1504 544 1552 544\nWIRE 1504 576 1552 576\nWIRE 1504 608 1552 608\nWIRE 1504 640 1552 640\nFLAG 64 864 vin\nFLAG 64 992 0\nFLAG 224 864 vref\nFLAG 224 992 0\nFLAG 384 864 vcm\nFLAG 384 992 0\nFLAG 544 864 vdd\nFLAG 544 992 0\nFLAG 704 864 clk\nFLAG 704 992 0\nFLAG 128 320 bot[7]\nFLAG 224 320 bot[6]\nFLAG 320 320 bot[5]\nFLAG 416 320 bot[4]\nFLAG 512 320 bot[3]\nFLAG 608 320 bot[2]\nFLAG 704 320 bot[1]\nFLAG 800 320 bot[0]\nFLAG 896 320 0\nFLAG 512 128 top\nFLAG 96 672 vin\nFLAG 16 576 smp\nFLAG 48 640 0\nFLAG 384 672 vref\nFLAG 384 464 bot[7:0]\nFLAG 304 576 up[7:0]\nFLAG 336 640 0\nFLAG 672 672 0\nFLAG 592 576 dn[7:0]\nFLAG 624 640 0\nFLAG 960 528 top\nFLAG 960 672 vcm\nFLAG 880 576 smp\nFLAG 912 640 0\nFLAG 1104 128 vcm\nFLAG 1216 64 vdd\nFLAG 1328 160 cmp\nFLAG 1344 848 data[7:0]\nFLAG 1344 1024 dac,n[6:0]\nFLAG 1504 848 dac,n[6:1]\nFLAG 1504 1024 n[6:0]\nFLAG 1664 848 n[0]\nFLAG 1664 1024 0\nFLAG 1360 512 clk\nFLAG 1360 544 cmp\nFLAG 1552 512 smp\nFLAG 1552 544 up[7:0]\nFLAG 1552 576 dn[7:0]\nFLAG 1552 608 eoc\nFLAG 1552 640 data[7:0]\nSYMBOL voltage 64 880 R0\nSYMATTR InstName Vin\nSYMATTR Value 3.1\nSYMBOL voltage 224 880 R0\nSYMATTR InstName Vref\nSYMATTR Value 5\nSYMBOL voltage 384 880 R0\nSYMATTR InstName Vcm\nSYMATTR Value 2.5\nSYMBOL voltage 544 880 R0\nSYMATTR InstName Vdd\nSYMATTR Value 5\nSYMBOL voltage 704 880 R0\nSYMATTR InstName Vclk\nSYMATTR Value PULSE(0 5 0.5u 5n 5n 495n 1u)\nSYMBOL cap 112 224 R0\nSYMATTR InstName C7\nSYMATTR Value {128*Cu}\nSYMBOL cap 208 224 R0\nSYMATTR InstName C6\nSYMATTR Value {64*Cu}\nSYMBOL cap 304 224 R0\nSYMATTR InstName C5\nSYMATTR Value {32*Cu}\nSYMBOL cap 400 224 R0\nSYMATTR InstName C4\nSYMATTR Value {16*Cu}\nSYMBOL cap 496 224 R0\nSYMATTR InstName C3\nSYMATTR Value {8*Cu}\nSYMBOL cap 592 224 R0\nSYMATTR InstName C2\nSYMATTR Value {4*Cu}\nSYMBOL cap 688 224 R0\nSYMATTR InstName C1\nSYMATTR Value {2*Cu}\nSYMBOL cap 784 224 R0\nSYMATTR InstName C0\nSYMATTR Value {Cu}\nSYMBOL cap 880 224 R0\nSYMATTR InstName Cd\nSYMATTR Value {Cu}\nSYMBOL ASW 96 544 R0\nSYMATTR InstName Ssmp[7:0]\nSYMBOL ASW 384 544 R0\nSYMATTR InstName Sref[7:0]\nSYMBOL ASW 672 544 R0\nSYMATTR InstName Sgnd[7:0]\nSYMBOL ASW 960 544 R0\nSYMATTR InstName Stop\nSYMBOL COMP 1216 160 R0\nSYMATTR InstName X1\nSYMBOL SARLOGIC 1456 576 R0\nSYMATTR InstName X2\nSYMBOL res 1328 880 R0\nSYMATTR InstName Rb[7:0]\nSYMATTR Value 20k\nSYMBOL res 1488 880 R0\nSYMATTR InstName Rs[6:0]\nSYMATTR Value 10k\nSYMBOL res 1648 880 R0\nSYMATTR InstName Rt\nSYMATTR Value 20k\nTEXT 112 -144 Left 2 ;8-bit SAR ADC with charge redistribution. One conversion takes 10 clock cycles, in three phases that never overlap:\\n1) Sample (smp = 1): Stop puts the top plate on vcm and Ssmp the bottom plates of the binary array (C7 = 128 Cu … C0 = Cu) on vin.\\n2) Hold (every switch open): the floating top plate keeps that charge, which is the sample.\\n3) Eight trials: Sref and Sgnd put each bottom plate on vref (up[k], the bits at 1 of the code being tried) or on ground (dn[k]): then top = vcm − vin·255/256 + vref·code/256.\\nThe comparator (COMP, a CMOS subcircuit of the project) says whether top is below vcm, that is, whether vin is above the trial voltage,\\nand SARLOGIC.v keeps or drops each bit, MSB first. Result: data = vin·255/vref, once every 10 clock cycles (100 kS/s at 1 MHz).\\nThe switches (ASW) are a «Model» module of the project: the XSPICE analog switch, which changes its resistance smoothly.\nTEXT 1296 768 Left 2 ;R-2R DAC, only to see data as a voltage:\\ndac = 5 V · data / 256\nTEXT 64 928 Left 2 !.param Cu=100f\nTEXT 64 960 Left 2 !.tran 21u\nTEXT 54 720 Left 2 ;Input Switches\n",
+  "sha256:9d62b3d2a9ebaee64e760de0c883472d9779c5f62cfcfc732625c9d51f859c98": "Version 4\nSHEET 1 1800 1100\nWIRE 64 784 64 752\nWIRE 64 864 64 880\nWIRE 224 784 224 752\nWIRE 224 864 224 880\nWIRE 384 784 384 752\nWIRE 384 864 384 880\nWIRE 544 784 544 752\nWIRE 544 864 544 880\nWIRE 704 784 704 752\nWIRE 704 864 704 880\nWIRE 1184 800 1184 752\nWIRE 1184 880 1184 928\nWIRE 1344 800 1344 752\nWIRE 1344 880 1344 928\nWIRE 1504 800 1504 752\nWIRE 1504 880 1504 928\nWIRE 48 192 48 224\nWIRE 144 192 144 224\nWIRE 240 192 240 224\nWIRE 336 192 336 224\nWIRE 432 192 432 224\nWIRE 528 192 528 224\nWIRE 624 192 624 224\nWIRE 720 192 720 224\nWIRE 816 192 816 224\nWIRE 48 96 144 96\nWIRE 48 128 48 96\nWIRE 144 128 144 96\nWIRE 144 96 240 96\nWIRE 240 128 240 96\nWIRE 240 96 336 96\nWIRE 336 128 336 96\nWIRE 336 96 432 96\nWIRE 432 96 432 32\nWIRE 432 128 432 96\nWIRE 432 96 528 96\nWIRE 528 128 528 96\nWIRE 528 96 624 96\nWIRE 624 128 624 96\nWIRE 624 96 720 96\nWIRE 720 128 720 96\nWIRE 720 96 816 96\nWIRE 816 128 816 96\nWIRE 16 544 16 576\nWIRE 16 464 16 416\nWIRE -32 480 -64 480\nWIRE -32 528 -32 544\nWIRE 304 544 304 576\nWIRE 304 464 304 416\nWIRE 304 416 304 368\nWIRE 256 480 224 480\nWIRE 256 528 256 544\nWIRE 592 464 592 416\nWIRE 592 544 592 576\nWIRE 544 480 512 480\nWIRE 544 528 544 544\nWIRE 880 464 880 432\nWIRE 880 544 880 576\nWIRE 832 480 800 480\nWIRE 832 528 832 544\nWIRE 1104 32 1056 32\nWIRE 816 96 1104 96\nWIRE 1168 0 1168 -32\nWIRE 1232 64 1280 64\nWIRE 592 416 304 416\nWIRE 16 416 304 416\nWIRE 1408 400 1360 400\nWIRE 1408 432 1360 432\nWIRE 1504 400 1552 400\nWIRE 1504 432 1552 432\nWIRE 1504 464 1552 464\nWIRE 1504 496 1552 496\nWIRE 1504 528 1552 528\nFLAG 64 752 vin\nFLAG 64 880 0\nFLAG 224 752 vref\nFLAG 224 880 0\nFLAG 384 752 vcm\nFLAG 384 880 0\nFLAG 544 752 vdd\nFLAG 544 880 0\nFLAG 704 752 clk\nFLAG 704 880 0\nFLAG 1184 752 data[7:0]\nFLAG 1184 928 dac,n[6:0]\nFLAG 1344 752 dac,n[6:1]\nFLAG 1344 928 n[6:0]\nFLAG 1504 752 n[0]\nFLAG 1504 928 0\nFLAG 48 224 bot[7]\nFLAG 144 224 bot[6]\nFLAG 240 224 bot[5]\nFLAG 336 224 bot[4]\nFLAG 432 224 bot[3]\nFLAG 528 224 bot[2]\nFLAG 624 224 bot[1]\nFLAG 720 224 bot[0]\nFLAG 816 224 0\nFLAG 432 32 top\nFLAG 16 576 vin\nFLAG -64 480 smp\nFLAG -32 544 0\nFLAG 304 576 vref\nFLAG 304 368 bot[7:0]\nFLAG 224 480 up[7:0]\nFLAG 256 544 0\nFLAG 592 576 0\nFLAG 512 480 dn[7:0]\nFLAG 544 544 0\nFLAG 880 432 top\nFLAG 880 576 vcm\nFLAG 800 480 smp\nFLAG 832 544 0\nFLAG 1056 32 vcm\nFLAG 1168 -32 vdd\nFLAG 1280 64 cmp\nFLAG 1360 400 clk\nFLAG 1360 432 cmp\nFLAG 1552 400 smp\nFLAG 1552 432 up[7:0]\nFLAG 1552 464 dn[7:0]\nFLAG 1552 496 eoc\nFLAG 1552 528 data[7:0]\nSYMBOL voltage 64 768 R0\nSYMATTR InstName Vin\nSYMATTR Value SINE(2.5 2.4 1k)\nSYMBOL voltage 224 768 R0\nSYMATTR InstName Vref\nSYMATTR Value 5\nSYMBOL voltage 384 768 R0\nSYMATTR InstName Vcm\nSYMATTR Value 2.5\nSYMBOL voltage 544 768 R0\nSYMATTR InstName Vdd\nSYMATTR Value 5\nSYMBOL voltage 704 768 R0\nSYMATTR InstName Vclk\nSYMATTR Value PULSE(0 5 0.5u 5n 5n 495n 1u)\nSYMBOL cap 32 128 R0\nSYMATTR InstName C7\nSYMATTR Value {128*Cu}\nSYMBOL cap 128 128 R0\nSYMATTR InstName C6\nSYMATTR Value {64*Cu}\nSYMBOL cap 224 128 R0\nSYMATTR InstName C5\nSYMATTR Value {32*Cu}\nSYMBOL cap 320 128 R0\nSYMATTR InstName C4\nSYMATTR Value {16*Cu}\nSYMBOL cap 416 128 R0\nSYMATTR InstName C3\nSYMATTR Value {8*Cu}\nSYMBOL cap 512 128 R0\nSYMATTR InstName C2\nSYMATTR Value {4*Cu}\nSYMBOL cap 608 128 R0\nSYMATTR InstName C1\nSYMATTR Value {2*Cu}\nSYMBOL cap 704 128 R0\nSYMATTR InstName C0\nSYMATTR Value {Cu}\nSYMBOL cap 800 128 R0\nSYMATTR InstName Cd\nSYMATTR Value {Cu}\nSYMBOL ASW 16 448 R0\nSYMATTR InstName Ssmp[7:0]\nSYMBOL ASW 304 448 R0\nSYMATTR InstName Sref[7:0]\nSYMBOL ASW 592 448 R0\nSYMATTR InstName Sgnd[7:0]\nSYMBOL ASW 880 448 R0\nSYMATTR InstName Stop\nSYMBOL COMP 1168 64 R0\nSYMATTR InstName X1\nSYMBOL SARLOGIC 1456 464 R0\nSYMATTR InstName X2\nSYMBOL res 1168 784 R0\nSYMATTR InstName Rb[7:0]\nSYMATTR Value 20k\nSYMBOL res 1328 784 R0\nSYMATTR InstName Rs[6:0]\nSYMATTR Value 10k\nSYMBOL res 1488 784 R0\nSYMATTR InstName Rt\nSYMATTR Value 20k\nTEXT 64 -272 Left 2 ;8-bit SAR ADC with charge redistribution. One conversion takes 10 clock cycles, in three phases that never overlap:\\n1) Sample (smp = 1): Stop puts the top plate on vcm and Ssmp the bottom plates of the binary array (C7 = 128 Cu … C0 = Cu) on vin.\\n2) Hold (every switch open): the floating top plate keeps that charge, which is the sample.\\n3) Eight trials: Sref and Sgnd put each bottom plate on vref (up[k], the bits at 1 of the code being tried) or on ground (dn[k]): then top = vcm − vin·255/256 + vref·code/256.\\nThe comparator (COMP, a CMOS subcircuit of the project) says whether top is below vcm, that is, whether vin is above the trial voltage,\\nand SARLOGIC.v keeps or drops each bit, MSB first. Result: data = vin·255/vref, once every 10 clock cycles (100 kS/s at 1 MHz).\\nThe switches (ASW) are a «Model» module of the project: the XSPICE analog switch, which changes its resistance smoothly.\nTEXT 1136 672 Left 2 ;R-2R DAC, only to see data as a voltage:\\ndac = 5 V · data / 256\nTEXT 64 928 Left 2 !.param Cu=100f\nTEXT 64 960 Left 2 !.tran 2m\nTEXT -26 624 Left 2 ;Input Switches\n",
+  "sha256:1eaf67ee43f5db11e6e5db95a9b79866d5eac086098ef2b1eb80ff153ef55ab9": "Version 4\nSHEET 1 1400 1000\nWIRE 96 272 96 224\nWIRE 96 224 192 224\nWIRE 272 224 624 224\nWIRE 912 192 944 192\nWIRE 944 192 944 96\nWIRE 944 96 560 96\nWIRE 480 96 448 96\nWIRE 448 96 448 224\nWIRE 752 336 752 368\nWIRE 912 256 960 256\nWIRE 960 256 1008 256\nWIRE 1200 256 1264 256\nWIRE 1104 336 1104 368\nWIRE 96 432 96 464\nWIRE 160 688 160 720\nWIRE 160 800 200 800\nWIRE 280 800 320 800\nWIRE 320 688 320 720\nWIRE 320 800 360 800\nWIRE 440 800 480 800\nWIRE 480 688 480 720\nWIRE 480 800 520 800\nWIRE 600 800 640 800\nWIRE 640 688 640 720\nWIRE 640 800 680 800\nWIRE 760 800 800 800\nWIRE 800 688 800 720\nWIRE 800 800 840 800\nWIRE 920 800 960 800\nWIRE 960 688 960 720\nWIRE 960 800 1000 800\nWIRE 1080 800 1120 800\nWIRE 1120 688 1120 720\nWIRE 160 800 160 816\nWIRE 1120 800 1216 800\nFLAG 96 352 0\nFLAG 144 224 vin\nFLAG 400 288 0\nFLAG 528 224 int\nFLAG 688 96 fb\nFLAG 752 368 clk\nFLAG 960 256 y\nFLAG 1264 256 d[6:0]\nFLAG 1104 368 clk\nFLAG 96 432 clk\nFLAG 96 544 0\nFLAG 160 688 d[0]\nFLAG 320 688 d[1]\nFLAG 480 688 d[2]\nFLAG 640 688 d[3]\nFLAG 800 688 d[4]\nFLAG 960 688 d[5]\nFLAG 1120 688 d[6]\nFLAG 160 896 0\nFLAG 1216 800 out\nSYMBOL voltage 96 256 R0\nSYMATTR InstName Vin\nSYMATTR Value SINE(2.5 2 250)\nSYMBOL res 288 208 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R1\nSYMATTR Value 10k\nSYMBOL cap 384 224 R0\nSYMATTR InstName C1\nSYMATTR Value 1n\nSYMBOL res 576 80 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R2\nSYMATTR Value 10k\nSYMBOL MODULATOR 768 224 R0\nSYMATTR InstName X1\nSYMBOL DOWNSAMPLER 1104 256 R0\nSYMATTR InstName X2\nSYMBOL voltage 96 448 R0\nSYMATTR InstName Vclk\nSYMATTR Value PULSE(0 5 0 5n 5n 495n 1u)\nSYMBOL res 144 704 R0\nSYMATTR InstName R10\nSYMATTR Value 20k\nSYMBOL res 296 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R20\nSYMATTR Value 10k\nSYMBOL res 304 704 R0\nSYMATTR InstName R11\nSYMATTR Value 20k\nSYMBOL res 456 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R21\nSYMATTR Value 10k\nSYMBOL res 464 704 R0\nSYMATTR InstName R12\nSYMATTR Value 20k\nSYMBOL res 616 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R22\nSYMATTR Value 10k\nSYMBOL res 624 704 R0\nSYMATTR InstName R13\nSYMATTR Value 20k\nSYMBOL res 776 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R23\nSYMATTR Value 10k\nSYMBOL res 784 704 R0\nSYMATTR InstName R14\nSYMATTR Value 20k\nSYMBOL res 936 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R24\nSYMATTR Value 10k\nSYMBOL res 944 704 R0\nSYMATTR InstName R15\nSYMATTR Value 20k\nSYMBOL res 1096 784 R90\nWINDOW 0 0 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName R25\nSYMATTR Value 10k\nSYMBOL res 1104 704 R0\nSYMATTR InstName R16\nSYMATTR Value 20k\nSYMBOL res 144 800 R0\nSYMATTR InstName R30\nSYMATTR Value 20k\nTEXT 96 -96 Left 2 ;First-order sigma-delta ADC in two Verilog blocks. Modulator: R1 carries the current of Vin and R2 the one of the feedback fb into node «int», and C1 integrates them;\\nMODULATOR (the 1-bit quantizer) compares «int» with vcc/2 on each clock edge: above it, y = 1 and fb goes to 0 and discharges C1; below it, y = 0 and fb goes to 1 and charges it.\\nSo «int» stays near 2.5 V, the average of fb follows 5 V − Vin and the fraction of ones in the stream y is Vin / 5 V. DOWNSAMPLER turns that 1 MHz stream into 7-bit words.\nTEXT 1008 416 Left 2 ;DOWNSAMPLER: every 64 clock cycles it puts on the bus d[6:0]\\nhow many ones came in on y (0 … 64): 15.6 kS/s.\nTEXT 160 624 Left 2 ;7-bit R-2R DAC: each bit of the bus d[6:0] goes in through a 20k; out = 5 V · code / 128 ≈ Vin/2\nTEXT 160 1008 Left 2 !.tran 8m\n"
+ }
+}

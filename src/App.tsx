@@ -106,7 +106,7 @@ import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
-import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, digitalProbeExpr, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
@@ -148,10 +148,14 @@ const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
-/** simulación mixta (#209): integrador RC + ADC sigma-delta en Verilog + DAC R-2R */
-const SIGMA_DELTA = 'ADC sigma-delta.turbo';
+/** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
+const ADC = 'ADC.turbo';
 const EXAMPLES_TURBO = 'Examples.turbo';
-const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
+const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
+/** las transferencias de 1er y 2do orden con RC y RLC: un workbench cada una (scripts/make-examples.ts) */
+const TRANSFER = 'Transfer functions.turbo';
+/** emisor común, degenerado, colector común y base común, BJT contra MOSFET (scripts/make-examples.ts) */
+const AMPS = 'Transistor amplifiers.turbo';
 
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
@@ -2204,6 +2208,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
       const sc = scaleOf(plot);
       if (!sc) return;
+      // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
+      const dig = digitalProbeExpr(sim.built, busBits(target.net), target.net);
+      if (dig && hasData(dig)) return addDigitalProbe(dig);
       const exprs = busBits(target.net)
         .map((b) => probeExpr(sim.built, { net: b }))
         .filter((e): e is string => {
@@ -2247,6 +2254,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
     if (traceBox.current?.focused()) return traceBox.current.insert(expr);
+    // una salida de un bloque Verilog: su versión digital (la tensión se puede pedir con V())
+    if (target.net && !lv) {
+      const dig = digitalProbeExpr(sim.built, [target.net]);
+      if (dig && hasData(dig)) return addDigitalProbe(dig);
+    }
     setPanel('plot');
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
@@ -2260,6 +2272,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
     addProbed(i, expr);
+  };
+  /** ¿La expresión tiene datos en el plot que se ve? (Dig() sólo después de un transitorio) */
+  const hasData = (expr: string) => {
+    const sc = plot && scaleOf(plot);
+    if (!plot || !sc) return false;
+    try {
+      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  /** traza digital de la punta: al panel digital (o a uno nuevo), con los resultados a la vista */
+  const addDigitalProbe = (expr: string) => {
+    setPanel('plot');
+    if (expanded === 'schematic') setExpanded('');
+    editPanes(addTraceTo(panes, Math.min(activePane, panes.length - 1), expr));
   };
   /** traza medida con la punta: a un eje con su unidad o libre del panel activo, o a uno nuevo (#308) */
   const addProbed = (i: number, expr: string) => {
@@ -2673,17 +2702,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           switch (lk) {
             case 'z':
               return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
-            // con los markers activos, A y D ponen los markers A y D (como en ViVA)
+            // A y D ponen los markers A y D, con sus diferencias (como en ViVA); T va a la caja de trazas
             case 'a':
-              return act(plotPanel.current?.markerMode() ? 'markA' : 'addTrace');
+              return act('markA');
+            case 't':
+              return act('addTrace');
             case 'p':
               return act('addPane');
             case 'b':
               return act('addPaneBelow');
             case 'u':
-              return act('paneUp');
+              return act(e.shiftKey ? 'paneDown' : 'paneUp');
             case 'd':
-              return act(plotPanel.current?.markerMode() ? 'markD' : 'paneDown');
+              return act('markD');
             case 'm':
               return act(e.shiftKey ? 'clearMarkers' : 'markPoint');
             case 'v':
@@ -3152,7 +3183,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Examples'),
       items: [
         { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
-        { label: 'ADC sigma-delta', title: t('Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC'), onClick: () => doExample(SIGMA_DELTA) },
+        { label: 'Transfer functions', title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'), onClick: () => doExample(TRANSFER) },
+        { label: 'Transistor amplifiers', title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'), onClick: () => doExample(AMPS) },
+        { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
       ],

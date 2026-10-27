@@ -412,31 +412,33 @@ export function removeVertex(doc: AscDoc, p: Point, lib?: Library): AscDoc {
  * Mueve el codo (extremo de uno o más cables) de `p` a `to`. Cada tramo conserva su
  * dirección desde su otro extremo y se agrega el codo necesario para seguir siendo
  * ortogonal; si dos tramos llegarían a `to` por el mismo lado, el segundo entra por el otro.
+ * En `track.out` quedan los tramos donde terminó el cable `track.index` (el seleccionado).
  */
-export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library): AscDoc {
+export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library, track?: { index: number; out: Wire[] }): AscDoc {
   if (samePt(p, to)) return doc;
   const used = new Set<string>();
   const side = (e: Point) => `${Math.sign(e.x - to.x)},${Math.sign(e.y - to.y)}`;
   let touched = false;
   const wires: Wire[] = [];
-  for (const w of doc.wires) {
+  doc.wires.forEach((w, i) => {
     const [a, b] = ends(w);
     const atA = samePt(a, p);
-    if (isZero(w) || (!atA && !samePt(b, p))) {
-      wires.push(w);
-      continue;
+    const from = wires.length;
+    if (isZero(w) || (!atA && !samePt(b, p))) wires.push(w);
+    else {
+      touched = true;
+      const q = atA ? b : a;
+      let c = to;
+      if (isH(w) || isV(w)) {
+        const keep = isH(w) ? { x: to.x, y: q.y } : { x: q.x, y: to.y };
+        const other = isH(w) ? { x: q.x, y: to.y } : { x: to.x, y: q.y };
+        c = !samePt(keep, to) && used.has(side(keep)) ? other : keep;
+        used.add(side(c));
+      }
+      pushPath(wires, atA ? [to, c, q] : [q, c, to]);
     }
-    touched = true;
-    const q = atA ? b : a;
-    let c = to;
-    if (isH(w) || isV(w)) {
-      const keep = isH(w) ? { x: to.x, y: q.y } : { x: q.x, y: to.y };
-      const other = isH(w) ? { x: q.x, y: to.y } : { x: to.x, y: q.y };
-      c = !samePt(keep, to) && used.has(side(keep)) ? other : keep;
-      used.add(side(c));
-    }
-    pushPath(wires, atA ? [to, c, q] : [q, c, to]);
-  }
+    if (i === track?.index) track.out.push(...wires.slice(from));
+  });
   return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
 }
 
@@ -444,8 +446,9 @@ export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library): Asc
  * Desplaza un tramo horizontal en vertical (o uno vertical en horizontal), como en
  * LTspice/KiCad: un tramo vecino perpendicular se estira; si en el extremo hay otra cosa
  * (pin, etiqueta, unión en T, tramo alineado) se agrega un cable que la sigue uniendo.
+ * En `selOut` queda el tramo desplazado (para reubicar la selección).
  */
-export function dragSegment(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library): AscDoc {
+export function dragSegment(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library, selOut?: Wire[]): AscDoc {
   const w = doc.wires[index];
   if (!w || !(isH(w) || isV(w))) return doc;
   const d = isH(w) ? { x: 0, y: dy } : { x: dx, y: 0 };
@@ -465,15 +468,17 @@ export function dragSegment(doc: AscDoc, index: number, dx: number, dy: number, 
       wires[endHere[0]] = samePt({ x: n.x1, y: n.y1 }, e) ? { ...n, x1: ne.x, y1: ne.y } : { ...n, x2: ne.x, y2: ne.y };
     } else if (endHere.length || passHere || fixed.has(ptKey(e))) stubs.push(seg(e, mvp(e)));
   }
-  wires.splice(index, 1, { x1: w.x1 + d.x, y1: w.y1 + d.y, x2: w.x2 + d.x, y2: w.y2 + d.y }, ...stubs);
+  const moved = { x1: w.x1 + d.x, y1: w.y1 + d.y, x2: w.x2 + d.x, y2: w.y2 + d.y };
+  selOut?.push(moved);
+  wires.splice(index, 1, moved, ...stubs);
   return mergeCollinear({ ...doc, wires }, lib);
 }
 
 /**
  * Como moveVertex pero sin codos (Ctrl+arrastre): cada cable que termina en `p` va en línea
- * recta desde su otro extremo hasta `to`, aunque quede en diagonal.
+ * recta desde su otro extremo hasta `to`, aunque quede en diagonal (`track`: como en moveVertex).
  */
-export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Library): AscDoc {
+export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Library, track?: { index: number; out: Wire[] }): AscDoc {
   if (samePt(p, to)) return doc;
   let touched = false;
   const wires = doc.wires.map((w) => {
@@ -483,6 +488,7 @@ export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Libra
     if (samePt(b, p)) return (touched = true), seg(a, to);
     return w;
   });
+  if (track && wires[track.index]) track.out.push(wires[track.index]);
   return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
 }
 
@@ -490,9 +496,9 @@ export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Libra
  * Como dragSegment pero en cualquier dirección y sin codos (Ctrl+arrastre): el tramo se
  * desplaza y los cables que terminan en sus extremos van en línea recta hasta la nueva
  * posición; si en el extremo hay otra cosa (pin, etiqueta, unión en T) se agrega un cable
- * recto que la sigue uniendo.
+ * recto que la sigue uniendo. En `selOut` queda el tramo desplazado.
  */
-export function dragSegmentStraight(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library): AscDoc {
+export function dragSegmentStraight(doc: AscDoc, index: number, dx: number, dy: number, lib?: Library, selOut?: Wire[]): AscDoc {
   const w = doc.wires[index];
   if (!w || (!dx && !dy)) return doc;
   const fixed = fixedPoints(doc, lib);
@@ -510,13 +516,35 @@ export function dragSegmentStraight(doc: AscDoc, index: number, dx: number, dy: 
         wires[j] = samePt({ x: n.x1, y: n.y1 }, e) ? { ...n, x1: e.x + dx, y1: e.y + dy } : { ...n, x2: e.x + dx, y2: e.y + dy };
       }
   }
-  wires.splice(index, 1, { x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }, ...stubs);
+  const moved = { x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy };
+  selOut?.push(moved);
+  wires.splice(index, 1, moved, ...stubs);
   return mergeCollinear({ ...doc, wires }, lib);
 }
 
 /** Índices de los cables de `doc` que caen sobre alguno de los tramos `segs` (para la selección) */
 export function wiresOn(doc: AscDoc, segs: Wire[]): number[] {
   return doc.wires.flatMap((w, i) => (!isZero(w) && segs.some((s) => ends(w).every((e) => onSegment(e, s))) ? [i] : []));
+}
+
+/**
+ * La selección de `doc` vista sobre `preview` (el fantasma de un movimiento o de un arrastre),
+ * donde los cables cambian de índice. Con `moved` (los tramos donde terminaron los cables
+ * seleccionados, de moveItems, dragSegment o moveVertex) se buscan ahí; si no, cada cable
+ * seleccionado se busca por identidad (los que no se tocaron conservan el objeto) y, si no
+ * está, se descarta: el mismo índice puede ser otro cable aunque la cantidad no cambie.
+ */
+export function previewSelection(selection: ItemRef[], doc: AscDoc, preview: AscDoc, moved?: Wire[]): ItemRef[] {
+  const others = selection.filter((r) => r.kind !== 'wire');
+  const wires = selection.filter((r) => r.kind === 'wire');
+  if (!wires.length) return selection;
+  let idx: number[];
+  if (moved) idx = wiresOn(preview, moved);
+  else {
+    const at = new Map(preview.wires.map((w, i) => [w, i]));
+    idx = wires.flatMap((r) => at.get(doc.wires[r.index]) ?? []);
+  }
+  return [...others, ...idx.map((index) => ({ kind: 'wire' as const, index }))];
 }
 
 /**

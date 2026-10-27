@@ -415,7 +415,8 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
                     }}
                   />
                 ) : (
-                  <button className="tree-name" onClick={() => toggleGroup(g.id)}>
+                  // (el nombre completo: el panel lo corta con «…»)
+                  <button className="tree-name" onClick={() => toggleGroup(g.id)} title={g.name}>
                     <span className="tree-glyph">▤</span> {g.name}
                   </button>
                 )}

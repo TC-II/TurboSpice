@@ -1,5 +1,6 @@
 // Esquemático → simulación: netlist LTspice → ngspice, archivos de modelos de la librería
 // y nombres de vectores para las puntas de prueba.
+import { linkDigitalNets } from '../hdl/digitalLinks.ts';
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
@@ -40,6 +41,10 @@ export interface BuiltSimulation {
   tooBig: SizeProblem[];
   /** símbolos que no están en la librería: sus elementos se omiten y el circuito simulado es otro (#108) */
   missingSymbols: string[];
+  /** redes entre bloques Verilog que se simulan digitales, sin puentes (nombres de ngspice; ver digitalLinks.ts) */
+  digitalNets?: Set<string>;
+  /** sus nodos de adentro de antes ("x1.q_0_d") → la red, para las trazas Dig() guardadas */
+  digitalAliases?: Map<string, string>;
 }
 
 /**
@@ -58,7 +63,10 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const texts = Object.fromEntries(
     await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),
   );
-  const prep = prepareSimulation(ng, (rel) => texts[rel]);
+  const prepared = prepareSimulation(ng, (rel) => texts[rel]);
+  // las redes que unen sólo bloques Verilog, digitales (#209)
+  const links = linkDigitalNets(prepared.netlist, prepared.files);
+  const prep = { ...prepared, netlist: links.netlist, files: links.files };
   const analyses = lt.texts
     .filter((tt) => (tt.kind === 'directive' || isNgspiceComment(tt.text)) && !isControlBlock(tt.text))
     .flatMap((tt) => tt.text.split('\\n'))
@@ -75,7 +83,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
-  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols };
+  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases };
 }
 
 /** Vectores de ngspice "@dev[param]" de los parámetros de dispositivo que usan unas trazas (#202) */

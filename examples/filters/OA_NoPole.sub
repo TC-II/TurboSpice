@@ -1,0 +1,6 @@
+* OA_NoPole: an op amp without poles, only its open-loop gain Avol (the drawing is TCLib's
+* OA_Ideal, by Javier Petrucci and Agustin Gullino, ITBA). OA_Ideal has one pole (GBWP), and in
+* a pole-zero map that pole shows up far away, at about −2π·GBWP/2, and squeezes the others.
+.SUBCKT OA_NoPole 1 2 3
+E1 3 0 1 2 {Avol}
+.ends OA_NoPole

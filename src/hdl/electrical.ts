@@ -1,9 +1,10 @@
 import { t } from '../i18n/i18n.ts';
 // Interfaz eléctrica de los bloques Verilog (#209): cómo se ven sus pines desde el circuito
 // analógico. Son parámetros del .subckt (y del símbolo, así cada instancia puede cambiarlos) que
-// usan los bidi_bridge de XSPICE de cada pin (ver synth.ts):
+// usan los puentes de XSPICE de cada pin (ver synth.ts):
 //  - entradas: 0 por debajo de vil, 1 por encima de vih (vil > vih da histéresis, como un Schmitt);
-//  - salidas: vol / voh, corriente máxima iol / ioh (como un driver CMOS) y rampas tr / tf;
+//  - salidas: vol / voh y rampas tr / tf; las tri-state y los inout, además, con corriente máxima
+//    iol / ioh (como un driver CMOS);
 //  - tpd: retardo de cada compuerta, flip-flop y buffer tri-state.
 
 export interface ElectricalParam {
@@ -20,8 +21,8 @@ export const ELECTRICAL: ElectricalParam[] = [
   { name: 'vih', label: t('Input high threshold (VIH)'), unit: 'V', value: '{vcc/2}' },
   { name: 'vol', label: t('Output low level (VOL)'), unit: 'V', value: '0' },
   { name: 'voh', label: t('Output high level (VOH)'), unit: 'V', value: '{vcc}' },
-  { name: 'iol', label: t('Max. output current, low (IOL)'), unit: 'A', value: '20m' },
-  { name: 'ioh', label: t('Max. output current, high (IOH)'), unit: 'A', value: '20m' },
+  { name: 'iol', label: t('Max. output current, low (IOL, tri-state and inout)'), unit: 'A', value: '20m' },
+  { name: 'ioh', label: t('Max. output current, high (IOH, tri-state and inout)'), unit: 'A', value: '20m' },
   { name: 'tr', label: t('Output rise time'), unit: 's', value: '1n' },
   { name: 'tf', label: t('Output fall time'), unit: 's', value: '1n' },
   { name: 'tpd', label: t('Delay of each gate (tpd)'), unit: 's', value: '1n' },

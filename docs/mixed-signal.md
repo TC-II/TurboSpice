@@ -18,6 +18,11 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
   El eje de tiempo usa los mismos márgenes que uPlot y comparte zoom y cursores.
 - Buses: valor en el radix de la traza (`Trace.radix`: hex, dec, ±dec, oct, bin); X/Z en rojo punteado.
 - Sólo se leen los nodos digitales del último análisis (con `.step`, la última corrida).
+- **Punta de prueba** en una red que sale de un bloque Verilog (un pin de salida o inout): grafica su
+  versión digital, `Dig(x1.d_0_d)`, y en un cable de bus con todos los bits del mismo puerto, el bus
+  entero (`Dig(x1.d[2:0])`). El nodo sale del puente `ab_<pin>` del `.subckt` generado
+  (`verilogDigitalNode` en `sim/traces.ts`). En las entradas del bloque, fuera de un transitorio o al
+  armar una expresión en la caja de trazas sigue siendo `V()`; la tensión se pide escribiéndola.
 
 ## Módulos Verilog
 

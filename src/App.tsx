@@ -106,7 +106,7 @@ import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
-import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, digitalProbeExpr, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
@@ -2208,6 +2208,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
       const sc = scaleOf(plot);
       if (!sc) return;
+      // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
+      const dig = digitalProbeExpr(sim.built, busBits(target.net));
+      if (dig && hasData(dig)) return addDigitalProbe(dig);
       const exprs = busBits(target.net)
         .map((b) => probeExpr(sim.built, { net: b }))
         .filter((e): e is string => {
@@ -2251,6 +2254,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
     if (traceBox.current?.focused()) return traceBox.current.insert(expr);
+    // una salida de un bloque Verilog: su versión digital (la tensión se puede pedir con V())
+    if (target.net && !lv) {
+      const dig = digitalProbeExpr(sim.built, [target.net]);
+      if (dig && hasData(dig)) return addDigitalProbe(dig);
+    }
     setPanel('plot');
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
@@ -2264,6 +2272,23 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
     addProbed(i, expr);
+  };
+  /** ¿La expresión tiene datos en el plot que se ve? (Dig() sólo después de un transitorio) */
+  const hasData = (expr: string) => {
+    const sc = plot && scaleOf(plot);
+    if (!plot || !sc) return false;
+    try {
+      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  /** traza digital de la punta: al panel digital (o a uno nuevo), con los resultados a la vista */
+  const addDigitalProbe = (expr: string) => {
+    setPanel('plot');
+    if (expanded === 'schematic') setExpanded('');
+    editPanes(addTraceTo(panes, Math.min(activePane, panes.length - 1), expr));
   };
   /** traza medida con la punta: a un eje con su unidad o libre del panel activo, o a uno nuevo (#308) */
   const addProbed = (i: number, expr: string) => {

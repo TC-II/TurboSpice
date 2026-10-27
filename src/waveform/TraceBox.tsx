@@ -69,7 +69,7 @@ export function TraceBox({ names, hints, onAdd, handle }: {
           spellCheck={false}
           placeholder={t('Add trace: V(out)/V(in), I(R1), @Q1[gm]…')}
           aria-label={t('Expression')}
-          title={t('Enter or + adds the trace (A: go to the box). With the focus here, clicking a node or component on the schematic types its name')}
+          title={t('Enter or + adds the trace (T: go to the box). With the focus here, clicking a node or component on the schematic types its name')}
           onChange={(e) => {
             setExpr(e.target.value);
             setError(undefined);

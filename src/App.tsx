@@ -2702,17 +2702,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
           switch (lk) {
             case 'z':
               return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
-            // con los markers activos, A y D ponen los markers A y D (como en ViVA)
+            // A y D ponen los markers A y D, con sus diferencias (como en ViVA); T va a la caja de trazas
             case 'a':
-              return act(plotPanel.current?.markerMode() ? 'markA' : 'addTrace');
+              return act('markA');
+            case 't':
+              return act('addTrace');
             case 'p':
               return act('addPane');
             case 'b':
               return act('addPaneBelow');
             case 'u':
-              return act('paneUp');
+              return act(e.shiftKey ? 'paneDown' : 'paneUp');
             case 'd':
-              return act(plotPanel.current?.markerMode() ? 'markD' : 'paneDown');
+              return act('markD');
             case 'm':
               return act(e.shiftKey ? 'clearMarkers' : 'markPoint');
             case 'v':

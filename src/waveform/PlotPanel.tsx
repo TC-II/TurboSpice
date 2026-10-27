@@ -28,19 +28,19 @@ export type PlotAction =
   | 'zoomPrev' // Shift+Z
   | 'autoY' // Ctrl+Y
   | 'grid' // Ctrl+G
-  | 'addTrace' // A
+  | 'addTrace' // T
   | 'addPane' // P
   | 'addPaneBelow' // B
   | 'paneUp' // U
-  | 'paneDown' // D
+  | 'paneDown' // Shift+U
   | 'removeTraces' // Backspace
   | 'cursor' // C
   | 'clearCursors' // Shift+C
   | 'markPoint' // M
   | 'markV' // V
   | 'markH' // H
-  | 'markA' // A (con los markers activos)
-  | 'markD' // D (con los markers activos)
+  | 'markA' // A
+  | 'markD' // D
   | 'clearMarkers' // Shift+M
   | 'deleteMarker' // Supr
   | 'cancel'; // Esc
@@ -73,7 +73,7 @@ interface Props {
   handle?: Ref<PlotPanelHandle>;
   /** lugar de la barra de resultados donde van Cursores, DFT, Medidas y Ajustar */
   toolsHost?: HTMLElement | null;
-  /** A: ir a la caja de expresiones (está en la barra de resultados) */
+  /** T: ir a la caja de expresiones (está en la barra de resultados) */
   onFocusTrace?(): void;
   /** avisa cuando se entra o sale del modo ⌖ de la DFT (el esquemático pasa a la punta de prueba) */
   onDftPicking?(on: boolean): void;

@@ -201,8 +201,9 @@ deshacer (§5).
 ## 7. Importar y exportar
 - **Abrir un `.asc`**: crea en memoria un proyecto con una variante y una simulación por cada
   análisis del `;.sims` (o una sola, si no hay). Al guardar se escribe un `.turbo`; el `.asc` no se toca.
-- **Importar a un proyecto**: un `.zip` o varios archivos arrastrados. Cada `.asc` se agrega como
-  variante y los `.asy`/`.lib`/`.sub` van a `files` (con la regla de conflictos de §4).
+- **Importar a un proyecto**: un `.zip` o archivos arrastrados (también un solo `.asc`; sólo un
+  `.turbo` se abre como proyecto). Cada `.asc` (o carpeta del `.zip`) se agrega como un workbench
+  nuevo con sus testbenches, y los `.asy`/`.lib`/`.sub` van a `files` (con la regla de conflictos de §4).
 - **Exportar una variante**: un `.zip` con un `.asc` por simulación (el *Actual*, sin historial),
   llamados `<Simulación>.asc`, más los archivos del proyecto que usan esos `.asc`.
 - **Exportar todo**: un solo `.zip` con una carpeta por variante, cada una con el mismo contenido que

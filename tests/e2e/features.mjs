@@ -781,7 +781,7 @@ const dropAsc = (name, text) =>
     window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
   }, [name, text]);
 await dropAsc('RLC pz.asc', rlcAsc([]));
-await pzp.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'RLC pz');
+await pzp.waitForFunction(() => /workbench RLC pz/.test(document.body.innerText));
 await pzp.getByLabel('Correr', { exact: true }).click();
 await pzp.locator('.pz-plane').waitFor({ timeout: 30000 });
 check((await pzp.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'pz1', 'con .ac y .pz se abre el mapa de polos y ceros');
@@ -797,7 +797,8 @@ check((await pzp.locator('.pz-plane text').allTextContents()).join() !== span0.j
 await pzp.locator('.pz-view').getByRole('button', { name: 'Ajustar' }).click();
 const [pzDl] = await Promise.all([pzp.waitForEvent('download'), pzp.getByRole('combobox', { name: 'Exportar polos y ceros' }).selectOption('csv')]);
 const pzCsv = { name: pzDl.suggestedFilename(), text: readFileSync(await pzDl.path(), 'utf8') };
-check(pzCsv.name === 'RLC pz.csv' && pzCsv.text.split('\n').filter(Boolean).length === 3 && pzCsv.text.startsWith('corrida,tipo'), `tabla de polos y ceros a CSV (${pzCsv.name})`);
+// (el .asc soltado es un workbench del proyecto abierto: el CSV lleva el nombre del proyecto)
+check(/\.csv$/.test(pzCsv.name) && pzCsv.text.split('\n').filter(Boolean).length === 3 && pzCsv.text.startsWith('corrida,tipo'), `tabla de polos y ceros a CSV (${pzCsv.name})`);
 await pzp.getByRole('combobox', { name: 'Plot' }).selectOption('ac1');
 await pzp.locator('.pz-view.compact .pz-plane').waitFor();
 await pzp.getByLabel('Expresión', { exact: true }).fill('V(out)');
@@ -806,7 +807,7 @@ await pzp.locator('.pane-chart').first().waitFor();
 check((await pzp.getByRole('checkbox', { name: 'Polos y ceros' }).isChecked()) && (await pzp.locator('.pz-view.compact path.pole').count()) === 2, 'en el Bode, el mapa de polos y ceros al lado');
 await pzp.screenshot({ path: `${OUT}/pz-bode.png` });
 await dropAsc('RLC pz step.asc', rlcAsc(['!.step param R list 10 20 40'], '{R}'));
-await pzp.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'RLC pz step');
+await pzp.waitForFunction(() => /workbench RLC pz step/.test(document.body.innerText));
 await pzp.getByLabel('Correr', { exact: true }).click();
 await pzp.locator('.pz-legend li').first().waitFor({ timeout: 30000 });
 const legend = await pzp.locator('.pz-legend li').allTextContents();

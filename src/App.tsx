@@ -69,7 +69,7 @@ import { FileConflictDialog } from './project/FileConflictDialog.tsx';
 import { staleInstances } from './project/staleInstances.ts';
 import { exportAllZip, subcktFilesFor, runFilesOf, runSummary, exportSubcktNetlist, exportSubcktZip, exportVariantZip, importEntries, subcktFilesFrom, type Imported } from './project/exchange.ts';
 import { readZip, type ZipEntry } from './project/zip.ts';
-import { asBenches, EMPTY_ASC, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
+import { asBenches, EMPTY_ASC, EXT, isTurboText, newId, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
 import { SlideConfirm } from './ui/SlideConfirm.tsx';
 import { isNativeSwitch, isTcSwitch, SwitchDialog } from './schematic/SwitchDialog.tsx';
 import { setSwModel } from './schematic/switchModel.ts';
@@ -2817,6 +2817,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     }
     try {
       let p = leave();
+      const before = new Set(p.variants.map((v) => v.id));
       const variants: string[] = [];
       const files: Project['files'] = [];
       const damaged: Imported['damaged'] = [];
@@ -2840,11 +2841,26 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         files.push(...r.files);
         damaged.push(...r.damaged);
       }
+      // cada .asc (o carpeta de un .zip) importado es un workbench propio con sus testbenches
+      const fresh = p.variants.filter((v) => !before.has(v.id));
+      const groups = [...p.groups, ...fresh.map((v) => ({ id: `g_${v.id}`, name: v.name }))];
+      p = {
+        ...p,
+        groups,
+        variants: p.variants.map((v) => {
+          if (before.has(v.id)) return v;
+          // (un .asc sin análisis no trae simulaciones: su único testbench es el circuito)
+          const sims = v.sims.length ? v.sims : [{ id: newId('s'), asc: v.base, runs: [] }];
+          return { ...v, activeSim: v.activeSim || sims[0].id, sims: sims.map((s) => ({ ...s, group: `g_${v.id}` })) };
+        }),
+      };
       const merged = await mergeFiles(p.files, files, askConflict);
       enter(asBenches({ ...p, files: merged.files }), true);
+      // (el testbench importado todavía no tiene resultados: nada que medir con la punta de prueba)
+      if (fresh.length) setTool({ kind: 'select' });
       markDirty();
       const parts = [
-        ...(variants.length ? [`${variants.length === 1 ? t('the testbench') : t('{length} testbenches:', { length: variants.length })} ${variants.join(', ')}`] : []),
+        ...(variants.length ? [`${variants.length === 1 ? t('the workbench') : t('{length} workbenches:', { length: variants.length })} ${variants.join(', ')}`] : []),
         ...(merged.added.length ? [`${merged.added.length === 1 ? t('the file') : t('{length} files:', { length: merged.added.length })} ${merged.added.join(', ')}`] : []),
       ];
       const imported = parts.length ? t('Imported {p0}', { p0: parts.join(' y ') }) : t('There was nothing to import (.asc, .asy, .lib, .sub or .zip)');
@@ -2929,7 +2945,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     download(z.name, new Blob([z.bytes as BlobPart], { type: 'application/zip' }));
   };
 
-  // Arrastrar y soltar: un .turbo o un .asc se abre; un .plt es una vista; lo demás (varios
+  // Arrastrar y soltar: un .turbo se abre; un .plt es una vista; lo demás (.asc, varios
   // archivos, un .zip, símbolos y modelos) se importa al proyecto
   useEffect(() => {
     const over = (e: DragEvent) => e.preventDefault();
@@ -2939,12 +2955,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const f = all[0];
       if (!f) return;
       if (f.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
-      if (all.length > 1 || !/\.(turbo|asc)$/i.test(f.name)) return importFiles(all);
-      if (/\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
-      // con la sesión de Google, soltar un .asc lo importa a "Mis simulaciones" y lo abre
-      if (google.account) return doImport([{ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }]);
-      if (!confirmDiscard()) return;
-      await openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
+      if (all.length === 1 && /\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
+      // lo demás (.asc, varios archivos, un .zip, símbolos y modelos) se suma al proyecto abierto:
+      // cada .asc, un workbench nuevo (#316)
+      return importFiles(all);
     };
     window.addEventListener('dragover', over);
     window.addEventListener('drop', drop);

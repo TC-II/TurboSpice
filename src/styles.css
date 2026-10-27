@@ -532,6 +532,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .result-table { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow: auto; }
 .result-cols { display: flex; gap: 12px; align-items: flex-start; min-height: 0; }
 .result-cols .pz-table { flex: 1 1 0; }
+.result-cols .pz-table tbody tr.hl > * { background: color-mix(in srgb, var(--sch-sel) 18%, transparent); }
 .result-cols .pz-table tbody tr:hover > * { background: color-mix(in srgb, var(--accent) 10%, transparent); }
 .result-cols .sort { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .sort-mark { display: inline-block; width: 1.2em; text-align: center; }

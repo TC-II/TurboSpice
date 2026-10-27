@@ -160,6 +160,10 @@ interface Props {
   showSimCommand?: boolean;
   /** elemento bajo el mouse (con la herramienta de selección) y punto de la grilla más cercano; null al salir */
   onHover?(h: { ref: ItemRef | null; at: Point } | null): void;
+  /** componente bajo el mouse (con la selección o la punta de prueba), undefined al salir: para la tabla del .op */
+  onHoverSymbol?(index: number | undefined): void;
+  /** componente resaltado desde afuera (la fila de la tabla de resultados bajo el mouse) */
+  highlightSymbol?: number;
   /** cambios contra la corrida anterior (historial, #153) */
   diff?: CircuitDiff;
 }
@@ -459,6 +463,7 @@ export function SchematicEditor(props: Props) {
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
+  const hoverSymOut = useRef<number | undefined>(undefined);
   const [grabLabel, setGrabLabel] = useState<{ sym: number; win: number } | undefined>();
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
@@ -1074,6 +1079,12 @@ export function SchematicEditor(props: Props) {
     // de operación (describe) sigue saliendo sobre el cuerpo
     const probe = tool.kind === 'probe' && (!drag || drag.mode === 'probe') ? probeTarget(p, true) : null;
     const target = describe && !drag ? probeTarget(p) : null;
+    // (con la punta de prueba, el componente de un pin o el de su cuerpo)
+    const hsym = drag ? undefined : tool.kind === 'probe' ? (probe?.symbol ?? (target ?? probeTarget(p))?.symbol) : hs;
+    if (hsym !== hoverSymOut.current) {
+      hoverSymOut.current = hsym;
+      props.onHoverSymbol?.(hsym);
+    }
     if (tool.kind === 'probe') {
       setHoverNet(probe?.net);
       setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined ? 'i' : '');
@@ -1414,6 +1425,7 @@ export function SchematicEditor(props: Props) {
         setPickHover(null);
         lastHover.current = '';
         onHover?.(null);
+        if (hoverSymOut.current !== undefined) props.onHoverSymbol?.((hoverSymOut.current = undefined));
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}
@@ -1430,7 +1442,7 @@ export function SchematicEditor(props: Props) {
         conn={shownConn}
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : shownSelection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
-        hoverSymbol={hoverSym}
+        hoverSymbol={hoverSym ?? props.highlightSymbol}
         grabLabel={grabLabel}
         hoverFlag={hoverFlag}
         hoverWire={previewing ? undefined : hoverWire}

@@ -9,8 +9,13 @@ import { t } from '../i18n/i18n.ts';
 
 /** Tabla de valores escalares; ordenable por nombre o por |valor|, con filtro. Las filas se
  * reparten en columnas (hasta `maxCols`, las que entren en el ancho del panel); pasar el mouse por una avisa qué vector es (para resaltarlo en el esquemático) */
-export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; maxCols?: number; onHoverRow?: (expr: string | null) => void }) {
+export function ResultTable({ plot, maxCols = 2, onHoverRow, highlightDevice }: { plot: SimPlot; maxCols?: number; onHoverRow?: (expr: string | null) => void; highlightDevice?: string }) {
   const box = useRef<HTMLDivElement>(null);
+  // el componente bajo el mouse en el esquemático: sus filas se resaltan y la primera se muestra
+  const hl = highlightDevice?.toUpperCase();
+  useEffect(() => {
+    if (hl) box.current?.querySelector('tr.hl')?.scrollIntoView({ block: 'nearest' });
+  }, [hl]);
   const [width, setWidth] = useState(0);
   useEffect(() => {
     const el = box.current;
@@ -50,7 +55,7 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; 
         </thead>
         <tbody onMouseLeave={() => onHoverRow?.(null)}>
           {part.map(({ name, raw, v }) => (
-            <tr key={raw} onMouseEnter={() => onHoverRow?.(name)}>
+            <tr key={raw} className={hl && rowDevice(name) === hl ? 'hl' : undefined} onMouseEnter={() => onHoverRow?.(name)}>
               <th title={paramTitle(raw)}>{name}</th>
               <td className="num">{Array.from(v.real, (re, i) => (v.imag ? complexText(re, v.imag[i]) : si(re))).join(', ')}</td>
             </tr>
@@ -72,6 +77,12 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow }: { plot: SimPlot; 
       </div>
     </div>
   );
+}
+
+/** Componente de una fila: "@Q1[gm]", "Ic(Q1)", "I(R1)" → "Q1"; null si no es de un componente */
+export function rowDevice(expr: string): string | null {
+  const m = /^@([^[\]\s]+)\[\w+\]$/.exec(expr) ?? /^I[a-z]?\(([^,()]+)\)$/i.exec(expr);
+  return m ? m[1].toUpperCase() : null;
 }
 
 /** Vector y, si es un parámetro de dispositivo (@q1[gm]), qué es */

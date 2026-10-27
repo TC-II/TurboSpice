@@ -12,7 +12,7 @@ import { biasCommand, biasParams, elementBias, netBias, pinBias, sameCircuit, sc
 import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
-import { isPzPlot, PzPlane, pzRuns, ResultTable } from './waveform/ScalarViews.tsx';
+import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
@@ -1993,6 +1993,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // fila de la tabla de resultados bajo el mouse: su red o sus flechas se resaltan en el esquemático
   const [rowHover, setRowHover] = useState<string | null>(null);
   const rowNet = rowHover ? /^V\(([^,()]+)\)$/i.exec(rowHover)?.[1] : undefined;
+  // …y el componente de la fila (@Q1[gm], Ic(Q1), I(R1)); al revés, el componente bajo el mouse resalta sus filas
+  const rowDev = rowHover ? rowDevice(rowHover) : null;
+  const rowSymbol = rowDev && !lvNow ? doc.symbols.findIndex((s) => s.attrs.get('InstName')?.toUpperCase() === rowDev) : -1;
+  const [hoverDev, setHoverDev] = useState<string>();
+  const onHoverSymbol = useCallback((i: number | undefined) => setHoverDev(i === undefined ? undefined : docRef.current.symbols[i]?.attrs.get('InstName')), []);
   const arrows = useMemo(() => {
     const rowCurrent = !!rowHover && /^I/i.test(rowHover);
     if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
@@ -3703,6 +3708,8 @@ ${ltNetlistText(sim.built.lt)}
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
             highlightNet={rowNet ?? traceNetShown}
+            highlightSymbol={rowSymbol >= 0 ? rowSymbol : undefined}
+            onHoverSymbol={onHoverSymbol}
             netColors={netColors}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
@@ -3915,7 +3922,7 @@ ${ltNetlistText(sim.built.lt)}
                 <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
               )}
               {panel === 'plot' && plot && !scale &&
-                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} />)}
+                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} highlightDevice={lvNow ? undefined : hoverDev} />)}
               </ErrorBoundary>
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}

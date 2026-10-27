@@ -119,7 +119,8 @@ await page.evaluate((asc) => {
   window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
   window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 }, CIRCUIT);
-await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'div4 tb' }).click();
+// (cada .asc soltado es un workbench nuevo y su testbench queda abierto, #316)
+await page.locator('.project-tree .tree-name', { hasText: 'div4 tb' }).waitFor();
 await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
 check((await page.locator('svg.editor .pinname', { hasText: 'q[1:0]' }).count()) === 1 && (await page.locator('svg.editor .buspin').count()) === 1, 'el símbolo muestra sus pines, con el bus q[1:0] marcado');
 check((await page.locator('svg.editor .wires line.bus').count()) === 1, 'el cable del bus se dibuja grueso');
@@ -170,7 +171,8 @@ await page.evaluate((asc) => {
   window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
   window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 }, CIRCUIT.replace('SYMBOL div4', 'SYMBOL tri2').replace(/\brst\b/g, 'en').replace('PWL(0 5 20n 5 21n 0)', 'PWL(0 0 300n 0 301n 5 600n 5 601n 0)'));
-await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'tri tb' }).click();
+// (cada .asc soltado es un workbench nuevo y su testbench queda abierto, #316)
+await page.locator('.project-tree .tree-name', { hasText: 'tri tb' }).waitFor();
 await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
 await simulate();
 check(await addTrace('Dig(x1.y[1:0])'), 'Dig(x1.y[1:0]): un bus tri-state');

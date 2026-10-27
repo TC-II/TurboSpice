@@ -250,6 +250,15 @@ Las diez partes están hechas (#149–#158). Detalles que se decidieron al imple
     inversor lleva `AC 1` en la fuente para que la simulación «Bandwidth» tenga excitación.
   - `public/examples/Examples.turbo`: los ejemplos sueltos, una variante cada uno. Archivo › Examples
     abre el proyecto en la variante elegida.
+  - `public/examples/ADC.turbo` (`npx vite-node scripts/make-adc.ts`, desde `examples/adc/`: los
+    esquemáticos de los testbenches son `.asc` ahí, editados en TurboSpice; el script arma el
+    proyecto y sintetiza el Verilog): simulación mixta, un workbench por convertidor. **Flash 3-bit**: escalera de 8 resistencias y 7
+    comparadores dibujados uno por uno, y el codificador en Verilog con su símbolo dibujado a mano.
+    **SAR 8-bit**: redistribución de carga (arreglo binario de capacitores y 25 llaves, en arreglos), el
+    comparador CMOS como subcircuito (`COMP`), la llave `ASW` como módulo «Modelo» (el `aswitch` de
+    XSPICE) y la lógica en Verilog. **Sigma-delta**: integrador RC y dos bloques Verilog, el modulador
+    (`MODULATOR`, cuantizador de 1 bit) y el downsampler (`DOWNSAMPLER`, cuenta los unos cada 64
+    ciclos). En el menú de ejemplos es una sola entrada, «ADCs».
 - **Exportar**: queda sólo «Export project» (una carpeta por variante); exportar una sola variante se
   sacó del menú.
 - **My symbols and models**: es uno solo para todos los proyectos. Con sesión de Google se guarda en

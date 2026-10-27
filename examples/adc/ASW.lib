@@ -1,0 +1,8 @@
+* ASW: analog switch of the ADC project, made with the XSPICE aswitch.
+* Between Vc = 1 V (open, roff) and Vc = 4 V (closed, ron) the resistance changes smoothly
+* (logarithmically): with the abrupt SPICE switch (S) and the digital bridges of the Verilog
+* blocks switching at the same time, ngspice cannot find the time step.
+.subckt ASW n1 n2 c+ c- params: ron=100 roff=1g
+A1 %vd(c+ c-) %gd(n1 n2) aswm
+.model aswm aswitch(cntl_off=1 cntl_on=4 r_off={roff} r_on={ron} log=TRUE)
+.ends ASW

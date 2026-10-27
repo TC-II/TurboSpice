@@ -47,13 +47,20 @@ Un módulo Verilog es `<nombre>.v` + `<nombre>.asy`, como un subcircuito esquem�
   el código tiene retardos o tareas del sistema.
 
 ### Interfaz eléctrica (`electrical.ts`)
-Cada pin pasa por un `bidi_bridge`: entradas con umbrales `vil`/`vih` (vil > vih: histéresis),
-salidas con niveles `vol`/`voh`, corriente máxima `iol`/`ioh` y rampas `tr`/`tf`, `inout` en los dos
-sentidos; `tpd` es el retardo de cada compuerta. Son parámetros del `.subckt` y del símbolo (cada
-instancia los cambia). Familias: ideal, 74HC, 74HCT, 74LS, LVCMOS 3.3 V, CD4000.
-Detalles: cada salida tiene su nodo detrás de un `d_buffer` (dos bidi_bridge no pueden compartir un
-nodo); las salidas sólo de tri-state van directo (para ver la Z); 1 GΩ a masa en cada salida evita la
-matriz singular en el punto de operación.
+Cada pin pasa por un puente de XSPICE: entradas con umbrales `vil`/`vih` (vil > vih: histéresis,
+`bidi_bridge`), salidas con niveles `vol`/`voh` y rampas `tr`/`tf` (`dac_bridge`), `inout` en los dos
+sentidos; `tpd` es el retardo de cada compuerta. Las salidas que pueden quedar en Z (tri-state) y los
+`inout` son `bidi_bridge` y tienen además corriente máxima `iol`/`ioh`. Son parámetros del `.subckt` y
+del símbolo (cada instancia los cambia). Familias: ideal, 74HC, 74HCT, 74LS, LVCMOS 3.3 V, CD4000.
+Detalles:
+- **Salidas con `dac_bridge`, no `bidi_bridge`**: el de salida es un puerto de transconductancia que
+  no converge cuando maneja nodos de alta impedancia y muchos cambian a la vez (el manual de ngspice
+  lo avisa). En el ADC SAR del ejemplo, la lógica maneja el control de 25 llaves: con `bidi_bridge`
+  daba «Timestep too small» en lugares al azar (probado con SW, aswitch, fuente B, Gear,
+  tolerancias, histéresis); con `dac_bridge`, 200 conversiones sin problemas y en un cuarto del tiempo.
+- Una salida tri-state tiene su nodo detrás de un `d_buffer` (dos bidi_bridge no pueden compartir un
+  nodo), salvo las que sólo maneja un buffer tri-state, que van directo (para ver la Z); 1 GΩ a masa
+  en cada una evita la matriz singular en el punto de operación.
 
 ### parameter por instancia (`variants.ts`)
 Un parameter cambia el circuito (ancho de un bus…): una instancia con otro valor (entero) usa otra

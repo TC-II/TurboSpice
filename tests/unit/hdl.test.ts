@@ -35,11 +35,12 @@ describe('Verilog → XSPICE (#209)', () => {
     expect(b.subckt).toContain('ab_a_1 [a_1] [a_1_d] null hdl_in');
     expect(b.subckt).toMatch(/\[a_0_d a_1_d\] y_d hdl_and/);
     expect(b.subckt).toMatch(/ y_d clk_d null null q_d null hdl_dff1/);
-    // cada salida con su propio nodo detrás de un buffer, y una fuga para el punto de operación
-    expect(b.subckt).toContain('aob_q q_d q_o hdl_obuf');
-    expect(b.subckt).toContain('ab_q [q] [q_o] null hdl_out');
-    expect(b.subckt).toContain('rleak_q q 0 1g');
-    expect(b.subckt).toContain('drive_low={iol}');
+    // cada salida es un dac_bridge que lee su nodo (el bidi_bridge de salida queda para las tri-state)
+    expect(b.subckt).toContain('ab_q [q_d] [q] hdl_dac');
+    expect(b.subckt).toContain('.model hdl_dac dac_bridge(out_low={vol} out_high={voh}');
+    expect(b.subckt).not.toContain('hdl_obuf');
+    expect(b.subckt).not.toContain('rleak_q');
+    expect(b.subckt).not.toContain('drive_low={iol}');
     expect(b.subckt).not.toContain('hdl_dlatch');
   });
 

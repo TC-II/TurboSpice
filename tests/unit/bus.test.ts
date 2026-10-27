@@ -116,6 +116,21 @@ SYMATTR InstName U1
     expect(ng).not.toMatch(/x\[1\]/);
   });
 
+  it('un subcircuito en arreglo va como X_S__1__: con corchetes, sus elementos XSPICE no encuentran el modelo', () => {
+    const ng = toNgspice(ltNetlist(parseAsc(`Version 4
+SHEET 1 880 680
+FLAG 0 16 a
+FLAG 0 96 b[1:0]
+FLAG -48 32 c
+FLAG -48 80 0
+SYMBOL TCLib\\\\switch 0 0 R0
+SYMATTR InstName S[1:0]
+`), lib), 't', { resolve: () => undefined }).text;
+    expect(ng).toMatch(/^X_S__1__ a b__1__ c 0 switch/m);
+    expect(ng).toMatch(/^X_S__0__ a b__0__ c 0 switch/m);
+    expect(ng).not.toMatch(/X_S\[/);
+  });
+
   it('V(f[3]) busca el vector f__3__ y la lista lo muestra como f[3]', () => {
     expect(ngNodeName('f[3]')).toBe('f__3__');
     expect(ngNodeName('in')).toBe('in');

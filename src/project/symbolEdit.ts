@@ -106,12 +106,14 @@ export function syncPins(text: string, ports: { name: string; dir?: string }[]):
   const free = (x: number) => {
     for (let y = body.y1 + 16; ; y += 32) if (!taken.has(`${x},${y}`)) return (taken.add(`${x},${y}`), y);
   };
+  let maxY = body.y2;
   for (const p of ports) {
     if (have.has(p.name.toLowerCase())) continue;
     const left = !/^out/i.test(p.dir ?? '') && !/out/i.test(p.name);
     const x = left ? body.x1 : body.x2;
     const y = free(x);
     ls.push(`PIN ${x} ${y} ${left ? 'LEFT' : 'RIGHT'} 8`, `PINATTR PinName ${p.name}`, 'PINATTR SpiceOrder 0');
+    maxY = Math.max(maxY, y + 16);
   }
   // SpiceOrder en el orden de los puertos
   const order = new Map(ports.map((p, i) => [p.name.toLowerCase(), i + 1]));
@@ -121,9 +123,8 @@ export function syncPins(text: string, ports: { name: string; dir?: string }[]):
     if (n) cur = n[1].trim().toLowerCase();
     return /^PINATTR SpiceOrder /.test(l) ? `PINATTR SpiceOrder ${order.get(cur) ?? 0}` : l;
   });
-  // agrandar el cuerpo si un pin nuevo quedó fuera
-  const all = symPins(join(ls));
-  const maxY = Math.max(body.y2, ...all.map((p) => p.y + 16));
+  // agrandar el cuerpo si un pin nuevo quedó fuera (los que ya estaban, aunque estén fuera del
+  // rectángulo, como un clk dibujado abajo, son del dibujo: no se tocan)
   return maxY > body.y2 ? resizeBody(join(ls), { ...body, y2: maxY }) : join(ls);
 }
 

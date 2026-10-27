@@ -105,6 +105,9 @@ export function sourceSyntax(letter: string, value: string): string {
 
 function ngspiceName(e: Element, used: Set<string>): string {
   let n = e.name.replace(/§/g, '_');
+  // una copia de un subcircuito en arreglo (X§U[3]) va como X_U__3__: con corchetes, sus
+  // elementos XSPICE (a.x_u[3].a1 …) se leen como vectores de conexión y no se encuentra el modelo
+  if (/^x/i.test(n)) n = busBitNode(n);
   while (used.has(n.toLowerCase())) n += '_';
   used.add(n.toLowerCase());
   return n;

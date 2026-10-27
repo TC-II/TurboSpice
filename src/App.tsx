@@ -148,8 +148,8 @@ const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
-/** simulación mixta (#209): integrador RC + ADC sigma-delta en Verilog + DAC R-2R */
-const SIGMA_DELTA = 'ADC sigma-delta.turbo';
+/** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
+const ADC = 'ADC.turbo';
 const EXAMPLES_TURBO = 'Examples.turbo';
 const EXAMPLES = ['RC Filter', 'RLC Bode', 'RC Sweep (.step)', 'Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
 
@@ -3138,7 +3138,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Examples'),
       items: [
         { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
-        { label: 'ADC sigma-delta', title: t('Mixed-signal: an RC integrator, a sigma-delta ADC in Verilog and an R-2R DAC'), onClick: () => doExample(SIGMA_DELTA) },
+        { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
       ],

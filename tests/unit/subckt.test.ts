@@ -241,6 +241,12 @@ describe('edición del símbolo (#180)', () => {
     expect(e.symParams(sym)).toEqual([['G', '2'], ['R', '{1k*G}']]);
     expect(e.setSymParams(sym, [])).not.toMatch(/SpiceLine|WINDOW 39/);
   });
+
+  it('un pin que ya estaba fuera del rectángulo (un clk dibujado abajo) no agranda el dibujo', async () => {
+    const e = await import('../../src/project/symbolEdit.ts');
+    const sym = ['Version 4', 'SymbolType CELL', 'RECTANGLE Normal 0 -40 56 24', 'PIN -16 112 NONE 0', 'PINATTR PinName clk', 'PINATTR SpiceOrder 1'].join('\n');
+    expect(e.symBody(e.syncPins(sym, [{ name: 'clk', dir: 'In' }]))).toEqual({ x1: 0, y1: -40, x2: 56, y2: 24 });
+  });
 });
 
 describe('exportar un subcircuito como .sub (#199)', () => {

@@ -5,9 +5,10 @@ import { electricalLine, ELECTRICAL_NAMES } from './electrical.ts';
 // Yosys (en WebAssembly, ver yosys.ts) sintetiza el módulo a compuertas sueltas, flip-flops y
 // buffers tri-state con yosysScript; acá se traduce su netlist JSON a un .subckt:
 //  - cada bit de un puerto es un pin analógico del subcircuito ("q_3" para q[3]) unido a su nodo
-//    digital interno por un bidi_bridge: de entrada (umbrales vil/vih), de salida (niveles
-//    vol/voh, corriente máxima iol/ioh, rampas tr/tf; con Z no maneja) o en los dos sentidos
-//    (inout). La interfaz eléctrica son parámetros del .subckt, ver electrical.ts;
+//    digital interno por un puente: un bidi_bridge de entrada (umbrales vil/vih), un dac_bridge
+//    de salida (niveles vol/voh, rampas tr/tf) o, si la salida puede quedar en Z o es inout, un
+//    bidi_bridge de salida o en los dos sentidos (con la corriente máxima iol/ioh). La interfaz
+//    eléctrica son parámetros del .subckt, ver electrical.ts;
 //  - $_AND_, $_OR_… → d_and, d_or… con retardo tpd; $_DFF_* → d_dff; $_DLATCH_* → d_dlatch, con
 //    el valor inicial ("initial" o reg q = 1) como ic; $_TBUF_ → d_tristate;
 //  - las constantes salen de un d_pullup / d_pulldown (y Z, de un d_tristate deshabilitado).
@@ -199,19 +200,23 @@ export function yosysToSubckt(json: YosysJson, source: string): HdlBlock {
     else lines.push(`al${k} ${one(c, 'D')} ${one(c, 'E')} ${s} ${r} ${one(c, 'Q')} ${unique(`nq${k}`)} hdl_dlatch${ic}`);
   }
 
-  // cada pin con su nodo digital (las salidas pueden salir de una constante). El puerto digital de
-  // un bidi_bridge es bidireccional: si dos comparten un nodo (una salida que lee un inout, o un
-  // nodo que también usa la lógica) se pelean. Cada salida tiene entonces su propio nodo, detrás de
-  // un d_buffer; menos las que sólo maneja un buffer tri-state, que tienen que ver la Z
+  // cada pin con su nodo digital (las salidas pueden salir de una constante). Una salida es un
+  // dac_bridge, que sólo lee el nodo: una fuente de tensión con rampas. El bidi_bridge de salida
+  // (un puerto de transconductancia) no converge cuando maneja nodos de alta impedancia y muchos
+  // cambian a la vez (el control de las llaves de un ADC SAR: «Timestep too small»), así que queda
+  // sólo para las salidas que maneja un buffer tri-state, que tienen que ver la Z. Su puerto
+  // digital es bidireccional: si dos comparten un nodo (una salida que lee un inout, o un nodo
+  // que también usa la lógica) se pelean; cada una tiene su propio nodo, detrás de un d_buffer
   const inoutNodes = new Set(pins.filter((p) => p.dir === 'inout').map((p) => nodeOf(p.bit)));
   const bridges = pins.flatMap(({ name: pin, dir, bit }) => {
     if (dir === 'out' && bit === 'x') warnings.push(t('Output {pin} is undefined: it will be at 0', { pin }));
     const n = nodeOf(bit);
-    // (una fuga de 1 GΩ: una salida sin carga, o en Z, no deja la matriz singular en el punto de operación)
+    // (una fuga de 1 GΩ: una salida en Z no deja la matriz singular en el punto de operación)
     const leak = `rleak_${pin} ${pin} 0 1g`;
     if (dir === 'in') return [`ab_${pin} [${pin}] [${n}] null hdl_in`];
     if (dir === 'inout') return [`ab_${pin} [${pin}] [${n}] null hdl_io`, leak];
-    if (tbufOut.has(n) && !inoutNodes.has(n) && pins.filter((p) => p.dir === 'out' && nodeOf(p.bit) === n).length === 1) return [`ab_${pin} [${pin}] [${n}] null hdl_out`, leak];
+    if (!tbufOut.has(n)) return [`ab_${pin} [${n}] [${pin}] hdl_dac`];
+    if (!inoutNodes.has(n) && pins.filter((p) => p.dir === 'out' && nodeOf(p.bit) === n).length === 1) return [`ab_${pin} [${pin}] [${n}] null hdl_out`, leak];
     const own = unique(`${pin}_o`);
     return [`aob_${pin} ${n} ${own} hdl_obuf`, `ab_${pin} [${pin}] [${own}] null hdl_out`, leak];
   });
@@ -224,6 +229,7 @@ export function yosysToSubckt(json: YosysJson, source: string): HdlBlock {
     // (el bidi_bridge de entrada no agrega retardo: el de cada compuerta ya es tpd. En un inout,
     // lo que lee del pin entra con fuerza resistiva: si el buffer tri-state del módulo maneja, gana él)
     '.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)',
+    '.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})',
     '.model hdl_out bidi_bridge(direction=0 out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf})',
     '.model hdl_io bidi_bridge(direction=2 strength=1 in_low={vil} in_high={vih} out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf} rise_delay=1e-12 fall_delay=1e-12)',
     '.model hdl_tbuf d_tristate(delay={tpd})',
@@ -292,16 +298,17 @@ export function cosimSubckt(
     const list = pins.filter((p) => p.dir === dir).map((p) => p.node);
     return list.length ? `[${list.join(' ')}]` : 'null';
   };
+  // (las salidas, dac_bridge como en un bloque sintetizado: ver yosysToSubckt)
   const lines = pins.flatMap(({ name: pin, dir, node }) => {
-    const leak = `rleak_${pin} ${pin} 0 1g`;
     if (dir === 'in') return [`ab_${pin} [${pin}] [${node}] null hdl_in`];
-    return [`ab_${pin} [${pin}] [${node}] null ${dir === 'out' ? 'hdl_out' : 'hdl_io'}`, leak];
+    if (dir === 'out') return [`ab_${pin} [${node}] [${pin}] hdl_dac`];
+    return [`ab_${pin} [${pin}] [${node}] null hdl_io`, `rleak_${pin} ${pin} 0 1g`];
   });
   lines.push(`acosim ${group('in')} ${group('out')} ${group('inout')} hdl_cosim`);
   const lib = '/usr/local/lib/ngspice';
   const models = [
     '.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)',
-    ...(pins.some((p) => p.dir === 'out') ? ['.model hdl_out bidi_bridge(direction=0 out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf})'] : []),
+    ...(pins.some((p) => p.dir === 'out') ? ['.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})'] : []),
     ...(pins.some((p) => p.dir === 'inout')
       ? ['.model hdl_io bidi_bridge(direction=2 strength=1 in_low={vil} in_high={vih} out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf} rise_delay=1e-12 fall_delay=1e-12)']
       : []),

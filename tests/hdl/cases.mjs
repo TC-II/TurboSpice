@@ -201,23 +201,29 @@ X1 clk we a_1 a_0 d_3 d_2 d_1 d_0 q_3 q_2 q_1 q_0 ram
   {
     name: 'interfaz eléctrica: histéresis (vil > vih), niveles y corriente de salida',
     file: 'buf.v',
-    verilog: `module buf1(input a, output y); assign y = a; endmodule`,
+    // y: salida pura (dac_bridge, niveles exactos); z: tri-state (bidi_bridge, con corriente máxima)
+    verilog: `module buf1(input a, input en, output y, output z);
+  assign y = a;
+  assign z = en ? a : 1'bz;
+endmodule`,
     // entrada triangular 0…5 V; vil=3 vih=2 (Schmitt): sube a 1 recién en 3 V y baja en 2 V
     circuit: `Va a 0 PWL(0 0 100n 5 200n 0)
-X1 a y buf1 vcc=5 vil=3 vih=2 vol=0.2 voh=4.5 iol=1m ioh=1m tr=1n tf=1n tpd=1n
-Rl y 0 10k
-X2 a y2 buf1 vcc=5 vil=3 vih=2 vol=0.2 voh=4.5 iol=1m ioh=1m tr=1n tf=1n tpd=1n
-Rl2 y2 0 1k
+Ven en 0 5
+X1 a en y z buf1 vcc=5 vil=3 vih=2 vol=0.2 voh=4.5 iol=1m ioh=1m tr=1n tf=1n tpd=1n
+Rl y 0 1k
+Rz z 0 1k
 .tran 0.1n 200n`,
     check: (at) => {
       // sube cuando a cruza 3 V (60 ns), baja cuando cruza 2 V de bajada (160 ns)
       if (at('y', 55e-9) > 1 || at('y', 70e-9) < 4) return `subida: ${at('y', 55e-9)} / ${at('y', 70e-9)}`;
       if (at('y', 150e-9) < 4 || at('y', 170e-9) > 1) return `bajada: ${at('y', 150e-9)} / ${at('y', 170e-9)}`;
-      if (Math.abs(at('y', 100e-9) - 4.5) > 0.1) return `voh = ${at('y', 100e-9)} (esperaba 4.5)`;
-      // con 1 mA como máximo, 1 kΩ no llega a 4.5 V: ≤ ~1 V
-      if (at('y2', 100e-9) > 1.2) return `con 1 kΩ y 1 mA máximo: ${at('y2', 100e-9)}`;
+      // la salida pura llega a voh aunque la carga sea de 1 kΩ; vol también es exacto
+      if (Math.abs(at('y', 100e-9) - 4.5) > 0.01) return `voh = ${at('y', 100e-9)} (esperaba 4.5)`;
+      if (Math.abs(at('y', 20e-9) - 0.2) > 0.01) return `vol = ${at('y', 20e-9)} (esperaba 0.2)`;
+      // la tri-state, con 1 mA como máximo, en 1 kΩ no llega a 4.5 V: ≤ ~1 V
+      if (at('z', 100e-9) > 1.2) return `con 1 kΩ y 1 mA máximo: ${at('z', 100e-9)}`;
     },
-    compare: ['y2', [100e-9]],
+    compare: ['z', [100e-9]],
   },
   {
     name: 'comportamiento (Icarus): retardos #, initial y un contador',

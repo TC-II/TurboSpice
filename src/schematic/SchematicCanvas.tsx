@@ -84,13 +84,15 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, hideLabels, mark }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark }: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
   selected?: boolean;
   /** el cursor está sobre uno de sus rótulos */
   hover?: boolean;
+  /** rótulo (ventana) que se puede arrastrar ahora: el cursor está sobre él, con el componente seleccionado */
+  grabWin?: number;
   /** sin rótulos (miniaturas) */
   hideLabels?: boolean;
   /** cambio contra la corrida anterior (historial, #153) */
@@ -121,7 +123,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     const text = idx === 3 ? displayValue(prefix, raw) : raw;
     const p = toWorld(inst, w.x, w.y);
     labels.push(
-      <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} className="win">
+      <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} className={idx === grabWin ? 'win grab' : 'win'}>
         {text}
       </AlignedText>,
     );
@@ -232,6 +234,8 @@ export interface CanvasProps {
   highlightNet?: string;
   /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
   hoverSymbol?: number;
+  /** rótulo arrastrable bajo el cursor (o que se arrastra) */
+  grabLabel?: { sym: number; win: number };
   /** etiqueta de red o masa bajo el puntero */
   hoverFlag?: number;
   /** cable bajo el puntero */
@@ -246,7 +250,7 @@ export interface CanvasProps {
   diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, hoverFlag, hoverWire, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -313,7 +317,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} mark={diff?.symbols.get(i)} />
+          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
         ))}
       </g>
       {diff && (diff.removed.symbols.length > 0 || diff.removed.wires.length > 0) && (

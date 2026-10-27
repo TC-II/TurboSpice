@@ -459,6 +459,7 @@ export function SchematicEditor(props: Props) {
   const [hoverNet, setHoverNet] = useState<string | undefined>();
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
+  const [grabLabel, setGrabLabel] = useState<{ sym: number; win: number } | undefined>();
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
   const [hoverFlag, setHoverFlag] = useState<number | undefined>();
@@ -1047,8 +1048,17 @@ export function SchematicEditor(props: Props) {
         onHover({ ref, at });
       }
     }
-    const lh = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol, lod)?.sym : drag?.mode === 'label' ? drag.sym : undefined;
+    const la = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol, lod) : null;
+    const lh = la ? la.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
+    // (un rótulo se arrastra sólo con su componente ya seleccionado: entonces se pinta de verde)
+    const gl =
+      drag?.mode === 'label'
+        ? { sym: drag.sym, win: drag.items.find((it) => it.sym === drag.sym)?.win ?? -1 }
+        : la && selection.some((r) => r.kind === 'symbol' && r.index === la.sym)
+          ? { sym: la.sym, win: la.win }
+          : undefined;
+    if (gl?.sym !== grabLabel?.sym || gl?.win !== grabLabel?.win) setGrabLabel(gl);
     const body = tool.kind === 'select' && !drag && lh === undefined ? hitTest(doc, p, lib, tol, showSimCommand) : null;
     const hs = lh ?? (body?.kind === 'symbol' ? body.index : undefined);
     if (hs !== hoverSym) setHoverSym(hs);
@@ -1397,6 +1407,7 @@ export function SchematicEditor(props: Props) {
         setTip(null);
         setHoverNet(undefined);
         setHoverLabel(undefined);
+        setGrabLabel(undefined);
         setHoverSym(undefined);
         setHoverFlag(undefined);
         setHoverWire(undefined);
@@ -1420,6 +1431,7 @@ export function SchematicEditor(props: Props) {
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : shownSelection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
         hoverSymbol={hoverSym}
+        grabLabel={grabLabel}
         hoverFlag={hoverFlag}
         hoverWire={previewing ? undefined : hoverWire}
         netColors={netColors}

@@ -108,6 +108,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-grid: #8a919c;
   --sch-sel: #e8590c;
   --sch-hl: #2b8a3e;
+  --sch-grab: #4c7a57;
   --sch-ghost: #868e96;
 }
 @media (prefers-color-scheme: dark) {
@@ -122,6 +123,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
     --sch-grid: #5b626e;
     --sch-sel: #ff922b;
     --sch-hl: #51cf66;
+    --sch-grab: #8fb996;
     --sch-ghost: #868e96;
   }
 }
@@ -136,6 +138,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
   --sch-grid: #5b626e;
   --sch-sel: #ff922b;
   --sch-hl: #51cf66;
+  --sch-grab: #8fb996;
 }
 
 .appbar { position: relative; display: flex; align-items: center; gap: 16px; padding: 6px 16px; border-bottom: 1px solid var(--border); background: var(--bg-alt); }
@@ -258,6 +261,8 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .sym text, .flag text, .texts text { stroke: none; font-family: system-ui, sans-serif; }
 .sym text.win { fill: var(--sch-label); }
 .sym.sel text.win { fill: var(--sch-sel); }
+/* el rótulo de un componente seleccionado que se puede arrastrar (o se arrastra): verde */
+.sym.sel text.win.grab { fill: var(--sch-grab); }
 .sym.hover:not(.sel) { color: var(--sch-sel); }
 .sym.hover:not(.sel) text.win { fill: var(--sch-sel); }
 .loose rect { stroke: var(--err); stroke-width: 1; fill: none; }

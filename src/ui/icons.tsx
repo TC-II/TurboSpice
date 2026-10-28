@@ -71,6 +71,9 @@ const P: Record<string, ReactNode> = {
   paste: <path d="M6 4H4v13h12V4h-2M7 3h6v3H7z" />,
   cut: <path d="M6 14a2 2 0 1 0 0 .01M14 14a2 2 0 1 0 0 .01M7.5 12.5 15 3M12.5 12.5 5 3" />,
   close: <path d="M5 5l10 10M15 5 5 15" />,
+  minus: <path d="M5 10h10" />,
+  // tutorial: un birrete
+  school: <path d="M10 4 1.5 8 10 12l8.5-4zM5 10v4c1.5 1.5 3.2 2 5 2s3.5-.5 5-2v-4M18.5 8v5" />,
   // menú principal: un cuadrado con líneas
   menu: (
     <>

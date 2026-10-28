@@ -482,6 +482,19 @@ describe('cambio de símbolo (fuente V ↔ Cell, #120)', () => {
     expect(sameConnections(d, m, lib)).toBe(true);
     expect(dcSourcesAsCell(m, lib)).toBe(m);
   });
+
+  it('una tierra o un pin apoyados en el pin que se mueve (sin cable) quedan unidos con un tramo', () => {
+    const d = asc('SYMBOL voltage 0 0 R0\nSYMATTR InstName V1\nSYMATTR Value 5\nWIRE 0 16 0 -32\nFLAG 0 96 0\nSYMBOL voltage 200 0 R0\nSYMATTR InstName V2\nSYMATTR Value 1\nSYMBOL res 184 80 R0\nSYMATTR InstName R1\nWIRE 200 16 200 -32\nFLAG 200 176 0\n');
+    const m = dcSourcesAsCell(d, lib);
+    expect(m.symbols.map((s) => s.type)).toEqual(['cell', 'cell', 'res']);
+    // (las mismas redes; ahora alguna tiene un cable que antes no tenía)
+    const nets = (x: typeof d) =>
+      connectivity(x, (tt) => lib.symbol(tt))
+        .nets.map((n) => [...n.pins.map((q) => `${q.sym}:${q.pin}`), ...n.labels].sort().join(' '))
+        .sort();
+    expect(nets(m)).toEqual(nets(d));
+    expect(ortho(m)).toBe(true);
+  });
 });
 
 describe('puntos de unión', () => {

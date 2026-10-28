@@ -75,6 +75,8 @@ import { isNativeSwitch, isTcSwitch, SwitchDialog } from './schematic/SwitchDial
 import { setSwModel } from './schematic/switchModel.ts';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
+import { Tutorial } from './tutorial/Tutorial.tsx';
+import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
 import { isControlBlock } from './netlist/directives.ts';
@@ -122,6 +124,7 @@ import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expa
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
+import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
 import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
@@ -567,6 +570,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       off = true;
     };
   }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  // el progreso del tutorial también (PROGRESS_NAME): así no se repite en otra máquina
+  useEffect(() => {
+    if (!account) return;
+    return connectProgress(drive, (e) => setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: PROGRESS_NAME, message: e.message })));
+  }, [account]);
   useEffect(() => setCurModel(''), [path, sims.active]);
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
@@ -826,6 +834,22 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const p = projectFromAsc(dcSourcesAsCell(d0, lib), ascName);
     loadProject(p, { name: `${projectName(ascName)}${EXT}` });
     return p;
+  };
+
+  // Tutorial interactivo (Academia): abierto y la foto del estado que mira (se arma antes del render)
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const tutorialProbe = useRef<() => TutorialProbe>();
+  const readTutorialProbe = useCallback(() => tutorialProbe.current!(), []);
+  /** Proyecto de práctica de una misión: vacío o con un circuito. El actual, si tenía cambios, queda en Recientes */
+  const loadPractice = (name: string, asc: string | null) => {
+    if (dirty) remember(snapshot(), file, true);
+    // (desde adentro de un subcircuito: se vuelve al testbench del proyecto nuevo)
+    pathRef.current = [];
+    setPath([]);
+    setCurModel('');
+    if (asc) loadDoc(parseAsc(asc), `${name}.asc`);
+    else loadProject(withGroups(newProject(name)), { name: `${name}${EXT}` });
+    setTimeout(() => editor.current?.fit(), 80);
   };
 
   const [recent, setRecent] = useState<RecentFile[]>([]);
@@ -3086,6 +3110,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     },
   ];
   const menus: MenuDef[] = [
+    // el tutorial, arriba de todo y con ícono: es lo primero que busca quien recién llega
+    { label: t('Interactive tutorial'), icon: 'school', onClick: () => setTutorialOpen(true) },
     {
       label: t('File'),
       items: [
@@ -3210,6 +3236,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       label: t('Help'),
       items: [
         { label: t('Keyboard shortcuts'), shortcut: '?', onClick: () => setDialog({ kind: 'help' }) },
+        { label: t('Interactive tutorial'), onClick: () => setTutorialOpen(true) },
         { label: t('Report a problem'), onClick: () => window.open(`${REPO}/issues`, '_blank', 'noopener') },
       ],
     },
@@ -3349,8 +3376,54 @@ ${ltNetlistText(sim.built.lt)}
         { label: 'Log', shortcut: 'Ctrl+L', checked: panel === 'log', onClick: () => setPanel('log') },
       ];
 
+  // Tutorial (Academia): lo que mira para saber si se cumplió cada paso. Es una función que se
+  // reemplaza en cada render: el tutorial la consulta seguido y siempre ve el estado actual
+  tutorialProbe.current = (): TutorialProbe => {
+    const effective = (s: SymbolInst) => effectiveAttrs(s, lib.symbol(s.type));
+    const benchDoc = tbDoc ?? doc;
+    let loose = 0;
+    for (const n of conn.pinNet.values()) if (n.pins.length === 1 && !n.labels.length) loose++;
+    loose += doc.symbols.reduce((k, s, si) => k + (lib.symbol(s.type)?.pins.filter((_, pi) => !conn.pinNet.has(`${si}:${pi}`)).length ?? 0), 0);
+    const ps = plotState.current;
+    return {
+      projectName: project.name,
+      dirty,
+      benches: variant.sims.map((x) => ({ id: x.id, custom: !!x.name, ...(x.group ? { group: x.group } : {}), line: sims.items.find((y) => y.id === x.id)?.line ?? '', runs: x.runs.length })),
+      activeBench: sims.active,
+      groups: project.groups.length,
+      modules: [...modules(project).map((f) => ({ name: subName(f.name), kind: f.kind === 'verilog' ? ('verilog' as const) : ('schematic' as const) })), ...modelModules(project).map((f) => ({ name: modelModuleName(f), kind: 'model' as const }))],
+      inSub: curSub,
+      symbols: doc.symbols.map((s) => {
+        const e = effective(s);
+        return { type: s.type, prefix: e.get('Prefix') ?? '', value: s.attrs.get('Value') ?? e.get('Value') ?? '' };
+      }),
+      wires: doc.wires.length,
+      grounds: doc.flags.filter((f) => f.name === '0').length,
+      labels: doc.flags.filter((f) => f.name !== '0' && !f.ioPin).map((f) => f.name),
+      ports: doc.flags.filter((f) => f.ioPin).length,
+      loose,
+      directives: benchDoc.texts.filter((x) => x.kind === 'directive').map((x) => x.text),
+      line: docLine,
+      tool: tool.kind,
+      dialog: dialog?.kind ?? null,
+      hasResult: !!sim,
+      resultKind: plot ? plotKind(plot.name) : '',
+      runs: allRuns.length,
+      panes: panes.map((p) => p.traces.map((x) => x.expr)),
+      zoomed: !!ps?.xRange,
+      cursors: ps ? [ps.cursors.a, ps.cursors.b].filter((x) => x !== undefined).length : 0,
+      markers: ps?.markers?.map((m) => m.kind) ?? [],
+      panel,
+      treeOpen,
+      historyOpen,
+      showOp: showOp && !!bias,
+      showNets: showNets && hasNets,
+    };
+  };
+
   return (
     <div className="schematic-mode">
+      {tutorialOpen && <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />}
       {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
       {slots.right &&
         createPortal(

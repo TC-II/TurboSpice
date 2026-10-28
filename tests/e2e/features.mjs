@@ -37,7 +37,9 @@ await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el p
 // --- #38: barra de herramientas y menú colapsado ---
 check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración…,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Tutorial interactivo,Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración…,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+// (el primero es el tutorial: se baja a Archivo)
+await page.keyboard.press('ArrowDown');
 await page.keyboard.press('ArrowRight');
 check(await page.getByRole('menu', { name: 'Archivo' }).isVisible(), 'con el teclado se abre el submenú (flecha derecha)');
 await page.keyboard.press('Escape');

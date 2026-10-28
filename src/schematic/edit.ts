@@ -692,7 +692,12 @@ export function setSymbolType(doc: AscDoc, index: number, type: string, lib: Lib
   const target = pinPoints(next, lib.symbol(type));
   let out: AscDoc = { ...doc, symbols: doc.symbols.map((s, i) => (i === index ? next : s)) };
   before.forEach((p, i) => {
-    if (i > 0 && target[i] && !samePt(p, target[i])) out = moveVertex(out, p, target[i], lib);
+    if (i === 0 || !target[i] || samePt(p, target[i])) return;
+    out = moveVertex(out, p, target[i], lib);
+    // lo que estaba apoyado en el pin sin cable (una tierra, una etiqueta, el pin de otro
+    // componente) no se mueve: queda unido con un tramo nuevo
+    const left = out.flags.some((f) => samePt(f, p)) || out.symbols.some((s, j) => j !== index && pinPoints(s, lib.symbol(s.type)).some((q) => samePt(q, p)));
+    if (left) out = addWire(out, target[i], p, lib);
   });
   return out;
 }

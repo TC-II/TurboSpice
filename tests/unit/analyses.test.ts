@@ -45,7 +45,7 @@ describe('comandos de análisis', () => {
   it('todos los análisis por defecto (salvo los que piden nodos) son válidos', () => {
     for (const { kind } of ANALYSES) {
       const errs = validateAnalysis(defaultAnalysis(kind));
-      if (['dc', 'noise', 'tf', 'sens', 'pz'].includes(kind)) expect(errs.length).toBeGreaterThan(0);
+      if (['dc', 'noise', 'tf', 'sens', 'pz', 'stb'].includes(kind)) expect(errs.length).toBeGreaterThan(0);
       else expect(errs).toEqual([]);
     }
     expect(validateAnalysis({ ...defaultAnalysis('tran'), tstop: 'abc' } as never)).toHaveLength(1);

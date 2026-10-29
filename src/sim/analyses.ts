@@ -29,7 +29,13 @@ export type Analysis =
   | { kind: 'sens'; out: string; ac: boolean; sweep: Sweep }
   | { kind: 'pz'; inP: string; inN: string; outP: string; outN: string; type: 'vol' | 'cur'; which: 'pz' | 'pol' | 'zer' }
   | { kind: 'disto'; sweep: Sweep; f2overf1: string }
-  | { kind: 'sp'; sweep: Sweep; noise: boolean };
+  | { kind: 'sp'; sweep: Sweep; noise: boolean }
+  | { kind: 'stb'; probe: string; mode: StbMode; sweep: Sweep; method: StbMethod; input: string; output: string };
+
+/** Método de la ganancia de lazo del .stb: Tian (el de Spectre) o el GFT de Middlebrook */
+export type StbMethod = 'tian' | 'gft';
+/** Con una sonda diferencial: modo diferencial o común ('' con la sonda simple) */
+export type StbMode = '' | 'dm' | 'cm';
 
 export type AnalysisKind = Analysis['kind'];
 
@@ -43,6 +49,7 @@ export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean
   { kind: 'sens', label: t('Sensitivity'), ngspiceOnly: true, help: t('Sensitivity of an output to each circuit parameter (.sens).') },
   { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
   { kind: 'disto', label: t('Distortion'), ngspiceOnly: true, help: t('Small-signal harmonic and intermodulation distortion (.disto). Sources need DISTOF1/DISTOF2.') },
+  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop gain T at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Tian method by default, or Middlebrook\'s GFT.') },
   { kind: 'sp', label: t('S-parameters'), ngspiceOnly: true, help: t('S-parameters (.sp). The ports are voltage sources with "portnum N z0 50" in their value.') },
 ];
 
@@ -70,6 +77,8 @@ export function defaultAnalysis(kind: AnalysisKind): Analysis {
       return { kind, sweep: { ...SWEEP, points: '10', start: '1k', stop: '100k' }, f2overf1: '' };
     case 'sp':
       return { kind, sweep: { ...SWEEP, points: '10', start: '1meg', stop: '1g' }, noise: false };
+    case 'stb':
+      return { kind, probe: '', mode: '', sweep: { ...SWEEP, stop: '100meg' }, method: 'tian', input: '', output: '' };
   }
 }
 
@@ -110,10 +119,14 @@ export function formatAnalysis(a: Analysis): string {
       return `.disto ${sweepText(a.sweep)}${a.f2overf1.trim() ? ` ${a.f2overf1.trim()}` : ''}`;
     case 'sp':
       return `.sp ${sweepText(a.sweep)}${a.noise ? ' 1' : ''}`;
+    case 'stb': {
+      const gft = a.method === 'gft' ? ` gft${a.input.trim() && a.output.trim() ? ` ${a.input.trim()} ${asVoltage(a.output.trim())}` : ''}` : '';
+      return `.stb ${a.probe}${a.mode ? ` ${a.mode}` : ''} ${sweepText(a.sweep)}${gft}`;
+    }
   }
 }
 
-export const ANALYSIS_LINE = /^\s*\.(tran|ac|dc|noise|op|tf|sens|pz|disto|sp)\b/i;
+export const ANALYSIS_LINE = /^\s*\.(tran|ac|dc|noise|op|tf|sens|pz|disto|sp|stb)\b/i;
 
 function parseSweep(tt: string[]): Sweep | null {
   const [type, points, start, stop] = tt;
@@ -185,8 +198,29 @@ function parseIncomplete(tt: string[]): Analysis | null {
       return { kind, out, ac: false, sweep: { ...SWEEP, points: '10' } };
     case 'pz':
       return { kind, inP: '', inN: '0', outP: '', outN: '0', type: 'vol', which: 'pz' };
+    case 'stb':
+      return parseStb(a, true);
   }
   return null;
+}
+
+/**
+ * ".stb LP1 [dm|cm] dec 100 1 100meg [gft [Vin V(out)]]". Con `loose`, a la línea le pueden
+ * faltar la sonda o valores del barrido.
+ */
+function parseStb(a: string[], loose = false): Analysis | null {
+  const i = a.findIndex((x) => SWEEP_TYPE.test(x));
+  if (i < 0) return loose ? { ...(defaultAnalysis('stb') as Extract<Analysis, { kind: 'stb' }>), probe: a[0] ?? '' } : null;
+  const head = a.slice(0, i);
+  const mode = (head.find((x) => /^(dm|cm)$/i.test(x))?.toLowerCase() ?? '') as StbMode;
+  const probe = head.find((x) => !/^(dm|cm)$/i.test(x)) ?? '';
+  const sweep = loose ? looseSweep(a)! : parseSweep(a.slice(i));
+  if (!sweep || (!loose && (!probe || head.length > 2))) return null;
+  const rest = a.slice(i + 4);
+  const gft = /^gft$/i.test(rest[0] ?? '');
+  if (rest.length && !gft && !/^tian$/i.test(rest[0])) return null;
+  const [input = '', output = ''] = gft ? rest.slice(1) : [];
+  return { kind: 'stb', probe, mode, sweep, method: gft ? 'gft' : 'tian', input, output: unwrapV(output)[0] };
 }
 
 function parseComplete(tt: string[]): Analysis | null {
@@ -246,6 +280,8 @@ function parseComplete(tt: string[]): Analysis | null {
       const sweep = parseSweep(a);
       return sweep ? { kind, sweep, noise: a[4] === '1' } : null;
     }
+    case 'stb':
+      return parseStb(a);
   }
   return null;
 }
@@ -301,6 +337,11 @@ export function validateAnalysis(a: Analysis): string[] {
     case 'sens':
       if (!a.out) errs.push(t('The output is missing'));
       if (a.ac) sweep(a.sweep);
+      break;
+    case 'stb':
+      if (!a.probe) errs.push(t('The loop probe is missing'));
+      sweep(a.sweep);
+      if (a.method === 'gft' && !!a.input.trim() !== !!a.output.trim()) errs.push(t('The GFT needs both the input source and the output, or neither'));
       break;
     case 'pz':
       for (const [v, w] of [[a.inP, t('input +')], [a.inN, t('input −')], [a.outP, t('output +')], [a.outN, t('output −')]]) {

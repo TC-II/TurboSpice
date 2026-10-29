@@ -20,7 +20,7 @@ import { t } from '../i18n/i18n.ts';
 const validNumber = (s: string) => /^\{.+\}$/.test(s.trim()) || Number.isFinite(parseSpiceNumber(s));
 
 /** Qué se elige en el esquemático: una red, una fuente V/I o cualquier componente */
-export type PickWhat = 'net' | 'source' | 'component';
+export type PickWhat = 'net' | 'source' | 'component' | 'probe';
 
 /** Elegir una red, fuente o componente haciendo click en el esquemático (null si se cancela) */
 /** `ground`: la tierra (0) también vale (un nodo de referencia); si no, se ignora */
@@ -124,9 +124,11 @@ export interface CircuitInfo {
   nets: string[];
   /** fuentes independientes V/I (InstName) */
   sources: string[];
+  /** sondas de lazo del .stb (diff: la diferencial, con modo DM/CM) */
+  probes?: { name: string; diff: boolean }[];
 }
 
-export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis): void; picker?: Picker }): ReactNode {
+export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Analysis): void; picker?: Picker; info?: CircuitInfo }): ReactNode {
   // ground: un nodo de referencia, donde se puede elegir la tierra
   const node = (label: string, value: string, onChange: (v: string) => void, hint?: string, required = true, ground = false) => (
     <Field label={label} value={value} onChange={onChange} list="sim-nets" required={required} hint={hint} pick={picker && { what: 'net', picker, ground }} />
@@ -246,6 +248,54 @@ export function AnalysisForm({ a, set, picker }: { a: Analysis; set(a: Analysis)
           </label>
         </>
       );
+    case 'stb': {
+      const probes = info?.probes ?? [];
+      const diff = probes.find((p) => p.name.toLowerCase() === a.probe.toLowerCase())?.diff ?? !!a.mode;
+      return (
+        <>
+          <Field
+            label={t('Loop probe')}
+            value={a.probe}
+            list="sim-probes"
+            required
+            pick={picker && { what: 'probe', picker }}
+            hint={probes.length ? undefined : t('Place a LoopProbe or DiffLoopProbe (Stability library) in series in the loop')}
+            onChange={(probe) => {
+              const d = probes.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
+              set({ ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' });
+            }}
+          />
+          {diff && (
+            <Select
+              label={t('Mode')}
+              value={a.mode || 'dm'}
+              options={[
+                ['dm', t('Differential (DM)')],
+                ['cm', t('Common mode (CM)')],
+              ]}
+              onChange={(mode) => set({ ...a, mode })}
+            />
+          )}
+          <Select
+            label={t('Method')}
+            value={a.method}
+            options={[
+              ['tian', t('Tian (as Spectre stb; probe orientation does not matter)')],
+              ['gft', t('Middlebrook\'s GFT (signal must enter the probe by its arrow)')],
+            ]}
+            onChange={(method) => set({ ...a, method })}
+          />
+          {a.method === 'gft' && (
+            <fieldset>
+              <legend>{t('Closed-loop transfer (optional): G, G∞, G0 and R')}</legend>
+              <Field label={t('Input source')} value={a.input} onChange={(input) => set({ ...a, input })} list="sim-sources" pick={picker && { what: 'source', picker }} />
+              {node(t('Output'), a.output, (output) => set({ ...a, output }), undefined, false)}
+            </fieldset>
+          )}
+          <SweepFields sweep={a.sweep} onChange={(sweep) => set({ ...a, sweep })} />
+        </>
+      );
+    }
   }
 }
 
@@ -273,6 +323,7 @@ export function SimulationDialog({ initial, analysis, info, onApply, onClose, pi
     <Modal title={t('Simulation command')} onClose={onClose} wide hidden={hidden}>
       <datalist id="sim-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
+      <datalist id="sim-probes">{(info.probes ?? []).map((p) => <option key={p.name} value={p.name} />)}</datalist>
       {initial && !parsed && (
         <p className="hint warn">
           {t('The current directive (')}<code>{initial}</code>{t(') uses options this form doesn\'t handle; accepting replaces it.')}
@@ -289,7 +340,7 @@ export function SimulationDialog({ initial, analysis, info, onApply, onClose, pi
         </nav>
         <div className="analysis-form">
           <p className="hint">{meta.help}</p>
-          <AnalysisForm a={a} set={set} picker={picker} />
+          <AnalysisForm a={a} set={set} picker={picker} info={info} />
         </div>
       </div>
       <div className="sim-preview">

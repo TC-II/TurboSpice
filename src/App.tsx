@@ -13,6 +13,7 @@ import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
+import { isStbPlot, StbView } from './waveform/StbView.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
@@ -156,11 +157,13 @@ const SAMPLE = 'Sample Project.turbo';
 /** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
 const ADC = 'ADC.turbo';
 const EXAMPLES_TURBO = 'Examples.turbo';
-const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier'];
+const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier', 'Loop Gain (.stb)'];
 /** las transferencias de 1er y 2do orden con RC y RLC: un workbench cada una (scripts/make-examples.ts) */
 const TRANSFER = 'Transfer functions.turbo';
 /** emisor común, degenerado, colector común y base común, BJT contra MOSFET (scripts/make-examples.ts) */
 const AMPS = 'Transistor amplifiers.turbo';
+/** ganancia de lazo (.stb) con la sonda simple y la diferencial (scripts/make-examples.ts) */
+const STABILITY = 'Loop stability.turbo';
 
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
@@ -1366,6 +1369,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
       const remembered = shown && plotView[plotKind(shown.name)];
       if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
+      // .stb: el Bode de la ganancia de lazo
+      else if (!remembered && isStbPlot(shown) && !panes.some((pn) => pn.traces.some((tr) => shown.vectors.some((v) => v.name === tr.expr.toLowerCase()))))
+        setPanes([{ traces: [{ expr: 'loopgain' }] }]);
       else if (remembered) {
         setPanes(remembered);
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
@@ -2517,6 +2523,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
     if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;
+    if (picking.what === 'probe') return /^(Diff)?LoopProbe$/i.test(a.get('SpiceModel') ?? '') ? (a.get('InstName') ?? null) : null;
     return /^[VI]$/i.test(a.get('Prefix') ?? '') ? (a.get('InstName') ?? null) : null;
   };
   useEffect(() => {
@@ -2751,6 +2758,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
         .map((a) => a.get('InstName') ?? '')
         .filter(Boolean),
+      // sondas de lazo del .stb (librería Stability)
+      probes: doc.symbols
+        .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
+        .filter((a) => /^(Diff)?LoopProbe$/i.test(a.get('SpiceModel') ?? ''))
+        .map((a) => ({ name: a.get('InstName') ?? '', diff: /^Diff/i.test(a.get('SpiceModel') ?? '') }))
+        .filter((p, i, all) => p.name && all.findIndex((q) => q.name === p.name) === i),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [conn, doc, lib, libVersion],
@@ -3286,6 +3299,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
         { label: 'Transfer functions', title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'), onClick: () => doExample(TRANSFER) },
         { label: 'Transistor amplifiers', title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'), onClick: () => doExample(AMPS) },
+        { label: 'Loop stability', title: t('Loop gain (.stb) with the single-ended and the differential loop probe: Tian and GFT methods, phase and gain margins, root locus and the step response that confirms them'), onClick: () => doExample(STABILITY) },
         { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
@@ -3898,7 +3912,7 @@ ${ltNetlistText(sim.built.lt)}
           )}
           {picking && (
             <div className="pick-banner">
-              {picking.what === 'net' ? t('Pick a net on the schematic') : picking.what === 'source' ? t('Pick a source (V or I) on the schematic') : t('Pick a component on the schematic')}
+              {picking.what === 'net' ? t('Pick a net on the schematic') : picking.what === 'source' ? t('Pick a source (V or I) on the schematic') : picking.what === 'probe' ? t('Pick a loop probe on the schematic') : t('Pick a component on the schematic')}
               <button onClick={() => endPick(null)}>{t('Cancel')}</button>
             </div>
           )}
@@ -4065,6 +4079,7 @@ ${ltNetlistText(sim.built.lt)}
               {panel === 'plot' && plot && scale && withPz && pzSide && mode !== 'smith' && (
                 <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
               )}
+              {panel === 'plot' && plot && scale && isStbPlot(plot) && mode !== 'smith' && <StbView plot={plot} name={project.name} />}
               {panel === 'plot' && plot && !scale &&
                 (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} highlightDevice={lvNow ? undefined : hoverDev} />)}
               </ErrorBoundary>
@@ -4516,6 +4531,6 @@ function toolHint(tt: Tool): string {
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':
-      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
+      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : tt.what === 'probe' ? t('Click a loop probe (LoopProbe or DiffLoopProbe) to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
   }
 }

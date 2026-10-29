@@ -11,6 +11,8 @@
 //   pasatodo, con un operacional sin polos (OA_NoPole, archivos del proyecto).
 // - Transistor amplifiers.turbo: emisor común, degenerado, colector común y base común
 //   (examples/transistors/), con el BJT (BC547C) y el MOSFET (2N7000) uno al lado del otro.
+// - Loop stability.turbo: la ganancia de lazo (.stb) con la sonda simple y la diferencial
+//   (examples/stability/): Tian, GFT, márgenes, lugar de raíces y el transitorio que los confirma.
 // (ADC.turbo, el de simulación mixta con Verilog, lo arma scripts/make-adc.ts)
 //   npx vite-node scripts/make-examples.ts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -48,7 +50,7 @@ const COMMENTS: Record<string, string> = {
   'RC Sweep (.step).asc': 'RC low-pass filter with .step: one run per value of R; the rise time is 2.2 RC',
 };
 /** El orden en Archivo › Examples */
-const EXAMPLES = ['Half-wave Rectifier.asc', 'Common Emitter.asc', 'Inverting Amplifier.asc'];
+const EXAMPLES = ['Half-wave Rectifier.asc', 'Common Emitter.asc', 'Inverting Amplifier.asc', 'Loop Gain (.stb).asc'];
 /** Los de antes, que siguen usando los e2e */
 const TEST_EXAMPLES = ['RC Filter.asc', 'RLC Bode.asc', 'RC Sweep (.step).asc', ...EXAMPLES];
 
@@ -286,4 +288,71 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   const text = await serializeTurbo(amps);
   writeFileSync('public/examples/Transistor amplifiers.turbo', text);
   console.log(`Transistor amplifiers.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
+}
+
+// --- Loop stability: .stb con LoopProbe (simple) y DiffLoopProbe (diferencial), docs/estabilidad.md
+{
+  const groups = [{ id: newId('g'), name: 'Single-ended (LoopProbe)' }, { id: newId('g'), name: 'Differential (DiffLoopProbe)' }];
+  const note = (d: AscDoc, lines: string[]): AscDoc => ({
+    ...d,
+    texts: [...d.texts, { x: -64, y: 560, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
+  });
+  const STB = { panes: [{ traces: [{ expr: 'loopgain', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
+  const se = parseAsc(readFileSync('examples/stability/single.asc', 'utf8'));
+  const df = parseAsc(readFileSync('examples/stability/diff.asc', 'utf8'));
+  const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
+  const SE_NOTE = [
+    'LP1 (Stability > LoopProbe) is in series in the loop, at the error point: the loop signal goes from the summing node into the op amp (the arrow).',
+    'Outside .stb it is a plain wire. The .stb turns its sources on one at a time and computes T; next to the Bode plot: margins, poles and zeros of T,',
+    'closed-loop poles and the root locus of 1 + k·T. U1 has two poles (10 Hz and 1 MHz): with gain -1 the phase margin is only about 25°.',
+  ];
+  const step = (d: AscDoc, v: string, val: string) => hideWaveValues(setVal(d, v, val));
+  const sims: Sim[] = [
+    bench(0, 'Loop gain (Tian)', setAnalysisLine(note(se, SE_NOTE), '.stb LP1 dec 50 10 100meg'), STB),
+    bench(
+      0,
+      'GFT: G, G∞, G0 and R',
+      setAnalysisLine(note(se, ['Middlebrook\'s GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):', 'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.']), '.stb LP1 dec 50 10 100meg gft V1 V(out)'),
+      { panes: [{ traces: [{ expr: 'loopgain', color: '#1c7ed6' }] }, { traces: [{ expr: 'g', color: '#2f9e44' }, { expr: 'ginf', color: '#e8590c' }] }], active: 0, plot: 'stb1', mode: 'bode' },
+    ),
+    bench(0, 'Gain -10: more margin', setAnalysisLine(note(setVal(se, 'R2', '10k'), ['With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.']), '.stb LP1 dec 50 10 100meg'), STB),
+    bench(0, 'Step response', setAnalysisLine(note(step(se, 'V1', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 1'), ['The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.']), '.tran 20u'), {
+      panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }],
+      active: 0,
+      plot: 'tran1',
+    }),
+    bench(0, 'Closed-loop Bode', setAnalysisLine(se, '.ac dec 50 10 100meg'), { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'ac1', mode: 'bode' }),
+    bench(
+      1,
+      'Differential-mode loop gain',
+      setAnalysisLine(
+        note(df, [
+          'LP1 (Stability > DiffLoopProbe) is in series in the differential output, between the op amp outputs (op, on) and the outputs (outp, outn).',
+          'Inside, two ideal baluns back to back (E + F pairs: they neither isolate nor load) separate the differential and common modes,',
+          'with a probe in each mode; the .stb chooses one (dm or cm). In DM the loop is the R2/R1 network of each half: the same T as the single-ended one.',
+        ]),
+        '.stb LP1 dm dec 50 10 100meg',
+      ),
+      STB,
+    ),
+    bench(
+      1,
+      'Common-mode loop gain (CMFB)',
+      setAnalysisLine(note(df, ['In CM the probe also breaks the CMFB loop (Rcp, Rcn, Ecmfb into the + inputs): T adds both loops and the margin drops to about 15°.', 'Had the probe been at the inputs, the CMFB would stay closed inside the measured loop and its margin would not be seen (nested loops).']), '.stb LP1 cm dec 50 10 100meg'),
+      STB,
+    ),
+    bench(
+      1,
+      'Step response (the probe is transparent)',
+      setAnalysisLine(step(step(df, 'Vp', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 0.5'), 'Vn', 'PULSE(0 -0.1 0 10n 10n 5u 10u) AC 0.5 180'), '.tran 20u'),
+      { panes: [{ traces: [{ expr: 'V(outp)', color: '#1c7ed6' }, { expr: 'V(outn)', color: '#e8590c' }] }], active: 0, plot: 'tran1' },
+    ),
+  ];
+  const ls: Project = {
+    name: 'Loop stability', created: t0, modified: t0, groups, files: [],
+    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'Loop stability', base: sims[0].asc, activeSim: sims[0].id, sims }],
+  };
+  const text = await serializeTurbo(ls);
+  writeFileSync('public/examples/Loop stability.turbo', text);
+  console.log(`Loop stability.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }

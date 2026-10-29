@@ -104,6 +104,8 @@ export function analysisLabel(line: string): string {
     case 'disto':
     case 'sp':
       return `${label} ${sweepRange(a.sweep)}`;
+    case 'stb':
+      return `${t('Stability')} ${a.probe}${a.mode ? ` ${a.mode.toUpperCase()}` : ''} ${freqs(a.sweep)}`;
   }
 }
 
@@ -158,6 +160,8 @@ export function analysisDetail(line: string): string {
       return `${label} ${sweepDetail(a.sweep)}`;
     case 'sp':
       return `${label} ${sweepDetail(a.sweep)}${a.noise ? `, ${t('with noise')}` : ''}`;
+    case 'stb':
+      return `${label} ${a.probe || `(${t('no probe chosen')})`}${a.mode ? ` ${a.mode.toUpperCase()}` : ''}, ${a.method === 'gft' ? 'GFT' : 'Tian'}, ${sweepDetail(a.sweep)}`;
   }
 }
 

@@ -1,0 +1,35 @@
+* Sondas de ganancia de lazo de TurboSpice (análisis .stb: métodos de Tian y GFT de Middlebrook,
+* según las implementaciones para SPICE de Frank Wiedmann).
+* Fuera del .stb son transparentes: las fuentes tienen valor 0 en continua y en AC, así que la
+* sonda es un cable en serie (Vinj, Vprb) y nada en paralelo (Iinj). El .stb las enciende con
+* "alter" en cada corrida. La señal del lazo entra por p1 y sale por p2 (la flecha del símbolo).
+
+.subckt LoopProbe p1 p2
+Vinj p2 x 0 AC 0
+Vprb x p1 0
+Iinj 0 x 0 AC 0
+.ends LoopProbe
+
+* Balun ideal: (p, n) <-> modo diferencial d = V(p)-V(n) y modo común c = (V(p)+V(n))/2,
+* con las corrientes transformadas de modo dual (conserva la potencia: no aísla ni carga).
+.subckt TS_Balun p n d c
+Vsp p pp 0
+Ep pp m d 0 0.5
+Ec m 0 c 0 1
+Vsn n nn 0
+En nn m2 d 0 -0.5
+Ec2 m2 0 c 0 1
+Fd 0 d Vsp 0.5
+Fd2 0 d Vsn -0.5
+Fc 0 c Vsp 1
+Fc2 0 c Vsn 1
+.ends TS_Balun
+
+* Sonda diferencial: dos baluns espalda con espalda (equivalen a una conexión directa) con una
+* sonda en el modo diferencial (Xdm) y otra en el modo común (Xcm). La señal entra por p1/n1.
+.subckt DiffLoopProbe p1 n1 p2 n2
+X1 p1 n1 d1 c1 TS_Balun
+X2 p2 n2 d2 c2 TS_Balun
+Xdm d1 d2 LoopProbe
+Xcm c1 c2 LoopProbe
+.ends DiffLoopProbe

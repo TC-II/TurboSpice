@@ -320,7 +320,9 @@ export class Ngspice {
       const vectors = names
         .map((n) => this.readVector(`${plot}.${n}`, n))
         .filter((v): v is SimVector => v !== null);
-      plots.push({ name: plot, vectors });
+      // el plot de resultados de un .stb (setplot new lo llama "unknownN"): "stbN"
+      const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => v.name === 'loopgain');
+      plots.push({ name: stb ? `stb${plots.filter((p) => /^stb\d+$/.test(p.name)).length + 1}` : plot, vectors });
     }
     // los nodos digitales son del último análisis que corrió: si es un transitorio, van con él
     const last = plots.at(-1);

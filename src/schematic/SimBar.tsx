@@ -6,13 +6,13 @@
 // hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
-import { formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type Sweep } from '../sim/analyses.ts';
+import { formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../ui/icons.tsx';
 
 type BarField =
-  | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources'; placeholder?: string; width?: number; required?: boolean; numeric?: boolean; notGround?: boolean }
+  | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources' | 'probes'; placeholder?: string; width?: number; required?: boolean; numeric?: boolean; notGround?: boolean }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
   /** casillas una debajo de la otra */
@@ -136,6 +136,23 @@ function barRows(a: Analysis): BarField[][] {
       return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), text('f2/f1', a.f2overf1, (f2overf1) => ({ ...a, f2overf1 }), { placeholder: '—' })]];
     case 'sp':
       return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), { kind: 'check', label: t('Noise'), value: a.noise, set: (noise) => ({ ...a, noise }) }]];
+    case 'stb':
+      return [
+        [
+          text(t('Loop probe'), a.probe, (probe) => ({ ...a, probe }), { list: 'probes', required: true, width: 6 }),
+          { kind: 'select', label: t('Method'), value: a.method, options: [['tian', 'Tian'], ['gft', 'GFT']], set: (method) => ({ ...a, method: method as StbMethod }) },
+          ...(a.mode ? [{ kind: 'select', label: t('Mode'), value: a.mode, options: [['dm', 'DM'], ['cm', 'CM']], set: (mode: string) => ({ ...a, mode: mode as StbMode }) } as BarField] : []),
+        ],
+        ...(a.method === 'gft'
+          ? [
+              [
+                text(t('Input source'), a.input, (input) => ({ ...a, input }), { list: 'sources', placeholder: t('optional'), width: 6 }),
+                text(t('Output'), a.output, (output) => ({ ...a, output }), { list: 'nets', placeholder: t('optional'), width: 6, notGround: true }),
+              ],
+            ]
+          : []),
+        sweepFields(a.sweep, (sweep) => ({ ...a, sweep })),
+      ];
   }
 }
 
@@ -198,7 +215,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   const change = (a: Analysis) => (setDraft(a), apply(a));
   // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
-    picker(f.list === 'nets' ? 'net' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
+    picker(f.list === 'nets' ? 'net' : f.list === 'probes' ? 'probe' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
   const rows = sim && draft && control === undefined ? barRows(draft) : [];
   /** columnas de la grilla con varias filas (0: sin grilla) */
   const gridCols = rows.length > 1 && !(draft && COLUMNS.has(draft.kind)) ? Math.max(...rows.map((r) => r.length)) : 0;
@@ -219,6 +236,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
     <div className="simbar" role="group" aria-label={t('Selected simulation')}>
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
+      <datalist id="bar-probes">{(info.probes ?? []).map((p) => <option key={p.name} value={p.name} />)}</datalist>
       {!sim ? (
         <span className="sb-hint">{t('Select simulation type')}</span>
       ) : null}
@@ -294,7 +312,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
                       <button
                         type="button"
                         className="pick-btn"
-                        title={f.list === 'nets' ? t('Pick the net on the schematic') : t('Pick the source on the schematic')}
+                        title={f.list === 'nets' ? t('Pick the net on the schematic') : f.list === 'probes' ? t('Pick the loop probe on the schematic') : t('Pick the source on the schematic')}
                         aria-label={t('Pick {label} on the schematic', { label: f.label })}
                         onClick={(e) => {
                           e.preventDefault();

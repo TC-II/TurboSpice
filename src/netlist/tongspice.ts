@@ -10,6 +10,8 @@ import { busBitNode } from './bus.ts';
 import { translateDigital } from './digital.ts';
 import { fixFloatingNodes } from './floating.ts';
 import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
+import { stbControl } from './stb.ts';
+import { parseAnalysis } from '../sim/analyses.ts';
 import { collectModels, replaceAko } from './ako.ts';
 import { replaceIdealDiodes } from './idealdiode.ts';
 import { stripLtspiceInfo } from '../library/cmp.ts';
@@ -798,6 +800,8 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   // #241 Complex simulation: un .control común sin "run" reemplaza al análisis del testbench (que
   // queda en el .asc para LTspice): no se emiten los dos. Con "run", el análisis es lo que corre.
   const replacesAnalysis = !!ctl && !hooks && !blocksCtl && !controlUsesRun(ctl.text.split('\\n').slice(1, -1));
+  const stbLines: string[] = [];
+  let testbenchAnalysis = false;
   for (const tt of lt.texts) {
     if (hooks && tt === ctl) continue;
     if (blocksCtl && tt === blocksCtl) continue;
@@ -836,6 +840,12 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
         out.push(`* ${line}`);
         continue;
       }
+      if (/^\.stb\b/i.test(line)) {
+        out.push(`* ${line}`);
+        stbLines.push(line);
+        continue;
+      }
+      if (TESTBENCH_ANALYSIS.test(line)) testbenchAnalysis = true;
       if (/^\.step\b/i.test(line)) {
         out.push(`* ${line}`);
         const st = parseStep(line);
@@ -877,6 +887,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
 
   const stepRuns = steps.length ? addSteps(steps, lt, names, out, warnings, hooks ?? undefined) : undefined;
   if (hooks && !steps.length) out.push('.control', ...hooks.before, 'run', ...hooks.after, ...hooks.final, '.endc');
+  if (stbLines.length) out.push(...stbBlock(stbLines, lt, names, { ctl: !!ctl, steps: steps.length > 0, run: testbenchAnalysis }, warnings));
 
   // Modelos referenciados que no aparecen definidos en ningún lado
   const local = new Set(
@@ -945,6 +956,33 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
 
   out.push('.end');
   return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
+}
+
+/**
+ * .stb → bloque .control (ver stb.ts). Con un .control del usuario o un .step no se puede
+ * combinar: se avisa y no corre.
+ */
+function stbBlock(lines: string[], lt: LtNetlist, names: Map<string, string>, o: { ctl: boolean; steps: boolean; run: boolean }, warnings: string[]): string[] {
+  if (o.ctl || o.steps) {
+    warnings.push(o.ctl ? t('.stb is ignored because the schematic has a .control block') : t('.stb can\'t be combined with .step yet: it is ignored'));
+    return [];
+  }
+  const byName = new Map([...names].map(([k, v]) => [k.toLowerCase().replace(/§/g, ''), v.toLowerCase()]));
+  const ng = (n: string) => {
+    const k = n.toLowerCase();
+    return byName.get(k) ?? byName.get(`x${k}`) ?? (k.startsWith('x') ? byName.get(k.slice(1)) : undefined);
+  };
+  const sources = lt.elements.map((e) => names.get(e.name)?.toLowerCase()).filter((n): n is string => !!n && /^[vi]/.test(n));
+  const body: string[] = o.run ? ['run'] : [];
+  lines.forEach((line, i) => {
+    const a = parseAnalysis(line);
+    if (a?.kind !== 'stb') return warnings.push(t('{line}: invalid .stb', { line }));
+    const output = a.output.trim() ? `v(${ngNodeName(a.output.trim()).toLowerCase()})` : undefined;
+    const r = stbControl(a, { probe: ng(a.probe), sources, input: a.input.trim() ? ng(a.input.trim()) : undefined, output }, i + 1);
+    if (typeof r === 'string') warnings.push(r);
+    else body.push(...r);
+  });
+  return body.length > (o.run ? 1 : 0) ? ['.control', ...body, '.endc'] : [];
 }
 
 /** Parámetros declarados con .param en las directivas del esquemático (en minúsculas) */

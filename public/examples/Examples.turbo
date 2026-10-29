@@ -5,31 +5,38 @@
  "created": "2026-10-22T17:00:00.000Z",
  "modified": "2026-10-22T17:00:00.000Z",
  "files": [],
- "activeTestbench": "smvq15o7zo",
+ "activeTestbench": "smvu22853o",
  "groups": [],
  "testbenches": [
   {
-   "id": "smvq15o7zo",
+   "id": "smvu22853o",
    "name": "Half-wave Rectifier",
    "current": "sha256:8c9462eda8a2c60c734be06a04e9a15454826a430228c223b68f7e72a2336f5a",
    "runs": []
   },
   {
-   "id": "smvq15o7zq",
+   "id": "smvu22853q",
    "name": "Common Emitter",
    "current": "sha256:aa12debd4301b3e2e5d88fb08f667a64abd49172b0bb3970b88fb03eccda98a5",
    "runs": []
   },
   {
-   "id": "smvq15o7zs",
+   "id": "smvu22853s",
    "name": "Inverting Amplifier",
    "current": "sha256:9ddbc5b850f191a9c4dae1e0a9d26c1576e0b16e55617e10ee2c775f7f69b7c3",
+   "runs": []
+  },
+  {
+   "id": "smvu22853u",
+   "name": "Loop Gain (.stb)",
+   "current": "sha256:0c280c8d028fffa98ba7056f40ca58cc0275973d4ddad72d62b9ee4dfb4bdf8f",
    "runs": []
   }
  ],
  "blobs": {
   "sha256:8c9462eda8a2c60c734be06a04e9a15454826a430228c223b68f7e72a2336f5a": "Version 4\r\nSHEET 1 880 680\r\nWIRE 0 16 0 -32\r\nWIRE 0 -32 48 -32\r\nWIRE 112 -32 176 -32\r\nWIRE 176 -32 288 -32\r\nWIRE 176 -32 176 0\r\nWIRE 288 -32 368 -32\r\nWIRE 288 -32 288 16\r\nWIRE 0 96 0 128\r\nWIRE 176 128 176 80\r\nWIRE 288 128 288 80\r\nFLAG 368 -32 out\r\nFLAG 0 128 0\r\nFLAG 176 128 0\r\nFLAG 288 128 0\r\nSYMBOL voltage 0 0 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 10 50)\r\nSYMATTR Prefix V\r\nSYMBOL diode 48 -16 R270\r\nWINDOW 0 32 32 VTop 2\r\nWINDOW 3 0 32 VBottom 2\r\nSYMATTR InstName D1\r\nSYMATTR Value D\r\nSYMATTR Prefix D\r\nSYMBOL res 160 -16 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL cap 272 16 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 100µ\r\nSYMATTR Prefix C\r\nTEXT -416 128 Left 2 !.tran 100m\r\nTEXT -416 160 Left 2 ;Half-wave rectifier with a capacitor filter\r\n",
   "sha256:aa12debd4301b3e2e5d88fb08f667a64abd49172b0bb3970b88fb03eccda98a5": "Version 4\r\nSHEET 1 880 680\r\nWIRE 256 96 256 128\r\nWIRE 256 160 256 128\r\nWIRE 256 128 384 128\r\nWIRE 256 256 256 272\r\nWIRE 128 96 128 208\r\nWIRE 128 208 192 208\r\nWIRE 128 208 128 272\r\nWIRE 64 208 128 208\r\nWIRE -80 208 -80 240\r\nWIRE -80 208 0 208\r\nWIRE 128 -32 128 16\r\nWIRE 128 352 128 400\r\nWIRE 256 352 256 400\r\nWIRE -80 320 -80 400\r\nWIRE 256 16 256 -32\r\nWIRE -304 160 -304 96\r\nWIRE -304 224 -304 288\r\nFLAG 256 -32 vcc\r\nFLAG 384 128 out\r\nFLAG 256 400 0\r\nFLAG 128 -32 vcc\r\nFLAG 128 400 0\r\nFLAG -80 208 in\r\nFLAG -80 400 0\r\nFLAG -304 96 vcc\r\nFLAG -304 288 0\r\nSYMBOL npn 192 160 R0\r\nWINDOW 0 56 32 Left 2\r\nWINDOW 3 56 68 Left 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value QBC548\r\nSYMATTR Prefix QN\r\nSYMBOL res 240 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RC\r\nSYMATTR Value 4.7k\r\nSYMATTR Prefix R\r\nSYMBOL res 240 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName RE\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 0 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 47k\r\nSYMATTR Prefix R\r\nSYMBOL res 112 256 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 76 Left 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL cap 64 192 R90\r\nWINDOW 0 -8 32 VBottom 2\r\nWINDOW 3 48 32 VTop 2\r\nSYMATTR InstName C1\r\nSYMATTR Value 10u\r\nSYMATTR Prefix C\r\nSYMBOL voltage -80 224 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vin\r\nSYMATTR Value SINE(0 10m 1k)\r\nSYMATTR Prefix V\r\nSYMBOL TCLib/v_cell -304 160 R0\r\nWINDOW 0 24 8 Left 2\r\nWINDOW 3 24 56 Left 2\r\nSYMATTR InstName V2\r\nSYMATTR Value 12\r\nSYMATTR Prefix V\r\nTEXT -128 552 Left 2 !.tran 5m\r\nTEXT -128 584 Left 2 !.model QBC548 NPN(IS=1.8e-14 BF=290 VAF=63 BR=7.6 RB=10 RC=1 CJE=11.5p CJC=5.25p TF=410p)\r\nTEXT -128 624 Left 2 ;Common-emitter amplifier: hover over Q1 to see its operating point\r\n",
-  "sha256:9ddbc5b850f191a9c4dae1e0a9d26c1576e0b16e55617e10ee2c775f7f69b7c3": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k)\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL TCLib\\\\OA_Ideal 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg\r\nSYMATTR Value2 GBWP=10Meg\r\nSYMATTR SpiceModel OA_Ideal\r\nSYMATTR Prefix X\r\nSYMATTR ModelFile TCLib/OA_Ideal.lib\r\nTEXT 0 224 Left 2 !.tran 3m\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n"
+  "sha256:9ddbc5b850f191a9c4dae1e0a9d26c1576e0b16e55617e10ee2c775f7f69b7c3": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 288 -64 352 -64\r\nWIRE 352 -64 352 48\r\nWIRE 320 48 352 48\r\nWIRE 352 48 384 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 384 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k)\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL TCLib\\\\OA_Ideal 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg\r\nSYMATTR Value2 GBWP=10Meg\r\nSYMATTR SpiceModel OA_Ideal\r\nSYMATTR Prefix X\r\nSYMATTR ModelFile TCLib/OA_Ideal.lib\r\nTEXT 0 224 Left 2 !.tran 3m\r\nTEXT 0 256 Left 2 ;Inverting amplifier: Av = -R2/R1 = -10\r\n",
+  "sha256:0c280c8d028fffa98ba7056f40ca58cc0275973d4ddad72d62b9ee4dfb4bdf8f": "Version 4\r\nSHEET 1 880 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 160 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 16 208 16\r\nWIRE 160 -64 208 -64\r\nWIRE 384 -64 384 48\r\nWIRE 320 48 384 48\r\nWIRE 384 48 448 48\r\nWIRE 208 80 160 80\r\nWIRE 160 128 160 80\r\nWIRE -64 112 -64 128\r\nFLAG 160 128 0\r\nFLAG -64 128 0\r\nFLAG 448 48 out\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value SINE(0 1 1k) AC 1\r\nSYMATTR Prefix V\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMATTR Prefix R\r\nSYMBOL res 304 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMATTR Prefix R\r\nSYMBOL Stability\\\\LoopProbe 336 -64 R180\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_Ideal 400 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Avol=1Meg\r\nSYMATTR Value2 GBWP=10Meg\r\nSYMATTR SpiceModel OA_Ideal\r\nSYMATTR Prefix X\r\nSYMATTR ModelFile TCLib/OA_Ideal.lib\r\nTEXT 0 224 Left 2 ;.stb LP1 dec 50 1 100meg\r\nTEXT 0 256 Left 2 ;Loop gain at the LP1 probe (Stability > LoopProbe): the loop signal enters by the arrow.\\nTian method by default; with \"gft\" also H, Hinf, H0, D and Dn from V1 to V(out).\r\n"
  }
 }

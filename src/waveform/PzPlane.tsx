@@ -36,11 +36,15 @@ interface Props {
   name?: string;
   /** al lado de otro gráfico: mapa más chico y sin tabla */
   compact?: boolean;
+  /** ramas del lugar de raíces (s en rad/s), dibujadas debajo de las raíces */
+  locus?: { re: number; im: number }[][];
+  /** la estabilidad (✓/⚠) se evalúa sólo con los polos de esta corrida (el lazo cerrado del .stb) */
+  stableRun?: number;
 }
 
 const fmtNum = (x: number, digits = 3) => (Number.isFinite(x) ? String(Number(x.toPrecision(digits))) : '—');
 
-export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: Props) {
+export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, locus, stableRun }: Props) {
   const roots = useMemo(() => pzRoots(runs), [runs]);
   const [hz, setHz] = useState(false);
   const [log, setLog] = useState(false);
@@ -192,7 +196,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
   const ox = px(0);
   const oy = py(0);
   const unitText = hz ? 'Hz' : 'rad/s';
-  const bad = roots.filter(unstable);
+  const bad = roots.filter((r) => unstable(r) && (stableRun === undefined || r.run === stableRun));
   const nPoles = roots.filter((r) => r.kind === 'pole').length;
 
   // raíces en el mismo punto (polos dobles, etc.): se marca la multiplicidad
@@ -340,6 +344,17 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact }: 
                   <text className="axis-name" x={Math.min(W - 20, Math.max(6, ox + 6))} y={14}>
                     jω
                   </text>
+                  {locus?.map((br, i) => (
+                    <polyline
+                      key={`l${i}`}
+                      className="locus"
+                      points={br
+                        .map((r) => toXY(r.re, r.im))
+                        .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - v.cx) < 50 * v.h && Math.abs(y - v.cy) < 50 * v.h)
+                        .map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`)
+                        .join(' ')}
+                    />
+                  ))}
                   {hr && <circle className="halo" cx={px(pts[hover!][0])} cy={py(pts[hover!][1])} r={11} />}
                   {roots.map((r, i) => {
                     const [x, y] = pts[i];

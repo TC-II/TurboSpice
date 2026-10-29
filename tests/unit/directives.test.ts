@@ -28,7 +28,7 @@ describe('removeAnalysis (borrar la única simulación)', () => {
 
 describe('tipos de análisis', () => {
   it('en el orden del menú: transitorio, AC, polarización, barrido DC, ruido…', () => {
-    expect(ANALYSES.map((a) => a.kind)).toEqual(['tran', 'ac', 'op', 'dc', 'noise', 'tf', 'sens', 'pz', 'disto', 'sp']);
+    expect(ANALYSES.map((a) => a.kind)).toEqual(['tran', 'ac', 'op', 'dc', 'noise', 'tf', 'sens', 'pz', 'disto', 'stb', 'sp']);
   });
 });
 

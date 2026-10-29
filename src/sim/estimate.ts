@@ -40,6 +40,7 @@ export function analysisPoints(a: Analysis): number {
     case 'noise':
     case 'disto':
     case 'sp':
+    case 'stb':
       return sweepPoints(a.sweep);
     case 'sens':
       return a.ac ? sweepPoints(a.sweep) : NaN;

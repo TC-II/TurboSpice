@@ -1,8 +1,8 @@
-// Directivas que sólo existen en ngspice (.control, .pz, .sens, .disto, .sp, .pss).
+// Directivas que sólo existen en ngspice (.control, .pz, .sens, .disto, .sp, .pss) y el .stb de TurboSpice.
 // Para que el .asc siga simulando en LTspice se guardan como comentario (";.pz …"):
 // LTspice los muestra y los ignora; TurboSpice los reconoce y los ejecuta.
 
-export const NGSPICE_ONLY = /^\s*\.(control|pz|sens|disto|sp|pss)\b/i;
+export const NGSPICE_ONLY = /^\s*\.(control|pz|sens|disto|sp|pss|stb)\b/i;
 
 /**
  * Primera línea del comentario con los análisis adicionales del Estudio: LTspice corre un solo

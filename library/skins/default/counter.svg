@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-80 -48 224 176">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <rect class="st0" x="-64" y="-48" width="192" height="160"/>
+  <line class="st0" x1="-80" y1="32" x2="-64" y2="32"/>
+  <line class="st0" x1="128" y1="0" x2="144" y2="0"/>
+  <line class="st0" x1="128" y1="64" x2="144" y2="64"/>
+  <line class="st0" x1="-80" y1="128" x2="-80" y2="112"/>
+  <line class="st0" x1="-80" y1="112" x2="-64" y2="112"/>
+  <line class="st0" x1="-64" y1="24" x2="-54" y2="32"/>
+  <line class="st0" x1="-54" y1="32" x2="-64" y2="40"/>
+  <line class="st0" x1="-32" y1="48" x2="-32" y2="24"/>
+  <line class="st0" x1="-32" y1="24" x2="-26" y2="24"/>
+  <line class="st0" x1="-26" y1="24" x2="-26" y2="48"/>
+  <line class="st0" x1="-26" y1="48" x2="-20" y2="48"/>
+  <line class="st0" x1="-20" y1="48" x2="-20" y2="48"/>
+  <line class="st0" x1="-20" y1="48" x2="-20" y2="24"/>
+  <line class="st0" x1="-20" y1="24" x2="-14" y2="24"/>
+  <line class="st0" x1="-14" y1="24" x2="-14" y2="48"/>
+  <line class="st0" x1="-14" y1="48" x2="-8" y2="48"/>
+  <line class="st0" x1="-8" y1="48" x2="-8" y2="48"/>
+  <line class="st0" x1="-8" y1="48" x2="-8" y2="24"/>
+  <line class="st0" x1="-8" y1="24" x2="-2" y2="24"/>
+  <line class="st0" x1="-2" y1="24" x2="-2" y2="48"/>
+  <line class="st0" x1="-2" y1="48" x2="4" y2="48"/>
+  <line class="st0" x1="4" y1="48" x2="4" y2="48"/>
+  <line class="st0" x1="4" y1="48" x2="4" y2="24"/>
+  <line class="st0" x1="4" y1="24" x2="10" y2="24"/>
+  <line class="st0" x1="10" y1="24" x2="10" y2="48"/>
+  <line class="st0" x1="10" y1="48" x2="16" y2="48"/>
+  <line class="st0" x1="40" y1="48" x2="40" y2="24"/>
+  <line class="st0" x1="40" y1="24" x2="76" y2="24"/>
+  <line class="st0" x1="76" y1="24" x2="76" y2="48"/>
+  <line class="st0" x1="76" y1="48" x2="112" y2="48"/>
+</svg>

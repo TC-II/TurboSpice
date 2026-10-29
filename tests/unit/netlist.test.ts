@@ -1039,3 +1039,48 @@ SYMATTR InstName J1
     expect(f.find((x) => x.startsWith('B_A6__fs'))).toContain('(V(p,m)-');
   });
 });
+
+describe('otros dispositivos A de LTspice (COUNTER, PHASEDET, SAMPLEHOLD, MODULATOR, VARISTOR; #133)', () => {
+  it('COUNTER: d_fdiv con high_cycles = round(duty·cycles) e i_count=1; Phi1 en Q y Phi2 en _Q', () => {
+    const w: string[] = [];
+    const l = translateDigital('A1', ['clk', '0', '0', '0', '0', 'p2', 'p1', '0'], 'COUNTER cycles=5 duty=0.3', w)!;
+    expect(l).toContain('.model A1__divm d_fdiv(div_factor=5 high_cycles=2 i_count=1 rise_delay=1e-12 fall_delay=1e-12)');
+    expect(l.some((x) => x.startsWith('B_A1__q p1 0 '))).toBe(true);
+    expect(l.some((x) => x.startsWith('B_A1__qb p2 0 '))).toBe(true);
+    expect(w).toEqual([]);
+    // cycles que depende de una tensión: no se traduce
+    expect(translateDigital('A2', ['clk', '0', '0', '0', '0', '0', 'p', '0'], 'COUNTER cycles=2*V(x)', w)).toBeUndefined();
+    expect(w).toHaveLength(1);
+  });
+
+  it('PHASEDET: dos d_dff que se borran juntos; corriente Iout hacia Q con Rout; umbral 0,5', () => {
+    const l = translateDigital('A1', ['a', 'b', '0', '0', '0', '0', 'q', '0'], 'PHASEDET Vhigh=5', [])!;
+    expect(l).toContain('B_A1__a A1__a 0 V=min(max((V(a,0)-0.5)*1e4+0.5,0),1)');
+    expect(l).toContain('A_A1__up A1__one A1__a_d A1__zero A1__clr A1__up NULL A1__ffm');
+    expect(l).toContain('B_A1__q 0 q I={100u}*(V(A1__u)*min(max(({5}-V(q,0))*1e3,0),1)-V(A1__d))');
+    expect(l).toContain('R_A1__q q 0 {1e10}');
+  });
+
+  it('SAMPLEHOLD: con CLK una ventana de 1 ns en el flanco; con S/H sigue mientras está en alto', () => {
+    const c = translateDigital('A1', ['in', '0', 'clk', '0', '0', '0', 'o', '0'], 'SAMPLEHOLD', [])!;
+    expect(c).toContain('B_A1__h 0 A1__h I=10*V(A1__w)*(V(in)-V(A1__h))');
+    const s = translateDigital('A2', ['p', 'm', '0', 'sh', '0', '0', 'o', '0'], 'SAMPLEHOLD', [])!;
+    expect(s.find((x) => x.startsWith('B_A2__h'))).toMatch(/V\(sh,0\).*\(V\(p,m\)-V\(A2__h\)\)$/);
+    expect(s).toContain('B_A2__q o 0 V=V(A2__h)');
+  });
+
+  it('MODULATOR: integra space+V(FM)·(mark−space) con int de XSPICE; seno en Q y coseno en _Q', () => {
+    const l = translateDigital('A1', ['fm', 'am', '0', '0', '0', 'c', 's', '0'], 'MODULATOR mark=2k space=1k', [])!;
+    expect(l).toContain('B_A1__f A1__f 0 V={1k}+({2k}-{1k})*V(fm)');
+    expect(l).toContain('B_A1__q s 0 V=V(am)*sin(2*pi*V(A1__ph))');
+    expect(l).toContain('B_A1__qb c 0 V=V(am)*cos(2*pi*V(A1__ph))');
+    const w: string[] = [];
+    expect(translateDigital('A2', ['fm', 'am', '0', '0', '0', '0', 's', '0'], 'MODULATOR', w)).toBeUndefined();
+    expect(w).toHaveLength(1);
+  });
+
+  it('VARISTOR: recorta |V(out)| a |V(in1,in2)| con rclamp', () => {
+    const l = translateDigital('A1', ['c', '0', '0', '0', '0', '0', 'o', '0'], 'VARISTOR rclamp=10', [])!;
+    expect(l).toContain('B_A1__q o 0 I=(V(o,0)>abs(V(c,0))) ? (V(o,0)-abs(V(c,0)))/{10} : (V(o,0)<-abs(V(c,0))) ? (V(o,0)+abs(V(c,0)))/{10} : 0');
+  });
+});

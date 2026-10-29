@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="-32 32 36 64">
+  <defs>
+    <style>.st0 { fill: none; stroke: #000; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.5px; }</style>
+  </defs>
+  <rect class="st0" x="-24" y="44" width="16" height="40"/>
+  <line class="st0" x1="-16" y1="32" x2="-16" y2="44"/>
+  <line class="st0" x1="-16" y1="84" x2="-16" y2="96"/>
+  <line class="st0" x1="-30" y1="76" x2="-2" y2="52"/>
+  <line class="st0" x1="-2" y1="52" x2="4" y2="52"/>
+  <line class="st0" x1="-32" y1="48" x2="-24" y2="48"/>
+  <line class="st0" x1="-32" y1="80" x2="-24" y2="80"/>
+</svg>

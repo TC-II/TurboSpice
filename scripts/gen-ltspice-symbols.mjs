@@ -200,6 +200,34 @@ const hyst = (x, y) => [L(x - 4, y, x + 4, y), L(x, y - 8, x + 8, y - 8), L(x, y
 // + y − junto a las entradas de los diferenciales
 const diffSigns = [L(4, 48, 10, 48), L(7, 45, 7, 51), L(4, 80, 10, 80)];
 const srflop = flopBox(-32, 32, 16, 120, [['S', 48, -48], ['R', 96, -48]], 48, 64);
+// seno de un período, de (x, y) con ancho w y amplitud a
+const sine = (x, y, w, a) => polyline(...Array.from({ length: 17 }, (_, i) => [r1(x + (w * i) / 16), r1(y - a * Math.sin((2 * Math.PI * i) / 16))]));
+// onda cuadrada de n períodos
+const square = (x, y, w, h, n) => polyline(...Array.from({ length: n }, (_, i) => {
+  const x0 = x + (w * i) / n, xm = x0 + w / n / 2, x1 = x0 + w / n;
+  return [[x0, y], [x0, y - h], [xm, y - h], [xm, y], [x1, y]];
+}).flat());
+const counter = [
+  R(-64, -48, 128, 112), L(-80, 32, -64, 32), L(128, 0, 144, 0), L(128, 64, 144, 64), L(-80, 128, -80, 112), L(-80, 112, -64, 112),
+  ...polyline([-64, 24], [-54, 32], [-64, 40]), ...square(-32, 48, 48, 24, 4), ...square(40, 48, 72, 24, 1),
+];
+const phidet = [
+  R(-16, -40, 64, 40), L(-32, -16, -16, -16), L(-32, 16, -16, 16), L(-32, 48, -16, 48), L(-16, 48, -16, 40), L(64, 0, 96, 0),
+  C(24, 0, 16), L(12, 12, 36, -12),
+];
+const sample = [
+  R(-64, -48, 80, 112), L(-80, -32, -64, -32), L(-80, 0, -64, 0), L(-80, 32, -64, 32), L(-80, 64, -64, 64),
+  L(-80, 96, -64, 96), L(80, 16, 96, 16), ...polyline([-64, 24], [-54, 32], [-64, 40]),
+  L(-32, 16, -8, 16), L(-8, 16, 14, 4), L(16, 16, 40, 16), L(40, 16, 40, 40), L(30, 40, 50, 40), L(30, 46, 50, 46), L(40, 46, 40, 56),
+];
+const modBox = (cos) => [
+  R(16, -32, 128, 112), L(0, 0, 16, 0), L(0, 64, 16, 64), L(0, 96, 16, 96),
+  ...(cos ? [L(128, 0, 144, 0), L(128, 64, 144, 64)] : [L(128, 32, 144, 32)]), ...sine(40, 32, 64, 20),
+];
+const varistor = [
+  R(-24, 44, -8, 84), L(-16, 32, -16, 44), L(-16, 84, -16, 96), L(-30, 76, -2, 52), L(-2, 52, 4, 52),
+  L(-32, 48, -24, 48), L(-32, 80, -24, 80),
+];
 
 // nombre: [Prefix, Value, pines [x, y, nombre, SpiceOrder], ventanas, descripción, gráficos, atributos extra]
 const SYMBOLS = {
@@ -337,6 +365,20 @@ const SYMBOLS = {
     'D flip-flop: takes D on the rising edge of CLK; asynchronous PRE and CLR (CLR wins)', dflop, ['SpiceModel DFLOP']],
   'Digital/srflop': ['A', '', [[-48, 48, 'S', 1], [-48, 96, 'R', 2], [64, 96, '_Q', 6], [48, 48, 'Q', 7], [-48, 128, 'com', 8]],
     { 0: [-40, 0, 'Left'], 3: [-40, 152, 'Left'] }, 'Set-reset flip-flop (R wins if both are high)', srflop, ['SpiceModel SRFLOP']],
+  'Digital/counter': ['A', '', [[-80, 32, 'CLK', 1], [144, 64, 'Phi2', 6], [144, 0, 'Phi1', 7], [-80, 128, 'com', 8]],
+    { 0: [-64, -80, 'Left'], 3: [-64, 152, 'Left'] },
+    'Behavioral counter: Phi1 is high for round(duty*cycles) of every cycles rising edges of CLK', counter, ['SpiceModel COUNTER']],
+  'Digital/phidet': ['A', '', [[-32, -16, 'a', 1], [-32, 16, 'b', 2], [96, 0, 'Q', 7], [-32, 48, 'com', 8]],
+    { 0: [8, -64, 'Center'], 3: [0, 64, 'Left'] }, 'Phase/frequency detector with current output (Iout, Rout)', phidet, ['SpiceModel PHASEDET']],
+  'SpecialFunctions/sample': ['A', '', [[-80, -32, 'in+', 1], [-80, 0, 'in-', 2], [-80, 32, 'CLK', 3], [-80, 64, 'S/H', 4],
+    [96, 16, 'out', 7], [-80, 96, 'com', 8]], { 0: [-64, -80, 'Left'], 3: [-64, 120, 'Left'] },
+    'Sample and hold: samples on the rising edge of CLK, or tracks while S/H is high (use one of them)', sample, ['SpiceModel SAMPLEHOLD']],
+  'SpecialFunctions/modulate': ['A', '', [[0, 0, 'FM', 1], [0, 64, 'AM', 2], [144, 32, 'Q', 7], [0, 96, 'com', 8]],
+    { 0: [16, -48, 'Left'], 3: [16, 120, 'Left'] }, 'VCO/modulator: V(AM)*sin, frequency space+V(FM)*(mark-space)', modBox(false), ['SpiceModel MODULATOR']],
+  'SpecialFunctions/modulate2': ['A', '', [[0, 0, 'FM', 1], [0, 64, 'AM', 2], [144, 64, 'COS', 6], [144, 0, 'SIN', 7], [0, 96, 'com', 8]],
+    { 0: [16, -48, 'Left'], 3: [16, 120, 'Left'] }, 'VCO/modulator with sine and cosine outputs', modBox(true), ['SpiceModel MODULATOR']],
+  'SpecialFunctions/varistor': ['A', '', [[-32, 48, 'invin', 1], [-32, 80, 'noninvin', 2], [-16, 32, 'out', 7], [-16, 96, 'com', 8]],
+    { 0: [0, 32, 'Left'], 3: [0, 104, 'Left'] }, 'Voltage-controlled varistor: clamps |V(out)| to |V(invin,noninvin)| through rclamp', varistor, ['SpiceModel VARISTOR']],
 };
 
 // Skins que no se generan: son los npn.svg y pnp.svg (BJT con cápsula) del skin Default de

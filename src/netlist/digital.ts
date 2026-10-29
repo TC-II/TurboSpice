@@ -28,9 +28,25 @@ import { t } from '../i18n/i18n.ts';
 // En ngspice: las entradas normalizadas pasan por un adc_bridge a un d_dff de XSPICE (el SR es un
 // d_dff sin reloj que sólo usa set y reset) y un dac_bridge vuelve a 0…1; de ahí en adelante
 // (Td, rampas, Tau, salidas) es igual que en las compuertas.
+//
+// COUNTER (in1=CLK, _Q=Phi2, Q=Phi1, com; medido con LTspice -b, 24.1.10): con n = flancos de
+// subida de CLK contados desde t=0, Phi1 está en alto si (n mod cycles) < round(duty·cycles);
+// duty = 0,5 por omisión y cycles es obligatorio. En ngspice: d_fdiv de XSPICE.
+// PHASEDET (in1=a, in2=b, Q, com): detector de fase/frecuencia tipo 3/4 con salida de
+// corriente: Iout (100 µA) hacia Q mientras a adelanta, −Iout mientras b adelanta, en paralelo
+// con Rout (10 GΩ); Vhigh/Vlow, si se dan, recortan la tensión de Q; el umbral es Ref = 0,5
+// aunque cambien Vhigh/Vlow. En ngspice: dos d_dff
+// (D=1, reloj a y b) que se borran cuando están los dos en alto.
+// SAMPLEHOLD (in1=in+, in2=in−, in3=CLK, in4=S/H, Q=out, com): con CLK toma V(in+,in−) en el
+// flanco de subida; con S/H sigue la entrada en alto y retiene en bajo (no se pueden usar los
+// dos). Arranca en 0. En ngspice: un capacitor que sigue a la entrada mientras dura la ventana.
+// MODULATOR (in1=FM, in2=AM, _Q=COS, Q=SIN, com): V(AM)·sin(2π∫f dt) (y cos en _Q), con f = space + V(FM)·(mark−space);
+// mark es obligatorio (space = mark si falta). En ngspice: el integrador int de XSPICE.
+// VARISTOR (in1, in2, Q=out, com): recorta |V(out)| a |V(in1,in2)| a través de rclamp (1 Ω).
 
 const GATES = new Set(['and', 'or', 'xor', 'buf']);
-const FLOPS = new Set(['dflop', 'srflop', 'schmitt']);
+const FLOPS = new Set(['dflop', 'srflop', 'schmitt', 'counter']);
+const SPECIAL = new Set(['phasedet', 'samplehold', 'modulator', 'varistor']);
 
 /** Parámetros "k=v" o "k v" (LTspice acepta los dos; v puede ser {expr}) de la línea A */
 function params(text: string): Map<string, string> {
@@ -47,15 +63,21 @@ function params(text: string): Map<string, string> {
 export function translateDigital(name: string, nodes: string[], value: string, warnings: string[]): string[] | undefined {
   const m = /^\s*(\w+)\b(.*)$/s.exec(value);
   const model = m?.[1].toLowerCase() ?? '';
-  if ((!GATES.has(model) && !FLOPS.has(model)) || nodes.length !== 8) return undefined;
+  if ((!GATES.has(model) && !FLOPS.has(model) && !SPECIAL.has(model)) || nodes.length !== 8) return undefined;
   const p = params(m![2]);
+  if (model === 'counter' && (!p.has('cycles') || /\b[VI]\s*\(/i.test(p.get('cycles')!))) {
+    warnings.push(t('{name}: COUNTER with a non-constant cycles is not translated', { name }));
+    return undefined;
+  }
   // tripdt/tripdv sólo controlan el paso de LTspice
-  const known = new Set(['vhigh', 'vlow', 'ref', ...(model === 'schmitt' ? ['vt', 'vh'] : []), 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
+  const extra: Record<string, string[]> = { schmitt: ['vt', 'vh'], counter: ['cycles', 'duty'], phasedet: ['iout'], modulator: ['mark', 'space'], varistor: ['rclamp'] };
+  const known = new Set(['vhigh', 'vlow', 'ref', ...(extra[model] ?? []), 'td', 'trise', 'tfall', 'tau', 'rout', 'cout', 'tripdt', 'tripdv']);
   const ignored = [...p.keys()].filter((k) => !known.has(k));
   if (ignored.length) warnings.push(t('{name}: gate parameters not translated: {p1}', { name, p1: ignored.join(', ') }));
   const num = (k: string, d: string) => `{${p.get(k) ?? d}}`;
   const vh = num('vhigh', '1'), vl = num('vlow', '0');
-  const ref = p.has('ref') ? num('ref', '') : `(${vh}+${vl})/2`;
+  // PHASEDET: umbral 0,5 por omisión aunque cambien Vhigh/Vlow (medido)
+  const ref = p.has('ref') ? num('ref', '') : model === 'phasedet' ? '0.5' : `(${vh}+${vl})/2`;
   const [i1, i2, i3, i4, i5, qb, q, com] = nodes;
   const n = `${name}__`;
   const lines: string[] = [];
@@ -67,7 +89,107 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   // una resistencia de 1 TΩ a com (como gmin; ver floating.ts)
   const anchor = (ins: string[]) =>
     [...new Set(ins)].filter((x) => x !== '0' && x !== com).forEach((x, k) => lines.push(`R_${n}i${k + 1} ${x} ${com} 1e12`));
-  if (FLOPS.has(model)) {
+  const adc = () => lines.push(`.model ${n}adcm adc_bridge(in_low=0.5 in_high=0.5 rise_delay=1e-12 fall_delay=1e-12)`);
+  const dac = () => lines.push(`.model ${n}dacm dac_bridge(out_low=0 out_high=1 t_rise=1e-10 t_fall=1e-10)`);
+  if (model === 'phasedet') {
+    lines.push(`B_${n}a ${n}a 0 V=${bit(i1)}`, `B_${n}b ${n}b 0 V=${bit(i2)}`);
+    anchor([i1, i2]);
+    lines.push(
+      `A_${n}adc [${n}a ${n}b] [${n}a_d ${n}b_d] ${n}adcm`,
+      `A_${n}one ${n}one ${n}onem`,
+      `.model ${n}onem d_pullup`,
+      `A_${n}zero ${n}zero ${n}zerom`,
+      `.model ${n}zerom d_pulldown`,
+      `A_${n}up ${n}one ${n}a_d ${n}zero ${n}clr ${n}up NULL ${n}ffm`,
+      `A_${n}dn ${n}one ${n}b_d ${n}zero ${n}clr ${n}dn NULL ${n}ffm`,
+      `A_${n}and [${n}up ${n}dn] ${n}clr ${n}andm`,
+      `.model ${n}andm d_and(rise_delay=1e-11 fall_delay=1e-12)`,
+      `.model ${n}ffm d_dff(clk_delay=1e-12 set_delay=1e-12 reset_delay=1e-12 rise_delay=1e-12 fall_delay=1e-12)`,
+      `A_${n}dac [${n}up ${n}dn] [${n}u ${n}d] ${n}dacm`,
+    );
+    adc();
+    dac();
+    if (q === '0') return lines;
+    const vq = `V(${q},${com})`;
+    // recorte suave (1 mV) contra Vhigh/Vlow, sólo si se dan
+    const up = p.has('vhigh') ? `*min(max((${vh}-${vq})*1e3,0),1)` : '';
+    const dn = p.has('vlow') ? `*min(max((${vq}-${vl})*1e3,0),1)` : '';
+    lines.push(
+      `B_${n}q ${com} ${q} I=${num('iout', '100u')}*(V(${n}u)${up}-V(${n}d)${dn})`,
+      `R_${n}q ${q} ${com} ${num('rout', '1e10')}`,
+    );
+    if (p.has('cout')) lines.push(`C_${n}q ${q} ${com} ${num('cout', '0')}`);
+    return lines;
+  }
+  if (model === 'modulator') {
+    if (!p.has('mark')) {
+      warnings.push(t('{name}: MODULATOR without mark is not translated', { name }));
+      return undefined;
+    }
+    const mark = num('mark', '0'), space = p.has('space') ? num('space', '0') : mark;
+    const fm = i1 === '0' ? '0' : `V(${i1})`, am = i2 === '0' ? '0' : `V(${i2})`;
+    anchor([i1, i2]);
+    lines.push(
+      `B_${n}f ${n}f 0 V=${space}+(${mark}-${space})*${fm}`,
+      `A_${n}int ${n}f ${n}ph ${n}intm`,
+      `.model ${n}intm int(gain=1 out_ic=0 out_lower_limit=-1e30 out_upper_limit=1e30)`,
+    );
+    if (q !== '0') lines.push(`B_${n}q ${q} ${com} V=${am}*sin(2*pi*V(${n}ph))`);
+    // modulate2: COS en _Q
+    if (qb !== '0') lines.push(`B_${n}qb ${qb} ${com} V=${am}*cos(2*pi*V(${n}ph))`);
+    return lines;
+  }
+  if (model === 'varistor') {
+    if (q === '0') return lines;
+    const vc = `abs(V(${i1},${i2}))`, v = `V(${q},${com})`, r = num('rclamp', '1');
+    anchor([i1, i2]);
+    lines.push(`B_${n}q ${q} ${com} I=(${v}>${vc}) ? (${v}-${vc})/${r} : (${v}<-${vc}) ? (${v}+${vc})/${r} : 0`);
+    return lines;
+  }
+  if (model === 'samplehold') {
+    const vin = i2 === '0' ? `V(${i1})` : `V(${i1},${i2})`;
+    anchor([i1, i2, i3, i4]);
+    if (i3 !== '0' && i4 !== '0') warnings.push(t('{name}: SAMPLEHOLD with both CLK and S/H connected', { name }));
+    let track: string;
+    if (i3 !== '0') {
+      // ventana de 1 ns en cada flanco de subida de CLK
+      lines.push(
+        `B_${n}c ${n}c 0 V=${bit(i3)}`,
+        `A_${n}adc [${n}c] [${n}c_d] ${n}adcm`,
+        `A_${n}inv ${n}c_d ${n}cn_d ${n}invm`,
+        `.model ${n}invm d_inverter(rise_delay=1e-9 fall_delay=1e-9)`,
+        `A_${n}and [${n}c_d ${n}cn_d] ${n}w_d ${n}andm`,
+        `.model ${n}andm d_and(rise_delay=1e-12 fall_delay=1e-12)`,
+        `A_${n}dac [${n}w_d] [${n}w] ${n}dacm`,
+      );
+      adc();
+      dac();
+      track = `V(${n}w)`;
+    } else track = i4 === '0' ? '0' : bit(i4);
+    lines.push(
+      `C_${n}h ${n}h 0 1n`,
+      `R_${n}h ${n}h 0 1e12`,
+      `B_${n}h 0 ${n}h I=10*${track}*(${vin}-V(${n}h))`,
+    );
+    if (q !== '0') lines.push(`B_${n}q ${q} ${com} V=V(${n}h)`);
+    return lines;
+  }
+  if (model === 'counter') {
+    // d_fdiv toma enteros: si son números se calculan acá
+    const c = Number(p.get('cycles')), d = Number(p.get('duty') ?? '0.5');
+    const cyc = Number.isFinite(c) ? String(Math.round(c)) : num('cycles', '2');
+    const hi = Number.isFinite(c) && Number.isFinite(d) ? String(Math.round(d * c)) : `{round(${p.get('duty') ?? '0.5'}*${p.get('cycles')})}`;
+    lines.push(
+      `B_${n}c ${n}c 0 V=${bit(i1)}`,
+      `A_${n}adc [${n}c] [${n}c_d] ${n}adcm`,
+      `A_${n}div ${n}c_d ${n}fq_d ${n}divm`,
+      `.model ${n}divm d_fdiv(div_factor=${cyc} high_cycles=${hi} i_count=1 rise_delay=1e-12 fall_delay=1e-12)`,
+      `A_${n}dac [${n}fq_d] [${n}x] ${n}dacm`,
+    );
+    anchor([i1]);
+    adc();
+    dac();
+  } else if (FLOPS.has(model)) {
     const dff = model === 'dflop';
     const set = dff ? i4 : i1, rst = dff ? i5 : i2;
     const on = (x: string) => (x === '0' ? '0' : bit(x));

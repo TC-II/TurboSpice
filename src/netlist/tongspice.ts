@@ -1027,7 +1027,7 @@ function addSteps(steps: Step[], lt: LtNetlist, names: Map<string, string>, out:
  *  - agrega a los encabezados .subckt los parámetros que las instancias pasan y el archivo
  *    no declara (`.subckt OA_Ideal 1 2 3 4 5` → `... params: avol=1Meg gbwp=10Meg`).
  */
-export function patchModelFile(text: string, subcktParams: Map<string, Map<string, string>>): string {
+export function patchModelFile(text: string, subcktParams: Map<string, Map<string, string>>, warnings: string[] = []): string {
   let depth = 0;
   // las fuentes B con líneas "+" de continuación se unen en una sola
   const all: string[] = [];
@@ -1036,7 +1036,7 @@ export function patchModelFile(text: string, subcktParams: Map<string, Map<strin
     if (inB && /^\s*\+/.test(l)) all[all.length - 1] += ` ${l.trim().slice(1).trim()}`;
     else {
       all.push(l);
-      inB = /^\s*B\S*\s/i.test(l);
+      inB = /^\s*[AB]\S*\s/i.test(l);
     }
   }
   const lines = all.map((line) => {
@@ -1044,6 +1044,12 @@ export function patchModelFile(text: string, subcktParams: Map<string, Map<strin
     // auxiliares van justo después, en el mismo .subckt
     const bline = translateBLine(line, []);
     if (bline) return bline;
+    // dispositivos digitales de LTspice (A… nodos×8 MODELO params), como en el esquemático
+    const a = /^\s*(A\S*)\s+((?:\S+\s+){8})(\S.*)$/i.exec(line);
+    if (a) {
+      const gate = translateDigital(a[1], a[2].trim().split(/\s+/), a[3], warnings);
+      if (gate) return gate.join('\n');
+    }
     if (/^\s*\.subckt\b/i.test(line)) depth++;
     else if (/^\s*\.ends\b/i.test(line)) depth = Math.max(0, depth - 1);
     else if (depth > 0 && /^\s*\.end\b/i.test(line)) {
@@ -1087,7 +1093,7 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   const files: Record<string, string> = {};
   // (los informativos de LTspice en los .model, como Iave o Vpk, hacen fallar a ngspice)
   // Laplace= en E/G/B de los archivos y de los .subckt escritos como directiva (ver laplace.ts)
-  for (const rel of net.includes) files[rel] = replaceLaplaceLines(stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams)), warnings);
+  for (const rel of net.includes) files[rel] = replaceLaplaceLines(stripLtspiceInfo(patchModelFile(readFile(rel), net.subcktParams, warnings)), warnings);
   // ako: se resuelve con los modelos de todos los archivos y de la netlist
   const models = collectModels(net.text);
   for (const tt of Object.values(files)) collectModels(tt, models);

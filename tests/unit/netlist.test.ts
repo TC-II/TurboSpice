@@ -228,6 +228,16 @@ SYMATTR Value V=delay(V(in),V(td))
     expect(t).toMatch(/\.ends a$/);
   });
 
+  it('archivo de modelos: líneas A de LTspice (DFLOP, AND) adentro del .subckt (#133)', () => {
+    const lib = '.subckt cp a b o\nA2 Vcc 0 a 0 Clr 0 Dn 0 DFLOP Vhigh {Vcc}\n+ Trise 1n\nA4 Up 0 0 0 Dn 0 Clr 0 AND\n.ends cp';
+    const t = patchModelFile(lib, new Map());
+    expect(t).not.toMatch(/^A2 .*DFLOP/m);
+    expect(t).not.toMatch(/^A4 .* AND$/m);
+    expect(t).not.toMatch(/^\+/m);
+    expect(t).toMatch(/d_dff/);
+    expect(t).toMatch(/\.ends cp$/);
+  });
+
   it('fuente B: rand/random/white → hash pseudoaleatorio de floor(x)', () => {
     const t = bsrc('V=rand(time*10)>.5+white(time)');
     expect(t).not.toMatch(/\b(rand|white|random)\(/);

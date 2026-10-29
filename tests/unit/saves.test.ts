@@ -6,7 +6,7 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { addSubckt } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
 import { buildSimulation } from '../../src/sim/schematicSim.ts';
-import { savableSignals, saveRefs, saveSelection, setSaveSelection, textRefs } from '../../src/sim/saves.ts';
+import { elementRefs, toggleRefs, savableSignals, saveRefs, saveSelection, setSaveSelection, textRefs } from '../../src/sim/saves.ts';
 import { visibleText } from '../../src/schematic/geometry.ts';
 
 const lib = new Library(buildBundle());
@@ -93,5 +93,13 @@ describe('señales guardadas (#314)', () => {
     const inner = s.filter((x) => x.group === 'X_U1').map((x) => x.ref);
     expect(inner).toEqual(expect.arrayContaining(['I(X_U1.R1)', 'I(X_U1.R2)']));
     expect(inner.some((r) => /^V\(x_u1\.(in|out)\)$/i.test(r))).toBe(false);
+  });
+
+  it('marcar desde el esquemático agrega o saca las referencias', () => {
+    expect(elementRefs('Q1', 'Q')).toEqual(['Ic(Q1)', 'Ib(Q1)', 'Ie(Q1)']);
+    expect(elementRefs('U1', 'X')).toEqual([]);
+    expect(toggleRefs(['V(a)'], ['I(R1)'])).toEqual(['V(a)', 'I(R1)']);
+    expect(toggleRefs(['V(a)', 'I(R1)'], ['i(r1)'])).toEqual(['V(a)']);
+    expect(toggleRefs(null, ['V(a)'])).toBeNull();
   });
 });

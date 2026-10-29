@@ -122,6 +122,23 @@ export interface SavableSignal {
 /** Terminales con corriente propia de cada tipo de transistor */
 const TERMINALS: Record<string, string[]> = { Q: ['Ic', 'Ib', 'Ie'], M: ['Id', 'Ig', 'Is'], J: ['Id', 'Ig', 'Is'], Z: ['Id', 'Ig', 'Is'] };
 
+/** Referencias de corriente de un componente para el .save ("I(R1)", o "Ic(Q1)" "Ib(Q1)" "Ie(Q1)") */
+export function elementRefs(name: string, prefix: string): string[] {
+  const p = prefix.toUpperCase();
+  if (!name || ['X', 'A', 'K', 'U'].includes(p)) return [];
+  return (TERMINALS[p] ?? ['I']).map((tt) => `${tt}(${name})`);
+}
+
+/**
+ * Agrega o saca unas referencias de lo elegido (sin distinguir mayúsculas): si ya estaban todas,
+ * las saca. Con todo guardado (null) no cambia.
+ */
+export function toggleRefs(sel: string[] | null, refs: string[]): string[] | null {
+  if (!sel) return sel;
+  const has = (r: string) => sel.some((s) => s.toLowerCase() === r.toLowerCase());
+  return refs.every(has) ? sel.filter((s) => !refs.some((r) => r.toLowerCase() === s.toLowerCase())) : [...sel, ...refs.filter((r) => !has(r))];
+}
+
 function elementSignals(elements: Element[], name: (e: Element) => string | undefined, net: (n: string) => string, group: string): SavableSignal[] {
   const out: SavableSignal[] = [];
   const nets = new Set<string>();
@@ -131,8 +148,7 @@ function elementSignals(elements: Element[], name: (e: Element) => string | unde
     const p = e.prefix.toUpperCase();
     const nm = name(e);
     // los subcircuitos (X) y los dispositivos A digitales no tienen corriente propia
-    if (!nm || p === 'X' || p === 'A' || p === 'K' || p === 'U') continue;
-    for (const tt of TERMINALS[p] ?? ['I']) out.push({ ref: `${tt}(${nm})`, kind: 'current', group });
+    for (const ref of elementRefs(nm ?? '', p)) out.push({ ref, kind: 'current', group });
   }
   return out;
 }

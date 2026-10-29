@@ -30,7 +30,7 @@ import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, load
 import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { SavesDialog } from './schematic/SavesDialog.tsx';
-import { savableSignals, saveSelection, setSaveSelection, type SavableSignal } from './sim/saves.ts';
+import { elementRefs, savableSignals, saveSelection, setSaveSelection, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
@@ -100,7 +100,7 @@ import { ModelEditor } from './project/ModelEditor.tsx';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
-import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
+import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { TRACE_WIDTHS, setTraceWidth, useTraceWidth } from './waveform/lineWidth.ts';
@@ -1751,6 +1751,32 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   // menú del botón derecho de un comentario (tamaño, alineación)
   const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
   const closeTextMenu = useCallback(() => setTextMenu(null), []);
+  /**
+   * Ítem del botón derecho para guardar o dejar de guardar unas señales, sólo si el testbench
+   * guarda lo elegido (#314)
+   */
+  const saveItem = (refs: string[]): ContextItem | null => {
+    const sel = curSub ? null : saveSelection(doc.texts);
+    if (!sel || !refs.length) return null;
+    const next = toggleRefs(sel, refs)!;
+    const saved = next.length < sel.length;
+    const what = refs.join(' ');
+    return {
+      label: saved ? t('Don\'t save {what}', { what }) : t('Save {what}', { what }),
+      disabled: saved && !next.length,
+      onClick: () => {
+        commit(setSaveSelection(doc, next));
+        setMessage(t('Saved signals changed: simulate again with Alt+R'));
+      },
+    };
+  };
+  const netMenu = (net: string, at: { x: number; y: number }): boolean => {
+    if (net === '0') return false;
+    const item = saveItem([`V(${net})`]);
+    if (!item) return false;
+    setCtxMenu({ at, items: [item] });
+    return true;
+  };
   const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
     const s = doc.symbols[index];
     const inst = s?.attrs.get('InstName');
@@ -1767,8 +1793,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const peers = inBench ? groupPeersWith(p0, sims.active, inst, s.type) : [];
     const me = inBench ? variantOf(p0).sims.find((x) => x.id === sims.active) : undefined;
     const canPropagate = !!me?.group && peers.length > 0;
-    // fuera de los casos rápidos, el menú sólo aparece si hay a quién propagarle
-    if (!quick && !canPropagate) return false;
+    // con sólo las señales elegidas (#314): guardar (o no) sus corrientes
+    const save = saveItem(elementRefs(inst, prefix));
+    // fuera de los casos rápidos, el menú sólo aparece si hay a quién propagarle (o qué guardar)
+    if (!quick && !canPropagate) {
+      if (!save) return false;
+      setCtxMenu({ at, items: [save] });
+      return true;
+    }
     const group = p0.groups.find((g) => g.id === me?.group)?.name ?? '';
     setCtxMenu({
       at,
@@ -1796,6 +1828,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
             setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value: v, n: peers.length, group }));
           },
         },
+        ...(save ? [save] : []),
       ],
     });
     return true;
@@ -2076,6 +2109,19 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
 
   // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
   // traza); sólo con la punta de prueba
+  // Con la punta de prueba y sólo las señales elegidas (#314): lo que no se guardó, atenuado
+  const unsaved = useMemo(() => {
+    if (tool.kind !== 'probe' || !sim || !plot || path.length || !saveSelection(sim.built.lt.texts)) return undefined;
+    const names = new Set(plot.vectors.map((v) => v.name.toLowerCase()));
+    const nets = new Set(conn.nets.map((n) => n.name).filter((n) => n && n !== '0' && !names.has(netVector(n))).map((n) => n.toLowerCase()));
+    const symbols = new Set(
+      sim.built.lt.elements.filter((e) => {
+        const v = elementVector(sim.built, e.name);
+        return v && !names.has(v) && ![...names].some((n) => n.startsWith(`${v.replace(/\[.*$/, '')}[`));
+      }).map((e) => e.sym),
+    );
+    return { nets, symbols };
+  }, [tool.kind, sim, plot, path.length, conn]);
   const netColors = useMemo(() => {
     const m = new Map<string, string>();
     if (tool.kind !== 'probe') return m;
@@ -3275,8 +3321,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       ].map((p) => {
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
-        const fix = sim.built.tooBig?.find((f) => f.text === p.text)?.fix;
-        return { ...p, sym: el?.sym, fix };
+        const big = sim.built.tooBig?.find((f) => f.text === p.text);
+        // demasiado grande con todo guardado: elegir qué guardar (#314)
+        return { ...p, sym: el?.sym, fix: big?.fix, big: !!big && !saveSelection(sim.built.lt.texts) };
       })
     : [];
   const goTo = (sym: number) => {
@@ -3781,6 +3828,8 @@ ${ltNetlistText(sim.built.lt)}
           <SchematicEditor
             handle={editor}
             onSymbolMenu={symbolMenu}
+            onNetMenu={netMenu}
+            unsaved={unsaved}
             onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
             onDescend={descend}
             docKey={docKey}
@@ -4032,6 +4081,11 @@ ${ltNetlistText(sim.built.lt)}
                         {p.sym !== undefined && (
                           <button className="link" onClick={() => goTo(p.sym!)}>
                             {t('show on the schematic')}
+                          </button>
+                        )}
+                        {p.big && (
+                          <button className="link" onClick={openSaves}>
+                            {t('choose saved signals')}
                           </button>
                         )}
                         {p.fix && (

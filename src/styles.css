@@ -1508,3 +1508,5 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-group { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px 12px; }
 .saves-group legend { font-weight: 600; padding: 0 4px; }
 .saves-group legend button.link { font-weight: 400; }
+/* con la punta de prueba, lo que no se guardó en la simulación (#314) */
+.schematic line.unsaved, .schematic .sym.unsaved { opacity: 0.35; }

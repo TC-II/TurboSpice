@@ -118,6 +118,8 @@ interface Props {
   onEdit(ref: ItemRef): void;
   /** botón derecho en un componente: true si muestra un menú propio (si no, se edita) */
   onSymbolMenu?(symbol: number, at: { x: number; y: number }): boolean;
+  /** botón derecho en un cable o una etiqueta: menú de la red (guardarla, #314); true si se mostró */
+  onNetMenu?(net: string, at: { x: number; y: number }): boolean;
   /** botón derecho en un comentario: true si muestra su menú (tamaño, alineación…) */
   onTextMenu?(text: number, at: { x: number; y: number }): boolean;
   /** se soltó un subcircuito arrastrado desde el panel del proyecto (#199): el símbolo a colocar, o null si no se puede */
@@ -132,6 +134,8 @@ interface Props {
   highlightNet?: string;
   /** color de los cables de cada red (nombre en minúsculas) con una traza en el gráfico */
   netColors?: Map<string, string>;
+  /** lo que no se guardó en la simulación (#314), atenuado */
+  unsaved?: { nets: Set<string>; symbols: Set<number> };
   /** etiquetas temporales con los nombres de las redes */
   netNames?: NetName[];
   /** click en una etiqueta temporal de una red sin nombre */
@@ -716,6 +720,8 @@ export function SchematicEditor(props: Props) {
       const hit = hitTest(doc, p, lib, tol, showSimCommand);
       // un componente con menú propio (#180: propagar al grupo): lo muestra quien lo pide
       if (hit?.kind === 'symbol' && screen && props.onSymbolMenu?.(hit.index, screen)) return;
+      const net = hit?.kind === 'wire' ? conn.netAt({ x: doc.wires[hit.index].x1, y: doc.wires[hit.index].y1 })?.name : hit?.kind === 'flag' ? conn.netAt(doc.flags[hit.index])?.name : undefined;
+      if (net && screen && props.onNetMenu?.(net, screen)) return;
       if (hit?.kind === 'text' && screen && inlineEditable(doc.texts[hit.index]) && props.onTextMenu?.(hit.index, screen)) {
         setSelection([hit]);
         return;
@@ -1447,6 +1453,7 @@ export function SchematicEditor(props: Props) {
         hoverFlag={hoverFlag}
         hoverWire={previewing ? undefined : hoverWire}
         netColors={netColors}
+        unsaved={props.unsaved}
         showLoose={showLoose}
         showSimCommand={showSimCommand}
         diff={previewing ? undefined : diff}

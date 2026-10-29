@@ -84,7 +84,9 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark, unsaved }: {
+  /** no se guardó en la simulación (#314): atenuado */
+  unsaved?: boolean;
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
@@ -99,7 +101,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
   mark?: Mark | 'removed';
 }) {
   const skin = lib.skin(inst.type);
-  const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}${mark ? ` diff-${mark}` : ''}`;
+  const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}${mark ? ` diff-${mark}` : ''}${unsaved ? ' unsaved' : ''}`;
   if (!def) {
     return (
       <g className={cls}>
@@ -242,6 +244,8 @@ export interface CanvasProps {
   hoverWire?: number;
   /** color de los cables de las redes con traza (nombre en minúsculas) */
   netColors?: Map<string, string>;
+  /** lo que no se guardó en la simulación (#314): redes (minúsculas) y componentes, atenuados */
+  unsaved?: { nets: Set<string>; symbols: Set<number> };
   /** marcas de pines sueltos (Ctrl+U) */
   showLoose?: boolean;
   /** Ver › Mostrar el comando de simulación */
@@ -250,7 +254,7 @@ export interface CanvasProps {
   diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -275,6 +279,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
     if (c) n.wires.forEach((wi) => wireColor.set(wi, c));
   }
 
+  const dimWires = new Set(unsaved ? conn.nets.filter((n) => unsaved.nets.has(n.name.toLowerCase())).flatMap((n) => n.wires) : []);
   const hl = highlightNet ? conn.nets.find((n) => n.name === highlightNet) : undefined;
   // cables de bus (más de un bit): más gruesos, como en LTspice
   const busWires = new Set(conn.nets.filter((n) => n.bits.length > 1).flatMap((n) => n.wires));
@@ -292,7 +297,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             y1={w.y1}
             x2={w.x2}
             y2={w.y2}
-            className={[busWires.has(i) && 'bus', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
+            className={[busWires.has(i) && 'bus', dimWires.has(i) && 'unsaved', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
             style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined}
           />
         ))}
@@ -317,7 +322,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
+          <SymbolView key={i} unsaved={unsaved?.symbols.has(i)} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
         ))}
       </g>
       {diff && (diff.removed.symbols.length > 0 || diff.removed.wires.length > 0) && (

@@ -5,6 +5,7 @@ import { deviceVector, elementVector, netVector, type BuiltSimulation } from './
 import { blockInstances, hierDevice, scopeElement, scopeElementOf, scopeNet, type InstScope } from './context.ts';
 import { deviceParams, deviceTraceName, parseDeviceVector } from './deviceParams.ts';
 import { busRange, joinBits } from '../waveform/digital.ts';
+import { mergeEvents, sampleEvents } from '../waveform/series.ts';
 
 /** Parámetro de dispositivo de ngspice para Ic, Ib, Id… */
 const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id', ig: 'ig', is: 'is' };
@@ -33,6 +34,9 @@ export function traceResolver(sim: BuiltSimulation | null, plot: SimPlot, runs: 
 }
 
 function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
+  const time = plot.vectors.find((v) => v.name === 'time')?.real;
+  // un nodo digital pedido como tensión (V(red)): recién ahí se lleva a la grilla del transitorio (#314)
+  const analog = (v: SimVector | undefined): Wave | null => (v?.x ? (time ? { re: sampleEvents(v.x, v.real, time) } : null) : wave(v));
   const node = (name: string): Wave | null => {
     if (name === '0') {
       const len = plot.vectors[0]?.real.length ?? 0;
@@ -40,7 +44,7 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     }
     // V(onoise)/V(inoise) de LTspice son los espectros de ruido de ngspice
     // (una red entre bloques Verilog que se simuló digital: su valor lógico, 0 o 1)
-    return wave(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`) ?? findDigital(plot, netVector(name)));
+    return analog(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`) ?? findDigital(plot, netVector(name)));
   };
   const element = (name: string) => sim?.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
   /** Nombre de ngspice de un dispositivo escrito en una traza ("Q1", "x_u1.q1") */
@@ -56,11 +60,16 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     if (f === 'dig') {
       const alias = (n: string) => sim?.digitalAliases?.get(n.toLowerCase());
       const one = (n: string) => findDigital(plot, netVector(n)) ?? findDigital(plot, n) ?? (alias(n) ? findDigital(plot, alias(n)!) : undefined);
+      // sus cambios, con sus instantes (x): no se llevan a la grilla del transitorio (#314)
+      const ev = (v: SimVector | undefined): Wave | null => (v ? (v.x ? { re: v.real, x: v.x } : wave(v)) : null);
       const bus = busRange(args[0]);
-      if (!bus) return wave(one(args[0]));
+      if (!bus) return ev(one(args[0]));
       // (o los bits de un bus de nivel superior que se simuló digital: d[2] → d__2__)
       const bits = bus.bits.map((b) => one(`${bus.base}_${b}_d`) ?? one(`${bus.base}[${b}]`));
-      return bits.every((b) => b) ? { re: joinBits(bits.map((b) => b!.real)) } : null;
+      if (!bits.every((b) => b)) return null;
+      if (bits.some((b) => !b!.x)) return { re: joinBits(bits.map((b) => b!.real)) };
+      const m = mergeEvents(bits.map((b) => ({ x: b!.x!, y: b!.real })));
+      return { re: joinBits(m.ys), x: m.x };
     }
     if (f === 'v') {
       const a = node(args[0]);
@@ -158,6 +167,16 @@ export function verilogDigitalNode(sim: BuiltSimulation, net: string): string | 
     if (node && inst) return `${inst.toLowerCase()}.${node.toLowerCase()}`;
   }
   return null;
+}
+
+/**
+ * Nodos digitales con nombre de un bloque Verilog (`q_3_d`, `d_0_d`: pines y cables con nombre;
+ * los internos sin nombre son `n<bit>`), o null si `name` no es un .subckt generado
+ */
+export function verilogNodes(sim: BuiltSimulation, name: string): string[] | null {
+  const sub = subcktOf(sim, name);
+  if (!sub) return null;
+  return [...new Set((sub.body.match(/[\w$]+_d\b/g) ?? []).map((n) => n.toLowerCase()))].sort();
 }
 
 /** Pines y cuerpo de un .subckt generado de un Verilog, buscado en los archivos de la simulación */

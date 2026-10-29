@@ -4,7 +4,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { analyze, defaultFs, spectrum, WINDOWS } from './dft.ts';
 import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
-import { isLogScale, resample, scaleOf, si } from './series.ts';
+import { isLogScale, resample, sampleEvents, scaleOf, si } from './series.ts';
 import { PALETTE, addTraceTo, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 import { digitalWidth, isDigitalExpr } from './digital.ts';
@@ -22,6 +22,8 @@ export interface Curve {
   /** eje: y (izquierdo), i (corrientes, derecho), ph (fase, derecho) */
   axis: 'y' | 'i' | 'ph';
   y: Float64Array;
+  /** nodo digital en un panel digital: los instantes de sus cambios (`y`, el valor desde cada uno), en vez del eje del panel (#314) */
+  x?: Float64Array;
   hidden: boolean;
   /** nodo digital (#209): se dibuja en escalones */
   digital?: boolean;
@@ -30,6 +32,9 @@ export interface Curve {
   /** corrida a la que pertenece ("R=2k", "#2") si hay varias */
   runLabel?: string;
 }
+
+/** Valores de una curva en los puntos `xs` del eje (una digital trae sólo sus cambios) */
+export const curveOn = (c: Pick<Curve, 'x' | 'y'>, xs: Float64Array): Float64Array => (c.x ? sampleEvents(c.x, c.y, xs) : c.y);
 
 export interface PaneData {
   x: Float64Array;
@@ -159,7 +164,10 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
         if (ri === 0) errors.set(ti, (e as Error).message);
         return;
       }
-      const toX = (y: Float64Array) => (r === ctx.plot ? y : resample(rs.real, y, scale.real));
+      // un nodo digital (sus cambios): así en un panel digital; en uno analógico, en escalones sobre el eje
+      const ex = w.x && pane.digital ? w.x : undefined;
+      if (w.x && !ex) w = { re: sampleEvents(w.x, w.re, rs.real) };
+      const toX = (y: Float64Array) => (ex || r === ctx.plot ? y : resample(rs.real, y, scale.real));
       const runLabel = all.length > 1 ? ` · ${ctx.labels.get(r.name) ?? r.name}` : '';
       const color = perRunColor ? PALETTE[ri % PALETTE.length] : shade(base, ri, all.length);
       const parts: { y: Float64Array; axis: Curve['axis']; dash: boolean; suffix: string }[] = [];
@@ -186,7 +194,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
             curves.push({ label: `${tt.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!tt.hidden, runLabel: `#${si + 1}`, ...digital });
           });
         } else {
-          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}), ...digital });
+          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, ...(ex ? { x: ex } : {}), hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}), ...digital });
         }
       }
     });

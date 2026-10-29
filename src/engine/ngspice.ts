@@ -16,6 +16,11 @@ export interface SimVector {
   real: Float64Array;
   /** sólo en vectores complejos (AC, noise, S-param, pz) */
   imag?: Float64Array;
+  /**
+   * Nodos digitales: los instantes de cada cambio (`real` tiene el valor desde ese instante). No
+   * se llevan a la grilla del transitorio: eso lo hace V(red) cuando se pide (#314)
+   */
+  x?: Float64Array;
 }
 
 /**
@@ -54,6 +59,11 @@ export interface SimulateOptions {
    * el estado inicial), que es lo que se anota en el esquemático.
    */
   biasCommand?: string;
+  /**
+   * Nodos digitales (de eventos) que se leen, en minúsculas; sin esto, todos. Cada uno se copia con
+   * un valor por punto del transitorio, así que pesan como una tensión (#314)
+   */
+  digital?: string[];
 }
 
 export interface NgspiceOptions {
@@ -235,6 +245,7 @@ export class Ngspice {
     this.log = [];
     this.errors = [];
     this.aborted = false;
+    this.digitalKeep = opts.digital ? new Set(opts.digital) : null;
 
     // Liberar resultados y circuitos anteriores
     this.command('destroy all');
@@ -318,11 +329,13 @@ export class Ngspice {
   }
 
   /**
-   * Nodos de eventos digitales de XSPICE (ngGet_Evt_NodeInfo) muestreados en los tiempos del
-   * transitorio: cada punto toma el último valor con tiempo ≤ t. Los eventos caen en puntos del
-   * transitorio (XSPICE pone un breakpoint en cada uno), así que los flancos quedan exactos.
+   * Nodos de eventos digitales de XSPICE (ngGet_Evt_NodeInfo): sólo sus cambios, con el instante
+   * de cada uno (`x`); no se muestrean en los tiempos del transitorio (pesarían como una tensión,
+   * #314). Los eventos caen en puntos del transitorio (XSPICE pone un breakpoint en cada uno).
    * Los nodos no digitales (real, int de xtraevt) no se leen.
    */
+  private digitalKeep: Set<string> | null = null;
+
   private readEventNodes(plot: SimPlot): SimVector[] {
     const m = this.m;
     const time = plot.vectors.find((v) => v.name === 'time')?.real;
@@ -333,6 +346,9 @@ export class Ngspice {
     const names = this.readStringArray(m._ngSpice_AllEvtNodes());
     this.muted = false;
     for (const name of names) {
+      if (this.digitalKeep && !this.digitalKeep.has(name.toLowerCase())) continue;
+      // los nodos internos sin nombre de un bloque Verilog (x1.n12, ver hdl/synth.ts): nunca
+      else if (!this.digitalKeep && /\.n\d+$/i.test(name)) continue;
       const p = m.stringToNewUTF8(name);
       const info = m._ngGet_Evt_NodeInfo(p);
       m._free(p);
@@ -354,12 +370,16 @@ export class Ngspice {
         levels[i] = v[1] === 'z' ? NaN : v[0] === 'U' ? 0.5 : v[0] === '1' ? 1 : 0;
       }
       if (!digital) continue;
-      const real = new Float64Array(time.length);
-      for (let k = 0, j = 0; k < time.length; k++) {
-        while (j + 1 < n && steps[j + 1] <= time[k]) j++;
-        real[k] = levels[j];
+      // sólo los cambios (#314): un evento que repite el valor anterior no aporta
+      const keep: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const prev = keep.length ? levels[keep[keep.length - 1]] : undefined;
+        if (prev === undefined || !(prev === levels[i] || (Number.isNaN(prev) && Number.isNaN(levels[i])))) keep.push(i);
+        // el último valor en un mismo instante gana (el .op y luego el primer paso)
+        else if (steps[i] === steps[keep[keep.length - 1]]) keep[keep.length - 1] = i;
       }
-      out.push({ name, type: DIGITAL_TYPE, real });
+      const x = Float64Array.from(keep, (i) => Math.max(steps[i], time[0]));
+      out.push({ name, type: DIGITAL_TYPE, real: Float64Array.from(keep, (i) => levels[i]), x });
     }
     return out;
   }

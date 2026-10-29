@@ -57,11 +57,12 @@ export function SavesDialog({ initial, signals, onApply, onClose }: {
         </div>
         {mode === 'some' && (
           <>
-            <p className="hint">{t('What the plots, the .meas and the Studio use is always saved too. Digital nodes (also inside Verilog blocks) are always saved.')}</p>
+            <p className="hint">{t('What the plots, the .meas and the Studio use is always saved too. The unnamed internal nodes of Verilog blocks are never saved.')}</p>
             <div className="saves-tools">
               <input type="search" placeholder={t('Search')} aria-label={t('Search')} value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
               {shortcut(t('Top-level voltages'), all.filter((s) => !s.group && s.kind === 'voltage'), true)}
               {shortcut(t('All currents'), all.filter((s) => s.kind === 'current'), true)}
+              {shortcut(t('Digital signals between blocks'), all.filter((s) => !s.group && s.kind === 'digital'), true)}
               {shortcut(t('Nothing from subcircuits'), all.filter((s) => s.group), false)}
               {shortcut(t('None'), all, false)}
               <span className="hint">{t('{n} selected', { n: refs.length })}</span>

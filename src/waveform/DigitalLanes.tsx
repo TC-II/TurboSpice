@@ -16,7 +16,8 @@ const LABEL = 72;
 const RIGHT = 25;
 
 /** Tramos en que el valor no cambia: [desde, hasta, valor] (0,5 es X y NaN es Z, ver digital.ts) */
-function runs(x: Float64Array, y: Float64Array, from: number, to: number): [number, number, number][] {
+/** `end`: hasta dónde vale el último valor (el fin del eje; un nodo digital trae sólo sus cambios) */
+function runs(x: Float64Array, y: Float64Array, from: number, to: number, end = x[x.length - 1]): [number, number, number][] {
   const out: [number, number, number][] = [];
   const n = Math.min(x.length, y.length);
   if (!n) return out;
@@ -37,7 +38,7 @@ function runs(x: Float64Array, y: Float64Array, from: number, to: number): [numb
     start = x[k];
     v = w;
   }
-  out.push([start, Math.min(to, x[n - 1]), v]);
+  out.push([start, Math.min(to, Math.max(end, x[n - 1])), v]);
   return out;
 }
 
@@ -177,7 +178,7 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
           const bot = top + lane - 8;
           const mid = (top + bot) / 2;
           const bits = c.bits ?? 1;
-          const segs = runs(x, c.y, x0, x1);
+          const segs = runs(c.x ?? x, c.y, x0, x1, x[x.length - 1]);
           return (
             <g key={`${c.trace}-${c.run}`} className="dl-lane">
               {/* el nombre, alineado a la derecha del margen (si no entra, se ve el final) */}

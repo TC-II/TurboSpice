@@ -155,7 +155,8 @@ R1 q 0 1k
       const d = p.vectors.find((v) => v.name === 'x1.dq');
       if (!d || d.type !== 2000) return 'falta el nodo digital x1.dq';
       // Dig(x1.dq) vale 1 al principio y cambia en cada flanco de subida del reloj (cada 100 ns)
-      const at = (x) => d.real[t.findIndex((tt) => tt >= x)];
+      // (sólo sus cambios, con sus instantes en d.x)
+      const at = (x) => d.real[d.x.findLastIndex((tt) => tt <= x)];
       if (at(0) !== 1 || at(50e-9) !== 0 || at(150e-9) !== 1) return `Dig(x1.dq) = ${at(0)}, ${at(50e-9)}, ${at(150e-9)}`;
       // la salida analógica (puente automático con vcc=5; el dac_bridge tiene 20 Ω de salida)
       return near(vec(p, 'q').real[t.findIndex((tt) => tt >= 50e-9)], (5 * 1e3) / 1020, 1e-6, 'V(q)');

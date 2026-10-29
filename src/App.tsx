@@ -1324,7 +1324,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
       const { result, ms } = blocking.length
         ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
-        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd });
+        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd, digital: built.digitalSaves });
       // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
       const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
       if (pzErrs.length) result.errors.unshift(...pzErrs);

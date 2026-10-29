@@ -125,6 +125,25 @@ export function siFixed(x: number, digits = 4): string {
 }
 
 /** Interpola linealmente (xs, ys) en los puntos xd (xs creciente). Fuera de rango: NaN */
+/**
+ * Valores de un nodo digital (cambios en los instantes `xs`) en los puntos `xd`: el último
+ * cambio con instante ≤ x (escalones, sin interpolar)
+ */
+export function sampleEvents(xs: Float64Array, ys: Float64Array, xd: Float64Array): Float64Array {
+  const out = new Float64Array(xd.length);
+  for (let i = 0, j = 0; i < xd.length; i++) {
+    while (j + 1 < xs.length && xs[j + 1] <= xd[i]) j++;
+    out[i] = xs.length ? ys[j] : NaN;
+  }
+  return out;
+}
+
+/** Varios nodos digitales en los mismos instantes (la unión de sus cambios), para armar un bus */
+export function mergeEvents(waves: { x: Float64Array; y: Float64Array }[]): { x: Float64Array; ys: Float64Array[] } {
+  const x = Float64Array.from(new Set(waves.flatMap((w) => [...w.x]))).sort();
+  return { x, ys: waves.map((w) => sampleEvents(w.x, w.y, x)) };
+}
+
 export function resample(xs: Float64Array, ys: Float64Array, xd: Float64Array): Float64Array {
   const out = new Float64Array(xd.length);
   let j = 0;

@@ -7,6 +7,11 @@ import { addSubckt } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
 import { buildSimulation } from '../../src/sim/schematicSim.ts';
 import { elementRefs, toggleRefs, savableSignals, saveRefs, saveSelection, setSaveSelection, textRefs } from '../../src/sim/saves.ts';
+import { digitalNodes } from '../../src/sim/saves.ts';
+import { mergeEvents, sampleEvents } from '../../src/waveform/series.ts';
+import { traceResolver } from '../../src/sim/traces.ts';
+import { DIGITAL_TYPE } from '../../src/engine/ngspice.ts';
+import { evalTrace } from '../../src/waveform/expr.ts';
 import { visibleText } from '../../src/schematic/geometry.ts';
 
 const lib = new Library(buildBundle());
@@ -101,5 +106,33 @@ describe('señales guardadas (#314)', () => {
     expect(toggleRefs(['V(a)'], ['I(R1)'])).toEqual(['V(a)', 'I(R1)']);
     expect(toggleRefs(['V(a)', 'I(R1)'], ['i(r1)'])).toEqual(['V(a)']);
     expect(toggleRefs(null, ['V(a)'])).toBeNull();
+  });
+
+  it('los nodos digitales elegidos van en un comentario aparte y el motor lee sólo esos', () => {
+    const doc = setSaveSelection(parseAsc(TB()), ['V(a)', 'Dig(x1.q_3_d)']);
+    const c = doc.texts.find((x) => x.kind === 'comment' && x.text.startsWith('.save'))!;
+    expect(c.text).toBe('.save Dig(x1.q_3_d)');
+    expect(visibleText(c, false)).toBeNull();
+    expect(saveSelection(doc.texts)).toEqual(['V(a)', 'Dig(x1.q_3_d)']);
+    // sólo digitales: sin directiva .save analógica
+    const only = setSaveSelection(parseAsc(TB()), ['Dig(q)']);
+    expect(only.texts.some((x) => x.kind === 'directive' && x.text.startsWith('.save'))).toBe(false);
+    expect(saveSelection(only.texts)).toEqual(['Dig(q)']);
+    expect(digitalNodes('Dig(x1.d[1:0])')).toEqual(expect.arrayContaining(['x1.d_0_d', 'x1.d_1_d']));
+  });
+
+  it('un nodo digital queda en sus cambios y V() lo lleva a la grilla', () => {
+    const time = Float64Array.of(0, 1, 2, 3, 4);
+    const plot = { name: 'tran1', vectors: [
+      { name: 'time', type: 1, real: time },
+      { name: 'q', type: DIGITAL_TYPE, real: Float64Array.of(0, 1), x: Float64Array.of(0, 2.5) },
+    ] };
+    const r = traceResolver(null, plot);
+    const dig = evalTrace('Dig(q)', { resolve: r, scale: time, scaleName: 'time' });
+    expect([...dig.x!]).toEqual([0, 2.5]);
+    expect([...evalTrace('V(q)', { resolve: r, scale: time, scaleName: 'time' }).re]).toEqual([0, 0, 0, 1, 1]);
+    expect([...evalTrace('Dig(q)*2', { resolve: r, scale: time, scaleName: 'time' }).re]).toEqual([0, 0, 0, 2, 2]);
+    expect([...sampleEvents(Float64Array.of(0, 2), Float64Array.of(1, 0), Float64Array.of(1, 2, 3))]).toEqual([1, 0, 0]);
+    expect([...mergeEvents([{ x: Float64Array.of(0, 2), y: Float64Array.of(0, 1) }, { x: Float64Array.of(0, 1), y: Float64Array.of(1, 0) }]).x]).toEqual([0, 1, 2]);
   });
 });

@@ -79,6 +79,12 @@ for (const c of CASES) {
     const at = (node, tt) => {
       const v = p.vectors.find((x) => x.name === node);
       if (!v) throw new Error(`no hay ${node}`);
+      // un nodo digital trae sólo sus cambios (x): el último con instante ≤ t
+      if (v.x) {
+        let j = 0;
+        while (j + 1 < v.x.length && v.x[j + 1] <= tt) j++;
+        return v.real[j];
+      }
       const k = time.findIndex((x) => x >= tt);
       return v.real[k];
     };

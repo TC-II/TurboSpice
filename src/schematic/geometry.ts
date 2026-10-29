@@ -22,6 +22,8 @@ const MANAGED_LINE = /^\s*;?\s*\.(param|step|meas|measure|save)\b/i;
 const STUDY_FUNC = /^\s*;?\s*\.func\s+binary\s*\(/i;
 export function visibleText<T extends SchText>(t: T, showSim: boolean): T | null {
   if (isDataText(t)) return null;
+  // los nodos digitales guardados (#314): tienen su menú
+  if (t.kind === 'comment' && /^\s*\.save\s+dig\s*\(/i.test(t.text)) return showSim ? t : null;
   if (showSim || !(t.kind === 'directive' || isNgspiceComment(t.text))) return t;
   if (isControlBlock(t.text)) return null;
   const lines = t.text.split('\\n');

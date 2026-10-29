@@ -1,4 +1,5 @@
 import { t } from '../i18n/i18n.ts';
+import { sampleEvents } from './series.ts';
 // Expresiones de trazas al estilo LTspice: V(out), V(a,b), I(R1), Ic(Q1), V(out)/V(in),
 // db(V(out)), d(V(c)), 2*I(L1)… Se evalúan punto a punto sobre vectores reales o complejos.
 // Con .step, V(out)@2 es el vector de la segunda corrida (como en LTspice).
@@ -7,6 +8,11 @@ export interface Wave {
   re: Float64Array;
   /** sólo si es complejo (AC, ruido, S) */
   im?: Float64Array;
+  /**
+   * Nodo digital (Dig()): los instantes de sus cambios, y `re` el valor desde cada uno. Sólo una
+   * traza que es Dig() sola lo conserva; en una cuenta se lleva al eje X (#314)
+   */
+  x?: Float64Array;
 }
 
 /**
@@ -242,6 +248,11 @@ export interface EvalContext {
 }
 
 export function evaluate(n: Node, ctx: EvalContext): Wave {
+  // Dig(x) sola: sus cambios tal cual
+  if (n.t === 'ref' && n.fn.toLowerCase() === 'dig') {
+    const w = ctx.resolve(n.fn, n.args, n.run);
+    if (w?.x) return { re: w.re, x: w.x };
+  }
   const r = ev(n, ctx);
   return r.im ? { re: r.re, im: r.im } : { re: r.re };
 }
@@ -267,6 +278,8 @@ function ev(n: Node, ctx: EvalContext): C {
       const w = ctx.resolve(n.fn, n.args, n.run);
       if (!w && n.fn === '@') throw new ExprError(t('{name}{p1} doesn\'t exist', { name: `@${n.args[0]}[${n.args[1]}]`, p1: n.run ? `@${n.run}` : '' }));
       if (!w) throw new ExprError(t('{fn}({p1}){p2} doesn\'t exist', { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
+      // un nodo digital dentro de una cuenta: en escalones sobre el eje X
+      if (w.x) return { re: sampleEvents(w.x, w.re, ctx.scale), im: null };
       return { re: w.re, im: w.im ?? null };
     }
     case 'un': {
@@ -376,6 +389,7 @@ function integral(a: C, x: Float64Array, len: number): C {
 /** Evalúa una expresión y la lleva al largo del eje X (las constantes se repiten) */
 export function evalTrace(src: string, ctx: EvalContext): Wave {
   const w = evaluate(parseExpr(src), ctx);
+  if (w.x) return w;
   const len = ctx.scale.length;
   return { re: expand(w.re, len), ...(w.im ? { im: expand(w.im, len) } : {}) };
 }

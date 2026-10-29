@@ -13,7 +13,7 @@ import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
 import { hierDevice } from './context.ts';
 import { deviceParams, deviceRefs } from './deviceParams.ts';
-import { refVectors, saveSelection, textRefs } from './saves.ts';
+import { digitalNodes, refVectors, saveSelection, textRefs } from './saves.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -46,6 +46,8 @@ export interface BuiltSimulation {
   digitalNets?: Set<string>;
   /** sus nodos de adentro de antes ("x1.q_0_d") → la red, para las trazas Dig() guardadas */
   digitalAliases?: Map<string, string>;
+  /** con sólo las señales elegidas (#314): los nodos digitales que lee el motor (si no, todos) */
+  digitalSaves?: string[];
 }
 
 /**
@@ -82,12 +84,20 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const selection = saveSelection(lt.texts);
   let netlist: string;
   let vectorCount: number | undefined;
+  let digitalSaves: string[] | undefined;
   if (selection) {
     const used = [...traces, ...ng.measures, control?.text.split('\\n').join('\n') ?? '', ...lt.texts.filter((tt) => /^\s*;?\s*\.four\b/im.test(tt.text)).map((tt) => tt.text)].flatMap(textRefs);
     const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...deviceSaves(traces, lt, ng), ...op])];
-    vectorCount = vectors.length + 1;
+    digitalSaves = [...new Set([...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)))];
+    // (los nodos digitales que no existen no suman: se cuentan los que pueden ser, de más)
+    vectorCount = vectors.length + 1 + digitalSaves.length;
     // el .save del usuario (con nombres de LTspice) se reemplaza por el traducido
     const body = prep.netlist.replace(/^\s*\.save\b.*\n/gim, '');
+    // ngspice no corre sin nada analógico que guardar: con sólo nodos digitales, una red cualquiera
+    if (!vectors.length) {
+      const n = lt.elements.flatMap((e) => e.nodes).find((x) => x && x !== '0');
+      if (n) vectors.push(netVector(n));
+    }
     netlist = vectors.length ? body.replace(/\n\.end\s*$/i, `\n.save ${vectors.join(' ')}\n.end`) : body;
   } else {
     const saves = saveLine(prep.netlist, [...deviceSaves(traces, lt, ng), ...op]);
@@ -98,7 +108,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1, vectorCount);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
-  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases };
+  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases, digitalSaves };
 }
 
 /** Vectores de ngspice "@dev[param]" de los parámetros de dispositivo que usan unas trazas (#202) */

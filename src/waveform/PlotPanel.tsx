@@ -5,12 +5,12 @@ import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot } from '../engine/ngspice.ts';
-import { dftSampling, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
+import { dftSampling, curveOn, paneCurves, traceLabel, type ComplexMode, type Curve, type PaneData } from './curves.ts';
 import type { Resolver } from './expr.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from './measure.ts';
 import { alignScales, exactRange, extent, logLabeled, mapTicks, niceTicks, panBy, wheelZoom, zoomAt, type Aligned } from './scales.ts';
 import { decimator } from './decimate.ts';
-import { axisSpace, axisTicks, scaleOf, si, siFixed } from './series.ts';
+import { axisSpace, axisTicks, sampleEvents, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
 import { PALETTE, acceptsTrace, colorFor, sameDft, cursorForClick, isDftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace, type TraceDft } from './view.ts';
@@ -470,7 +470,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     csv: () => {
       const d = data[0];
       if (!d) return '';
-      const cols = data.filter((_, k) => !isF(k)).flatMap((pd) => pd.curves.filter((c) => !c.hidden).map((c) => ({ name: c.label, ys: c.y })));
+      const cols = data.filter((_, k) => !isF(k)).flatMap((pd) => pd.curves.filter((c) => !c.hidden).map((c) => ({ name: c.label, ys: curveOn(c, pd.x) })));
       return toCsv(d.xName, d.x, cols);
     },
     png: () => exportPng(panes, data, charts.current),
@@ -501,7 +501,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           charts.current.forEach((u, k) => {
             const xr = isF(k) ? (fRanges[k] ?? null) : xRange;
             if (!xr) return;
-            const e = extent(data[k].x, data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => c.y), xr[0], xr[1]);
+            const e = extent(data[k].x, data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => curveOn(c, data[k].x)), xr[0], xr[1]);
             if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
           });
           return zoomTo(xRange, ys);
@@ -953,7 +953,7 @@ function PaneView(props: {
     const extents = new Map<string, Range | null>();
     const fullY = (scale: string) => {
       if (!extents.has(scale)) {
-        const e = extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => c.y));
+        const e = extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => curveOn(c, data.x)));
         // dB y grados que varían menos que el ruido numérico (un pasatodo: |H| = 0 dB ± 1e-15) son
         // una recta (±1 dB o ±1° a su alrededor): sin esto el eje se estira hasta mostrar ese ruido
         const flat = e && (scale === 'ph' || (scale === 'y' && data.yUnit === 'dB')) && e[1] - e[0] < 1e-6;
@@ -1821,7 +1821,7 @@ function PaneView(props: {
         {pane.traces.map((tt: Trace, ti) => {
           const c = firstCurve(ti);
           const err = data.errors.get(ti);
-          const v = hover !== null && c ? c.y[hover] : NaN;
+          const v = hover !== null && c ? (c.x ? sampleEvents(c.x, c.y, Float64Array.of(data.x[hover]))[0] : c.y[hover]) : NaN;
           return (
             <span
               key={`${props.labelOf(tt)}${ti}`}

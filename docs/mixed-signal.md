@@ -35,10 +35,15 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
   (`verilogDigitalNode` en `sim/traces.ts`). En las entradas del bloque, fuera de un transitorio o al
   armar una expresión en la caja de trazas sigue siendo `V()`; la tensión se pide escribiéndola.
 
-- **Señales guardadas** (#314): con «sólo las señales elegidas» (`.save` con lista), los nodos
-  digitales (también los internos de los bloques Verilog sintetizados, con o sin nombre) se guardan
-  igual: medido en ngspice-47, `.save` no filtra los nodos event-driven de XSPICE. Las señales de
-  los bloques cosimulados con Icarus no pasan por ngspice y no dependen de esa elección.
+- **Señales guardadas** (#314): el motor entrega cada nodo digital como **eventos** (el instante y
+  el valor de cada cambio, `SimVector.x`), no muestreado en los tiempos del transitorio: así pesa
+  casi nada en la página y en el historial. Sólo se lleva a la grilla cuando se pide como tensión
+  (`V(x1.d_0_d)`) o se usa en una cuenta (`Dig(q)*2`); `Dig(q)` solo se dibuja desde los eventos
+  (un bus une los cambios de sus bits). Medido en ngspice-47: `.save` no filtra los nodos de
+  eventos, así que el filtro lo hace el motor al leerlos: con «sólo las señales elegidas» lee los
+  elegidos (`.save Dig(…)` en un comentario aparte, que LTspice ignora) y los que usan las trazas;
+  los nodos internos sin nombre de los bloques Verilog (`x1.n12`) no se leen nunca. Los bloques
+  cosimulados con Icarus no pasan por ngspice.
 
 ## Módulos Verilog
 

@@ -7,6 +7,7 @@
 //   .meas … nombre MAX|MIN|PP|AVG|RMS|INTEG expr [FROM=a] [TO=b] [TRIG … TARG …]
 //   .meas … nombre TRIG lhs=rhs [TD=t] [RISE|FALL|CROSS=n] TARG lhs=rhs [TD=t] [RISE|FALL|CROSS=n]
 //   .meas … nombre PARAM expr
+import { sampleEvents } from '../waveform/series.ts';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { evalTrace, ExprError, type Resolver, type Wave } from '../waveform/expr.ts';
 import { scaleOf } from '../waveform/series.ts';
@@ -165,7 +166,9 @@ interface Ctx {
 }
 
 function wave(src: string, c: Ctx): Wave {
-  return evalTrace(src, { resolve: c.resolve, scale: c.x, scaleName: c.xName, vars: c.vars });
+  const w = evalTrace(src, { resolve: c.resolve, scale: c.x, scaleName: c.xName, vars: c.vars });
+  // un nodo digital (sus cambios), en el eje
+  return w.x ? { re: sampleEvents(w.x, w.re, c.x) } : w;
 }
 
 /** Valor numérico de una expresión constante (AT=1m, VAL=vmax/2, TD=…) */

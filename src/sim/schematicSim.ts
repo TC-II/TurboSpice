@@ -13,6 +13,7 @@ import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
 import { hierDevice } from './context.ts';
 import { deviceParams, deviceRefs } from './deviceParams.ts';
+import { refVectors, saveSelection, textRefs } from './saves.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
@@ -75,12 +76,26 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   // Corrientes de todos los dispositivos para poder medirlas con la punta de prueba (y, con .op,
   // los parámetros de pequeña señal de transistores y diodos para la tabla)
   const op = analyses.some((l) => /^\.op\b/i.test(l)) ? opDeviceSaves(lt, ng) : [];
-  const saves = saveLine(prep.netlist, [...deviceSaves(traces, lt, ng), ...op]);
-  const netlist = prep.netlist.replace(/\n\.end\s*$/i, `\n${saves}.options savecurrents\n.end`);
   const control = lt.texts.find((tt) => isControlBlock(tt.text));
+  // sólo las señales elegidas (#314): lo que usan las trazas, los .meas, el .control y los
+  // parámetros de dispositivo se guarda igual
+  const selection = saveSelection(lt.texts);
+  let netlist: string;
+  let vectorCount: number | undefined;
+  if (selection) {
+    const used = [...traces, ...ng.measures, control?.text.split('\\n').join('\n') ?? '', ...lt.texts.filter((tt) => /^\s*;?\s*\.four\b/im.test(tt.text)).map((tt) => tt.text)].flatMap(textRefs);
+    const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...deviceSaves(traces, lt, ng), ...op])];
+    vectorCount = vectors.length + 1;
+    // el .save del usuario (con nombres de LTspice) se reemplaza por el traducido
+    const body = prep.netlist.replace(/^\s*\.save\b.*\n/gim, '');
+    netlist = vectors.length ? body.replace(/\n\.end\s*$/i, `\n.save ${vectors.join(' ')}\n.end`) : body;
+  } else {
+    const saves = saveLine(prep.netlist, [...deviceSaves(traces, lt, ng), ...op]);
+    netlist = prep.netlist.replace(/\n\.end\s*$/i, `\n${saves}.options savecurrents\n.end`);
+  }
   const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
   // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
-  const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1);
+  const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1, vectorCount);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
   return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases };

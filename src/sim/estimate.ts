@@ -198,11 +198,12 @@ function fewerPoints(line: string, a: Analysis, factor: number): string | undefi
 
 /**
  * Revisa los análisis del esquemático (líneas tal como están escritas) contra la netlist
- * final: puntos × vectores × 8 bytes (16 en los complejos: AC), por cada corrida de .step.
+ * final (`savedVectors`: los que se guardan, si se eligieron; si no, todos): puntos × vectores × 8 bytes (16 en los complejos: AC), por cada corrida de .step.
  */
-export function checkSimSize(analysisLines: string[], netlist: string, files: Record<string, string>, runs = 1): SizeCheck {
+export function checkSimSize(analysisLines: string[], netlist: string, files: Record<string, string>, runs = 1, savedVectors?: number): SizeCheck {
   const out: SizeCheck = { errors: [], warnings: [] };
-  let vectors: number | undefined;
+  // con sólo las señales elegidas (#314), las que se guardan
+  let vectors: number | undefined = savedVectors;
   for (const line of analysisLines) {
     const a = parseAnalysis(line);
     if (!a) continue;
@@ -226,7 +227,8 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     out.errors.push({
       text:
         t('{line} produces {p1} points × {vectors} vectors{per} {why}, so it isn\'t simulated.', { line, p1: fmtCount(points), vectors, per, why }) +
-        (to ? t(' Try «{to}».', { to }) : t(' Lower the number of points.')),
+        (to ? t(' Try «{to}».', { to }) : t(' Lower the number of points.')) +
+        (savedVectors === undefined ? t(' Or save only some signals (Simulate › Saved signals…).') : ''),
       fix: to ? { from: line, to } : undefined,
     });
   }

@@ -18,7 +18,7 @@ import { si } from '../waveform/series.ts';
  * .meas, el .func del Estudio y los bloques .control (en el Estudio y Alt+C). Si comparten el texto
  * con otras directivas, se ocultan sólo sus líneas (y sus continuaciones «+»).
  */
-const MANAGED_LINE = /^\s*;?\s*\.(param|step|meas|measure)\b/i;
+const MANAGED_LINE = /^\s*;?\s*\.(param|step|meas|measure|save)\b/i;
 const STUDY_FUNC = /^\s*;?\s*\.func\s+binary\s*\(/i;
 export function visibleText<T extends SchText>(t: T, showSim: boolean): T | null {
   if (isDataText(t)) return null;

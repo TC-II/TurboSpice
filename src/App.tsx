@@ -29,6 +29,8 @@ import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceL
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
+import { SavesDialog } from './schematic/SavesDialog.tsx';
+import { savableSignals, saveSelection, setSaveSelection, type SavableSignal } from './sim/saves.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
@@ -169,6 +171,8 @@ type Dialog =
   | { kind: 'flag'; index?: number; at?: Point; ioPin?: string }
   | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
+  /** qué señales se guardan (#314); `signals` llega después de armar la netlist */
+  | { kind: 'saves'; signals?: SavableSignal[] }
   | { kind: 'share'; url: string }
   | { kind: 'help' }
   | { kind: 'userfiles' }
@@ -2300,6 +2304,12 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     try {
       evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
     } catch {
+      // con sólo las señales elegidas (#314) puede no haberse guardado: la traza queda y, como lo
+      // que usan las trazas se guarda siempre, aparece al volver a simular
+      if (saveSelection(sim.built.lt.texts)) {
+        addProbed(i, expr);
+        return setMessage(t('{expr} wasn\'t saved (only the selected signals are): it will be when you run again', { expr }));
+      }
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
     addProbed(i, expr);
@@ -2677,6 +2687,13 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   /** Menú de simulación; con un tipo de análisis, abre en ese tipo */
   const openSimulation = (analysis?: AnalysisKind) => setDialog({ kind: 'sim', found: findAnalysis(doc), analysis });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
+  const openSaves = () => {
+    if (curSub) return setMessage(t('The saved signals belong to the testbench: go up (Alt+↑) to change them'));
+    setDialog({ kind: 'saves' });
+    buildSimulation(doc, lib, ascName())
+      .then((b) => setDialog((d) => (d?.kind === 'saves' ? { kind: 'saves', signals: savableSignals(b) } : d)))
+      .catch(() => setDialog((d) => (d?.kind === 'saves' ? { kind: 'saves', signals: [] } : d)));
+  };
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
   // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
@@ -3086,6 +3103,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     },
     'sep',
     { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
+    {
+      label: t('Saved signals…'),
+      title: t('Save everything, or only some voltages and currents (smaller simulations)'),
+      onClick: openSaves,
+    },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
     { label: t('Studio…'), shortcut: 'Alt+E', onClick: openStudy },
@@ -4153,6 +4175,17 @@ ${ltNetlistText(sim.built.lt)}
             const text = controlBlock(body).split('\n').join('\\n');
             if (dialog.index >= 0) commit(setText(doc, dialog.index, { text, kind: 'comment' }));
             else setTool({ kind: 'text', text, textKind: 'comment' });
+          }}
+        />
+      )}
+      {dialog?.kind === 'saves' && (
+        <SavesDialog
+          initial={saveSelection(doc.texts)}
+          signals={dialog.signals}
+          onClose={() => setDialog(null)}
+          onApply={(refs) => {
+            setDialog(null);
+            commit(setSaveSelection(doc, refs));
           }}
         />
       )}

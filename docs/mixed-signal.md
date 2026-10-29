@@ -35,6 +35,11 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
   (`verilogDigitalNode` en `sim/traces.ts`). En las entradas del bloque, fuera de un transitorio o al
   armar una expresión en la caja de trazas sigue siendo `V()`; la tensión se pide escribiéndola.
 
+- **Señales guardadas** (#314): con «sólo las señales elegidas» (`.save` con lista), los nodos
+  digitales (también los internos de los bloques Verilog sintetizados, con o sin nombre) se guardan
+  igual: medido en ngspice-47, `.save` no filtra los nodos event-driven de XSPICE. Las señales de
+  los bloques cosimulados con Icarus no pasan por ngspice y no dependen de esa elección.
+
 ## Módulos Verilog
 
 Un módulo Verilog es `<nombre>.v` + `<nombre>.asy`, como un subcircuito esquemático es `.asc` + `.asy`:

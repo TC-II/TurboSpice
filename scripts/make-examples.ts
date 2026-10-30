@@ -292,7 +292,11 @@ const AMPS: { name: string; file: string; sine: string }[] = [
 
 // --- Loop stability: .stb con LoopProbe (simple) y DiffLoopProbe (diferencial), docs/estabilidad.md
 {
-  const groups = [{ id: newId('g'), name: 'Single-ended (LoopProbe)' }, { id: newId('g'), name: 'Differential (DiffLoopProbe)' }];
+  const groups = [
+    { id: newId('g'), name: 'Single-ended (LoopProbe)' },
+    { id: newId('g'), name: 'Differential (DiffLoopProbe)' },
+    { id: newId('g'), name: 'How the probes work' },
+  ];
   const note = (d: AscDoc, lines: string[], y = 560): AscDoc => ({
     ...d,
     texts: [...d.texts, { x: -64, y, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
@@ -318,6 +322,53 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     'The stages cross (Q5 takes the collector of Q2) so that each output feeds back to its own input through R2/R1 (gain -10).',
     'Q7/Q8 are the output current sinks; the CMFB (Rcp, Rcn, Q9 to Q11) sets their base vb so that the outputs sit at Vcm.',
     'LP1 (Stability > DiffLoopProbe) is in series in the differential output; the .stb picks the mode (dm or cm). DM: about 58° of margin.',
+  ];
+  // cómo funcionan las sondas: la DiffLoopProbe armada a mano (dos Balun y dos LoopProbe) en lugar de LP1
+  const bal = parseAsc(readFileSync('examples/stability/balun.asc', 'utf8'));
+  const byHand: AscDoc = (() => {
+    const part = parseAsc(`Version 4
+SHEET 1 1800 1300
+WIRE 448 1168 496 1168
+WIRE 592 1168 640 1168
+WIRE 448 1232 496 1232
+WIRE 592 1232 640 1232
+FLAG 864 368 op
+FLAG 864 432 on
+FLAG 960 368 outp
+FLAG 960 432 outn
+FLAG 352 1168 op
+FLAG 352 1232 on
+FLAG 736 1168 outp
+FLAG 736 1232 outn
+TEXT 352 1072 Left 2 ;LP1 by hand: two Balun back to back, a LoopProbe in each mode
+SYMBOL Stability\\Balun 400 1200 R0
+SYMATTR InstName B1
+SYMBOL Stability\\LoopProbe 544 1168 R0
+SYMATTR InstName LPd
+SYMBOL Stability\\LoopProbe 544 1232 R0
+SYMATTR InstName LPc
+SYMBOL Stability\\Balun 688 1200 M0
+SYMATTR InstName B2
+`);
+    const d = without(df, 'LP1');
+    return { ...d, wires: [...d.wires, ...part.wires], flags: [...d.flags, ...part.flags], symbols: [...d.symbols, ...part.symbols], texts: [...d.texts, ...part.texts] };
+  })();
+  const TIAN = [
+    'LoopProbe (library/sub/Stability/LoopProbe.lib): in series in the loop, Vprb (an ammeter) from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground into x).',
+    'All are 0 outside .stb: the probe is a wire. The .stb turns off every other AC source and runs two ac: run 1 with Vinj = 1, run 3 with Iinj = 1. With Vy = -V(x) and Iy = I(Vprb):',
+    '   D = Vy1·Iy3 - Vy3·Iy1        T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1        T(GFT) = 1/(1/D - 1)',
+    'Tian: the two injections (series voltage and shunt current) cancel the loading of the cut on both sides, so T does not depend on the impedances there',
+    'nor on the probe orientation. It is what Spectre stb computes. GFT (Middlebrook): the same two runs read as a null double injection; it treats the reverse',
+    'transmission across the cut as load and, with an input and an output (gft V1 V(out)), gives G = G∞·T/(1+T) + G0/(1+T). Both give the same closed-loop poles (zeros of 1 + T).',
+    'Sources: M. Tian, V. Visvanathan, J. Hantgan and K. Kundert, "Striving for small-signal stability", IEEE Circuits and Devices Magazine 17(1), 2001.',
+    'R. D. Middlebrook, "The general feedback theorem: a final solution for feedback systems", IEEE Microwave Magazine 7(2), 2006.',
+    'SPICE implementations: Frank Wiedmann, https://sites.google.com/site/frankwiedmann/loopgain . More in docs/estabilidad.md.',
+  ];
+  const BALUN = [
+    'Balun (Stability > Balun): an ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)',
+    'and the F sources put them back on the mode side as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Then V(p)·I(p) + V(n)·I(n) = V(d)·I(d) + V(c)·I(c):',
+    'it conserves power, so it neither isolates nor loads, and unlike a transformer it passes DC. Here Vp and Vn are 120° apart: d is their difference and c their mean (1 V with a 0.25 V ripple).',
+    'A DiffLoopProbe is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.',
   ];
   const sims: Sim[] = [
     bench(0, 'Loop gain (Tian)', setAnalysisLine(note(se, SE_NOTE), '.stb LP1 dec 50 10 100meg'), STB),
@@ -356,6 +407,19 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     bench(1, 'Differential step', setAnalysisLine(dnote(dmStep(df), ['A ±10 mV differential step: the outputs move ∓100 mV with the small overshoot of a 58° margin.']), '.tran 4u'), TRAN),
     bench(1, 'Differential step, Cc = 22p', setAnalysisLine(dnote(dmStep(lowCc), ['The same step with Cc = 22p: it rings at about 2 MHz, the crossover of T, with the 15° margin.']), '.tran 4u'), TRAN),
     bench(1, 'Common-mode step (Vcm)', setAnalysisLine(dnote(step(df, 'Vcm', 'PULSE(0 10m 0.5u 10n 10n 2u 4u)'), ['A 10 mV step in Vcm, the CMFB reference: both outputs follow it together. The probes are transparent here.']), '.tran 4u'), TRAN),
+    bench(2, 'LoopProbe: Tian and GFT', setAnalysisLine(note(se, TIAN), '.stb LP1 dec 50 10 100meg'), STB),
+    bench(2, 'Balun: differential and common mode', setAnalysisLine(note(bal, BALUN, 320), '.tran 3m'), {
+      panes: [{ traces: [{ expr: 'V(p)', color: '#1c7ed6' }, { expr: 'V(n)', color: '#e8590c' }] }, { traces: [{ expr: 'V(d)', color: '#2f9e44' }, { expr: 'V(c)', color: '#ae3ec9' }] }],
+      active: 0,
+      plot: 'tran1',
+    }),
+    bench(
+      2,
+      'DiffLoopProbe by hand: DM',
+      setAnalysisLine(dnote(byHand, ['LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn).', 'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.']), '.stb LPd dec 50 10 100meg'),
+      STB,
+    ),
+    bench(2, 'DiffLoopProbe by hand: CM', setAnalysisLine(dnote(byHand, ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
   ];
   const ls: Project = {
     name: 'Loop stability', created: t0, modified: t0, groups, files: [],

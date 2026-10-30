@@ -10,9 +10,9 @@ Vprb x p1 0
 Iinj 0 x 0 AC 0
 .ends LoopProbe
 
-* Balun ideal: (p, n) <-> modo diferencial d = V(p)-V(n) y modo común c = (V(p)+V(n))/2,
+* Balun ideal (también es un componente de la librería): (p, n) <-> modo diferencial d = V(p)-V(n) y modo común c = (V(p)+V(n))/2,
 * con las corrientes transformadas de modo dual (conserva la potencia: no aísla ni carga).
-.subckt TS_Balun p n d c
+.subckt Balun p n d c
 Vsp p pp 0
 Ep pp m d 0 0.5
 Ec m 0 c 0 1
@@ -23,13 +23,13 @@ Fd 0 d Vsp 0.5
 Fd2 0 d Vsn -0.5
 Fc 0 c Vsp 1
 Fc2 0 c Vsn 1
-.ends TS_Balun
+.ends Balun
 
 * Sonda diferencial: dos baluns espalda con espalda (equivalen a una conexión directa) con una
 * sonda en el modo diferencial (Xdm) y otra en el modo común (Xcm). La señal entra por p1/n1.
 .subckt DiffLoopProbe p1 n1 p2 n2
-X1 p1 n1 d1 c1 TS_Balun
-X2 p2 n2 d2 c2 TS_Balun
+X1 p1 n1 d1 c1 Balun
+X2 p2 n2 d2 c2 Balun
 Xdm d1 d2 LoopProbe
 Xcm c1 c2 LoopProbe
 .ends DiffLoopProbe

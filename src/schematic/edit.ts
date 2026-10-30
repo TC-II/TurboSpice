@@ -121,6 +121,12 @@ export function instLetter(prefix: string): string {
   return p[0] ?? 'U';
 }
 
+/** Letra para numerar un símbolo: la de su InstName por defecto si la trae (LP1 → LP), si no la del prefijo */
+function nameLetter(def: { attrs: Map<string, string> } | undefined): string {
+  const m = /^([A-Za-z_]+)\d+$/.exec(def?.attrs.get('InstName') ?? '');
+  return m ? m[1] : instLetter(def?.attrs.get('Prefix') ?? 'X');
+}
+
 export function nextInstName(doc: AscDoc, letter: string, lib: Library): string {
   const used = new Set(
     doc.symbols.map((s) => (s.attrs.get('InstName') ?? lib.symbol(s.type)?.attrs.get('InstName') ?? '').toUpperCase()),
@@ -131,7 +137,10 @@ export function nextInstName(doc: AscDoc, letter: string, lib: Library): string 
 export function placeSymbol(doc: AscDoc, type: string, at: Point, orient: Orient, lib: Library): AscDoc {
   const def = lib.symbol(type);
   const attrs = new Map<string, string>();
-  if (!def?.attrs.has('InstName')) attrs.set('InstName', nextInstName(doc, instLetter(def?.attrs.get('Prefix') ?? 'X'), lib));
+  // sin InstName en el símbolo, o con uno por defecto ya usado (dos sondas LP1): el siguiente libre
+  const dflt = def?.attrs.get('InstName')?.toUpperCase();
+  if (!dflt || (/\d$/.test(dflt) && doc.symbols.some((o) => (o.attrs.get('InstName') ?? lib.symbol(o.type)?.attrs.get('InstName') ?? '').toUpperCase() === dflt)))
+    attrs.set('InstName', nextInstName(doc, nameLetter(def), lib));
   const sym: SymbolInst = { type, x: at.x, y: at.y, orient, windows: new Map(), attrs };
   // colocado sobre un cable: el cable se parte en sus pines, no queda en corto
   return cutNew({ ...doc, symbols: [...doc.symbols, sym] }, [{ kind: 'symbol', index: doc.symbols.length }], lib).doc;
@@ -753,7 +762,7 @@ export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: num
       const s = doc.symbols[r.index];
       const def = lib.symbol(s.type);
       const attrs = new Map(s.attrs);
-      if (attrs.has('InstName')) attrs.set('InstName', nextInstName(out, instLetter(def?.attrs.get('Prefix') ?? 'X'), lib));
+      if (attrs.has('InstName')) attrs.set('InstName', nextInstName(out, nameLetter(def), lib));
       out = { ...out, symbols: [...out.symbols, { ...s, x: s.x + dx, y: s.y + dy, attrs, windows: new Map(s.windows) }] };
       newRefs.push({ kind: 'symbol', index: out.symbols.length - 1 });
     } else if (r.kind === 'wire') {
@@ -816,7 +825,7 @@ export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): 
     const attrs = new Map(s.attrs);
     const name = nameOf(s);
     if (name && symbols.some((o) => nameOf(o) === name)) {
-      attrs.set('InstName', nextInstName({ ...doc, symbols }, instLetter(lib.symbol(s.type)?.attrs.get('Prefix') ?? 'X'), lib));
+      attrs.set('InstName', nextInstName({ ...doc, symbols }, nameLetter(lib.symbol(s.type)), lib));
     }
     symbols = [...symbols, { ...s, x: s.x + dx, y: s.y + dy, attrs, windows: new Map(s.windows) }];
   }

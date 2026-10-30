@@ -54,7 +54,7 @@ const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefine
       : undefined;
 
 /** Campos de la barra por línea */
-function barRows(a: Analysis): BarField[][] {
+function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
   const text = (label: string, value: string, set: (v: string) => Analysis, o: Partial<Extract<BarField, { kind: 'text' }>> = {}): BarField => ({ kind: 'text', label, value, set, ...o });
   switch (a.kind) {
     case 'tran':
@@ -139,7 +139,11 @@ function barRows(a: Analysis): BarField[][] {
     case 'stb':
       return [
         [
-          text(t('Loop probe'), a.probe, (probe) => ({ ...a, probe }), { list: 'probes', required: true, width: 6 }),
+          // la sonda diferencial lleva modo DM/CM; la simple, ninguno (como en el diálogo)
+          text(t('Loop probe'), a.probe, (probe) => {
+            const d = info.probes?.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
+            return { ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' };
+          }, { list: 'probes', required: true, width: 6 }),
           { kind: 'select', label: t('Method'), value: a.method, options: [['tian', 'Tian'], ['gft', 'GFT']], set: (method) => ({ ...a, method: method as StbMethod }) },
           ...(a.mode ? [{ kind: 'select', label: t('Mode'), value: a.mode, options: [['dm', 'DM'], ['cm', 'CM']], set: (mode: string) => ({ ...a, mode: mode as StbMode }) } as BarField] : []),
         ],
@@ -216,7 +220,7 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
     picker(f.list === 'nets' ? 'net' : f.list === 'probes' ? 'probe' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
-  const rows = sim && draft && control === undefined ? barRows(draft) : [];
+  const rows = sim && draft && control === undefined ? barRows(draft, info) : [];
   /** columnas de la grilla con varias filas (0: sin grilla) */
   const gridCols = rows.length > 1 && !(draft && COLUMNS.has(draft.kind)) ? Math.max(...rows.map((r) => r.length)) : 0;
 

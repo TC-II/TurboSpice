@@ -1,12 +1,14 @@
-// Arma los modelos del PDK sky130 para TurboSpice a partir de los primitivos de SkyWater
-// (skywater-pdk-libs-sky130_fd_pr, commit fijado). Los originales están escritos para el modo
-// HSPICE de ngspice (ngbehavior=hsa); TurboSpice corre siempre con ltpsa, así que se traducen
-// una vez acá en vez de cambiar el modo por proyecto:
+// Arma los modelos del PDK sky130 para TurboSpice a partir de open_pdks (sky130A, los mismos que
+// usan xschem y los tutoriales), de las versiones ya armadas de fossi-foundation/ciel-releases
+// (fijada por su commit de open_pdks): libs.tech/ngspice de common.tar.zst y
+// libs.ref/sky130_fd_pr/spice de sky130_fd_pr.tar.zst. Están escritos para el modo HSPICE de
+// ngspice (ngbehavior=hsa); TurboSpice corre siempre con ltpsa, así que se traducen una vez acá
+// en vez de cambiar el modo por proyecto:
 // - cada esquina (.lib tt … .endl de sky130.lib.spice) pasa a su propio archivo con .include:
 //   en modo LTspice, un `.lib tt` de un solo argumento se lee como «incluir el archivo tt»;
-// - se borran los comentarios de fin de línea `$ …` (HSPICE), que con ltpsa son error de sintaxis;
 // - `level = 5.400000e+1` pasa a `level = 54`: el modo PSpice lee mal el exponente (sale EKV, level 5);
-// - un `include` sin punto (error del repo) queda comentado.
+// - por las dudas, como en los primitivos de SkyWater sin procesar: se borran los comentarios de
+//   fin de línea `$ …` (HSPICE) y un `include` sin punto queda comentado.
 // Sólo se copian los archivos alcanzables desde las esquinas. Cargar una esquina entera tarda
 // ~1 s (la mayor parte, dispositivos que el circuito no usa), así que cada esquina se parte además
 // en unidades (sus .include, abriendo los archivos que sólo agrupan otros) y index.json guarda qué
@@ -16,44 +18,47 @@
 // Corre con `npm run assets`; la salida no se versiona. Si ya está generada desde el mismo commit
 // y no cambió este script, no hace nada (sin red).
 // Uso: node scripts/build-pdk.ts [salida]   (por defecto public/library/pdk/sky130)
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const REPO = 'https://github.com/google/skywater-pdk-libs-sky130_fd_pr.git';
-const COMMIT = 'f62031a1be9aefe902d6d54cddd6f59b57627436';
+/** Versión de open_pdks (su commit), la misma para sky130 y gf180 */
+export const OPEN_PDKS = '792ef67037d74c8c51811eab3ce23cf793491296';
+const RELEASES = 'https://github.com/fossi-foundation/ciel-releases/releases/download';
 export const CORNERS = ['tt', 'ff', 'ss', 'sf', 'fs'] as const;
 
-export const SRC = join(ROOT, '.cache', 'pdk', 'sky130_fd_pr');
+export const SRC = join(ROOT, '.cache', 'pdk', `sky130-${OPEN_PDKS.slice(0, 12)}`, 'sky130A');
 const OUT = process.argv[2] ? join(process.cwd(), process.argv[2]) : join(ROOT, 'public', 'library', 'pdk', 'sky130');
 
 export const rel = (base: string, p: string) => relative(base, p).split('\\').join('/');
+
 /**
- * Clona (sparse, sin blobs de más) un repo de modelos al commit fijado, o reusa el clon.
- * (También la usa scripts/build-pdk-gf180.ts.)
+ * Baja de ciel-releases las partes de una versión de open_pdks que hacen falta (sin guardar los
+ * .tar.zst: se descomprimen al vuelo y se extrae sólo `globs`) a `dest`, o reusa lo ya bajado.
+ * Necesita curl, zstd y tar. (También la usa scripts/build-pdk-gf180.ts.)
  */
-export function fetchSources(src = SRC, repo = REPO, commit = COMMIT, paths = ['models', 'cells']) {
-  const git = (...args: string[]) => execFileSync('git', ['-C', src, ...args], { stdio: 'inherit' });
-  if (!existsSync(join(src, '.git'))) {
-    mkdirSync(src, { recursive: true });
-    git('init', '-q');
-    git('remote', 'add', 'origin', repo);
-    git('sparse-checkout', 'set', ...paths);
+export function fetchCiel(family: string, dest: string, parts: { asset: string; globs: string[] }[]) {
+  const done = join(dest, '.ciel-ok');
+  if (existsSync(done)) return;
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(dest, { recursive: true });
+  const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
+  for (const { asset, globs } of parts) {
+    const url = `${RELEASES}/${family}-${OPEN_PDKS}/${asset}`;
+    console.log(`${family}: bajando ${asset}…`);
+    execSync(`curl -fsSL ${quote(url)} | zstd -dc | tar -x -C ${quote(dest)} --wildcards ${globs.map(quote).join(' ')}`, { stdio: 'inherit', shell: '/bin/sh' });
   }
-  const head = (() => {
-    try {
-      return execFileSync('git', ['-C', src, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: 'pipe' }).trim();
-    } catch {
-      return '';
-    }
-  })();
-  if (head !== commit) {
-    git('fetch', '-q', '--depth', '1', '--filter=blob:none', 'origin', commit);
-    git('checkout', '-q', '--force', commit);
-  }
+  writeFileSync(done, `${family}-${OPEN_PDKS}\n`);
 }
+
+/** Los modelos de sky130A (el directorio de arriba de SRC), si no están */
+export const fetchSources = () =>
+  fetchCiel('sky130', dirname(SRC), [
+    { asset: 'common.tar.zst', globs: ['sky130A/libs.tech/ngspice/*'] },
+    { asset: 'sky130_fd_pr.tar.zst', globs: ['sky130A/libs.ref/sky130_fd_pr/spice/*'] },
+  ]);
 
 /**
  * Traduce un archivo de modelos de la sintaxis HSPICE a la que ngspice lee con ltpsa. Con
@@ -123,13 +128,15 @@ const AGGREGATOR = 3; // un archivo con al menos estos .include se abre en unida
  * archivos `<nombre>.partN.spice`. Devuelve las unidades, las que van siempre y, por dispositivo,
  * los índices de las que necesita.
  */
-function splitUnits(out: string, body: string[]) {
+function splitUnits(out: string, corner: string, body: string[]) {
   const units: string[] = [];
   const open = (lines: string[], file: string | null) => {
     let chunk: string[] = [];
     const flush = () => {
-      if (!file || !chunk.some((l) => !/^\s*(\*|$)/.test(l))) return (chunk = []);
-      const part = file.replace(/\.spice$/, `.part${units.filter((u) => u.startsWith(file.replace(/\.spice$/, '.part'))).length + 1}.spice`);
+      if (!chunk.some((l) => !/^\s*(\*|$)/.test(l))) return (chunk = []);
+      // (las líneas propias de la esquina, como .param mc_mm_switch=0, van a <esquina>.partN.spice)
+      const at = (file ?? `${corner}.spice`).replace(/\.spice$/, '.part');
+      const part = `${at}${units.filter((u) => u.startsWith(at)).length + 1}.spice`;
       writeFileSync(join(out, part), chunk.join('\n') + '\n');
       units.push(part);
       chunk = [];
@@ -213,7 +220,7 @@ function splitUnits(out: string, body: string[]) {
 }
 
 export function build(out = OUT, onlyFixes = false) {
-  const modelsDir = join(SRC, 'models');
+  const modelsDir = join(SRC, 'libs.tech', 'ngspice');
   const lib = readFileSync(join(modelsDir, 'sky130.lib.spice'), 'utf8');
   rmSync(out, { recursive: true, force: true });
 
@@ -254,18 +261,18 @@ export function build(out = OUT, onlyFixes = false) {
     });
     const header = [
       `* sky130, esquina ${corner}. Generado por scripts/build-pdk.ts desde`,
-      `* ${REPO} @ ${COMMIT}`,
+      `* open_pdks ${OPEN_PDKS} (sky130A, de ciel-releases)`,
       '* (Apache-2.0). No editar: se regenera.',
     ];
     writeFileSync(join(out, `${corner}.spice`), [...header, ...body, ''].join('\n'));
-    corners.push({ name: corner, file: `${corner}.spice`, ...splitUnits(out, body) });
+    corners.push({ name: corner, file: `${corner}.spice`, ...splitUnits(out, corner, body) });
   }
 
   const files = [...done.values()];
   const bytes = files.reduce((n, f) => n + statSync(join(out, f)).size, 0);
   const index = {
     pdk: 'sky130',
-    source: { repo: REPO, commit: COMMIT, license: 'Apache-2.0' },
+    source: { open_pdks: OPEN_PDKS, from: `${RELEASES}/sky130-${OPEN_PDKS}`, license: 'Apache-2.0' },
     corners,
     devices: [...devices.values()]
       .filter((d) => d.name.startsWith('sky130_fd_pr__'))
@@ -279,7 +286,7 @@ export function build(out = OUT, onlyFixes = false) {
     bytes,
   };
   // Apache-2.0: la licencia va con los modelos
-  copyFileSync(join(SRC, 'LICENSE'), join(out, 'LICENSE'));
+  copyFileSync(join(ROOT, 'scripts', 'pdk', 'LICENSE-Apache-2.0'), join(out, 'LICENSE'));
   writeFileSync(join(out, 'index.json'), JSON.stringify(index, null, 1) + '\n');
   return index;
 }
@@ -288,7 +295,7 @@ export function build(out = OUT, onlyFixes = false) {
 function upToDate(out: string) {
   try {
     const index = JSON.parse(readFileSync(join(out, 'index.json'), 'utf8'));
-    return index.source.commit === COMMIT && statSync(join(out, 'index.json')).mtimeMs > statSync(fileURLToPath(import.meta.url)).mtimeMs;
+    return index.source.open_pdks === OPEN_PDKS && statSync(join(out, 'index.json')).mtimeMs > statSync(fileURLToPath(import.meta.url)).mtimeMs;
   } catch {
     return false;
   }

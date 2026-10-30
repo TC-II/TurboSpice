@@ -14,9 +14,11 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 WINDOW 39 56 96 Left 2
 SYMATTR Prefix X
+SYMATTR InstName XM1
 SYMATTR Value sky130_fd_pr__pfet_01v8_hvt
 SYMATTR SpiceLine W=1 L=0.15 nf=1
 SYMATTR Description sky130 PMOS 1.8 V, high Vt (sky130_fd_pr__pfet_01v8_hvt). W and L in µm.
+SYMATTR Skin pmos4
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

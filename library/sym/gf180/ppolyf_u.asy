@@ -8,6 +8,7 @@ WINDOW 3 36 56 Left 2
 LINE Normal 32 32 48 32
 WINDOW 39 36 80 Left 2
 SYMATTR Prefix X
+SYMATTR InstName XR1
 SYMATTR Value ppolyf_u
 SYMATTR SpiceLine r_width=1u r_length=10u
 SYMATTR Description GF180MCU unsalicided P+ poly resistor (~350 Ω/□); r_width and r_length in meters (ppolyf_u).

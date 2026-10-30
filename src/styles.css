@@ -1523,3 +1523,20 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-group legend button.link { font-weight: 400; }
 /* con la punta de prueba, lo que no se guardó en la simulación (#314) */
 .schematic line.unsaved, .schematic .sym.unsaved { opacity: 0.35; }
+/* diálogo de un dispositivo de PDK (PdkDialog.tsx) */
+.pdk-dlg .pdk-head { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); }
+.pdk-dlg .pdk-head code { font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdk-dlg .pdk-chip { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.pdk-dlg .pdk-variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
+.pdk-dlg .pdk-variants button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 8px; text-align: left; border-radius: 8px; }
+.pdk-dlg .pdk-variants button b { font: 600 12px var(--mono); }
+.pdk-dlg .pdk-variants button small { font-size: 11px; color: var(--fg-muted); line-height: 1.25; }
+.pdk-dlg .pdk-variants button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--bg)); box-shadow: inset 0 0 0 1px var(--accent); }
+.pdk-dlg .pdk-input { position: relative; display: block; }
+.pdk-dlg .pdk-input input { padding-right: 40px; }
+.pdk-dlg .pdk-input em { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font: 12px var(--mono); font-style: normal; color: var(--fg-muted); pointer-events: none; }
+.pdk-dlg .pdk-facts { font: 12px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+.pdk-dlg .pdk-shows { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.pdk-dlg .pdk-shows label { display: flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; }
+.pdk-dlg .pdk-shows input { width: auto; margin: 0; }
+.pdk-dlg .buttons { display: flex; gap: 8px; align-items: center; }

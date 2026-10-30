@@ -10,9 +10,11 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 64 Left 2
 WINDOW 39 24 88 Left 2
 SYMATTR Prefix D
-SYMATTR Value np_3p3
+SYMATTR InstName D1
+SYMATTR Value diode_nd2ps_03v3
 SYMATTR SpiceLine area=1p pj=4u
-SYMATTR Description GF180MCU N+ / P-well diode, 3.3 V (np_3p3). Area in m², perimeter (pj) in meters.
+SYMATTR Description GF180MCU N+ / P-substrate diode, 3.3 V (diode_nd2ps_03v3). Area in m², perimeter (pj) in meters.
+SYMATTR Skin diode
 PIN 16 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

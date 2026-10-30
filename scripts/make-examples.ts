@@ -315,13 +315,13 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   const step = (d: AscDoc, v: string, val: string) => hideWaveValues(setVal(d, v, val));
   // diferencial de dos etapas: par Q1/Q2 con carga resistiva, emisor común PNP (Q5, Q6) con Miller (Cc1, Cc2),
   // fuentes de corriente Q7/Q8 manejadas por el CMFB (Q9, Q10, Q11)
-  const dnote = (d: AscDoc, lines: string[]) => note(d, lines, 880);
+  const dnote = (d: AscDoc, lines: string[]) => note(d, lines, 1072);
   const lowCc = setVal(setVal(df, 'Cc1', '22p'), 'Cc2', '22p');
   const dmStep = (d: AscDoc) => step(step(d, 'Vp', 'PULSE(0 10m 0.5u 10n 10n 2u 4u) AC 0.5'), 'Vn', 'PULSE(0 -10m 0.5u 10n 10n 2u 4u) AC 0.5 180');
   const TRAN = { panes: [{ traces: [{ expr: 'V(outp)', color: '#1c7ed6' }, { expr: 'V(outn)', color: '#e8590c' }] }], active: 0, plot: 'tran1' } as SimView;
   const DF_NOTE = [
     'Two-stage fully differential amplifier: the pair Q1/Q2 with RC1/RC2, then the PNP common emitters Q5/Q6 with Miller compensation (Cc1, Cc2).',
-    'The stages cross (Q5 takes the collector of Q2) so that each output feeds back to its own input through R2/R1 (gain -10).',
+    'Q1 drives Q5 and Q2 drives Q6, so each output is in phase with its own side: the feedback crosses (outn to Q1, outp to Q2, by net labels) through R2/R1 (gain -10).',
     'Q7/Q8 are the output current sinks; the CMFB (Rcp, Rcn, Q9 to Q11) sets their base vb so that the outputs sit at Vcm.',
     'LP1 (Stability > DiffLoopProbe) is in series in the differential output; the .stb picks the mode (dm or cm). DM: about 58° of margin.',
   ];
@@ -329,34 +329,48 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   const bal = parseAsc(readFileSync('examples/stability/balun.asc', 'utf8'));
   const byHand: AscDoc = (() => {
     const part = parseAsc(`Version 4
-SHEET 1 1800 1300
-WIRE 448 1168 496 1168
-WIRE 592 1168 640 1168
-WIRE 448 1232 496 1232
-WIRE 592 1232 640 1232
-FLAG 864 368 op
-FLAG 864 432 on
-FLAG 960 368 outp
-FLAG 960 432 outn
-FLAG 352 1168 op
-FLAG 352 1232 on
-FLAG 736 1168 outp
-FLAG 736 1232 outn
-TEXT 352 1072 Left 2 ;LP1 by hand: two Balun back to back, a LoopProbe in each mode
-SYMBOL Stability\\Balun 400 1200 R0
+SHEET 1 2500 1600
+WIRE 448 1360 496 1360
+WIRE 592 1360 640 1360
+WIRE 448 1424 496 1424
+WIRE 592 1424 640 1424
+FLAG 1488 544 op
+FLAG 1488 608 on
+FLAG 1584 544 outp
+FLAG 1584 608 outn
+FLAG 352 1360 op
+FLAG 352 1424 on
+FLAG 736 1360 outp
+FLAG 736 1424 outn
+TEXT 352 1264 Left 2 ;LP1 by hand: two Balun back to back, a LoopProbe in each mode
+SYMBOL Stability\\Balun 400 1392 R0
 SYMATTR InstName B1
-SYMBOL Stability\\LoopProbe 544 1168 R0
+SYMBOL Stability\\LoopProbe 544 1360 R0
 SYMATTR InstName LPd
-SYMBOL Stability\\LoopProbe 544 1232 R0
+SYMBOL Stability\\LoopProbe 544 1424 R0
 SYMATTR InstName LPc
-SYMBOL Stability\\Balun 688 1200 M0
+SYMBOL Stability\\Balun 688 1392 M0
 SYMATTR InstName B2
 `);
     const d = without(df, 'LP1');
     return { ...d, wires: [...d.wires, ...part.wires], flags: [...d.flags, ...part.flags], symbols: [...d.symbols, ...part.symbols], texts: [...d.texts, ...part.texts] };
   })();
+  // la LoopProbe y el Balun dibujados como subcircuitos del proyecto (los mismos elementos que
+  // LoopProbe.lib): doble clic en la instancia muestra su circuito, y el .stb los encuentra igual
+  const SUBS = ['ProbeCircuit', 'BalunCircuit'].flatMap((n) => [
+    { name: `${n}.asc`, kind: 'schematic' as const, text: readFileSync(`examples/stability/${n}.asc`, 'utf8') },
+    { name: `${n}.asy`, kind: 'symbol' as const, text: readFileSync(`examples/stability/${n}.asy`, 'utf8') },
+  ]);
+  const inside = (d: AscDoc): AscDoc => ({
+    ...d,
+    symbols: d.symbols.map((x) => {
+      const t = x.type.replace(/\\+/g, '/');
+      return t === 'Stability/LoopProbe' && x.attrs.get('InstName') !== 'LP2' ? { ...x, type: 'ProbeCircuit' } : t === 'Stability/Balun' ? { ...x, type: 'BalunCircuit' } : x;
+    }),
+  });
   const TIAN = [
-    'LoopProbe (library/sub/Stability/LoopProbe.lib): in series in the loop, Vprb (an ammeter) from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground into x).',
+    'Double-click LP1 to see its circuit: ProbeCircuit is the LoopProbe (library/sub/Stability/LoopProbe.lib) drawn as a subcircuit of this project. In series in the loop,',
+    'Vprb (an ammeter) goes from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground) into x.',
     'All are 0 outside .stb: the probe is a wire. The .stb turns off every other AC source and runs two ac: run 1 with Vinj = 1, run 3 with Iinj = 1. With Vy = -V(x) and Iy = I(Vprb):',
     '   D = Vy1·Iy3 - Vy3·Iy1        T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1        T(GFT) = 1/(1/D - 1)',
     'Tian: the two injections (series voltage and shunt current) cancel the loading of the cut on both sides, so T does not depend on the impedances there',
@@ -367,7 +381,7 @@ SYMATTR InstName B2
     'SPICE implementations: Frank Wiedmann, https://sites.google.com/site/frankwiedmann/loopgain . More in docs/estabilidad.md.',
   ];
   const BALUN = [
-    'Balun (Stability > Balun): an ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)',
+    'Double-click B1 to see its circuit (BalunCircuit: the Stability > Balun drawn as a subcircuit of this project). An ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)',
     'and the F sources put them back on the mode side as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Then V(p)·I(p) + V(n)·I(n) = V(d)·I(d) + V(c)·I(c):',
     'it conserves power, so it neither isolates nor loads, and unlike a transformer it passes DC. Here Vp and Vn are 120° apart: d is their difference and c their mean (1 V with a 0.25 V ripple).',
     'A DiffLoopProbe is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.',
@@ -409,8 +423,8 @@ SYMATTR InstName B2
     bench(1, 'Differential step', setAnalysisLine(dnote(dmStep(df), ['A ±10 mV differential step: the outputs move ∓100 mV with the small overshoot of a 58° margin.']), '.tran 4u'), TRAN),
     bench(1, 'Differential step, Cc = 22p', setAnalysisLine(dnote(dmStep(lowCc), ['The same step with Cc = 22p: it rings at about 2 MHz, the crossover of T, with the 15° margin.']), '.tran 4u'), TRAN),
     bench(1, 'Common-mode step (Vcm)', setAnalysisLine(dnote(step(df, 'Vcm', 'PULSE(0 10m 0.5u 10n 10n 2u 4u)'), ['A 10 mV step in Vcm, the CMFB reference: both outputs follow it together. The probes are transparent here.']), '.tran 4u'), TRAN),
-    bench(2, 'LoopProbe: Tian and GFT', setAnalysisLine(note(se, TIAN), '.stb LP1 dec 50 10 100meg'), STB),
-    bench(2, 'Balun: differential and common mode', setAnalysisLine(note(bal, BALUN, 320), '.tran 3m'), {
+    bench(2, 'LoopProbe: Tian and GFT', setAnalysisLine(note(inside(se), TIAN), '.stb LP1 dec 50 10 100meg'), STB),
+    bench(2, 'Balun: differential and common mode', setAnalysisLine(note(inside(bal), BALUN, 320), '.tran 3m'), {
       panes: [{ traces: [{ expr: 'V(p)', color: '#1c7ed6' }, { expr: 'V(n)', color: '#e8590c' }] }, { traces: [{ expr: 'V(d)', color: '#2f9e44' }, { expr: 'V(c)', color: '#ae3ec9' }] }],
       active: 0,
       plot: 'tran1',
@@ -418,13 +432,13 @@ SYMATTR InstName B2
     bench(
       2,
       'DiffLoopProbe by hand: DM',
-      setAnalysisLine(dnote(byHand, ['LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn).', 'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.']), '.stb LPd dec 50 10 100meg'),
+      setAnalysisLine(dnote(inside(byHand), ['LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn). Double-click any of them to see its circuit.', 'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.']), '.stb LPd dec 50 10 100meg'),
       STB,
     ),
-    bench(2, 'DiffLoopProbe by hand: CM', setAnalysisLine(dnote(byHand, ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
+    bench(2, 'DiffLoopProbe by hand: CM', setAnalysisLine(dnote(inside(byHand), ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
   ];
   const ls: Project = {
-    name: 'Loop stability', created: t0, modified: t0, groups, files: [],
+    name: 'Loop stability', created: t0, modified: t0, groups, files: SUBS,
     activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'Loop stability', base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
   const text = await serializeTurbo(ls);

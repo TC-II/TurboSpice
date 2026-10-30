@@ -31,16 +31,16 @@ export const PDKS = ['sky130', 'gf180'] as const;
 /**
  * ".lib <ruta> <sección>" (o ".include <ruta>") de un PDK: su nombre y, si la sección la fija, la
  * esquina. Valen el nombre ("sky130 tt", "gf180 ff") y las rutas de open_pdks que usan xschem y los
- * tutoriales: sky130.lib.spice tt; sm141064.ngspice typical (las secciones bjt_, res_… de los demás
- * dispositivos no cambian la esquina: ya van con ella) y design.ngspice.
+ * tutoriales: sky130.lib.spice tt; sm141064.ngspice (o .spice) typical (las secciones bjt_, res_… de
+ * los demás dispositivos no cambian la esquina: ya van con ella) y design.ngspice (o .spice).
  */
 export function pdkLib(path: string, section?: string): { name: string; corner?: string } | undefined {
   const base = path.replace(/\\/g, '/').replace(/^["']|["']$/g, '').split('/').pop()!.toLowerCase();
   const sec = section?.toLowerCase();
   if (base === 'sky130' || base === 'sky130.lib.spice') return { name: 'sky130', corner: sec };
   if (base === 'gf180' || base === 'gf180mcu') return { name: 'gf180', corner: sec === 'typical' ? 'tt' : sec };
-  if (base === 'design.ngspice') return { name: 'gf180' };
-  if (base === 'sm141064.ngspice') {
+  if (base === 'design.ngspice' || base === 'design.spice') return { name: 'gf180' };
+  if (base === 'sm141064.ngspice' || base === 'sm141064.spice') {
     return { name: 'gf180', corner: !sec || /^(bjt|diode|res|mimcap|moscap)_/.test(sec) ? undefined : sec === 'typical' ? 'tt' : sec };
   }
   return undefined;

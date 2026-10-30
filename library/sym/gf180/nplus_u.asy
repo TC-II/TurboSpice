@@ -8,6 +8,7 @@ WINDOW 3 36 56 Left 2
 LINE Normal 32 32 48 32
 WINDOW 39 36 80 Left 2
 SYMATTR Prefix X
+SYMATTR InstName XR1
 SYMATTR Value nplus_u
 SYMATTR SpiceLine r_width=1u r_length=10u
 SYMATTR Description GF180MCU unsalicided N+ diffusion resistor; r_width and r_length in meters (nplus_u).

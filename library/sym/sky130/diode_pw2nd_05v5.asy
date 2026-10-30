@@ -10,9 +10,11 @@ WINDOW 0 24 0 Left 2
 WINDOW 3 24 64 Left 2
 WINDOW 39 24 88 Left 2
 SYMATTR Prefix D
+SYMATTR InstName D1
 SYMATTR Value sky130_fd_pr__diode_pw2nd_05v5
 SYMATTR SpiceLine area=1 pj=4
 SYMATTR Description sky130 P-well / N+ diode, 5.5 V (sky130_fd_pr__diode_pw2nd_05v5). Area in µm², perimeter (pj) in µm.
+SYMATTR Skin diode
 PIN 16 0 NONE 0
 PINATTR PinName +
 PINATTR SpiceOrder 1

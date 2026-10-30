@@ -74,12 +74,12 @@ for (const corner of corners) {
   for (;;) {
     ref = op(dir, [`.include "${PDK}/${c.file}"`], pool);
     if (!ref.error) break;
-    // las instancias nombradas en los errores y en la línea siguiente (n<k>_<pin>, x<k>…)
+    // las instancias nombradas en los errores y en las líneas de al lado (n<k>_<pin>, x<k>, xx<k>…)
     const lines = ref.log.split('\n');
     const blamed = new Set();
     lines.forEach((l, i) => {
       if (!/error|can't find model/i.test(l)) return;
-      for (const [, k] of `${l} ${lines[i + 1] ?? ''}`.matchAll(/\b(?:[xdqrc]|n)(\d+)(?:_\d+)?\b/gi)) blamed.add(Number(k));
+      for (const [, k] of `${lines[i - 1] ?? ''} ${l} ${lines[i + 1] ?? ''}`.matchAll(/\b(?:x+|[dqrc]|n)(\d+)(?:_\d+)?\b/gi)) blamed.add(Number(k));
     });
     const bad = pool.filter(({ k }) => blamed.has(k));
     if (!bad.length) throw new Error(`${corner}: la esquina entera no da punto de operación:\n${ref.log.slice(-2000)}`);

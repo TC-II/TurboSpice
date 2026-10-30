@@ -29,8 +29,8 @@ lo necesario para reproducir los binarios está acá.
 
 | Modelos | Origen | Licencia | Uso |
 |---|---|---|---|
-| SkyWater sky130 (`sky130_fd_pr`) | [google/skywater-pdk-libs-sky130_fd_pr](https://github.com/google/skywater-pdk-libs-sky130_fd_pr), commit fijado en `scripts/build-pdk.ts` | Apache-2.0 | Se bajan al construir y se distribuyen traducidos para ngspice en `library/pdk/sky130/` del sitio (ver `docs/pdk.md`) |
-| GlobalFoundries GF180MCU (`gf180mcu_fd_pr`) | [google/globalfoundries-pdk-libs-gf180mcu_fd_pr](https://github.com/google/globalfoundries-pdk-libs-gf180mcu_fd_pr), commit fijado en `scripts/build-pdk-gf180.ts` | Apache-2.0 | Igual, en `library/pdk/gf180/` |
+| SkyWater sky130 (`sky130_fd_pr`, sky130A) | [open_pdks](https://github.com/RTimothyEdwards/open_pdks) armado por [ciel-releases](https://github.com/fossi-foundation/ciel-releases), versión fijada en `scripts/build-pdk.ts` | Apache-2.0 | Se bajan al construir y se distribuyen traducidos para ngspice en `library/pdk/sky130/` del sitio (ver `docs/pdk.md`) |
+| GlobalFoundries GF180MCU (`gf180mcu_fd_pr`, gf180mcuD) | Igual, open_pdks de ciel-releases | Apache-2.0 | Igual, en `library/pdk/gf180/` |
 
 ## Librería de componentes, ejemplos y casos de prueba
 

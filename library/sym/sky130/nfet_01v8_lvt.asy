@@ -14,9 +14,11 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 WINDOW 39 56 96 Left 2
 SYMATTR Prefix X
+SYMATTR InstName XM1
 SYMATTR Value sky130_fd_pr__nfet_01v8_lvt
 SYMATTR SpiceLine W=1 L=0.15 nf=1
 SYMATTR Description sky130 NMOS 1.8 V, low Vt (sky130_fd_pr__nfet_01v8_lvt). W and L in µm.
+SYMATTR Skin nmos4
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

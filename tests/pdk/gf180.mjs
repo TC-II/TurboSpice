@@ -16,20 +16,20 @@ const DEVICES = `Vg g 0 1.65
 Vd d 0 3.3
 Vh h 0 6
 Vb b 0 0
-X1 d g 0 0 nmos_3p3 W=1u L=0.28u
-X2 0 g d d pmos_3p3 W=2u L=0.28u
-X3 h g 0 0 nmos_6p0 W=1u L=0.7u
-X4 0 g h h pmos_6p0 W=2u L=0.5u
-X5 d g 0 0 nmos_6p0_nat W=1u L=1.8u
+X1 d g 0 0 nfet_03v3 W=1u L=0.28u
+X2 0 g d d pfet_03v3 W=2u L=0.28u
+X3 h g 0 0 nfet_06v0 W=1u L=0.7u
+X4 0 g h h pfet_06v0 W=2u L=0.55u
+X5 d g 0 0 nfet_06v0_nvt W=1u L=1.8u
 X6 d g 0 ppolyf_u r_width=1u r_length=10u
 X7 d g 0 nplus_u r_width=1u r_length=10u
-X8 g 0 mim_2p0fF c_width=5u c_length=5u
-X9 0 g b 0 vnpn_10x10
-X10 0 b g vpnp_10x10
-D1 b g np_3p3 area=1e-12 pj=4e-6
+X8 g 0 cap_mim_2f0_m4m5_noshield c_width=5u c_length=5u
+X9 0 g b 0 npn_10p00x10p00
+X10 0 b g pnp_10p00x10p00
+D1 b g diode_nd2ps_03v3 area=1e-12 pj=4e-6
 Vin in 0 pulse(0 3.3 1n 50p 50p 2n 4n)
-X11 out in 0 0 nmos_3p3 W=1u L=0.28u
-X12 out in d d pmos_3p3 W=2u L=0.28u
+X11 out in 0 0 nfet_03v3 W=1u L=0.28u
+X12 out in d d pfet_03v3 W=2u L=0.28u
 C1 out 0 10f
 .control
 foreach vg 0 0.5 1 1.65 2.3 2.8 3.3

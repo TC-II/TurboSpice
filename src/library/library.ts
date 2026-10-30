@@ -253,7 +253,8 @@ export class Library implements SymbolSource {
   }
 
   skin(type: string) {
-    const name = baseName(type);
+    // un símbolo puede usar el dibujo de otro (SYMATTR Skin nmos4: los de PDK, sky130/nfet_01v8)
+    const name = this.symbol(type)?.attrs.get('Skin') ?? baseName(type);
     return this.bundle.skins[name] ?? this.bundle.skins[name.toLowerCase()];
   }
 

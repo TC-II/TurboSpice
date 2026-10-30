@@ -9,8 +9,10 @@ LINE Normal 16 64 26 60
 WINDOW 0 84 32 Left 2
 WINDOW 3 84 68 Left 2
 SYMATTR Prefix X
-SYMATTR Value vpnp_10x10
-SYMATTR Description GF180MCU vertical PNP, 10 × 10 µm emitter (vpnp_10x10).
+SYMATTR InstName XQ1
+SYMATTR Value pnp_10p00x10p00
+SYMATTR Description GF180MCU vertical PNP, 10 × 10 µm emitter (pnp_10p00x10p00).
+SYMATTR Skin pnp
 PIN 64 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

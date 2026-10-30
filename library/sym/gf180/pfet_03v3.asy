@@ -14,9 +14,11 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 WINDOW 39 56 96 Left 2
 SYMATTR Prefix X
-SYMATTR Value pmos_6p0
-SYMATTR SpiceLine W=1u L=0.5u nf=1
-SYMATTR Description GF180MCU PMOS 6 V; W and L in meters (pmos_6p0).
+SYMATTR InstName XM1
+SYMATTR Value pfet_03v3
+SYMATTR SpiceLine W=1u L=0.28u nf=1
+SYMATTR Description GF180MCU PMOS 3.3 V; W and L in meters (pfet_03v3).
+SYMATTR Skin pmos4
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

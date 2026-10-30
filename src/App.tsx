@@ -17,6 +17,7 @@ import { isStbPlot, StbView } from './waveform/StbView.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
+import { PdkDialog, pdkOfSymbol } from './schematic/PdkDialog.tsx';
 import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, ImportInfoDialog, SettingsDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
@@ -170,7 +171,7 @@ const GF180 = 'gf180.turbo';
 
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
-  | { kind: 'attrs'; index: number; label?: number }
+  | { kind: 'attrs'; index: number; label?: number; generic?: boolean }
   | { kind: 'switch'; index: number }
   | { kind: 'source'; index: number }
   | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
@@ -4184,7 +4185,23 @@ ${ltNetlistText(sim.built.lt)}
           }}
         />
       )}
-      {dialog?.kind === 'attrs' && doc.symbols[dialog.index] && (
+      {dialog?.kind === 'attrs' && doc.symbols[dialog.index] && !dialog.generic && pdkOfSymbol(doc.symbols[dialog.index].type) && (
+        <PdkDialog
+          inst={doc.symbols[dialog.index]}
+          def={lib.symbol(doc.symbols[dialog.index].type)}
+          lib={lib}
+          windowDefaults={lib.windowDefaults}
+          onAdvanced={() => setDialog({ ...dialog, generic: true })}
+          onClose={() => setDialog(null)}
+          onApply={(attrs, labels) => {
+            setDialog(null);
+            let d = Object.keys(attrs).length ? setSymbolAttrs(doc, dialog.index, attrs) : doc;
+            d = patchLabels(d, [dialog.index], labels, lib);
+            if (d !== doc) commit(d);
+          }}
+        />
+      )}
+      {dialog?.kind === 'attrs' && doc.symbols[dialog.index] && (dialog.generic || !pdkOfSymbol(doc.symbols[dialog.index].type)) && (
         <AttributeDialog
           inst={doc.symbols[dialog.index]}
           def={lib.symbol(doc.symbols[dialog.index].type)}

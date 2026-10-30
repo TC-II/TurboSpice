@@ -14,9 +14,11 @@ WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 WINDOW 39 56 96 Left 2
 SYMATTR Prefix X
-SYMATTR Value nmos_6p0_nat
-SYMATTR SpiceLine W=1u L=1.8u nf=1
-SYMATTR Description GF180MCU NMOS 6 V, native; W and L in meters (nmos_6p0_nat).
+SYMATTR InstName XM1
+SYMATTR Value nfet_06v0
+SYMATTR SpiceLine W=1u L=0.7u nf=1
+SYMATTR Description GF180MCU NMOS 6 V; W and L in meters (nfet_06v0).
+SYMATTR Skin nmos4
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

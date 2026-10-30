@@ -8,6 +8,7 @@ WINDOW 3 36 56 Left 2
 LINE Normal 32 32 48 32
 WINDOW 39 36 80 Left 2
 SYMATTR Prefix X
+SYMATTR InstName XR1
 SYMATTR Value sky130_fd_pr__res_xhigh_po_0p35
 SYMATTR SpiceLine L=3.5
 SYMATTR Description sky130 Poly resistor, extra high sheet, 0.35 µm wide (~2 kΩ/□) (sky130_fd_pr__res_xhigh_po_0p35). W and L in µm.

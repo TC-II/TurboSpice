@@ -12,7 +12,7 @@ export type PdkCorner = {
   devices: Record<string, number[]>;
 };
 
-export type PdkIndex = { pdk: string; corners: PdkCorner[] };
+export type PdkIndex = { pdk: string; corners: PdkCorner[]; devices?: { name: string }[]; models?: { name: string }[] };
 
 /**
  * Las líneas .include de una esquina para los dispositivos dados: sólo los archivos que hacen
@@ -26,16 +26,38 @@ export function pdkIncludes(index: PdkIndex, corner: string, devices: Iterable<s
   return [...need].sort((a, b) => a - b).map((i) => `.include "${base}/${c.units[i]}"`);
 }
 
-export const PDKS = ['sky130'] as const;
+export const PDKS = ['sky130', 'gf180'] as const;
 
 /**
- * ".lib <ruta> <esquina>" de un PDK: "sky130", o cualquier ruta a sky130.lib.spice (como la de
- * open_pdks que usan xschem y los tutoriales). Devuelve el nombre del PDK.
+ * ".lib <ruta> <sección>" (o ".include <ruta>") de un PDK: su nombre y, si la sección la fija, la
+ * esquina. Valen el nombre ("sky130 tt", "gf180 ff") y las rutas de open_pdks que usan xschem y los
+ * tutoriales: sky130.lib.spice tt; sm141064.ngspice typical (las secciones bjt_, res_… de los demás
+ * dispositivos no cambian la esquina: ya van con ella) y design.ngspice.
  */
-export function pdkLib(path: string): string | undefined {
-  const base = path.replace(/\\/g, '/').replace(/^"|"$/g, '').split('/').pop()!.toLowerCase();
-  return PDKS.find((p) => base === p || base === `${p}.lib.spice`);
+export function pdkLib(path: string, section?: string): { name: string; corner?: string } | undefined {
+  const base = path.replace(/\\/g, '/').replace(/^["']|["']$/g, '').split('/').pop()!.toLowerCase();
+  const sec = section?.toLowerCase();
+  if (base === 'sky130' || base === 'sky130.lib.spice') return { name: 'sky130', corner: sec };
+  if (base === 'gf180' || base === 'gf180mcu') return { name: 'gf180', corner: sec === 'typical' ? 'tt' : sec };
+  if (base === 'design.ngspice') return { name: 'gf180' };
+  if (base === 'sm141064.ngspice') {
+    return { name: 'gf180', corner: !sec || /^(bjt|diode|res|mimcap|moscap)_/.test(sec) ? undefined : sec === 'typical' ? 'tt' : sec };
+  }
+  return undefined;
 }
+
+/** Los .lib/.include de PDK de unas directivas (para saber qué índices cargar antes de la netlist) */
+export function pdkLibsIn(text: string): string[] {
+  const out = new Set<string>();
+  for (const [, path, sec] of text.matchAll(/^\s*\.(?:lib|include|inc)\s+["']?([^"'\s]+)["']?(?:\s+(\S+))?/gim)) {
+    const hit = pdkLib(path, sec);
+    if (hit) out.add(hit.name);
+  }
+  return [...out];
+}
+
+/** Nombres (en minúsculas) de los subcircuitos y modelos de un índice */
+export const pdkNames = (index: PdkIndex) => new Set([...(index.devices ?? []), ...(index.models ?? [])].map((d) => d.name.toLowerCase()));
 
 const DEVICE = /\bsky130_fd_pr__\w+/gi;
 

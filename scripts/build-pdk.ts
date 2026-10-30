@@ -29,27 +29,29 @@ export const CORNERS = ['tt', 'ff', 'ss', 'sf', 'fs'] as const;
 export const SRC = join(ROOT, '.cache', 'pdk', 'sky130_fd_pr');
 const OUT = process.argv[2] ? join(process.cwd(), process.argv[2]) : join(ROOT, 'public', 'library', 'pdk', 'sky130');
 
-const rel = (base: string, p: string) => relative(base, p).split('\\').join('/');
-const git = (...args: string[]) => execFileSync('git', ['-C', SRC, ...args], { stdio: 'inherit' });
-
-/** Clona (sparse, sin blobs de más) los modelos al commit fijado, o reusa el clon. */
-export function fetchSources() {
-  if (!existsSync(join(SRC, '.git'))) {
-    mkdirSync(SRC, { recursive: true });
+export const rel = (base: string, p: string) => relative(base, p).split('\\').join('/');
+/**
+ * Clona (sparse, sin blobs de más) un repo de modelos al commit fijado, o reusa el clon.
+ * (También la usa scripts/build-pdk-gf180.ts.)
+ */
+export function fetchSources(src = SRC, repo = REPO, commit = COMMIT, paths = ['models', 'cells']) {
+  const git = (...args: string[]) => execFileSync('git', ['-C', src, ...args], { stdio: 'inherit' });
+  if (!existsSync(join(src, '.git'))) {
+    mkdirSync(src, { recursive: true });
     git('init', '-q');
-    git('remote', 'add', 'origin', REPO);
-    git('sparse-checkout', 'set', 'models', 'cells');
+    git('remote', 'add', 'origin', repo);
+    git('sparse-checkout', 'set', ...paths);
   }
   const head = (() => {
     try {
-      return execFileSync('git', ['-C', SRC, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: 'pipe' }).trim();
+      return execFileSync('git', ['-C', src, 'rev-parse', 'HEAD'], { encoding: 'utf8', stdio: 'pipe' }).trim();
     } catch {
       return '';
     }
   })();
-  if (head !== COMMIT) {
-    git('fetch', '-q', '--depth', '1', '--filter=blob:none', 'origin', COMMIT);
-    git('checkout', '-q', '--force', COMMIT);
+  if (head !== commit) {
+    git('fetch', '-q', '--depth', '1', '--filter=blob:none', 'origin', commit);
+    git('checkout', '-q', '--force', commit);
   }
 }
 
@@ -85,7 +87,7 @@ function libSection(text: string, name: string): string[] {
 type Subckt = { name: string; pins: string[]; params: Record<string, string>; file: string };
 
 /** Pines y parámetros por defecto de cada .subckt (la línea y sus continuaciones +). */
-function subckts(text: string, file: string): Subckt[] {
+export function subckts(text: string, file: string): Subckt[] {
   const out: Subckt[] = [];
   const lines = text.split('\n');
   for (let i = 0; i < lines.length; i++) {

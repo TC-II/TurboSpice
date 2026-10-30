@@ -33,8 +33,8 @@ export interface ModelResolver {
   cmpFile?(name: string): string | undefined;
   /** Archivo de la librería de LTspice del usuario que define este modelo/subcircuito (se incluye solo) */
   ltspiceFile?(name: string): string | undefined;
-  /** ¿Es ".lib <ruta> <esquina>" la librería de un PDK? Su nombre (los modelos los agrega schematicSim) */
-  pdkLib?(path: string): string | undefined;
+  /** ¿Es ".lib <ruta> <sección>" la librería de un PDK? Su nombre y la esquina, si la fija (los modelos los agrega schematicSim) */
+  pdkLib?(path: string, section?: string): { name: string; corner?: string } | undefined;
 }
 
 export interface NgspiceNetlist {
@@ -748,9 +748,11 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const include = (path: string, section?: string): string | null => {
     // (sin comillas, el regex de .lib deja la esquina pegada a la ruta: ".lib sky130 tt")
     const split = section === undefined ? /^(.*\S)\s+(\S+)$/.exec(path) : null;
-    const pdkName = models.pdkLib?.(path) ?? (split ? models.pdkLib?.(split[1]) : undefined);
-    if (pdkName) {
-      pdk = { name: pdkName, corner: (section ?? (models.pdkLib?.(path) ? undefined : split?.[2]) ?? 'tt').toLowerCase() };
+    const hit = models.pdkLib?.(path, section) ?? (split ? models.pdkLib?.(split[1], split[2]) : undefined);
+    if (hit) {
+      // (design.ngspice o .lib … res_typical: el PDK, sin cambiar la esquina que ya haya)
+      if (hit.corner || !pdk || pdk.name !== hit.name) pdk = { name: hit.name, corner: hit.corner ?? pdk?.corner ?? 'tt' };
+      const pdkName = hit.name;
       return `* PDK ${pdkName}, esquina ${pdk.corner}`;
     }
     const rel = models.resolve(path);

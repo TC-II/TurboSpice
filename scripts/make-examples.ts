@@ -13,8 +13,8 @@
 //   (examples/transistors/), con el BJT (BC547C) y el MOSFET (2N7000) uno al lado del otro.
 // - Loop stability.turbo: la ganancia de lazo (.stb) con la sonda simple y la diferencial
 //   (examples/stability/): Tian, GFT, márgenes, lugar de raíces y el transitorio que los confirma.
-// - sky130.turbo: transistores del PDK sky130 (examples/pdk/, docs/pdk.md): curvas del NMOS y el
-//   inversor en las esquinas tt, ff y ss, y su transitorio.
+// - sky130.turbo y gf180.turbo: transistores de los PDK (examples/pdk/, docs/pdk.md): curvas del
+//   NMOS y el inversor en las esquinas tt, ff y ss, y su transitorio.
 // (ADC.turbo, el de simulación mixta con Verilog, lo arma scripts/make-adc.ts)
 //   npx vite-node scripts/make-examples.ts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -432,18 +432,21 @@ SYMATTR InstName B2
   console.log(`Loop stability.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }
 
-// --- sky130: modelos del PDK (docs/pdk.md); la esquina es la línea .lib sky130 <esquina>
-{
+// --- sky130 y gf180: modelos de PDK (docs/pdk.md); la esquina es la línea .lib <pdk> <esquina>
+for (const pdk of [
+  { name: 'sky130', nmos: 'NMOS curves', curves: 'sky130_nfet_curves', inverter: 'sky130_inverter', vdd: '1.8' },
+  { name: 'gf180', nmos: 'NMOS curves', curves: 'gf180_nmos_curves', inverter: 'gf180_inverter', vdd: '3.3' },
+]) {
   const groups = [
-    { id: newId('g'), name: 'NMOS curves' },
+    { id: newId('g'), name: pdk.nmos },
     { id: newId('g'), name: 'CMOS inverter' },
   ];
-  const corner = (d: AscDoc, c: string): AscDoc => parseAsc(serializeAsc(d).replace(/!\.lib sky130 \w+/, `!.lib sky130 ${c}`));
+  const corner = (d: AscDoc, c: string): AscDoc => parseAsc(serializeAsc(d).replace(new RegExp(`!\\.lib ${pdk.name} \\w+`), `!.lib ${pdk.name} ${c}`));
   const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
-  const nfet = parseAsc(readFileSync('examples/pdk/sky130_nfet_curves.asc', 'utf8'));
-  const inv = parseAsc(readFileSync('examples/pdk/sky130_inverter.asc', 'utf8'));
+  const nfet = parseAsc(readFileSync(`examples/pdk/${pdk.curves}.asc`, 'utf8'));
+  const inv = parseAsc(readFileSync(`examples/pdk/${pdk.inverter}.asc`, 'utf8'));
   const vtc: SimView = { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'dc1' };
-  const pulse = setAnalysisLine(hideWaveValues(setVal(inv, 'V2', 'PULSE(0 1.8 0.5n 50p 50p 1n 2n)')), '.tran 4n');
+  const pulse = setAnalysisLine(hideWaveValues(setVal(inv, 'V2', `PULSE(0 ${pdk.vdd} 0.5n 50p 50p 1n 2n)`)), '.tran 4n');
   const sims: Sim[] = [
     bench(0, 'ID against VDS (tt)', nfet, { panes: [{ traces: [{ expr: '-I(VD)', color: '#1c7ed6' }] }], active: 0, plot: 'dc1' }),
     bench(0, 'ID against VDS (ff)', corner(nfet, 'ff'), { panes: [{ traces: [{ expr: '-I(VD)', color: '#e8590c' }] }], active: 0, plot: 'dc1' }),
@@ -453,11 +456,11 @@ SYMATTR InstName B2
     bench(1, 'Transfer curve (ss)', corner(inv, 'ss'), vtc),
     bench(1, 'Step response (tt)', pulse, { panes: [{ traces: [{ expr: 'V(in)', color: '#2f9e44' }, { expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'tran1' }),
   ];
-  const sky: Project = {
-    name: 'sky130', created: t0, modified: t0, groups, files: [],
-    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'sky130', base: sims[0].asc, activeSim: sims[0].id, sims }],
+  const project: Project = {
+    name: pdk.name, created: t0, modified: t0, groups, files: [],
+    activeVariant: BENCHES, variants: [{ id: BENCHES, name: pdk.name, base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
-  const text = await serializeTurbo(sky);
-  writeFileSync('public/examples/sky130.turbo', text);
-  console.log(`sky130.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
+  const text = await serializeTurbo(project);
+  writeFileSync(`public/examples/${pdk.name}.turbo`, text);
+  console.log(`${pdk.name}.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }

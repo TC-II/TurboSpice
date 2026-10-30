@@ -275,6 +275,7 @@ export const es: Record<string, string> = {
   'Copy the link with Ctrl+C.': 'Copiá el link con Ctrl+C.',
   'Could not download {rel}': 'No se pudo descargar {rel}',
   'SkyWater sky130 PDK: NMOS output curves and a CMOS inverter in the tt, ff and ss corners': 'PDK sky130 de SkyWater: curvas de salida del NMOS y un inversor CMOS en las esquinas tt, ff y ss',
+  'GlobalFoundries GF180MCU PDK: NMOS output curves and a CMOS inverter in the tt, ff and ss corners': 'PDK GF180MCU de GlobalFoundries: curvas de salida del NMOS y un inversor CMOS en las esquinas tt, ff y ss',
   '{pdk} has no corner "{corner}" (available: {list})': '{pdk} no tiene la esquina "{corner}" (hay: {list})',
   'Could not import the LTspice library: {p0}': 'No se pudo importar la librería de LTspice: {p0}',
   'Could not import: {p0}': 'No se pudo importar: {p0}',

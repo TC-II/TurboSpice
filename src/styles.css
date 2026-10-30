@@ -1547,3 +1547,4 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .simbar .sb-pdk button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--fg); }
 .simbar .sb-pdk button.active { background: var(--accent); color: #fff; }
 .simbar .sb-pdk button:disabled { opacity: 0.35; }
+.simbar .sb-pdk button.sb-pdk-all { font: 11px system-ui, sans-serif; border-left: 1px solid var(--border); border-radius: 0 6px 6px 0; margin-left: 2px; }

@@ -80,5 +80,5 @@ Vienen de **open_pdks**, los mismos que usan xschem y los tutoriales, con sus no
 
 ## Pendiente
 
-- Barrido de esquinas en el Estudio (hoy, un testbench por esquina, como en los ejemplos).
+- Curvas de todas las esquinas superpuestas en una sola simulación (hoy, el botón «All» de la barra crea un testbench por esquina: `.step` no sirve, cada esquina carga otros modelos).
 - Los símbolos usan los gráficos de línea de los base (sin skin SVG).

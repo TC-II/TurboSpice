@@ -53,6 +53,7 @@ import {
   propagateAttrs,
   mergeFiles,
   projectFileKind,
+  cornerSims,
   duplicateSim as duplicateProjectSim,
   removeVariant,
   lineOf,
@@ -1897,6 +1898,11 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     markDirty();
   };
 
+  const simAllCorners = (id: string, name: string, corner: string) => {
+    enter(cornerSims(leave(), id, name, corner, PDK_CORNERS));
+    markDirty();
+  };
+
   // --- Variantes (#150): la cápsula Proyecto · Variante ---
   const deleteVariant = (id: string) => {
     const p0 = leave();
@@ -3683,6 +3689,7 @@ ${ltNetlistText(sim.built.lt)}
             onPickCancel={() => endPick(null)}
             control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
             pdk={pdkBar}
+            onAllCorners={curSim && pdkBar && !pdkBar.fixed ? () => simAllCorners(curSim.id, simName(curSim), pdkBar.corner) : undefined}
             onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}

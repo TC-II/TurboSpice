@@ -1,6 +1,7 @@
 // Operaciones sobre el proyecto (#150, #151, #152): variantes, simulaciones con su propio
 // circuito y corridas. Todas devuelven un proyecto nuevo (no modifican el que reciben).
 import type { AscDoc } from '../asc/model.ts';
+import { writeData } from '../asc/dataText.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import { removeAnalysis } from '../schematic/directivesEdit.ts';
@@ -94,6 +95,33 @@ export function duplicateSim(p: Project, simId: string): { project: Project; id:
   const s: Sim = { id: newId('s'), ...(name ? { name } : {}), asc: src.asc, ...(src.view ? { view: structuredClone(src.view) } : {}), ...(src.group ? { group: src.group } : {}), runs: [] };
   const i = v.sims.indexOf(src);
   return { project: mapVariant(p, v.id, (x) => ({ ...x, sims: [...v.sims.slice(0, i + 1), s, ...v.sims.slice(i + 1)], activeSim: s.id })), id: s.id };
+}
+
+/**
+ * Un testbench por esquina del PDK a partir de uno (docs/pdk.md): copias con su circuito y su
+ * vista, sin historial, detrás del original y con la esquina en el nombre. Saltea las esquinas que
+ * ya tiene otro testbench con ese nombre; el original queda activo y se renombra con la suya.
+ */
+export function cornerSims(p: Project, simId: string, name: string, corner: string, corners: readonly string[]): Project {
+  const v = variantOf(p);
+  const src = simOf(v, simId);
+  if (!src) return p;
+  const base = name.replace(/ \((tt|ff|ss|sf|fs)\)$/, '');
+  const named = (c: string) => `${base} (${c})`;
+  const taken = new Set(v.sims.map((x) => x.name));
+  const copies = corners
+    .filter((c) => c !== corner && !taken.has(named(c)))
+    .map((c): Sim => ({
+      id: newId('s'),
+      name: named(c),
+      asc: serializeAsc(writeData(parseAsc(src.asc), 'pdk', c === 'tt' ? undefined : { corner: c })),
+      ...(src.view ? { view: structuredClone(src.view) } : {}),
+      ...(src.group ? { group: src.group } : {}),
+      runs: [],
+    }));
+  const i = v.sims.indexOf(src);
+  const sims = [...v.sims.slice(0, i), { ...src, name: named(corner) }, ...copies, ...v.sims.slice(i + 1)];
+  return mapVariant(p, v.id, (x) => ({ ...x, sims }));
 }
 
 /** Saca una simulación; si era la activa pasa a la siguiente (o a la anterior, o a la base) */

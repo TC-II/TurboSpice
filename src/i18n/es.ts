@@ -2094,5 +2094,6 @@ export const es: Record<string, string> = {
   'Set by the directive {line}': 'La fija la directiva {line}',
   'Process corner of the {pdk} models: typical, fast or slow NMOS and PMOS (first letter NMOS, second PMOS)': 'Esquina de proceso de los modelos de {pdk}: NMOS y PMOS típicos, rápidos o lentos (la primera letra es el NMOS, la segunda el PMOS)',
   'corner {c}': 'esquina {c}',
+  'Create one testbench per corner from this one': 'Crear un testbench por esquina a partir de éste',
   'All attributes…': 'Todos los atributos…',
 };

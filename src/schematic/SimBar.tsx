@@ -168,7 +168,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, pdk, onStudio, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -195,6 +195,8 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
    * .lib del esquemático (el texto de la directiva, para el tooltip).
    */
   pdk?: { name: string; corner: string; corners: readonly string[]; fixed?: string; onChange(corner: string): void };
+  /** crear un testbench por esquina del PDK */
+  onAllCorners?(): void;
   /** abrir el Studio */
   onStudio(): void;
   onApply(line: string): void;
@@ -264,6 +266,11 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
               {c}
             </button>
           ))}
+          {onAllCorners && (
+            <button type="button" className="sb-pdk-all" title={t('Create one testbench per corner from this one')} aria-label={t('Create one testbench per corner from this one')} onClick={onAllCorners}>
+              {t('All')}
+            </button>
+          )}
         </div>
       )}
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>

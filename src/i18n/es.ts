@@ -2089,6 +2089,10 @@ export const es: Record<string, string> = {
   'gate area {a} µm²': 'área de compuerta {a} µm²',
   'Show the model name': 'Mostrar el nombre del modelo',
   'Show the parameters': 'Mostrar los parámetros',
-  'The corner is the .lib {pdk} <corner> directive (tt, ff, ss, sf, fs); without one, tt.': 'La esquina es la directiva .lib {pdk} <esquina> (tt, ff, ss, sf, fs); sin ella, tt.',
+  'The corner (tt, ff, ss, sf, fs) is chosen in the simulation bar.': 'La esquina (tt, ff, ss, sf, fs) se elige en la barra de simulación.',
+  '{pdk} corner': 'Esquina de {pdk}',
+  'Set by the directive {line}': 'La fija la directiva {line}',
+  'Process corner of the {pdk} models: typical, fast or slow NMOS and PMOS (first letter NMOS, second PMOS)': 'Esquina de proceso de los modelos de {pdk}: NMOS y PMOS típicos, rápidos o lentos (la primera letra es el NMOS, la segunda el PMOS)',
+  'corner {c}': 'esquina {c}',
   'All attributes…': 'Todos los atributos…',
 };

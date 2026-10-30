@@ -22,13 +22,18 @@ Vienen de **open_pdks**, los mismos que usan xschem y los tutoriales, con sus no
     resistencias de poly y de difusión, MIM (`cap_mim_2f0_m4m5_noshield`: las esquinas de open_pdks
     cargan los MIM nuevos, no `cap_mim_2f0ff`), NPN, PNP (3 pines) y diodo. **W y L van en metros**
     (`W=1u L=0.28u`); las resistencias usan `r_width`/`r_length` y el MIM, `c_width`/`c_length`.
-- La esquina se elige con `.lib sky130 <esquina>` o `.lib gf180 <esquina>` (tt, ff, ss, sf, fs).
-  También valen las líneas de xschem y los tutoriales: `.lib /…/sky130.lib.spice tt`;
-  `.include /…/design.ngspice` y `.lib /…/sm141064.ngspice typical` (o `.spice`) (las de `res_typical`,
-  `bjt_typical`… no cambian la esquina: cada esquina ya trae las de todos los dispositivos).
-- sky130 sin `.lib`: cualquier `sky130_fd_pr__…` en la netlist (también en subcircuitos propios o
-  en archivos del usuario) se reconoce y va con tt. GF180 necesita el `.lib`: sus nombres
-  (`nmos_3p3`, `rm1`…) no se distinguen de los de un modelo cualquiera.
+- **No hace falta ninguna directiva.** El PDK sale de los símbolos que se usan (los de `sky130/` o
+  `gf180/`, `pdkOfSymbols`) y la esquina (tt, ff, ss, sf, fs) se elige en la barra de simulación,
+  al principio, cuando el circuito tiene un símbolo de PDK. Se guarda en el `.asc` de cada testbench
+  como dato oculto (`;.pdk`, `src/asc/dataText.ts`; tt no se guarda), así que viaja con él, cuenta
+  como cambio del circuito y aparece en el historial de corridas («esquina ss»).
+- También vale escribirla: `.lib sky130 <esquina>`, `.lib gf180 <esquina>` o las líneas de xschem
+  y los tutoriales (`.lib /…/sky130.lib.spice tt`; `.include /…/design.ngspice` y
+  `.lib /…/sm141064.ngspice typical`, o `.spice`; las de `res_typical`, `bjt_typical`… no cambian la
+  esquina). Una directiva con esquina manda: la barra la muestra fija.
+- sky130 también se reconoce por cualquier `sky130_fd_pr__…` en la netlist (subcircuitos propios,
+  archivos del usuario). Los nombres de GF180 (`nfet_03v3`, `rm1`…) no se distinguen de un modelo
+  cualquiera: hace falta un símbolo de `gf180/` o la directiva.
 - Ejemplos: los proyectos **sky130** y **gf180** del menú Ejemplos (curvas del NMOS e inversor en
   tt, ff y ss, `scripts/make-examples.ts`), armados con `examples/pdk/*.asc`.
 
@@ -75,5 +80,5 @@ Vienen de **open_pdks**, los mismos que usan xschem y los tutoriales, con sus no
 
 ## Pendiente
 
-- Barrido de esquinas en el Estudio.
+- Barrido de esquinas en el Estudio (hoy, un testbench por esquina, como en los ejemplos).
 - Los símbolos usan los gráficos de línea de los base (sin skin SVG).

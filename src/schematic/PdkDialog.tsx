@@ -6,17 +6,14 @@ import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, type WindowDefaults } from '../asc/resolve.ts';
 import type { Library } from '../library/library.ts';
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
+import { pdkOfSymbol } from '../library/pdk.ts';
 import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import { si } from '../waveform/series.ts';
 import { t } from '../i18n/i18n.ts';
 import { Modal, labelRows } from './dialogs.tsx';
 import type { LabelPatch } from './edit.ts';
 
-/** El PDK de un símbolo («sky130\nfet_01v8» → sky130), si es de uno */
-export function pdkOfSymbol(type: string): 'sky130' | 'gf180' | undefined {
-  const dir = type.replace(/\\/g, '/').split('/').slice(-2, -1)[0]?.toLowerCase();
-  return dir === 'sky130' || dir === 'gf180' ? dir : undefined;
-}
+export { pdkOfSymbol } from '../library/pdk.ts';
 
 type Field = { key: string; label: string; unit: string; scale: number; suffix: string };
 
@@ -193,7 +190,7 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
             </label>
           )}
         </div>
-        <small className="hint">{t('The corner is the .lib {pdk} <corner> directive (tt, ff, ss, sf, fs); without one, tt.', { pdk })}</small>
+        <small className="hint">{t('The corner (tt, ff, ss, sf, fs) is chosen in the simulation bar.')}</small>
         <div className="buttons">
           <button type="button" className="link" onClick={onAdvanced}>
             {t('All attributes…')}

@@ -27,6 +27,24 @@ export function pdkIncludes(index: PdkIndex, corner: string, devices: Iterable<s
 }
 
 export const PDKS = ['sky130', 'gf180'] as const;
+export type PdkName = (typeof PDKS)[number];
+/** Las esquinas de los dos PDK (las que arma scripts/build-pdk*.ts) */
+export const PDK_CORNERS = ['tt', 'ff', 'ss', 'sf', 'fs'] as const;
+
+/** El PDK de un símbolo de la librería («sky130\\nfet_01v8» → sky130), si es de uno */
+export function pdkOfSymbol(type: string): PdkName | undefined {
+  const dir = type.replace(/\\/g, '/').split('/').slice(-2, -1)[0]?.toLowerCase();
+  return PDKS.find((p) => p === dir);
+}
+
+/** El PDK de los símbolos de un esquemático (el primero que aparece) */
+export const pdkOfSymbols = (types: Iterable<string>): PdkName | undefined => {
+  for (const t of types) {
+    const p = pdkOfSymbol(t);
+    if (p) return p;
+  }
+  return undefined;
+};
 
 /**
  * ".lib <ruta> <sección>" (o ".include <ruta>") de un PDK: su nombre y, si la sección la fija, la

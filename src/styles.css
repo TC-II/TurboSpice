@@ -1540,3 +1540,10 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .pdk-dlg .pdk-shows label { display: flex; align-items: center; gap: 6px; color: var(--fg); cursor: pointer; }
 .pdk-dlg .pdk-shows input { width: auto; margin: 0; }
 .pdk-dlg .buttons { display: flex; gap: 8px; align-items: center; }
+/* esquina del PDK en la barra de simulación (SimBar.tsx) */
+.simbar .sb-pdk { display: inline-flex; flex: none; align-items: center; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; }
+.simbar .sb-pdk .pdk-chip { margin-right: 4px; font-size: 11px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+.simbar .sb-pdk button { font: 12px var(--mono); padding: 2px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--fg-muted); }
+.simbar .sb-pdk button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--fg); }
+.simbar .sb-pdk button.active { background: var(--accent); color: #fff; }
+.simbar .sb-pdk button:disabled { opacity: 0.35; }

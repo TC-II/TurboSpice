@@ -168,7 +168,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, onStudio, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, pdk, onStudio, onApply, onRun }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -190,6 +190,11 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   onPickCancel?(): void;
   /** texto del bloque .control si la simulación es Complex (#241) */
   control?: string;
+  /**
+   * El circuito usa un PDK (docs/pdk.md): su esquina se elige acá. `fixed`: la fija una directiva
+   * .lib del esquemático (el texto de la directiva, para el tooltip).
+   */
+  pdk?: { name: string; corner: string; corners: readonly string[]; fixed?: string; onChange(corner: string): void };
   /** abrir el Studio */
   onStudio(): void;
   onApply(line: string): void;
@@ -238,6 +243,29 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
 
   return (
     <div className="simbar" role="group" aria-label={t('Selected simulation')}>
+      {pdk && (
+        <div
+          className="sb-pdk"
+          role="radiogroup"
+          aria-label={t('{pdk} corner', { pdk: pdk.name })}
+          title={pdk.fixed ? t('Set by the directive {line}', { line: pdk.fixed }) : t('Process corner of the {pdk} models: typical, fast or slow NMOS and PMOS (first letter NMOS, second PMOS)', { pdk: pdk.name })}
+        >
+          <span className="chip pdk-chip">{pdk.name}</span>
+          {pdk.corners.map((c) => (
+            <button
+              type="button"
+              key={c}
+              role="radio"
+              aria-checked={c === pdk.corner}
+              className={c === pdk.corner ? 'active' : ''}
+              disabled={!!pdk.fixed && c !== pdk.corner}
+              onClick={() => pdk.onChange(c)}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      )}
       <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
       <datalist id="bar-probes">{(info.probes ?? []).map((p) => <option key={p.name} value={p.name} />)}</datalist>

@@ -20,6 +20,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import type { AscDoc } from '../src/asc/model.ts';
 import { parseAsc } from '../src/asc/parse.ts';
+import { writeData } from '../src/asc/dataText.ts';
 import { serializeAsc } from '../src/asc/serialize.ts';
 import { readAsc } from '../src/schematic/fileio.ts';
 import { setAnalysisLine } from '../src/schematic/directivesEdit.ts';
@@ -446,7 +447,7 @@ SYMATTR InstName B2
   console.log(`Loop stability.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }
 
-// --- sky130 y gf180: modelos de PDK (docs/pdk.md); la esquina es la línea .lib <pdk> <esquina>
+// --- sky130 y gf180: modelos de PDK (docs/pdk.md); el PDK sale de los símbolos y la esquina, de la barra
 for (const pdk of [
   { name: 'sky130', nmos: 'NMOS curves', curves: 'sky130_nfet_curves', inverter: 'sky130_inverter', vdd: '1.8' },
   { name: 'gf180', nmos: 'NMOS curves', curves: 'gf180_nmos_curves', inverter: 'gf180_inverter', vdd: '3.3' },
@@ -455,7 +456,8 @@ for (const pdk of [
     { id: newId('g'), name: pdk.nmos },
     { id: newId('g'), name: 'CMOS inverter' },
   ];
-  const corner = (d: AscDoc, c: string): AscDoc => parseAsc(serializeAsc(d).replace(new RegExp(`!\\.lib ${pdk.name} \\w+`), `!.lib ${pdk.name} ${c}`));
+  // la esquina, como la elige la barra de simulación (;.pdk, sin directiva .lib)
+  const corner = (d: AscDoc, c: string): AscDoc => writeData(d, 'pdk', { corner: c });
   const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
   const nfet = parseAsc(readFileSync(`examples/pdk/${pdk.curves}.asc`, 'utf8'));
   const inv = parseAsc(readFileSync(`examples/pdk/${pdk.inverter}.asc`, 'utf8'));

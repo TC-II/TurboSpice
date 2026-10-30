@@ -2,7 +2,7 @@
 // modificaron (por InstName), qué cables cambiaron (por segmento) y un resumen de una línea,
 // "+C3, −R2, R1 1k→2k2". Se usa en el historial de corridas: cada una contra la anterior.
 import type { AscDoc, SymbolInst, Wire } from '../asc/model.ts';
-import { isDataText } from '../asc/dataText.ts';
+import { isDataText, readData } from '../asc/dataText.ts';
 import { t } from '../i18n/i18n.ts';
 
 export type Mark = 'added' | 'changed';
@@ -94,6 +94,10 @@ export function diffCircuits(prev: AscDoc, next: AscDoc): CircuitDiff {
   const nextShown = shown(next);
   const texts = new Map<number, Mark>(textsAdded.map((i) => [next.texts.indexOf(nextShown[i]), 'changed']));
   if (textsAdded.length || textsRemoved) parts.push(nextShown.some((tt, i) => textsAdded.includes(i) && tt.kind === 'directive') || textsRemoved ? t('directives') : t('texts'));
+
+  // la esquina del PDK (;.pdk, elegida en la barra de simulación) sí cambia el circuito
+  const cornerOf = (d: AscDoc) => (readData(d, 'pdk') as { corner?: string } | undefined)?.corner ?? 'tt';
+  if (cornerOf(prev) !== cornerOf(next)) parts.push(t('corner {c}', { c: cornerOf(next) }));
 
   const same = !parts.length;
   return { symbols, wires, flags, texts, removed: { symbols: removedSyms, wires: wiresRemoved }, summary: same ? t('no changes') : parts.join(', '), same };

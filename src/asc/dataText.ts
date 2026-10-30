@@ -6,9 +6,10 @@ import type { AscDoc, SchText } from './model.ts';
 /**
  * Prefijos de los comentarios con datos (programa de bloques del Estudio, vista de ploteo de la
  * simulación activa, lista de simulaciones, #39, y bloque .control guardado mientras el
- * testbench usa un análisis simple, #241, y etiquetas del OP fijadas o movidas, #306)
+ * testbench usa un análisis simple, #241, etiquetas del OP fijadas o movidas, #306, y la esquina
+ * del PDK elegida en la barra de simulación, docs/pdk.md)
  */
-export const DATA_TAGS = { study: '.study ', plot: '.plot ', sims: '.sims ', ctloff: '.ctloff ', optags: '.optags ' } as const;
+export const DATA_TAGS = { study: '.study ', plot: '.plot ', sims: '.sims ', ctloff: '.ctloff ', optags: '.optags ', pdk: '.pdk ' } as const;
 export type DataTag = keyof typeof DATA_TAGS;
 
 export const isDataTextOf = (t: { kind: string; text: string }, tag: DataTag) => t.kind === 'comment' && t.text.startsWith(DATA_TAGS[tag]);
@@ -102,7 +103,8 @@ export function placeDataTexts(doc: AscDoc): AscDoc {
 export function sameExceptData(a: AscDoc, b: AscDoc): boolean {
   if (a === b) return true;
   if (a.symbols !== b.symbols || a.wires !== b.wires || a.flags !== b.flags || a.dataFlags !== b.dataFlags || a.shapes !== b.shapes) return false;
-  const ta = a.texts.filter((t) => !isDataText(t));
-  const tb = b.texts.filter((t) => !isDataText(t));
+  // (la esquina del PDK cambia la simulación: cuenta como circuito)
+  const ta = a.texts.filter((t) => !isDataText(t) || isDataTextOf(t, 'pdk'));
+  const tb = b.texts.filter((t) => !isDataText(t) || isDataTextOf(t, 'pdk'));
   return ta.length === tb.length && ta.every((t, i) => t === tb[i]);
 }

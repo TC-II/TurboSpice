@@ -12,7 +12,8 @@ import { ANALYSIS_LINE } from './analyses.ts';
 import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
 import { hierDevice } from './context.ts';
-import { isPdkDevice, loadPdk, pdkDevices, pdkLib, pdkLibsIn, pdkNames, type PdkIndex } from '../library/pdk.ts';
+import { isPdkDevice, loadPdk, pdkDevices, pdkLib, pdkLibsIn, pdkNames, pdkOfSymbols, type PdkIndex } from '../library/pdk.ts';
+import { readData } from '../asc/dataText.ts';
 import { deviceParams, deviceRefs } from './deviceParams.ts';
 import { digitalNodes, refVectors, saveSelection, textRefs } from './saves.ts';
 
@@ -40,17 +41,18 @@ function fetchPdkFile(rel: string): Promise<string> {
 }
 
 /**
- * Modelos de PDK que usa la simulación (dispositivos sky130_fd_pr__… en la netlist o en los
- * archivos): las líneas .include de sólo lo que hace falta y los archivos. La esquina sale de
- * ".lib sky130 <esquina>" (o la ruta a sky130.lib.spice de open_pdks); si no hay, tt.
+ * Modelos de PDK que usa la simulación: los .include de sólo lo que hace falta y los archivos.
+ * El PDK sale de ".lib sky130 <esquina>" (o las líneas de open_pdks), de los símbolos del
+ * esquemático (library/sym/sky130, gf180) o de los dispositivos sky130_fd_pr__… de la netlist;
+ * la esquina, de esa línea o de la elegida en la barra de simulación (`corner`); si no, tt.
  */
 const pdkIndex = async (name: string): Promise<PdkIndex> => JSON.parse(await fetchPdkFile(`${name}/index.json`));
 
-async function pdkModels(ng: NgspiceNetlist, netlist: string, files: Record<string, string>) {
+async function pdkModels(ng: NgspiceNetlist, netlist: string, files: Record<string, string>, fromSymbols?: string, chosen?: string) {
   const devices = pdkDevices([netlist, ...Object.values(files)].join('\n'));
-  if (!devices.size && !ng.pdk) return null;
-  const name = ng.pdk?.name ?? 'sky130';
-  const corner = ng.pdk?.corner ?? 'tt';
+  if (!devices.size && !ng.pdk && !fromSymbols) return null;
+  const name = ng.pdk?.name ?? fromSymbols ?? 'sky130';
+  const corner = ng.pdk?.corner ?? chosen ?? 'tt';
   const index = await pdkIndex(name);
   if (!index.corners.some((c) => c.name === corner)) {
     throw new Error(t('{pdk} has no corner "{corner}" (available: {list})', { pdk: name, corner, list: index.corners.map((c) => c.name).join(', ') }));
@@ -98,7 +100,10 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   // los nombres de los PDK que piden las directivas (los de GF180, como nmos_3p3, no se reconocen
   // por el nombre como los sky130_fd_pr__…): definidos, sin aviso de modelo que falta
   const directives = [...lt.texts, ...lt.blocks.flatMap((b) => b.lt.texts)].map((tt) => tt.text.split('\\n').join('\n')).join('\n');
-  const inPdk = new Set((await Promise.all(pdkLibsIn(directives).map(pdkIndex))).flatMap((i) => [...pdkNames(i)]));
+  const fromSymbols = pdkOfSymbols(doc.symbols.map((x) => x.type));
+  const corner = (readData(doc, 'pdk') as { corner?: string } | undefined)?.corner;
+  const wanted = [...new Set([...pdkLibsIn(directives), ...(fromSymbols ? [fromSymbols] : [])])];
+  const inPdk = new Set((await Promise.all(wanted.map(pdkIndex))).flatMap((i) => [...pdkNames(i)]));
   const ng = toNgspice(lt, title, {
     resolve: (p) => lib.resolveModelFile(p),
     defines: (m) => lib.definesModel(m) || isPdkDevice(m) || inPdk.has(m.toLowerCase()),
@@ -153,7 +158,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
   // los modelos del PDK van después de medir el tamaño (son decenas de miles de líneas que no
   // agregan vectores) y no pasan por prepareSimulation (ya están traducidos para ngspice)
-  const pdk = await pdkModels(ng, netlist, prep.files);
+  const pdk = await pdkModels(ng, netlist, prep.files, fromSymbols, corner);
   let files = prep.files;
   if (pdk) {
     netlist = netlist.replace(/\n/, `\n${pdk.includes.join('\n')}\n`);

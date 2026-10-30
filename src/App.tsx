@@ -17,7 +17,8 @@ import { isStbPlot, StbView } from './waveform/StbView.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
-import { PdkDialog, pdkOfSymbol } from './schematic/PdkDialog.tsx';
+import { PdkDialog } from './schematic/PdkDialog.tsx';
+import { PDK_CORNERS, pdkLib, pdkOfSymbol, pdkOfSymbols } from './library/pdk.ts';
 import { Modal, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, LineStyleDialog, RunsDialog, ShareDialog, TextDialog, UserFilesDialog, AboutDialog, ImportInfoDialog, SettingsDialog, type UserFileInfo } from './schematic/dialogs.tsx';
 import { SourceDialog } from './schematic/SourceDialog.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
@@ -1405,6 +1406,28 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (!aborting.current) setStatus({ kind: 'error', message: (e as Error).message });
     }
   };
+
+  // la esquina del PDK (docs/pdk.md): la de una directiva .lib, si hay, o la elegida en la barra
+  // (guardada en el .asc, ;.pdk); el PDK, de los símbolos o de esa directiva
+  const pdkBar = useMemo(() => {
+    const lines = doc.texts.filter((x) => x.kind === 'directive').flatMap((x) => x.text.split('\\n'));
+    let fixed: { name: string; corner?: string; line: string } | undefined;
+    for (const line of lines) {
+      const m = /^\s*\.(?:lib|include|inc)\s+["']?([^"'\s]+)["']?(?:\s+(\S+))?/i.exec(line);
+      const hit = m && pdkLib(m[1], m[2]);
+      if (hit && (hit.corner || !fixed)) fixed = { ...hit, line: line.trim() };
+    }
+    const name = pdkOfSymbols(doc.symbols.map((x) => x.type)) ?? fixed?.name;
+    if (!name) return undefined;
+    const chosen = (readData(doc, 'pdk') as { corner?: string } | undefined)?.corner;
+    return {
+      name,
+      corner: fixed?.corner ?? chosen ?? 'tt',
+      corners: PDK_CORNERS,
+      fixed: fixed?.corner ? fixed.line : undefined,
+      onChange: (corner: string) => commit(writeData(doc, 'pdk', corner === 'tt' ? undefined : { corner })),
+    };
+  }, [doc]);
 
   const aborting = useRef(false);
   const abort = () => {
@@ -3659,6 +3682,7 @@ ${ltNetlistText(sim.built.lt)}
             picker={picker}
             onPickCancel={() => endPick(null)}
             control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
+            pdk={pdkBar}
             onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             onRun={run}

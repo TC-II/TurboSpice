@@ -3683,8 +3683,6 @@ ${ltNetlistText(sim.built.lt)}
                     ? t('done in {p0} ms', { p0: status.ms.toFixed(0) })
                     : undefined
             }
-            stale={!sim && !!curSim?.view?.panes.some((p) => p.traces.length)}
-            running={running}
             picker={picker}
             onPickCancel={() => endPick(null)}
             control={curSim && isComplexLine(curSim.line) ? controlText(tbDoc ?? doc) : undefined}
@@ -3692,7 +3690,6 @@ ${ltNetlistText(sim.built.lt)}
             onAllCorners={curSim && pdkBar && !pdkBar.fixed ? () => simAllCorners(curSim.id, simName(curSim), pdkBar.corner) : undefined}
             onStudio={openStudy}
             onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
-            onRun={run}
           />
           )}
         </div>

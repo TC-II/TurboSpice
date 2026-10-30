@@ -168,7 +168,7 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, stale, running, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply, onRun }: {
+export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply }: {
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -182,8 +182,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   /** detalle del estado (tiempo, avance o mensaje de error), en el tooltip */
   stateDetail?: string;
   /** se simuló pero sus resultados ya no están en memoria */
-  stale: boolean;
-  running: boolean;
   /** elegir una red o una fuente haciendo click en el esquemático */
   picker: Picker;
   /** deja de elegir en el esquemático (el foco pasó a otro control) */
@@ -200,7 +198,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
   /** abrir el Studio */
   onStudio(): void;
   onApply(line: string): void;
-  onRun(): void;
 }) {
   const line = sim?.line ?? '';
   const [draft, setDraft] = useState(() => parseAnalysis(line));
@@ -372,11 +369,6 @@ export function SimBar({ sim, info, state, stateDetail, stale, running, picker, 
         </div>
       )}
       {slot && stateEl && createPortal(stateEl, slot)}
-      {sim && stale && !running && (
-        <button className="sb-run" onClick={onRun} title={t('Its results are no longer in memory (those of the last simulations viewed are kept)')}>
-          {t('Run again')}
-        </button>
-      )}
     </div>
   );
 }

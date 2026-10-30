@@ -187,6 +187,12 @@ jobs:
       - if: steps.ref.outputs.ok == 'true'
         run: npm ci
       - if: steps.ref.outputs.ok == 'true'
+        name: Caché de los PDK
+        uses: actions/cache@v4
+        with:
+          path: .cache/pdk
+          key: pdk-${{ hashFiles('scripts/build-pdk.ts', 'scripts/build-pdk-gf180.ts') }}
+      - if: steps.ref.outputs.ok == 'true'
         run: npm run build
         env:
           BASE_PATH: ${{ matrix.base }}

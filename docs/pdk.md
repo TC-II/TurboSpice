@@ -13,7 +13,10 @@ Los modelos de transistores, resistencias, capacitores y diodos de **SkyWater sk
   open_pdks que usan xschem y los tutoriales (`.lib /…/sky130.lib.spice tt`). Sin `.lib`, tt.
 - Cualquier `sky130_fd_pr__…` en la netlist (también en subcircuitos propios o en archivos del
   usuario) se reconoce: la simulación agrega sólo los archivos que ese dispositivo necesita.
-- Ejemplo: `examples/pdk/sky130_inverter.asc`.
+- Diodos: `area` en µm² y `pj` en µm (el símbolo trae `area=1 pj=4`); el `.model` trae
+  `area=1e12` por defecto, que con `scale` da corrientes absurdas.
+- Ejemplos: el proyecto **sky130** del menú Ejemplos (curvas del NMOS e inversor en tt, ff y ss,
+  `scripts/make-examples.ts`), armado con `examples/pdk/*.asc`.
 
 ## Cómo está hecho
 

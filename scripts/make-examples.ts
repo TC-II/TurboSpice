@@ -13,6 +13,8 @@
 //   (examples/transistors/), con el BJT (BC547C) y el MOSFET (2N7000) uno al lado del otro.
 // - Loop stability.turbo: la ganancia de lazo (.stb) con la sonda simple y la diferencial
 //   (examples/stability/): Tian, GFT, márgenes, lugar de raíces y el transitorio que los confirma.
+// - sky130.turbo: transistores del PDK sky130 (examples/pdk/, docs/pdk.md): curvas del NMOS y el
+//   inversor en las esquinas tt, ff y ss, y su transitorio.
 // (ADC.turbo, el de simulación mixta con Verilog, lo arma scripts/make-adc.ts)
 //   npx vite-node scripts/make-examples.ts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -428,4 +430,34 @@ SYMATTR InstName B2
   const text = await serializeTurbo(ls);
   writeFileSync('public/examples/Loop stability.turbo', text);
   console.log(`Loop stability.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
+}
+
+// --- sky130: modelos del PDK (docs/pdk.md); la esquina es la línea .lib sky130 <esquina>
+{
+  const groups = [
+    { id: newId('g'), name: 'NMOS curves' },
+    { id: newId('g'), name: 'CMOS inverter' },
+  ];
+  const corner = (d: AscDoc, c: string): AscDoc => parseAsc(serializeAsc(d).replace(/!\.lib sky130 \w+/, `!.lib sky130 ${c}`));
+  const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
+  const nfet = parseAsc(readFileSync('examples/pdk/sky130_nfet_curves.asc', 'utf8'));
+  const inv = parseAsc(readFileSync('examples/pdk/sky130_inverter.asc', 'utf8'));
+  const vtc: SimView = { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'dc1' };
+  const pulse = setAnalysisLine(hideWaveValues(setVal(inv, 'V2', 'PULSE(0 1.8 0.5n 50p 50p 1n 2n)')), '.tran 4n');
+  const sims: Sim[] = [
+    bench(0, 'ID against VDS (tt)', nfet, { panes: [{ traces: [{ expr: '-I(VD)', color: '#1c7ed6' }] }], active: 0, plot: 'dc1' }),
+    bench(0, 'ID against VDS (ff)', corner(nfet, 'ff'), { panes: [{ traces: [{ expr: '-I(VD)', color: '#e8590c' }] }], active: 0, plot: 'dc1' }),
+    bench(0, 'ID against VDS (ss)', corner(nfet, 'ss'), { panes: [{ traces: [{ expr: '-I(VD)', color: '#2f9e44' }] }], active: 0, plot: 'dc1' }),
+    bench(1, 'Transfer curve (tt)', inv, vtc),
+    bench(1, 'Transfer curve (ff)', corner(inv, 'ff'), vtc),
+    bench(1, 'Transfer curve (ss)', corner(inv, 'ss'), vtc),
+    bench(1, 'Step response (tt)', pulse, { panes: [{ traces: [{ expr: 'V(in)', color: '#2f9e44' }, { expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'tran1' }),
+  ];
+  const sky: Project = {
+    name: 'sky130', created: t0, modified: t0, groups, files: [],
+    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'sky130', base: sims[0].asc, activeSim: sims[0].id, sims }],
+  };
+  const text = await serializeTurbo(sky);
+  writeFileSync('public/examples/sky130.turbo', text);
+  console.log(`sky130.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }

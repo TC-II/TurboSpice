@@ -74,8 +74,8 @@ write(
   symbol(params(base('diode')), [
     ['Prefix', 'D'],
     ['Value', 'sky130_fd_pr__diode_pw2nd_05v5'],
-    ['SpiceLine', 'area=1e-12'],
-    ['Description', 'sky130 P-well / N+ diode, 5.5 V (sky130_fd_pr__diode_pw2nd_05v5). Area in m².'],
+    ['SpiceLine', 'area=1 pj=4'],
+    ['Description', 'sky130 P-well / N+ diode, 5.5 V (sky130_fd_pr__diode_pw2nd_05v5). Area in µm², perimeter (pj) in µm.'],
   ]),
 );
 console.log(`sky130: ${MOS.length + RES.length + 3} símbolos → library/sym/sky130`);

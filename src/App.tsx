@@ -164,6 +164,8 @@ const TRANSFER = 'Transfer functions.turbo';
 const AMPS = 'Transistor amplifiers.turbo';
 /** ganancia de lazo (.stb) con la sonda simple y la diferencial (scripts/make-examples.ts) */
 const STABILITY = 'Loop stability.turbo';
+/** transistores del PDK sky130 en varias esquinas (scripts/make-examples.ts, docs/pdk.md) */
+const SKY130 = 'sky130.turbo';
 
 type Dialog =
   | { kind: 'picker'; forSymbol?: boolean }
@@ -3300,6 +3302,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: 'Transfer functions', title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'), onClick: () => doExample(TRANSFER) },
         { label: 'Transistor amplifiers', title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'), onClick: () => doExample(AMPS) },
         { label: 'Loop stability', title: t('Loop gain (.stb) with the single-ended and the differential loop probe: Tian and GFT methods, phase and gain margins, root locus and the step response that confirms them'), onClick: () => doExample(STABILITY) },
+        { label: 'sky130', title: t('SkyWater sky130 PDK: NMOS output curves and a CMOS inverter in the tt, ff and ss corners'), onClick: () => doExample(SKY130) },
         { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),

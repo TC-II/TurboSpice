@@ -28,7 +28,7 @@ X4 0 g d d sky130_fd_pr__pfet_01v8_hvt W=2 L=0.15
 X5 h g 0 0 sky130_fd_pr__nfet_g5v0d10v5 W=1 L=0.5
 X6 d g 0 sky130_fd_pr__res_high_po_0p35 L=3.5
 X7 g 0 sky130_fd_pr__cap_mim_m3_1 W=5 L=5
-D1 b g sky130_fd_pr__diode_pw2nd_05v5 area=1e-12
+D1 b g sky130_fd_pr__diode_pw2nd_05v5 area=1 pj=4
 X8 0 b g 0 sky130_fd_pr__pnp_05v5_W0p68L0p68
 Vin in 0 pulse(0 1.8 1n 50p 50p 2n 4n)
 X9 out in 0 0 sky130_fd_pr__nfet_01v8 W=1 L=0.15

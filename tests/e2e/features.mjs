@@ -265,7 +265,8 @@ const dnd = async (src, dst) => {
   await src.dispatchEvent('dragstart', { dataTransfer: dt });
   await dst.dispatchEvent('dragover', { dataTransfer: dt });
   await dst.dispatchEvent('drop', { dataTransfer: dt });
-  await src.dispatchEvent('dragend', { dataTransfer: dt }).catch(() => {});
+  // (tras soltar, el chip suele haberse ido del panel: sin esperar los 30 s por defecto)
+  await src.dispatchEvent('dragend', { dataTransfer: dt }, { timeout: 500 }).catch(() => {});
 };
 // las dos DFT de V(out) en el mismo panel: dos curvas y dos nombres
 await dnd(page.locator('.pane').nth(2).locator('.trace-chip').first(), page.locator('.pane').nth(1).locator('.pane-chart'));
@@ -329,7 +330,6 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   await page.waitForTimeout(300);
   const yt = (await page.locator('.pane-chart .uplot').first().getAttribute('data-ticks-y'))?.split('|') ?? [];
   check(yt.length >= 2 && new Set(yt).size === yt.length, `con zoom las marcas del eje Y son todas distintas (${yt.join(' ')})`);
-  await page.getByRole('button', { name: /Zoom|Ver todo|Fit/i }).first().click().catch(() => {});
 }
 // #200 y #201: recuadro en X e Y, zoom sólo en X o sólo en Y, y el Y no se reajusta con el zoom en X
 {

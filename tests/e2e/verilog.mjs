@@ -138,7 +138,7 @@ await page.waitForFunction(() => !document.querySelector('.verilog-module'));
 
 // --- simular: la salida analógica, y los nodos digitales en un panel aparte ---
 await simulate();
-check((await page.locator('.status.ok').count()) === 1, `la simulación con el bloque Verilog anda (${await page.locator('.status').first().textContent()} ${await page.locator('.errors, .sim-errors, .log .err').first().textContent().catch(() => '')})`);
+check((await page.locator('.status.ok').count()) === 1, `la simulación con el bloque Verilog anda (${await page.locator('.status').first().textContent()} ${await page.locator('.errors, .sim-errors, .log .err').first().textContent({ timeout: 500 }).catch(() => '')})`);
 check(await addTrace('V(q[1])'), 'V(q[1]): un bit del bus de salida, analógico');
 check(await addTrace('Dig(x1.q[1:0])'), 'Dig(x1.q[1:0]): el bus de los nodos digitales');
 check(await addTrace('Dig(x1.q_0_d)'), 'Dig(x1.q_0_d): un bit');

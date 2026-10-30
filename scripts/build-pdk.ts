@@ -17,7 +17,7 @@
 // y no cambió este script, no hace nada (sin red).
 // Uso: node scripts/build-pdk.ts [salida]   (por defecto public/library/pdk/sky130)
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -276,6 +276,8 @@ export function build(out = OUT, onlyFixes = false) {
     files: files.length,
     bytes,
   };
+  // Apache-2.0: la licencia va con los modelos
+  copyFileSync(join(SRC, 'LICENSE'), join(out, 'LICENSE'));
   writeFileSync(join(out, 'index.json'), JSON.stringify(index, null, 1) + '\n');
   return index;
 }

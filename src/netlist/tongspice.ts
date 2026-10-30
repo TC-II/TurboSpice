@@ -33,6 +33,8 @@ export interface ModelResolver {
   cmpFile?(name: string): string | undefined;
   /** Archivo de la librería de LTspice del usuario que define este modelo/subcircuito (se incluye solo) */
   ltspiceFile?(name: string): string | undefined;
+  /** ¿Es ".lib <ruta> <esquina>" la librería de un PDK? Su nombre (los modelos los agrega schematicSim) */
+  pdkLib?(path: string): string | undefined;
 }
 
 export interface NgspiceNetlist {
@@ -57,6 +59,8 @@ export interface NgspiceNetlist {
   xyPlots: { id: number; x: string; y: string }[];
   /** el .control lo generó un programa de bloques (tabla, listas e histogramas en el log) */
   blocks?: boolean;
+  /** ".lib sky130.lib.spice ff": el PDK y la esquina pedidos (ver src/library/pdk.ts) */
+  pdk?: { name: string; corner: string };
   warnings: string[];
   /** elementos sin valor asignado (R, C, L, fuentes…): no se simula hasta asignarlo (#256) */
   missingValues: string[];
@@ -740,7 +744,15 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     '.param pi=3.141592653589793',
   ];
 
+  let pdk: { name: string; corner: string } | undefined;
   const include = (path: string, section?: string): string | null => {
+    // (sin comillas, el regex de .lib deja la esquina pegada a la ruta: ".lib sky130 tt")
+    const split = section === undefined ? /^(.*\S)\s+(\S+)$/.exec(path) : null;
+    const pdkName = models.pdkLib?.(path) ?? (split ? models.pdkLib?.(split[1]) : undefined);
+    if (pdkName) {
+      pdk = { name: pdkName, corner: (section ?? (models.pdkLib?.(path) ? undefined : split?.[2]) ?? 'tt').toLowerCase() };
+      return `* PDK ${pdkName}, esquina ${pdk.corner}`;
+    }
     const rel = models.resolve(path);
     if (!rel) {
       warnings.push(t('Model file "{path}" not found', { path }));
@@ -955,7 +967,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}) };
+  return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}), ...(pdk ? { pdk } : {}) };
 }
 
 /**

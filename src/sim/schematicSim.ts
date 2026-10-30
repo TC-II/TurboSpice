@@ -12,12 +12,49 @@ import { ANALYSIS_LINE } from './analyses.ts';
 import { checkSimSize, type SizeProblem } from './estimate.ts';
 import { t } from '../i18n/i18n.ts';
 import { hierDevice } from './context.ts';
+import { isPdkDevice, loadPdk, pdkDevices, pdkLib, type PdkIndex } from '../library/pdk.ts';
 import { deviceParams, deviceRefs } from './deviceParams.ts';
 import { digitalNodes, refVectors, saveSelection, textRefs } from './saves.ts';
 
 // (import.meta.env no existe fuera de Vite: tests en Node)
 const LIB_URL = `${import.meta.env?.BASE_URL ?? '/'}library/sub/`;
 const fileCache = new Map<string, string>();
+
+const PDK_URL = `${import.meta.env?.BASE_URL ?? '/'}library/pdk/`;
+/** Dónde quedan los modelos de un PDK en el FS del motor */
+const PDK_DIR = '/pdk';
+const pdkCache = new Map<string, Promise<string>>();
+
+/** Un archivo de public/library/pdk (una vez por sesión: son grandes y no cambian) */
+function fetchPdkFile(rel: string): Promise<string> {
+  let p = pdkCache.get(rel);
+  if (!p) {
+    p = fetch(PDK_URL + rel.split('/').map(encodeURIComponent).join('/')).then(async (res) => {
+      if (!res.ok) throw new Error(t('Could not download {rel}', { rel: `pdk/${rel}` }));
+      return res.text();
+    });
+    p.catch(() => pdkCache.delete(rel));
+    pdkCache.set(rel, p);
+  }
+  return p;
+}
+
+/**
+ * Modelos de PDK que usa la simulación (dispositivos sky130_fd_pr__… en la netlist o en los
+ * archivos): las líneas .include de sólo lo que hace falta y los archivos. La esquina sale de
+ * ".lib sky130 <esquina>" (o la ruta a sky130.lib.spice de open_pdks); si no hay, tt.
+ */
+async function pdkModels(ng: NgspiceNetlist, netlist: string, files: Record<string, string>) {
+  const devices = pdkDevices([netlist, ...Object.values(files)].join('\n'));
+  if (!devices.size && !ng.pdk) return null;
+  const name = ng.pdk?.name ?? 'sky130';
+  const corner = ng.pdk?.corner ?? 'tt';
+  const index: PdkIndex = JSON.parse(await fetchPdkFile(`${name}/index.json`));
+  if (!index.corners.some((c) => c.name === corner)) {
+    throw new Error(t('{pdk} has no corner "{corner}" (available: {list})', { pdk: name, corner, list: index.corners.map((c) => c.name).join(', ') }));
+  }
+  return loadPdk(index, corner, devices, `${PDK_DIR}/${name}`, (rel) => fetchPdkFile(`${name}/${rel}`));
+}
 
 async function fetchModelFile(rel: string): Promise<string> {
   let tt = fileCache.get(rel);
@@ -58,10 +95,11 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const lt = ltNetlist(doc, lib);
   const ng = toNgspice(lt, title, {
     resolve: (p) => lib.resolveModelFile(p),
-    defines: (m) => lib.definesModel(m),
+    defines: (m) => lib.definesModel(m) || isPdkDevice(m),
     cmpFile: (m) => lib.cmpFileDefining(m),
     // sólo si no lo define la librería propia ni un archivo del usuario
-    ltspiceFile: (m) => (lib.definesModel(m, false) ? undefined : lib.ltspiceFileDefining(m)),
+    ltspiceFile: (m) => (lib.definesModel(m, false) || isPdkDevice(m) ? undefined : lib.ltspiceFileDefining(m)),
+    pdkLib,
   });
   const texts = Object.fromEntries(
     await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),
@@ -107,8 +145,16 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1, vectorCount);
   const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
+  // los modelos del PDK van después de medir el tamaño (son decenas de miles de líneas que no
+  // agregan vectores) y no pasan por prepareSimulation (ya están traducidos para ngspice)
+  const pdk = await pdkModels(ng, netlist, prep.files);
+  let files = prep.files;
+  if (pdk) {
+    netlist = netlist.replace(/\n/, `\n${pdk.includes.join('\n')}\n`);
+    files = { ...files, ...pdk.files };
+  }
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
-  return { netlist, files: prep.files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases, digitalSaves };
+  return { netlist, files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases, digitalSaves };
 }
 
 /** Vectores de ngspice "@dev[param]" de los parámetros de dispositivo que usan unas trazas (#202) */

@@ -25,6 +25,12 @@ lo necesario para reproducir los binarios está acá.
 | Blockly | 13.3.0 | Apache-2.0 | Editor de bloques del Estudio (se carga al abrirlo) |
 | @yowasp/yosys (Yosys en WebAssembly) | 0.70.1258 | ISC | Síntesis de módulos Verilog (se carga al sintetizar) |
 
+## Modelos de PDK
+
+| Modelos | Origen | Licencia | Uso |
+|---|---|---|---|
+| SkyWater sky130 (`sky130_fd_pr`) | [google/skywater-pdk-libs-sky130_fd_pr](https://github.com/google/skywater-pdk-libs-sky130_fd_pr), commit fijado en `scripts/build-pdk.ts` | Apache-2.0 | Se bajan al construir y se distribuyen traducidos para ngspice en `library/pdk/sky130/` del sitio (ver `docs/pdk.md`) |
+
 ## Librería de componentes, ejemplos y casos de prueba
 
 `library/` (símbolos, modelos y skins) y `tests/fixtures/` **no** están bajo la GPL. Cada parte

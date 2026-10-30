@@ -719,6 +719,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['R · C · L · D · V · I', t('Resistor, capacitor, inductor, diode, voltage source, current source')],
       ['G', t('Ground')],
       ['W', t('Wire (right-click or Esc finishes)')],
+      ['H', t('Highlight the net under the cursor')],
       ['N', t('Net label')],
       ['. · T', t('SPICE directive · comment')],
       ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],

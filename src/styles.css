@@ -278,6 +278,11 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .texts .sel text { fill: var(--sch-sel); }
 .net-hl line { stroke: var(--sch-hl); stroke-width: 3.2; }
 .net-hl circle { fill: var(--sch-hl); stroke: none; }
+/* halo de Virtuoso: la opacidad va en el grupo para que los trazos no se sumen donde se pisan */
+.net-hl.flight { --sch-hl: #b197fc; opacity: 0.4; pointer-events: none; }
+.net-hl.flight line { stroke-width: 9; stroke-linecap: round; }
+.net-hl.flight circle { r: 6px; }
+.net-hl.flight path { fill: none; stroke: var(--sch-hl); stroke-width: 6; stroke-linecap: round; }
 .placing { pointer-events: none; }
 .ghost { opacity: 0.55; color: var(--sch-ghost); stroke: var(--sch-ghost); fill: none; }
 .ghost text { fill: var(--sch-ghost); stroke: none; }

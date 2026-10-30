@@ -2103,6 +2103,7 @@ export const es: Record<string, string> = {
   'corner {c}': 'esquina {c}',
   'Create one testbench per corner from this one': 'Crear un testbench por esquina a partir de éste',
   'All attributes…': 'Todos los atributos…',
+  'Highlight the net under the cursor': 'Resaltar la red bajo el cursor',
   'Highlight nets': 'Resaltar redes',
   'Click a net to highlight it or turn it off · Shift+H clears them all': 'Click en una red para resaltarla o apagarla · Shift+H las borra todas',
   'Highlight nets: click toggles each one, with its color · clear them all': 'Resaltar redes: click prende o apaga cada una, con su color · borrarlas todas',

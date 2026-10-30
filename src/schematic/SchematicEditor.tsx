@@ -134,6 +134,8 @@ interface Props {
   highlightNet?: string;
   /** color de los cables de cada red (nombre en minúsculas) con una traza en el gráfico */
   netColors?: Map<string, string>;
+  /** H: resaltar la red bajo el cursor con cualquier herramienta */
+  netHover?: boolean;
   /** lo que no se guardó en la simulación (#314), atenuado */
   unsaved?: { nets: Set<string>; symbols: Set<number> };
   /** etiquetas temporales con los nombres de las redes */
@@ -465,6 +467,8 @@ export function SchematicEditor(props: Props) {
   }, [doc, drag]);
   const [boxEnd, setBoxEnd] = useState<Point | null>(null);
   const [hoverNet, setHoverNet] = useState<string | undefined>();
+  /** de dónde salen las flight lines (H) */
+  const [flightFrom, setFlightFrom] = useState<Point | undefined>();
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
   const hoverSymOut = useRef<number | undefined>(undefined);
@@ -484,9 +488,9 @@ export function SchematicEditor(props: Props) {
   // siempre y en todos los testbench (el editor y los nombres de red son los mismos)
   useEffect(() => {
     if (tool.kind === 'probe' || tool.kind === 'pick') return;
-    setHoverNet(undefined);
+    if (!props.netHover) setHoverNet(undefined);
     setPickHover(null);
-  }, [tool.kind]);
+  }, [tool.kind, props.netHover]);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
   const spaceDown = useRef(false);
   const spaceUsed = useRef(false);
@@ -1095,6 +1099,11 @@ export function SchematicEditor(props: Props) {
       setHoverNet(probe?.net);
       setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined ? 'i' : '');
     }
+    if (props.netHover && tool.kind !== 'probe' && tool.kind !== 'pick') {
+      setHoverNet(drag ? undefined : probeTarget(p)?.net);
+      const g = snapPoint(p);
+      setFlightFrom((c) => (c?.x === g.x && c?.y === g.y ? c : g));
+    }
     if (tool.kind === 'pick') {
       const t = probeTarget(p);
       const v = t && pickValue?.(t);
@@ -1448,6 +1457,7 @@ export function SchematicEditor(props: Props) {
         conn={shownConn}
         selection={tool.kind === 'pick' && pickHover?.symbol !== undefined ? [{ kind: 'symbol', index: pickHover.symbol }] : shownSelection}
         highlightNet={labelNet ?? highlightNet ?? hoverNet}
+        flightFrom={props.netHover && hoverNet ? flightFrom : undefined}
         hoverSymbol={hoverSym ?? props.highlightSymbol}
         grabLabel={grabLabel}
         hoverFlag={hoverFlag}

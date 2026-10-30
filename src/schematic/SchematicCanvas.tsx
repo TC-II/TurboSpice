@@ -1,11 +1,11 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
 import { memo, useId, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
-import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type PinDef, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
+import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type PinDef, type Point, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
-import type { Connectivity } from '../netlist/connectivity.ts';
+import { onSegment, type Connectivity, type Net } from '../netlist/connectivity.ts';
 import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, visibleText, type ItemRef } from './geometry.ts';
@@ -227,6 +227,35 @@ export function FlagView({ flag, doc, lib, selected, hover, mark }: { flag: Flag
   );
 }
 
+/** Arco que sube entre dos puntos, más alto cuanto más lejos están */
+function flightArc(a: Point, b: Point): string {
+  const mx = (a.x + b.x) / 2;
+  const my = (a.y + b.y) / 2;
+  return `M${a.x} ${a.y}Q${mx} ${my - Math.hypot(b.x - a.x, b.y - a.y) * 0.4} ${b.x} ${b.y}`;
+}
+
+/**
+ * Un punto por cada parte de la red sin cable que la una a la que está bajo `from` (la red sigue
+ * unida por el nombre de sus etiquetas): lo que ya se ve conectado no lleva arco.
+ */
+function netIslands(net: Net, doc: AscDoc, conn: Connectivity, from: Point): Point[] {
+  const dot = (p: Point) => ({ x1: p.x, y1: p.y, x2: p.x, y2: p.y });
+  const flags = doc.flags.filter((f) => conn.netAt(f) === net);
+  const points = [...flags, ...net.pins.map((p) => p.at)];
+  const items = [...points.map(dot), ...net.wires.map((i) => doc.wires[i])];
+  const touch = (a: typeof items[number], b: typeof items[number]) =>
+    [{ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }].some((p) => onSegment(p, b)) || [{ x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 }].some((p) => onSegment(p, a));
+  const island = items.map((_, i) => i);
+  const root = (i: number): number => (island[i] === i ? i : (island[i] = root(island[i])));
+  items.forEach((a, i) => items.forEach((b, j) => j > i && touch(a, b) && (island[root(j)] = root(i))));
+  // el cursor se ajusta a la grilla y puede no caer justo sobre la red: vale lo más cercano
+  const d = (it: typeof items[number]) => Math.min(Math.hypot(it.x1 - from.x, it.y1 - from.y), Math.hypot(it.x2 - from.x, it.y2 - from.y));
+  const on = items.findIndex((it) => touch(dot(from), it));
+  const here = on >= 0 ? on : items.reduce((m, it, i) => (d(it) < d(items[m]) ? i : m), 0);
+  const seen = new Set([root(here)]);
+  return points.filter((_, i) => !seen.has(root(i)) && seen.add(root(i)));
+}
+
 export interface CanvasProps {
   doc: AscDoc;
   lib: Library;
@@ -234,6 +263,8 @@ export interface CanvasProps {
   selection: ItemRef[];
   /** red resaltada (probe o hover) */
   highlightNet?: string;
+  /** flight lines de Virtuoso: arcos desde este punto a los pines y etiquetas de la red resaltada */
+  flightFrom?: Point;
   /** símbolo resaltado porque el cursor está sobre uno de sus rótulos */
   hoverSymbol?: number;
   /** rótulo arrastrable bajo el cursor (o que se arrastra) */
@@ -254,7 +285,7 @@ export interface CanvasProps {
   diff?: CircuitDiff;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, flightFrom, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -311,12 +342,13 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
         })}
       </g>
       {hl && (
-        <g className="net-hl">
+        <g className={flightFrom ? 'net-hl flight' : 'net-hl'}>
           {hl.wires.map((wi) => {
             const w = doc.wires[wi];
             return <line key={wi} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />;
           })}
           {hl.pins.map((p, i) => <circle key={i} cx={p.at.x} cy={p.at.y} r={4} />)}
+          {flightFrom && netIslands(hl, doc, conn, flightFrom).map((q, i) => <path key={i} d={flightArc(flightFrom, q)} />)}
         </g>
       )}
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>

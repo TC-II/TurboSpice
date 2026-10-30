@@ -554,6 +554,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   const [pzSide, setPzSide] = useState(true);
   const editor = useRef<EditorHandle>(null);
   const [docKey, setDocKey] = useState(0);
+  const [netHover, setNetHover] = useState(false);
 
   // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
   const [userFiles, setUserFiles] = useState<UserFile[]>([]);
@@ -2900,6 +2901,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (e.altKey) return;
       if (ctrl) return;
       if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
+      if (lk === 'h') return handled(), setNetHover((v) => !v);
       switch (k) {
         case 'Escape':
           plotPanel.current?.action('cancel');
@@ -3307,6 +3309,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     {
       label: t('View'),
       items: [
+        { label: t('Highlight the net under the cursor'), shortcut: 'H', onClick: () => setNetHover((v) => !v), checked: netHover },
+        'sep',
         { label: t('Fit to view'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { label: t('Zoom to a box'), shortcut: 'Z', onClick: zoomBox },
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
@@ -3881,6 +3885,7 @@ ${ltNetlistText(sim.built.lt)}
             onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
             onDescend={descend}
             docKey={docKey}
+            netHover={netHover}
             doc={doc}
             lib={lib}
             conn={conn}

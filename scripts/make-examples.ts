@@ -293,9 +293,9 @@ const AMPS: { name: string; file: string; sine: string }[] = [
 // --- Loop stability: .stb con LoopProbe (simple) y DiffLoopProbe (diferencial), docs/estabilidad.md
 {
   const groups = [{ id: newId('g'), name: 'Single-ended (LoopProbe)' }, { id: newId('g'), name: 'Differential (DiffLoopProbe)' }];
-  const note = (d: AscDoc, lines: string[]): AscDoc => ({
+  const note = (d: AscDoc, lines: string[], y = 560): AscDoc => ({
     ...d,
-    texts: [...d.texts, { x: -64, y: 560, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
+    texts: [...d.texts, { x: -64, y, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
   });
   const STB = { panes: [{ traces: [{ expr: 'loopgain', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
   const se = parseAsc(readFileSync('examples/stability/single.asc', 'utf8'));
@@ -307,6 +307,21 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     'closed-loop poles and the root locus of 1 + k·T. U1 has two poles (10 Hz and 1 MHz): with gain -1 the phase margin is only about 25°.',
   ];
   const step = (d: AscDoc, v: string, val: string) => hideWaveValues(setVal(d, v, val));
+  // diferencial: par de BJT con cargas PNP y CMFB (Q6, Q7, Q8 manejan las bases de las cargas)
+  const dnote = (d: AscDoc, lines: string[]) => note(d, lines, 880);
+  const COMP = new Set(['1280,544,1280,608', '1344,544,1360,544', '1360,544,1360,608', '1440,544,1456,544', '1440,544,1440,608', '1520,544,1520,608']);
+  const uncomp: AscDoc = {
+    ...without(without(df, 'Ccp'), 'Ccn'),
+    wires: df.wires.filter((w) => !COMP.has(`${w.x1},${w.y1},${w.x2},${w.y2}`)),
+  };
+  const cmStep = (d: AscDoc) => step(d, 'Vcm', 'PULSE(0 10m 100n 10n 10n 1u 2u)');
+  const CM_TRAN = { panes: [{ traces: [{ expr: 'V(outp)', color: '#1c7ed6' }, { expr: 'V(outn)', color: '#e8590c' }] }], active: 0, plot: 'tran1' } as SimView;
+  const DF_NOTE = [
+    'A differential pair (Q1, Q2) with PNP current-source loads (Q3, Q4); R2/R1 set the gain to -10 on each side. The loads take the common mode:',
+    'Rcp and Rcn sense it (cm), Q6/Q7 compare it with Vcm and Q8 moves the bases of Q3 and Q4 (CMFB). LP1 (Stability > DiffLoopProbe) is in series',
+    'in the differential output, between the collectors (op, on) and the outputs (outp, outn): two ideal baluns separate the modes and the .stb picks one (dm or cm).',
+    'In DM cm stays still and only the R2/R1 loop is left: one pole at the outputs, about 90° of margin.',
+  ];
   const sims: Sim[] = [
     bench(0, 'Loop gain (Tian)', setAnalysisLine(note(se, SE_NOTE), '.stb LP1 dec 50 10 100meg'), STB),
     bench(
@@ -322,29 +337,36 @@ const AMPS: { name: string; file: string; sine: string }[] = [
       plot: 'tran1',
     }),
     bench(0, 'Closed-loop Bode', setAnalysisLine(se, '.ac dec 50 10 100meg'), { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'ac1', mode: 'bode' }),
+    bench(1, 'Differential-mode loop gain', setAnalysisLine(dnote(df, DF_NOTE), '.stb LP1 dm dec 50 1k 10g'), STB),
     bench(
       1,
-      'Differential-mode loop gain',
-      setAnalysisLine(
-        note(df, [
-          'LP1 (Stability > DiffLoopProbe) is in series in the differential output, between the op amp outputs (op, on) and the outputs (outp, outn).',
-          'Inside, two ideal baluns back to back (E + F pairs: they neither isolate nor load) separate the differential and common modes,',
-          'with a probe in each mode; the .stb chooses one (dm or cm). In DM the loop is the R2/R1 network of each half: the same T as the single-ended one.',
-        ]),
-        '.stb LP1 dm dec 50 10 100meg',
-      ),
+      'Common-mode loop gain, no compensation',
+      setAnalysisLine(dnote(uncomp, ['Without Ccp and Ccn the CMFB loop has two poles close together (the outputs and the sense node cm, loaded by Q7): the CM margin is only about 15°.', 'In CM the probe breaks every loop that goes through the outputs: the CMFB and the R2 feedback (small in CM: the tail rejects it).']), '.stb LP1 cm dec 50 1k 10g'),
       STB,
     ),
     bench(
       1,
-      'Common-mode loop gain (CMFB)',
-      setAnalysisLine(note(df, ['In CM the probe also breaks the CMFB loop (Rcp, Rcn, Ecmfb into the + inputs): T adds both loops and the margin drops to about 15°.', 'Had the probe been at the inputs, the CMFB would stay closed inside the measured loop and its margin would not be seen (nested loops).']), '.stb LP1 cm dec 50 10 100meg'),
+      'CMFB loop alone (LoopProbe at cm)',
+      setAnalysisLine(dnote(uncomp, ['LP2 breaks only the CMFB loop; the R2 feedback stays closed inside it. It sees T2/(1 + T1) instead of T1 + T2:', 'about 4 dB less at low frequency than LP1 in CM, with the same crossover and margin, because the pair barely amplifies the common mode.', 'With a weak tail (a resistor, not a current source) T1 grows and the two probes drift apart.']), '.stb LP2 dec 50 1k 10g'),
       STB,
     ),
     bench(
       1,
-      'Step response (the probe is transparent)',
-      setAnalysisLine(step(step(df, 'Vp', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 0.5'), 'Vn', 'PULSE(0 -0.1 0 10n 10n 5u 10u) AC 0.5 180'), '.tran 20u'),
+      'Common-mode loop gain, compensated',
+      setAnalysisLine(dnote(df, ['Ccp and Ccn (1p) across Rcp and Rcn bypass the sense resistors at high frequency: a zero that cancels the pole at cm.', 'The crossover moves to about 11 MHz and the CM margin rises to about 80°. The differential mode does not change: in DM cm does not move.']), '.stb LP1 cm dec 50 1k 10g'),
+      STB,
+    ),
+    bench(
+      1,
+      'Common-mode step, no compensation',
+      setAnalysisLine(dnote(cmStep(uncomp), ['A 10 mV step in Vcm, the CMFB reference: the outputs follow it ringing at about 4.5 MHz, the crossover of T, with the 15° margin.', 'A common-mode step at the inputs would barely show: the pair rejects it. The probes are transparent here.']), '.tran 3u'),
+      CM_TRAN,
+    ),
+    bench(1, 'Common-mode step, compensated', setAnalysisLine(dnote(cmStep(df), ['The same step with Ccp and Ccn: about 80° of margin, no ringing. The slow tail is a pole-zero doublet: the zero of Ccp/Rcp does not cancel the pole exactly.']), '.tran 3u'), CM_TRAN),
+    bench(
+      1,
+      'Differential step',
+      setAnalysisLine(step(step(df, 'Vp', 'PULSE(0 10m 100n 10n 10n 1u 2u) AC 0.5'), 'Vn', 'PULSE(0 -10m 100n 10n 10n 1u 2u) AC 0.5 180'), '.tran 3u'),
       { panes: [{ traces: [{ expr: 'V(outp)', color: '#1c7ed6' }, { expr: 'V(outn)', color: '#e8590c' }] }], active: 0, plot: 'tran1' },
     ),
   ];

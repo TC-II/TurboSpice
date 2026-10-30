@@ -236,7 +236,7 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
               }}
             />
           ) : (
-            <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={`${b.detail} — ${t('↑ ↓ to go through the testbenches')}`}>
+            <button className="tree-name" onClick={() => (b.id === activeBench ? onTestbench() : onBench(b.id))} title={`${b.name}\n${b.detail} — ${t('↑ ↓ to go through the testbenches')}`}>
               {b.name}
             </button>
           )}

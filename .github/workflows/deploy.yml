@@ -65,6 +65,13 @@ jobs:
       - name: Smoke test del motor
         run: npm run smoke
       - run: npm test --if-present
+      # Los modelos de PDK (open_pdks) se bajan una vez por versión: gf180 pesa 170 MB
+      - name: Caché de los PDK
+        uses: actions/cache@v4
+        with:
+          path: .cache/pdk
+          key: pdk-${{ hashFiles('scripts/build-pdk.ts', 'scripts/build-pdk-gf180.ts') }}
+
       - run: npm run build
         env:
           # OAuth Client ID público (Settings → Variables); vacío = sin inicio de sesión con Google

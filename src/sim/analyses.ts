@@ -49,7 +49,7 @@ export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean
   { kind: 'sens', label: t('Sensitivity'), ngspiceOnly: true, help: t('Sensitivity of an output to each circuit parameter (.sens).') },
   { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
   { kind: 'disto', label: t('Distortion'), ngspiceOnly: true, help: t('Small-signal harmonic and intermodulation distortion (.disto). Sources need DISTOF1/DISTOF2.') },
-  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop gain T at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Tian method by default, or Middlebrook\'s GFT.') },
+  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop stability at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Tian method (A-β model, T = −Aβ) by default, or Middlebrook\'s GFT (asymptotic gain model: R, G∞ and G0).') },
   { kind: 'sp', label: t('S-parameters'), ngspiceOnly: true, help: t('S-parameters (.sp). The ports are voltage sources with "portnum N z0 50" in their value.') },
 ];
 
@@ -120,8 +120,10 @@ export function formatAnalysis(a: Analysis): string {
     case 'sp':
       return `.sp ${sweepText(a.sweep)}${a.noise ? ' 1' : ''}`;
     case 'stb': {
-      const gft = a.method === 'gft' ? ` gft${a.input.trim() && a.output.trim() ? ` ${a.input.trim()} ${asVoltage(a.output.trim())}` : ''}` : '';
-      return `.stb ${a.probe}${a.mode ? ` ${a.mode}` : ''} ${sweepText(a.sweep)}${gft}`;
+      // la entrada y la salida (lazo cerrado) van detrás del método; Tian sin ellas no se escribe
+      const io = a.input.trim() && a.output.trim() ? ` ${a.input.trim()} ${asVoltage(a.output.trim())}` : '';
+      const method = a.method === 'gft' || io ? ` ${a.method}${io}` : '';
+      return `.stb ${a.probe}${a.mode ? ` ${a.mode}` : ''} ${sweepText(a.sweep)}${method}`;
     }
   }
 }
@@ -205,7 +207,7 @@ function parseIncomplete(tt: string[]): Analysis | null {
 }
 
 /**
- * ".stb LP1 [dm|cm] dec 100 1 100meg [gft [Vin V(out)]]". Con `loose`, a la línea le pueden
+ * ".stb LP1 [dm|cm] dec 100 1 100meg [tian|gft [Vin V(out)]]". Con `loose`, a la línea le pueden
  * faltar la sonda o valores del barrido.
  */
 function parseStb(a: string[], loose = false): Analysis | null {
@@ -219,7 +221,7 @@ function parseStb(a: string[], loose = false): Analysis | null {
   const rest = a.slice(i + 4);
   const gft = /^gft$/i.test(rest[0] ?? '');
   if (rest.length && !gft && !/^tian$/i.test(rest[0])) return null;
-  const [input = '', output = ''] = gft ? rest.slice(1) : [];
+  const [input = '', output = ''] = rest.slice(1);
   return { kind: 'stb', probe, mode, sweep, method: gft ? 'gft' : 'tian', input, output: unwrapV(output)[0] };
 }
 
@@ -341,7 +343,7 @@ export function validateAnalysis(a: Analysis): string[] {
     case 'stb':
       if (!a.probe) errs.push(t('The loop probe is missing'));
       sweep(a.sweep);
-      if (a.method === 'gft' && !!a.input.trim() !== !!a.output.trim()) errs.push(t('The GFT needs both the input source and the output, or neither'));
+      if (!!a.input.trim() !== !!a.output.trim()) errs.push(t('The closed-loop transfer needs both the input source and the output, or neither'));
       break;
     case 'pz':
       for (const [v, w] of [[a.inP, t('input +')], [a.inN, t('input −')], [a.outP, t('output +')], [a.outN, t('output −')]]) {

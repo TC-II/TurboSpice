@@ -53,7 +53,24 @@ describe('.stb', () => {
     expect(ng.text).toMatch(/alter vin acmag=0/);
     expect(ng.text).toMatch(/alter @v\.x_lp1\.vinj\[acmag\]=1/);
     expect(ng.text).toMatch(/alter @i\.x_lp1\.iinj\[acmag\]=1/);
+    // GFT: modelo asintótico y el A-β equivalente
+    expect(ng.text).toMatch(/let r = /);
     expect(ng.text).toMatch(/let ginf = /);
+    expect(ng.text).toMatch(/let g0 = /);
+    expect(ng.text).toMatch(/let beta = 1\//);
+    expect(ng.text).toMatch(/let a = ginf\*\(ginf\*r\+g0\)/);
+    expect(ng.text).toMatch(/let t = -ab/);
+  });
+
+  it('Tian: modelo A-β (T = −Aβ) y, con entrada y salida, A y β', () => {
+    expect(formatAnalysis(parseAnalysis('.stb LP1 dec 10 1 1g tian Vin V(out)')!)).toBe('.stb LP1 dec 10 1 1g tian Vin V(out)');
+    const ng = toNgspice(ltNetlist(parseAsc(INVERTING(';.stb LP1 dec 10 1 10meg tian Vin V(out)')), lib), 'stb', { resolve: (p) => lib.resolveModelFile(p) });
+    expect(ng.warnings).toEqual([]);
+    expect(ng.text).toMatch(/alter vin acmag=1/);
+    expect(ng.text).toMatch(/let t = -ab/);
+    expect(ng.text).toMatch(/let a = g\*\(1-t\)/);
+    expect(ng.text).toMatch(/let beta = /);
+    expect(ng.text).not.toMatch(/let ginf = /);
   });
 
   it('sonda diferencial: inyecta en el modo elegido', () => {

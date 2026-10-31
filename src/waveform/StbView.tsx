@@ -60,7 +60,10 @@ export function StbView({ plot, name }: { plot: SimPlot; name: string }) {
   const minGm = gm.length ? gm.reduce((a, b) => (b.margin < a.margin ? b : a)) : undefined;
   const rhpOpen = info.open?.poles.filter((p) => p.re > 1e-9 * Math.hypot(p.re, p.im)).length ?? 0;
   const rhpClosed = info.closed.filter((p) => p.re > 1e-9 * Math.hypot(p.re, p.im)).length;
-  const runs = info.open ? [rootsPlot(t('T (open loop)'), info.open.poles, info.open.zeros), rootsPlot(t('closed loop'), info.closed)] : [];
+  const gft = plot.vectors.some((v) => v.name === 'r');
+  // la ganancia de lazo de los márgenes: Aβ (Tian, T = −Aβ) o R (GFT)
+  const L = gft ? 'R' : 'Aβ';
+  const runs = info.open ? [rootsPlot(t('{L} (open loop)', { L }), info.open.poles, info.open.zeros), rootsPlot(t('closed loop'), info.closed)] : [];
   const labels = new Map(runs.map((r) => [r.name, r.name]));
   return (
     <div className="stb-view">
@@ -78,14 +81,14 @@ export function StbView({ plot, name }: { plot: SimPlot; name: string }) {
         <dt>{t('Closed loop')}</dt>
         <dd className={rhpClosed ? 'bad' : ''}>{info.open ? (rhpClosed ? t('unstable ({n} poles in the right half-plane)', { n: rhpClosed }) : t('stable')) : '—'}</dd>
       </dl>
-      {rhpOpen > 0 && <p className="stb-warn">⚠ {t('T has poles in the right half-plane (an inner loop is unstable): the margins read on the Bode plot are not valid; use the closed-loop poles.')}</p>}
+      {rhpOpen > 0 && <p className="stb-warn">⚠ {t('{L} has poles in the right half-plane (an inner loop is unstable): the margins read on the Bode plot are not valid; use the closed-loop poles.', { L })}</p>}
       {info.open ? (
         <PzPlane runs={runs} labels={labels} name={`${name} stb`} compact locus={info.locus} stableRun={1} />
       ) : (
-        <p className="hint">{t('Too few points to fit a model of T')}</p>
+        <p className="hint">{t('Too few points to fit a model of {L}', { L })}</p>
       )}
       <p className="hint">
-        {t('Poles and zeros from a rational fit of T(jω) (error {e}); line: root locus of 1 + k·T, k from 0 to ∞. The margin assumes what stays closed is stable.', { e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}
+        {t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', { L, e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}
       </p>
     </div>
   );

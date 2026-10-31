@@ -304,7 +304,7 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     ...d,
     texts: [...d.texts, { x: -64, y, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
   });
-  const STB = { panes: [{ traces: [{ expr: 'loopgain', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
+  const STB = { panes: [{ traces: [{ expr: 't', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
   const se = parseAsc(readFileSync('examples/stability/single.asc', 'utf8'));
   const df = parseAsc(readFileSync('examples/stability/diff.asc', 'utf8'));
   const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
@@ -373,10 +373,10 @@ SYMATTR InstName B2
     'Double-click LP1 to see its circuit: ProbeCircuit is the LoopProbe (library/sub/Stability/LoopProbe.lib) drawn as a subcircuit of this project. In series in the loop,',
     'Vprb (an ammeter) goes from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground) into x.',
     'All are 0 outside .stb: the probe is a wire. The .stb turns off every other AC source and runs two ac: run 1 with Vinj = 1, run 3 with Iinj = 1. With Vy = -V(x) and Iy = I(Vprb):',
-    '   D = Vy1·Iy3 - Vy3·Iy1        T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1        T(GFT) = 1/(1/D - 1)',
+    '   D = Vy1·Iy3 - Vy3·Iy1        Aβ(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1, T = -Aβ        R(GFT) = 1/(1/D - 1)',
     'Tian: the two injections (series voltage and shunt current) cancel the loading of the cut on both sides, so T does not depend on the impedances there',
     'nor on the probe orientation. It is what Spectre stb computes. GFT (Middlebrook): the same two runs read as a null double injection; it treats the reverse',
-    'transmission across the cut as load and, with an input and an output (gft V1 V(out)), gives G = G∞·T/(1+T) + G0/(1+T). Both give the same closed-loop poles (zeros of 1 + T).',
+    'transmission across the cut as load and, with an input and an output (gft V1 V(out)), gives G = G∞·R/(1+R) + G0/(1+R). Both give the same closed-loop poles (zeros of 1 + Aβ = 1 + R).',
     'Sources: M. Tian, V. Visvanathan, J. Hantgan and K. Kundert, "Striving for small-signal stability", IEEE Circuits and Devices Magazine 17(1), 2001.',
     'R. D. Middlebrook, "The general feedback theorem: a final solution for feedback systems", IEEE Microwave Magazine 7(2), 2006.',
     'SPICE implementations: Frank Wiedmann, https://sites.google.com/site/frankwiedmann/loopgain . More in docs/estabilidad.md.',
@@ -392,8 +392,8 @@ SYMATTR InstName B2
     bench(
       0,
       'GFT: G, G∞, G0 and R',
-      setAnalysisLine(note(se, ['Middlebrook\'s GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):', 'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.']), '.stb LP1 dec 50 10 100meg gft V1 V(out)'),
-      { panes: [{ traces: [{ expr: 'loopgain', color: '#1c7ed6' }] }, { traces: [{ expr: 'g', color: '#2f9e44' }, { expr: 'ginf', color: '#e8590c' }] }], active: 0, plot: 'stb1', mode: 'bode' },
+      setAnalysisLine(note(se, ['Middlebrook\'s GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):', 'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.', 'It also gives the equivalent A-β model: β = 1/G∞ and A = G∞·(G∞·R + G0)/(G∞ - G0) (A = G∞·R without direct path), with T = -Aβ.']), '.stb LP1 dec 50 10 100meg gft V1 V(out)'),
+      { panes: [{ traces: [{ expr: 'r', color: '#1c7ed6' }] }, { traces: [{ expr: 'g', color: '#2f9e44' }, { expr: 'ginf', color: '#e8590c' }] }, { traces: [{ expr: 'a', color: '#7048e8' }, { expr: 'beta', color: '#0c8599' }] }], active: 0, plot: 'stb1', mode: 'bode' },
     ),
     bench(0, 'Gain -10: more margin', setAnalysisLine(note(setVal(se, 'R2', '10k'), ['With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.']), '.stb LP1 dec 50 10 100meg'), STB),
     bench(0, 'Step response', setAnalysisLine(note(step(se, 'V1', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 1'), ['The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.']), '.tran 20u'), {

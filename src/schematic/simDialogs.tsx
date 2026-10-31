@@ -14,6 +14,7 @@ import {
 } from '../sim/analyses.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
 import { Modal } from './dialogs.tsx';
+import { StbModelsInfo } from './StbModelsInfo.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** Valor numérico SPICE (1k, 10meg…) o expresión entre llaves */
@@ -276,18 +277,21 @@ export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Ana
               onChange={(mode) => set({ ...a, mode })}
             />
           )}
-          <Select
-            label={t('Method')}
-            value={a.method}
-            options={[
-              ['tian', t('Tian (as Spectre stb; probe orientation does not matter)')],
-              ['gft', t('Middlebrook\'s GFT (signal must enter the probe by its arrow)')],
-            ]}
-            onChange={(method) => set({ ...a, method })}
-          />
-          {a.method === 'gft' && (
+          <div className="stbm-row">
+            <Select
+              label={t('Method')}
+              value={a.method}
+              options={[
+                ['tian', t('Tian, A-β model: T = −Aβ (as Spectre stb; probe orientation does not matter)')],
+                ['gft', t('Middlebrook\'s GFT, asymptotic model: R, G∞, G0 (signal must enter the probe by its arrow)')],
+              ]}
+              onChange={(method) => set({ ...a, method })}
+            />
+            <StbModelsInfo />
+          </div>
+          {(
             <fieldset>
-              <legend>{t('Closed-loop transfer (optional): G, G∞, G0 and R')}</legend>
+              <legend>{a.method === 'gft' ? t('Closed-loop transfer (optional): G, G∞, G0 and R, and the equivalent A and β') : t('Closed-loop transfer (optional): G, A and β')}</legend>
               <Field label={t('Input source')} value={a.input} onChange={(input) => set({ ...a, input })} list="sim-sources" pick={picker && { what: 'source', picker }} />
               {node(t('Output'), a.output, (output) => set({ ...a, output }), undefined, false)}
             </fieldset>

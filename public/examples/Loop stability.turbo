@@ -8,51 +8,51 @@
   {
    "name": "ProbeCircuit.asc",
    "kind": "schematic",
-   "text": "Version 4\nSHEET 1 800 400\nWIRE 0 0 80 0\nWIRE 160 0 208 0\nWIRE 208 0 240 0\nWIRE 320 0 400 0\nWIRE 208 0 208 64\nFLAG 0 0 p1\nIOPIN 0 0 BiDir\nFLAG 400 0 p2\nIOPIN 400 0 BiDir\nFLAG 208 0 x\nFLAG 208 144 0\nTEXT -32 -112 Left 2 ;Inside the LoopProbe: the loop signal goes in at p1 and out at p2 (left to right). Outside .stb all three sources are 0: a wire.\nTEXT -32 -80 Left 2 ;Vprb (0 V) is the ammeter: Iy = I(Vprb). Vinj is the series voltage injection, Iinj the shunt current injection into x. Vy = -V(x).\nTEXT -32 208 Left 2 ;.stb run 1: Vinj = 1 (AC). Run 3: Iinj = 1. Then D = Vy1·Iy3 - Vy3·Iy1, T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1, T(GFT) = 1/(1/D - 1).\nSYMBOL voltage 176 0 R90\nWINDOW 0 -32 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Vprb\nSYMATTR Value 0\nSYMBOL voltage 336 0 R90\nWINDOW 0 -32 56 VBottom 2\nWINDOW 3 32 56 VTop 2\nSYMATTR InstName Vinj\nSYMATTR Value 0 AC 0\nSYMBOL current 208 144 R180\nWINDOW 0 -32 56 Right 2\nWINDOW 3 -32 24 Right 2\nSYMATTR InstName Iinj\nSYMATTR Value 0 AC 0\n"
+   "text": "Version 4\r\nSHEET 1 800 400\r\nWIRE 0 0 80 0\r\nWIRE 160 0 208 0\r\nWIRE 208 0 240 0\r\nWIRE 320 0 400 0\r\nWIRE 208 0 208 64\r\nFLAG 0 0 p1\r\nIOPIN 0 0 BiDir\r\nFLAG 400 0 p2\r\nIOPIN 400 0 BiDir\r\nFLAG 208 0 x\r\nFLAG 208 144 0\r\nTEXT -32 -112 Left 2 ;Inside the LoopProbe: the loop signal goes in at p1 and out at p2 (left to right). Outside .stb all three sources are 0: a wire.\r\nTEXT -32 -80 Left 2 ;Vprb (0 V) is the ammeter: Iy = I(Vprb). Vinj is the series voltage injection, Iinj the shunt current injection into x. Vy = -V(x).\r\nTEXT -32 208 Left 2 ;.stb run 1: Vinj = 1 (AC). Run 3: Iinj = 1. Then D = Vy1·Iy3 - Vy3·Iy1, T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1, T(GFT) = 1/(1/D - 1).\r\nSYMBOL voltage 176 0 R90\r\nWINDOW 0 -32 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName Vprb\r\nSYMATTR Value 0\r\nSYMBOL voltage 336 0 R90\r\nWINDOW 0 -32 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName Vinj\r\nSYMATTR Value 0 AC 0\r\nSYMBOL current 208 144 R180\r\nWINDOW 0 -32 56 Right 2\r\nWINDOW 3 -32 24 Right 2\r\nSYMATTR InstName Iinj\r\nSYMATTR Value 0 AC 0\r\n"
   },
   {
    "name": "ProbeCircuit.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType BLOCK\nRECTANGLE Normal -32 -12 32 12\nLINE Normal -48 0 -32 0\nLINE Normal 32 0 48 0\nLINE Normal -20 0 18 0\nLINE Normal 10 -5 18 0\nLINE Normal 10 5 18 0\nTEXT 0 -20 Center 0 T\nWINDOW 0 0 -32 Center 2\nSYMATTR Prefix X\nSYMATTR InstName LP1\nSYMATTR Description The LoopProbe drawn as a subcircuit of the project: double-click it to see Vprb, Vinj and Iinj.\nPIN -48 0 NONE 0\nPINATTR PinName p1\nPINATTR SpiceOrder 1\nPIN 48 0 NONE 0\nPINATTR PinName p2\nPINATTR SpiceOrder 2\n"
+   "text": "Version 4\r\nSymbolType BLOCK\r\nRECTANGLE Normal -32 -12 32 12\r\nLINE Normal -48 0 -32 0\r\nLINE Normal 32 0 48 0\r\nLINE Normal -20 0 18 0\r\nLINE Normal 10 -5 18 0\r\nLINE Normal 10 5 18 0\r\nTEXT 0 -20 Center 0 T\r\nWINDOW 0 0 -32 Center 2\r\nSYMATTR Prefix X\r\nSYMATTR InstName LP1\r\nSYMATTR Description The LoopProbe drawn as a subcircuit of the project: double-click it to see Vprb, Vinj and Iinj.\r\nPIN -48 0 NONE 0\r\nPINATTR PinName p1\r\nPINATTR SpiceOrder 1\r\nPIN 48 0 NONE 0\r\nPINATTR PinName p2\r\nPINATTR SpiceOrder 2\r\n"
   },
   {
    "name": "BalunCircuit.asc",
    "kind": "schematic",
-   "text": "Version 4\nSHEET 1 1000 600\nWIRE 64 64 192 64\nWIRE 192 144 192 192\nWIRE 192 272 192 320\nWIRE 320 64 448 64\nWIRE 448 144 448 192\nWIRE 448 272 448 320\nWIRE 640 64 768 64\nWIRE 768 64 864 64\nWIRE 640 320 768 320\nWIRE 768 320 864 320\nFLAG 64 64 p\nIOPIN 64 64 BiDir\nFLAG 320 64 n\nIOPIN 320 64 BiDir\nFLAG 864 64 d\nIOPIN 864 64 BiDir\nFLAG 864 320 c\nIOPIN 864 320 BiDir\nFLAG 144 208 d\nFLAG 144 256 0\nFLAG 144 336 c\nFLAG 144 384 0\nFLAG 192 400 0\nFLAG 400 208 d\nFLAG 400 256 0\nFLAG 400 336 c\nFLAG 400 384 0\nFLAG 448 400 0\nFLAG 640 144 0\nFLAG 768 144 0\nFLAG 640 400 0\nFLAG 768 400 0\nTEXT 32 -64 Left 2 ;Terminal side: V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2 (E sources); Vsp and Vsn (0 V) measure I(p) and I(n).\nTEXT 32 -32 Left 2 ;Mode side: the F sources put the currents back as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Power is conserved.\nSYMBOL voltage 192 48 R0\nWINDOW 0 24 32 Left 2\nWINDOW 3 24 64 Left 2\nSYMATTR InstName Vsp\nSYMATTR Value 0\nSYMBOL e 192 176 R0\nSYMATTR InstName Ep\nSYMATTR Value 0.5\nSYMBOL e 192 304 R0\nSYMATTR InstName Ec\nSYMATTR Value 1\nSYMBOL voltage 448 48 R0\nWINDOW 0 24 32 Left 2\nWINDOW 3 24 64 Left 2\nSYMATTR InstName Vsn\nSYMATTR Value 0\nSYMBOL e 448 176 R0\nSYMATTR InstName En\nSYMATTR Value -0.5\nSYMBOL e 448 304 R0\nSYMATTR InstName Ec2\nSYMATTR Value 1\nSYMBOL f 640 144 R180\nWINDOW 0 -32 56 Right 2\nWINDOW 3 -32 24 Right 2\nSYMATTR InstName Fd\nSYMATTR Value Vsp 0.5\nSYMBOL f 768 144 R180\nWINDOW 0 -32 56 Right 2\nWINDOW 3 -32 24 Right 2\nSYMATTR InstName Fd2\nSYMATTR Value Vsn -0.5\nSYMBOL f 640 400 R180\nWINDOW 0 -32 56 Right 2\nWINDOW 3 -32 24 Right 2\nSYMATTR InstName Fc\nSYMATTR Value Vsp 1\nSYMBOL f 768 400 R180\nWINDOW 0 -32 56 Right 2\nWINDOW 3 -32 24 Right 2\nSYMATTR InstName Fc2\nSYMATTR Value Vsn 1\n"
+   "text": "Version 4\r\nSHEET 1 1000 600\r\nWIRE 64 64 192 64\r\nWIRE 192 144 192 192\r\nWIRE 192 272 192 320\r\nWIRE 320 64 448 64\r\nWIRE 448 144 448 192\r\nWIRE 448 272 448 320\r\nWIRE 640 64 768 64\r\nWIRE 768 64 864 64\r\nWIRE 640 320 768 320\r\nWIRE 768 320 864 320\r\nFLAG 64 64 p\r\nIOPIN 64 64 BiDir\r\nFLAG 320 64 n\r\nIOPIN 320 64 BiDir\r\nFLAG 864 64 d\r\nIOPIN 864 64 BiDir\r\nFLAG 864 320 c\r\nIOPIN 864 320 BiDir\r\nFLAG 144 208 d\r\nFLAG 144 256 0\r\nFLAG 144 336 c\r\nFLAG 144 384 0\r\nFLAG 192 400 0\r\nFLAG 400 208 d\r\nFLAG 400 256 0\r\nFLAG 400 336 c\r\nFLAG 400 384 0\r\nFLAG 448 400 0\r\nFLAG 640 144 0\r\nFLAG 768 144 0\r\nFLAG 640 400 0\r\nFLAG 768 400 0\r\nTEXT 32 -64 Left 2 ;Terminal side: V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2 (E sources); Vsp and Vsn (0 V) measure I(p) and I(n).\r\nTEXT 32 -32 Left 2 ;Mode side: the F sources put the currents back as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Power is conserved.\r\nSYMBOL voltage 192 48 R0\r\nWINDOW 0 24 32 Left 2\r\nWINDOW 3 24 64 Left 2\r\nSYMATTR InstName Vsp\r\nSYMATTR Value 0\r\nSYMBOL e 192 176 R0\r\nSYMATTR InstName Ep\r\nSYMATTR Value 0.5\r\nSYMBOL e 192 304 R0\r\nSYMATTR InstName Ec\r\nSYMATTR Value 1\r\nSYMBOL voltage 448 48 R0\r\nWINDOW 0 24 32 Left 2\r\nWINDOW 3 24 64 Left 2\r\nSYMATTR InstName Vsn\r\nSYMATTR Value 0\r\nSYMBOL e 448 176 R0\r\nSYMATTR InstName En\r\nSYMATTR Value -0.5\r\nSYMBOL e 448 304 R0\r\nSYMATTR InstName Ec2\r\nSYMATTR Value 1\r\nSYMBOL f 640 144 R180\r\nWINDOW 0 -32 56 Right 2\r\nWINDOW 3 -32 24 Right 2\r\nSYMATTR InstName Fd\r\nSYMATTR Value Vsp 0.5\r\nSYMBOL f 768 144 R180\r\nWINDOW 0 -32 56 Right 2\r\nWINDOW 3 -32 24 Right 2\r\nSYMATTR InstName Fd2\r\nSYMATTR Value Vsn -0.5\r\nSYMBOL f 640 400 R180\r\nWINDOW 0 -32 56 Right 2\r\nWINDOW 3 -32 24 Right 2\r\nSYMATTR InstName Fc\r\nSYMATTR Value Vsp 1\r\nSYMBOL f 768 400 R180\r\nWINDOW 0 -32 56 Right 2\r\nWINDOW 3 -32 24 Right 2\r\nSYMATTR InstName Fc2\r\nSYMATTR Value Vsn 1\r\n"
   },
   {
    "name": "BalunCircuit.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType BLOCK\nRECTANGLE Normal -32 -48 32 48\nLINE Normal -48 -32 -32 -32\nLINE Normal -48 32 -32 32\nLINE Normal 32 -32 48 -32\nLINE Normal 32 32 48 32\nARC Normal -14 -24 -2 -12 -8 -12 -8 -24\nARC Normal -14 -12 -2 0 -8 0 -8 -12\nARC Normal -14 0 -2 12 -8 12 -8 0\nARC Normal -14 12 -2 24 -8 24 -8 12\nARC Normal 2 -24 14 -12 8 -24 8 -12\nARC Normal 2 -12 14 0 8 -12 8 0\nARC Normal 2 0 14 12 8 0 8 12\nARC Normal 2 12 14 24 8 12 8 24\nTEXT -28 -36 Left 0 p\nTEXT -28 36 Left 0 n\nTEXT 28 -36 Right 0 d\nTEXT 28 36 Right 0 c\nWINDOW 0 0 -60 Center 2\nSYMATTR Prefix X\nSYMATTR InstName B1\nSYMATTR Description The Balun drawn as a subcircuit of the project: double-click it to see its E and F sources.\nPIN -48 -32 NONE 0\nPINATTR PinName p\nPINATTR SpiceOrder 1\nPIN -48 32 NONE 0\nPINATTR PinName n\nPINATTR SpiceOrder 2\nPIN 48 -32 NONE 0\nPINATTR PinName d\nPINATTR SpiceOrder 3\nPIN 48 32 NONE 0\nPINATTR PinName c\nPINATTR SpiceOrder 4\n"
+   "text": "Version 4\r\nSymbolType BLOCK\r\nRECTANGLE Normal -32 -48 32 48\r\nLINE Normal -48 -32 -32 -32\r\nLINE Normal -48 32 -32 32\r\nLINE Normal 32 -32 48 -32\r\nLINE Normal 32 32 48 32\r\nARC Normal -14 -24 -2 -12 -8 -12 -8 -24\r\nARC Normal -14 -12 -2 0 -8 0 -8 -12\r\nARC Normal -14 0 -2 12 -8 12 -8 0\r\nARC Normal -14 12 -2 24 -8 24 -8 12\r\nARC Normal 2 -24 14 -12 8 -24 8 -12\r\nARC Normal 2 -12 14 0 8 -12 8 0\r\nARC Normal 2 0 14 12 8 0 8 12\r\nARC Normal 2 12 14 24 8 12 8 24\r\nTEXT -28 -36 Left 0 p\r\nTEXT -28 36 Left 0 n\r\nTEXT 28 -36 Right 0 d\r\nTEXT 28 36 Right 0 c\r\nWINDOW 0 0 -60 Center 2\r\nSYMATTR Prefix X\r\nSYMATTR InstName B1\r\nSYMATTR Description The Balun drawn as a subcircuit of the project: double-click it to see its E and F sources.\r\nPIN -48 -32 NONE 0\r\nPINATTR PinName p\r\nPINATTR SpiceOrder 1\r\nPIN -48 32 NONE 0\r\nPINATTR PinName n\r\nPINATTR SpiceOrder 2\r\nPIN 48 -32 NONE 0\r\nPINATTR PinName d\r\nPINATTR SpiceOrder 3\r\nPIN 48 32 NONE 0\r\nPINATTR PinName c\r\nPINATTR SpiceOrder 4\r\n"
   }
  ],
- "activeTestbench": "smvukgv9i2r",
+ "activeTestbench": "smvvxl3np2r",
  "groups": [
   {
-   "id": "gmvukgv9i2o",
+   "id": "gmvvxl3nn2o",
    "name": "Single-ended (LoopProbe)"
   },
   {
-   "id": "gmvukgv9i2p",
+   "id": "gmvvxl3nn2p",
    "name": "Differential (DiffLoopProbe)"
   },
   {
-   "id": "gmvukgv9i2q",
+   "id": "gmvvxl3nn2q",
    "name": "How the probes work"
   }
  ],
  "testbenches": [
   {
-   "id": "smvukgv9i2r",
+   "id": "smvvxl3np2r",
    "name": "Loop gain (Tian)",
-   "group": "gmvukgv9i2o",
+   "group": "gmvvxl3nn2o",
    "current": "sha256:50c83aef44b689b2b8eae978dad4725e35aa1944b7a5aab776f7ed3cad1cfebf",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -65,16 +65,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9i2s",
+   "id": "smvvxl3np2s",
    "name": "GFT: G, G∞, G0 and R",
-   "group": "gmvukgv9i2o",
-   "current": "sha256:45ea236bebd3b6f1a9eaf41e9171457999cfc0e3d12cfbc2778f644db869df92",
+   "group": "gmvvxl3nn2o",
+   "current": "sha256:33133d6bf44b17d92c84c059f28e0f6bb01f7a387811dfac18f857b8860b3c47",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "r",
         "color": "#1c7ed6"
        }
       ]
@@ -90,6 +90,18 @@
         "color": "#e8590c"
        }
       ]
+     },
+     {
+      "traces": [
+       {
+        "expr": "a",
+        "color": "#7048e8"
+       },
+       {
+        "expr": "beta",
+        "color": "#0c8599"
+       }
+      ]
      }
     ],
     "active": 0,
@@ -99,16 +111,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9i2t",
+   "id": "smvvxl3np2t",
    "name": "Gain -10: more margin",
-   "group": "gmvukgv9i2o",
+   "group": "gmvvxl3nn2o",
    "current": "sha256:d697ba9d2568500f791bfd4729320cbd470ecf8e213364e7e4e39be0a598dc73",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -121,9 +133,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2u",
+   "id": "smvvxl3nq2u",
    "name": "Step response",
-   "group": "gmvukgv9i2o",
+   "group": "gmvvxl3nn2o",
    "current": "sha256:e832cb5421b2e08922febd547739e64c29ae8393437bff05b13208363da23a93",
    "view": {
     "panes": [
@@ -142,9 +154,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2v",
+   "id": "smvvxl3nq2v",
    "name": "Closed-loop Bode",
-   "group": "gmvukgv9i2o",
+   "group": "gmvvxl3nn2o",
    "current": "sha256:f10829117a6259560dc180a98e93eba173dfea7620351cb3e3aa25580e7cb02b",
    "view": {
     "panes": [
@@ -164,16 +176,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2w",
+   "id": "smvvxl3nq2w",
    "name": "Differential-mode loop gain",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:a4443a93022fa082bdd197e65b41b54bc45a731d59c5542a32218e3e83e8e704",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -186,16 +198,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2x",
+   "id": "smvvxl3nq2x",
    "name": "DM without enough Miller (Cc = 22p)",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:a3ada02a9d62bf20ea177ecdffa12bf7bb9799a47189cedbbfaf17e9cad706f6",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -208,16 +220,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2y",
+   "id": "smvvxl3nq2y",
    "name": "Common-mode loop gain",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:2743887e680c55742d91efc9cd5897cf2bec323565f0c5ad0b5c21cfb970e49a",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -230,16 +242,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j2z",
+   "id": "smvvxl3nq2z",
    "name": "CMFB loop alone (LoopProbe at cm)",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:b614d2c15fc7aa5a518cf6e95e4415be375965366132620dd50c781884d7666e",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -252,9 +264,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j30",
+   "id": "smvvxl3nr30",
    "name": "Differential step",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:afc5a46d63d0b06941899b728e1eed7fba8f19b4b0dc4a9160b0bc40794652c5",
    "view": {
     "panes": [
@@ -277,9 +289,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j31",
+   "id": "smvvxl3nr31",
    "name": "Differential step, Cc = 22p",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:4aedfa41a304c72e13e15f13ddb41de5fabb60368d0143bd3a34b9c3dd0b3e22",
    "view": {
     "panes": [
@@ -302,9 +314,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j32",
+   "id": "smvvxl3nr32",
    "name": "Common-mode step (Vcm)",
-   "group": "gmvukgv9i2p",
+   "group": "gmvvxl3nn2p",
    "current": "sha256:564262fdb5c927f9631f14708393ad8d15325051ac39d4965c56c1490e2be3be",
    "view": {
     "panes": [
@@ -327,16 +339,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j33",
+   "id": "smvvxl3nr33",
    "name": "LoopProbe: Tian and GFT",
-   "group": "gmvukgv9i2q",
-   "current": "sha256:bc273aa799eda8cb108b407345ddb65f6d9f08b329ccfeda5fb57238054cec93",
+   "group": "gmvvxl3nn2q",
+   "current": "sha256:191133d49565bafb4b7b541178f48464dd245f84bacf4d56d03143aa71a0eff3",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -349,9 +361,9 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j34",
+   "id": "smvvxl3nr34",
    "name": "Balun: differential and common mode",
-   "group": "gmvukgv9i2q",
+   "group": "gmvvxl3nn2q",
    "current": "sha256:61c1b4338e69ad571187763c96941ced3f6e1e6efc958480c415b9dfc0a56840",
    "view": {
     "panes": [
@@ -386,16 +398,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j35",
+   "id": "smvvxl3nr35",
    "name": "DiffLoopProbe by hand: DM",
-   "group": "gmvukgv9i2q",
+   "group": "gmvvxl3nn2q",
    "current": "sha256:67876d8591be0d3ca362c91ba5d0d8392109ce15ea1de17b24ca0db42c4a7bd3",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -408,16 +420,16 @@
    "runs": []
   },
   {
-   "id": "smvukgv9j36",
+   "id": "smvvxl3ns36",
    "name": "DiffLoopProbe by hand: CM",
-   "group": "gmvukgv9i2q",
+   "group": "gmvvxl3nn2q",
    "current": "sha256:33ec9db47b6d3328f6d90a77acfb71df725812e2c6c2dbaeaeb38b405e9e7813",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "loopgain",
+        "expr": "t",
         "color": "#1c7ed6"
        }
       ]
@@ -432,7 +444,7 @@
  ],
  "blobs": {
   "sha256:50c83aef44b689b2b8eae978dad4725e35aa1944b7a5aab776f7ed3cad1cfebf": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;LP1 (Stability > LoopProbe) is in series in the loop, at the error point: the loop signal goes from the summing node into the op amp (the arrow).\\nOutside .stb it is a plain wire. The .stb turns its sources on one at a time and computes T; next to the Bode plot: margins, poles and zeros of T,\\nclosed-loop poles and the root locus of 1 + k·T. U1 has two poles (10 Hz and 1 MHz): with gain -1 the phase margin is only about 25°.\r\nTEXT -64 664 Left 2 ;.stb LP1 dec 50 10 100meg\r\n",
-  "sha256:45ea236bebd3b6f1a9eaf41e9171457999cfc0e3d12cfbc2778f644db869df92": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;Middlebrook's GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):\\nG (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.\r\nTEXT -64 640 Left 2 ;.stb LP1 dec 50 10 100meg gft V1 V(out)\r\n",
+  "sha256:33133d6bf44b17d92c84c059f28e0f6bb01f7a387811dfac18f857b8860b3c47": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;Middlebrook's GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):\\nG (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.\\nIt also gives the equivalent A-β model: β = 1/G∞ and A = G∞·(G∞·R + G0)/(G∞ - G0) (A = G∞·R without direct path), with T = -Aβ.\r\nTEXT -64 664 Left 2 ;.stb LP1 dec 50 10 100meg gft V1 V(out)\r\n",
   "sha256:d697ba9d2568500f791bfd4729320cbd470ecf8e213364e7e4e39be0a598dc73": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 10k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.\r\nTEXT -64 616 Left 2 ;.stb LP1 dec 50 10 100meg\r\n",
   "sha256:e832cb5421b2e08922febd547739e64c29ae8393437bff05b13208363da23a93": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V1\r\nSYMATTR Value PULSE(0 0.1 0 10n 10n 5u 10u) AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.\r\nTEXT -64 616 Left 2 !.tran 20u\r\n",
   "sha256:f10829117a6259560dc180a98e93eba173dfea7620351cb3e3aa25580e7cb02b": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL Stability\\\\LoopProbe 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 224 Left 2 !.ac dec 50 10 100meg\r\n",
@@ -443,7 +455,7 @@
   "sha256:afc5a46d63d0b06941899b728e1eed7fba8f19b4b0dc4a9160b0bc40794652c5": "Version 4\r\nSHEET 1 2500 1300\r\nWIRE 384 0 640 0\r\nWIRE 640 0 800 0\r\nWIRE 800 0 960 0\r\nWIRE 960 0 1216 0\r\nWIRE 640 0 640 112\r\nWIRE 640 192 640 256\r\nWIRE 640 256 640 416\r\nWIRE 960 0 960 112\r\nWIRE 960 192 960 256\r\nWIRE 960 256 960 416\r\nWIRE 640 512 640 560\r\nWIRE 640 560 800 560\r\nWIRE 800 560 960 560\r\nWIRE 960 560 960 512\r\nWIRE 800 560 800 576\r\nWIRE 800 656 800 688\r\nWIRE 576 464 528 464\r\nWIRE 528 464 528 672\r\nWIRE 528 672 496 672\r\nWIRE 416 672 320 672\r\nWIRE 528 672 528 704\r\nWIRE 1024 464 1072 464\r\nWIRE 1072 464 1072 672\r\nWIRE 1072 672 1088 672\r\nWIRE 1168 672 1280 672\r\nWIRE 1072 672 1072 704\r\nWIRE 384 0 384 112\r\nWIRE 384 192 384 208\r\nWIRE 640 256 512 256\r\nWIRE 512 256 448 256\r\nWIRE 512 320 512 352\r\nWIRE 512 352 384 352\r\nWIRE 384 304 384 352\r\nWIRE 384 352 384 416\r\nWIRE 384 352 320 352\r\nWIRE 384 512 384 560\r\nWIRE 448 464 480 464\r\nWIRE 1216 0 1216 112\r\nWIRE 1216 192 1216 208\r\nWIRE 960 256 1088 256\r\nWIRE 1088 256 1152 256\r\nWIRE 1088 320 1088 352\r\nWIRE 1088 352 1216 352\r\nWIRE 1216 304 1216 352\r\nWIRE 1216 352 1216 416\r\nWIRE 1216 352 1280 352\r\nWIRE 1216 512 1216 560\r\nWIRE 1152 464 1120 464\r\nWIRE 1440 544 1488 544\r\nWIRE 1440 608 1488 608\r\nWIRE 1584 544 1632 544\r\nWIRE 1632 544 1632 432\r\nWIRE 1632 432 1696 432\r\nWIRE 1584 608 1632 608\r\nWIRE 1632 608 1632 720\r\nWIRE 1632 720 1696 720\r\nWIRE 1696 432 1760 432\r\nWIRE 1760 432 1856 432\r\nWIRE 1856 432 1920 432\r\nWIRE 1696 720 1760 720\r\nWIRE 1760 720 1856 720\r\nWIRE 1856 720 1920 720\r\nWIRE 1856 432 1856 448\r\nWIRE 1856 528 1856 576\r\nWIRE 1856 576 1856 624\r\nWIRE 1856 688 1856 720\r\nWIRE 1856 576 1904 576\r\nWIRE 2064 528 2128 528\r\nWIRE 2128 528 2192 528\r\nWIRE 2128 448 2128 416\r\nWIRE 2064 624 2064 704\r\nWIRE 2192 624 2192 672\r\nWIRE 2192 672 2192 704\r\nWIRE 2192 672 2304 672\r\nWIRE 2304 672 2304 752\r\nWIRE 2256 752 2304 752\r\nWIRE 2304 752 2368 752\r\nWIRE 2192 800 2192 832\r\nWIRE 2256 576 2368 576\r\nWIRE 176 896 176 864\r\nWIRE 320 896 320 864\r\nFLAG 800 0 vcc\r\nFLAG 800 688 vee\r\nFLAG 320 752 0\r\nFLAG 528 784 outn\r\nFLAG 1280 752 0\r\nFLAG 1072 784 outp\r\nFLAG 320 352 op\r\nFLAG 384 560 vee\r\nFLAG 480 464 vb\r\nFLAG 1280 352 on\r\nFLAG 1216 560 vee\r\nFLAG 1120 464 vb\r\nFLAG 1440 544 op\r\nFLAG 1440 608 on\r\nFLAG 1920 432 outp\r\nFLAG 1920 720 outn\r\nFLAG 1760 496 0\r\nFLAG 1760 784 0\r\nFLAG 1856 576 cm\r\nFLAG 2128 416 vcc\r\nFLAG 2064 704 vee\r\nFLAG 2368 752 vb\r\nFLAG 2192 832 vee\r\nFLAG 2368 656 0\r\nFLAG 176 864 vcc\r\nFLAG 176 976 0\r\nFLAG 320 864 vee\r\nFLAG 320 976 0\r\nSYMBOL res 624 96 R0\r\nSYMATTR InstName RC1\r\nSYMATTR Value 1.6k\r\nSYMBOL res 944 96 R0\r\nSYMATTR InstName RC2\r\nSYMATTR Value 1.6k\r\nSYMBOL npn 576 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value 2N3904\r\nSYMBOL npn 1024 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q2\r\nSYMATTR Value 2N3904\r\nSYMBOL res 784 560 R0\r\nSYMATTR InstName RT\r\nSYMATTR Value 4.3k\r\nSYMBOL res 512 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1p\r\nSYMATTR Value 10k\r\nSYMBOL voltage 320 656 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value PULSE(0 10m 0.5u 10n 10n 2u 4u) AC 0.5\r\nSYMBOL res 512 688 R0\r\nSYMATTR InstName R2p\r\nSYMATTR Value 100k\r\nSYMBOL res 1184 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1n\r\nSYMATTR Value 10k\r\nSYMBOL voltage 1280 656 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value PULSE(0 -10m 0.5u 10n 10n 2u 4u) AC 0.5 180\r\nSYMBOL res 1056 688 R0\r\nSYMATTR InstName R2n\r\nSYMATTR Value 100k\r\nSYMBOL res 368 96 R0\r\nSYMATTR InstName RE5\r\nSYMATTR Value 200\r\nSYMBOL pnp 448 304 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q5\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 496 256 R0\r\nWINDOW 0 24 24 Left 2\r\nWINDOW 3 24 48 Left 2\r\nSYMATTR InstName Cc1\r\nSYMATTR Value 470p\r\nSYMBOL npn 448 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q7\r\nSYMATTR Value 2N3904\r\nSYMBOL res 1200 96 R0\r\nSYMATTR InstName RE6\r\nSYMATTR Value 200\r\nSYMBOL pnp 1152 304 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q6\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 1072 256 R0\r\nWINDOW 0 -8 24 Right 2\r\nWINDOW 3 -8 48 Right 2\r\nSYMATTR InstName Cc2\r\nSYMATTR Value 470p\r\nSYMBOL npn 1152 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q8\r\nSYMATTR Value 2N3904\r\nSYMBOL Stability\\\\DiffLoopProbe 1536 576 R0\r\nSYMATTR InstName LP1\r\nSYMBOL cap 1744 432 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLp\r\nSYMATTR Value 10p\r\nSYMBOL cap 1744 720 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLn\r\nSYMATTR Value 10p\r\nSYMBOL res 1840 432 R0\r\nSYMATTR InstName Rcp\r\nSYMATTR Value 100k\r\nSYMBOL res 1840 608 R0\r\nSYMATTR InstName Rcn\r\nSYMATTR Value 100k\r\nSYMBOL Stability\\\\LoopProbe 1952 576 R0\r\nSYMATTR InstName LP2\r\nSYMBOL pnp 2000 624 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q9\r\nSYMATTR Value 2N3906\r\nSYMBOL pnp 2256 624 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q10\r\nSYMATTR Value 2N3906\r\nSYMBOL res 2144 544 R180\r\nSYMATTR InstName RT2\r\nSYMATTR Value 4.3k\r\nSYMBOL npn 2256 704 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q11\r\nSYMATTR Value 2N3904\r\nSYMBOL voltage 2368 560 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vcm\r\nSYMATTR Value 0\r\nSYMBOL voltage 176 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 320 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VEE\r\nSYMATTR Value -5\r\nTEXT 176 -176 Left 2 ;NPN: 2N3904   PNP: 2N3906\r\nTEXT 736 -96 Left 2 ;Stage 1\r\nTEXT 320 -96 Left 2 ;Stage 2\r\nTEXT 1120 -96 Left 2 ;Stage 2\r\nTEXT 2000 384 Left 2 ;CMFB\r\nTEXT 1440 384 Left 2 ;Loop probe and load\r\nTEXT -64 1072 Left 2 ;A ±10 mV differential step: the outputs move ∓100 mV with the small overshoot of a 58° margin.\r\nTEXT 176 1128 Left 2 !.tran 4u\r\n",
   "sha256:4aedfa41a304c72e13e15f13ddb41de5fabb60368d0143bd3a34b9c3dd0b3e22": "Version 4\r\nSHEET 1 2500 1300\r\nWIRE 384 0 640 0\r\nWIRE 640 0 800 0\r\nWIRE 800 0 960 0\r\nWIRE 960 0 1216 0\r\nWIRE 640 0 640 112\r\nWIRE 640 192 640 256\r\nWIRE 640 256 640 416\r\nWIRE 960 0 960 112\r\nWIRE 960 192 960 256\r\nWIRE 960 256 960 416\r\nWIRE 640 512 640 560\r\nWIRE 640 560 800 560\r\nWIRE 800 560 960 560\r\nWIRE 960 560 960 512\r\nWIRE 800 560 800 576\r\nWIRE 800 656 800 688\r\nWIRE 576 464 528 464\r\nWIRE 528 464 528 672\r\nWIRE 528 672 496 672\r\nWIRE 416 672 320 672\r\nWIRE 528 672 528 704\r\nWIRE 1024 464 1072 464\r\nWIRE 1072 464 1072 672\r\nWIRE 1072 672 1088 672\r\nWIRE 1168 672 1280 672\r\nWIRE 1072 672 1072 704\r\nWIRE 384 0 384 112\r\nWIRE 384 192 384 208\r\nWIRE 640 256 512 256\r\nWIRE 512 256 448 256\r\nWIRE 512 320 512 352\r\nWIRE 512 352 384 352\r\nWIRE 384 304 384 352\r\nWIRE 384 352 384 416\r\nWIRE 384 352 320 352\r\nWIRE 384 512 384 560\r\nWIRE 448 464 480 464\r\nWIRE 1216 0 1216 112\r\nWIRE 1216 192 1216 208\r\nWIRE 960 256 1088 256\r\nWIRE 1088 256 1152 256\r\nWIRE 1088 320 1088 352\r\nWIRE 1088 352 1216 352\r\nWIRE 1216 304 1216 352\r\nWIRE 1216 352 1216 416\r\nWIRE 1216 352 1280 352\r\nWIRE 1216 512 1216 560\r\nWIRE 1152 464 1120 464\r\nWIRE 1440 544 1488 544\r\nWIRE 1440 608 1488 608\r\nWIRE 1584 544 1632 544\r\nWIRE 1632 544 1632 432\r\nWIRE 1632 432 1696 432\r\nWIRE 1584 608 1632 608\r\nWIRE 1632 608 1632 720\r\nWIRE 1632 720 1696 720\r\nWIRE 1696 432 1760 432\r\nWIRE 1760 432 1856 432\r\nWIRE 1856 432 1920 432\r\nWIRE 1696 720 1760 720\r\nWIRE 1760 720 1856 720\r\nWIRE 1856 720 1920 720\r\nWIRE 1856 432 1856 448\r\nWIRE 1856 528 1856 576\r\nWIRE 1856 576 1856 624\r\nWIRE 1856 688 1856 720\r\nWIRE 1856 576 1904 576\r\nWIRE 2064 528 2128 528\r\nWIRE 2128 528 2192 528\r\nWIRE 2128 448 2128 416\r\nWIRE 2064 624 2064 704\r\nWIRE 2192 624 2192 672\r\nWIRE 2192 672 2192 704\r\nWIRE 2192 672 2304 672\r\nWIRE 2304 672 2304 752\r\nWIRE 2256 752 2304 752\r\nWIRE 2304 752 2368 752\r\nWIRE 2192 800 2192 832\r\nWIRE 2256 576 2368 576\r\nWIRE 176 896 176 864\r\nWIRE 320 896 320 864\r\nFLAG 800 0 vcc\r\nFLAG 800 688 vee\r\nFLAG 320 752 0\r\nFLAG 528 784 outn\r\nFLAG 1280 752 0\r\nFLAG 1072 784 outp\r\nFLAG 320 352 op\r\nFLAG 384 560 vee\r\nFLAG 480 464 vb\r\nFLAG 1280 352 on\r\nFLAG 1216 560 vee\r\nFLAG 1120 464 vb\r\nFLAG 1440 544 op\r\nFLAG 1440 608 on\r\nFLAG 1920 432 outp\r\nFLAG 1920 720 outn\r\nFLAG 1760 496 0\r\nFLAG 1760 784 0\r\nFLAG 1856 576 cm\r\nFLAG 2128 416 vcc\r\nFLAG 2064 704 vee\r\nFLAG 2368 752 vb\r\nFLAG 2192 832 vee\r\nFLAG 2368 656 0\r\nFLAG 176 864 vcc\r\nFLAG 176 976 0\r\nFLAG 320 864 vee\r\nFLAG 320 976 0\r\nSYMBOL res 624 96 R0\r\nSYMATTR InstName RC1\r\nSYMATTR Value 1.6k\r\nSYMBOL res 944 96 R0\r\nSYMATTR InstName RC2\r\nSYMATTR Value 1.6k\r\nSYMBOL npn 576 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value 2N3904\r\nSYMBOL npn 1024 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q2\r\nSYMATTR Value 2N3904\r\nSYMBOL res 784 560 R0\r\nSYMATTR InstName RT\r\nSYMATTR Value 4.3k\r\nSYMBOL res 512 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1p\r\nSYMATTR Value 10k\r\nSYMBOL voltage 320 656 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value PULSE(0 10m 0.5u 10n 10n 2u 4u) AC 0.5\r\nSYMBOL res 512 688 R0\r\nSYMATTR InstName R2p\r\nSYMATTR Value 100k\r\nSYMBOL res 1184 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1n\r\nSYMATTR Value 10k\r\nSYMBOL voltage 1280 656 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value PULSE(0 -10m 0.5u 10n 10n 2u 4u) AC 0.5 180\r\nSYMBOL res 1056 688 R0\r\nSYMATTR InstName R2n\r\nSYMATTR Value 100k\r\nSYMBOL res 368 96 R0\r\nSYMATTR InstName RE5\r\nSYMATTR Value 200\r\nSYMBOL pnp 448 304 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q5\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 496 256 R0\r\nWINDOW 0 24 24 Left 2\r\nWINDOW 3 24 48 Left 2\r\nSYMATTR InstName Cc1\r\nSYMATTR Value 22p\r\nSYMBOL npn 448 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q7\r\nSYMATTR Value 2N3904\r\nSYMBOL res 1200 96 R0\r\nSYMATTR InstName RE6\r\nSYMATTR Value 200\r\nSYMBOL pnp 1152 304 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q6\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 1072 256 R0\r\nWINDOW 0 -8 24 Right 2\r\nWINDOW 3 -8 48 Right 2\r\nSYMATTR InstName Cc2\r\nSYMATTR Value 22p\r\nSYMBOL npn 1152 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q8\r\nSYMATTR Value 2N3904\r\nSYMBOL Stability\\\\DiffLoopProbe 1536 576 R0\r\nSYMATTR InstName LP1\r\nSYMBOL cap 1744 432 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLp\r\nSYMATTR Value 10p\r\nSYMBOL cap 1744 720 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLn\r\nSYMATTR Value 10p\r\nSYMBOL res 1840 432 R0\r\nSYMATTR InstName Rcp\r\nSYMATTR Value 100k\r\nSYMBOL res 1840 608 R0\r\nSYMATTR InstName Rcn\r\nSYMATTR Value 100k\r\nSYMBOL Stability\\\\LoopProbe 1952 576 R0\r\nSYMATTR InstName LP2\r\nSYMBOL pnp 2000 624 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q9\r\nSYMATTR Value 2N3906\r\nSYMBOL pnp 2256 624 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q10\r\nSYMATTR Value 2N3906\r\nSYMBOL res 2144 544 R180\r\nSYMATTR InstName RT2\r\nSYMATTR Value 4.3k\r\nSYMBOL npn 2256 704 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q11\r\nSYMATTR Value 2N3904\r\nSYMBOL voltage 2368 560 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vcm\r\nSYMATTR Value 0\r\nSYMBOL voltage 176 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 320 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VEE\r\nSYMATTR Value -5\r\nTEXT 176 -176 Left 2 ;NPN: 2N3904   PNP: 2N3906\r\nTEXT 736 -96 Left 2 ;Stage 1\r\nTEXT 320 -96 Left 2 ;Stage 2\r\nTEXT 1120 -96 Left 2 ;Stage 2\r\nTEXT 2000 384 Left 2 ;CMFB\r\nTEXT 1440 384 Left 2 ;Loop probe and load\r\nTEXT -64 1072 Left 2 ;The same step with Cc = 22p: it rings at about 2 MHz, the crossover of T, with the 15° margin.\r\nTEXT 176 1128 Left 2 !.tran 4u\r\n",
   "sha256:564262fdb5c927f9631f14708393ad8d15325051ac39d4965c56c1490e2be3be": "Version 4\r\nSHEET 1 2500 1300\r\nWIRE 384 0 640 0\r\nWIRE 640 0 800 0\r\nWIRE 800 0 960 0\r\nWIRE 960 0 1216 0\r\nWIRE 640 0 640 112\r\nWIRE 640 192 640 256\r\nWIRE 640 256 640 416\r\nWIRE 960 0 960 112\r\nWIRE 960 192 960 256\r\nWIRE 960 256 960 416\r\nWIRE 640 512 640 560\r\nWIRE 640 560 800 560\r\nWIRE 800 560 960 560\r\nWIRE 960 560 960 512\r\nWIRE 800 560 800 576\r\nWIRE 800 656 800 688\r\nWIRE 576 464 528 464\r\nWIRE 528 464 528 672\r\nWIRE 528 672 496 672\r\nWIRE 416 672 320 672\r\nWIRE 528 672 528 704\r\nWIRE 1024 464 1072 464\r\nWIRE 1072 464 1072 672\r\nWIRE 1072 672 1088 672\r\nWIRE 1168 672 1280 672\r\nWIRE 1072 672 1072 704\r\nWIRE 384 0 384 112\r\nWIRE 384 192 384 208\r\nWIRE 640 256 512 256\r\nWIRE 512 256 448 256\r\nWIRE 512 320 512 352\r\nWIRE 512 352 384 352\r\nWIRE 384 304 384 352\r\nWIRE 384 352 384 416\r\nWIRE 384 352 320 352\r\nWIRE 384 512 384 560\r\nWIRE 448 464 480 464\r\nWIRE 1216 0 1216 112\r\nWIRE 1216 192 1216 208\r\nWIRE 960 256 1088 256\r\nWIRE 1088 256 1152 256\r\nWIRE 1088 320 1088 352\r\nWIRE 1088 352 1216 352\r\nWIRE 1216 304 1216 352\r\nWIRE 1216 352 1216 416\r\nWIRE 1216 352 1280 352\r\nWIRE 1216 512 1216 560\r\nWIRE 1152 464 1120 464\r\nWIRE 1440 544 1488 544\r\nWIRE 1440 608 1488 608\r\nWIRE 1584 544 1632 544\r\nWIRE 1632 544 1632 432\r\nWIRE 1632 432 1696 432\r\nWIRE 1584 608 1632 608\r\nWIRE 1632 608 1632 720\r\nWIRE 1632 720 1696 720\r\nWIRE 1696 432 1760 432\r\nWIRE 1760 432 1856 432\r\nWIRE 1856 432 1920 432\r\nWIRE 1696 720 1760 720\r\nWIRE 1760 720 1856 720\r\nWIRE 1856 720 1920 720\r\nWIRE 1856 432 1856 448\r\nWIRE 1856 528 1856 576\r\nWIRE 1856 576 1856 624\r\nWIRE 1856 688 1856 720\r\nWIRE 1856 576 1904 576\r\nWIRE 2064 528 2128 528\r\nWIRE 2128 528 2192 528\r\nWIRE 2128 448 2128 416\r\nWIRE 2064 624 2064 704\r\nWIRE 2192 624 2192 672\r\nWIRE 2192 672 2192 704\r\nWIRE 2192 672 2304 672\r\nWIRE 2304 672 2304 752\r\nWIRE 2256 752 2304 752\r\nWIRE 2304 752 2368 752\r\nWIRE 2192 800 2192 832\r\nWIRE 2256 576 2368 576\r\nWIRE 176 896 176 864\r\nWIRE 320 896 320 864\r\nFLAG 800 0 vcc\r\nFLAG 800 688 vee\r\nFLAG 320 752 0\r\nFLAG 528 784 outn\r\nFLAG 1280 752 0\r\nFLAG 1072 784 outp\r\nFLAG 320 352 op\r\nFLAG 384 560 vee\r\nFLAG 480 464 vb\r\nFLAG 1280 352 on\r\nFLAG 1216 560 vee\r\nFLAG 1120 464 vb\r\nFLAG 1440 544 op\r\nFLAG 1440 608 on\r\nFLAG 1920 432 outp\r\nFLAG 1920 720 outn\r\nFLAG 1760 496 0\r\nFLAG 1760 784 0\r\nFLAG 1856 576 cm\r\nFLAG 2128 416 vcc\r\nFLAG 2064 704 vee\r\nFLAG 2368 752 vb\r\nFLAG 2192 832 vee\r\nFLAG 2368 656 0\r\nFLAG 176 864 vcc\r\nFLAG 176 976 0\r\nFLAG 320 864 vee\r\nFLAG 320 976 0\r\nSYMBOL res 624 96 R0\r\nSYMATTR InstName RC1\r\nSYMATTR Value 1.6k\r\nSYMBOL res 944 96 R0\r\nSYMATTR InstName RC2\r\nSYMATTR Value 1.6k\r\nSYMBOL npn 576 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value 2N3904\r\nSYMBOL npn 1024 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q2\r\nSYMATTR Value 2N3904\r\nSYMBOL res 784 560 R0\r\nSYMATTR InstName RT\r\nSYMATTR Value 4.3k\r\nSYMBOL res 512 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1p\r\nSYMATTR Value 10k\r\nSYMBOL voltage 320 656 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value AC 0.5\r\nSYMBOL res 512 688 R0\r\nSYMATTR InstName R2p\r\nSYMATTR Value 100k\r\nSYMBOL res 1184 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1n\r\nSYMATTR Value 10k\r\nSYMBOL voltage 1280 656 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value AC 0.5 180\r\nSYMBOL res 1056 688 R0\r\nSYMATTR InstName R2n\r\nSYMATTR Value 100k\r\nSYMBOL res 368 96 R0\r\nSYMATTR InstName RE5\r\nSYMATTR Value 200\r\nSYMBOL pnp 448 304 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q5\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 496 256 R0\r\nWINDOW 0 24 24 Left 2\r\nWINDOW 3 24 48 Left 2\r\nSYMATTR InstName Cc1\r\nSYMATTR Value 470p\r\nSYMBOL npn 448 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q7\r\nSYMATTR Value 2N3904\r\nSYMBOL res 1200 96 R0\r\nSYMATTR InstName RE6\r\nSYMATTR Value 200\r\nSYMBOL pnp 1152 304 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q6\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 1072 256 R0\r\nWINDOW 0 -8 24 Right 2\r\nWINDOW 3 -8 48 Right 2\r\nSYMATTR InstName Cc2\r\nSYMATTR Value 470p\r\nSYMBOL npn 1152 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q8\r\nSYMATTR Value 2N3904\r\nSYMBOL Stability\\\\DiffLoopProbe 1536 576 R0\r\nSYMATTR InstName LP1\r\nSYMBOL cap 1744 432 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLp\r\nSYMATTR Value 10p\r\nSYMBOL cap 1744 720 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLn\r\nSYMATTR Value 10p\r\nSYMBOL res 1840 432 R0\r\nSYMATTR InstName Rcp\r\nSYMATTR Value 100k\r\nSYMBOL res 1840 608 R0\r\nSYMATTR InstName Rcn\r\nSYMATTR Value 100k\r\nSYMBOL Stability\\\\LoopProbe 1952 576 R0\r\nSYMATTR InstName LP2\r\nSYMBOL pnp 2000 624 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q9\r\nSYMATTR Value 2N3906\r\nSYMBOL pnp 2256 624 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q10\r\nSYMATTR Value 2N3906\r\nSYMBOL res 2144 544 R180\r\nSYMATTR InstName RT2\r\nSYMATTR Value 4.3k\r\nSYMBOL npn 2256 704 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q11\r\nSYMATTR Value 2N3904\r\nSYMBOL voltage 2368 560 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName Vcm\r\nSYMATTR Value PULSE(0 10m 0.5u 10n 10n 2u 4u)\r\nSYMBOL voltage 176 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 320 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VEE\r\nSYMATTR Value -5\r\nTEXT 176 -176 Left 2 ;NPN: 2N3904   PNP: 2N3906\r\nTEXT 736 -96 Left 2 ;Stage 1\r\nTEXT 320 -96 Left 2 ;Stage 2\r\nTEXT 1120 -96 Left 2 ;Stage 2\r\nTEXT 2000 384 Left 2 ;CMFB\r\nTEXT 1440 384 Left 2 ;Loop probe and load\r\nTEXT -64 1072 Left 2 ;A 10 mV step in Vcm, the CMFB reference: both outputs follow it together. The probes are transparent here.\r\nTEXT 176 1128 Left 2 !.tran 4u\r\n",
-  "sha256:bc273aa799eda8cb108b407345ddb65f6d9f08b329ccfeda5fb57238054cec93": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL ProbeCircuit 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;Double-click LP1 to see its circuit: ProbeCircuit is the LoopProbe (library/sub/Stability/LoopProbe.lib) drawn as a subcircuit of this project. In series in the loop,\\nVprb (an ammeter) goes from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground) into x.\\nAll are 0 outside .stb: the probe is a wire. The .stb turns off every other AC source and runs two ac: run 1 with Vinj = 1, run 3 with Iinj = 1. With Vy = -V(x) and Iy = I(Vprb):\\n   D = Vy1·Iy3 - Vy3·Iy1        T(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1        T(GFT) = 1/(1/D - 1)\\nTian: the two injections (series voltage and shunt current) cancel the loading of the cut on both sides, so T does not depend on the impedances there\\nnor on the probe orientation. It is what Spectre stb computes. GFT (Middlebrook): the same two runs read as a null double injection; it treats the reverse\\ntransmission across the cut as load and, with an input and an output (gft V1 V(out)), gives G = G∞·T/(1+T) + G0/(1+T). Both give the same closed-loop poles (zeros of 1 + T).\\nSources: M. Tian, V. Visvanathan, J. Hantgan and K. Kundert, \"Striving for small-signal stability\", IEEE Circuits and Devices Magazine 17(1), 2001.\\nR. D. Middlebrook, \"The general feedback theorem: a final solution for feedback systems\", IEEE Microwave Magazine 7(2), 2006.\\nSPICE implementations: Frank Wiedmann, https://sites.google.com/site/frankwiedmann/loopgain . More in docs/estabilidad.md.\r\nTEXT -64 832 Left 2 ;.stb LP1 dec 50 10 100meg\r\n",
+  "sha256:191133d49565bafb4b7b541178f48464dd245f84bacf4d56d03143aa71a0eff3": "Version 4\r\nSHEET 1 1200 680\r\nWIRE -64 32 -64 16\r\nWIRE -64 16 16 16\r\nWIRE 96 16 208 16\r\nWIRE 160 16 160 -64\r\nWIRE 160 -64 304 -64\r\nWIRE 304 80 240 80\r\nWIRE 240 80 240 128\r\nWIRE -64 112 -64 128\r\nWIRE 416 48 480 48\r\nWIRE 384 -64 480 -64\r\nWIRE 480 -64 480 48\r\nWIRE 480 48 544 48\r\nWIRE 544 48 544 64\r\nWIRE 544 144 544 160\r\nFLAG 240 128 0\r\nFLAG -64 128 0\r\nFLAG 544 160 0\r\nFLAG 544 48 out\r\nFLAG 160 16 err\r\nSYMBOL voltage -64 16 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName V1\r\nSYMATTR Value AC 1\r\nSYMBOL res 112 0 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1\r\nSYMATTR Value 1k\r\nSYMBOL res 400 -80 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R2\r\nSYMATTR Value 1k\r\nSYMBOL res 528 48 R0\r\nSYMATTR InstName RL\r\nSYMATTR Value 2k\r\nSYMBOL ProbeCircuit 256 16 R0\r\nSYMATTR InstName LP1\r\nSYMBOL TCLib\\\\OA_param 496 0 R0\r\nWINDOW 0 -113 80 Left 2\r\nWINDOW 3 -176 32 Left 0\r\nWINDOW 123 -176 48 Left 0\r\nWINDOW 39 -176 64 Left 0\r\nSYMATTR InstName U1\r\nSYMATTR Value Av=1Meg\r\nSYMATTR Value2 f1=10\r\nSYMATTR SpiceLine f2=1Meg\r\nTEXT -64 560 Left 2 ;Double-click LP1 to see its circuit: ProbeCircuit is the LoopProbe (library/sub/Stability/LoopProbe.lib) drawn as a subcircuit of this project. In series in the loop,\\nVprb (an ammeter) goes from p1 to node x, Vinj (a series voltage) from x to p2 and Iinj (a current from ground) into x.\\nAll are 0 outside .stb: the probe is a wire. The .stb turns off every other AC source and runs two ac: run 1 with Vinj = 1, run 3 with Iinj = 1. With Vy = -V(x) and Iy = I(Vprb):\\n   D = Vy1·Iy3 - Vy3·Iy1        Aβ(Tian) = 1/(Vy1 + Iy3 - 2·D) - 1, T = -Aβ        R(GFT) = 1/(1/D - 1)\\nTian: the two injections (series voltage and shunt current) cancel the loading of the cut on both sides, so T does not depend on the impedances there\\nnor on the probe orientation. It is what Spectre stb computes. GFT (Middlebrook): the same two runs read as a null double injection; it treats the reverse\\ntransmission across the cut as load and, with an input and an output (gft V1 V(out)), gives G = G∞·R/(1+R) + G0/(1+R). Both give the same closed-loop poles (zeros of 1 + Aβ = 1 + R).\\nSources: M. Tian, V. Visvanathan, J. Hantgan and K. Kundert, \"Striving for small-signal stability\", IEEE Circuits and Devices Magazine 17(1), 2001.\\nR. D. Middlebrook, \"The general feedback theorem: a final solution for feedback systems\", IEEE Microwave Magazine 7(2), 2006.\\nSPICE implementations: Frank Wiedmann, https://sites.google.com/site/frankwiedmann/loopgain . More in docs/estabilidad.md.\r\nTEXT -64 832 Left 2 ;.stb LP1 dec 50 10 100meg\r\n",
   "sha256:61c1b4338e69ad571187763c96941ced3f6e1e6efc958480c415b9dfc0a56840": "Version 4\r\nSHEET 1 800 400\r\nWIRE 0 112 192 112\r\nWIRE 96 176 192 176\r\nWIRE 288 112 352 112\r\nWIRE 352 112 416 112\r\nWIRE 288 176 336 176\r\nFLAG 0 192 0\r\nFLAG 96 256 0\r\nFLAG 192 112 p\r\nFLAG 192 176 n\r\nFLAG 352 112 d\r\nFLAG 288 176 c\r\nFLAG 416 192 0\r\nFLAG 336 256 0\r\nSYMBOL voltage 0 96 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value SINE(1 0.5 1k)\r\nSYMBOL voltage 96 160 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value SINE(1 0.5 1k 0 0 120)\r\nSYMBOL BalunCircuit 240 144 R0\r\nSYMATTR InstName B1\r\nSYMBOL res 320 160 R0\r\nSYMATTR InstName Rc\r\nSYMATTR Value 1k\r\nSYMBOL res 400 96 R0\r\nSYMATTR InstName Rd\r\nSYMATTR Value 1k\r\nTEXT -64 320 Left 2 ;Double-click B1 to see its circuit (BalunCircuit: the Stability > Balun drawn as a subcircuit of this project). An ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)\\nand the F sources put them back on the mode side as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Then V(p)·I(p) + V(n)·I(n) = V(d)·I(d) + V(c)·I(c):\\nit conserves power, so it neither isolates nor loads, and unlike a transformer it passes DC. Here Vp and Vn are 120° apart: d is their difference and c their mean (1 V with a 0.25 V ripple).\\nA DiffLoopProbe is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.\r\nTEXT -64 448 Left 2 !.tran 3m\r\n",
   "sha256:67876d8591be0d3ca362c91ba5d0d8392109ce15ea1de17b24ca0db42c4a7bd3": "Version 4\r\nSHEET 1 2500 1300\r\nWIRE 384 0 640 0\r\nWIRE 640 0 800 0\r\nWIRE 800 0 960 0\r\nWIRE 960 0 1216 0\r\nWIRE 640 0 640 112\r\nWIRE 640 192 640 256\r\nWIRE 640 256 640 416\r\nWIRE 960 0 960 112\r\nWIRE 960 192 960 256\r\nWIRE 960 256 960 416\r\nWIRE 640 512 640 560\r\nWIRE 640 560 800 560\r\nWIRE 800 560 960 560\r\nWIRE 960 560 960 512\r\nWIRE 800 560 800 576\r\nWIRE 800 656 800 688\r\nWIRE 576 464 528 464\r\nWIRE 528 464 528 672\r\nWIRE 528 672 496 672\r\nWIRE 416 672 320 672\r\nWIRE 528 672 528 704\r\nWIRE 1024 464 1072 464\r\nWIRE 1072 464 1072 672\r\nWIRE 1072 672 1088 672\r\nWIRE 1168 672 1280 672\r\nWIRE 1072 672 1072 704\r\nWIRE 384 0 384 112\r\nWIRE 384 192 384 208\r\nWIRE 640 256 512 256\r\nWIRE 512 256 448 256\r\nWIRE 512 320 512 352\r\nWIRE 512 352 384 352\r\nWIRE 384 304 384 352\r\nWIRE 384 352 384 416\r\nWIRE 384 352 320 352\r\nWIRE 384 512 384 560\r\nWIRE 448 464 480 464\r\nWIRE 1216 0 1216 112\r\nWIRE 1216 192 1216 208\r\nWIRE 960 256 1088 256\r\nWIRE 1088 256 1152 256\r\nWIRE 1088 320 1088 352\r\nWIRE 1088 352 1216 352\r\nWIRE 1216 304 1216 352\r\nWIRE 1216 352 1216 416\r\nWIRE 1216 352 1280 352\r\nWIRE 1216 512 1216 560\r\nWIRE 1152 464 1120 464\r\nWIRE 1440 544 1488 544\r\nWIRE 1440 608 1488 608\r\nWIRE 1584 544 1632 544\r\nWIRE 1632 544 1632 432\r\nWIRE 1632 432 1696 432\r\nWIRE 1584 608 1632 608\r\nWIRE 1632 608 1632 720\r\nWIRE 1632 720 1696 720\r\nWIRE 1696 432 1760 432\r\nWIRE 1760 432 1856 432\r\nWIRE 1856 432 1920 432\r\nWIRE 1696 720 1760 720\r\nWIRE 1760 720 1856 720\r\nWIRE 1856 720 1920 720\r\nWIRE 1856 432 1856 448\r\nWIRE 1856 528 1856 576\r\nWIRE 1856 576 1856 624\r\nWIRE 1856 688 1856 720\r\nWIRE 1856 576 1904 576\r\nWIRE 2064 528 2128 528\r\nWIRE 2128 528 2192 528\r\nWIRE 2128 448 2128 416\r\nWIRE 2064 624 2064 704\r\nWIRE 2192 624 2192 672\r\nWIRE 2192 672 2192 704\r\nWIRE 2192 672 2304 672\r\nWIRE 2304 672 2304 752\r\nWIRE 2256 752 2304 752\r\nWIRE 2304 752 2368 752\r\nWIRE 2192 800 2192 832\r\nWIRE 2256 576 2368 576\r\nWIRE 176 896 176 864\r\nWIRE 320 896 320 864\r\nWIRE 448 1360 496 1360\r\nWIRE 592 1360 640 1360\r\nWIRE 448 1424 496 1424\r\nWIRE 592 1424 640 1424\r\nFLAG 800 0 vcc\r\nFLAG 800 688 vee\r\nFLAG 320 752 0\r\nFLAG 528 784 outn\r\nFLAG 1280 752 0\r\nFLAG 1072 784 outp\r\nFLAG 320 352 op\r\nFLAG 384 560 vee\r\nFLAG 480 464 vb\r\nFLAG 1280 352 on\r\nFLAG 1216 560 vee\r\nFLAG 1120 464 vb\r\nFLAG 1440 544 op\r\nFLAG 1440 608 on\r\nFLAG 1920 432 outp\r\nFLAG 1920 720 outn\r\nFLAG 1760 496 0\r\nFLAG 1760 784 0\r\nFLAG 1856 576 cm\r\nFLAG 2128 416 vcc\r\nFLAG 2064 704 vee\r\nFLAG 2368 752 vb\r\nFLAG 2192 832 vee\r\nFLAG 2368 656 0\r\nFLAG 176 864 vcc\r\nFLAG 176 976 0\r\nFLAG 320 864 vee\r\nFLAG 320 976 0\r\nFLAG 1488 544 op\r\nFLAG 1488 608 on\r\nFLAG 1584 544 outp\r\nFLAG 1584 608 outn\r\nFLAG 352 1360 op\r\nFLAG 352 1424 on\r\nFLAG 736 1360 outp\r\nFLAG 736 1424 outn\r\nSYMBOL res 624 96 R0\r\nSYMATTR InstName RC1\r\nSYMATTR Value 1.6k\r\nSYMBOL res 944 96 R0\r\nSYMATTR InstName RC2\r\nSYMATTR Value 1.6k\r\nSYMBOL npn 576 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value 2N3904\r\nSYMBOL npn 1024 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q2\r\nSYMATTR Value 2N3904\r\nSYMBOL res 784 560 R0\r\nSYMATTR InstName RT\r\nSYMATTR Value 4.3k\r\nSYMBOL res 512 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1p\r\nSYMATTR Value 10k\r\nSYMBOL voltage 320 656 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value AC 0.5\r\nSYMBOL res 512 688 R0\r\nSYMATTR InstName R2p\r\nSYMATTR Value 100k\r\nSYMBOL res 1184 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1n\r\nSYMATTR Value 10k\r\nSYMBOL voltage 1280 656 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value AC 0.5 180\r\nSYMBOL res 1056 688 R0\r\nSYMATTR InstName R2n\r\nSYMATTR Value 100k\r\nSYMBOL res 368 96 R0\r\nSYMATTR InstName RE5\r\nSYMATTR Value 200\r\nSYMBOL pnp 448 304 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q5\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 496 256 R0\r\nWINDOW 0 24 24 Left 2\r\nWINDOW 3 24 48 Left 2\r\nSYMATTR InstName Cc1\r\nSYMATTR Value 470p\r\nSYMBOL npn 448 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q7\r\nSYMATTR Value 2N3904\r\nSYMBOL res 1200 96 R0\r\nSYMATTR InstName RE6\r\nSYMATTR Value 200\r\nSYMBOL pnp 1152 304 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q6\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 1072 256 R0\r\nWINDOW 0 -8 24 Right 2\r\nWINDOW 3 -8 48 Right 2\r\nSYMATTR InstName Cc2\r\nSYMATTR Value 470p\r\nSYMBOL npn 1152 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q8\r\nSYMATTR Value 2N3904\r\nSYMBOL cap 1744 432 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLp\r\nSYMATTR Value 10p\r\nSYMBOL cap 1744 720 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLn\r\nSYMATTR Value 10p\r\nSYMBOL res 1840 432 R0\r\nSYMATTR InstName Rcp\r\nSYMATTR Value 100k\r\nSYMBOL res 1840 608 R0\r\nSYMATTR InstName Rcn\r\nSYMATTR Value 100k\r\nSYMBOL Stability\\\\LoopProbe 1952 576 R0\r\nSYMATTR InstName LP2\r\nSYMBOL pnp 2000 624 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q9\r\nSYMATTR Value 2N3906\r\nSYMBOL pnp 2256 624 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q10\r\nSYMATTR Value 2N3906\r\nSYMBOL res 2144 544 R180\r\nSYMATTR InstName RT2\r\nSYMATTR Value 4.3k\r\nSYMBOL npn 2256 704 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q11\r\nSYMATTR Value 2N3904\r\nSYMBOL voltage 2368 560 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vcm\r\nSYMATTR Value 0\r\nSYMBOL voltage 176 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 320 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VEE\r\nSYMATTR Value -5\r\nSYMBOL BalunCircuit 400 1392 R0\r\nSYMATTR InstName B1\r\nSYMBOL ProbeCircuit 544 1360 R0\r\nSYMATTR InstName LPd\r\nSYMBOL ProbeCircuit 544 1424 R0\r\nSYMATTR InstName LPc\r\nSYMBOL BalunCircuit 688 1392 M0\r\nSYMATTR InstName B2\r\nTEXT 176 -176 Left 2 ;NPN: 2N3904   PNP: 2N3906\r\nTEXT 736 -96 Left 2 ;Stage 1\r\nTEXT 320 -96 Left 2 ;Stage 2\r\nTEXT 1120 -96 Left 2 ;Stage 2\r\nTEXT 2000 384 Left 2 ;CMFB\r\nTEXT 1440 384 Left 2 ;Loop probe and load\r\nTEXT 352 1264 Left 2 ;LP1 by hand: two Balun back to back, a LoopProbe in each mode\r\nTEXT -64 1072 Left 2 ;LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn). Double-click any of them to see its circuit.\\nThe .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.\r\nTEXT 176 1568 Left 2 ;.stb LPd dec 50 10 100meg\r\n",
   "sha256:33ec9db47b6d3328f6d90a77acfb71df725812e2c6c2dbaeaeb38b405e9e7813": "Version 4\r\nSHEET 1 2500 1300\r\nWIRE 384 0 640 0\r\nWIRE 640 0 800 0\r\nWIRE 800 0 960 0\r\nWIRE 960 0 1216 0\r\nWIRE 640 0 640 112\r\nWIRE 640 192 640 256\r\nWIRE 640 256 640 416\r\nWIRE 960 0 960 112\r\nWIRE 960 192 960 256\r\nWIRE 960 256 960 416\r\nWIRE 640 512 640 560\r\nWIRE 640 560 800 560\r\nWIRE 800 560 960 560\r\nWIRE 960 560 960 512\r\nWIRE 800 560 800 576\r\nWIRE 800 656 800 688\r\nWIRE 576 464 528 464\r\nWIRE 528 464 528 672\r\nWIRE 528 672 496 672\r\nWIRE 416 672 320 672\r\nWIRE 528 672 528 704\r\nWIRE 1024 464 1072 464\r\nWIRE 1072 464 1072 672\r\nWIRE 1072 672 1088 672\r\nWIRE 1168 672 1280 672\r\nWIRE 1072 672 1072 704\r\nWIRE 384 0 384 112\r\nWIRE 384 192 384 208\r\nWIRE 640 256 512 256\r\nWIRE 512 256 448 256\r\nWIRE 512 320 512 352\r\nWIRE 512 352 384 352\r\nWIRE 384 304 384 352\r\nWIRE 384 352 384 416\r\nWIRE 384 352 320 352\r\nWIRE 384 512 384 560\r\nWIRE 448 464 480 464\r\nWIRE 1216 0 1216 112\r\nWIRE 1216 192 1216 208\r\nWIRE 960 256 1088 256\r\nWIRE 1088 256 1152 256\r\nWIRE 1088 320 1088 352\r\nWIRE 1088 352 1216 352\r\nWIRE 1216 304 1216 352\r\nWIRE 1216 352 1216 416\r\nWIRE 1216 352 1280 352\r\nWIRE 1216 512 1216 560\r\nWIRE 1152 464 1120 464\r\nWIRE 1440 544 1488 544\r\nWIRE 1440 608 1488 608\r\nWIRE 1584 544 1632 544\r\nWIRE 1632 544 1632 432\r\nWIRE 1632 432 1696 432\r\nWIRE 1584 608 1632 608\r\nWIRE 1632 608 1632 720\r\nWIRE 1632 720 1696 720\r\nWIRE 1696 432 1760 432\r\nWIRE 1760 432 1856 432\r\nWIRE 1856 432 1920 432\r\nWIRE 1696 720 1760 720\r\nWIRE 1760 720 1856 720\r\nWIRE 1856 720 1920 720\r\nWIRE 1856 432 1856 448\r\nWIRE 1856 528 1856 576\r\nWIRE 1856 576 1856 624\r\nWIRE 1856 688 1856 720\r\nWIRE 1856 576 1904 576\r\nWIRE 2064 528 2128 528\r\nWIRE 2128 528 2192 528\r\nWIRE 2128 448 2128 416\r\nWIRE 2064 624 2064 704\r\nWIRE 2192 624 2192 672\r\nWIRE 2192 672 2192 704\r\nWIRE 2192 672 2304 672\r\nWIRE 2304 672 2304 752\r\nWIRE 2256 752 2304 752\r\nWIRE 2304 752 2368 752\r\nWIRE 2192 800 2192 832\r\nWIRE 2256 576 2368 576\r\nWIRE 176 896 176 864\r\nWIRE 320 896 320 864\r\nWIRE 448 1360 496 1360\r\nWIRE 592 1360 640 1360\r\nWIRE 448 1424 496 1424\r\nWIRE 592 1424 640 1424\r\nFLAG 800 0 vcc\r\nFLAG 800 688 vee\r\nFLAG 320 752 0\r\nFLAG 528 784 outn\r\nFLAG 1280 752 0\r\nFLAG 1072 784 outp\r\nFLAG 320 352 op\r\nFLAG 384 560 vee\r\nFLAG 480 464 vb\r\nFLAG 1280 352 on\r\nFLAG 1216 560 vee\r\nFLAG 1120 464 vb\r\nFLAG 1440 544 op\r\nFLAG 1440 608 on\r\nFLAG 1920 432 outp\r\nFLAG 1920 720 outn\r\nFLAG 1760 496 0\r\nFLAG 1760 784 0\r\nFLAG 1856 576 cm\r\nFLAG 2128 416 vcc\r\nFLAG 2064 704 vee\r\nFLAG 2368 752 vb\r\nFLAG 2192 832 vee\r\nFLAG 2368 656 0\r\nFLAG 176 864 vcc\r\nFLAG 176 976 0\r\nFLAG 320 864 vee\r\nFLAG 320 976 0\r\nFLAG 1488 544 op\r\nFLAG 1488 608 on\r\nFLAG 1584 544 outp\r\nFLAG 1584 608 outn\r\nFLAG 352 1360 op\r\nFLAG 352 1424 on\r\nFLAG 736 1360 outp\r\nFLAG 736 1424 outn\r\nSYMBOL res 624 96 R0\r\nSYMATTR InstName RC1\r\nSYMATTR Value 1.6k\r\nSYMBOL res 944 96 R0\r\nSYMATTR InstName RC2\r\nSYMATTR Value 1.6k\r\nSYMBOL npn 576 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q1\r\nSYMATTR Value 2N3904\r\nSYMBOL npn 1024 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q2\r\nSYMATTR Value 2N3904\r\nSYMBOL res 784 560 R0\r\nSYMATTR InstName RT\r\nSYMATTR Value 4.3k\r\nSYMBOL res 512 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1p\r\nSYMATTR Value 10k\r\nSYMBOL voltage 320 656 M0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vp\r\nSYMATTR Value AC 0.5\r\nSYMBOL res 512 688 R0\r\nSYMATTR InstName R2p\r\nSYMATTR Value 100k\r\nSYMBOL res 1184 656 R90\r\nWINDOW 0 0 56 VBottom 2\r\nWINDOW 3 32 56 VTop 2\r\nSYMATTR InstName R1n\r\nSYMATTR Value 10k\r\nSYMBOL voltage 1280 656 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vn\r\nSYMATTR Value AC 0.5 180\r\nSYMBOL res 1056 688 R0\r\nSYMATTR InstName R2n\r\nSYMATTR Value 100k\r\nSYMBOL res 368 96 R0\r\nSYMATTR InstName RE5\r\nSYMATTR Value 200\r\nSYMBOL pnp 448 304 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q5\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 496 256 R0\r\nWINDOW 0 24 24 Left 2\r\nWINDOW 3 24 48 Left 2\r\nSYMATTR InstName Cc1\r\nSYMATTR Value 470p\r\nSYMBOL npn 448 416 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q7\r\nSYMATTR Value 2N3904\r\nSYMBOL res 1200 96 R0\r\nSYMATTR InstName RE6\r\nSYMATTR Value 200\r\nSYMBOL pnp 1152 304 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q6\r\nSYMATTR Value 2N3906\r\nSYMBOL cap 1072 256 R0\r\nWINDOW 0 -8 24 Right 2\r\nWINDOW 3 -8 48 Right 2\r\nSYMATTR InstName Cc2\r\nSYMATTR Value 470p\r\nSYMBOL npn 1152 416 R0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q8\r\nSYMATTR Value 2N3904\r\nSYMBOL cap 1744 432 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLp\r\nSYMATTR Value 10p\r\nSYMBOL cap 1744 720 R0\r\nWINDOW 0 36 40 Left 2\r\nWINDOW 3 36 64 Left 2\r\nSYMATTR InstName CLn\r\nSYMATTR Value 10p\r\nSYMBOL res 1840 432 R0\r\nSYMATTR InstName Rcp\r\nSYMATTR Value 100k\r\nSYMBOL res 1840 608 R0\r\nSYMATTR InstName Rcn\r\nSYMATTR Value 100k\r\nSYMBOL Stability\\\\LoopProbe 1952 576 R0\r\nSYMATTR InstName LP2\r\nSYMBOL pnp 2000 624 M180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q9\r\nSYMATTR Value 2N3906\r\nSYMBOL pnp 2256 624 R180\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q10\r\nSYMATTR Value 2N3906\r\nSYMBOL res 2144 544 R180\r\nSYMATTR InstName RT2\r\nSYMATTR Value 4.3k\r\nSYMBOL npn 2256 704 M0\r\nWINDOW 3 0 0 Invisible 2\r\nSYMATTR InstName Q11\r\nSYMATTR Value 2N3904\r\nSYMBOL voltage 2368 560 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName Vcm\r\nSYMATTR Value 0\r\nSYMBOL voltage 176 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 320 880 R0\r\nWINDOW 0 24 16 Left 2\r\nWINDOW 3 24 96 Left 2\r\nSYMATTR InstName VEE\r\nSYMATTR Value -5\r\nSYMBOL BalunCircuit 400 1392 R0\r\nSYMATTR InstName B1\r\nSYMBOL ProbeCircuit 544 1360 R0\r\nSYMATTR InstName LPd\r\nSYMBOL ProbeCircuit 544 1424 R0\r\nSYMATTR InstName LPc\r\nSYMBOL BalunCircuit 688 1392 M0\r\nSYMATTR InstName B2\r\nTEXT 176 -176 Left 2 ;NPN: 2N3904   PNP: 2N3906\r\nTEXT 736 -96 Left 2 ;Stage 1\r\nTEXT 320 -96 Left 2 ;Stage 2\r\nTEXT 1120 -96 Left 2 ;Stage 2\r\nTEXT 2000 384 Left 2 ;CMFB\r\nTEXT 1440 384 Left 2 ;Loop probe and load\r\nTEXT 352 1264 Left 2 ;LP1 by hand: two Balun back to back, a LoopProbe in each mode\r\nTEXT -64 1072 Left 2 ;The .stb at LPc: the same T as LP1 in CM (about 110°).\r\nTEXT 176 1568 Left 2 ;.stb LPc dec 50 10 100meg\r\n"

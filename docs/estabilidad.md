@@ -1,16 +1,21 @@
 # Análisis de estabilidad (`.stb`)
 
-Calcula la ganancia de lazo T en un punto del lazo, con los métodos que Frank Wiedmann
-implementó para SPICE (<https://sites.google.com/site/frankwiedmann/loopgain>):
+Calcula la ganancia de lazo en un punto del lazo, con los métodos que Frank Wiedmann
+implementó para SPICE (<https://sites.google.com/site/frankwiedmann/loopgain>). Cada método se
+presenta con su modelo:
 
-- **Tian** (por defecto): el mismo que `stb` de Spectre (Tian et al., «Striving for Small-Signal
-  Stability», IEEE Circuits & Devices, 2001). Es simétrico: no importa la orientación de la sonda.
-- **GFT** de Middlebrook («The General Feedback Theorem», IEEE Microwave Magazine, 2006). La señal
-  del lazo tiene que entrar a la sonda por su flecha. Con una fuente de entrada y una salida da
-  además el modelo de ganancia asintótica: G = G∞·R/(1+R) + G0/(1+R), con G (lazo cerrado),
-  G∞ (ideal), G0 (camino directo) y R (razón de retorno, el T del GFT); y también D, Dn, Tn y Tp.
-
-Los dos métodos dan los mismos polos de lazo cerrado (los ceros de 1 + T). Difieren cuando hay
+- **Tian** (por defecto) → **modelo A-β sin feedforward**: A (amplificador), β (realimentador),
+  T = −Aβ y G = A/(1 + Aβ) = A/(1 − T). Es el mismo que `stb` de Spectre (Tian et al., «Striving
+  for Small-Signal Stability», IEEE Circuits & Devices, 2001) y es simétrico: no importa la
+  orientación de la sonda. Con una fuente de entrada y una salida da además G, A = G·(1 − T) y
+  β = −T/A.
+- **GFT** de Middlebrook («The General Feedback Theorem», IEEE Microwave Magazine, 2006) →
+  **modelo de ganancia asintótica**: G = G∞·R/(1+R) + G0/(1+R), con R (razón de retorno),
+  G∞ = 1/β (ganancia con R → ∞) y G0 (ganancia con R = 0). La señal del lazo tiene que entrar a
+  la sonda por su flecha. Con entrada y salida da G, G∞, G0, Rn (razón de retorno nula), Rp y el
+  **A-β equivalente**: β = 1/G∞, A = G∞·(G∞·R + G0)/(G∞ − G0) (sin camino directo, A = G∞·R y
+  Aβ = R), con T = −Aβ.
+Los dos métodos dan los mismos polos de lazo cerrado (los ceros de 1 + Aβ o de 1 + R). Difieren cuando hay
 transmisión en reversa en el corte: Tian la suma al lazo y el GFT la toma como carga.
 
 ## Sondas
@@ -33,7 +38,7 @@ Subcircuitos: `library/sub/Stability/LoopProbe.lib`.
 ## Sintaxis
 
 ```
-.stb <sonda> [dm|cm] <dec|oct|lin> <puntos> <f inicio> <f fin> [gft [<fuente> V(<salida>)]]
+.stb <sonda> [dm|cm] <dec|oct|lin> <puntos> <f inicio> <f fin> [tian|gft [<fuente> V(<salida>)]]
 ```
 
 Se guarda como comentario (`;.stb …`), igual que los otros análisis que sólo tiene ngspice:
@@ -44,15 +49,20 @@ LTspice lo ignora y la sonda queda transparente.
 `tongspice.ts` lo traduce a un bloque `.control` (`netlist/stb.ts`):
 
 1. todas las fuentes V/I del nivel superior pasan a `acmag=0`;
-2. un `ac` con `Vinj` en 1, otro con `Iinj` en 1 y, con el GFT completo, otro con la entrada en 1;
+2. un `ac` con `Vinj` en 1, otro con `Iinj` en 1 y, con entrada y salida, otro con la entrada en 1;
 3. con Vy = −V(x) e Iy = I(Vprb) (corrida 1: tensión, 2: entrada, 3: corriente):
    - D = Vy1·Iy3 − Vy3·Iy1
-   - T(GFT) = 1/(1/D − 1); T(Tian) = 1/(Vy1 + Iy3 − 2·D) − 1
-   - A = Vo2·D + Vo1·(Vy3·Iy2 − Vy2·Iy3) + Vo3·(Vy2·Iy1 − Vy1·Iy2)
-   - G = Vo2, G∞ = A/D, Dn = G/A, Tn = 1/(Dn − 1), G0 = (G − G∞·D)/(1 − D), Tp = 1/(G∞/G − 1)
-4. los resultados quedan en un plot propio con la frecuencia como escala (`stbN`): `loopgain` (el
-   T del método elegido), `t_tian`, `t_gft`, `d` y, con el GFT completo, `g`, `ginf`, `g0`, `r`, `dn`,
-   `tn` y `tp`. Los plots de las corridas se borran.
+   - R = 1/(1/D − 1) (GFT); Aβ = 1/(Vy1 + Iy3 − 2·D) − 1 (Tian), T = −Aβ
+   - num = Vo2·D + Vo1·(Vy3·Iy2 − Vy2·Iy3) + Vo3·(Vy2·Iy1 − Vy1·Iy2)
+   - Tian: G = Vo2, A = G·(1 − T), β = −T/A
+   - GFT: G = Vo2, G∞ = num/D, G0 = (G − G∞·D)/(1 − D), Rn = 1/(G/num − 1), Rp = 1/(G∞/G − 1),
+     β = 1/G∞, A = G∞·(G∞·R + G0)/(G∞ − G0), T = −Aβ
+4. los resultados quedan en un plot propio con la frecuencia como escala (`stbN`):
+   - Tian: `t` (= −Aβ, el que se grafica), `ab` y, con entrada y salida, `g`, `a` y `beta`;
+   - GFT: `r` (el que se grafica) y, con entrada y salida, `g`, `ginf`, `g0`, `rn`, `rp`, `a`,
+     `beta`, `ab` y `t`;
+   - `loopgain` es Aβ (Tian) o R (GFT): la ganancia de lazo sobre la que se calculan los márgenes.
+   Los plots de las corridas se borran.
 
 No se combina con un `.control` del usuario ni con `.step` (se avisa y no corre).
 
@@ -62,9 +72,9 @@ diferencial da el T del medio circuito.
 
 ## Resultados
 
-Al lado del Bode de `loopgain` (`waveform/StbView.tsx`):
+Al lado del Bode de `t` (Tian) o `r` (GFT) (`waveform/StbView.tsx`):
 
-- márgenes de fase (en cada cruce de 0 dB) y de ganancia (en cada cruce de −180°);
+- márgenes (calculados sobre Aβ o R) de fase (en cada cruce de 0 dB) y de ganancia (en cada cruce de −180°);
 - un modelo racional de T por *vector fitting* (`sim/stbMath.ts`) en variables de estado,
   T(s) = c·(sI − A)⁻¹·b + d. De ahí salen los polos y ceros de T (lazo abierto), los polos del
   lazo cerrado (autovalores de A − b·c/(1 + d)) y el lugar de raíces de 1 + k·T, k de 0 a ∞.
@@ -74,6 +84,6 @@ Al lado del Bode de `loopgain` (`waveform/StbView.tsx`):
 - T depende del punto de corte cuando hay lazos anidados. El margen leído en el Bode supone que
   lo que queda cerrado es estable: si T tiene polos en el semiplano derecho se avisa y hay que
   mirar los polos del lazo cerrado.
-- Con el GFT, la salida no puede ser el nodo de la sonda: G∞ da 0 y Dn, Tn y Tp no tienen sentido.
+- Con el GFT, la salida no puede ser el nodo de la sonda: G∞ da 0 y Rn, Rp, A y β no tienen sentido.
   Conviene inyectar en el punto de error (la entrada del amplificador) y revisar primero G∞.
 - Lazos múltiples independientes (General Network Theorem): fuera de alcance.

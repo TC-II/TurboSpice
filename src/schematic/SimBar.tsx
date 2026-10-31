@@ -6,7 +6,8 @@
 // hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
-import { formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
+import { StbModelsInfo } from './StbModelsInfo.tsx';
+import { formatAnalysis,isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../ui/icons.tsx';
@@ -368,6 +369,7 @@ export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, co
           ))}
         </div>
       )}
+      {draft?.kind === 'stb' && <StbModelsInfo />}
       {slot && stateEl && createPortal(stateEl, slot)}
     </div>
   );

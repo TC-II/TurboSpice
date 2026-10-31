@@ -1,6 +1,7 @@
 // Ícono de información del .stb: al posar el mouse muestra los dos modelos de realimentación
 // (A-β para Tian y ganancia asintótica para el GFT) y cómo se pasa de uno al otro.
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '../i18n/i18n.ts';
 
 const Arrow = ({ id }: { id: string }) => (
@@ -77,17 +78,37 @@ function Asymptotic() {
 const POP_W = 420;
 
 export function StbModelsInfo() {
-  // el globo va fijo en la ventana, debajo del ícono y sin salirse por los costados
-  const [pos, setPos] = useState<CSSProperties>({});
-  const place = (el: HTMLElement) => {
+  // abierto mientras el mouse está en el ícono o en el globo; al salir se cierra con una demora
+  // corta, así se puede cruzar el hueco entre los dos y leer, desplazar o seleccionar el globo
+  const [pos, setPos] = useState<CSSProperties | null>(null);
+  const timer = useRef(0);
+  const keep = () => window.clearTimeout(timer.current);
+  const close = () => {
+    keep();
+    timer.current = window.setTimeout(() => setPos(null), 250);
+  };
+  useEffect(() => keep, []);
+  const open = (el: HTMLElement) => {
+    keep();
+    // fijo en la ventana, debajo del ícono y sin salirse por los costados
     const r = el.getBoundingClientRect();
     const w = Math.min(POP_W, window.innerWidth - 16);
-    setPos({ width: w, top: r.bottom + 8, left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)), maxHeight: window.innerHeight - r.bottom - 16 });
+    setPos({ width: w, top: r.bottom + 4, left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)), maxHeight: window.innerHeight - r.bottom - 12 });
   };
   return (
-    <span className="stbm" tabIndex={0} aria-label={t('Feedback models')} onMouseEnter={(e) => place(e.currentTarget)} onFocus={(e) => place(e.currentTarget)}>
+    <span
+      className={`stbm${pos ? ' open' : ''}`}
+      tabIndex={0}
+      aria-label={t('Feedback models')}
+      aria-expanded={!!pos}
+      onMouseEnter={(e) => open(e.currentTarget)}
+      onMouseLeave={close}
+      onFocus={(e) => open(e.currentTarget)}
+      onBlur={close}
+      onKeyDown={(e) => e.key === 'Escape' && setPos(null)}
+    >
       <span className="stbm-icon" aria-hidden>i</span>
-      <div className="stbm-pop" role="tooltip" style={pos}>
+      {pos && createPortal(<div className="stbm-pop" role="tooltip" style={pos} onMouseEnter={keep} onMouseLeave={close}>
         <section>
           <h4>{t('Tian → A-β model')}</h4>
           <ABeta />
@@ -105,7 +126,7 @@ export function StbModelsInfo() {
           <p className="stbm-eq">{'β = 1/G∞  ·  A = G∞·(G∞·R + G0)/(G∞ − G0)'}</p>
           <p>{t('Without direct path (G0 = 0) both models are the same: A = G∞·R, Aβ = R and T = −R. With G0 ≠ 0 the equivalent A absorbs the direct path.')}</p>
         </section>
-      </div>
+      </div>, document.body)}
     </span>
   );
 }

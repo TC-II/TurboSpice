@@ -1381,7 +1381,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         // GFT: R (modelo asintótico); Tian: T = −Aβ
         setPanes([{ traces: [{ expr: shown.vectors.some((v) => v.name === 'r') ? 'R' : 'T' }] }]);
       else if (remembered) {
-        setPanes(remembered);
+        // vistas guardadas antes de que existieran T y R: la vieja "loopgain" pasa a la de ahora
+        const main = isStbPlot(shown) ? (shown.vectors.some((v) => v.name === 'r') ? 'R' : 'T') : '';
+        setPanes(main ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: main } : tr)) })) : remembered);
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
       } else if (built.controlPanes.length) setPanes(built.controlPanes);
       const errs = result.errors.length ? result.errors : [];

@@ -2,13 +2,26 @@
 // polos y ceros de T (lazo abierto), los polos del lazo cerrado y el lugar de raíces de 1 + k·T,
 // a partir de un modelo racional ajustado a T(jω) (stbMath.ts).
 import { useMemo } from 'react';
-import type { SimPlot, SimVector } from '../engine/ngspice.ts';
+import { STB_MAIN, type SimPlot, type SimVector } from '../engine/ngspice.ts';
 import { closedLoopRoots, fitRational, margins, modelZeros, rootLocus, type Complex } from '../sim/stbMath.ts';
 import { PzPlane } from './PzPlane.tsx';
 import { si } from './series.ts';
 import { t } from '../i18n/i18n.ts';
 
-export const isStbPlot = (p: SimPlot | undefined) => !!p && /^stb\d+$/i.test(p.name) && p.vectors.some((v) => v.name === 'loopgain');
+export const isStbPlot = (p: SimPlot | undefined) => !!p && /^stb\d+$/i.test(p.name) && p.vectors.some((v) => STB_MAIN.includes(v.name));
+
+/**
+ * La ganancia de lazo sobre la que se calculan márgenes y polos (positiva con realimentación
+ * negativa): R con el GFT, Aβ = −T con Tian. El GFT con entrada y salida también trae una T
+ * (la del A-β equivalente): manda R.
+ */
+function loopGain(plot: SimPlot): { re: Float64Array; im: Float64Array } | null {
+  const r = plot.vectors.find((v) => v.name === 'r');
+  if (r?.imag) return { re: r.real, im: r.imag };
+  const tv = plot.vectors.find((v) => v.name === 't');
+  if (!tv?.imag) return null;
+  return { re: tv.real.map((x) => -x), im: tv.imag.map((x) => -x) };
+}
 
 /** plot de raíces como los de .pz ("pole(1)", "zero(1)"), para el mapa */
 function rootsPlot(name: string, poles: Complex[], zeros: Complex[] = []): SimPlot {
@@ -38,10 +51,10 @@ export interface StbInfo {
 
 export function stbInfo(plot: SimPlot): StbInfo | null {
   const f = plot.vectors.find((v) => v.name === 'frequency')?.real;
-  const T = plot.vectors.find((v) => v.name === 'loopgain');
-  if (!f || !T?.imag) return null;
-  const m = margins(f, T.real, T.imag);
-  const model = fitRational(f, T.real, T.imag);
+  const L = loopGain(plot);
+  if (!f || !L) return null;
+  const m = margins(f, L.re, L.im);
+  const model = fitRational(f, L.re, L.im);
   if (!model) return { margins: m, open: null, closed: [], locus: [], error: NaN };
   const [poles, zeros] = cancel(model.poles, modelZeros(model));
   const closed = closedLoopRoots(model, 1);

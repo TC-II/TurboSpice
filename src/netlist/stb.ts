@@ -19,18 +19,13 @@
 //          y el A-β equivalente: β = 1/G∞, A = G∞·(G∞·R + G0)/(G∞ − G0) (sin G0: A = G∞·R),
 //          con su T = −Aβ = −(G∞·R + G0)/(G∞ − G0).
 // Los resultados quedan en un plot propio ("stbN" al leerlo, ver engine/ngspice.ts) con la
-// frecuencia como escala; los plots de las corridas se borran. `loopgain` es Aβ (Tian) o R (GFT):
-// la ganancia de lazo con realimentación negativa positiva, sobre la que se calculan los márgenes.
+// frecuencia como escala; los plots de las corridas se borran. Lo marca T (Tian) o R (GFT), y los
+// márgenes se calculan sobre R o Aβ = −T (waveform/StbView.tsx).
 import type { Analysis } from '../sim/analyses.ts';
 import { t } from '../i18n/i18n.ts';
 
 export type StbAnalysis = Extract<Analysis, { kind: 'stb' }>;
 
-/** Vector que marca el plot de resultados de un .stb (Aβ con Tian, R con el GFT) */
-export const STB_VECTOR = 'loopgain';
-
-/** Vector que se grafica por defecto: T = −Aβ con Tian, R con el GFT */
-export const stbMainVector = (method: 'tian' | 'gft') => (method === 'gft' ? 'r' : 't');
 
 /** `x` sin ceros exactos, para dividir por él (ngspice corta todo el .control con "out of range for divide") */
 const nz = (x: string) => `(${x}+1e-300*(mag(${x}) lt 1e-300))`;
@@ -91,7 +86,6 @@ export function stbControl(a: StbAnalysis, ctx: StbContext, n: number): string[]
   // el plot de resultados
   const cur = `{$${v(3)}}.${x}`;
   out.push('setplot new', `let frequency = real(${q(1, 'frequency')})`, 'settype frequency frequency', 'setscale frequency');
-  out.push(`let ${STB_VECTOR} = ${cur}lg`);
   if (!gft) {
     // modelo A-β: T = −Aβ
     out.push(`let ab = ${cur}lg`, 'let t = -ab');

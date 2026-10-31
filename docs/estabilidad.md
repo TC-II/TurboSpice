@@ -61,7 +61,8 @@ LTspice lo ignora y la sonda queda transparente.
    - Tian: `t` (= −Aβ, el que se grafica), `ab` y, con entrada y salida, `g`, `a` y `beta`;
    - GFT: `r` (el que se grafica) y, con entrada y salida, `g`, `ginf`, `g0`, `rn`, `rp`, `a`,
      `beta`, `ab` y `t`;
-   - `loopgain` es Aβ (Tian) o R (GFT): la ganancia de lazo sobre la que se calculan los márgenes.
+   - los márgenes y los polos se calculan sobre R (GFT) o Aβ = −T (Tian). Los vectores se muestran
+     en mayúsculas (`R`, `T`, `G`, `GINF`…); en las expresiones da lo mismo `R` que `r`.
    Los plots de las corridas se borran.
 
 No se combina con un `.control` del usuario ni con `.step` (se avisa y no corre).

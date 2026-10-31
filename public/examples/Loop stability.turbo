@@ -26,33 +26,33 @@
    "text": "Version 4\r\nSymbolType BLOCK\r\nRECTANGLE Normal -32 -48 32 48\r\nLINE Normal -48 -32 -32 -32\r\nLINE Normal -48 32 -32 32\r\nLINE Normal 32 -32 48 -32\r\nLINE Normal 32 32 48 32\r\nARC Normal -14 -24 -2 -12 -8 -12 -8 -24\r\nARC Normal -14 -12 -2 0 -8 0 -8 -12\r\nARC Normal -14 0 -2 12 -8 12 -8 0\r\nARC Normal -14 12 -2 24 -8 24 -8 12\r\nARC Normal 2 -24 14 -12 8 -24 8 -12\r\nARC Normal 2 -12 14 0 8 -12 8 0\r\nARC Normal 2 0 14 12 8 0 8 12\r\nARC Normal 2 12 14 24 8 12 8 24\r\nTEXT -28 -36 Left 0 p\r\nTEXT -28 36 Left 0 n\r\nTEXT 28 -36 Right 0 d\r\nTEXT 28 36 Right 0 c\r\nWINDOW 0 0 -60 Center 2\r\nSYMATTR Prefix X\r\nSYMATTR InstName B1\r\nSYMATTR Description The Balun drawn as a subcircuit of the project: double-click it to see its E and F sources.\r\nPIN -48 -32 NONE 0\r\nPINATTR PinName p\r\nPINATTR SpiceOrder 1\r\nPIN -48 32 NONE 0\r\nPINATTR PinName n\r\nPINATTR SpiceOrder 2\r\nPIN 48 -32 NONE 0\r\nPINATTR PinName d\r\nPINATTR SpiceOrder 3\r\nPIN 48 32 NONE 0\r\nPINATTR PinName c\r\nPINATTR SpiceOrder 4\r\n"
   }
  ],
- "activeTestbench": "smvvxl3np2r",
+ "activeTestbench": "smvvyec492r",
  "groups": [
   {
-   "id": "gmvvxl3nn2o",
+   "id": "gmvvyec452o",
    "name": "Single-ended (LoopProbe)"
   },
   {
-   "id": "gmvvxl3nn2p",
+   "id": "gmvvyec452p",
    "name": "Differential (DiffLoopProbe)"
   },
   {
-   "id": "gmvvxl3nn2q",
+   "id": "gmvvyec452q",
    "name": "How the probes work"
   }
  ],
  "testbenches": [
   {
-   "id": "smvvxl3np2r",
+   "id": "smvvyec492r",
    "name": "Loop gain (Tian)",
-   "group": "gmvvxl3nn2o",
+   "group": "gmvvyec452o",
    "current": "sha256:50c83aef44b689b2b8eae978dad4725e35aa1944b7a5aab776f7ed3cad1cfebf",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -65,16 +65,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3np2s",
+   "id": "smvvyec492s",
    "name": "GFT: G, G∞, G0 and R",
-   "group": "gmvvxl3nn2o",
+   "group": "gmvvyec452o",
    "current": "sha256:33133d6bf44b17d92c84c059f28e0f6bb01f7a387811dfac18f857b8860b3c47",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "r",
+        "expr": "R",
         "color": "#1c7ed6"
        }
       ]
@@ -82,11 +82,11 @@
      {
       "traces": [
        {
-        "expr": "g",
+        "expr": "G",
         "color": "#2f9e44"
        },
        {
-        "expr": "ginf",
+        "expr": "GINF",
         "color": "#e8590c"
        }
       ]
@@ -94,11 +94,11 @@
      {
       "traces": [
        {
-        "expr": "a",
+        "expr": "A",
         "color": "#7048e8"
        },
        {
-        "expr": "beta",
+        "expr": "BETA",
         "color": "#0c8599"
        }
       ]
@@ -111,16 +111,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3np2t",
+   "id": "smvvyec492t",
    "name": "Gain -10: more margin",
-   "group": "gmvvxl3nn2o",
+   "group": "gmvvyec452o",
    "current": "sha256:d697ba9d2568500f791bfd4729320cbd470ecf8e213364e7e4e39be0a598dc73",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -133,9 +133,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2u",
+   "id": "smvvyec4a2u",
    "name": "Step response",
-   "group": "gmvvxl3nn2o",
+   "group": "gmvvyec452o",
    "current": "sha256:e832cb5421b2e08922febd547739e64c29ae8393437bff05b13208363da23a93",
    "view": {
     "panes": [
@@ -154,9 +154,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2v",
+   "id": "smvvyec4a2v",
    "name": "Closed-loop Bode",
-   "group": "gmvvxl3nn2o",
+   "group": "gmvvyec452o",
    "current": "sha256:f10829117a6259560dc180a98e93eba173dfea7620351cb3e3aa25580e7cb02b",
    "view": {
     "panes": [
@@ -176,16 +176,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2w",
+   "id": "smvvyec4a2w",
    "name": "Differential-mode loop gain",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:a4443a93022fa082bdd197e65b41b54bc45a731d59c5542a32218e3e83e8e704",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -198,16 +198,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2x",
+   "id": "smvvyec4a2x",
    "name": "DM without enough Miller (Cc = 22p)",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:a3ada02a9d62bf20ea177ecdffa12bf7bb9799a47189cedbbfaf17e9cad706f6",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -220,16 +220,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2y",
+   "id": "smvvyec4a2y",
    "name": "Common-mode loop gain",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:2743887e680c55742d91efc9cd5897cf2bec323565f0c5ad0b5c21cfb970e49a",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -242,16 +242,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nq2z",
+   "id": "smvvyec4b2z",
    "name": "CMFB loop alone (LoopProbe at cm)",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:b614d2c15fc7aa5a518cf6e95e4415be375965366132620dd50c781884d7666e",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -264,9 +264,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr30",
+   "id": "smvvyec4b30",
    "name": "Differential step",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:afc5a46d63d0b06941899b728e1eed7fba8f19b4b0dc4a9160b0bc40794652c5",
    "view": {
     "panes": [
@@ -289,9 +289,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr31",
+   "id": "smvvyec4b31",
    "name": "Differential step, Cc = 22p",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:4aedfa41a304c72e13e15f13ddb41de5fabb60368d0143bd3a34b9c3dd0b3e22",
    "view": {
     "panes": [
@@ -314,9 +314,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr32",
+   "id": "smvvyec4c32",
    "name": "Common-mode step (Vcm)",
-   "group": "gmvvxl3nn2p",
+   "group": "gmvvyec452p",
    "current": "sha256:564262fdb5c927f9631f14708393ad8d15325051ac39d4965c56c1490e2be3be",
    "view": {
     "panes": [
@@ -339,16 +339,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr33",
+   "id": "smvvyec4c33",
    "name": "LoopProbe: Tian and GFT",
-   "group": "gmvvxl3nn2q",
+   "group": "gmvvyec452q",
    "current": "sha256:191133d49565bafb4b7b541178f48464dd245f84bacf4d56d03143aa71a0eff3",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -361,9 +361,9 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr34",
+   "id": "smvvyec4c34",
    "name": "Balun: differential and common mode",
-   "group": "gmvvxl3nn2q",
+   "group": "gmvvyec452q",
    "current": "sha256:61c1b4338e69ad571187763c96941ced3f6e1e6efc958480c415b9dfc0a56840",
    "view": {
     "panes": [
@@ -398,16 +398,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3nr35",
+   "id": "smvvyec4c35",
    "name": "DiffLoopProbe by hand: DM",
-   "group": "gmvvxl3nn2q",
+   "group": "gmvvyec452q",
    "current": "sha256:67876d8591be0d3ca362c91ba5d0d8392109ce15ea1de17b24ca0db42c4a7bd3",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]
@@ -420,16 +420,16 @@
    "runs": []
   },
   {
-   "id": "smvvxl3ns36",
+   "id": "smvvyec4d36",
    "name": "DiffLoopProbe by hand: CM",
-   "group": "gmvvxl3nn2q",
+   "group": "gmvvyec452q",
    "current": "sha256:33ec9db47b6d3328f6d90a77acfb71df725812e2c6c2dbaeaeb38b405e9e7813",
    "view": {
     "panes": [
      {
       "traces": [
        {
-        "expr": "t",
+        "expr": "T",
         "color": "#1c7ed6"
        }
       ]

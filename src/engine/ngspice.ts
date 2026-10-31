@@ -9,8 +9,13 @@ export interface NgspiceAssets {
   codemodels: Record<string, Uint8Array>;
 }
 
+/** Vectores que marcan el plot de resultados de un .stb: T (Tian) o R (GFT) */
+export const STB_MAIN = ['t', 'r'];
+
 export interface SimVector {
   name: string;
+  /** cómo se muestra, si no es el nombre (los vectores de un .stb, en mayúsculas) */
+  label?: string;
   /** tipo de ngspice: 1 time, 2 frequency, 3 voltage, 4 current, ... (ver SV_* en ngspice) */
   type: number;
   real: Float64Array;
@@ -321,7 +326,9 @@ export class Ngspice {
         .map((n) => this.readVector(`${plot}.${n}`, n))
         .filter((v): v is SimVector => v !== null);
       // el plot de resultados de un .stb (setplot new lo llama "unknownN"): "stbN"
-      const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => v.name === 'loopgain');
+      const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => STB_MAIN.includes(v.name));
+      // sus vectores se muestran en mayúsculas, como la notación de los modelos (R, T, G, GINF…)
+      if (stb) for (const v of vectors) if (v.name !== 'frequency') v.label = v.name.toUpperCase();
       plots.push({ name: stb ? `stb${plots.filter((p) => /^stb\d+$/.test(p.name)).length + 1}` : plot, vectors });
     }
     // los nodos digitales son del último análisis que corrió: si es un transitorio, van con él

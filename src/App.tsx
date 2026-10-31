@@ -1379,7 +1379,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // .stb: el Bode de la ganancia de lazo
       else if (!remembered && isStbPlot(shown) && !panes.some((pn) => pn.traces.some((tr) => shown.vectors.some((v) => v.name === tr.expr.toLowerCase()))))
         // GFT: R (modelo asintótico); Tian: T = −Aβ
-        setPanes([{ traces: [{ expr: shown.vectors.some((v) => v.name === 'r') ? 'r' : 't' }] }]);
+        setPanes([{ traces: [{ expr: shown.vectors.some((v) => v.name === 'r') ? 'R' : 'T' }] }]);
       else if (remembered) {
         setPanes(remembered);
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));

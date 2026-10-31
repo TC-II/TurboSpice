@@ -53,6 +53,7 @@ export function project(v: SimVector, view: ComplexView): Float64Array {
 
 /** Nombre al estilo LTspice: "out" → "V(out)", "v1#branch" → "I(v1)" */
 export function displayName(v: SimVector): string {
+  if (v.label) return v.label;
   // bits de bus: f__3__ en ngspice, f[3] para el usuario
   const n = bitNodeName(v.name);
   const br = /^(.*)#branch(.*)$/i.exec(n);

@@ -304,7 +304,7 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     ...d,
     texts: [...d.texts, { x: -64, y, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
   });
-  const STB = { panes: [{ traces: [{ expr: 't', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
+  const STB = { panes: [{ traces: [{ expr: 'T', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
   const se = parseAsc(readFileSync('examples/stability/single.asc', 'utf8'));
   const df = parseAsc(readFileSync('examples/stability/diff.asc', 'utf8'));
   const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
@@ -393,7 +393,7 @@ SYMATTR InstName B2
       0,
       'GFT: G, G∞, G0 and R',
       setAnalysisLine(note(se, ['Middlebrook\'s GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):', 'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.', 'It also gives the equivalent A-β model: β = 1/G∞ and A = G∞·(G∞·R + G0)/(G∞ - G0) (A = G∞·R without direct path), with T = -Aβ.']), '.stb LP1 dec 50 10 100meg gft V1 V(out)'),
-      { panes: [{ traces: [{ expr: 'r', color: '#1c7ed6' }] }, { traces: [{ expr: 'g', color: '#2f9e44' }, { expr: 'ginf', color: '#e8590c' }] }, { traces: [{ expr: 'a', color: '#7048e8' }, { expr: 'beta', color: '#0c8599' }] }], active: 0, plot: 'stb1', mode: 'bode' },
+      { panes: [{ traces: [{ expr: 'R', color: '#1c7ed6' }] }, { traces: [{ expr: 'G', color: '#2f9e44' }, { expr: 'GINF', color: '#e8590c' }] }, { traces: [{ expr: 'A', color: '#7048e8' }, { expr: 'BETA', color: '#0c8599' }] }], active: 0, plot: 'stb1', mode: 'bode' },
     ),
     bench(0, 'Gain -10: more margin', setAnalysisLine(note(setVal(se, 'R2', '10k'), ['With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.']), '.stb LP1 dec 50 10 100meg'), STB),
     bench(0, 'Step response', setAnalysisLine(note(step(se, 'V1', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 1'), ['The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.']), '.tran 20u'), {

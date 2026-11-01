@@ -38,7 +38,8 @@ import { elementRefs, savableSignals, saveSelection, setSaveSelection, toggleRef
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
-import { FULL_SIM_BYTES, MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit } from './sim/estimate.ts';
+import { fmtBytes, measuredSizeProblem, signalsThatFit, simLimits } from './sim/estimate.ts';
+import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
@@ -149,6 +150,9 @@ import { busNames } from './waveform/digital.ts';
 import { busBits, isBusName } from './netlist/bus.ts';
 import { NewModuleDialog } from './project/NewModuleDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
+
+/** Resultados más grandes que esto no se guardan en el navegador al simular */
+const MAX_CACHED_BYTES = 256 * 1024 ** 2;
 
 /** Nombre de un proyecto nuevo; con sesión de Google pasa a «Project 2», «Project 3»… si ya está en el Drive */
 const DEFAULT_PROJECT = 'Project';
@@ -1363,7 +1367,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       const incomplete = analysisProblem(lineOf(simAsc) ?? '');
       const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
       // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
-      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: unlimited ? FULL_SIM_BYTES : MAX_SIM_BYTES, project: !unlimited });
+      // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
+      const run = (b: BuiltSimulation) => {
+        const lim = simLimits(!!streamPlan(b.netlist));
+        return engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: unlimited ? lim.full : lim.max, project: !unlimited });
+      };
       let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
       // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
       // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
@@ -1380,7 +1388,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       }
       // cortado porque no iba a entrar: cuánto iba a guardar y qué hacer; los plots traen lo simulado
       if (result.sizeStop) {
-        const big = measuredSizeProblem(lineOf(simAsc) ?? '.tran', result.sizeStop);
+        // (cuántas señales o cuánto del final entran: con el límite de una corrida normal, no el de «seguir igual»)
+        const big = measuredSizeProblem(lineOf(simAsc) ?? '.tran', result.sizeStop, simLimits(!!streamPlan(built.netlist)).max);
         built.tooBig = [...built.tooBig, big];
         result.errors = [big.text];
       }
@@ -1400,8 +1409,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       const xy = [...xyPlotsFromLog(result.log, built.ng.xyPlots), ...blk.plots];
       result.plots.push(...xy);
       const meas = cardMeas ?? blk.table;
-      // los resultados de la última corrida quedan en el navegador (no van en el .turbo)
-      if (id) saveResult(id, { asc: simAsc, result: { result, meas }, time: Date.now() });
+      // los resultados de la última corrida quedan en el navegador (no van en el .turbo); los muy
+      // grandes no: guardarlos los copia entera otra vez (y la base del navegador puede no admitirlos)
+      if (id) {
+        const bytes = result.plots.reduce((n, pl) => n + pl.vectors.reduce((k, v) => k + v.real.byteLength + (v.imag?.byteLength ?? 0), 0), 0);
+        if (bytes <= MAX_CACHED_BYTES) saveResult(id, { asc: simAsc, result: { result, meas }, time: Date.now() });
+        else dropResult(id);
+      }
       // si mientras tanto se eligió otra simulación, los resultados quedan guardados para ésta
       if (simsRef.current.active !== id) {
         if (simsRef.current.items.some((s) => s.id === id)) keepResult(kept.current, id, { built, result, doc, meas });
@@ -4330,7 +4344,7 @@ ${ltNetlistText(sim.built.lt)}
                               </button>
                             )}
                             {p.size.resume && (
-                              <button onClick={() => run({ unlimited: true })} title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", { size: '1 GB' })}>
+                              <button onClick={() => run({ unlimited: true })} title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", { size: fmtBytes(simLimits(!!streamPlan(sim.built.netlist)).full) })}>
                                 {t('Continue anyway')}
                               </button>
                             )}
@@ -4505,7 +4519,7 @@ ${ltNetlistText(sim.built.lt)}
         <SavesDialog
           initial={saveSelection(doc.texts)}
           signals={dialog.signals}
-          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected) : undefined}
+          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected, simLimits(!!streamPlan(sim.built.netlist)).max) : undefined}
           onClose={() => setDialog(null)}
           onApply={(refs) => {
             setDialog(null);

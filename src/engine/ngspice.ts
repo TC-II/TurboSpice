@@ -58,6 +58,8 @@ export interface SimResult {
   bias?: Record<string, number>;
   /** El transitorio se cortó porque, al ritmo que iba, no entraba en memoria (`maxBytes`) */
   sizeStop?: SizeStop;
+  /** Se simuló punto a punto (`.save none`): el módulo queda así para siempre y hay que recrearlo */
+  reload?: boolean;
 }
 
 /** Lo que se midió al cortar un transitorio que no iba a entrar en memoria */
@@ -99,6 +101,11 @@ export interface SimulateOptions {
    * sólo se corta cuando lo guardado llega a `maxBytes`. En los dos casos se devuelve lo simulado.
    */
   project?: boolean;
+  /**
+   * Recibir los puntos de un transitorio uno a uno (SendData) en vez de que ngspice los guarde
+   * (por defecto, cuando se puede: ver `streamPlan`)
+   */
+  stream?: boolean;
 }
 
 export interface NgspiceOptions {
@@ -168,6 +175,89 @@ class SizeStopSignal {
     this.stop = stop;
     this.plots = plots;
   }
+}
+
+/** Valores por página de un plot recibido punto a punto (4 MB) */
+const PAGE = 1 << 19;
+// vecvaluesall { int veccount; int vecindex; vecvalues **vecsa } y
+// vecvalues { char *name; double creal; double cimag; int is_scale; int is_complex } (wasm32)
+const VVA_VECSA = 8;
+const VIA_TYPE = 12;
+const VV_REAL = 8;
+const VV_IMAG = 16;
+const VV_SCALE = 24;
+const VV_COMPLEX = 28;
+
+/**
+ * Un plot que llega punto a punto (SendData, con `.save none`): los vectores que se guardan, en
+ * páginas de PAGE puntos. Así no hay copias al crecer (ngspice duplica sus vectores con realloc:
+ * 1 GB de datos ocupaban 2 GB en el motor) y la memoria del motor no crece con la simulación.
+ */
+class Stream {
+  names: string[] = [];
+  /** por vector: su columna (y la de la parte imaginaria, o -1) */
+  re: number[] = [];
+  im: number[] = [];
+  /** de dónde se lee cada columna en HEAPF64 (los punteros no cambian durante el análisis) */
+  src = new Int32Array(0);
+  /** puntos por página: cada página tiene los valores de todas las columnas, punto tras punto */
+  rows = 1;
+  pages: (Float64Array | null)[] = [];
+  length = 0;
+  ready = false;
+  readonly plot: string;
+  constructor(plot: string) {
+    this.plot = plot;
+  }
+
+  /** El primer valor (real) del vector k */
+  first(k: number): number {
+    return this.pages[0]![this.re[k]];
+  }
+
+  /**
+   * Todos los vectores, cada uno en su arreglo; las páginas se sueltan a medida que se copian
+   * (el pico es lo guardado más una página)
+   */
+  takeAll(): { real: Float64Array; imag?: Float64Array }[] {
+    const n = this.src.length;
+    const cols = Array.from({ length: n }, () => new Float64Array(this.length));
+    this.pages.forEach((pg, p) => {
+      const r0 = p * this.rows;
+      const rows = Math.min(this.rows, this.length - r0);
+      for (let c = 0; c < n; c++) {
+        const out = cols[c];
+        for (let r = 0; r < rows; r++) out[r0 + r] = pg![r * n + c];
+      }
+      this.pages[p] = null;
+    });
+    return this.names.map((_, k) => (this.im[k] >= 0 ? { real: cols[this.re[k]], imag: cols[this.im[k]] } : { real: cols[this.re[k]] }));
+  }
+}
+
+/**
+ * ¿Se puede simular punto a punto? Sólo transitorios sin .control, .four ni .meas (ngspice usa sus
+ * vectores después de correr, y con `.save none` quedan de un punto). Devuelve la netlist con
+ * `.save none` y qué vectores guardar (null: todos; si no, los del .save con lista que arma
+ * TurboSpice, que ya son nombres de vectores). null si no se puede.
+ */
+export function streamPlan(netlist: string): { netlist: string; keep: Set<string> | null } | null {
+  if (/^\s*\.(control|four|meas|measure)\b/im.test(netlist) || !/\n\.end\s*$/i.test(netlist)) return null;
+  const analyses = netlist.match(/^\s*\.(ac|dc|tran|op|noise|tf|sens|pz|disto|sp|pss)\b/gim) ?? [];
+  if (!analyses.length || analyses.some((a) => !/tran$/i.test(a.trim()))) return null;
+  let keep: Set<string> | null = new Set(['time']);
+  for (const line of netlist.match(/^\s*\.save\b.*$/gim) ?? []) {
+    for (const tok of line.trim().split(/\s+/).slice(1)) {
+      const v = tok.toLowerCase();
+      if (v === 'none') continue;
+      if (v === 'all' || v === 'allv' || v === 'alli') keep = null;
+      // v(x), i(v1)…: el nombre del vector no es el escrito
+      else if (/[()]/.test(v)) return null;
+      else keep?.add(v);
+    }
+  }
+  if (keep && keep.size === 1) keep = null;
+  return { netlist: netlist.replace(/\n\.end\s*$/i, '\n.save none\n.end\n'), keep };
 }
 
 export class Ngspice {
@@ -249,8 +339,20 @@ export class Ngspice {
       return 0;
     }, 'iiiiii');
     const bgRunning = m.addFunction(() => 0, 'iiii');
+    // un plot nuevo (op, tran…): con `.save none` sus puntos llegan uno a uno por sendData
+    const sendInitData = m.addFunction((ptr) => {
+      if (!this.streams) return 0;
+      // vecinfoall { name ("Transient Analysis"), title, date, type ("tran1": el nombre del plot) … }
+      this.stream = new Stream(m.UTF8ToString(m.getValue(ptr + VIA_TYPE, 'i32')));
+      this.streams.set(this.stream.plot, this.stream);
+      return 0;
+    }, 'iiii');
+    const sendData = m.addFunction((ptr) => {
+      if (this.stream) this.addPoint(this.stream, ptr);
+      return 0;
+    }, 'iiiii');
 
-    m._ngSpice_Init(sendChar, sendStat, controlledExit, 0, 0, bgRunning, 0);
+    m._ngSpice_Init(sendChar, sendStat, controlledExit, sendData, sendInitData, bgRunning, 0);
     this.command(`cd ${WORK_DIR}`);
   }
 
@@ -308,8 +410,13 @@ export class Ngspice {
     // semilla fija: los Monte Carlo (mc, gauss, unif…) dan lo mismo en cada simulación, como al
     // arrancar ngspice (y como LTspice); si no, la secuencia sigue de la simulación anterior
     this.command('setseed 1');
-    this.writeFiles({ 'circuit.cir': netlist });
     const control = /^\s*\.control\b/im.test(netlist);
+    // punto a punto, sin que ngspice guarde nada (ver Stream)
+    const plan = opts.stream !== false ? streamPlan(netlist) : null;
+    this.streams = plan ? new Map() : null;
+    this.stream = null;
+    this.keep = plan?.keep ?? null;
+    this.writeFiles({ 'circuit.cir': plan?.netlist ?? netlist });
     this.size = opts.maxBytes ? { max: opts.maxBytes, project: opts.project ?? true, last: 0, percent: 0, start: -1, points: 0 } : null;
     let sizeStop: SizeStop | undefined;
     let partial: SimPlot[] = [];
@@ -328,8 +435,60 @@ export class Ngspice {
     }
     const plots = sizeStop ? partial : this.aborted ? [] : this.readPlots();
     const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias, opts.biasCommand) : undefined;
+    this.streams = null;
+    this.stream = null;
 
-    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias, ...(sizeStop ? { sizeStop } : {}) };
+    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias, ...(sizeStop ? { sizeStop } : {}), ...(plan ? { reload: true } : {}) };
+  }
+
+  /** Plots recibidos punto a punto en esta simulación (null: los guarda ngspice) */
+  private streams: Map<string, Stream> | null = null;
+  /** el plot que está llegando */
+  private stream: Stream | null = null;
+  /** vectores que se guardan de los que llegan (null: todos) */
+  private keep: Set<string> | null = null;
+
+  /** Un punto de un plot que llega punto a punto (sendData) */
+  private addPoint(st: Stream, ptr: number): void {
+    const m = this.m;
+    if (!st.ready) {
+      st.ready = true;
+      const n = m.getValue(ptr, 'i32');
+      const vecsa = m.getValue(ptr + VVA_VECSA, 'i32');
+      const src: number[] = [];
+      for (let i = 0; i < n; i++) {
+        const pv = m.getValue(vecsa + 4 * i, 'i32');
+        const name = m.UTF8ToString(m.getValue(pv, 'i32'));
+        if (this.keep && !m.getValue(pv + VV_SCALE, 'i32') && !this.keep.has(name.toLowerCase())) continue;
+        st.names.push(name);
+        st.re.push(src.push((pv + VV_REAL) >> 3) - 1);
+        st.im.push(m.getValue(pv + VV_COMPLEX, 'i32') ? src.push((pv + VV_IMAG) >> 3) - 1 : -1);
+      }
+      st.src = Int32Array.from(src);
+      st.rows = Math.max(1, Math.floor(PAGE / Math.max(1, src.length)));
+    }
+    const i = st.length;
+    const row = i % st.rows;
+    if (row === 0) st.pages.push(new Float64Array(st.rows * st.src.length));
+    const page = st.pages[st.pages.length - 1]!;
+    const h = m.HEAPF64;
+    const src = st.src;
+    const n = src.length;
+    const base = row * n;
+    for (let c = 0; c < n; c++) page[base + c] = h[src[c]];
+    st.length = i + 1;
+  }
+
+  /** Los vectores de un plot que llegó punto a punto (el tipo, de ngspice: su vector de un punto) */
+  private streamVectors(st: Stream): SimVector[] {
+    const data = st.takeAll();
+    return st.names.map((name, k) => {
+      const p = this.m.stringToNewUTF8(`${st.plot}.${name}`);
+      const vi = this.m._ngGet_Vec_Info(p);
+      this.m._free(p);
+      const type = vi ? this.m.getValue(vi + VI_TYPE, 'i32') : 0;
+      return { name, type, ...data[k] };
+    });
   }
 
   /** Medición del transitorio en curso (ver `maxBytes`); null si no se mide */
@@ -349,15 +508,25 @@ export class Ngspice {
     if (now - z.last < SIZE_CHECK_MS) return;
     z.last = now;
     const m = this.m;
-    const plot = m.UTF8ToString(m._ngSpice_CurPlot());
-    if (!/^tran\d+$/i.test(plot)) return;
-    const p = m.stringToNewUTF8(plot);
-    const vectors = this.readStringArray(m._ngSpice_AllVecs(p)).length;
-    m._free(p);
-    const tp = m.stringToNewUTF8(`${plot}.time`);
-    const vi = m._ngGet_Vec_Info(tp);
-    m._free(tp);
-    const points = vi ? m.getValue(vi + VI_LENGTH, 'i32') : 0;
+    let points: number;
+    let vectors: number;
+    if (this.streams) {
+      // punto a punto: lo que llegó y se guarda
+      const st = this.stream;
+      if (!st || !/^tran\d+$/i.test(st.plot)) return;
+      points = st.length;
+      vectors = st.names.length;
+    } else {
+      const plot = m.UTF8ToString(m._ngSpice_CurPlot());
+      if (!/^tran\d+$/i.test(plot)) return;
+      const p = m.stringToNewUTF8(plot);
+      vectors = this.readStringArray(m._ngSpice_AllVecs(p)).length;
+      m._free(p);
+      const tp = m.stringToNewUTF8(`${plot}.time`);
+      const vi = m._ngGet_Vec_Info(tp);
+      m._free(tp);
+      points = vi ? m.getValue(vi + VI_LENGTH, 'i32') : 0;
+    }
     if (!points || !vectors) return;
     if (z.start < 0) {
       z.start = percent;
@@ -402,6 +571,19 @@ export class Ngspice {
     }
     const out: Record<string, number> = {};
     const plot = this.readStringArray(this.m._ngSpice_AllPlots())[0];
+    // punto a punto: el primer punto que llegó de cada vector
+    const st = this.streams?.get(plot);
+    if (st) {
+      if (st.length) st.names.forEach((n, k) => (out[n.toLowerCase()] = st.first(k)));
+      // los parámetros de dispositivo que no llegaron como vectores se le piden al dispositivo
+      for (const n of params) {
+        if (out[n.toLowerCase()] !== undefined) continue;
+        const v = this.readVector(n, n);
+        if (v?.real.length) out[n.toLowerCase()] = v.real[0];
+      }
+      this.errors.length = errors;
+      return out;
+    }
     const p = this.m.stringToNewUTF8(plot);
     const names = this.readStringArray(this.m._ngSpice_AllVecs(p));
     this.m._free(p);
@@ -435,12 +617,15 @@ export class Ngspice {
     // ngSpice_AllPlots devuelve el más reciente primero; los queremos en orden de ejecución
     for (const plot of this.readStringArray(this.m._ngSpice_AllPlots()).reverse()) {
       if (plot === 'const') continue;
-      const p = this.m.stringToNewUTF8(plot);
-      const names = this.readStringArray(this.m._ngSpice_AllVecs(p));
-      this.m._free(p);
-      const vectors = names
-        .map((n) => this.readVector(`${plot}.${n}`, n))
-        .filter((v): v is SimVector => v !== null);
+      const st = this.streams?.get(plot);
+      let vectors: SimVector[];
+      if (st) vectors = this.streamVectors(st);
+      else {
+        const p = this.m.stringToNewUTF8(plot);
+        const names = this.readStringArray(this.m._ngSpice_AllVecs(p));
+        this.m._free(p);
+        vectors = names.map((n) => this.readVector(`${plot}.${n}`, n)).filter((v): v is SimVector => v !== null);
+      }
       // el plot de resultados de un .stb (setplot new lo llama "unknownN"): "stbN"
       const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => isStbMain(v.name));
       // sus vectores se muestran en mayúsculas, como la notación de los modelos (R, T, G, GINF…)

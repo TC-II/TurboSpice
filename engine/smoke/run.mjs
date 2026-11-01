@@ -18,10 +18,12 @@ const codemodels = {};
 for (const f of readdirSync(DIST).filter((f) => f.endsWith('.cm'))) {
   codemodels[f] = new Uint8Array(readFileSync(join(DIST, f)));
 }
-const ng = await Ngspice.create(factory, {
-  spinit: readFileSync(join(DIST, 'spinit'), 'utf8'),
-  codemodels,
-});
+const engine = () =>
+  Ngspice.create(factory, {
+    spinit: readFileSync(join(DIST, 'spinit'), 'utf8'),
+    codemodels,
+  });
+let ng = await engine();
 
 // Sólo se compara contra el nativo si es la misma versión que la compilada a wasm
 const WASM_VERSION = /NGSPICE_VERSION=(\d+)/.exec(readFileSync(join(HERE, '..', 'build.sh'), 'utf8'))[1];
@@ -138,6 +140,8 @@ for (const c of CASES) {
   const t0 = performance.now();
   const res = ng.simulate(c.netlist);
   const ms = (performance.now() - t0).toFixed(0);
+  // (tras simular punto a punto ngspice queda con `.save none`: motor nuevo, como en el Worker)
+  if (res.reload) ng = await engine();
   const problems = [...res.errors.map((e) => `ngspice: ${e}`)];
   if (res.aborted) problems.push('ngspice abortó');
   try {

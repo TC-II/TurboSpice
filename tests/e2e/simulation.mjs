@@ -280,7 +280,7 @@ check(await page.getByRole('menu', { name: 'Nueva simulación' }).isVisible(), '
 await page.keyboard.press('Escape');
 await page.screenshot({ path: `${OUT}/simulaciones.png` });
 
-// --- #361 y #363: un transitorio que al ritmo medido no entra en memoria se frena enseguida, con lo
+// --- #361, #363 y #365: un transitorio que al ritmo medido no entra en memoria se frena enseguida, con lo
 // simulado hasta ahí y lo que se puede hacer como botones; mientras corre, el % va en el botón ---
 const longAsc = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 16 80 16', 'WIRE 80 16 160 16', 'WIRE 0 96 80 96', 'WIRE 80 96 160 96', 'WIRE 160 80 160 96', 'FLAG 0 96 0',
   'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
@@ -297,10 +297,11 @@ await page.getByRole('button', { name: 'Correr', exact: true }).click();
 await page.locator('.sim-progress').waitFor({ timeout: 10000 });
 check(/^\d+ %$/.test((await page.locator('.sim-progress .pct').textContent()).trim()), `mientras corre, el botón muestra el avance (${await page.locator('.sim-progress .pct').textContent()})`);
 await page.locator('.problems li', { hasText: 'Se frenó al' }).waitFor({ timeout: 60000 });
+// (simulado punto a punto, el límite es 1 GB: el doble que con los vectores en ngspice)
 const stopText = await page.locator('.problems li', { hasText: 'Se frenó al' }).innerText();
-check(/a este ritmo «\.tran 0 5» guardaría .* \(512 MB\)\. Los gráficos muestran lo simulado hasta ahí/.test(stopText), `se frena y dice cuánto iba a guardar (${stopText.split('\n')[0]})`);
+check(/a este ritmo «\.tran 0 5» guardaría .* \(1,0 GB\)\. Los gráficos muestran lo simulado hasta ahí/.test(stopText), `se frena y dice cuánto iba a guardar (${stopText.split('\n')[0]})`);
 const stopButtons = await page.locator('.problems .size-actions button').allTextContents();
-check(/^Graficar hasta \d[\d.]*[mµ]?s\|Guardar sólo los últimos 0\.2s\|Seguir igual$/.test(stopButtons.join('|')), `lo que se puede hacer, como botones (${stopButtons.join(' | ')})`);
+check(/^Graficar hasta \d[\d.]*[mµ]?s\|Guardar sólo los últimos 0\.5s\|Seguir igual$/.test(stopButtons.join('|')), `lo que se puede hacer, como botones (${stopButtons.join(' | ')})`);
 check((await page.locator('.sim-state.err').count()) === 1, 'el aro queda en error');
 const probeBtn = page.getByRole('button', { name: 'Medir', exact: true });
 check(await probeBtn.isDisabled(), 'la punta de prueba no se habilita hasta elegir graficar');

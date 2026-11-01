@@ -14,7 +14,7 @@ import {
 } from '../sim/analyses.ts';
 import { CONTROL_SNIPPETS } from '../sim/controlSnippets.ts';
 import { Modal } from './dialogs.tsx';
-import { StbModelsInfo } from './StbModelsInfo.tsx';
+import { SimHelp } from './SimHelp.tsx';
 import { t } from '../i18n/i18n.ts';
 
 /** Valor numérico SPICE (1k, 10meg…) o expresión entre llaves */
@@ -282,12 +282,12 @@ export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Ana
               label={t('Method')}
               value={a.method}
               options={[
-                ['tian', t('Tian, A-β model: T = −Aβ (as Spectre stb; probe orientation does not matter)')],
                 ['gft', t('Middlebrook\'s GFT, asymptotic model: R, G∞, G0 (signal must enter the probe by its arrow)')],
+                ['tian', t('Tian, A-β model: T = −Aβ (as Spectre stb; probe orientation does not matter)')],
               ]}
               onChange={(method) => set({ ...a, method })}
             />
-            <StbModelsInfo />
+            <SimHelp kind="stb" label={t('Stability (loop gain)')} />
           </div>
           {(
             <fieldset>

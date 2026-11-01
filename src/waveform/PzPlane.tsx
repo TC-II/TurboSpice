@@ -111,8 +111,36 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     // pts depende de roots, unit, log y decade0
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roots, unit, log, decade0]);
-  useEffect(() => setView(null), [fitted]);
+  // otras raíces o pasar a escala log: se vuelve a ajustar. Cambiar de rad/s a Hz no (#332): la
+  // vista se convierte a la otra unidad (switchUnit). Las raíces se comparan por su valor (quien
+  // llama puede armar las corridas de nuevo en cada render)
+  const rootsKey = roots.map((r) => `${r.kind}${r.run}:${r.re},${r.im}`).join(';');
+  useEffect(() => setView(null), [rootsKey, log]);
   const v = view ?? fitted;
+  /** la década del centro del mapa log para una unidad (1: rad/s, 2π: Hz) */
+  const decadeFor = (u: number) => {
+    const mags = roots.map((r) => Math.hypot(r.re, r.im) / u).filter((m) => m > 0);
+    return mags.length ? Math.floor(Math.log10(Math.min(...mags))) - 1 : 0;
+  };
+  const switchUnit = (toHz: boolean) => {
+    if (toHz === hz) return;
+    const nu = toHz ? 2 * Math.PI : 1;
+    if (view && !log) {
+      // lineal: el mismo lugar del plano s, en la otra unidad
+      const r = unit / nu;
+      setView({ cx: view.cx * r, cy: view.cy * r, h: view.h * r });
+    } else if (view) {
+      // log: el radio está en décadas; el centro se corre a lo largo de su dirección y el ancho
+      // (en décadas) queda igual
+      const rho = Math.hypot(view.cx, view.cy);
+      if (rho > 0) {
+        const mag = 10 ** (rho + decade0) * unit;
+        const rho2 = Math.max(0, Math.log10(mag / nu) - decadeFor(nu));
+        setView({ ...view, cx: (view.cx * rho2) / rho, cy: (view.cy * rho2) / rho });
+      }
+    }
+    setHz(toHz);
+  };
 
   // px, py: coordenadas dentro del área del mapa (el <g> la corre a los márgenes)
   const k = W / (2 * v.h);
@@ -218,6 +246,16 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     if (png) download(`${name}.png`, png);
   };
 
+  const legend = (
+    <ul className="pz-legend">
+      {runs.map((p, i) => (
+        <li key={p.name}>
+          <i style={{ background: PALETTE[i % PALETTE.length] }} />
+          {runLabel(i)}
+        </li>
+      ))}
+    </ul>
+  );
   const hr = hover !== null ? roots[hover] : undefined;
   const hi = hr && rootInfo(hr);
   const glyph = (r: Root) => (
@@ -232,10 +270,10 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
           {t('Fit')}
         </button>
         <span className="pz-seg" role="group" aria-label={t('Units')}>
-          <button className={hz ? '' : 'active'} aria-pressed={!hz} onClick={() => setHz(false)}>
+          <button className={hz ? '' : 'active'} aria-pressed={!hz} onClick={() => switchUnit(false)}>
             rad/s
           </button>
-          <button className={hz ? 'active' : ''} aria-pressed={hz} onClick={() => setHz(true)} title="s/2π">
+          <button className={hz ? 'active' : ''} aria-pressed={hz} onClick={() => switchUnit(true)} title="s/2π">
             Hz
           </button>
         </span>
@@ -245,39 +283,34 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
         <button className={guides ? 'active' : ''} aria-pressed={guides} onClick={() => setGuides(!guides)} title={t('Lines of constant ζ and circles of constant ω₀')}>
           {t('ζ/ω₀ guides')}
         </button>
-        <select
-          value=""
-          aria-label={t('Export poles and zeros')}
-          onChange={(e) => {
-            void exportAs(e.target.value);
-            e.target.value = '';
-          }}
-        >
-          <option value="">{t('Export…')}</option>
-          <option value="png">{t('Map to PNG')}</option>
-          <option value="svg">{t('Map to SVG')}</option>
-          <option value="csv">{t('Table to CSV')}</option>
-        </select>
-        <span className="pz-summary">
-          {multi && (
-            <ul className="pz-legend">
-              {runs.map((p, i) => (
-                <li key={p.name}>
-                  <i style={{ background: PALETTE[i % PALETTE.length] }} />
-                  {runLabel(i)}
-                </li>
-              ))}
-            </ul>
-          )}
-          {!compact && (
+        {/* al lado de otro gráfico (el .stb), sin exportar ni la cápsula: la estabilidad ya la
+            dice el resumen de arriba, y la leyenda va debajo del mapa (#332) */}
+        {!compact && (
+          <select
+            value=""
+            aria-label={t('Export poles and zeros')}
+            onChange={(e) => {
+              void exportAs(e.target.value);
+              e.target.value = '';
+            }}
+          >
+            <option value="">{t('Export…')}</option>
+            <option value="png">{t('Map to PNG')}</option>
+            <option value="svg">{t('Map to SVG')}</option>
+            <option value="csv">{t('Table to CSV')}</option>
+          </select>
+        )}
+        {!compact && (
+          <span className="pz-summary">
+            {multi && legend}
             <span className="pz-count">
               <span className="pz-glyph pole">×</span> {nPoles} <span className="pz-glyph zero">○</span> {roots.length - nPoles}
             </span>
-          )}
-          <span className={`pz-badge ${bad.length ? 'bad' : 'ok'}`} title={bad.length ? t('in the right half-plane: the circuit is unstable') : undefined}>
-            {bad.length ? `⚠ ${t('Unstable')}` : `✓ ${t('Stable')}`}
+            <span className={`pz-badge ${bad.length ? 'bad' : 'ok'}`} title={bad.length ? t('in the right half-plane: the circuit is unstable') : undefined}>
+              {bad.length ? `⚠ ${t('Unstable')}` : `✓ ${t('Stable')}`}
+            </span>
           </span>
-        </span>
+        )}
       </div>
       <div className="pz-body">
         <div className="pz-side" style={{ width: SW }}>
@@ -415,7 +448,8 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
             )}
           </div>
           <div className="pz-foot" ref={foot}>
-            {!compact && SW >= 380 && <p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
+            {compact && multi && legend}
+            {!compact && SW >= 380 &&<p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
           </div>
         </div>
         {!compact && (

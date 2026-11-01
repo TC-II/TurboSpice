@@ -80,29 +80,23 @@ export function StbView({ plot, name }: { plot: SimPlot; name: string }) {
   const labels = new Map(runs.map((r) => [r.name, r.name]));
   return (
     <div className="stb-view">
-      <dl className="stb-summary">
-        <dt>{t('Phase margin')}</dt>
-        <dd className={minPm && minPm.margin < 45 ? 'bad' : ''}>{minPm ? `${deg(minPm.margin)} @ ${si(minPm.f)}Hz` : t('no 0 dB crossing')}</dd>
-        {pm.length > 1 && (
-          <>
-            <dt>{t('0 dB crossings')}</dt>
-            <dd>{pm.map((c) => `${si(c.f)}Hz (${deg(c.margin)})`).join(' · ')}</dd>
-          </>
-        )}
-        <dt>{t('Gain margin')}</dt>
-        <dd className={minGm && minGm.margin < 6 ? 'bad' : ''}>{minGm ? `${minGm.margin.toFixed(1)} dB @ ${si(minGm.f)}Hz` : t('no −180° crossing')}</dd>
-        <dt>{t('Closed loop')}</dt>
-        <dd className={rhpClosed ? 'bad' : ''}>{info.open ? (rhpClosed ? t('unstable ({n} poles in the right half-plane)', { n: rhpClosed }) : t('stable')) : '—'}</dd>
-      </dl>
+      {/* márgenes y estabilidad en una sola línea (#332); los otros cruces de 0 dB, en el tooltip */}
+      <p className="stb-summary" title={t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', { L, e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}>
+        <span title={t('Phase margin') + (pm.length > 1 ? ` · ${t('0 dB crossings')}: ${pm.map((c) => `${si(c.f)}Hz (${deg(c.margin)})`).join(' · ')}` : '')}>
+          {t('PM')} <b className={minPm && minPm.margin < 45 ? 'bad' : ''}>{minPm ? `${deg(minPm.margin)} @ ${si(minPm.f)}Hz` : t('no 0 dB crossing')}</b>
+          {pm.length > 1 && <sup>{pm.length}×</sup>}
+        </span>
+        <span title={t('Gain margin')}>
+          {t('GM')} <b className={minGm && minGm.margin < 6 ? 'bad' : ''}>{minGm ? `${minGm.margin.toFixed(1)} dB @ ${si(minGm.f)}Hz` : t('no −180° crossing')}</b>
+        </span>
+        {info.open && <b className={rhpClosed ? 'bad' : 'ok'}>{rhpClosed ? `⚠ ${t('unstable ({n} poles in the right half-plane)', { n: rhpClosed })}` : `✓ ${t('Stable')}`}</b>}
+      </p>
       {rhpOpen > 0 && <p className="stb-warn">⚠ {t('{L} has poles in the right half-plane (an inner loop is unstable): the margins read on the Bode plot are not valid; use the closed-loop poles.', { L })}</p>}
       {info.open ? (
         <PzPlane runs={runs} labels={labels} name={`${name} stb`} compact locus={info.locus} stableRun={1} />
       ) : (
         <p className="hint">{t('Too few points to fit a model of {L}', { L })}</p>
       )}
-      <p className="hint">
-        {t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', { L, e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}
-      </p>
     </div>
   );
 }

@@ -369,16 +369,26 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 /* .stb: ícono con los modelos de realimentación (StbModelsInfo.tsx) */
 .stbm-row { display: flex; align-items: flex-end; gap: 8px; }
 .stbm-row > :first-child { flex: 1; }
-.stbm { position: relative; display: inline-flex; margin-bottom: 4px; outline: none; }
-.simbar > .stbm { align-self: center; margin: 0 4px; }
-.stbm-icon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; cursor: help; font: italic 600 13px Georgia, serif; color: var(--accent); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); transition: background .15s, color .15s; }
-.stbm:hover .stbm-icon, .stbm:focus .stbm-icon, .stbm.open .stbm-icon { background: var(--accent); color: var(--bg); }
-.stbm-pop { position: fixed; z-index: 1000; overflow-y: auto; padding: 14px 16px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 12px 36px rgb(0 0 0 / .22); color: var(--fg); font-size: 12px; line-height: 1.45; animation: stbm-in .15s ease-out; }
-@keyframes stbm-in { from { opacity: 0; transform: translateY(-4px); } }
-.stbm-pop section + section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-.stbm-pop h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
-.stbm-pop p { margin: 4px 0 0; color: var(--fg-muted); }
-.stbm-pop .stbm-eq { color: var(--fg); font-family: var(--mono); font-size: 12px; text-align: center; padding: 4px 6px; border-radius: 6px; background: var(--bg-alt); }
+/* Ayuda de cada análisis (#331): ícono cuadrado "i" y el globo que abre al posar el mouse */
+.hpop-anchor { position: relative; display: inline-flex; outline: none; }
+.sim-help { flex: none; align-self: center; margin: 0 2px; }
+.stbm-row .sim-help { align-self: flex-end; margin-bottom: 4px; }
+.sim-help-icon { box-sizing: border-box; width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; cursor: help; font: 700 13px/1 Georgia, 'Times New Roman', serif; color: var(--accent); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); transition: background .15s, color .15s; }
+.sim-help:hover .sim-help-icon, .sim-help:focus-visible .sim-help-icon, .sim-help.open .sim-help-icon { background: var(--accent); color: #fff; }
+.hpop { position: fixed; z-index: 1000; box-sizing: border-box; overflow-y: auto; padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 12px 36px rgb(0 0 0 / .28); color: var(--fg); font-size: 12px; line-height: 1.45; animation: hpop-in .15s ease-out; }
+@keyframes hpop-in { from { opacity: 0; transform: translateY(-4px); } }
+.hpop section + section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.hpop h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--accent); }
+.hpop p { margin: 6px 0 0; color: var(--fg-muted); }
+.hpop .stbm-svg { margin: 6px auto; }
+/* ecuaciones: variables en itálica, fracciones apiladas, centradas (hasta el LaTeX de #328) */
+.mx { margin: 8px 0 2px; padding: 6px 10px; border-radius: 6px; background: var(--bg-alt); color: var(--fg); text-align: center; font: 15px/1.3 'Cambria Math', Cambria, 'Times New Roman', serif; }
+.mx sub { font-size: .68em; font-style: normal; }
+.mx-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 3px; }
+.mx-frac > span { padding: 0 3px; line-height: 1.25; white-space: nowrap; }
+.mx-frac > span:last-child { border-top: 1px solid currentColor; }
+.mx-gap { display: inline-block; width: 26px; }
+.stbm-probe .sym { color: var(--fg); }
 .stbm-svg { display: block; width: 100%; height: auto; }
 .stbm-svg line, .stbm-svg polyline { stroke: var(--fg); stroke-width: 1.4; fill: none; }
 .stbm-head, .stbm-dot { fill: var(--fg); }
@@ -574,10 +584,14 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-plane .locus { fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: 0.55; vector-effect: non-scaling-stroke; }
 .stb-view { flex: none; width: 360px; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; }
 .stb-view .pz-view.compact { width: auto; flex: 1 1 auto; min-height: 260px; }
-.stb-summary { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; margin: 0; }
-.stb-summary dt { color: var(--fg-muted); }
-.stb-summary dd { margin: 0; font-variant-numeric: tabular-nums; }
+/* márgenes y estabilidad en una línea (#332) */
+.stb-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 2px 14px; font-size: 12px; margin: 0; color: var(--fg-muted); white-space: nowrap; }
+.stb-summary b { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
+.stb-summary sup { font-size: 9px; margin-left: 2px; }
+.stb-summary .ok { color: var(--ok); }
 .stb-summary .bad { color: var(--err); }
+.pz-view.compact .pz-foot { align-items: center; padding-top: 2px; }
+.pz-view.compact .pz-legend { justify-content: center; font-size: 12px; }
 .stb-warn { font-size: 12px; color: var(--err); margin: 0; }
 .stb-view .hint { font-size: 11px; margin: 0; }
 .results-body:has(> .stb-view) { flex-direction: row; gap: 12px; }
@@ -1406,6 +1420,20 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .sim-row > .group:first-child + .group::before { display: none; }
 .iconbar.sim-row .proj-capsule { width: 100%; height: 100%; margin: 0; padding: 0 12px; border: 0; border-radius: 0; background: transparent; }
 .iconbar.sim-row .proj-capsule:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+/* New y Run, un solo botón partido (#331): se pinta la mitad que sigue */
+.sim-split { display: inline-flex; align-items: stretch; }
+.sim-split > .menu-top > button { height: 100%; gap: 4px; padding: 4px 10px 4px 7px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.sim-split > .menu-top > button.labeled { border-right-width: 0; }
+.sim-split > button { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 4px 12px; }
+.sim-split > button.primary { box-shadow: inset 1px 0 0 color-mix(in srgb, #fff 35%, var(--accent)); }
+.iconbar .sim-split > button.run-off { opacity: 1; color: var(--fg-muted); }
+/* la barra de la simulación tiene la misma altura con cualquier análisis (la de Noise: dos
+   renglones de campos); los de un renglón quedan centrados */
+@media (min-width: 701px) { .iconbar.sim-row { box-sizing: border-box; height: var(--simrow-h, 54px); } }
+/* dibujito de cada tipo de simulación en el menú New */
+.menu-item .menu-lead-label { display: inline-flex; align-items: center; }
+.menu-item .menu-lead { display: inline-flex; width: 20px; margin-right: 8px; color: var(--accent); }
+.menu-item .analysis-icon { display: block; }
 /* New simulation y Run con aire entre sí; Probe y los suyos, separados de Run */
 .sim-row > .group.fixed { gap: 8px; padding-right: 10px; }
 .sim-row > .group.fixed + .group { padding-left: 10px; }
@@ -1631,3 +1659,7 @@ svg.export-sheet .wires polyline.bus { stroke-width: 4.5; }
 svg.export-sheet .op-annotation rect { fill: #fff; }
 svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #000; color: #000 !important; }
 @media (max-width: 640px) { .export-view { flex-direction: column; } .export-panel { width: auto; border-left: none; border-top: 1px solid var(--border); max-height: 45vh; } }
+/* el tipo de simulación del testbench en el menú New (#331): sin tilde, el fondo apenas más claro */
+.menu-item.current > button { background: color-mix(in srgb, var(--fg) 9%, transparent); }
+/* lugar del ⌖ en una caja que no lo tiene, para alinear las cajas de una columna */
+.simbar .sb-field .pick-btn.pick-pad { visibility: hidden; pointer-events: none; }

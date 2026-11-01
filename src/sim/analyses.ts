@@ -44,12 +44,13 @@ export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean
   { kind: 'ac', label: 'AC (Bode)', ngspiceOnly: false, help: t('Small-signal frequency response around the operating point (.ac). Excitation sources need "AC 1" in their value.') },
   { kind: 'op', label: t('Operating point'), ngspiceOnly: false, help: t('DC voltages and currents (.op).') },
   { kind: 'dc', label: t('DC sweep'), ngspiceOnly: false, help: t('Sweeps the value of one or two sources and solves the operating point at each step (.dc).') },
+  // polos y ceros y estabilidad, debajo del barrido DC (#331)
+  { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
+  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop stability at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Middlebrook\'s GFT (asymptotic gain model: R, G∞ and G0) by default, or the Tian method (A-β model, T = −Aβ).') },
   { kind: 'noise', label: t('Noise'), ngspiceOnly: false, help: t('Noise spectral density at the output and referred to the input (.noise).') },
   { kind: 'tf', label: t('DC transfer function'), ngspiceOnly: false, help: t('DC gain, input and output resistance (.tf).') },
   { kind: 'sens', label: t('Sensitivity'), ngspiceOnly: true, help: t('Sensitivity of an output to each circuit parameter (.sens).') },
-  { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
   { kind: 'disto', label: t('Distortion'), ngspiceOnly: true, help: t('Small-signal harmonic and intermodulation distortion (.disto). Sources need DISTOF1/DISTOF2.') },
-  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop stability at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Tian method (A-β model, T = −Aβ) by default, or Middlebrook\'s GFT (asymptotic gain model: R, G∞ and G0).') },
   { kind: 'sp', label: t('S-parameters'), ngspiceOnly: true, help: t('S-parameters (.sp). The ports are voltage sources with "portnum N z0 50" in their value.') },
 ];
 
@@ -78,7 +79,7 @@ export function defaultAnalysis(kind: AnalysisKind): Analysis {
     case 'sp':
       return { kind, sweep: { ...SWEEP, points: '10', start: '1meg', stop: '1g' }, noise: false };
     case 'stb':
-      return { kind, probe: '', mode: '', sweep: { ...SWEEP, stop: '100meg' }, method: 'tian', input: '', output: '' };
+      return { kind, probe: '', mode: '', sweep: { ...SWEEP, stop: '100meg' }, method: 'gft', input: '', output: '' };
   }
 }
 

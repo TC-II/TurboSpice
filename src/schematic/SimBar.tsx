@@ -5,15 +5,29 @@
 // campo o con Enter y reemplazan el comando del esquemático. En una Complex simulation (#241) no
 // hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
-import { useEffect, useRef, useState } from 'react';
-import { StbModelsInfo } from './StbModelsInfo.tsx';
-import { formatAnalysis,isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { HoverPop, ProbePlacement, SimHelp } from './SimHelp.tsx';
+import { ANALYSES, formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
+import type { Library } from '../library/library.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../ui/icons.tsx';
 
 type BarField =
-  | { kind: 'text'; label: string; value: string; set(v: string): Analysis; list?: 'nets' | 'sources' | 'probes'; placeholder?: string; width?: number; required?: boolean; numeric?: boolean; notGround?: boolean }
+  | {
+      kind: 'text';
+      label: string;
+      value: string;
+      set(v: string): Analysis;
+      list?: 'nets' | 'sources' | 'probes';
+      placeholder?: string;
+      width?: number;
+      required?: boolean;
+      numeric?: boolean;
+      notGround?: boolean;
+      /** vacío: al posar el mouse, un globo explica qué poner (la sonda del .stb) */
+      explain?: 'probe';
+    }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
   /** casillas una debajo de la otra */
@@ -43,6 +57,15 @@ const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
     set: (type) => set({ ...s, type: type as Sweep['type'] }),
   },
 ];
+
+/** El barrido en dos columnas, como en Noise: F start y F stop; tipo de barrido y puntos */
+const sweepCols = (s: Sweep, set: (s: Sweep) => Analysis): BarField[][] => {
+  const [fstart, fstop, points, sweep] = sweepFields(s, set);
+  return [
+    [fstart, fstop],
+    [sweep, points],
+  ];
+};
 
 /** Qué le falta a un campo (se marca en rojo; el texto queda como ayuda al pasar el mouse) */
 const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefined =>
@@ -76,7 +99,7 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
         ],
       ];
     case 'ac':
-      return [sweepFields(a.sweep, (sweep) => ({ ...a, sweep }))];
+      return sweepCols(a.sweep, (sweep) => ({ ...a, sweep }));
     case 'dc':
       return [0, 1].map((i) => {
         const s = a.sweeps[i] ?? { src: '', start: '', stop: '', step: '' };
@@ -97,15 +120,13 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
       });
     case 'noise': {
       // en columnas (ver COLUMNS): fuente; salida y referencia; F start y F stop; barrido y puntos
-      const [fstart, fstop, points, sweep] = sweepFields(a.sweep, (sw) => ({ ...a, sweep: sw }));
       return [
         [text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true })],
         [
           text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }),
           text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') }),
         ],
-        [fstart, fstop],
-        [sweep, points],
+        ...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })),
       ];
     }
     case 'op':
@@ -115,7 +136,7 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
     case 'sens':
       return [
         [text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }), { kind: 'check', label: t('In AC'), value: a.ac, set: (ac) => ({ ...a, ac }) }],
-        ...(a.ac ? [sweepFields(a.sweep, (sweep) => ({ ...a, sweep }))] : []),
+        ...(a.ac ? sweepCols(a.sweep, (sweep) => ({ ...a, sweep })) : []),
       ];
     case 'pz':
       return [
@@ -134,20 +155,22 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
         ],
       ];
     case 'disto':
-      return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), text('f2/f1', a.f2overf1, (f2overf1) => ({ ...a, f2overf1 }), { placeholder: '—' })]];
+      return [...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })), [text('f2/f1', a.f2overf1, (f2overf1) => ({ ...a, f2overf1 }), { placeholder: '—' })]];
     case 'sp':
-      return [[...sweepFields(a.sweep, (sweep) => ({ ...a, sweep })), { kind: 'check', label: t('Noise'), value: a.noise, set: (noise) => ({ ...a, noise }) }]];
+      return [...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })), [{ kind: 'check', label: t('Noise'), value: a.noise, set: (noise) => ({ ...a, noise }) }]];
     case 'stb':
+      // en columnas (ver COLUMNS): sonda y método; el modo (sonda diferencial); entrada y salida
+      // (sólo GFT); F start y F stop; barrido y puntos
       return [
         [
           // la sonda diferencial lleva modo DM/CM; la simple, ninguno (como en el diálogo)
           text(t('Loop probe'), a.probe, (probe) => {
             const d = info.probes?.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
             return { ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' };
-          }, { list: 'probes', required: true, width: 6 }),
-          { kind: 'select', label: t('Method'), value: a.method, options: [['tian', 'Tian'], ['gft', 'GFT']], set: (method) => ({ ...a, method: method as StbMethod }) },
-          ...(a.mode ? [{ kind: 'select', label: t('Mode'), value: a.mode, options: [['dm', 'DM'], ['cm', 'CM']], set: (mode: string) => ({ ...a, mode: mode as StbMode }) } as BarField] : []),
+          }, { list: 'probes', required: true, width: 6, explain: 'probe' }),
+          { kind: 'select', label: t('Method'), value: a.method, options: [['gft', 'GFT'], ['tian', 'Tian']], set: (method) => ({ ...a, method: method as StbMethod }) },
         ],
+        ...(a.mode ? [[{ kind: 'select', label: t('Mode'), value: a.mode, options: [['dm', 'DM'], ['cm', 'CM']], set: (mode: string) => ({ ...a, mode: mode as StbMode }) } as BarField]] : []),
         ...(a.method === 'gft'
           ? [
               [
@@ -156,20 +179,29 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
               ],
             ]
           : []),
-        sweepFields(a.sweep, (sweep) => ({ ...a, sweep })),
+        ...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })),
       ];
   }
 }
 
 /** Análisis cuyos grupos de campos van en columnas (uno debajo del otro) en vez de en filas */
-const COLUMNS = new Set<Analysis['kind']>(['pz', 'noise']);
+const COLUMNS = new Set<Analysis['kind']>(['pz', 'noise', 'ac', 'stb', 'sens', 'disto', 'sp']);
+
+/** Lugar vacío del ancho del botón ⌖ (mismas medidas: es un botón invisible) */
+const PickPad = () => (
+  <button type="button" className="pick-btn pick-pad" tabIndex={-1} aria-hidden disabled>
+    ⌖
+  </button>
+);
 
 /** Estado de la simulación elegida: sin correr, corriendo, lista o con error */
 export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply }: {
+export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply }: {
+  /** para dibujar componentes en la ayuda (la LoopProbe) */
+  lib?: Library;
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
   sim?: {
     name: string;
@@ -226,6 +258,27 @@ export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, co
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
     picker(f.list === 'nets' ? 'net' : f.list === 'probes' ? 'probe' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
   const rows = sim && draft && control === undefined ? barRows(draft, info) : [];
+  // en columnas, una caja sin ⌖ deja su lugar si otra de la columna lo tiene: así las cajas
+  // quedan alineadas entre sí (Method bajo Loop probe), no con el ⌖
+  const padPick = (r: BarField[]) => !!draft && COLUMNS.has(draft.kind) && r.some((x) => x.kind === 'text' && x.list);
+  // la caja de la sonda vacía (en rojo): al posar el mouse, qué poner y dónde va (#332)
+  const withExplain = (f: Extract<BarField, { kind: 'text' }>, box: ReactElement) =>
+    f.explain === 'probe' && !f.value.trim() ? (
+      <HoverPop
+        focusable={false}
+        width={380}
+        pop={
+          <section>
+            <h4>{(info.probes ?? []).length ? t('Select the Loop Probe: click ⌖ and then the probe on the schematic') : t('Insert a Loop Probe from the Component menu and select it')}</h4>
+            <ProbePlacement lib={lib} />
+          </section>
+        }
+      >
+        {box}
+      </HoverPop>
+    ) : (
+      box
+    );
   /** columnas de la grilla con varias filas (0: sin grilla) */
   const gridCols = rows.length > 1 && !(draft && COLUMNS.has(draft.kind)) ? Math.max(...rows.map((r) => r.length)) : 0;
 
@@ -314,17 +367,20 @@ export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, co
                         <option key={v} value={v}>{l}</option>
                       ))}
                     </select>
+                    {padPick(r) && <PickPad />}
                     </span>
                   </label>
                 ) : (
                   <label key={f.label} className="sb-field">
                     <span>{f.label}</span>
+                    {withExplain(f,
                     <span className="sb-box">
                     <input
                       value={f.value}
                       aria-label={f.label}
                       className={fieldProblem(f) ? 'missing' : undefined}
-                      title={fieldProblem(f)}
+                      // con globo explicativo, el título del navegador sobra
+                      title={f.explain && !f.value.trim() ? undefined : fieldProblem(f)}
                       aria-invalid={!!fieldProblem(f) || undefined}
                       placeholder={f.placeholder}
                       spellCheck={false}
@@ -359,7 +415,8 @@ export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, co
                         ⌖
                       </button>
                     )}
-                    </span>
+                    {!f.list && padPick(r) && <PickPad />}
+                    </span>)}
                   </label>
                 ),
               )}
@@ -369,7 +426,8 @@ export function SimBar({ sim, info, state, stateDetail, picker, onPickCancel, co
           ))}
         </div>
       )}
-      {draft?.kind === 'stb' && <StbModelsInfo />}
+      {/* la ayuda de cada análisis (#331), en un ícono cuadrado */}
+      {sim && draft && control === undefined && <SimHelp kind={draft.kind} label={ANALYSES.find((x) => x.kind === draft.kind)?.label ?? draft.kind} lib={lib} />}
       {slot && stateEl && createPortal(stateEl, slot)}
     </div>
   );

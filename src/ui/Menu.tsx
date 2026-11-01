@@ -25,6 +25,10 @@ export type MenuItem =
       actions?: MenuAction[];
       /** ícono antes del nombre (para destacar un ítem) */
       icon?: IconName;
+      /** dibujito delante del nombre (los tipos de simulación, #331) */
+      lead?: ReactNode;
+      /** el elegido ahora, sin tilde: fondo apenas sombreado (el tipo de simulación del testbench) */
+      current?: boolean;
     }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | 'sep';
@@ -211,7 +215,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
             )}
           </div>
         ) : (
-          <div key={i} data-i={i} className={`menu-item${it.actions?.length ? ' with-actions' : ''}`}>
+          <div key={i} data-i={i} className={`menu-item${it.actions?.length ? ' with-actions' : ''}${it.current ? ' current' : ''}`}>
             {editing === i && it.rename ? (
               <div className="menu-rename">
                 {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
@@ -228,6 +232,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
             ) : (
               <button
                 role={it.checked === undefined ? 'menuitem' : 'menuitemcheckbox'}
+                aria-current={it.current || undefined}
                 aria-checked={it.checked}
                 aria-label={it.label}
                 aria-keyshortcuts={it.shortcut}
@@ -251,8 +256,9 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
                     : undefined
                 }
               >
-                <span>
+                <span className={it.lead ? 'menu-lead-label' : undefined}>
                   {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
+                  {it.lead && <span className="menu-lead" aria-hidden>{it.lead}</span>}
                   {it.label}
                 </span>
                 {it.shortcut ? <span className="sc">{it.shortcut}</span> : it.icon && <span className="sc menu-icon"><Icon name={it.icon} size={14} /></span>}

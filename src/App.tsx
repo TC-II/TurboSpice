@@ -26,6 +26,7 @@ import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
+import { AnalysisIcon } from './ui/analysisIcons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
@@ -3233,11 +3234,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...ANALYSES.map((x) => ({ label: x.label, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), checked: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    ...ANALYSES.map((x) => ({ label: x.label, lead: <AnalysisIcon kind={x.kind} />, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), current: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
     {
       label: t('Complex simulation'),
+      lead: <AnalysisIcon kind="complex" />,
       title: t('The Studio or a .control block decides what is simulated, instead of a single analysis'),
-      checked: isComplexLine(docLine),
+      current: isComplexLine(docLine),
       onClick: complexSim,
     },
     'sep',
@@ -3663,9 +3665,11 @@ ${ltNetlistText(sim.built.lt)}
             />
         </div>
         <div className="group fixed">
-            {/* New simulation elige el análisis (en otro testbench si éste ya tiene); Run corre el elegido */}
+            {/* un solo botón partido (#331): New elige el análisis (en otro testbench si éste ya tiene);
+                Run corre el elegido (Re-Run si ya hay resultados). Se pinta la mitad que sigue */}
+            <div className="sim-split">
             <MenuButton items={simItems} label={t('New simulation')} title={t('Simulations and analysis types')} className={canRun ? "labeled" : "primary"} openRef={simMenu}>
-              {t('New simulation')} <Icon name="caret" size={14} />
+              <Icon name="caret" size={14} /> {t('New')}
             </MenuButton>
             {running ? (
               <button className="labeled" onClick={abort} aria-label={t('Abort')} title={t('Abort the simulation (Alt+S)')}>
@@ -3680,9 +3684,10 @@ ${ltNetlistText(sim.built.lt)}
                 aria-keyshortcuts="Alt+R Control+Enter"
                 title={curSub ? t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate') : canRun ? t('Run the simulation with these parameters (Alt+R / Ctrl+Enter)') : t('Choose what to simulate')}
               >
-                <Icon name="run" /> {t('Run|verb')}
+                <Icon name="run" /> {sim && canRun ? t('Re-Run') : t('Run|verb')}
               </button>
             )}
+            </div>
         </div>
         {/* siempre a la vista, en su propio grupo (separado de Simular); se habilitan cuando hay resultados (y punto de operación) */}
         <div className="group">
@@ -3715,6 +3720,7 @@ ${ltNetlistText(sim.built.lt)}
           <SimBar
             sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}
             info={circuitInfo()}
+            lib={lib ?? undefined}
             state={running ? 'running' : status.kind === 'error' ? 'err' : status.kind === 'aborted' ? 'idle' : sim ? 'ok' : 'idle'}
             stateDetail={
               status.kind === 'running'
@@ -3988,12 +3994,7 @@ ${ltNetlistText(sim.built.lt)}
               <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
             </div>
           )}
-          {picking && (
-            <div className="pick-banner">
-              {picking.what === 'net' ? t('Pick a net on the schematic') : picking.what === 'source' ? t('Pick a source (V or I) on the schematic') : picking.what === 'probe' ? t('Pick a loop probe on the schematic') : t('Pick a component on the schematic')}
-              <button onClick={() => endPick(null)}>{t('Cancel')}</button>
-            </div>
-          )}
+          {/* elegir en el esquemático no pone cartel: la barra de estado dice qué clickear (Esc cancela) */}
           {valueOffer && !picking && (
             <div className="pick-banner">
               {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} {t('also in')}{' '}

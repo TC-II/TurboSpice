@@ -262,8 +262,8 @@ await goBench('DC');
 check((await directive()) === '.dc V1 0 5 0.1', 'el otro testbench sigue con su simulación');
 // al lado de la fuente, elegirla en el esquemático (como en el menú completo)
 await page.getByRole('button', { name: 'Elegir Fuente 1 en el esquemático' }).click();
-check(await page.locator('.pick-banner').isVisible(), 'el botón de la fuente pide elegirla en el esquemático');
-await page.locator('.pick-banner').getByRole('button', { name: 'Cancelar' }).click();
+check(/fuente V o I/.test(await page.locator('.hint-bar .hint-text').innerText()), 'el botón de la fuente pide elegirla en el esquemático (en la barra de estado, #331)');
+await page.keyboard.press('Escape');
 // un testbench nuevo está vacío y sin simulación: Simular despliega el menú para elegir el tipo
 await openPanel();
 await page.locator('.project-tree .tree-group .tree-add').first().click();

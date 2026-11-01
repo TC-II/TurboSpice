@@ -433,7 +433,7 @@ await page.keyboard.press('Control+z'); // sacar la tierra agregada
 await simCommand(page, 'Ruido');
 check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'el comando de simulación se abre en el tipo elegido');
 await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
-check(await page.locator('.pick-banner').isVisible(), 'el diálogo se oculta y pide elegir una red');
+check(/elegir su red/.test(await page.locator('.hint-bar .hint-text').innerText()) && (await page.locator('.pick-banner').count()) === 0, 'el diálogo se oculta y la barra de estado pide elegir una red (sin cartel arriba, #331)');
 const outPick = await at(320, 128);
 await page.mouse.move(outPick.x, outPick.y);
 await page.mouse.click(outPick.x, outPick.y);
@@ -442,7 +442,7 @@ check(outVal === 'out', `click en el cable completa el nodo (${outVal})`);
 await page.getByRole('button', { name: 'Elegir Fuente de entrada en el esquemático' }).click();
 const rcBody = await at(256, 48); // una resistencia no es una fuente: no se elige
 await page.mouse.click(rcBody.x, rcBody.y);
-check(await page.locator('.pick-banner').isVisible(), 'una resistencia no se puede elegir como fuente');
+check(/fuente V o I/.test(await page.locator('.hint-bar .hint-text').innerText()), 'una resistencia no se puede elegir como fuente');
 const vin = await at(-80, 272);
 await page.mouse.click(vin.x, vin.y);
 const srcVal = await page.locator('.field', { hasText: 'Fuente de entrada' }).locator('input').inputValue();

@@ -12,6 +12,7 @@ import type { Library } from '../library/library.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 import { Icon } from '../ui/icons.tsx';
+import { AnalysisIcon } from '../ui/analysisIcons.tsx';
 
 type BarField =
   | {
@@ -423,6 +424,12 @@ export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCance
       )}
       {/* la ayuda de cada análisis (#331), en un ícono cuadrado */}
       {sim && draft && control === undefined && <SimHelp kind={draft.kind} label={ANALYSES.find((x) => x.kind === draft.kind)?.label ?? draft.kind} lib={lib} />}
+      {/* al lado, el dibujito del tipo de simulación, el mismo del menú New (#339) */}
+      {sim && draft && control === undefined && (
+        <span className="sb-kind" role="img" aria-label={ANALYSES.find((x) => x.kind === draft.kind)?.label ?? draft.kind} title={ANALYSES.find((x) => x.kind === draft.kind)?.label ?? draft.kind}>
+          <AnalysisIcon kind={draft.kind} />
+        </span>
+      )}
       {slot && stateEl && createPortal(stateEl, slot)}
     </div>
   );

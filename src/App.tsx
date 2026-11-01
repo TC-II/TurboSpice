@@ -3526,6 +3526,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       tools: [
         { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { icon: 'grid', label: t('Grid'), title: t('Show or hide the grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), active: showGrid },
+        // resaltar la red bajo el cursor (#340), el mismo modo que la tecla H
+        { icon: 'highlight', label: t('Highlight'), title: t('Highlight the net under the cursor'), shortcut: 'H', onClick: () => setNetHover((v) => !v), active: netHover },
         { icon: 'move', label: t('Move'), title: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false), active: tool.kind === 'move' && !tool.stretch },
         { icon: 'rotate', label: t('Rotate'), title: t('Rotate'), shortcut: 'Ctrl+R', onClick: () => rotateOrMirror('rotate') },
         { icon: 'mirror', label: t('Mirror'), title: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },

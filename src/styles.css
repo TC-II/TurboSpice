@@ -1686,4 +1686,14 @@ svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #
 .side-split.column { height: 6px; margin: -3px 0; cursor: row-resize; }
 .side-split::before { content: ''; position: absolute; inset: -4px; }
 .side-split:hover, .side-split.dragging { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+/* el tipo de simulación, al lado de la ayuda (#339) */
+.simbar .sb-kind { flex: none; align-self: center; display: grid; place-items: center; height: 22px; padding: 0 3px; color: var(--accent); }
+.simbar .sb-kind .analysis-icon { display: block; }
+/* barra de la simulación con poco ancho (#339): los campos no se achican debajo de su tamaño (se
+   pisaban con la ayuda); si no entran, la barra pasa a un segundo renglón y, si tampoco, se
+   desplaza de costado */
+@media (min-width: 701px) { .iconbar.sim-row { height: auto; min-height: var(--simrow-h, 54px); flex-wrap: wrap; row-gap: 10px; } }
+.iconbar.sim-row > .bar-after { flex: 1 0 auto; max-width: 100%; scrollbar-width: thin; }
+.iconbar .simbar .sb-rows { flex: none; }
+@media (max-width: 700px) { .iconbar.sim-row { row-gap: 10px; } .iconbar.sim-row > .group:first-child { margin-bottom: 0; min-height: 34px; } }
 .workspace.side .stb-view .pz-view.compact { flex: 1 1 auto; }

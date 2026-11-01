@@ -1192,6 +1192,7 @@ export const es: Record<string, string> = {
   'Ctrl+wheel': 'Ctrl+rueda',
   'Scroll along the X axis': 'Desplazar en el eje X',
   'Wheel: zoom · right-drag: pan · drag: zoom to a box · double-click: fit': 'Rueda: zoom · arrastrar con el derecho: mover · arrastrar: zoom a un recuadro · doble click: ajustar',
+  'Highlight': 'Resaltar',
   'Resize the pole-zero map': 'Cambiar el tamaño del mapa de polos y ceros',
   'Resize the stability view': 'Cambiar el tamaño de la vista de estabilidad',
   'Drag to resize · double-click: default size': 'Arrastrar para cambiar el tamaño · doble click: tamaño por defecto',

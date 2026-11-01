@@ -60,7 +60,7 @@ await page.locator('.modal').getByRole('button', { name: 'Cerrar', exact: true }
 check((await page.locator('.modal').count()) === 0, 'y se cierra con Cerrar');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  toolbarNames.slice(0, 18).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Mover' && toolbarNames.includes('Borrar'),
+  toolbarNames.slice(0, 19).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Resaltar,Mover' && toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');

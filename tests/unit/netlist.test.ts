@@ -49,24 +49,6 @@ SYMATTR Value 1k
     expect(n.elements[0].nodes).toEqual(['0', 'NC_01']);
   });
 
-  it('Misc\\jumper es un subcircuito bypass (TCLib) entre las redes de sus dos pines, en los pines de LTspice (±32, 64)', () => {
-    const n = netFromAsc(`Version 4
-SHEET 1 880 680
-FLAG -32 64 out
-FLAG -32 144 0
-FLAG 32 144 0
-SYMBOL Misc\\\\jumper 0 0 R0
-SYMATTR InstName J1
-SYMBOL res -48 48 R0
-SYMATTR InstName R1
-SYMATTR Value 1k
-SYMBOL res 16 48 R0
-SYMATTR InstName R2
-SYMATTR Value 2k
-`);
-    expect(n.elements.map((e) => `${e.name} ${e.nodes.join(' ')}`)).toEqual(['X§J1 out P001', 'R1 out 0', 'R2 P001 0']);
-  });
-
   it('redes sin cables (pines que se tocan): P001, P002… con contador aparte, en el orden de los símbolos (#109)', () => {
     // medido con LTspice -netlist: dos pilas de resistencias sin cable y un par unido con cable
     const text = ltNetlistText(
@@ -996,16 +978,16 @@ describe('flip-flops y Schmitt de LTspice (A: DFLOP, SRFLOP, SCHMITT; #133)', ()
     expect(w).toEqual([]);
   });
 
-  it('una entrada unida a tierra por un Misc\\jumper (bypass) no participa, como en LTspice que une las redes', () => {
+  it('una entrada unida a tierra por un bypass de TCLib no participa, como en LTspice que une las redes', () => {
     const t = toNgspice(netFromAsc(`Version 4
 SHEET 1 880 680
 FLAG -32 32 a
 FLAG -32 48 b
 FLAG 32 48 q
-FLAG -96 48 0
+FLAG -64 48 0
 SYMBOL Digital\\\\and 0 0 R0
 SYMATTR InstName A1
-SYMBOL Misc\\\\jumper -64 -16 R0
+SYMBOL TCLib\\\\Special\\\\bypass -64 48 R0
 SYMATTR InstName J1
 `), 't', resolver).text;
     expect(t).toMatch(/^X\S*J1 0 b bypass$/m);

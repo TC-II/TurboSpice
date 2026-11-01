@@ -652,7 +652,7 @@ function convertElements(
     }
     const letter = name[0].toUpperCase();
     // compuertas digitales de LTspice (ver digital.ts)
-    // una entrada unida a tierra por un jumper (bypass) está en el nodo 0 en LTspice, que une las redes
+    // una entrada unida a tierra por un bypass (TCLib) está en el nodo 0 en LTspice, que une las redes
     const gate = letter === 'A' ? translateDigital(name, e.nodes.map((n) => (grounded.has(n) ? '0' : n)), e.value, warnings) : undefined;
     if (gate) {
       out.push(...gate);
@@ -1173,7 +1173,7 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
 }
 
 /**
- * Nodos unidos a tierra sólo a través de Misc\jumper (subcircuito bypass de TCLib, una fuente de 0 V).
+ * Nodos unidos a tierra sólo a través de un bypass de TCLib (subcircuito bypass, una fuente de 0 V).
  * LTspice une esas redes con la de tierra, así que para él son el nodo 0.
  */
 function bypassGrounded(elements: { name: string; nodes: string[]; value: string }[]): Set<string> {

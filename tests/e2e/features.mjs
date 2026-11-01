@@ -132,22 +132,54 @@ await page.getByRole('button', { name: 'Exportar a PDF' }).click();
 const exportView = page.getByRole('dialog', { name: 'Exportar' });
 await exportView.locator('button:enabled', { hasText: 'Descargar PDF' }).waitFor();
 check((await exportView.locator('svg.export-sheet .sym').count()) > 0 && /^\d+ × \d+ pt/.test(await exportView.locator('.hint').first().innerText()), 'Exportar a PDF abre la hoja a pantalla completa, con su tamaño en pt');
+check((await exportView.getByLabel('Skin').inputValue()) === 'Default' && (await exportView.getByLabel('Letra').inputValue()) === 'lmodern', 'la primera vez: skin Default y la letra de LaTeX');
+// las capas opcionales, abajo en «Avanzado»
+await exportView.getByText('Avanzado', { exact: true }).click();
 check((await exportView.getByRole('checkbox', { name: 'Valores del punto de operación' }).isDisabled()) && !(await exportView.getByRole('checkbox', { name: 'Directivas SPICE' }).isChecked()), 'sin simular, el OP no se puede incluir; las directivas arrancan apagadas');
 const [pdfDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar PDF' }).click()]);
-const pdfHead = readFileSync(await pdfDl.path()).subarray(0, 8).toString('latin1');
+const pdfBytes = readFileSync(await pdfDl.path()).toString('latin1');
+const pdfHead = pdfBytes.slice(0, 8);
+check(pdfBytes.includes('/Creator (TurboSpice https://tc-ii.github.io/TurboSpice/)') && pdfBytes.includes('xmp:CreatorTool>TurboSpice'), 'el PDF lleva la marca de TurboSpice en sus metadatos (Info y XMP)');
 check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'), `Descargar PDF baja un .pdf (${pdfDl.suggestedFilename()})`);
 const [sheetDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar SVG' }).click()]);
 const sheet = readFileSync(await sheetDl.path(), 'utf8');
-check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class='), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
+check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class=') && sheet.includes('<!-- Created with TurboSpice https://tc-ii.github.io/TurboSpice/ -->') && sheet.includes('<metadata'), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
 // #327: la misma hoja en TikZ, como .tex standalone
 const [texDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar .tex (TikZ)' }).click()]);
 const tex = readFileSync(await texDl.path(), 'utf8');
 check(texDl.suggestedFilename().endsWith('.tex') && tex.includes('\\documentclass[border=0pt]{standalone}') && tex.includes('\\begin{tikzpicture}') && /\\node\[[^\]]*\] at \([\d.-]+,[\d.-]+\) \{R1\}/.test(tex) && tex.includes('\\path['), `Descargar .tex (TikZ): standalone con caminos y rótulos (${tex.length} bytes)`);
-// #330: el trazo Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja
-await exportView.getByRole('checkbox', { name: 'Trazo Tremor' }).check();
-check((await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0, 'Trazo Tremor: los cables de la hoja salen a mano alzada; los del esquemático no');
+check(tex.includes('% Created with TurboSpice https://tc-ii.github.io/TurboSpice/'), 'el .tex dice que se hizo con TurboSpice');
+// #330: el skin Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja, y sugiere su letra
+await exportView.getByLabel('Skin').selectOption('Tremor');
+check((await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0, 'Skin Tremor: los cables de la hoja salen a mano alzada; los del esquemático no');
+check((await exportView.getByLabel('Letra').inputValue()) === 'comicrelief', 'el skin Tremor elige su letra (Comic Relief)');
+// la vista previa: zoom con la rueda y un área de la hoja
+const stage = exportView.locator('.export-stage');
+const sb = await stage.boundingBox();
+await page.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+await page.mouse.wheel(0, -400);
+const zoomed = parseInt(await exportView.locator('.export-hint').innerText(), 10);
+check(zoomed > 100, `la rueda acerca la vista previa (${zoomed} %)`);
+await page.getByRole('button', { name: 'Elegir área' }).click();
+const shb = await exportView.locator('svg.export-sheet').boundingBox();
+await page.mouse.move(shb.x + shb.width * 0.3, shb.y + shb.height * 0.3);
+check((await exportView.locator('.export-aim line').count()) === 2, 'al elegir el área, una cruz sigue al cursor sobre la hoja');
+await page.mouse.down();
+await page.mouse.move(shb.x + shb.width * 0.7, shb.y + shb.height * 0.7, { steps: 5 });
+await page.mouse.up();
+check((await exportView.locator('.export-panel .hint').nth(1).innerText()).includes('Sólo el área elegida'), 'arrastrar con «Elegir área» deja sólo esa parte de la hoja');
+const areaPt = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith('turbospice.export.')).map(([, v]) => JSON.parse(v).area).find(Boolean));
+check(!!areaPt && Object.values(areaPt).every(Number.isInteger), `el recorte va en pt enteros (${JSON.stringify(areaPt)})`);
 await page.keyboard.press('Escape');
 check((await exportView.count()) === 0, 'Esc cierra la vista de export');
+// las opciones quedan para la próxima vez, en este dibujo
+await page.getByRole('button', { name: 'Exportar a PDF' }).click();
+check((await exportView.getByLabel('Skin').inputValue()) === 'Tremor' && (await exportView.locator('.export-panel .hint').nth(1).innerText()).includes('Sólo el área elegida'), 'al volver, el dibujo recuerda su skin y su área');
+await page.getByRole('button', { name: 'Hoja entera' }).click();
+// como Esquemático/Resultados: la pestaña Exportar va pintada y Esquemático sale de Exportar
+check((await page.locator('.appbar .view-tabs button.active').innerText()).trim() === 'Exportar', 'la pestaña Exportar va pintada junto a Esquemático');
+await page.locator('.appbar .view-tabs button', { hasText: 'Esquemático' }).click();
+check((await exportView.count()) === 0 && (await page.locator('.appbar .view-tabs button', { hasText: 'Resultados' }).count()) === 1, 'la pestaña Esquemático sale de Exportar y vuelven las pestañas de siempre');
 const other = await context.newPage();
 watch(other);
 await other.goto(link);

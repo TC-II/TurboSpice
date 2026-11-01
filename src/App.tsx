@@ -14,7 +14,7 @@ import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
 import { isStbPlot, StbView, stbMainTraces } from './waveform/StbView.tsx';
-import { pzMarks, pzRoots } from './waveform/pz.ts';
+import { isPzBodePlot, pzBodePlots, pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PdkDialog } from './schematic/PdkDialog.tsx';
@@ -38,6 +38,7 @@ import { elementRefs, savableSignals, saveSelection, setSaveSelection, toggleRef
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
+import { MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit } from './sim/estimate.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
@@ -1267,6 +1268,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Exportar (#326): la hoja a pantalla completa (PDF, SVG, PNG o portapapeles); nada viaja a un servidor
   const doExport = () => setDialog({ kind: 'export' });
+  const exporting = dialog?.kind === 'export';
+  /** nombre de lo que se exporta: «Workbench - Testbench» (sin los caracteres que no van en un archivo) */
+  const exportName = () => {
+    const me = variant.sims.find((x) => x.id === sims.active);
+    const bench = project.groups.find((g) => g.id === me?.group)?.name;
+    const tb = (curSim && simName(curSim)) || t('No analysis');
+    return [bench, tb].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '_').trim() || project.name;
+  };
 
   const doRecent = async (i: number) => {
     const r = recent[i];
@@ -1346,7 +1355,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
       const incomplete = analysisProblem(lineOf(simAsc) ?? '');
       const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
-      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves });
+      // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
+      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: MAX_SIM_BYTES });
       let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
       // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
       // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
@@ -1361,11 +1371,19 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
           }
         }
       }
+      // cortado porque no iba a entrar: cuánto iba a guardar, cuántas señales entran, guardar el final
+      if (result.sizeStop) {
+        const big = measuredSizeProblem(lineOf(simAsc) ?? '.tran', result.sizeStop);
+        built.tooBig = [...built.tooBig, big];
+        result.errors = [big.text];
+      }
       // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
       const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
       if (pzErrs.length) result.errors.unshift(...pzErrs);
       if (result.bias) setOpPoint({ doc, built, bias: result.bias });
       result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
+      // .pz sin otro análisis en frecuencia: su Bode normalizado, con el mapa al lado (#343)
+      result.plots.push(...pzBodePlots(result.plots));
       // .meas: se evalúan sobre los resultados de cada corrida
       const cardMeas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
       const mp = cardMeas && measSweepPlot(cardMeas, built);
@@ -1396,7 +1414,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       const withScale = xy.length ? xy : realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
       // con .pz se abre el mapa de polos y ceros aunque haya otros análisis
       const pzs = result.plots.filter(isPzPlot);
-      const shown = pzs[pzs.length - 1] ?? withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
+      const pzBodes = result.plots.filter(isPzBodePlot);
+      const shown = pzBodes[pzBodes.length - 1] ?? pzs[pzs.length - 1] ?? withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
       // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
       // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
@@ -1409,6 +1428,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       const fits = (pns: typeof panes) => pns.some((pn) => pn.traces.some((tr) => shown!.vectors.some((v) => v.name === tr.expr.trim().toLowerCase())));
       if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
       else if (stbMain.length && !fits(keptView ?? panes)) setPanes(stbMain.map((expr) => ({ traces: [{ expr }] })));
+      else if (isPzBodePlot(shown) && !fits(keptView ?? panes)) setPanes([{ traces: [{ expr: 'h' }] }]);
       else if (keptView) {
         setPanes(keptView);
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
@@ -3318,7 +3338,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         { label: t('Share link…'), onClick: doShare },
         { label: t('Import symbols and models'), title: t('Pending: not implemented yet (#{n})', { n: 304 }), disabled: true, onClick: () => {} },
         'sep',
-        { label: t('Export to PDF…'), title: t('The schematic on a white sheet: PDF, SVG, PNG or the clipboard'), onClick: doExport },
+        { label: t('Export to PDF…'), title: t('Export to PDF or LaTeX'), onClick: doExport },
         {
           label: t('Export'),
           items: [
@@ -3449,7 +3469,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
         const big = sim.built.tooBig?.find((f) => f.text === p.text);
         // demasiado grande con todo guardado: elegir qué guardar (#314)
-        return { ...p, sym: el?.sym, fix: big?.fix, big: !!big && !saveSelection(sim.built.lt.texts) };
+        return { ...p, sym: el?.sym, fix: big?.fix, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
       })
     : [];
   const goTo = (sym: number) => {
@@ -3488,7 +3508,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         {
           icon: 'pdf',
           label: t('Export to PDF'),
-          title: t('The schematic on a white sheet: PDF, SVG, PNG or the clipboard'),
+          title: t('Export to PDF or LaTeX'),
           onClick: doExport,
         },
         // con la sesión de Google, Abrir muestra «Mis simulaciones»; sin sesión, Abrir/Importar
@@ -3618,7 +3638,8 @@ ${ltNetlistText(sim.built.lt)}
   return (
     <div className="schematic-mode">
       {tutorialOpen && <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />}
-      {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
+      {/* exportando, la barra de la app queda (marca y estilo) con las herramientas de la vista previa */}
+      {slots.tools && !exporting && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
       {slots.right &&
         createPortal(
           <>
@@ -3640,14 +3661,15 @@ ${ltNetlistText(sim.built.lt)}
               <span className={getLang() === 'en' ? 'on' : ''}>EN</span>
               <span className={getLang() === 'es' ? 'on' : ''}>ES</span>
             </button>
-            <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
+            {!exporting && <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
               <Icon name="share" />
               <span className="txt">{t('Share')}</span>
-            </button>
+            </button>}
           </>,
           slots.right,
         )}
       {slots.tabs &&
+        !exporting &&
         createPortal(
           <>
             {/* vistas: con las dos prendidas, pantalla partida */}
@@ -4400,6 +4422,7 @@ ${ltNetlistText(sim.built.lt)}
         <SavesDialog
           initial={saveSelection(doc.texts)}
           signals={dialog.signals}
+          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected) : undefined}
           onClose={() => setDialog(null)}
           onApply={(refs) => {
             setDialog(null);
@@ -4596,7 +4619,10 @@ ${ltNetlistText(sim.built.lt)}
           doc={doc}
           lib={lib}
           conn={conn}
-          name={project.name}
+          name={exportName()}
+          storeKey={`${project.created}/${sims.active ?? ''}/${curSub}`}
+          toolsSlot={slots.tools}
+          tabsSlot={slots.tabs}
           annotations={opAnnotations(true)}
           arrows={sim && (lvNow ? simScope : sim.doc === doc) ? currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements) : undefined}
           onClose={() => setDialog(null)}

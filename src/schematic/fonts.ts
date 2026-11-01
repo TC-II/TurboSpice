@@ -1,6 +1,7 @@
 // Letras del esquemático (#328): la de la pantalla (Configuración) y la de la hoja de export, que
-// el PDF incrusta. Las dos con archivo propio en public/fonts: Arimo (OFL, mide igual que Arial,
-// con griegas) y Latin Modern Roman (GFL, la de \usepackage{lmodern}; sólo regular).
+// el PDF incrusta. Con archivo propio en public/fonts: Arimo (OFL, mide igual que Arial, con
+// griegas), Latin Modern Roman (GFL, la de \usepackage{lmodern}; sólo regular) y Comic Relief
+// (OFL, a mano alzada, la del skin Tremor).
 
 import type { SheetFont } from './exportSchematic.ts';
 
@@ -19,13 +20,21 @@ const url = (f: string) => `${import.meta.env.BASE_URL}fonts/${f}`;
 
 export const FONTS: FontChoice[] = [
   { id: 'system', label: 'System (sans-serif)', css: 'system-ui, sans-serif', font: null, bold: true },
-  { id: 'arimo', label: 'Arimo (Arial)', css: 'Arimo, Arial, sans-serif', font: { family: 'Arimo', files: { normal: url('Arimo-Regular.ttf'), bold: url('Arimo-Bold.ttf') } }, bold: true },
+  { id: 'arimo', label: 'Arimo', css: 'Arimo, Arial, sans-serif', font: { family: 'Arimo', files: { normal: url('Arimo-Regular.ttf'), bold: url('Arimo-Bold.ttf') } }, bold: true },
   {
     id: 'lmodern',
     label: 'Latin Modern (LaTeX)',
     css: "'Latin Modern Roman', 'CMU Serif', serif",
     font: { family: 'Latin Modern Roman', files: { normal: url('LatinModern-Regular.ttf'), bold: url('LatinModern-Regular.ttf') } },
     bold: false,
+  },
+  // a mano alzada, para el skin Tremor (OFL, con griegas: Ω, µ, τ)
+  {
+    id: 'comicrelief',
+    label: 'Comic Relief',
+    css: "'Comic Relief', 'Comic Sans MS', cursive",
+    font: { family: 'Comic Relief', files: { normal: url('ComicRelief-Regular.ttf'), bold: url('ComicRelief-Bold.ttf') } },
+    bold: true,
   },
 ];
 

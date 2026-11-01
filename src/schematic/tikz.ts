@@ -308,7 +308,7 @@ const GRAPHIC = 'line, polyline, polygon, rect, circle, ellipse, path, text';
  * El .tex de la hoja: `content` es el <g> con el dibujo, en unidades de la hoja (1 = 1 bp), ya
  * con el tema de impresión aplicado; `page`, la hoja
  */
-export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: number; w: number; h: number }, info: { name: string; skin: string }): string {
+export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: number; w: number; h: number }, info: { name: string; skin: string; /** sólo un área de la hoja: lo de afuera se recorta */ clip?: boolean }): string {
   const base = content.getCTM();
   if (!base) throw new Error('TikZ: the sheet is not laid out');
   const inv = base.inverse();
@@ -380,6 +380,7 @@ export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: num
   const name = info.name.replace(/[\r\n]+/g, ' ');
   return [
     `% TikZ export of a TurboSpice schematic: ${name}   Skin: ${info.skin}`,
+    '% Created with TurboSpice https://tc-ii.github.io/TurboSpice/',
     '%',
     `% Compile on its own:   pdflatex "${name}.tex"`,
     '% Or include it in a document:',
@@ -398,6 +399,7 @@ export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: num
     '\\begin{document}',
     '\\begin{tikzpicture}[x=1bp, y=1bp, line cap=round, line join=round]',
     `  \\useasboundingbox (0,0) rectangle (${tikzNum(page.w)},${tikzNum(-page.h)});`,
+    ...(info.clip ? [`  \\clip (0,0) rectangle (${tikzNum(page.w)},${tikzNum(-page.h)});`] : []),
     ...body,
     '\\end{tikzpicture}',
     '\\end{document}',

@@ -1,6 +1,27 @@
 // Exportar el esquemático a SVG, PNG o PDF (con el skin y estilos en línea, para que se vea
 // igual fuera de la app).
 
+/** La marca de lo exportado: va en los metadatos (no se ve en el dibujo) */
+export const TURBOSPICE_URL = 'https://tc-ii.github.io/TurboSpice/';
+export const CREATED_WITH = `Created with TurboSpice ${TURBOSPICE_URL}`;
+
+const xmlEscape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Metadatos RDF (Dublin Core y XMP) de la hoja: los del SVG y los XMP del PDF */
+function rdf(title: string): string {
+  return (
+    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:xmp="http://ns.adobe.com/xap/1.0/">' +
+    '<rdf:Description rdf:about="">' +
+    `<dc:title><rdf:Alt><rdf:li xml:lang="x-default">${xmlEscape(title)}</rdf:li></rdf:Alt></dc:title>` +
+    `<dc:description><rdf:Alt><rdf:li xml:lang="x-default">${xmlEscape(CREATED_WITH)}</rdf:li></rdf:Alt></dc:description>` +
+    '<dc:creator><rdf:Seq><rdf:li>TurboSpice</rdf:li></rdf:Seq></dc:creator>' +
+    `<dc:source>${TURBOSPICE_URL}</dc:source>` +
+    `<xmp:CreatorTool>TurboSpice ${TURBOSPICE_URL}</xmp:CreatorTool>` +
+    `<xmp:CreateDate>${new Date().toISOString()}</xmp:CreateDate>` +
+    '</rdf:Description></rdf:RDF>'
+  );
+}
+
 export function download(name: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -123,7 +144,7 @@ const BASELINE: Record<string, string> = {
  * SVG autónomo de la hoja de export (ExportView): el tema de impresión ya está aplicado y el
  * viewBox es la hoja, a 1 unidad = 1 pt
  */
-export function sheetSvg(svg: SVGSVGElement, page: Rect): string {
+export function sheetSvg(svg: SVGSVGElement, page: Rect, title = 'TurboSpice schematic'): string {
   const clone = inlineStyled(svg, 'defs, style');
   clone.removeAttribute('style');
   // svg2pdf ubica el texto con alignment-baseline (no lee dominant-baseline)
@@ -135,7 +156,48 @@ export function sheetSvg(svg: SVGSVGElement, page: Rect): string {
   clone.setAttribute('width', `${page.w}pt`);
   clone.setAttribute('height', `${page.h}pt`);
   whiteBackground(clone, page);
-  return XML_HEAD + new XMLSerializer().serializeToString(clone);
+  // la marca: un comentario y los metadatos RDF (no se dibujan)
+  const meta = new DOMParser().parseFromString(`<metadata xmlns="http://www.w3.org/2000/svg">${rdf(title)}</metadata>`, 'image/svg+xml').documentElement;
+  clone.insertBefore(document.importNode(meta, true), clone.firstChild);
+  return XML_HEAD + `<!-- ${CREATED_WITH} -->
+` + new XMLSerializer().serializeToString(clone);
+}
+
+// --- texto en el PNG (chunks tEXt, antes de IEND) ---
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (const b of bytes) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+/** Chunk tEXt (Latin-1): palabra clave, un 0 y el texto */
+function textChunk(key: string, text: string): Uint8Array {
+  const data = Uint8Array.from(`${key}\0${text}`, (ch) => (ch.charCodeAt(0) < 256 ? ch.charCodeAt(0) : 63));
+  const out = new Uint8Array(12 + data.length);
+  const dv = new DataView(out.buffer);
+  dv.setUint32(0, data.length);
+  out.set([0x74, 0x45, 0x58, 0x74], 4); // tEXt
+  out.set(data, 8);
+  dv.setUint32(8 + data.length, crc32(out.subarray(4, 8 + data.length)));
+  return out;
+}
+
+/** El PNG con la marca en sus metadatos (Software, Title, Comment, Source) */
+export async function pngWithText(png: Blob, title: string): Promise<Blob> {
+  const bytes = new Uint8Array(await png.arrayBuffer());
+  // IEND son los últimos 12 bytes
+  const end = bytes.length - 12;
+  const chunks = [
+    textChunk('Title', title),
+    textChunk('Software', 'TurboSpice'),
+    textChunk('Source', TURBOSPICE_URL),
+    textChunk('Comment', CREATED_WITH),
+  ];
+  return new Blob([bytes.subarray(0, end), ...chunks, bytes.subarray(end)], { type: 'image/png' });
 }
 
 /** PNG de un SVG autónomo a `scale` píxeles por píxel CSS del SVG */
@@ -177,7 +239,7 @@ function base64(bytes: Uint8Array): string {
  * PDF vectorial de una página del tamaño de la hoja (sheetSvg), con jsPDF + svg2pdf.js. La
  * fuente va incrustada (las de fábrica del PDF no tienen Ω, µ ni las griegas)
  */
-export async function sheetPdf(svgText: string, page: Rect, font: SheetFont): Promise<Blob> {
+export async function sheetPdf(svgText: string, page: Rect, font: SheetFont, title = 'TurboSpice schematic'): Promise<Blob> {
   const [{ jsPDF }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);
   const el = new DOMParser().parseFromString(svgText, 'image/svg+xml').documentElement as unknown as SVGSVGElement;
   const pdf = new jsPDF({ unit: 'pt', format: [page.w, page.h], orientation: page.w > page.h ? 'landscape' : 'portrait', compress: true });
@@ -189,5 +251,8 @@ export async function sheetPdf(svgText: string, page: Rect, font: SheetFont): Pr
     pdf.addFont(file, font.family, style);
   }
   await pdf.svg(el, { x: 0, y: 0, width: page.w, height: page.h });
+  // la marca, en el diccionario Info y en los XMP (el Producer lo escribe jsPDF con su nombre)
+  pdf.setDocumentProperties({ title, subject: CREATED_WITH, keywords: 'TurboSpice, schematic, SPICE', creator: `TurboSpice ${TURBOSPICE_URL}` });
+  pdf.addMetadata(`<x:xmpmeta xmlns:x="adobe:ns:meta/">${rdf(title)}</x:xmpmeta>`, true);
   return pdf.output('blob');
 }

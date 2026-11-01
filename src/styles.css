@@ -1600,6 +1600,9 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-mode { display: flex; flex-direction: column; gap: 4px; }
 .saves-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .saves-tools input[type='search'] { flex: 1 1 160px; }
+/* más señales de las que entran en memoria (según la última simulación cortada) */
+.savesdlg .saves-over { color: var(--err); font-weight: 600; }
+.savesdlg .saves-max { color: var(--fg); }
 .savesdlg button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; cursor: pointer; }
 .savesdlg button.link:hover { text-decoration: underline; }
 .savesdlg button.link:disabled { color: var(--fg-muted); cursor: default; text-decoration: none; }
@@ -1637,20 +1640,40 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .model-pins-lib { margin-top: 6px; }
 
 /* Exportar (#326): la hoja a pantalla completa con el tema de impresión (fondo blanco, todo negro) */
-.export-view { position: fixed; inset: 0; z-index: 60; display: flex; background: var(--bg-alt); }
-.export-stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in srgb, var(--fg) 12%, var(--bg)); }
-.export-empty { color: var(--fg-muted); }
-.export-panel { width: 260px; flex: none; display: flex; flex-direction: column; gap: 14px; padding: 18px 16px; border-left: 1px solid var(--border); background: var(--bg); overflow: auto; }
-.export-panel h2 { margin: 0; font-size: 17px; }
-.export-panel h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
-.export-panel section { display: flex; flex-direction: column; gap: 6px; }
+/* debajo de la barra de la app (top lo pone ExportView): la marca y el estilo siguen a la vista */
+.export-view { position: fixed; inset: 0; z-index: 60; display: flex; background: var(--bg); }
+.export-stage {
+  position: relative; flex: 1; min-width: 0; overflow: hidden; cursor: grab; touch-action: none; user-select: none;
+  background: color-mix(in srgb, var(--fg) 6%, var(--bg));
+}
+.export-stage.grabbing { cursor: grabbing; }
+.export-stage.picking { cursor: crosshair; }
+.export-stage > svg { position: absolute; }
+.export-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
+.export-hint { position: absolute; left: 12px; bottom: 10px; padding: 3px 8px; border-radius: 6px; font-size: 12px; color: var(--fg-muted); background: color-mix(in srgb, var(--bg) 85%, transparent); pointer-events: none; }
+svg.export-area { pointer-events: none; overflow: visible; }
+svg.export-area .export-aim line { stroke: var(--accent); stroke-width: 0.75; vector-effect: non-scaling-stroke; opacity: 0.8; }
+svg.export-area rect { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; }
+/* las herramientas de la vista previa, en el centro de la barra de la app (no del lugar que les queda) */
+.appbar .export-tools { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: max-content; }
+.appbar .export-tools .iconbar { padding: 0; border-bottom: 0; }
+.export-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 1; }
+.export-panel { width: 272px; flex: none; display: flex; flex-direction: column; gap: 18px; padding: 16px; border-left: 1px solid var(--border); background: var(--bg-alt); overflow: auto; }
+.export-panel h3 { margin: 0 0 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); }
+.export-panel section { display: flex; flex-direction: column; gap: 8px; }
 .export-panel label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.export-panel label.choice { display: grid; grid-template-columns: 44px 1fr; }
+.export-panel label.choice select { width: 100%; min-width: 0; }
 .export-panel label.disabled { color: var(--fg-muted); }
 .export-panel .hint { margin: 0; font-size: 12px; color: var(--fg-muted); }
-.export-actions button { width: 100%; }
-.export-close { margin-top: auto; }
+.export-actions button { width: 100%; text-align: left; padding: 7px 12px; }
+.export-actions button.primary { text-align: center; font-weight: 600; }
+.export-advanced { margin-top: auto; border-top: 1px solid var(--border); padding-top: 12px; }
+.export-advanced summary { cursor: pointer; font-size: 13px; color: var(--fg-muted); user-select: none; }
+.export-advanced summary:hover { color: var(--fg); }
+.export-advanced[open] summary { margin-bottom: 10px; }
 svg.export-sheet {
-  flex: none; background: #fff; box-shadow: 0 2px 14px rgb(0 0 0 / 25%);
+  background: #fff; box-shadow: 0 2px 14px rgb(0 0 0 / 25%);
   --sch-bg: #ffffff; --sch-wire: #000; --sch-sym: #000; --sch-label: #000; --sch-directive: #000;
   --sch-comment: #000; --sch-drawing: #000; --sch-hl: #000;
 }

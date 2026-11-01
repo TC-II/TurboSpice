@@ -44,6 +44,10 @@ const P: Record<string, ReactNode> = {
   rotate: <path d="M15.5 8.5A6 6 0 1 0 14 14M15.5 3.5v5h-5" />,
   mirror: <path d="M10 2.5v15M8 5 3 15h5zM12 5l5 10h-5z" />,
   fit: <path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4M7 7h6v6H7z" />,
+  zoomIn: <path d="M8.5 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11M12.5 12.5l5 5M6 8.5h5M8.5 6v5" />,
+  zoomOut: <path d="M8.5 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11M12.5 12.5l5 5M6 8.5h5" />,
+  // área de la hoja (export): el recorte
+  area: <path d="M5 2v13h13M2 5h13v13" />,
   check: <path d="M4 10.5l4 4 8-9" />,
   // resaltador (#340): la red bajo el cursor se ilumina
   highlight: <path d="M11.5 3.5l5 5-6.5 6.5H5v-5zM8 7l5 5M3 18h14" />,

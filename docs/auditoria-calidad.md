@@ -1,0 +1,189 @@
+# Auditoría de calidad y consistencia — TurboSpice
+
+Fecha: 2026-11-01 · Commit auditado: `888ee42` · Alcance: `src/`, `tests/`, `scripts/`, CI, docs.
+
+## 1. Qué se corrió
+
+| Control | Resultado |
+|---|---|
+| `tsc -b` (sólo `src/`) | ✅ sin errores (15 s) |
+| `vitest run` | ✅ 71 archivos, **1094 tests**, 18 s |
+| `node scripts/i18n/check.mjs` | ⚠️ 2 textos sin traducir: `"Fast"` (`src/App.tsx:3272`), `"Rectangular"` (`src/waveform/PlotPanel.tsx:580`) |
+| `vite build` | ✅ con aviso: chunk principal **949 kB** (327 kB gzip) y `StudyBlocks` 868 kB (226 kB gzip) |
+| `tsc` incluyendo `tests/unit` y `scripts/*.ts` | ❌ **32 errores** (29 por importar `build-library.mjs` sin tipos, 3 reales, ver H-2) |
+| `npm audit --omit=dev` | ✅ 0 vulnerabilidades en producción |
+| `npm audit` (dev) | ⚠️ 6 (2 críticas: vitest/tinypool; 1 alta: vite dev server) |
+| `npm run smoke` / e2e | ⏭️ no se pudieron correr: la red del entorno bloquea `tc-ii.github.io` y no hay emsdk para compilar el motor |
+
+## 2. Fortalezas (mantener)
+
+- **Tipado estricto real**: `strict`, `noUnused*`, cero `any`, cero `@ts-ignore`, sólo 6 `as unknown as`.
+- **Tests amplios**: 84 de 140 módulos de `src/` tienen test unitario directo; los que faltan son casi todos
+  UI o glue de workers. Además hay smoke del motor contra ngspice nativo, e2e en Chrome/Firefox, corpus de
+  `.asc` y benchmarks.
+- **Entrada no confiable bien validada**: `parseTurbo` verifica estructura y hash de cada blob; los `catch`
+  silenciosos (41) son casi todos degradaciones deliberadas y comentadas (portapapeles, `localStorage`).
+- **Sin XSS evidente**: los dos `dangerouslySetInnerHTML` insertan skins SVG del bundle generado en build
+  (`scripts/build-library.mjs`), no contenido del usuario.
+- **i18n con control automático** (script + `i18n-audit.test.ts`), docs por tema y commits descriptivos
+  con referencia a issue.
+
+## 3. Hallazgos
+
+Severidad: **A** = riesgo de regresión o bug real · **M** = deuda que frena · **B** = prolijidad.
+
+### Arquitectura y mantenibilidad
+
+**H-1 (A) Componentes monolíticos.** `SchematicMode` (`src/App.tsx:365-4290`) son ~3900 líneas en una sola
+función con **93 `useState`/`useRef`**, ~190 funciones internas y 5 `eslint-disable … exhaustive-deps`
+(`App.tsx:484, 488, 569, 693, 944`). Le siguen `PlotPanel.tsx` (2172 líneas; `PaneView` sola ~1200),
+`SchematicEditor.tsx` (1593), `es.ts` (1808, datos), `tongspice.ts` (1134), `studyBlocks.ts` (1093).
+Consecuencias: la mayoría de las features tocan `App.tsx` (16 de los últimos 30 commits), re-render de todo el
+árbol por cualquier cambio de estado, dependencias de efectos silenciadas a mano y conflictos de merge
+frecuentes entre ramas.
+
+**H-2 (A) `tests/` y `scripts/` no se tipan.** `tsconfig.json` sólo incluye `src`; vitest transpila sin
+chequear. Al incluirlos aparecen errores reales que hoy pasan desapercibidos:
+- `tests/unit/project.test.ts:66` arma un `Project` sin `groups` (el fixture quedó viejo respecto del tipo).
+- `tests/unit/skins.test.ts:31` y `tests/unit/i18n-audit.test.ts:28` (tipos implícitos).
+- 29 × `TS7016`: `scripts/build-library.mjs` se importa desde TS sin `.d.ts`.
+
+**H-3 (M) Utilidades duplicadas con semántica distinta.**
+- Parseo de números con sufijo, tres implementaciones: `netlist/spicenum.ts` (SPICE: `M` = mili, acepta
+  `mil`, `µ` y `μ`), `waveform/expr.ts:26` (sin `μ` U+03BC ni `mil`) y `waveform/dft.ts:196` (`M` = **mega**).
+  En la misma interfaz, `10M` vale 10·10⁻³ en un campo de componente y 10·10⁶ en un campo del visor.
+- Formato SI, cuatro tablas: `netlist/step.ts:85` (`Meg`), `waveform/series.ts:69` (`M`),
+  `sim/studyTemplates.ts:97` (`meg`, `u`), `sim/sources.ts:190` (`Meg`, `u`). Un valor mostrado como `1M`
+  y copiado a un campo SPICE cambia nueve órdenes de magnitud.
+- `niceStep` está tres veces (`waveform/pz.ts:83`, `waveform/scales.ts:96`, `schematic/SourceDialog.tsx:849`).
+- `addSim`/`removeSim`/`duplicateSim` existen con firmas distintas en `sim/simList.ts` y
+  `project/project.ts`: no es duplicación de lógica, pero el nombre igual confunde en imports y búsquedas.
+
+**H-4 (M) Bundle inicial pesado.** 949 kB minificado en el chunk de entrada: todo el editor, diálogos, panel
+de Estudio y Google se cargan al abrir. `StudyBlocks` (Blockly) ya va aparte, bien.
+
+### Calidad de pruebas y CI
+
+**H-5 (A) La CI corre 7 de las 17 suites e2e.** La matriz de `deploy.yml` tiene `features, save, panes,
+verilog, examples, simulation, editor`. Quedan fuera **`templates, wires, shortcuts, rotate, shapes,
+placing, dialogs, hierarchy, deviceparams, performance`** — justo las que cubren la edición de cables y el
+movimiento, donde están varios de los últimos bugs (#315). También quedan fuera `npm run hdl` y el corpus.
+
+**H-6 (M) E2E con esperas fijas.** 144 `waitForTimeout`/`setTimeout`/`sleep` en `tests/e2e/*.mjs`
+(`features.mjs` 43, `save.mjs` 26, `hierarchy.mjs` 19): fuente típica de tests lentos e intermitentes.
+Conviene esperar condiciones (`waitForSelector`, `waitForFunction`, un evento de «simulación terminada»).
+
+**H-7 (M) Sin linter ni formateador.** No hay ESLint ni Prettier, pero el código tiene comentarios
+`eslint-disable` que no hace cumplir nadie. El estilo varía entre carpetas (p.ej. `scripts/fetch-engine.mjs`
+sin `;`, `src/` con `;`). Las reglas de hooks de React (`rules-of-hooks`, `exhaustive-deps`) atraparían
+bugs reales en un archivo con 93 hooks.
+
+**H-8 (B) Sin medición de cobertura.** No está `@vitest/coverage-v8`; el dato «84/140 módulos importados»
+es aproximado y no dice qué ramas de `tongspice.ts`/`studyBlocks.ts` se ejercitan.
+
+### Dependencias
+
+**H-9 (M) Toolchain de desarrollo atrasado y vulnerable.** vite 6.0.5, vitest 2.1.8, plugin-react 4.3.4,
+TypeScript 5.7. Las vulnerabilidades son del servidor de desarrollo y de vitest (no llegan al sitio), pero
+afectan a quien corre `npm run dev`/`vitest` en una máquina con navegador abierto. Rangos mezclados:
+casi todo fijo, salvo `fflate` y `playwright-core` con `^`.
+
+### Consistencia del repositorio y la documentación
+
+**H-10 (M) Documentación desactualizada.**
+- `docs/PLAN.md` § Estructura describe `src/analyses/`, `src/io/`, el formato `.tsch` y
+  `scripts/build-library.ts`, que no existen (hoy: `src/sim/`, `src/asc/`, `.turbo`, `build-library.mjs`).
+- `README.md` § Deploy dice «en cada push a `main`»; el workflow publica `main` y `dev` (`/dev/`) y en PR
+  corre build + e2e.
+- `graphify-out/` (6,3 MB versionados) se generó desde `b33c77a2`, que ya no está en la historia: el grafo
+  que `CLAUDE.md` recomienda consultar está desfasado.
+
+**H-11 (B) Archivos de entorno personal o de una sola vez en el repo.**
+- `.claude/launch.json` tiene rutas absolutas de Windows de worktrees personales (`C:/_DATA/ITBA/…`).
+- `docs/issues-open.json` y `docs/issues-open.created.json` son la salida de una carga de issues.
+- `tests/setup-i18n.ts` está en `.gitignore` y a la vez versionado (y lo necesita `vite.config.ts`).
+
+**H-12 (B) Detalles.** Dos textos sin traducción (ver §1). `engine/worker.ts:70` y `hdl/yosysWorker.ts:19`
+usan `new Function('u','return import(u)')`, lo que obliga a permitir `unsafe-eval` si algún día se agrega
+una CSP (documentar el motivo o usar `import(/* @vite-ignore */ u)`).
+
+## 4. Plan propuesto
+
+Ordenado por impacto/esfuerzo. Cada fase se puede mergear sola; las fases 0–1 no cambian comportamiento.
+
+### Fase 0 — Red de seguridad (≈1–2 días)
+
+| # | Tarea | Hallazgo | Criterio de aceptación |
+|---|---|---|---|
+| 0.1 | Agregar a la matriz e2e de CI las 10 suites que faltan (agrupar las cortas en un job para no multiplicar runners) y un job para `npm run hdl` | H-5 | Las 17 suites corren en cada PR |
+| 0.2 | `tsconfig.test.json` que incluya `tests/unit`, `tests/setup-i18n.ts` y `scripts/**/*.ts`; `build-library.d.mts` para el `.mjs`; arreglar los 3 errores reales; `npm run typecheck` corre ambos proyectos y la CI lo ejecuta | H-2 | `npm run typecheck` en verde con tests incluidos |
+| 0.3 | Traducir `"Fast"` y `"Rectangular"`; correr `scripts/i18n/check.mjs` en CI con salida ≠ 0 si falta algo | H-12 | Check en CI |
+| 0.4 | Sacar `tests/setup-i18n.ts` del `.gitignore`; reemplazar `.claude/launch.json` por una versión sin rutas personales (o ignorarlo); mover `docs/issues-open*.json` fuera de `docs/` o borrarlos | H-11 | Repo sin archivos personales |
+
+### Fase 1 — Herramientas de consistencia (≈2–3 días)
+
+| # | Tarea | Hallazgo | Criterio |
+|---|---|---|---|
+| 1.1 | ESLint (flat config) con `typescript-eslint` + `eslint-plugin-react-hooks`; arrancar con `exhaustive-deps` en *warn* y `rules-of-hooks` en *error*; `npm run lint` en CI | H-7 | Lint en CI; los `eslint-disable` existentes pasan a ser reales |
+| 1.2 | Prettier con la configuración que ya sigue `src/` (comillas simples, `;`, ancho ~140) y un commit único de formato para `scripts/` y `tests/` (sin tocar `src/` si ya cumple, para no ensuciar `git blame`) | H-7 | `prettier --check` en CI |
+| 1.3 | `@vitest/coverage-v8` y reporte en CI (sin umbral al principio; umbral por carpeta para `netlist/`, `asc/`, `sim/` después) | H-8 | Reporte de cobertura publicado como artefacto |
+| 1.4 | Actualizar vitest (≥3) y vite (≥6.x parcheado, idealmente 7) y plugin-react; fijar `fflate` y `playwright-core` | H-9 | `npm audit` sin altas ni críticas |
+
+### Fase 2 — Unificar utilidades (≈2 días)
+
+| # | Tarea | Hallazgo | Criterio |
+|---|---|---|---|
+| 2.1 | Módulo único `src/units/si.ts` con `parseSpiceNumber` (SPICE), `parseViewerSi` (convención del visor, `M` = mega, explícita en el nombre) y `formatSi(x, { style: 'spice' \| 'display' })`; migrar `expr.ts`, `dft.ts`, `step.ts`, `series.ts`, `studyTemplates.ts`, `sources.ts` | H-3 | Una sola tabla de sufijos; tests de tabla con `µ`/`μ`/`mil`/`M`/`Meg` para ambas convenciones |
+| 2.2 | Decidir producto: ¿los campos del visor aceptan `M` = mega? Si sí, mostrar siempre `Meg` en todo valor que pueda copiarse a un campo SPICE | H-3 | Decisión anotada en `docs/compatibilidad-ltspice.md` |
+| 2.3 | Un `niceStep` en `waveform/scales.ts`, reusado por `pz.ts` y `SourceDialog.tsx`; renombrar `simList.addSim…` a `addSimLine…` (o similar) | H-3 | Sin funciones homónimas exportadas |
+
+### Fase 3 — Partir los monolitos (incremental, 1–2 semanas repartidas)
+
+Regla: **una extracción por PR, sin cambiar comportamiento**, con las 17 suites e2e de la fase 0 como red.
+
+1. **`SchematicMode` (`App.tsx`)** — extraer por dominio a hooks y componentes:
+   - `useProjectState` (proyecto, variantes, testbenches, historial, autoguardado),
+   - `useSimulation` (correr, cancelar, corridas, resultados, `.op`),
+   - `useCloud` (cuenta, Drive, conflictos),
+   - `useResultsPanes` (paneles, splitter, plot/log/meas),
+   - menús y atajos a `src/app/menus.ts` / `src/app/shortcuts.ts`,
+   - diálogos a componentes propios.
+   Meta: `App.tsx` < 1000 líneas y ningún `eslint-disable exhaustive-deps`.
+   Si el estado compartido sigue siendo grande, introducir un `useReducer` + contexto por dominio (no hace
+   falta una librería externa).
+2. **`PlotPanel.tsx`** — separar `PaneView` en interacción (pan/zoom/markers), dibujo y tablas
+   (`CursorTable`/`StatsTable` ya están aisladas: moverlas de archivo).
+3. **`SchematicEditor.tsx`** — separar el manejo de herramientas (máquina de estados de `Tool`) del render;
+   la lógica pura ya vive en `schematic/edit.ts`, seguir esa línea.
+4. **`tongspice.ts`/`studyBlocks.ts`** — partir por responsabilidad (traducción de elementos, directivas,
+   `.step`, fuentes) sólo cuando haya cobertura medida (1.3).
+
+### Fase 4 — Rendimiento de carga y robustez de e2e (≈3–4 días)
+
+| # | Tarea | Hallazgo | Criterio |
+|---|---|---|---|
+| 4.1 | `React.lazy` para diálogos grandes (`SourceDialog`, `SymbolEditor`, `ModelEditor`, `StudyPanel`, `Hierarchy`) y para `cloud/` | H-4 | Chunk de entrada < 600 kB minificado |
+| 4.2 | Reemplazar esperas fijas por esperas de condición, empezando por `features`, `save` y `hierarchy`; exponer en `window` (sólo en e2e) un indicador de «simulación terminada» / «guardado» | H-6 | < 30 esperas fijas; tiempo total de e2e medido antes/después |
+| 4.3 | Documentar por qué se usa `new Function` en los workers o cambiarlo por `import(/* @vite-ignore */)` | H-12 | Comentario o cambio aplicado |
+
+### Fase 5 — Documentación viva (≈medio día, después recurrente)
+
+- Actualizar `docs/PLAN.md` § Estructura y `README.md` § Deploy.
+- Decidir si `graphify-out/` se versiona: si sí, regenerarlo en CI (`graphify update .`) en cada push a `dev`;
+  si no, ignorarlo y generarlo localmente.
+- Agregar `CONTRIBUTING.md` corto: comandos de control (`typecheck`, `lint`, `test`, i18n), regla de «una
+  extracción por PR» de la fase 3 y convención de commits que ya se usa.
+
+## 5. Métricas para seguir el avance
+
+| Métrica | Hoy | Meta |
+|---|---|---|
+| Líneas de `App.tsx` | 4361 | < 1000 |
+| Hooks en `SchematicMode` | 93 | < 25 por componente |
+| `eslint-disable` | 5 (sin linter) | 0 con linter activo |
+| Suites e2e en CI | 7/17 | 17/17 |
+| Esperas fijas en e2e | 144 | < 30 |
+| Errores de tipos en tests/scripts | 32 | 0 |
+| Chunk de entrada | 949 kB | < 600 kB |
+| Tablas de sufijos SI | 7 | 1 |
+| Vulnerabilidades dev altas/críticas | 3 | 0 |

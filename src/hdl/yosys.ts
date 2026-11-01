@@ -8,6 +8,7 @@ type Tree = { [name: string]: Tree | string | Uint8Array };
 export type RunYosys = (args: string[], files: Tree, opts: { stdout(b: Uint8Array | null): void; stderr(b: Uint8Array | null): void }) => Promise<Tree> | Tree | undefined;
 
 /** Sin los colores de terminal de Yosys */
+// eslint-disable-next-line no-control-regex -- ESC de los códigos de color ANSI
 const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, '');
 
 export interface SynthResult {

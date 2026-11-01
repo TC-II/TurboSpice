@@ -447,7 +447,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       setMeasureFont(c.css);
     };
     loadFont(c).then(apply, () => setMessage(t('Could not load the font «{name}»', { name: c.label })));
-  }, [schFont]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [schFont]);
   const setSchFont = (id: string) => (lsSet(SCH_FONT_KEY, id), setSchFontState(id));
   const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
@@ -2745,7 +2745,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     } catch {
       // sin permiso o sin API de imágenes: se sigue con el texto
     }
-    let text = '';
+    let text: string;
     try {
       text = await navigator.clipboard.readText();
     } catch {

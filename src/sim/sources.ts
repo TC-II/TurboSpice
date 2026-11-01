@@ -150,7 +150,7 @@ function argList(args: string[]): string {
 /** Atributos a escribir (null = se borra), con la sintaxis de LTspice */
 export function writeSource(spec: SourceSpec): { Value: string; Value2: string | null; SpiceLine: string | null } {
   const ac = spec.acMag.trim() ? `AC ${spec.acMag.trim()}${spec.acPhase.trim() ? ` ${spec.acPhase.trim()}` : ''}` : '';
-  let wave = '';
+  let wave: string;
   switch (spec.kind) {
     case 'dc':
       wave = spec.dc.trim();

@@ -65,6 +65,8 @@ jobs:
       # tsc -b (en npm run build) sólo mira src/: esto suma los tests unitarios y los scripts .ts
       - name: Tipos de los tests y los scripts
         run: npx tsc -p tsconfig.test.json
+      - name: Lint (ESLint)
+        run: npm run lint
       - name: Traducciones (textos en español fuera de es.ts o sin traducir)
         run: node scripts/i18n/check.mjs
       - name: Smoke test del motor

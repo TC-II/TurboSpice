@@ -94,6 +94,7 @@ import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { ExportView } from './schematic/ExportView.tsx';
 import { FONTS, fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
+import { DISPLAY_PREFIXES, formatSi } from './netlist/spicenum.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
@@ -1486,7 +1487,17 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // frenada por memoria (#363): lo simulado hasta ahí se mira recién al elegir «Plot up to here»
   const [stopPlotted, setStopPlotted] = useState(false);
   const stopHidden = !!sim?.result.sizeStop && !stopPlotted;
+  // hasta qué instante llegó (el último tiempo del transitorio frenado)
+  const stopTime = useMemo(() => {
+    if (!sim?.result.sizeStop) return undefined;
+    const time = sim.result.plots.filter((pl) => /^tran\d+$/i.test(pl.name)).at(-1)?.vectors.find((v) => v.name === 'time')?.real;
+    return time?.length ? time[time.length - 1] : undefined;
+  }, [sim]);
   const plotStop = () => {
+    // todo lo simulado a la vista: sin el zoom de la corrida anterior (al volver a simular el mismo
+    // análisis se conserva, pero tras «seguir igual» hay más tiempo y no se vería)
+    if (plotState.current) plotState.current = { ...plotState.current, xRange: null, yRanges: {} };
+    plotPanel.current?.action('fit');
     setStopPlotted(true);
     setPanel('plot');
     setTool({ kind: 'probe' });
@@ -4290,14 +4301,14 @@ ${ltNetlistText(sim.built.lt)}
                         {p.size?.fit !== undefined ? (
                           // el transitorio que se cortó mientras simulaba: qué se puede hacer, como botones
                           <span className="size-actions">
-                            {sim.result.plots.length > 0 && (
-                              <button onClick={plotStop} title={t('Show in the plotter what was simulated up to the stop, with the probe to pick what to plot')}>
-                                {t('Plot up to here')}
+                            {p.size.chooseSignals && (
+                              <button className="primary" onClick={openSaves} title={t('Save only some signals: the plotted ones count too')}>
+                                {t('Choose signals (up to {n})', { n: p.size.fit })}
                               </button>
                             )}
-                            {p.size.chooseSignals && (
-                              <button onClick={openSaves} title={t('Save only some signals: the plotted ones count too')}>
-                                {t('Choose signals (up to {n})', { n: p.size.fit })}
+                            {stopTime !== undefined && (
+                              <button className={p.size.chooseSignals ? '' : 'primary'} onClick={plotStop} title={t('Show in the plotter what was simulated up to the stop, with the probe to pick what to plot')}>
+                                {t('Plot up to {time}', { time: `${formatSi(stopTime, 3, DISPLAY_PREFIXES)}s` })}
                               </button>
                             )}
                             {p.fix && p.size.keep && (

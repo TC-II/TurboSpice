@@ -298,11 +298,11 @@ await page.locator('.problems li', { hasText: 'Se frenó al' }).waitFor({ timeou
 const stopText = await page.locator('.problems li', { hasText: 'Se frenó al' }).innerText();
 check(/a este ritmo «\.tran 0 5» guardaría .* \(512 MB\)\. Los gráficos muestran lo simulado hasta ahí/.test(stopText), `se frena y dice cuánto iba a guardar (${stopText.split('\n')[0]})`);
 const stopButtons = await page.locator('.problems .size-actions button').allTextContents();
-check(stopButtons.join('|') === 'Graficar hasta acá|Guardar sólo los últimos 0.2s|Seguir igual', `lo que se puede hacer, como botones (${stopButtons.join(' | ')})`);
+check(/^Graficar hasta \d[\d.]*[mµ]?s\|Guardar sólo los últimos 0\.2s\|Seguir igual$/.test(stopButtons.join('|')), `lo que se puede hacer, como botones (${stopButtons.join(' | ')})`);
 check((await page.locator('.sim-state.err').count()) === 1, 'el aro queda en error');
 const probeBtn = page.getByRole('button', { name: 'Medir', exact: true });
 check(await probeBtn.isDisabled(), 'la punta de prueba no se habilita hasta elegir graficar');
-await page.getByRole('button', { name: 'Graficar hasta acá', exact: true }).click();
+await page.getByRole('button', { name: /^Graficar hasta / }).click();
 check((await page.locator('.problems').count()) === 0 && (await probeBtn.getAttribute('class')) === 'active', 'graficar lleva al gráfico, con la punta de prueba elegida');
 await probe(40, 16);
 check((await chipNames()).length === 1, `lo simulado hasta el freno se grafica (${(await chipNames()).join()})`);

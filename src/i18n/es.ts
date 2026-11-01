@@ -2111,7 +2111,7 @@ export const es: Record<string, string> = {
   'Save only the last {keep}': 'Guardar sólo los últimos {keep}',
   "Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)": 'Simular otra vez sin frenar hasta que los resultados llenen {size} (ngspice no puede seguir desde donde frenó: empieza de nuevo)',
   'Continue anyway': 'Seguir igual',
-  'Plot up to here': 'Graficar hasta acá',
+  'Plot up to {time}': 'Graficar hasta {time}',
   'Show in the plotter what was simulated up to the stop, with the probe to pick what to plot': 'Mostrar en el graficador lo simulado hasta el freno, con la punta de prueba para elegir qué graficar',
   '{expr} wasn\'t saved (only the selected signals are): it will be when you run again': '{expr} no se guardó (sólo se guardan las señales elegidas): se va a guardar al volver a simular',
   'Don\'t save {what}': 'No guardar {what}',

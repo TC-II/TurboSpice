@@ -157,7 +157,7 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
       boxOf.current = name;
       return fits ? b : [lo - 64, top - 56, hi - lo + 128, bot - top + 120];
     });
-  }, [shapes, pins, texts, name, fitTick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shapes, pins, texts, name, fitTick]);
   const fit = () => {
     manual.current = false;
     boxOf.current = '';

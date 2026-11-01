@@ -7,3 +7,4 @@
 - PDK sky130 y GF180 (modelos, traducción a ltpsa, carga por dispositivo): `docs/pdk.md`.
 - Simulación mixta, Verilog y Verilog-A: `docs/mixed-signal.md`. Compatibilidad con LTspice: `docs/compatibilidad-ltspice.md`. Formato `.turbo`: `docs/turbo-formato.md`. Estabilidad (`.stb`, sondas de lazo): `docs/estabilidad.md`. Idiomas: `docs/i18n.md`.
 - **Grafo del código** (graphify): `graphify-out/GRAPH_REPORT.md` y `graph.json`. Consultar con `graphify query "<pregunta>"`, `graphify explain "<símbolo>"`, `graphify affected "<símbolo>"`. Regenerar tras cambios grandes: `graphify update .` (sin LLM).
+- **Calidad**: antes de subir, `npm run typecheck`, `npm run lint`, `npm test` y `node scripts/i18n/check.mjs` (ver `CONTRIBUTING.md`). Auditoría, plan por fases y avance: `docs/auditoria-calidad.md`; lo que falta y cómo retomarlo: issue #344. Números con prefijo SI: `parseSpiceNumber`/`formatSi` de `src/netlist/spicenum.ts` (no crear otra tabla de sufijos).

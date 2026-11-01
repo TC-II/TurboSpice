@@ -62,9 +62,29 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # tsc -b (en npm run build) sólo mira src/: esto suma los tests unitarios y los scripts .ts
+      - name: Tipos de los tests y los scripts
+        run: npx tsc -p tsconfig.test.json
+      - name: Lint (ESLint)
+        run: npm run lint
+      - name: Traducciones (textos en español fuera de es.ts o sin traducir)
+        run: node scripts/i18n/check.mjs
       - name: Smoke test del motor
         run: npm run smoke
-      - run: npm test --if-present
+      - name: Verilog (Yosys + Icarus + ngspice)
+        run: npm run hdl
+      # tests unitarios con cobertura de src/: el resumen va a la página del run y el detalle a un artefacto
+      - name: Tests unitarios (con cobertura)
+        run: |
+          npm run coverage
+          node -e "const t=require('./coverage/coverage-summary.json').total;const r=(k)=>'| '+k+' | '+t[k].pct+' % | '+t[k].covered+' / '+t[k].total+' |';console.log(['### Cobertura de src/','','| | % | cubiertas |','|---|---|---|',r('lines'),r('statements'),r('functions'),r('branches')].join('\\n'))" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: coverage
+          retention-days: 14
+          if-no-files-found: ignore
       # Los modelos de PDK (open_pdks) se bajan una vez por versión: gf180 pesa 170 MB
       - name: Caché de los PDK
         uses: actions/cache@v4
@@ -92,16 +112,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [features, save, panes, verilog, examples, simulation, editor]
+        # cada entrada corre tests/e2e/<suite>.mjs, o las de `files` en un mismo runner (las cortas)
+        suite: [features, save, panes, verilog, examples, simulation, editor, edit-tools, study, performance]
         include:
-          - suite: examples
-            out: test-results
-          - suite: editor
-            out: test-results
-          - suite: simulation
-            out: test-results
-          - suite: features
-            out: test-results
+          - suite: edit-tools
+            files: wires rotate shapes placing dialogs shortcuts
+          # hierarchy.mjs queda afuera hasta reescribirlo: arranca con Alt+B (convertir la selección
+          # en subcircuito), que se sacó de la interfaz (ver src/project/extract.ts)
+          - suite: study
+            files: templates deviceparams
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -119,7 +138,13 @@ jobs:
         run: |
           npx vite preview --port 4173 --strictPort &
           timeout 30 bash -c 'until curl -sf http://localhost:4173/TurboSpice/ >/dev/null; do sleep 1; done'
-          node tests/e2e/${{ matrix.suite }}.mjs http://localhost:4173/TurboSpice/ ${{ matrix.out }}
+          rc=0
+          for f in ${{ matrix.files || matrix.suite }}; do
+            echo "::group::$f"
+            node tests/e2e/$f.mjs http://localhost:4173/TurboSpice/ test-results || { rc=1; echo "::error::E2E $f falló"; }
+            echo "::endgroup::"
+          done
+          exit $rc
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

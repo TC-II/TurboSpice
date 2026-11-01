@@ -159,7 +159,7 @@ describe('.turbo: ida y vuelta de todos los ejemplos', () => {
 
   it('nombres con acentos, comillas, emojis y caracteres de control en el texto', async () => {
     const p = sample();
-    p.name = 'Filtro d\'O «ñ» "x" 🎛️ \ /';
+    p.name = 'Filtro d\'O «ñ» "x" 🎛️ \\ /';
     p.variants[0].sims[0].name = 'Testbench — 2 <a>&';
     p.variants[0].name = p.name;
     p.files.push({ name: 'ü.lib', kind: 'model', text: '* línea con \t tab y \u0000 nulo\n.model D1 D(Is=1e-14)\n' });

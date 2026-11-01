@@ -25,7 +25,10 @@ const parsed = files
 const line = (sf: ts.SourceFile, n: ts.Node) => sf.getLineAndCharacterOfPosition(n.getStart()).line + 1;
 const each = (fn: (n: ts.Node, sf: ts.SourceFile, f: string) => void) => {
   for (const { f, sf } of parsed) {
-    const v = (n: ts.Node) => (fn(n, sf, f), ts.forEachChild(n, v));
+    const v = (n: ts.Node): void => {
+      fn(n, sf, f);
+      ts.forEachChild(n, v);
+    };
     v(sf);
   }
 };

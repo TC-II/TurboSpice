@@ -753,7 +753,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
       // (design.ngspice o .lib … res_typical: el PDK, sin cambiar la esquina que ya haya)
       if (hit.corner || !pdk || pdk.name !== hit.name) pdk = { name: hit.name, corner: hit.corner ?? pdk?.corner ?? 'tt' };
       const pdkName = hit.name;
-      return `* PDK ${pdkName}, esquina ${pdk.corner}`;
+      return `* PDK ${pdkName}, corner ${pdk.corner}`;
     }
     const rel = models.resolve(path);
     if (!rel) {

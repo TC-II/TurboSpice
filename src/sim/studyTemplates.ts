@@ -3,7 +3,7 @@
 // (componentes, parámetros y nodos existentes) y se edita a partir de ahí; las que se pueden
 // expresar como "barrer → simular → medir" también existen como bloques (studyToBlocks), y la
 // búsqueda / ajuste es sólo de bloques (usa lógica que LTspice no tiene).
-import { formatSpiceNumber, parseSpiceNumber } from '../netlist/spicenum.ts';
+import { formatSi, formatSpiceNumber, parseSpiceNumber, SPICE_PREFIXES } from '../netlist/spicenum.ts';
 import { defaultAnalysis, formatAnalysis, parseAnalysis, type AnalysisKind } from './analyses.ts';
 import type { MeasAnalysis } from './meas.ts';
 import { BLOCK_MEASURES, studyToBlocks, type BlockJson, type WorkspaceJson } from './studyBlocks.ts';
@@ -91,13 +91,8 @@ export function defaultOptions(c: TemplateCircuit): TemplateOptions {
   };
 }
 
-/** Valor con sufijo SPICE (500, 2k, 470n, 1meg): más legible en las tarjetas */
-export function engValue(x: number): string {
-  if (!Number.isFinite(x) || x === 0) return formatSpiceNumber(x);
-  const units: [number, string][] = [[1e12, 't'], [1e9, 'g'], [1e6, 'meg'], [1e3, 'k'], [1, ''], [1e-3, 'm'], [1e-6, 'u'], [1e-9, 'n'], [1e-12, 'p'], [1e-15, 'f']];
-  const [mult, suf] = units.find(([m]) => Math.abs(x) >= m * 0.9999999) ?? units[units.length - 1];
-  return `${Number((x / mult).toPrecision(6))}${suf}`;
-}
+/** Valor con sufijo SPICE (500, 2k, 470n, 1Meg): más legible en las tarjetas */
+export const engValue = (x: number): string => (!Number.isFinite(x) || x === 0 ? formatSpiceNumber(x) : formatSi(x, 6, SPICE_PREFIXES));
 
 // --- piezas ---------------------------------------------------------------------------------
 

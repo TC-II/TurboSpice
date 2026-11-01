@@ -5,7 +5,6 @@ const asc = {}, ltn = {};
 const txt = c => asc[c.src] ??= (existsSync(c.src) ? ((b)=>b.includes(0)?b.toString('utf16le'):b.toString('latin1'))(readFileSync(c.src)) : '');
 const net = c => { if (ltn[c.id] === undefined) { const p = `${S}/res/${c.id}.ts.json`; ltn[c.id] = existsSync(p) ? (JSON.parse(readFileSync(p,'utf8')).ltNet ?? '') : ''; } return ltn[c.id]; };
 const log = c => [...(c.errors??[]), ...(c.logTail??[])].join('\n');
-const miss = c => (c.missing ?? []).join('\n');
 const T = {
   startup: c => /^TEXT .*!\.tran\b[^\n]*\bstartup/im.test(txt(c)),
   flotante: c => /singular matrix|floating|no dc path|gmin stepping failed|source stepping failed/i.test(log(c)),

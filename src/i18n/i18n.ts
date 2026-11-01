@@ -3,7 +3,6 @@
 // El idioma se fija al cargar la página (los textos de nivel de módulo y los bloques de Blockly se
 // arman una sola vez): cambiarlo guarda todo y recarga (setLang + location.reload, ver App).
 //   t('Saved to Google Drive: {name}', { name })
-import { es } from './es.ts';
 
 export type Lang = 'en' | 'es';
 export const LANGS: Lang[] = ['en', 'es'];
@@ -18,6 +17,16 @@ function stored(): Lang {
 }
 
 let lang: Lang = stored();
+/** Las traducciones al español: van en un chunk aparte y se bajan sólo si hacen falta */
+let es: Record<string, string> = {};
+
+/**
+ * Carga las traducciones del idioma elegido. main.tsx la espera antes de importar la app (que
+ * arma textos a nivel de módulo) y tests/setup-i18n.ts antes de los tests.
+ */
+export async function loadTranslations(): Promise<void> {
+  if (lang === 'es' && !Object.keys(es).length) es = (await import('./es.ts')).es;
+}
 if (typeof document !== 'undefined') document.documentElement.lang = lang;
 
 export const getLang = () => lang;

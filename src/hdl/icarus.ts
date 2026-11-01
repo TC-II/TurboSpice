@@ -79,7 +79,7 @@ export async function compileIcarus(load: IcarusLoader, files: Record<string, st
   pp.FS.writeFile('/flags', 'D:__ICARUS__=1\nrelative include:false\n');
   pp.FS.writeFile('/files', names.map((n) => `/src/${n}`).join('\n') + '\n');
   pp.FS.writeFile('/pdefs', '__ICARUS__:0:1:1\n');
-  let rc = 1;
+  let rc: number;
   try {
     rc = pp.callMain(['-L', '-o', '/design.pp', '-F/flags', '-f/files', '-p/pdefs']);
   } catch (e) {

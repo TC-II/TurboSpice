@@ -6,6 +6,7 @@
 // de Bluestein (chirp-z), que lleva la DFT a una convolución hecha con FFT. Las dos son O(N log N).
 
 import type { TraceDft } from './view.ts';
+import { parseDisplayNumber } from '../netlist/spicenum.ts';
 
 export type DftWindow = TraceDft['window'];
 
@@ -193,18 +194,8 @@ export function dft(re: Float64Array, im: Float64Array): void {
   }
 }
 
-const SI_PREFIX: Record<string, number> = { f: 1e-15, p: 1e-12, n: 1e-9, u: 1e-6, µ: 1e-6, μ: 1e-6, m: 1e-3, '': 1, k: 1e3, K: 1e3, M: 1e6, meg: 1e6, MEG: 1e6, Meg: 1e6, G: 1e9, T: 1e12 };
-
-/**
- * Valor escrito en un campo con prefijo SI, como los muestra el visor: "1m" = 1e-3, "10M" = 10e6,
- * "2.5µs", "100kHz", "1e-3". La unidad (s, Hz) es opcional. null si no se entiende.
- */
-export function parseSi(text: string): number | null {
-  const m = /^\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)\s*(meg|MEG|Meg|[fpnuµμmkKMGT]?)\s*(s|Hz|hz|S|V|A|dB|°)?\s*$/.exec(text);
-  if (!m) return null;
-  const v = parseFloat(m[1]) * SI_PREFIX[m[2]];
-  return Number.isFinite(v) ? v : null;
-}
+/** Valor escrito en un campo del visor ("10M" = 10e6): ver parseDisplayNumber */
+export const parseSi = parseDisplayNumber;
 
 /** Valor "lindo" (1, 2 o 5 × 10ⁿ) mayor o igual que x */
 export function niceAbove(x: number): number {

@@ -1430,7 +1430,7 @@ function PaneView(props: {
       let best: Marker | undefined;
       let dist = GRAB + 2;
       for (const m of live.current.markers) {
-        let d = Infinity;
+        let d: number;
         if (m.kind === 'v') d = Math.abs(u.valToPos(m.x!, 'x') - px);
         else if (m.kind === 'h') d = Math.abs(u.valToPos(m.y!, m.axis ?? 'y') - py);
         else {

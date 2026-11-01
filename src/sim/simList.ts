@@ -168,19 +168,28 @@ export function analysisDetail(line: string): string {
 export const simName = (s: SimInstance) => s.name || analysisLabel(s.line);
 
 // --- operaciones sobre la lista ------------------------------------------------------------
+// Del formato anterior a los proyectos (la lista de simulaciones guardada en el .asc). La interfaz
+// usa las de project/project.ts, con el mismo nombre; éstas quedan para armar ese formato en los
+// tests de la migración (takeSims).
 
 const replace = (l: SimList, id: string, f: (s: SimInstance) => SimInstance): SimList => ({
   ...l,
   items: l.items.map((s) => (s.id === id ? f(s) : s)),
 });
 
-/** Agrega una simulación con ese comando y la deja activa */
+/**
+ * Agrega una simulación con ese comando y la deja activa
+ * @deprecated la interfaz usa la de project/project.ts
+ */
 export function addSim(l: SimList, line: string): SimList {
   const s: SimInstance = { id: newId(), line };
   return { items: [...l.items, s], active: s.id };
 }
 
-/** Copia de una simulación (con su vista), a continuación de ella y activa */
+/**
+ * Copia de una simulación (con su vista), a continuación de ella y activa
+ * @deprecated la interfaz usa la de project/project.ts
+ */
 export function duplicateSim(l: SimList, id: string): SimList {
   const i = l.items.findIndex((s) => s.id === id);
   if (i < 0) return l;
@@ -189,7 +198,10 @@ export function duplicateSim(l: SimList, id: string): SimList {
   return { items: [...l.items.slice(0, i + 1), copy, ...l.items.slice(i + 1)], active: copy.id };
 }
 
-/** Saca una simulación; si era la activa, pasa a la siguiente (o a la anterior) */
+/**
+ * Saca una simulación; si era la activa, pasa a la siguiente (o a la anterior)
+ * @deprecated la interfaz usa la de project/project.ts
+ */
 export function removeSim(l: SimList, id: string): SimList {
   const i = l.items.findIndex((s) => s.id === id);
   if (i < 0) return l;
@@ -198,10 +210,14 @@ export function removeSim(l: SimList, id: string): SimList {
   return { items, active };
 }
 
-/** Nombre propio (vacío: vuelve al automático) */
+/**
+ * Nombre propio (vacío: vuelve al automático)
+ * @deprecated la interfaz usa la de project/project.ts
+ */
 export const renameSim = (l: SimList, id: string, name: string): SimList =>
   replace(l, id, ({ name: _, ...s }) => (name.trim() ? { ...s, name: name.trim() } : s));
 
+/** @deprecated la interfaz usa la de project/project.ts */
 export const selectSim = (l: SimList, id: string): SimList => (l.items.some((s) => s.id === id) ? { ...l, active: id } : l);
 
 export const setSimView = (l: SimList, id: string, view: SimView): SimList => replace(l, id, (s) => ({ ...s, view }));
@@ -288,7 +304,10 @@ export function keepResult<T>(kept: Map<string, T>, id: string, value: T, max = 
  */
 const worthSaving = (l: SimList) => l.items.length > 1 || l.items.some((s) => s.name);
 
-/** El documento con la lista en su comentario (reemplaza el anterior; sin lista, lo saca) */
+/**
+ * El documento con la lista en su comentario (reemplaza el anterior; sin lista, lo saca)
+ * @deprecated sólo la usan los tests de la migración
+ */
 export const withSims = (doc: AscDoc, l: SimList): AscDoc => writeData(doc, 'sims', worthSaving(l) ? l : undefined);
 
 const validList = (v: unknown): v is SimList => {

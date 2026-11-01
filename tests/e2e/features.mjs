@@ -4,7 +4,7 @@
 // colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, openExample, resultsMenu, resultsView, simCommand, simType, skipWelcome, spanishUi, launchBrowser, FIREFOX } from './lib.mjs';
+import { menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, launchBrowser, FIREFOX } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';

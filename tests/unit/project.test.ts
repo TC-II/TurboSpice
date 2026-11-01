@@ -63,8 +63,9 @@ describe('testbenches (#180)', () => {
 
   it('las variantes (versión 1) se aplanan: cada simulación es un testbench', () => {
     const v = (id: string, name: string, sims: string[]) => ({ id, name, base: asc(''), activeSim: sims.length ? `${id}s1` : '', sims: sims.map((l, i) => ({ id: `${id}s${i}`, asc: asc(l), runs: [] })) });
-    const old: Project = { name: 'P', created: 0, modified: 0, files: [], activeVariant: 'b', variants: [v('a', 'Pasabajos', ['.tran 10m', '.ac dec 10 1 1meg']), v('b', 'Pasaaltos', ['.op']), v('c', 'Vacía', [])] };
-    const p = asBenches(old);
+    // un proyecto de la versión 1 no tiene `groups` (asBenches lo crea)
+    const old: Omit<Project, 'groups'> = { name: 'P', created: 0, modified: 0, files: [], activeVariant: 'b', variants: [v('a', 'Pasabajos', ['.tran 10m', '.ac dec 10 1 1meg']), v('b', 'Pasaaltos', ['.op']), v('c', 'Vacía', [])] };
+    const p = asBenches(old as Project);
     expect(p.variants).toHaveLength(1);
     expect(p.variants[0].id).toBe(BENCHES);
     // una variante con varias simulaciones es un grupo

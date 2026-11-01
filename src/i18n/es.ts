@@ -1194,6 +1194,8 @@ export const es: Record<string, string> = {
   'Drag to resize · double-click: default size': 'Arrastrar para cambiar el tamaño · doble click: tamaño por defecto',
   'Resize cursors and stats': 'Cambiar el tamaño de cursores y estadísticas',
   'Resize the table of poles and zeros': 'Cambiar el tamaño de la tabla de polos y ceros',
+  'Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at DC) and the phase may be off by 180°': 'Bode normalizado a partir de los polos y ceros: .pz no da la ganancia, así que el nivel en dB es relativo (0 dB en continua) y la fase puede estar corrida 180°',
+  'Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at its maximum) and the phase may be off by 180°': 'Bode normalizado a partir de los polos y ceros: .pz no da la ganancia, así que el nivel en dB es relativo (0 dB en su máximo) y la fase puede estar corrida 180°',
   'Window': 'Ventana',
   'fundamental {p1}Hz, amplitude {p2} · THD {p3} % (harmonics 2 to {p4}) · {n} samples at {fs}Hz (Δf = {df}Hz)': 'fundamental {p1}Hz, amplitud {p2} · THD {p3} % (armónicas 2 a {p4}) · {n} muestras a {fs}Hz (Δf = {df}Hz)',
   'Start of the sampling (empty: the start of the zoom, or of the simulation)': 'Comienzo del muestreo (vacío: el comienzo del zoom, o de la simulación)',

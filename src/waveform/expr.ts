@@ -1,5 +1,6 @@
 import { t } from '../i18n/i18n.ts';
 import { sampleEvents } from './series.ts';
+import { spiceSuffix } from '../netlist/spicenum.ts';
 // Expresiones de trazas al estilo LTspice: V(out), V(a,b), I(R1), Ic(Q1), V(out)/V(in),
 // db(V(out)), d(V(c)), 2*I(L1)… Se evalúan punto a punto sobre vectores reales o complejos.
 // Con .step, V(out)@2 es el vector de la segunda corrida (como en LTspice).
@@ -29,7 +30,6 @@ type Node =
   | { t: 'un'; op: string; a: Node }
   | { t: 'bin'; op: string; a: Node; b: Node };
 
-const SUFFIX: Record<string, number> = { t: 1e12, g: 1e9, meg: 1e6, k: 1e3, m: 1e-3, u: 1e-6, µ: 1e-6, n: 1e-9, p: 1e-12, f: 1e-15 };
 
 /** Funciones que reciben nombres de nodos/elementos y no expresiones */
 // Dig(q): nodo digital de XSPICE (#209); D() es la derivada, como en LTspice
@@ -67,10 +67,11 @@ export function parseExpr(src: string): Node {
       i++;
       return { t: 'un', op: c, a: power() };
     }
-    const num = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?(meg|[tgkmuµnpf])?[a-z]*/i.exec(src.slice(i));
+    // sufijo SPICE (meg, k, u, µ, mil…) y unidades sueltas, como parseSpiceNumber
+    const num = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?([a-zµμ]*)/i.exec(src.slice(i));
     if (num) {
       i += num[0].length;
-      return { t: 'num', v: parseFloat(num[1] + (num[2] ?? '')) * (num[3] ? SUFFIX[num[3].toLowerCase()] : 1) };
+      return { t: 'num', v: parseFloat(num[1] + (num[2] ?? '')) * (spiceSuffix(num[3]) ?? 1) };
     }
     // parámetro de un dispositivo (#202): @Q1[gm], @x_u1.q1[ic], con corrida @Q1[gm]@2
     const dev = /^@([A-Za-z_§$][\w.§$]*)\[(\w+)\](?:\s*@(\d+))?/.exec(src.slice(i));

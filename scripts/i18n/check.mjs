@@ -2,7 +2,8 @@
 //  1. textos del código (literales, plantillas, JSX) que siguen en español: los que tienen
 //     tildes/¿¡ o palabras del vocabulario español de es.ts que no aparecen en inglés;
 //  2. textos de t('…') que no tienen traducción en es.ts (se ven en inglés con el idioma ES).
-//   node scripts/i18n/check.mjs            (sale con 1 si hay texto en español fuera de es.ts)
+//   node scripts/i18n/check.mjs            (sale con 1 si hay texto en español fuera de es.ts o
+//                                           textos sin traducción; lo corre la CI)
 import ts from 'typescript';
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -20,6 +21,7 @@ const ALLOW = [
   /^(prueba\.turbo|privacidad\.html)$/,
   /compatibilidad-ltspice\.md$/,
   /^\(sin\(\(/, // expresión de ruido para B-sources
+  /^\*sin\(2\*pi\*V\($/, // fuente B del modulador (netlist/digital.ts)
   /^\(dentro del bloque$|^: se ignora\)$/, // comentario de netlist
 ];
 
@@ -30,7 +32,8 @@ const parse = (f) => ts.createSourceFile(f, readFileSync(f, 'utf8'), ts.ScriptTa
 const es = new Map();
 {
   const visit = (n) => {
-    if (ts.isPropertyAssignment(n) && ts.isStringLiteral(n.name) && ts.isStringLiteral(n.initializer)) es.set(n.name.text, n.initializer.text);
+    // claves con o sin comillas ('Rectangular': … o Rectangular: …)
+    if (ts.isPropertyAssignment(n) && (ts.isStringLiteral(n.name) || ts.isIdentifier(n.name)) && ts.isStringLiteral(n.initializer)) es.set(n.name.text, n.initializer.text);
     ts.forEachChild(n, visit);
   };
   visit(parse(join(SRC, 'i18n/es.ts')));
@@ -103,4 +106,4 @@ if (missing.size) {
 if (!found.length && !missing.size) console.log('Todo traducido.');
 const j = process.argv.indexOf('--json');
 if (j > 0) writeFileSync(process.argv[j + 1], JSON.stringify(spots, null, 1));
-process.exit(found.length ? 1 : 0);
+process.exit(found.length || missing.size ? 1 : 0);

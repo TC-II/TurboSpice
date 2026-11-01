@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignScales, mapTicks, niceStep, niceTicks, exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
+import { alignScales, mapTicks, niceStepAbove, niceTicks, exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
 
 describe('escalas del visor', () => {
   it('extent: sólo valores finitos dentro del rango de X', () => {
@@ -58,11 +58,11 @@ describe('escalas del visor', () => {
     expect(zoomAt([0, 10], 0.25, 0.5)).toEqual([1.25, 6.25]);
   });
 
-  it('niceStep y niceTicks: pasos 1, 2, 2,5, 5', () => {
-    expect(niceStep(0.3)).toBe(0.5);
-    expect(niceStep(2)).toBe(2);
-    expect(niceStep(21)).toBe(25);
-    expect(niceStep(60)).toBe(100);
+  it('niceStepAbove y niceTicks: pasos 1, 2, 2,5, 5', () => {
+    expect(niceStepAbove(0.3)).toBe(0.5);
+    expect(niceStepAbove(2)).toBe(2);
+    expect(niceStepAbove(21)).toBe(25);
+    expect(niceStepAbove(60)).toBe(100);
     expect(niceTicks(-0.05, 1.03, 5)).toEqual([0, 0.25, 0.5, 0.75, 1]);
   });
 

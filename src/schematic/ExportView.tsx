@@ -17,7 +17,6 @@ import { SchematicCanvas } from './SchematicCanvas.tsx';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AnnotationLayer, type Annotation } from './NetNames.tsx';
 import { download, pngWithText, schematicPng, sheetBox, sheetPdf, sheetSvg } from './exportSchematic.ts';
-import { sheetTikz } from './tikz.ts';
 import { FONTS, fontChoice, loadFont } from './fonts.ts';
 import { useMathJax } from './latex.ts';
 
@@ -285,6 +284,8 @@ export function ExportView({ doc, lib, conn, name, storeKey, annotations, arrows
     try {
       if (what === 'tex') {
         if (!contentRef.current) return;
+        // el generador de TikZ se baja recién al exportar
+        const { sheetTikz } = await import('./tikz.ts');
         download(`${name}.tex`, new Blob([sheetTikz(contentRef.current, page, { name, skin, clip: !!area })], { type: 'application/x-tex' }));
       } else if (what === 'svg') download(`${name}.svg`, new Blob([text], { type: 'image/svg+xml' }));
       else if (what === 'pdf') download(`${name}.pdf`, await sheetPdf(text, page, FONT, name));

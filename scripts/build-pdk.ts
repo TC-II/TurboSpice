@@ -18,7 +18,7 @@
 // Corre con `npm run assets`; la salida no se versiona. Si ya está generada desde el mismo commit
 // y no cambió este script, no hace nada (sin red).
 // Uso: node scripts/build-pdk.ts [salida]   (por defecto public/library/pdk/sky130)
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,7 +37,8 @@ export const rel = (base: string, p: string) => relative(base, p).split('\\').jo
 /**
  * Baja de ciel-releases las partes de una versión de open_pdks que hacen falta (sin guardar los
  * .tar.zst: se descomprimen al vuelo y se extrae sólo `globs`) a `dest`, o reusa lo ya bajado.
- * Necesita curl, zstd y tar. (También la usa scripts/build-pdk-gf180.ts.)
+ * Necesita curl, zstd y tar; en Windows, el curl y el tar (bsdtar, que lee .zst) que trae el
+ * sistema. (También la usa scripts/build-pdk-gf180.ts.)
  */
 export function fetchCiel(family: string, dest: string, parts: { asset: string; globs: string[] }[]) {
   const done = join(dest, '.ciel-ok');
@@ -48,7 +49,14 @@ export function fetchCiel(family: string, dest: string, parts: { asset: string; 
   for (const { asset, globs } of parts) {
     const url = `${RELEASES}/${family}-${OPEN_PDKS}/${asset}`;
     console.log(`${family}: bajando ${asset}…`);
-    execSync(`curl -fsSL ${quote(url)} | zstd -dc | tar -x -C ${quote(dest)} --wildcards ${globs.map(quote).join(' ')}`, { stdio: 'inherit', shell: '/bin/sh' });
+    if (process.platform === 'win32') {
+      // sin /bin/sh ni zstd: se baja el .tar.zst y lo abre el bsdtar de Windows (los globs ya son comodines)
+      const tmp = join(dest, asset);
+      const sys = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
+      execFileSync(join(sys, 'curl.exe'), ['-fsSL', '-o', tmp, url], { stdio: 'inherit' });
+      execFileSync(join(sys, 'tar.exe'), ['-x', '-f', tmp, '-C', dest, ...globs], { stdio: 'inherit' });
+      rmSync(tmp);
+    } else execSync(`curl -fsSL ${quote(url)} | zstd -dc | tar -x -C ${quote(dest)} --wildcards ${globs.map(quote).join(' ')}`, { stdio: 'inherit', shell: '/bin/sh' });
   }
   writeFileSync(done, `${family}-${OPEN_PDKS}\n`);
 }

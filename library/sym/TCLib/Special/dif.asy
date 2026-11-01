@@ -7,7 +7,7 @@ LINE Normal 11 37 11 27
 SYMATTR Prefix X
 SYMATTR Description Subtractor, created by Javier Petrucci and Agustin Gullino (ITBA)
 SYMATTR SpiceModel SUB1
-SYMATTR ModelFile dif.lib
+SYMATTR ModelFile TCLib/dif.lib
 PIN -16 32 NONE 0
 PINATTR PinName in+
 PINATTR SpiceOrder 1

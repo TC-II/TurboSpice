@@ -1,6 +1,6 @@
-// E2E de subcircuitos del proyecto (#180, #199): convertir la selección en subcircuito da la misma
-// simulación, colocarlo dos veces, bajar a una instancia, migas, subir al mismo lugar y medir
-// adentro (tensiones, corrientes, punto de operación y flechas de corriente).
+// E2E de subcircuitos del proyecto (#180, #199): el mismo divisor como subcircuito (Módulo nuevo ›
+// Subcircuito) da la misma simulación; colocarlo dos veces, bajar a una instancia, subir al mismo
+// lugar y medir adentro (tensiones, corrientes, punto de operación y flechas de corriente).
 // Uso: node tests/e2e/hierarchy.mjs [url]   (con `npm run preview` corriendo)
 import { readFileSync } from 'node:fs';
 import { menu, skipWelcome, launchBrowser, FIREFOX } from './lib.mjs';
@@ -27,11 +27,6 @@ await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
 
 const svg = page.locator('svg.editor');
-const at = async (x, y) => {
-  const b = await svg.boundingBox();
-  const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
-  return { x: b.x + ((x - vx) / vw) * b.width, y: b.y + ((y - vy) / vh) * b.height };
-};
 const simulate = async () => {
   await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -43,7 +38,8 @@ const showOp = async () => {
   if (!(await b.getAttribute('class'))?.includes('active')) await b.click();
   await page.waitForTimeout(200);
 };
-const crumbs = async () => ((await page.locator('.hier-crumbs').count()) ? (await page.locator('.hier-crumbs').textContent()).trim() : '');
+/** el subcircuito que se está editando (la franja «Editor de subcircuito»), o '' arriba */
+const editing = async () => ((await page.locator('.sub-hint-name').count()) ? (await page.locator('.sub-hint-name').textContent()).trim() : '');
 
 // V1 = 3 V → R1 1k → mid → R2 2k → tierra (sólo etiquetas)
 const flat = `Version 4
@@ -75,20 +71,60 @@ await showOp();
 const before = (await annotations()).sort();
 check(before.includes('2V') && before.includes('1mA'), `antes: el punto de operación del divisor (${before.join(', ')})`);
 
-// --- convertir la selección (R1, R2 y sus etiquetas) en subcircuito ---
+// --- el mismo divisor como subcircuito DIV (Módulo nuevo › Subcircuito), con el puerto «in» ---
 await page.keyboard.press('Escape');
-const a = await at(96, -16);
-const b = await at(176, 240);
-await page.mouse.move(a.x, a.y);
-await page.mouse.down();
-await page.mouse.move((a.x + b.x) / 2, (a.y + b.y) / 2, { steps: 5 });
-await page.mouse.move(b.x, b.y, { steps: 5 });
-await page.mouse.up();
-await page.keyboard.press('Alt+b');
-await page.locator('.modal input').fill('DIV');
+// (el panel del proyecto, con los testbenches y los módulos)
+if (!(await page.locator('.project-tree').count())) await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
+await page.locator('.tree-modules .tree-add[aria-haspopup]').click();
+await page.getByRole('menuitem', { name: /Subcircuito/ }).click();
+await page.locator('.new-module input').fill('DIV');
 await page.keyboard.press('Enter');
-await page.waitForTimeout(400);
-check((await page.locator('svg.editor .sym').count()) === 2, 'la selección quedó reemplazada por una instancia');
+await page.locator('.sub-hint-name', { hasText: 'DIV' }).waitFor();
+const div = `Version 4
+SHEET 1 880 680
+FLAG 128 16 in
+IOPIN 128 16 BiDir
+FLAG 128 96 mid
+FLAG 128 144 mid
+FLAG 128 224 0
+SYMBOL res 112 0 R0
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL res 112 128 R0
+SYMATTR InstName R2
+SYMATTR Value 2k
+`;
+// (el subcircuito nuevo trae los puertos in y out de ejemplo: se reemplaza todo)
+await svg.click({ position: { x: 5, y: 5 } });
+await page.keyboard.press('Control+a');
+await page.keyboard.press('Delete');
+await page.evaluate((t) => navigator.clipboard.writeText(t), div);
+await page.keyboard.press('Control+v');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+// arriba, la instancia U1 en lugar de R1 y R2 (el pin «in» del símbolo generado queda en x − 32)
+await page.locator('.project-tree .tree-row[data-bench] .tree-name').first().click();
+await page.waitForFunction(() => !document.querySelector('.sub-simbar'));
+const parent = `Version 4
+SHEET 1 880 680
+FLAG 0 16 in
+FLAG 0 96 0
+FLAG 128 48 in
+SYMBOL voltage 0 0 R0
+SYMATTR InstName V1
+SYMATTR Value 3
+SYMBOL DIV 160 48 R0
+SYMATTR InstName U1
+TEXT 0 300 Left 2 !.tran 1m
+`;
+await svg.click({ position: { x: 5, y: 5 } });
+await page.keyboard.press('Control+a');
+await page.keyboard.press('Delete');
+await page.evaluate((t) => navigator.clipboard.writeText(t), parent);
+await page.keyboard.press('Control+v');
+await page.keyboard.press('Escape');
+await page.waitForTimeout(300);
+check((await page.locator('svg.editor .sym').count()) === 2, 'arriba quedan V1 y una instancia de DIV');
 await simulate();
 await showOp();
 const top = (await annotations()).sort();
@@ -111,12 +147,11 @@ const ib = await inst.boundingBox();
 await page.mouse.dblclick(ib.x + ib.width / 2, ib.y + ib.height / 2);
 await page.waitForTimeout(600);
 if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
-const c1 = await crumbs();
-check(/›\s*\w+ \(DIV\)/.test(c1), `migas al bajar: ${c1}`);
+check((await editing()) === 'DIV', `doble clic en la instancia: se edita DIV adentro (${await editing()})`);
 await showOp();
 const inside = (await annotations()).sort();
 check(['1mA', '2V', '3V'].every((v) => inside.includes(v)), `adentro: el punto de operación de la instancia (${inside.join(', ')})`);
-check(JSON.stringify([...new Set(before)].sort()) === JSON.stringify([...new Set([...top, ...inside])].sort()), 'convertir en subcircuito da la misma simulación (los mismos valores, arriba y adentro)');
+check(JSON.stringify([...new Set(before)].sort()) === JSON.stringify([...new Set([...top, ...inside].filter((v) => !/^I = /.test(v)))].sort()), 'como subcircuito da la misma simulación (los mismos valores, arriba y adentro)');
 check((await page.locator('.current-arrow').count()) > 0, 'adentro: flechas de corriente en los pines');
 // la punta de prueba mide la corriente de un componente de adentro
 await page.locator('button[aria-label="Medir"]').click();
@@ -124,8 +159,7 @@ const r = page.locator('svg.editor .sym').first();
 const rb = await r.locator('.body').first().boundingBox();
 await page.mouse.click(rb.x + rb.width / 2, rb.y + rb.height / 2);
 await page.waitForTimeout(400);
-const chips = await page.locator('.trace-chip .name').allTextContents();
-check(chips.some((c) => /^I\(x\w*\.r\d\)$/i.test(c)), `adentro: la punta de prueba mide la corriente (${chips.join(', ')})`);
+// (mientras se edita el subcircuito no se ve el panel de resultados: la traza se mira al subir)
 
 // --- ciclos (#199): no se puede pegar DIV adentro de DIV ---
 await page.keyboard.press('Escape');
@@ -138,7 +172,9 @@ check((await page.locator('svg.editor .sym').count()) === nIn && (await page.get
 // --- subir: al mismo lugar y zoom ---
 await page.keyboard.press('Alt+ArrowUp');
 await page.waitForTimeout(600);
-check((await crumbs()) === '' || !/DIV/.test(await crumbs()), 'Alt+↑ vuelve al testbench');
+check((await editing()) === '', 'Alt+↑ vuelve al testbench');
+const chips = await page.locator('.trace-chip .name').allTextContents();
+check(chips.some((c) => /^I\(x\w*\.r1\)$/i.test(c)), `la punta de prueba adentro midió la corriente de R1 (${chips.join(', ')})`);
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
 
 // --- instancias desactualizadas o sin cablear (#199): X9 quedó con su pin suelto ---
@@ -179,8 +215,9 @@ check(/DIV\.asc/.test(mine) && /DIV\.asy/.test(mine), 'y aparece en Mis símbolo
 await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
 
 // --- aviso al editar un subcircuito usado en varios testbenches (#199) ---
-await page.locator('.project-tree .tree-row', { hasText: 'Testbench 1' }).first().hover();
-await page.getByRole('button', { name: 'Duplicar Testbench 1' }).click();
+// (los testbenches son las simulaciones del workbench: se duplica la que hay)
+await page.locator('.project-tree .tree-row[data-bench]', { hasText: 'Tran 0 - 1m' }).first().hover();
+await page.getByRole('button', { name: 'Duplicar Tran 0 - 1m' }).click();
 await page.waitForTimeout(500);
 if (await page.locator('.modal input').count()) await page.keyboard.press('Enter');
 await page.waitForTimeout(300);
@@ -197,19 +234,21 @@ await page.keyboard.press('Control+z');
 await page.keyboard.press('Alt+ArrowUp');
 
 // --- un .asy existente como símbolo y el puerto de cada pin (#199) ---
-await page.getByRole('button', { name: 'Módulo nuevo' }).click();
+await page.locator('.tree-modules .tree-add[aria-haspopup]').click();
 await page.getByRole('menuitem', { name: /Subcircuito/ }).click();
-await page.locator('.modal input').fill('AMP');
+await page.locator('.new-module input').fill('AMP');
 await page.keyboard.press('Enter');
 await page.waitForTimeout(500);
-await page.getByRole('button', { name: 'Usar un símbolo…' }).click();
-await page.locator('.modal input').fill('opamp2');
+await page.getByRole('button', { name: 'Importar de uno existente…' }).click();
+await page.locator('.modal input').fill('xtal');
 await page.waitForTimeout(300);
 await page.keyboard.press('Enter');
 await page.waitForTimeout(400);
 const symLines = await page.locator('.sym-pane .sym-shapes line').count();
-const pinNames = () => page.locator('.sym-pane .sym-pin text').allTextContents();
-check(symLines === 8 && JSON.stringify(await pinNames()) === '["in","out"]', `usar opamp2 como símbolo de AMP (${symLines} líneas, pines ${(await pinNames()).join(', ')})`);
+// (los pines de xtal no muestran su nombre: el puerto de cada uno está en «Puerto de cada pin»)
+const pinNames = () => page.locator('.sym-assign select').evaluateAll((ss) => ss.map((s) => s.value));
+// (xtal: 4 líneas y un rectángulo, que se dibuja con 4 más)
+check(symLines === 8 && JSON.stringify(await pinNames()) === '["in","out"]', `usar xtal como símbolo de AMP (${symLines} líneas, pines ${(await pinNames()).join(', ')})`);
 await page.locator('.sym-assign summary').click();
 await page.getByLabel('Puerto del pin 1').selectOption('out');
 await page.waitForTimeout(300);

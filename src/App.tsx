@@ -1150,6 +1150,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       return;
     }
     driveBusy.current = true;
+    // (data-drive en <html>: «busy» mientras sube o hay guardados en cola; lo esperan los e2e)
+    document.documentElement.dataset.drive = 'busy';
     saveToDrive(auto, force)
       .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
       .finally(() => {
@@ -1157,6 +1159,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         const next = drivePending.current;
         drivePending.current = null;
         if (next) queueDriveSave(next.auto);
+        else document.documentElement.dataset.drive = 'idle';
       });
   };
   // al simular se guarda solo en Drive (después de que la corrida entró al proyecto)

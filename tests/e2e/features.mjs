@@ -139,6 +139,9 @@ check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'),
 const [sheetDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar SVG' }).click()]);
 const sheet = readFileSync(await sheetDl.path(), 'utf8');
 check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class='), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
+// #330: el trazo Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja
+await exportView.getByRole('checkbox', { name: 'Trazo Tremor' }).check();
+check((await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0, 'Trazo Tremor: los cables de la hoja salen a mano alzada; los del esquemático no');
 await page.keyboard.press('Escape');
 check((await exportView.count()) === 0, 'Esc cierra la vista de export');
 const other = await context.newPage();

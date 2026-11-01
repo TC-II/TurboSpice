@@ -18,6 +18,8 @@ interface Layers {
   op: boolean;
   currents: boolean;
   directives: boolean;
+  /** trazo Tremor (#330): cables y símbolos a mano alzada */
+  tremor: boolean;
 }
 
 /**
@@ -63,7 +65,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
   onClose(): void;
   onMessage(text: string): void;
 }) {
-  const [layers, setLayers] = useState<Layers>({ op: false, currents: false, directives: false });
+  const [layers, setLayers] = useState<Layers>({ op: false, currents: false, directives: false, tremor: false });
   const [page, setPage] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -93,7 +95,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
     if (!g) return;
     const b = g.getBBox();
     setPage(b.width || b.height ? sheetBox({ x: b.x, y: b.y, w: b.width, h: b.height }) : null);
-  }, [shown, op, cur, lib, font]);
+  }, [shown, op, cur, lib, font, layers.tremor]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -155,7 +157,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
           height={page ? page.h * fit : 0}
         >
           <g ref={contentRef}>
-            <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={[]} showLoose={false} showSimCommand={layers.directives} />
+            <SchematicCanvas doc={shown} lib={lib} conn={conn} selection={[]} showLoose={false} showSimCommand={layers.directives} tremor={layers.tremor} />
             {cur && <CurrentArrowsLayer items={cur.map((a) => ({ ...a, color: undefined, hl: false }))} />}
             {op && <AnnotationLayer items={op} scale={1} />}
           </g>
@@ -169,6 +171,10 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
           {check('op', t('Operating point values'), !!annotations?.length)}
           {check('currents', t('Current arrows'), !!arrows?.length)}
           {check('directives', t('SPICE directives'), true)}
+        </section>
+        <section>
+          <h3>{t('Style')}</h3>
+          {check('tremor', t('Tremor stroke'), true, t('Wires and symbols drawn freehand (the same sheet always comes out the same)'))}
         </section>
         <section>
           <h3>{t('Sheet')}</h3>

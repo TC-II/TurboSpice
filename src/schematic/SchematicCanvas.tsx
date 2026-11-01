@@ -12,6 +12,7 @@ import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPo
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
+import { tremorSkin, tremorWire } from './tremor.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
@@ -88,7 +89,9 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark, unsaved }: {
+export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark, unsaved, tremor }: {
+  /** a mano alzada (trazo Tremor de la hoja de export, #330) */
+  tremor?: boolean;
   /** no se guardó en la simulación (#314): atenuado */
   unsaved?: boolean;
   inst: SymbolInst;
@@ -104,7 +107,8 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
   /** cambio contra la corrida anterior (historial, #153) */
   mark?: Mark | 'removed';
 }) {
-  const skin = lib.skin(inst.type);
+  const clean = lib.skin(inst.type);
+  const skin = clean && tremor ? tremorSkin(clean, def?.pins.map((p) => [p.x, p.y] as [number, number]) ?? [], `${inst.type}|${inst.x}|${inst.y}`) : clean;
   const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}${mark ? ` diff-${mark}` : ''}${unsaved ? ' unsaved' : ''}`;
   if (!def) {
     return (
@@ -209,11 +213,12 @@ const FLAG_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
   right: { align: 'Right', dx: -8, dy: 0 },
 };
 
-export function FlagView({ flag, doc, lib, selected, hover, mark }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean; hover?: boolean; mark?: Mark }) {
+export function FlagView({ flag, doc, lib, selected, hover, mark, tremor }: { flag: Flag; doc: AscDoc; lib: Library; selected?: boolean; hover?: boolean; mark?: Mark; tremor?: boolean }) {
   const dir = flagDirection(doc, flag);
   const cls = `flag${selected ? ' sel' : ''}${hover ? ' hover' : ''}${mark ? ` diff-${mark}` : ''}`;
   if (flag.name === '0') {
-    const gnd = lib.skin('GND');
+    const clean = lib.skin('GND');
+    const gnd = clean && tremor ? tremorSkin(clean, [[0, 0]], `GND|${flag.x}|${flag.y}`) : clean;
     return (
       <g className={cls} transform={matrix(GND_ROT[dir], flag.x, flag.y)}>
         {gnd ? <g className="skin" dangerouslySetInnerHTML={{ __html: gnd.body }} /> : <path d="M -16 0 H 16 M -9 6 H 9 M -3 12 H 3" />}
@@ -287,9 +292,11 @@ export interface CanvasProps {
   showSimCommand?: boolean;
   /** cambios contra la corrida anterior (historial, #153): colores y fantasmas de lo quitado */
   diff?: CircuitDiff;
+  /** cables y símbolos a mano alzada (trazo Tremor de la hoja de export, #330) */
+  tremor?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, flightFrom, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, flightFrom, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff, tremor }: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -325,17 +332,15 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="images">{doc.shapes.map((s, i) => s.kind === 'IMAGE' && <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="shapes">{doc.shapes.map((s, i) => s.kind !== 'IMAGE' && <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
-        {doc.wires.map((w, i) => (
-          <line
-            key={i}
-            x1={w.x1}
-            y1={w.y1}
-            x2={w.x2}
-            y2={w.y2}
-            className={[busWires.has(i) && 'bus', dimWires.has(i) && 'unsaved', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined}
-            style={wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined}
-          />
-        ))}
+        {doc.wires.map((w, i) => {
+          const className = [busWires.has(i) && 'bus', dimWires.has(i) && 'unsaved', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined;
+          const style = wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined;
+          return tremor ? (
+            <polyline key={i} points={tremorWire(w.x1, w.y1, w.x2, w.y2)} className={className} style={style} />
+          ) : (
+            <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} className={className} style={style} />
+          );
+        })}
       </g>
       {/* derivaciones de bus de LTspice (BUSTAP x1 y1 x2 y2: del bus al extremo del bit); sólo
           dibujo: el bit se une al bus por el nombre de su etiqueta */}
@@ -358,7 +363,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} unsaved={unsaved?.symbols.has(i)} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
+          <SymbolView key={i} tremor={tremor} unsaved={unsaved?.symbols.has(i)} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
         ))}
       </g>
       {diff && (diff.removed.symbols.length > 0 || diff.removed.wires.length > 0) && (
@@ -396,7 +401,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
         })}
       </g>
       <g className="flags">
-        {doc.flags.map((f, i) => <FlagView key={i} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} hover={hoverFlag === i} mark={diff?.flags.get(i)} />)}
+        {doc.flags.map((f, i) => <FlagView key={i} tremor={tremor} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} hover={hoverFlag === i} mark={diff?.flags.get(i)} />)}
       </g>
     </g>
   );

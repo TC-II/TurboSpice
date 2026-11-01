@@ -2,7 +2,7 @@
 // mueven, rotan, borran, se les cambia el estilo de línea, y se dibujan círculos y arcos.
 // Uso: node tests/e2e/shapes.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { menu, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, menu, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -61,7 +61,7 @@ const attr = (i, a) => shapes.nth(i).getAttribute(a);
 const center = await svg.boundingBox();
 await page.mouse.move(center.x + center.width / 2, center.y + center.height / 2);
 await page.keyboard.press('Space');
-await page.waitForTimeout(150);
+await frames(page);
 check((await shapes.count()) === 4, 'se dibujan las 4 figuras');
 const style = await shapes.evaluateAll((els) => els.map((e) => [getComputedStyle(e).stroke, getComputedStyle(e).strokeDasharray]));
 check(style.every(([s]) => s !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(s)), 'las figuras tienen trazo visible');
@@ -134,7 +134,7 @@ check((await svg.locator('.shapes path').count()) === 2, 'Dibujar › Arco agreg
 await page.keyboard.press('Escape');
 
 await page.keyboard.press('Space');
-await page.waitForTimeout(150);
+await frames(page);
 await page.screenshot({ path: `${OUT}/shapes.png` });
 
 // (al abrir un archivo se aborta la simulación automática del anterior: no es un error)

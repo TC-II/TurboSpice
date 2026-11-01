@@ -497,9 +497,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const warnShared = () => {
     const sub = pathRef.current[pathRef.current.length - 1]?.sub;
     if (!sub || warnedSubs.current.has(sub.toLowerCase())) return;
-    warnedSubs.current.add(sub.toLowerCase());
     const n = benchesUsing(projectRef.current, sub);
-    if (n > 1) setMessage(t('{name} is used in {n} testbenches: the changes apply to all of them', { name: sub, n }));
+    // (si todavía lo usa uno solo, se avisa cuando pase a usarse en varios)
+    if (n < 2) return;
+    warnedSubs.current.add(sub.toLowerCase());
+    setMessage(t('{name} is used in {n} testbenches: the changes apply to all of them', { name: sub, n }));
   };
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
@@ -996,11 +998,16 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
   // pilas de deshacer no se guardan, #154)
+  // (data-autosave en <html>: «pending» hasta que termina el último guardado, «saved» después; lo esperan los e2e)
+  const autosaveSeq = useRef(0);
   useEffect(() => {
     if (!restored) return;
+    const seq = ++autosaveSeq.current;
+    document.documentElement.dataset.autosave = 'pending';
     const tt = setTimeout(() => {
       serializeTurbo(snapshot())
         .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
+        .then(() => seq === autosaveSeq.current && (document.documentElement.dataset.autosave = 'saved'))
         .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);

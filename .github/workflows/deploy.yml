@@ -117,10 +117,8 @@ jobs:
         include:
           - suite: edit-tools
             files: wires rotate shapes placing dialogs shortcuts
-          # hierarchy.mjs queda afuera hasta reescribirlo: arranca con Alt+B (convertir la selección
-          # en subcircuito), que se sacó de la interfaz (ver src/project/extract.ts)
           - suite: study
-            files: templates deviceparams
+            files: templates deviceparams hierarchy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

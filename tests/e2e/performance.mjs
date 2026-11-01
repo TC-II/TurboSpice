@@ -4,7 +4,7 @@
 // y la segunda carga no lo vuelve a bajar.
 // Uso: node tests/e2e/performance.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { launchBrowser, skipWelcome } from './lib.mjs';
+import { frames, launchBrowser, skipWelcome, until } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -31,7 +31,7 @@ page.on('request', (r) => /library\/(bundle|cmp-passives)\.json/.test(r.url()) &
 await page.goto(URL);
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
 await page.locator('svg.editor .sym').first().waitFor();
-await page.waitForTimeout(500);
+await frames(page);
 check(libRequests[0] === 'bundle.json' && libRequests.includes('cmp-passives.json'), `librería y después las listas de pasivos (${libRequests.join(', ')})`);
 
 // --- Motor en Cache Storage (#191) ---
@@ -91,7 +91,7 @@ await page.mouse.move(P.x + 120, P.y + 80, { steps: 3 });
 const during = await transform();
 check(/translate/.test(during), `durante el paneo se mueve el dibujo ya pintado (${during})`);
 await page.mouse.up({ button: 'middle' });
-await page.waitForTimeout(100);
+await frames(page);
 check((await transform()) === '', 'al soltar se saca el transform');
 const after = await docAt({ x: P.x + 120, y: P.y + 80 });
 check(near(after, before, 1), `el punto agarrado queda bajo el mouse (${before.x.toFixed(1)},${before.y.toFixed(1)} → ${after.x.toFixed(1)},${after.y.toFixed(1)})`);
@@ -104,7 +104,8 @@ await page.mouse.move(Q.x, Q.y);
 await page.mouse.wheel(0, -200);
 await page.mouse.wheel(0, -200);
 check(/scale/.test(await transform()), 'durante la rueda se escala el dibujo ya pintado');
-await page.waitForTimeout(400);
+// (la vista se aplica 150 ms después del último giro: se espera a que se saque el transform)
+await until(async () => (await transform()) === '', 2000);
 check((await transform()) === '', '150 ms después del último giro se aplica la vista');
 const vw1 = Number((await svg.getAttribute('viewBox')).split(' ')[2]);
 const q1 = await docAt(Q);
@@ -114,7 +115,7 @@ const tolQ = Math.max(1.5, (1.5 * vw1) / box.width);
 check(near(q1, q0, tolQ), `el punto bajo el cursor queda fijo (${q0.x.toFixed(1)},${q0.y.toFixed(1)} → ${q1.x.toFixed(1)},${q1.y.toFixed(1)}, tolerancia ${tolQ.toFixed(1)})`);
 // alejar mucho: la rueda sobre el borde vacío (fuera del svg escalado) sigue haciendo zoom
 for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 120);
-await page.waitForTimeout(400);
+await until(async () => (await transform()) === '', 2000);
 const vw2 = Number((await svg.getAttribute('viewBox')).split(' ')[2]);
 check(vw2 > vw1 * 2 && (await transform()) === '', `alejó (ancho ${vw1.toFixed(0)} → ${vw2.toFixed(0)}) y quedó sin transform`);
 
@@ -126,7 +127,7 @@ const screenAt = async (d) => {
 };
 const r5 = await screenAt({ x: 16, y: 504 });
 await page.mouse.move(r5.x, r5.y);
-await page.waitForTimeout(100);
+await until(async () => /R5/.test(await page.locator('.hint-bar').textContent()), 2000);
 const hint = await page.locator('.hint-bar').textContent();
 // (#196: en Firefox el esquemático queda más alejado, la tolerancia de 6 px abarca ~50 unidades y el
 // cable vecino le ganaba al cuerpo; ahora el componente bajo el cursor tiene prioridad)
@@ -142,14 +143,14 @@ await page.mouse.move(r5.x + 64, r5.y + 32, { steps: 4 });
 const shifted = await page.evaluate(() => document.querySelector('svg.editor g.schematic').getAttribute('transform'));
 check(/translate/.test(shifted ?? ''), `mover todo traslada el dibujo (${shifted})`);
 await page.mouse.up();
-await page.waitForTimeout(50);
+await frames(page);
 const moved = await page.evaluate(() => ({
   t: document.querySelector('svg.editor g.schematic').getAttribute('transform'),
   x: document.querySelector('svg.editor .symbols > .sym .body')?.getAttribute('transform'),
 }));
 check(moved.t === null && !/^matrix\(1 0 0 1 0 0\)$/.test(moved.x ?? ''), `al soltar queda el documento movido, sin traslación (${moved.x})`);
 await page.keyboard.press('Control+z');
-await page.waitForTimeout(50);
+await frames(page);
 check(Date.now() - t0 < 5000, `seleccionar todo, mover y deshacer en ${Date.now() - t0} ms`);
 
 // --- Nivel de detalle (#195): al alejar, los textos de menos de ~3 px no se dibujan ---
@@ -159,12 +160,12 @@ const C = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 await page.mouse.move(C.x, C.y);
 for (let i = 0; i < 20 && (await pxPerUnit()) > 0.1; i++) {
   await page.mouse.wheel(0, 300);
-  await page.waitForTimeout(250);
+  await until(async () => (await transform()) === '', 2000);
 }
 check(!(await textShown()), `alejado (${(await pxPerUnit()).toFixed(3)} px por unidad) no se dibujan los rótulos`);
 for (let i = 0; i < 20 && (await pxPerUnit()) < 1; i++) {
   await page.mouse.wheel(0, -300);
-  await page.waitForTimeout(250);
+  await until(async () => (await transform()) === '', 2000);
 }
 check(await textShown(), `de cerca (${(await pxPerUnit()).toFixed(2)} px por unidad) sí`);
 

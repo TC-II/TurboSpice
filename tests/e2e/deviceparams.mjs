@@ -1,7 +1,7 @@
 // E2E de los parámetros de dispositivo (#202): @Q1[gm] e Ic(Q1) en el visor, guardados con .save
 // al simular de nuevo, con su unidad y ofrecidos en la caja de trazas.
 // Uso: node tests/e2e/deviceparams.mjs [url]   (con `npm run preview` corriendo)
-import { openExample, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, steady, openExample, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await launchBrowser();
@@ -20,13 +20,14 @@ const check = (ok, msg) => {
 const simulate = async () => {
   await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-  await page.waitForTimeout(300);
+  // (al abrirse los resultados el esquemático se reacomoda)
+  await steady(page);
 };
 const names = () => page.locator('.trace-chip .name').allTextContents();
 const add = async (expr) => {
   await page.getByLabel('Expresión').fill(expr);
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(200);
+  await frames(page);
 };
 
 await page.goto(URL);
@@ -52,7 +53,7 @@ for (const n of ['Ic(Q1)']) await page.locator('.trace-chip', { hasText: n }).lo
 check((await names()).join() === '@Q1[gm]', `queda sólo gm (${await names()})`);
 const cb = await page.locator('.pane-chart').first().boundingBox();
 await page.mouse.move(cb.x + cb.width / 2, cb.y + cb.height / 2);
-await page.waitForTimeout(200);
+await frames(page);
 const val = await page.locator('.trace-chip .val').first().textContent();
 // Ic ≈ 1.4 mA → gm = Ic/VT ≈ 54 mS
 check(/^\s*[\d.]+mS\s*$/.test(val ?? ''), `gm en siemens (${val})`);

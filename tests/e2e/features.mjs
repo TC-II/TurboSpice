@@ -4,7 +4,7 @@
 // colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, launchBrowser, FIREFOX } from './lib.mjs';
+import { autosaved, frames, steady, menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, until, launchBrowser, FIREFOX } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -86,7 +86,7 @@ check((await page.locator('.modal').count()) === 0 && (await page.locator('.sche
 await page.keyboard.press('Escape');
 // en ancho de celular la barra no desborda: los grupos que no entran van a "Más herramientas"
 await page.setViewportSize({ width: 375, height: 760 });
-await page.waitForTimeout(300);
+await frames(page);
 const overflow = await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector('.appbar .iconbar').scrollWidth, document.querySelector('.appbar').scrollWidth]);
 // (si desborda, qué elementos de la barra pasan del borde)
 const past = await page.evaluate(() => [...document.querySelectorAll('.appbar *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => `${e.tagName.toLowerCase()}.${e.className}@${Math.round(e.getBoundingClientRect().left)}-${Math.round(e.getBoundingClientRect().right)}`).slice(0, 8));
@@ -96,7 +96,7 @@ await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exac
 check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');
 await page.keyboard.press('Escape');
 await page.setViewportSize({ width: 1600, height: 800 });
-await page.waitForTimeout(300);
+await frames(page);
 await page.keyboard.press('Home');
 
 // --- #15: nombres de redes temporales ---
@@ -202,7 +202,7 @@ await page.keyboard.press('g');
 await page.mouse.click(box.x + 60, box.y + 60);
 await page.keyboard.press('Escape');
 check((await flags()) === before + 1, 'agrega una tierra');
-await page.waitForTimeout(1200); // autoguardado
+await autosaved(page);
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
@@ -228,7 +228,8 @@ await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await page.waitForTimeout(300);
+// (al abrirse los resultados el esquemático se reacomoda)
+await steady(page);
 const q1 = await at(236, 208);
 await page.mouse.move(q1.x, q1.y);
 const tip = await page.locator('.bias-tip').textContent().catch(() => '');
@@ -238,12 +239,12 @@ check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.
   const names = () => page.locator('.trace-chip .name').allTextContents();
   const n0 = (await names()).length;
   await page.mouse.click(q1.x, q1.y);
-  await page.waitForTimeout(200);
+  await frames(page);
   check((await names()).length === n0, 'click en el cuerpo de Q1 no mide');
   for (const [x, y] of [[256, 164], [196, 208], [256, 252]]) {
     const pin = await at(x, y);
     await page.mouse.click(pin.x, pin.y);
-    await page.waitForTimeout(200);
+    await frames(page);
   }
   const got = (await names()).slice(n0);
   check(got.join() === 'Ic(Q1),Ib(Q1),Ie(Q1)', `colector, base y emisor miden Ic, Ib e Ie (${got})`);
@@ -294,7 +295,7 @@ const r2 = await rangeX(2);
   const cb = await page.locator('.pane').nth(2).locator('.pane-chart').boundingBox();
   await page.mouse.move(cb.x + cb.width / 3, cb.y + cb.height / 2);
   await page.mouse.wheel(0, -300);
-  await page.waitForTimeout(200);
+  await frames(page);
 }
 check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de DFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
 }
@@ -330,7 +331,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   await field('Tiempo inicial de la DFT').fill('1m');
   await field('Tiempo final de la DFT').fill('5m');
   await field('Frecuencia de muestreo de la DFT').fill('2k');
-  await page.waitForTimeout(300);
+  await frames(page);
   check(/^8 muestras · Δf = 250Hz$/.test(await sampling()), `muestreo elegido: ${await sampling()}`);
   check((await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '8', `las 8 muestras se marcan sobre la traza (${await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')})`);
   // un valor que no se entiende: en rojo, sin ⌖
@@ -338,7 +339,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check((await page.locator('.dft-field.bad').count()) === 1 && (await page.locator('.dft-tools .dft-pick').isDisabled()) && /^Escribí un número/.test(await sampling()), 'un valor que no se entiende se marca y no deja agregar');
   // 1000 muestras: no hace falta una potencia de 2
   await field('Frecuencia de muestreo de la DFT').fill('250k');
-  await page.waitForTimeout(300);
+  await frames(page);
   check(/^1\.000 muestras · Δf = 250Hz$/.test(await sampling()), `1000 muestras: ${await sampling()}`);
   if (!(await page.locator('.plot-panel.dft-picking').count())) await fftPick.click();
   await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
@@ -351,7 +352,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check((await field('Frecuencia de muestreo de la DFT').inputValue()) === '250k' && /^Editando V\(out\)-Rec/.test(await sampling()), `al editar, la barra toma su muestreo (${await field('Frecuencia de muestreo de la DFT').inputValue()} · ${await sampling()})`);
   await field('Frecuencia de muestreo de la DFT').fill('500k');
   await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
-  await page.waitForTimeout(300);
+  await frames(page);
   await page.locator('.pane').nth(1).locator('.trace-chip').first().hover();
   check(/2000 muestras a 500kHz \(Δf = 250Hz\)/.test(await page.locator('.dft-info').first().textContent()), `Aplicar cambia la DFT: ${await page.locator('.dft-info').first().textContent()}`);
   await page.locator('.pane').nth(1).getByRole('button', { name: 'Quitar panel' }).click();
@@ -366,7 +367,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   await page.mouse.down();
   await page.mouse.move(cb.x + cb.width * 0.5 + 30, y, { steps: 5 });
   await page.mouse.up();
-  await page.waitForTimeout(300);
+  await frames(page);
   const yt = (await page.locator('.pane-chart .uplot').first().getAttribute('data-ticks-y'))?.split('|') ?? [];
   check(yt.length >= 2 && new Set(yt).size === yt.length, `con zoom las marcas del eje Y son todas distintas (${yt.join(' ')})`);
 }
@@ -375,7 +376,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   const plot = page.locator('.pane-chart .uplot').first();
   const over = plot.locator('.u-over');
   await page.getByRole('button', { name: 'Ajustar a la vista', exact: true }).last().click();
-  await page.waitForTimeout(200);
+  await frames(page);
   const rng = async () => {
     const [x, y] = await Promise.all([plot.getAttribute('data-range-x'), plot.getAttribute('data-range-y')]);
     const [x0, x1] = x.split('|').map(Number);
@@ -389,7 +390,7 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
     await page.mouse.down();
     await page.mouse.move(b.x + b.width * fx1, b.y + b.height * fy1, { steps: 8 });
     await page.mouse.up();
-    await page.waitForTimeout(300);
+    await frames(page);
   };
   const full = await rng();
   // recuadro: el rango de X e Y pasa a ser el recuadro (ocupa todo el gráfico)
@@ -409,12 +410,12 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   // rueda: sólo X; el Y fijado por el recuadro queda
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, 300);
-  await page.waitForTimeout(300);
+  await frames(page);
   const w = await rng();
   check(!same(w.x, box.x) && same(w.y, box.y), `la rueda cambia sólo X y el Y fijado no se reajusta (${box.y} = ${w.y})`);
   // vuelta a ver todo: doble click; luego zoom en X sin recuadro previo: el Y tampoco se reajusta
   await page.mouse.dblclick(b.x + b.width / 2, b.y + b.height / 2);
-  await page.waitForTimeout(300);
+  await frames(page);
   const back = await rng();
   check(back.key === full.key, 'doble click: vuelve a ver todo (X e Y)');
   await drag(0.4, 0.4, 0.5, 0.4 + 5 / b.height);
@@ -423,30 +424,30 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   check(!same(hx.x, full.x) && !same(hx.y, full.y), `arrastre casi horizontal: también es un recuadro (${full.y} → ${hx.y})`);
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -200);
-  await page.waitForTimeout(300);
+  await frames(page);
   check(same((await rng()).y, hx.y), 'zoom en X con la rueda: el Y no se reajusta solo (#200)');
   await page.keyboard.press('Space');
-  await page.waitForTimeout(300);
+  await frames(page);
   check((await rng()).key === full.key, 'Espacio: vuelve a ver todo');
   await drag(0.5, 0.2, 0.5 + 5 / b.width, 0.7);
   const vy = await rng();
   check(!same(vy.x, full.x) && !same(vy.y, full.y), `arrastre casi vertical: también es un recuadro (${full.y} → ${vy.y})`);
   await page.keyboard.press('Shift+Z');
-  await page.waitForTimeout(300);
+  await frames(page);
   check((await rng()).key === full.key, 'Shift+Z deshace el zoom en Y');
   await page.keyboard.down('Shift');
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
   await page.mouse.wheel(0, -300);
   await page.keyboard.up('Shift');
-  await page.waitForTimeout(300);
+  await frames(page);
   const sw = await rng();
   check(same(sw.x, full.x) && !same(sw.y, full.y), `Shift+rueda: zoom sólo en Y (${full.y} → ${sw.y})`);
   await page.mouse.move(b.x - 25, b.y + b.height / 2);
   await page.mouse.wheel(0, 300);
-  await page.waitForTimeout(300);
+  await frames(page);
   check(same((await rng()).x, full.x) && !same((await rng()).y, sw.y), 'rueda sobre el eje Y: zoom sólo en Y');
   await page.keyboard.press('Space');
-  await page.waitForTimeout(200);
+  await frames(page);
 }
 await page.getByRole('button', { name: 'Anotar OP' }).click();
 const ann = await page.locator('.op-annotation').allTextContents();
@@ -494,10 +495,10 @@ check((await resultsView(page)) === 'Mediciones', 'con .meas y nada graficado, a
 await page.locator('.results-panel').getByRole('button', { name: 'Resultados', exact: true }).click();
 const stepPlots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(stepPlots.join() === 'tran1 (R=500),tran2 (R=1k),tran3 (R=2k),meas vs R', `una corrida por paso (${stepPlots.join(', ')})`);
-await page.waitForTimeout(300);
+await frames(page);
 const outStep = await at(288, -32);
 await page.mouse.click(outStep.x, outStep.y);
-await page.waitForTimeout(300);
+await frames(page);
 await page.getByRole('button', { name: 'Medidas' }).click();
 const series = await page.locator('.readout tbody tr td:first-child').allTextContents();
 check(series.join() === 'V(out) · R=500,V(out) · R=1k,V(out) · R=2k', `cada paso identificado con su valor (${series.join(', ')})`);
@@ -530,7 +531,8 @@ await openExample(page, 'RLC Bode');
 await page.locator('svg.editor .sym').first().waitFor();
 await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-await page.waitForTimeout(300);
+// (al abrirse los resultados el esquemático se reacomoda)
+await steady(page);
 const outAc = await at(272, -32);
 await page.mouse.click(outAc.x, outAc.y);
 await page.getByRole('button', { name: 'Medidas' }).click();
@@ -562,12 +564,12 @@ check((await page.locator('.pane').count()) === 1, 'se puede quitar un panel');
   const swatches = () => page.locator('.pane').first().locator('.trace-chip .swatch').evaluateAll((l) => l.map((e) => getComputedStyle(e).backgroundColor));
   const [cOut, cDiv] = await swatches();
   await page.mouse.click(outAc.x, outAc.y);
-  await page.waitForTimeout(200);
+  await frames(page);
   check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `volver a medir un nodo ya graficado no lo quita (${await paneChips(0)})`);
   await page.locator('.trace-chip .x').first().click();
   check((await swatches()).join() === cDiv, `al quitar V(out) la otra conserva su color (${await swatches()} vs ${cDiv})`);
   await page.mouse.click(outAc.x, outAc.y);
-  await page.waitForTimeout(200);
+  await frames(page);
   check((await swatches()).join() === `${cDiv},${cOut}`, 'V(out) vuelve con su color (el que quedó libre)');
   const rb = await page.locator('.results-panel').boundingBox();
   await page.mouse.move(rb.x + rb.width / 2, rb.y + rb.height / 2);
@@ -594,10 +596,10 @@ const cb = await page.locator('.pane-chart').first().boundingBox();
   // #51: antes de fijarlo, el cursor A sigue al mouse (línea y tabla preliminares)
   const cp = await page.locator('.pane-chart').first().boundingBox();
   await page.mouse.move(cp.x + cp.width * 0.3, cp.y + cp.height / 2, { steps: 3 });
-  await page.waitForTimeout(150);
+  await frames(page);
   const h1 = await page.locator('.readout td.preview').textContent();
   await page.mouse.move(cp.x + cp.width * 0.6, cp.y + cp.height / 2, { steps: 3 });
-  await page.waitForTimeout(150);
+  await frames(page);
   const h2 = await page.locator('.readout td.preview').textContent();
   check(!!h1 && h1 !== h2, `cursor A preliminar sigue al mouse (${h1} → ${h2})`);
 }
@@ -607,7 +609,7 @@ await page.waitForTimeout(400); // que no cuente como doble click
 const cb2 = await page.locator('.pane-chart').first().boundingBox();
 // #234: el segundo click (izquierdo) fija el B
 await page.mouse.click(cb2.x + cb2.width * 0.7, cb2.y + cb2.height / 2);
-await page.waitForTimeout(100);
+await frames(page);
 const head = await page.locator('.readout thead').textContent();
 const dxRow = await page.locator('.readout tr.dx').textContent();
 check(/Trace|Traza/.test(head) && /B − A/.test(head) && !/\(/.test(head) && /Hz/.test(dxRow), `cursores A y B con Δ y 1/Δ en la fila del tiempo (${head} | ${dxRow})`);
@@ -673,13 +675,13 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   let r = await page.locator('.pane-chart').first().boundingBox();
   await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5, { steps: 3 });
   await page.keyboard.press('m');
-  await page.waitForTimeout(100);
+  await frames(page);
   check((await names()) === 'M1' && (await rowsOf('M1')).length === 1, `M pone un marker sobre la traza (${await names()})`);
   r = await page.locator('.pane-chart').first().boundingBox();
   await page.mouse.move(r.x + r.width * 0.5, r.y + r.height * 0.5, { steps: 3 });
   await page.keyboard.press('v');
   await page.keyboard.press('h');
-  await page.waitForTimeout(100);
+  await frames(page);
   check((await names()) === 'M1|V1|H1', `V y H ponen líneas (${await names()})`);
   check((await rowsOf('V1')).length >= 2, `la línea V mide cada traza (${(await rowsOf('V1')).length} cortes)`);
   check((await rowsOf('H1')).length >= 1, `la línea H mide dónde la cruzan (${await rowsOf('H1')})`);
@@ -688,7 +690,7 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   await page.keyboard.press('a');
   await page.mouse.move(r.x + r.width * 0.7, r.y + r.height * 0.5, { steps: 3 });
   await page.keyboard.press('d');
-  await page.waitForTimeout(100);
+  await frames(page);
   const deltaRow = (await rowsOf('D − A'))[0] ?? '';
   check((await names()).endsWith('A|D') && /D − A/.test(deltaRow) && /Hz/.test(deltaRow), `A y D con sus diferencias (${deltaRow})`);
   check(!(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), 'A no va a la caja de expresiones');
@@ -696,10 +698,10 @@ await page.getByRole('button', { name: 'Cursores' }).click();
   r = await page.locator('.pane-chart').first().boundingBox();
   // (lejos de la línea H, que está a media altura: un click sobre ella la selecciona)
   await page.mouse.click(r.x + r.width * 0.85, r.y + r.height * 0.25);
-  await page.waitForTimeout(100);
+  await frames(page);
   check((await names()).includes('M2'), `un click con Markers pone un marker (${await names()})`);
   await page.keyboard.press('Delete');
-  await page.waitForTimeout(100);
+  await frames(page);
   check(!(await names()).includes('M2') && (await page.locator('.pane').count()) >= 1, `Supr borra el marker seleccionado (${await names()})`);
   const v0 = (await rowsOf('V1'))[0];
   const ov = await page.locator('.pane-chart .uplot .u-over').first().boundingBox();
@@ -727,12 +729,12 @@ await page.getByRole('button', { name: 'Cursores' }).click();
     check(opened && /1\.000kHz/.test(now), `la x de la línea V se escribe a mano (${xs} → ${now})`);
   }
   await page.keyboard.press('Shift+M');
-  await page.waitForTimeout(100);
+  await frames(page);
   check((await names()) === '' && (await readings()).length === 0, 'Shift+M borra todos los markers');
   await page.getByRole('button', { name: 'Markers', exact: true }).click();
   await page.mouse.move(r.x + r.width * 0.4, r.y + r.height * 0.5);
   await page.keyboard.press('a');
-  await page.waitForTimeout(100);
+  await frames(page);
   check((await names()) === 'A' && !(await page.getByLabel('Expresión').evaluate((e) => e === document.activeElement)), `sin Markers, A también pone el marker A (${await names()})`);
   await page.keyboard.press('Shift+M');
   await page.keyboard.press('t');
@@ -748,7 +750,7 @@ check(png.name === 'Examples.png' && png.text.length > 1000, 'gráfico a PNG');
 // #51: ya no hay "Recordar vista" (la vista se guarda siempre con la simulación)
 check((await page.getByRole('button', { name: /Recordar vista|Vista recordada/ }).count()) === 0, 'sin botón Recordar vista');
 await page.getByLabel('Correr', { exact: true }).click();
-await page.waitForTimeout(500);
+await frames(page);
 check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `al volver a simular se conserva la vista (${await paneChips(0)})`);
 const plt = await downloaded(() => resultsMenu(page, 'Exportar', 'Vista a .plt (LTspice)'));
 check(plt.name === 'Examples.plt' && plt.text.includes('[AC Analysis]') && plt.text.includes('"V(out)/V(n001)"'), `vista a .plt de LTspice (${plt.name})`);
@@ -841,7 +843,7 @@ check(/5\.03\d*kHz/.test(pzTip) && /Q = 3\.16/.test(pzTip) && /ζ = 0\.158/.test
 check((await pzp.locator('.pz-table tr.hl').count()) === 1, 'el polo bajo el mouse se resalta en la tabla');
 const span0 = await pzp.locator('.pz-plane text').allTextContents();
 await pzp.mouse.wheel(0, -400);
-await pzp.waitForTimeout(100);
+await frames(pzp);
 check((await pzp.locator('.pz-plane text').allTextContents()).join() !== span0.join(), 'zoom con la rueda (cambia la escala)');
 await pzp.locator('.pz-view').getByRole('button', { name: 'Ajustar' }).click();
 const [pzDl] = await Promise.all([pzp.waitForEvent('download'), pzp.getByRole('combobox', { name: 'Exportar polos y ceros' }).selectOption('csv')]);
@@ -1015,7 +1017,7 @@ for (const where of ['al costado', 'abajo']) {
   check(Math.abs((await rect('.results-panel'))[dim] - ws / 2) < 4, `${where}: doble click en el divisor lleva a 50 %`);
   await splitter.dblclick({ position: { x: 1, y: 1 } });
   check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: otro doble click vuelve a la división guardada`);
-  if (where === 'al costado') await menu(page, 'Ver', 'Resultados al costado'), await page.waitForTimeout(500);
+  if (where === 'al costado') await menu(page, 'Ver', 'Resultados al costado'), await frames(page);
 }
 // simular con el esquemático expandido muestra los resultados
 await page.keyboard.press('Control+1');
@@ -1222,12 +1224,15 @@ check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición
   await page.mouse.move(p.x + 40, p.y + 20);
   // varias ruedas: Firefox anima el scroll y acota cada evento
   for (let i = 0; i < 30; i++) await page.mouse.wheel(0, 5000);
-  await page.waitForTimeout(1000);
-  const s = await log.evaluate((el) => {
-    const body = el.parentElement.getBoundingClientRect();
-    const r = el.getBoundingClientRect();
-    return { tall: el.scrollHeight > el.clientHeight, end: el.scrollTop + el.clientHeight >= el.scrollHeight - 1, inside: r.bottom <= body.bottom + 1 };
-  });
+  const scroll = () =>
+    log.evaluate((el) => {
+      const body = el.parentElement.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      return { tall: el.scrollHeight > el.clientHeight, end: el.scrollTop + el.clientHeight >= el.scrollHeight - 1, inside: r.bottom <= body.bottom + 1 };
+    });
+  // (el scroll puede ser animado: se espera a que llegue al final)
+  let s;
+  await until(async () => ((s = await scroll()), s.tall && s.end && s.inside));
   check(s.tall && s.end && s.inside, `el log se scrollea con la rueda hasta el final (${JSON.stringify(s)})`);
 }
 // los bloques quedan guardados en el .asc y se recuperan
@@ -1319,7 +1324,7 @@ await page.locator('svg.editor .sym').first().waitFor();
       const p = await at(0, 56);
       await page.mouse.dblclick(p.x, p.y);
       if (await page.getByRole('dialog', { name: 'Fuente de tensión V1' }).waitFor({ timeout: 2000 }).then(() => true, () => false)) return;
-      await page.waitForTimeout(500);
+      await frames(page);
     }
   };
   await openV1();
@@ -1407,7 +1412,7 @@ check(await fp.getByRole('dialog', { name: 'Acerca de TurboSpice' }).waitFor({ t
 await fp.keyboard.press('Escape');
 await menu(fp, 'Ejemplos', 'Common Emitter');
 await fp.locator('svg.editor .sym').first().waitFor();
-await fp.waitForTimeout(500);
+await frames(fp);
 check((await fp.locator('.capsule-names').textContent()).startsWith('Examples·Common Emitter'), `abre el ejemplo desde el menú (${await fp.locator('.capsule-names').textContent()})`);
 await fresh.close();
 

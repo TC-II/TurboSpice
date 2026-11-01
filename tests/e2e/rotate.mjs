@@ -2,7 +2,7 @@
 // "viajar" y, mientras se lo arrastra, el fantasma gira en el acto sin mover el mouse.
 // Uso: node tests/e2e/rotate.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, skipWelcome, launchBrowser } from './lib.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { activeAsc, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
@@ -43,7 +43,7 @@ const click = async (x, y) => {
 let saves = 0;
 const saved = async () => {
   // Chrome descarta una descarga automática pegada a la anterior: un respiro entre guardados
-  await page.waitForTimeout(400);
+  await frames(page);
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
   const path = `${OUT}/rotate-${saves++}.turbo`;
   await download.saveAs(path);
@@ -91,11 +91,11 @@ for (const [i, [x, y]] of [[0, 0], [160, 0]].entries()) {
   await page.mouse.move(b.x, b.y, { steps: 6 });
   const before = await body(0);
   await page.keyboard.press('Control+r');
-  await page.waitForTimeout(100);
+  await frames(page);
   const after = await body(0);
   check(after !== before, `Ctrl+R durante el arrastre actualiza el fantasma (${before} → ${after})`);
   await page.keyboard.press('Control+e');
-  await page.waitForTimeout(100);
+  await frames(page);
   const mirrored = await body(0);
   check(mirrored !== after, `Ctrl+E durante el arrastre actualiza el fantasma (${after} → ${mirrored})`);
   await page.mouse.up();

@@ -3,7 +3,7 @@
 // simulaciones (#39).
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, openExample, resultsMenu, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, menu, openExample, resultsMenu, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
 import { lineOf, simOf, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
 
@@ -82,10 +82,11 @@ await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const plots = await page.locator('select[aria-label="Plot"] option').allTextContents();
 check(plots.join() === 'tran1,tran2,tran3', `el barrido genera tres corridas (${plots.join(', ')})`);
-await page.waitForTimeout(300);
+// (al abrirse los resultados el esquemático se reacomoda)
+await steady(page);
 const out = await at(272, -32);
 await page.mouse.click(out.x, out.y);
-await page.waitForTimeout(300);
+await frames(page);
 await page.getByRole('button', { name: 'Medidas' }).click();
 const legend = await page.locator('.readout tbody tr').count();
 check(legend === 3, `las tres corridas de V(out) se superponen (${legend} curvas)`);
@@ -126,12 +127,13 @@ const chipNames = () => page.locator('.trace-chip .name').allTextContents();
 const simulate = async () => {
   await page.getByRole('button', { name: 'Correr', exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
-  await page.waitForTimeout(300);
+  // (al abrirse los resultados el esquemático se reacomoda)
+  await steady(page);
 };
 const probe = async (x, y) => {
   const p = await at(x, y);
   await page.mouse.click(p.x, p.y);
-  await page.waitForTimeout(200);
+  await frames(page);
 };
 const benchName = () => page.locator('.capsule-variant').textContent();
 await simType(page, 'Barrido DC');
@@ -149,7 +151,7 @@ check(!(await page.locator('.modal').count()), 'un tipo nuevo no abre el diálog
 check((await directive()).replace(/\s+/g, ' ') === '.dc 0 5 0.1', `elegir un tipo configura la simulación del testbench, sin elegir la fuente (${await directive()})`);
 await page.locator('.simbar input[aria-label="Fuente 1"]').fill('V1');
 await page.locator('.simbar input[aria-label="Fuente 1"]').press('Enter');
-await page.waitForTimeout(200);
+await frames(page);
 check((await directive()) === '.dc V1 0 5 0.1', `la fuente elegida en la barra (${await directive()})`);
 check((await benchName()) === 'DC', `la barra muestra el nombre del testbench (${await benchName()})`);
 check((await page.locator('.sim-state.idle').count()) === 1, 'el aro de estado arranca sin correr');
@@ -162,7 +164,7 @@ if (!(await page.locator('.project-tree').count())) await page.getByRole('button
 // (las acciones del testbench aparecen al pasar el mouse por su fila)
 await page.locator('.project-tree .tree-name').filter({ hasText: /^DC$/ }).hover();
 await page.getByRole('button', { name: 'Duplicar DC', exact: true }).click();
-await page.waitForTimeout(300);
+await frames(page);
 const copyName = await benchName();
 check(copyName === 'DC (copia)', `la copia es otro testbench, «‹nombre› (copia)» (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
@@ -194,7 +196,7 @@ const goBench = async (name) => {
   await openPanel();
   const names = (await benchRows().allTextContents()).map((x) => x.trim());
   await benchRows().nth(names.indexOf(name)).click();
-  await page.waitForTimeout(300);
+  await frames(page);
 };
 const listed = await items();
 const activeRow = (await page.locator('.project-tree .tree-row[data-bench].active .tree-name').textContent())?.trim();
@@ -205,16 +207,16 @@ check((await page.locator('.project-tree .tree-group').count()) >= 1 && !(await 
 // las flechas recorren los testbenches
 await benchRows().filter({ hasText: /^DC$/ }).click();
 await page.keyboard.press('ArrowDown');
-await page.waitForTimeout(300);
+await frames(page);
 check((await benchName()) === copyName, `↓ en el panel pasa al siguiente testbench (${await benchName()})`);
 await page.keyboard.press('ArrowRight');
 check((await page.locator('.project-tree .tree-row.tree-sub').count()) === 2, '→ lo despliega: simulación y parámetros (plegados)');
 await page.keyboard.press('ArrowLeft');
 await page.keyboard.press('ArrowUp');
-await page.waitForTimeout(300);
+await frames(page);
 check((await benchName()) === 'DC', `↑ vuelve al anterior (${await benchName()})`);
 await page.keyboard.press('ArrowDown');
-await page.waitForTimeout(300);
+await frames(page);
 check(!(await page.getByRole('button', { name: 'Nueva simulación', exact: true }).count()) || !(await (async () => {
   await page.getByRole('button', { name: 'Nueva simulación', exact: true }).click();
   const has = (await page.getByRole('menu').locator('[role^=menuitem]').allTextContents()).some((x) => x === 'DC');
@@ -247,7 +249,7 @@ check(rc.length === 2 && lineOf(simOf(saved).asc) === '.dc V1 0 2 0.01', 'el .tu
 const views = rc.map((s) => s.view?.panes.flatMap((p) => p.traces.map((t) => t.expr)).join() ?? '');
 check(views.join(' | ') === 'V(out) | V(out),V(N001)', `el archivo conserva la vista de cada uno (${views.join(' | ')})`);
 // y el autoguardado también: al recargar sigue la lista
-await page.waitForTimeout(1000); // autoguardado
+await autosaved(page);
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await items()).length === 2, 'al recargar se recuperan los testbenches');

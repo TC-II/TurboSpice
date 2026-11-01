@@ -4,7 +4,7 @@
 // (buses con radix); el modo comportamiento (Icarus) corre retardos y $display; todo sigue ahí
 // después de recargar.
 // Uso: node tests/e2e/verilog.mjs [url]   (con `npm run preview` corriendo)
-import { skipWelcome, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -56,13 +56,14 @@ TEXT 96 528 Left 2 !.tran 1u
 const simulate = async () => {
   await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 60000 });
-  await page.waitForTimeout(400);
+  // (al abrirse los resultados el esquemático se reacomoda)
+  await steady(page);
 };
 const addTrace = async (expr) => {
   const input = page.getByPlaceholder('Agregar traza: V(out)/V(in), I(R1), @Q1[gm]…');
   await input.fill(expr);
   await input.press('Enter');
-  await page.waitForTimeout(300);
+  await frames(page);
   return (await input.inputValue()) === '';
 };
 const panes = () =>
@@ -102,7 +103,7 @@ check((await page.locator('.vm-pins').textContent()).includes('q[1:0]'), `muestr
 check((await page.locator('.project-tree .tree-kind.verilog').count()) >= 1, 'aparece en el panel como módulo Verilog');
 // interfaz eléctrica: una familia lógica cambia los parámetros del símbolo
 await page.getByRole('combobox', { name: 'Familia lógica' }).selectOption({ label: '74HC (CMOS 5 V)' });
-await page.waitForTimeout(300);
+await frames(page);
 check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' }).inputValue()) === '3.5', 'la familia 74HC pone VIH = 3,5 V');
 // un error se marca en su línea
 await code.fill(VERILOG.replace('q <= q + 1;', 'q <= ;'));
@@ -146,7 +147,7 @@ check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q[1])', 'D:Dig(x1.q
 const values = await page.locator('.digital-lanes .dl-value').allTextContents();
 check(values.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `el bus muestra los valores en hex (${values.slice(0, 4)})`);
 await page.getByRole('combobox', { name: 'Base de Dig(x1.q[1:0])' }).selectOption('bin');
-await page.waitForTimeout(200);
+await frames(page);
 check((await page.locator('.digital-lanes .dl-value').first().textContent()) === '0b00', 'y en binario al cambiar el radix');
 check(!(await addTrace('Dig(x1.no_existe)')), 'un nodo digital que no existe da error');
 // arrastrar una traza analógica a un panel digital no hace nada
@@ -185,14 +186,14 @@ check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await p
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
 await code.fill('`timescale 1ns/1ps\nmodule pulso(input clk, output reg y);\n  initial y = 0;\n  always @(posedge clk) begin\n    #20 y = 1;\n    #10 y = 0;\n    $display("pulso");\n  end\nendmodule\n');
-await page.waitForTimeout(600);
+await frames(page);
 check((await page.locator('.vm-suggest').count()) === 1, 'sugiere el modo comportamiento (tiene retardos # y $display)');
 await page.locator('.vm-suggest button').click();
 await synthesize();
 check((await status()) === 'Compilado (Icarus)', `compila con Icarus (${await status()})`);
 
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
-await page.waitForTimeout(1500); // autoguardado
+await autosaved(page);
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await openTree();

@@ -22,12 +22,13 @@
     "pdk:units": "node tests/pdk/units.mjs",
     "perf": "node tests/perf/bench.mjs",
     "corpus": "node tests/corpus/roundtrip.mjs && node tests/corpus/explicit.mjs && node tests/corpus/netlist.mjs",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@yowasp/yosys": "0.70.1258",
     "blockly": "13.3.0",
-    "fflate": "^0.8.3",
+    "fflate": "0.8.3",
     "jspdf": "4.2.1",
     "mathjax-full": "3.2.2",
     "react": "18.3.1",
@@ -40,14 +41,18 @@
     "@types/node": "22.10.2",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
-    "@vitejs/plugin-react": "4.3.4",
+    "@vitejs/plugin-react": "4.7.0",
+    "@vitest/coverage-v8": "5.0.5",
     "eslint": "10.14.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.14.0",
-    "playwright-core": "^1.49.1",
+    "playwright-core": "1.49.1",
     "typescript": "5.7.2",
     "typescript-eslint": "8.72.1",
-    "vite": "6.0.5",
-    "vitest": "2.1.8"
+    "vite": "6.4.5",
+    "vitest": "5.0.5"
+  },
+  "overrides": {
+    "minimatch": "11.0.3"
   }
 }

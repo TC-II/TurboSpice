@@ -201,3 +201,12 @@ Regla: **una extracción por PR, sin cambiar comportamiento**, con las 17 suites
 
 Observación de producto que surgió de 0.1: a 1280 px de ancho, un tamaño común en notebooks, la barra
 de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) en «Más herramientas».
+
+### Fase 1
+
+| # | Estado | Detalle |
+|---|---|---|
+| 1.1 | ✅ | `eslint.config.js` con las recomendadas de JS y TypeScript, `rules-of-hooks` (error) y `exhaustive-deps` (aviso); `npm run lint` y paso en la CI. Se respetan las secuencias con coma y el `catch {}` vacío del estilo de la casa; `roughPen.js` (port de ASC-Parser) queda fuera. Encontró un bug en `tests/perf/plot.mjs` (`addTrace` fuera de su alcance), un test de `.turbo` que no probaba la `\` que decía (`'\ '` es un espacio en JS), inicializaciones muertas y dos `eslint-disable` sobrantes. Quedan 17 avisos de `exhaustive-deps` (casi todos en `App.tsx`, `SchematicEditor.tsx` y los diálogos), para la fase 3. |
+| 1.2 | ⏸️ | **Decisión del equipo.** Con la configuración que menos cambia (comillas simples, ancho 200), Prettier reformatea 118 archivos de `src/` (+5000/−2800 líneas). Hacerlo con ramas abiertas genera conflictos en todas; agregar sólo la configuración es peor, porque el formateo al guardar del editor reformatearía archivos enteros de a uno. Propuesta: elegir un momento sin ramas abiertas, aplicar `prettier --write` en un solo commit, agregarlo a `.git-blame-ignore-revs` y sumar `prettier --check` a la CI. |
+| 1.3 | ✅ | `@vitest/coverage-v8` y `npm run coverage`; la CI corre los unitarios con cobertura, publica el resumen en la página del run y el detalle como artefacto `coverage`. Línea de base (líneas de `src/`): **47 %** en total; `netlist` 96 %, `asc` 94 %, `sim` 89 %, `hdl` 65 %, `library` 65 %, `project` 60 %, `waveform` 35 %, `schematic` 31 %, `engine` 18 %, `ui` 6 %, `App.tsx`/`NetlistMode.tsx` 0 % (la interfaz la cubren los e2e). Sin umbral todavía. |
+| 1.4 | ✅ | vite 6.0.5 → 6.4.5 (misma serie: corrige todo lo del servidor de desarrollo), vitest 2.1.8 → 5.0.5, plugin-react 4.3.4 → 4.7.0; `fflate` y `playwright-core` fijos. `overrides` de `minimatch` a 11.0.3 (ESLint traía la 10.x, con un ReDoS moderado). `npm audit`: **0 vulnerabilidades** (antes 6, con 2 críticas y 1 alta). |

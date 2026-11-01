@@ -12,3 +12,4 @@ public/library/
 .env.local
 .env.*.local
 .cache/
+coverage/

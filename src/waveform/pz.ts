@@ -110,3 +110,88 @@ export function pzCsv(roots: Root[], label: (run: number) => string): string {
 
 /** "−1.2k + j3.4k" */
 export const complexText = (re: number, im: number) => `${si(re)} ${im < 0 ? '−' : '+'} j${si(Math.abs(im))}`;
+
+/** Prefijo de los plots del Bode normalizado de un .pz (#343): pzbode1, pzbode2… (uno por corrida) */
+export const PZ_BODE = 'pzbode';
+const PZ_BODE_NAME = new RegExp(`^${PZ_BODE}\\d+$`, 'i');
+export const isPzBodePlot = (p: SimPlot | undefined) => !!p && PZ_BODE_NAME.test(p.name);
+
+/**
+ * Bode normalizado de una corrida de .pz (#343). ngspice da sólo las raíces, no la constante K de
+ * H(s) = K·Π(s − zᵢ)/Π(s − pⱼ): se dibuja cada factor normalizado, (1 − s/r) o s para una raíz en el
+ * origen, así la ganancia en continua es 1 (0 dB, fase 0°); con raíces en el origen se lleva el
+ * máximo del rango a 0 dB. El nivel absoluto y el signo de K (fase ±180°) no se conocen.
+ * El rango va de una década debajo de la raíz más chica a una arriba de la más grande.
+ */
+export function pzBode(roots: Root[], perDecade = 50): { f: Float64Array; re: Float64Array; im: Float64Array; atOrigin: boolean } | null {
+  const mags = roots.map((r) => Math.hypot(r.re, r.im)).filter((m) => m > 0);
+  if (!roots.length || !mags.length) return null;
+  const f0 = Math.min(...mags) / (2 * Math.PI) / 10;
+  const f1 = Math.max(...mags) / (2 * Math.PI) * 10;
+  const d0 = Math.floor(Math.log10(f0));
+  const d1 = Math.ceil(Math.log10(f1));
+  const n = (d1 - d0) * perDecade + 1;
+  const f = Float64Array.from({ length: n }, (_, i) => 10 ** (d0 + i / perDecade));
+  const re = new Float64Array(n);
+  const im = new Float64Array(n);
+  const atOrigin = roots.some((r) => !r.re && !r.im);
+  let max = 0;
+  for (let i = 0; i < n; i++) {
+    const w = 2 * Math.PI * f[i];
+    // producto de los factores: (a + jb)
+    let a = 1;
+    let b = 0;
+    for (const r of roots) {
+      // factor de la raíz en s = jω: s, o 1 − s/r
+      let fr: number;
+      let fi: number;
+      if (!r.re && !r.im) [fr, fi] = [0, w];
+      else {
+        const m2 = r.re * r.re + r.im * r.im;
+        // s/r = jω·conj(r)/|r|² = (ω·r.im + jω·r.re)/|r|²
+        [fr, fi] = [1 - (w * r.im) / m2, -(w * r.re) / m2];
+      }
+      if (r.kind === 'pole') {
+        // dividir por (fr + j fi)
+        const m = fr * fr + fi * fi;
+        [fr, fi] = [fr / m, -fi / m];
+      }
+      [a, b] = [a * fr - b * fi, a * fi + b * fr];
+    }
+    re[i] = a;
+    im[i] = b;
+    max = Math.max(max, Math.hypot(a, b));
+  }
+  if (atOrigin && max > 0)
+    for (let i = 0; i < n; i++) {
+      re[i] /= max;
+      im[i] /= max;
+    }
+  return { f, re, im, atOrigin };
+}
+
+/**
+ * Plots del Bode normalizado para los .pz de una simulación que no trae otro análisis en
+ * frecuencia: uno por corrida (pzbode1… se superponen con .step como cualquier otro), con la
+ * traza H y el aviso de que la ganancia es relativa.
+ */
+export function pzBodePlots(plots: SimPlot[]): SimPlot[] {
+  const pzs = plots.filter(isPzPlot);
+  if (!pzs.length || plots.some((p) => !isPzPlot(p) && p.vectors.some((v) => v.name.toLowerCase() === 'frequency'))) return [];
+  return pzs.flatMap((p, i) => {
+    const b = pzBode(pzRoots([p]));
+    if (!b) return [];
+    return [
+      {
+        name: `${PZ_BODE}${i + 1}`,
+        info: b.atOrigin
+          ? t('Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at its maximum) and the phase may be off by 180°')
+          : t('Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at DC) and the phase may be off by 180°'),
+        vectors: [
+          { name: 'frequency', type: 2, real: b.f },
+          { name: 'h', label: 'H', type: 0, real: b.re, imag: b.im },
+        ],
+      },
+    ];
+  });
+}

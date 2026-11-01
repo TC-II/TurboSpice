@@ -796,7 +796,13 @@ await pzField('Salida +').fill('out');
 await pzField('Salida −').fill('0');
 await page.getByRole('button', { name: 'Aceptar' }).click();
 await page.getByLabel('Correr', { exact: true }).click();
-await page.locator('.pz-plane').waitFor({ timeout: 30000 });
+// (un .pz solo abre su Bode normalizado con el mapa al lado, #343; la tabla está en pz1)
+await page.locator('.pz-view.compact .pz-plane').waitFor({ timeout: 30000 });
+const pzBodeShown = [await page.getByRole('combobox', { name: 'Plot' }).inputValue(), (await page.locator('.trace-chip .name').allTextContents()).join()];
+check(pzBodeShown[0] === 'pzbode1' && /^h$/i.test(pzBodeShown[1]), `.pz solo: Bode normalizado de H con el mapa al lado (${pzBodeShown.join(': ')})`);
+await page.screenshot({ path: `${OUT}/pz-bode-normalizado.png` });
+await page.getByRole('combobox', { name: 'Plot' }).selectOption('pz1');
+await page.locator('.pz-view:not(.compact) tbody tr').first().waitFor();
 const pzRows = await page.locator('.pz-view tbody tr').allTextContents();
 check(pzRows.length === 2 && pzRows.every((r) => /polo/.test(r) && /5\.03\d*kHz/.test(r) && /3\.16/.test(r)), `.pz: dos polos con f0 = 5.03 kHz y Q = 3.16 (${pzRows.join(' | ')})`);
 await page.screenshot({ path: `${OUT}/pz.png` });

@@ -415,9 +415,15 @@ describe('un cable no atraviesa componentes (#45)', () => {
     const d = placeSymbol(wire2, 'res', { x: 0, y: 0 }, 'R0', lib);
     expect(ws(d)).toEqual(cutWires);
     expect(net(d)).toMatch(/^R1 a b /m);
-    // sobre un cable que sólo toca un pin (T) no se corta nada
+    // sobre un cable que sólo toca un pin (T): se parte en el pin, como al cruzar otro cable
     const t = placeSymbol(asc('WIRE -64 96 96 96\n'), 'res', { x: 0, y: 0 }, 'R0', lib);
-    expect(ws(t)).toEqual([[-64, 96, 96, 96]]);
+    expect(ws(t)).toEqual([[-64, 96, 16, 96], [16, 96, 96, 96]]);
+  });
+
+  it('soltar un pin en el medio de un cable al moverlo lo parte ahí', () => {
+    const d = asc('WIRE -64 -32 96 -32\nSYMBOL res 0 64 R0\n');
+    const m = moveItems(d, [{ kind: 'symbol', index: 0 }], 0, -112, true, lib);
+    expect(ws(m).filter((w) => w[1] === -32 && w[3] === -32).sort()).toEqual([[-64, -32, 16, -32], [16, -32, 96, -32]]);
   });
 
   it('pegar un componente sobre un cable lo parte; las referencias siguen a los cables pegados', () => {

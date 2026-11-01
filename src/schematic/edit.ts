@@ -104,7 +104,9 @@ function cutPieces(doc: AscDoc, wires: Wire[], lib: Library, applies: (sym: numb
 function cutNew(doc: AscDoc, refs: ItemRef[], lib: Library): { doc: AscDoc; refs: ItemRef[] } {
   const syms = new Set(refs.filter((r) => r.kind === 'symbol').map((r) => r.index));
   const news = new Set(refs.filter((r) => r.kind === 'wire').map((r) => doc.wires[r.index]));
-  const pieces = cutPieces(doc, doc.wires, lib, (sym, w) => syms.has(sym) || news.has(w));
+  // un pin que cae en el medio de un cable lo parte ahí (unión en T, como LTspice)
+  const pins = [...syms].flatMap((i) => pinPoints(doc.symbols[i], lib.symbol(doc.symbols[i].type)));
+  const pieces = cutPieces(doc, doc.wires, lib, (sym, w) => syms.has(sym) || news.has(w)).map((p) => p.flatMap((w) => pins.reduce((ws, q) => splitAt(ws, q), [w])));
   if (pieces.every((p, i) => p.length === 1 && p[0] === doc.wires[i])) return { doc, refs };
   const at: number[] = [];
   pieces.reduce((n, p, i) => ((at[i] = n), n + p.length), 0);
@@ -201,8 +203,10 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
     selOut?.push(m);
     return m;
   };
+  // un pin movido que cae en el medio de un cable lo parte ahí (unión en T)
+  const movedPins = [...s].flatMap((i) => pinPoints(base.symbols[i], lib.symbol(base.symbols[i].type)));
   const finish = (wires: Wire[]) =>
-    mergeCollinear({ ...base, wires: cutThroughBodies(base, wires, lib, (sym, wr) => s.has(sym) || moved.has(wr)) }, lib);
+    mergeCollinear({ ...base, wires: movedPins.reduce((ws, p) => splitAt(ws, p), cutThroughBodies(base, wires, lib, (sym, wr) => s.has(sym) || moved.has(wr))) }, lib);
   if (!drag) return finish(doc.wires.map((wr, i) => (w.has(i) ? moveWire(wr) : wr)));
 
   // Puntos que se mueven: pines y etiquetas seleccionados, extremos de cables seleccionados

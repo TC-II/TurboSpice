@@ -218,3 +218,11 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 | 2.1 | ✅ | Un solo núcleo en `netlist/spicenum.ts`: `formatSi(x, cifras, tabla)` con tres tablas con nombre (`SPICE_PREFIXES` con `u`/`Meg`, `LTSPICE_PREFIXES` con `µ`/`Meg`, `DISPLAY_PREFIXES` con `µ`/`M`), `spiceSuffix` y `parseDisplayNumber`. `si`, `siValue`, `engValue` y `engNumber` quedan como envoltorios de una línea (no cambia ninguna llamada); `expr.ts` y `dft.ts` usan las tablas compartidas. Comparación contra las versiones anteriores sobre ~200 000 valores: `si` (el visor) idéntica; en las demás ningún valor cambia, sólo el texto en tres casos: `1meg` → `1Meg` en las tarjetas del Estudio, el redondeo a 1000 corregido (`siValue` podía mostrar «1000m») y ≥10¹² con `T` en vez de «1070G». Las expresiones del visor ahora leen `μ` (antes daban error) y `mil` como en SPICE (antes valía 1 m). Tests en `tests/unit/si.test.ts`. |
 | 2.2 | ✅ | Decisión: las dos convenciones de «M» se quedan (mili en SPICE, mega en el visor y sus campos), documentadas en `docs/compatibilidad-ltspice.md` § Números con prefijo SI. |
 | 2.3 | ✅ | `niceStep` (paso redondo para *n* divisiones) queda sólo en `waveform/pz.ts`; `SourceDialog.tsx` lo importa (y gana la guarda de rango vacío). El de `scales.ts`, que hace otra cosa (el paso lindo ≥ x, con 2,5), pasa a llamarse `niceStepAbove`. Las `addSim`/`duplicateSim`/`removeSim`/`renameSim`/`selectSim`/`withSims` de `sim/simList.ts` no las usa la interfaz (usa las de `project/project.ts`): quedan marcadas `@deprecated`, sólo para armar el formato viejo en los tests de la migración. |
+
+### Fase 5
+
+| # | Estado | Detalle |
+|---|---|---|
+| 5.1 | ✅ | `docs/PLAN.md` § Estructura al día (sin `src/analyses/`, `src/io/`, `.tsch` ni `build-library.ts`); `README.md` § Deploy con las dos ramas y los controles de la CI, y los comandos nuevos. |
+| 5.2 | ✅ | `graphify-out/` ya se regeneró en `dev` (desde `2b19d1b`). Queda versionado; conviene regenerarlo tras cambios grandes, como dice `CLAUDE.md`. |
+| 5.3 | ✅ | `CONTRIBUTING.md`: ramas, controles antes de subir, convenciones (commits, `t()`, números SI, tests). |

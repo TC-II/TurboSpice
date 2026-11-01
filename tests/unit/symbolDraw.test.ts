@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addPin, addShape, moveParamWindow, removeShape, resizeBody, setShape, setSymParams, symParamWindow, symPins, symShapes } from '../../src/project/symbolEdit.ts';
+import { addPin, addShape, addText, copySym, pasteSym, setText, symTexts, moveParamWindow, removeShape, resizeBody, setShape, setSymParams, symParamWindow, symPins, symShapes } from '../../src/project/symbolEdit.ts';
 import { addFlag, setFlagName } from '../../src/schematic/edit.ts';
 import { emptyDoc } from '../../src/asc/model.ts';
 
@@ -47,5 +47,31 @@ describe('rótulo de los parámetros del símbolo (WINDOW 39)', () => {
     s = setSymParams(s, [['G', '2'], ['R', '1k']]);
     expect(symParamWindow(s)).toMatchObject({ x: 64, y: -48 });
     expect(symParamWindow(resizeBody(s, { x1: -48, y1: -32, x2: 48, y2: 64 }))).toMatchObject({ x: 64, y: -48 });
+  });
+});
+
+describe('copiar y pegar en el símbolo', () => {
+  it('pega figuras corridas y pines con nombre libre y el SpiceOrder siguiente', () => {
+    const s = 'Version 4\nSymbolType CELL\nLINE Normal 0 0 16 16\nPIN -32 0 LEFT 8\nPINATTR PinName A\nPINATTR SpiceOrder 1\n';
+    const clip = copySym(s, [2], [0]);
+    const r = pasteSym(s, clip, 16, 16);
+    expect(symShapes(r.text).map((x) => x.coords.join(' '))).toEqual(['0 0 16 16', '16 16 32 32']);
+    expect(symPins(r.text).map((p) => `${p.name}:${p.order}@${p.x},${p.y}`)).toEqual(['A:1@-32,0', 'A_1:2@-16,16']);
+    expect(r.shapes).toEqual([3]);
+    expect(r.pins).toEqual([1]);
+  });
+});
+
+describe('textos del símbolo (TEXT del .asy)', () => {
+  it('lee, agrega, cambia, borra y pega textos', () => {
+    let s = 'Version 4\nSymbolType CELL\nLINE Normal 0 0 16 16\nTEXT 4 32 Left 0 Vdd\nPIN -32 0 LEFT 8\nPINATTR PinName A\nPINATTR SpiceOrder 1\n';
+    expect(symTexts(s)).toEqual([{ line: 3, x: 4, y: 32, align: 'Left', size: 0, text: 'Vdd' }]);
+    s = addText(s, { x: 3, y: 105, align: 'Left', size: 0, text: 'Gnd' });
+    expect(s.split('\n')[4]).toBe('TEXT 3 105 Left 0 Gnd');
+    s = setText(s, 3, { text: 'V+', size: 2 });
+    expect(symTexts(s)[0]).toMatchObject({ text: 'V+', size: 2, x: 4 });
+    const r = pasteSym(s, copySym(s, [3], []), 16, 16);
+    expect(symTexts(r.text).map((x) => `${x.text}@${x.x},${x.y}`)).toContain('V+@20,48');
+    expect(symTexts(removeShape(s, 3)).map((x) => x.text)).toEqual(['Gnd']);
   });
 });

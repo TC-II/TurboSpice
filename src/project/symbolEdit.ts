@@ -55,12 +55,13 @@ function sideOf(x: number, y: number, body: ReturnType<typeof symBody>): string 
 }
 
 /** Mueve el pin `index` (orden en el archivo) */
-export function movePin(text: string, index: number, x: number, y: number): string {
+export function movePin(text: string, index: number, x: number, y: number, keepAlign = false): string {
   const ls = lines(text);
   const pin = symPins(text)[index];
   if (!pin) return text;
   const off = /^PIN\s+\S+\s+\S+\s+\S+\s+(\S+)/.exec(ls[pin.line])?.[1] ?? '8';
-  ls[pin.line] = `PIN ${x} ${y} ${sideOf(x, y, symBody(text))} ${off}`;
+  // la alineación elegida a mano (y un nombre oculto, NONE) se conserva; si no, la del lado más cercano
+  ls[pin.line] = `PIN ${x} ${y} ${keepAlign || pin.align === 'NONE' ? pin.align : sideOf(x, y, symBody(text))} ${off}`;
   return join(ls);
 }
 
@@ -234,6 +235,33 @@ export function moveParamWindow(text: string, x: number, y: number): string {
   return join(ls);
 }
 
+export interface SymWindow {
+  /** número de WINDOW (0 InstName, 3 Value, 38 SpiceModel, 39 SpiceLine, 40 SpiceLine2, 123 Value2) */
+  n: number;
+  x: number;
+  y: number;
+  align: string;
+  size: number;
+}
+
+/** Rótulos (WINDOW) del símbolo */
+export function symWindows(text: string): SymWindow[] {
+  return [...text.matchAll(/^WINDOW (\d+) (-?\d+) (-?\d+) (\S+)(?: (\d+))?/gm)].map((m) => ({ n: Number(m[1]), x: Number(m[2]), y: Number(m[3]), align: m[4], size: m[5] === undefined ? 2 : Number(m[5]) }));
+}
+
+/** ¿Se ve el rótulo? Sólo «Invisible» lo oculta: el tamaño 0 es la letra más chica (spec §7.1) */
+export const windowShown = (w: SymWindow) => w.align !== 'Invisible';
+
+/** Mueve el rótulo `n` (conserva su alineación y tamaño) */
+export function moveWindow(text: string, n: number, x: number, y: number): string {
+  const ls = lines(text);
+  const i = ls.findIndex((l) => l.startsWith(`WINDOW ${n} `));
+  if (i < 0) return text;
+  const m = /^WINDOW \d+ \S+ \S+ (.*)$/.exec(ls[i]);
+  ls[i] = `WINDOW ${n} ${x} ${y} ${m?.[1] ?? 'Left 2'}`;
+  return join(ls);
+}
+
 // --- dibujo: líneas, rectángulos, círculos y pines nuevos ----------------------------------
 
 export type ShapeKind = 'LINE' | 'RECTANGLE' | 'CIRCLE';
@@ -276,8 +304,49 @@ export function setShape(text: string, line: number, c: [number, number, number,
 /** Saca la figura de la línea `line` */
 export function removeShape(text: string, line: number): string {
   const ls = lines(text);
-  if (!/^(LINE|RECTANGLE|CIRCLE)\s/.test(ls[line] ?? '')) return text;
+  if (!/^(LINE|RECTANGLE|CIRCLE|TEXT)\s/.test(ls[line] ?? '')) return text;
   ls.splice(line, 1);
+  return join(ls);
+}
+
+// --- textos del símbolo (TEXT x y alineación tamaño contenido; en el .asy, sin «;», spec §5.3) ----
+
+export interface SymText {
+  /** índice de la línea en el texto */
+  line: number;
+  x: number;
+  y: number;
+  align: string;
+  size: number;
+  text: string;
+}
+
+export function symTexts(text: string): SymText[] {
+  const out: SymText[] = [];
+  lines(text).forEach((l, i) => {
+    const m = /^TEXT\s+(-?\d+)\s+(-?\d+)\s+(\S+)\s+(\d+)\s?(.*)$/.exec(l);
+    if (m) out.push({ line: i, x: Number(m[1]), y: Number(m[2]), align: m[3], size: Number(m[4]), text: m[5] });
+  });
+  return out;
+}
+
+const textLine = (t: Omit<SymText, 'line'>) => `TEXT ${t.x} ${t.y} ${t.align} ${t.size} ${t.text.replace(/[\r\n]+/g, ' ')}`;
+
+/** Agrega un texto detrás de las figuras (antes de los atributos y los pines) */
+export function addText(text: string, t: Omit<SymText, 'line'>): string {
+  const ls = lines(text);
+  const last = Math.max(symShapes(text).at(-1)?.line ?? -1, symTexts(text).at(-1)?.line ?? -1);
+  const at = last >= 0 ? last + 1 : Math.max(1, ls.findIndex((l) => /^SymbolType /.test(l)) + 1);
+  ls.splice(at, 0, textLine(t));
+  return join(ls);
+}
+
+/** Cambia el texto de la línea `line` (posición, alineación, tamaño o contenido) */
+export function setText(text: string, line: number, patch: Partial<Omit<SymText, 'line'>>): string {
+  const t = symTexts(text).find((x) => x.line === line);
+  if (!t) return text;
+  const ls = lines(text);
+  ls[line] = textLine({ ...t, ...patch });
   return join(ls);
 }
 
@@ -287,4 +356,102 @@ export function addPin(text: string, name: string, x: number, y: number): string
   const order = symPins(text).length + 1;
   ls.push(`PIN ${x} ${y} ${sideOf(x, y, symBody(text))} 8`, `PINATTR PinName ${name}`, `PINATTR SpiceOrder ${order}`);
   return join(ls);
+}
+
+/** Alineación del nombre del pin `index` (LEFT, RIGHT, TOP, BOTTOM; NONE lo oculta) */
+export function setPinAlign(text: string, index: number, align: string): string {
+  const ls = lines(text);
+  const pin = symPins(text)[index];
+  if (!pin) return text;
+  const off = align === 'NONE' ? 0 : Number(/^PIN\s+\S+\s+\S+\s+\S+\s+(\S+)/.exec(ls[pin.line])?.[1]) || 8;
+  ls[pin.line] = `PIN ${pin.x} ${pin.y} ${align} ${off}`;
+  return join(ls);
+}
+
+/** Lado del cuerpo que le corresponde al pin `index` por su posición (para volver a mostrar su nombre) */
+export const pinSide = (text: string, index: number) => {
+  const p = symPins(text)[index];
+  return p ? sideOf(p.x, p.y, symBody(text)) : 'LEFT';
+};
+
+/** Saca el pin `index` con sus PINATTR; los SpiceOrder mayores bajan uno */
+export function removePin(text: string, index: number): string {
+  const pins = symPins(text);
+  const pin = pins[index];
+  if (!pin) return text;
+  const ls = lines(text);
+  let end = pin.line + 1;
+  while (end < ls.length && ls[end].startsWith('PINATTR')) end++;
+  ls.splice(pin.line, end - pin.line);
+  return join(ls.map((l) => {
+    const m = /^PINATTR SpiceOrder (\d+)$/.exec(l);
+    return m && Number(m[1]) > pin.order ? `PINATTR SpiceOrder ${Number(m[1]) - 1}` : l;
+  }));
+}
+
+/** Pin nuevo `name` en un lugar libre de la grilla, a la izquierda del cuerpo */
+export function addFreePin(text: string, name: string, grid: number): string {
+  const pins = symPins(text);
+  const b = symBody(text);
+  const x = b ? Math.floor((b.x1 - 1) / grid) * grid : -2 * grid;
+  let y = b ? Math.ceil(b.y1 / grid) * grid : 0;
+  while (pins.some((p) => p.x === x && p.y === y)) y += grid;
+  return addPin(text, name, x, y);
+}
+
+// --- copiar y pegar ------------------------------------------------------------------------
+
+/** Lo copiado del símbolo: las líneas de las figuras y textos, y las de cada pin (PIN y sus PINATTR) */
+export interface SymClip {
+  shapes: string[];
+  pins: string[][];
+}
+
+/** Copia las figuras (por su línea) y los pines (por su índice) */
+export function copySym(text: string, shapeLines: number[], pinIdx: number[]): SymClip {
+  const ls = lines(text);
+  const pins = symPins(text);
+  return {
+    shapes: shapeLines.filter((l) => ls[l] !== undefined).map((l) => ls[l]),
+    pins: pinIdx.flatMap((i) => {
+      const p = pins[i];
+      if (!p) return [];
+      let end = p.line + 1;
+      while (end < ls.length && ls[end].startsWith('PINATTR')) end++;
+      return [ls.slice(p.line, end)];
+    }),
+  };
+}
+
+/** Pega lo copiado corrido (dx, dy): las figuras detrás de las que hay; los pines al final, con un
+ *  nombre libre (A → A_1) y el SpiceOrder siguiente. Devuelve el texto y qué quedó seleccionado */
+export function pasteSym(text: string, clip: SymClip, dx: number, dy: number): { text: string; shapes: number[]; pins: number[] } {
+  const shift = (l: string) =>
+    l
+      .replace(/^(LINE|RECTANGLE|CIRCLE)(\s+\S+\s+)(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/, (_, k: string, st: string, a: string, b: string, c: string, d: string) => `${k}${st}${+a + dx} ${+b + dy} ${+c + dx} ${+d + dy}`)
+      .replace(/^TEXT\s+(-?\d+)\s+(-?\d+)/, (_, a: string, b: string) => `TEXT ${+a + dx} ${+b + dy}`);
+  let ls = lines(text);
+  const last = Math.max(symShapes(text).at(-1)?.line ?? -1, symTexts(text).at(-1)?.line ?? -1);
+  const at = last >= 0 ? last + 1 : Math.max(1, ls.findIndex((l) => /^SymbolType /.test(l)) + 1);
+  ls = [...ls.slice(0, at), ...clip.shapes.map(shift), ...ls.slice(at)];
+  const shapes = clip.shapes.map((_, i) => at + i);
+  const names = new Set(symPins(text).map((p) => p.name.toLowerCase()));
+  let order = Math.max(0, ...symPins(text).map((p) => p.order));
+  const before = symPins(join(ls)).length;
+  for (const block of clip.pins) {
+    const base = /^PINATTR PinName (.*)$/m.exec(block.join('\n'))?.[1].trim() || 'p';
+    let nm = base;
+    for (let k = 1; names.has(nm.toLowerCase()); k++) nm = `${base}_${k}`;
+    names.add(nm.toLowerCase());
+    order++;
+    ls.push(
+      ...block.map((l) => {
+        if (l.startsWith('PIN ')) return l.replace(/^PIN (-?\d+) (-?\d+)/, (_, x: string, y: string) => `PIN ${+x + dx} ${+y + dy}`);
+        if (l.startsWith('PINATTR PinName')) return `PINATTR PinName ${nm}`;
+        if (l.startsWith('PINATTR SpiceOrder')) return `PINATTR SpiceOrder ${order}`;
+        return l;
+      }),
+    );
+  }
+  return { text: join(ls), shapes, pins: clip.pins.map((_, i) => before + i) };
 }

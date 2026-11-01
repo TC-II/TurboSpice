@@ -99,12 +99,12 @@ import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
-import { addModelModule, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
+import { addModelModule, adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
 import { ModelEditor } from './project/ModelEditor.tsx';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
-import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
+import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { TRACE_WIDTHS, setTraceWidth, useTraceWidth } from './waveform/lineWidth.ts';
@@ -172,7 +172,7 @@ const SKY130 = 'sky130.turbo';
 const GF180 = 'gf180.turbo';
 
 type Dialog =
-  | { kind: 'picker'; forSymbol?: boolean }
+  | { kind: 'picker'; forSymbol?: boolean; forNetlist?: boolean }
   | { kind: 'attrs'; index: number; label?: number; generic?: boolean }
   | { kind: 'switch'; index: number }
   | { kind: 'source'; index: number }
@@ -1580,6 +1580,9 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setDocKey((k) => k + 1);
     const saved = levelViews.current.get(levelKey(next));
     if (saved) requestAnimationFrame(() => requestAnimationFrame(() => editor.current?.setView(saved)));
+    // al entrar a un subcircuito aparece el panel del símbolo y el esquemático se angosta después de
+    // ajustar: se vuelve a ajustar con el ancho final (si no, lo dibujado queda detrás del panel)
+    else setTimeout(() => editor.current?.fit(), 120);
   };
   const goUp = () => pathRef.current.length && go(pathRef.current.slice(0, -1));
   /** Abre un subcircuito sin instancia (desde el panel, una pestaña o Ctrl+P) */
@@ -2247,9 +2250,48 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const y = (fs.length ? Math.max(...fs.map((f) => f.y)) : -64) + 64;
     commit(addFlag(doc, { x, y }, name, 'BiDir'));
   };
-  /** Un .asy existente como símbolo del subcircuito que se edita (#199) */
+  /** El netlist de un componente existente en el modelo que se edita (el dibujo no se toca): de un
+   *  subcircuito del proyecto (o un módulo Verilog sintetizado), su .subckt; de uno de la librería,
+   *  su archivo de modelos entero, tal cual. SpiceModel pasa a ser el .subckt/.model que usaba */
+  const adoptNetlistFor = async (type: string) => {
+    const p0 = projectRef.current;
+    if (!curModel) return;
+    const vf = verilogFile(p0, type);
+    let net = vf ? vf.synth?.subckt : subcktFile(p0, type) ? exportSubcktNetlist(snapshot(), type, lib)?.text : undefined;
+    let from = type;
+    if (!net) {
+      const asy = lib.symbolText(type);
+      const at = (k: string) => (asy ? symAttr(asy, k) : '');
+      // como el netlist: sin ModelFile, SpiceModel es el archivo y el nombre es Value2 o Value (#ltnetlist)
+      const file = at('ModelFile') || (at('Prefix') === 'X' ? at('SpiceModel') : '');
+      from = (at('ModelFile') ? at('SpiceModel') || at('Value') : at('Value2') || at('Value')).split(/\s/)[0];
+      const rel = file ? lib.resolveModelFile(file) : undefined;
+      try {
+        net = rel ? (lib.userFile(rel) ?? (await fetchModelFile(rel))) : undefined;
+      } catch {
+        net = undefined;
+      }
+    }
+    if (!net) return setMessage(t('{sym} has no netlist to import (only subcircuits and components with a model file)', { sym: baseName(type) }));
+    let p = storeModelText(p0, curModel, net.endsWith('\n') ? net : `${net}\n`);
+    const sym = modelSymbolText(p, curModel);
+    // los parámetros del .subckt (params: G=1) van, en orden, a Value, Value2, SpiceLine y SpiceLine2
+    const ps = from ? subcktParams(net, from) : [];
+    if (sym && from) p = storeModelSymbol(p, curModel, setModelParams(syncModelAttrs(setModelAttr(sym, 'SpiceModel', from), net), ps.length ? ps : modelParams(sym)));
+    projectRef.current = p;
+    editProject(p);
+    setMessage(t('Netlist of {sym} imported into {name}: check the pins of the symbol', { sym: baseName(type), name: curModel }));
+  };
+  /** Un .asy existente como símbolo del subcircuito (o del modelo) que se edita (#199) */
   const adoptSymbolFor = (type: string) => {
-    const asy = lib.symbolText(type);
+    const asy = lib.symbolText(type) ?? (curModel ? subcktSymbolText(projectRef.current, type) : undefined);
+    if (asy && curModel) {
+      // el código no se toca: los pines se pasan al .lib con «Update pins in .lib»
+      const p = storeModelSymbol(projectRef.current, curModel, adoptModelSymbol(asy, modelSymbolText(projectRef.current, curModel) ?? '', curModel));
+      projectRef.current = p;
+      editProject(p);
+      return setMessage(t('Symbol {sym} adopted: to pass its pins to the code, use «Update pins in .lib»', { sym: baseName(type) }));
+    }
     if (!curSub || !asy) return setMessage(t('Symbol not found: {p0}', { p0: type }));
     if (subcktFile(projectRef.current, type)) return setMessage(t('Choose a symbol from the library, not another subcircuit'));
     const ports = subPorts.map((n) => ({ name: n, dir: liveDoc.flags.find((f) => f.name === n)?.ioPin }));
@@ -3840,8 +3882,6 @@ ${ltNetlistText(sim.built.lt)}
               name={curModel}
               text={modelModuleFile(project, curModel)!.text}
               symText={modelSymbolText(project, curModel) ?? ''}
-              symW={symW}
-              onWidth={setSymW}
               onText={(text) => {
                 const p = storeModelText(projectRef.current, curModel, text);
                 projectRef.current = p;
@@ -3852,6 +3892,8 @@ ${ltNetlistText(sim.built.lt)}
                 projectRef.current = p;
                 editProject(p);
               }}
+              onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
+              onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
               onClose={() => setCurModel('')}
             />
           )}
@@ -4192,6 +4234,7 @@ ${ltNetlistText(sim.built.lt)}
             // los símbolos del usuario se referencian por nombre, como los de junto al .asc en LTspice
             const dir = [USER_DIR, PROJECT_DIR].find((d) => type.startsWith(`${d}/`));
             const name = dir ? type.slice(dir.length + 1) : type;
+            if (dialog.forNetlist) return void adoptNetlistFor(name);
             if (dialog.forSymbol) return adoptSymbolFor(name);
             if (!makesCycle([name])) setTool({ kind: 'place', type: name, orient: 'R0' });
           }}

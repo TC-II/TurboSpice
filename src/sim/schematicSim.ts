@@ -61,7 +61,7 @@ async function pdkModels(ng: NgspiceNetlist, netlist: string, files: Record<stri
   return loadPdk(index, corner, devices, `${PDK_DIR}/${name}`, (rel) => fetchPdkFile(`${name}/${rel}`));
 }
 
-async function fetchModelFile(rel: string): Promise<string> {
+export async function fetchModelFile(rel: string): Promise<string> {
   let tt = fileCache.get(rel);
   if (tt === undefined) {
     const res = await fetch(LIB_URL + rel.split('/').map(encodeURIComponent).join('/'));

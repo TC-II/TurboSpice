@@ -188,12 +188,17 @@ export function importEntries(p: Project, entries: ZipEntry[], zipName?: string)
  * Un subcircuito como .zip para LTspice u otro proyecto: su .asc y su .asy (un bloque jerárquico
  * de LTspice), los subcircuitos que usa adentro y los modelos que nombra.
  */
-/** El subcircuito, su símbolo y lo que usa adentro (otros subcircuitos y modelos); vacío si no existe */
+/** El subcircuito, su símbolo y lo que usa adentro (otros subcircuitos y modelos); de un módulo
+ *  «Modelo», su .lib y su .asy. Vacío si no existe */
 export function subcktFilesFor(p: Project, name: string): ProjectFile[] {
   const key = name.toLowerCase();
   const sch = p.files.find((f) => f.kind === 'schematic' && f.name.replace(/\.asc$/i, '').toLowerCase() === key);
-  if (!sch) return [];
   const sym = p.files.filter((f) => f.kind === 'symbol' && f.name.replace(/\.asy$/i, '').toLowerCase() === key);
+  if (!sch) {
+    // un módulo «Modelo»: su netlist (.lib) y su símbolo
+    const lib = p.files.find((f) => f.kind === 'model' && f.module === 'model' && f.name.replace(/\.(lib|sub|mod)$/i, '').toLowerCase() === key);
+    return lib ? [lib, ...sym] : [];
+  }
   const rest = usedFiles(p.files, [sch.text]).filter((f) => f !== sch && !sym.includes(f));
   return [sch, ...sym, ...rest];
 }

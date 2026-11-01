@@ -45,10 +45,10 @@ export interface TreeBench {
 
 export type BenchItem = 'sim' | 'schematic' | 'params' | 'history' | 'study';
 
-/** Tipos de módulo: glifo, etiqueta de la fila, nombre en el menú «+ New» y ayuda */
-const KIND = {
+/** Tipos de módulo: glifo (texto o ícono), etiqueta de la fila, nombre en el menú «+ New» y ayuda */
+const KIND: Record<'subckt' | 'model' | 'verilog', { glyph: React.ReactNode; label(): string; name(): string; title(): string }> = {
   subckt: { glyph: '▭', label: () => t('subcir'), name: () => t('Subcircuit'), title: () => t('Subcircuit: schematic and its symbol') },
-  model: { glyph: '◇', label: () => t('model'), name: () => t('Model'), title: () => t('Model: netlist (.subckt or .model) and its symbol') },
+  model: { glyph: <Icon name="component" size={13} />, label: () => t('model'), name: () => t('Model'), title: () => t('Model: netlist (.subckt or .model) and its symbol') },
   verilog: { glyph: '⟨⟩', label: () => t('verilog'), name: () => t('Verilog'), title: () => t('Verilog: synthesizable code, turned into a digital block with its symbol') },
 };
 
@@ -337,11 +337,19 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
-          {!s.type && <>
-          <button onClick={() => onExport(s.name)} title={t('Export (.zip with its .asc and .asy, for LTspice or another project)')} aria-label={t('Export {name}', { name: s.name })}>⤓</button>
-          <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
-            .sub
+          {(!s.type || s.type === 'model') && <>
+          <button
+            onClick={() => onExport(s.name)}
+            title={s.type === 'model' ? t('Export (.zip with its .lib and .asy, for LTspice or another project)') : t('Export (.zip with its .asc and .asy, for LTspice or another project)')}
+            aria-label={t('Export {name}', { name: s.name })}
+          >
+            ⤓
           </button>
+          {!s.type && (
+            <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
+              .sub
+            </button>
+          )}
           <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
             ☆
           </button>

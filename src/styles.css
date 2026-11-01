@@ -1134,6 +1134,7 @@ button.hier-tab { padding-right: 10px; }
 .hier-x { margin-left: 6px; width: 18px; height: 18px; border-radius: 4px; line-height: 1; opacity: .6; }
 .hier-x:hover { opacity: 1; background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .tree-glyph { color: var(--accent); font-size: 11px; }
+.tree-glyph .icon { vertical-align: -2px; }
 .hier-quick { margin-left: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--fg-muted); font: inherit; font-size: 12px; padding: 2px 8px; white-space: nowrap; }
 .hier-quick kbd { font: 11px var(--mono); opacity: .7; margin-left: 4px; }
 .hier-crumbs { height: 30px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 2px; padding: 0 8px 0 12px; border-top: 1px solid var(--border); background: var(--bg); white-space: nowrap; overflow-x: auto; scrollbar-width: none; }
@@ -1183,13 +1184,14 @@ button.hier-tab { padding-right: 10px; }
 .sym-pane header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
 .sym-pane header .tree-add { margin-left: auto; }
 .sym-canvas { flex: 1 1 0; min-height: 180px; height: 0; width: 100%; background: var(--bg); border-bottom: 1px solid var(--border); touch-action: none; }
-.sym-dot { fill: var(--grid, #888); opacity: .5; }
+.sym-grid-major { fill: none; stroke: var(--fg-muted); stroke-width: 1px; vector-effect: non-scaling-stroke; opacity: .45; }
+.sym-grid-fine { fill: none; stroke: var(--fg-muted); stroke-width: 1px; vector-effect: non-scaling-stroke; opacity: .12; }
 .sym-shapes { fill: none; stroke: var(--fg); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .sym-shapes * { vector-effect: non-scaling-stroke; }
-.sym-title { fill: var(--fg-muted); font-size: 12px; }
 .sym-corner { fill: var(--bg); stroke: var(--accent); stroke-width: 1; cursor: nwse-resize; vector-effect: non-scaling-stroke; }
 .sym-pin { cursor: grab; }
-.sym-param { cursor: move; }
+.sym-param, .sym-win, .sym-text { cursor: move; }
+.sym-text.sel text { fill: var(--accent); }
 .sym-pin rect { fill: var(--accent); }
 .sym-pin text { fill: var(--fg); font-size: 11px; font-family: var(--mono); user-select: none; }
 .sym-pin:hover rect { fill: #e67700; }
@@ -1206,6 +1208,8 @@ button.hier-tab { padding-right: 10px; }
 .sym-ask input { flex: 1; min-width: 0; font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
 .sym-shapes .sel { stroke: var(--accent); }
 .sym-shapes .preview { stroke: var(--accent); stroke-dasharray: 4 3; }
+.sym-shapes .band { fill: rgb(77 171 247 / 10%); stroke: var(--accent); stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; pointer-events: none; }
+.sym-pin.sel rect { fill: #e67700; }
 .sym-shapes > * { pointer-events: none; }
 .sym-shapes > .hit { stroke: transparent; stroke-width: 14px; fill: none; pointer-events: stroke; cursor: move; }
 .sym-shapes > .hit:hover { stroke: color-mix(in srgb, var(--accent) 18%, transparent); }
@@ -1220,6 +1224,7 @@ button.hier-tab { padding-right: 10px; }
 .sym-params th { text-align: left; font-weight: 500; color: var(--fg-muted); font-size: 11px; padding: 2px 4px; }
 .sym-params td { padding: 2px 4px; }
 .sym-params input { width: 100%; box-sizing: border-box; font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; }
+.sym-params input.bad { border-color: var(--warn, #e67700); }
 .sym-params .icon-x { border: 0; background: transparent; color: var(--fg-muted); font-size: 16px; line-height: 1; padding: 0 4px; }
 .sym-params .icon-x:hover { color: var(--err); }
 @media (max-width: 700px) { .canvas-wrap.with-sym { padding-right: 0; } .sym-pane { width: 85%; box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
@@ -1365,10 +1370,21 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .model-editor > .sym-pane { top: 31px; }
 .model-left { position: absolute; top: 31px; left: 0; bottom: 0; right: var(--sym-wc, 420px); display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; overflow: auto; box-sizing: border-box; font-size: 13px; }
 .model-label { font-weight: 600; }
-.model-text { flex: 1 1 auto; min-height: 180px; font-family: var(--mono); font-size: 13px; resize: vertical; background: var(--bg-alt); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; white-space: pre; }
-.model-attrs table { border-collapse: collapse; }
+.model-text { flex: 0 0 auto; height: 25vh; min-height: 120px; font-family: var(--mono); font-size: 13px; resize: vertical; background: var(--bg-alt); color: var(--fg); border: 1px solid var(--border); border-radius: 6px; padding: 8px; white-space: pre; }
+.model-attrs table { border-collapse: collapse; width: 100%; }
+.model-attrs .model-attr-table { table-layout: fixed; }
+.model-attr-table td:first-child, .model-attr-table th:first-child { width: 84px; }
+.model-attr-table td:nth-child(2), .model-attr-table th:nth-child(2) { width: 38%; }
+.model-attr-table td:nth-child(3), .model-attr-table th:nth-child(3) { width: 40px; text-align: center; font-size: 11px; font-weight: 500; }
+.model-attr-table td:nth-child(4), .model-attr-table th:nth-child(4) { width: 58px; font-size: 11px; font-weight: 500; }
+.model-attrs .model-attr-table select { font-size: 11px; padding: 1px 2px; }
 .model-attrs td, .model-attrs th { padding: 2px 6px 2px 0; text-align: left; }
-.model-attrs input { font-family: var(--mono); width: 100%; min-width: 160px; box-sizing: border-box; }
+.model-attrs input:not([type=checkbox]), .model-attrs select { font-family: var(--mono); width: 100%; min-width: 0; box-sizing: border-box; }
+.model-attrs td.tree-meta { font-size: 11px; white-space: normal; }
+.model-attrs summary .tree-add { margin-left: 8px; }
+.model-line { font: 12px var(--mono); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 4px; padding: 4px 6px; margin: 4px 0; white-space: pre-wrap; word-break: break-all; }
+.model-label-row { display: flex; align-items: center; gap: 8px; }
+.model-label-row .tree-add { margin-left: auto; }
 .tree-kind { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; border-radius: 4px; border: 1px solid currentColor; color: var(--fg-muted); }
 .tree-kind.model { color: #4dabf7; }
 .tree-kind.verilog { color: #b197fc; }
@@ -1578,3 +1594,4 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .simbar .sb-pdk button.active { background: var(--accent); color: #fff; }
 .simbar .sb-pdk button:disabled { opacity: 0.35; }
 .simbar .sb-pdk button.sb-pdk-all { font: 11px system-ui, sans-serif; border-left: 1px solid var(--border); border-radius: 0 6px 6px 0; margin-left: 2px; }
+.model-pins-lib { margin-top: 6px; }

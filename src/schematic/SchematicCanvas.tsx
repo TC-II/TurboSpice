@@ -18,15 +18,19 @@ const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
 
 
 /** <text> con la semántica de alineación de LTspice (Left…VBottom, spec §7) */
-export function AlignedText({ x, y, align, size, children, className }: {
+export function AlignedText({ x, y, align, size, children, className, label }: {
   x: number;
   y: number;
   align: string;
   size: number;
   children: ReactNode;
   className?: string;
+  /** rótulo de un atributo (WINDOW) o texto de un símbolo (TEXT del .asy): el tamaño 0 es la letra
+   *  más chica, no oculto (sólo «Invisible» lo oculta, spec §7.1). En los TEXT del .asc el tamaño 0
+   *  sí se oculta: así se guardan datos en el esquemático */
+  label?: boolean;
 }) {
-  if (align === 'Invisible' || size <= 0) return null;
+  if (align === 'Invisible' || (size <= 0 && !label)) return null;
   const vertical = align.startsWith('V');
   const base = vertical ? align.slice(1) : align;
   const anchor = base === 'Left' ? 'start' : base === 'Right' ? 'end' : 'middle';
@@ -125,7 +129,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     const text = idx === 3 ? displayValue(prefix, raw) : raw;
     const p = toWorld(inst, w.x, w.y);
     labels.push(
-      <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} className={idx === grabWin ? 'win grab' : 'win'}>
+      <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} label className={idx === grabWin ? 'win grab' : 'win'}>
         {text}
       </AlignedText>,
     );
@@ -150,7 +154,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
           <>
             {def.shapes.map((s, i) => <ShapeView key={i} s={s} />)}
             {def.texts.map((t, i) => (
-              <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size}>{t.text}</AlignedText>
+              <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size} label>{t.text}</AlignedText>
             ))}
             {!hideLabels && def.pins.map((p, i) => <PinName key={`p${i}`} pin={p} />)}
           </>

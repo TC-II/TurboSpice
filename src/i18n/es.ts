@@ -1092,6 +1092,7 @@ export const es: Record<string, string> = {
   'Use initial conditions (UIC: doesn\'t compute the operating point; starts from the IC=)': 'Usar condiciones iniciales (UIC: no calcula el punto de operación; arranca de las IC=)',
   'Use it in a value as {nombre}': 'Usalo en un valor como {nombre}',
   'Using the remembered view instead of the .control "plot" commands': 'Se usa la vista recordada en lugar de los "plot" del .control',
+  'Simulated without the subcircuit pin currents (Ix): with them the matrix was singular': 'Se simuló sin las corrientes de los pines de los subcircuitos (Ix): con ellas la matriz era singular',
   'V1 (initial)': 'V1 (inicial)',
   'V2 (pulse)': 'V2 (pulso)',
   'value': 'valor',

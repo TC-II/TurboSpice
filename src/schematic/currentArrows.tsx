@@ -15,7 +15,7 @@ export interface CurrentArrow {
   inward: Point;
   /** la corriente positiva entra al componente por este pin (si no, sale) */
   enters: boolean;
-  /** símbolo y pin (desde 1, como la punta de prueba) */
+  /** símbolo y pin (SpiceOrder, como la punta de prueba) */
   sym: number;
   pin: number;
   /** color de la traza de esa corriente, si está graficada */
@@ -71,7 +71,7 @@ export function currentArrows(doc: AscDoc, lib: Library, elements: { sym: number
       const d = transformOffset(inward.x, inward.y, s.orient);
       // dos terminales: entra por el primer nodo, sale por el otro (sólo se dibuja la que entra)
       const enters = !two || orders[k] === first;
-      if (enters) out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters, sym: el.sym, pin: k + 1 });
+      if (enters) out.push({ at: pts[k], inward: { x: Math.sign(d.x), y: Math.sign(d.y) }, enters, sym: el.sym, pin: orders[k] });
     });
   }
   return out;

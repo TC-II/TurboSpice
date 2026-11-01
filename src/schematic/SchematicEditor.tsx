@@ -41,6 +41,9 @@ import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from '.
 import { resizeShape, shapeBox, shapeHandles, shapeInBox } from './shapes.ts';
 import { multiPinPrefix } from '../sim/traces.ts';
 
+/** ¿La corriente se mide por pin? (transistores de 3 o más pines y todos los subcircuitos) */
+const pinCurrents = (pins: number, prefix: string) => multiPinPrefix(prefix) && (pins >= 3 || /^X/i.test(prefix));
+
 /**
  * Nodos del SVG desde los que paneo y zoom mueven el dibujo ya pintado (#186): con la CPU frenada
  * 4×, ~9.000 nodos costaban ~105 ms por cuadro; con menos de esto cabe en un cuadro.
@@ -652,7 +655,7 @@ export function SchematicEditor(props: Props) {
       let best: { symbol: number; pin: number; d: number } | null = null;
       doc.symbols.forEach((s, i) => {
         const def = lib.symbol(s.type);
-        if (!def || def.pins.length < 3 || !multiPinPrefix(s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return;
+        if (!def || !pinCurrents(def.pins.length, s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return;
         pinPoints(s, def).forEach((q, k) => {
           const d = Math.hypot(p.x - q.x, p.y - q.y);
           if (d <= tol * 2 && (!best || d < best.d)) best = { symbol: i, pin: Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1), d };
@@ -672,7 +675,7 @@ export function SchematicEditor(props: Props) {
       // el cuerpo de un transistor no mide: la corriente va por pin
       const s = doc.symbols[hit.index];
       const def = lib.symbol(s.type);
-      if (pins && def && def.pins.length >= 3 && multiPinPrefix(s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return null;
+      if (pins && def && pinCurrents(def.pins.length, s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return null;
       return { symbol: hit.index };
     }
     if (hit?.kind === 'flag') return { net: conn.netAt(doc.flags[hit.index])?.name };

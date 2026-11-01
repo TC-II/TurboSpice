@@ -1321,20 +1321,36 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
       // los módulos Verilog que cambiaron se sintetizan antes (#209)
       await synthStale();
-      const built = await buildSimulation(doc, lib, ascName(), allTraces());
-      // y las instancias con otro parameter usan su propia síntesis
-      const vv = await withVariants(built.netlist);
-      built.netlist = vv.netlist;
-      built.files = { ...built.files, ...vv.files };
-      built.warnings.push(...vv.warnings);
+      const prepare = async (pinCurrents: boolean) => {
+        const b = await buildSimulation(doc, lib, ascName(), allTraces(), { pinCurrents });
+        // y las instancias con otro parameter usan su propia síntesis
+        const vv = await withVariants(b.netlist);
+        b.netlist = vv.netlist;
+        b.files = { ...b.files, ...vv.files };
+        b.warnings.push(...vv.warnings);
+        return b;
+      };
+      let built = await prepare(true);
       // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
       // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
       // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
       const incomplete = analysisProblem(lineOf(simAsc) ?? '');
       const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
-      const { result, ms } = blocking.length
-        ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 }
-        : await engine.simulate(built.netlist, built.files, { bias: biasParams(built), biasCommand: biasCommand(built.netlist).cmd, digital: built.digitalSaves });
+      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves });
+      let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
+      // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
+      // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
+      if (!blocking.length && !result.aborted && [...result.errors, ...result.log].some((l) => /singular/i.test(l))) {
+        const plain = await prepare(false);
+        if (plain.netlist !== built.netlist) {
+          const again = await run(plain);
+          if (!again.result.errors.some((l) => /singular/i.test(l))) {
+            built = plain;
+            ({ result, ms } = again);
+            built.warnings.push(t('Simulated without the subcircuit pin currents (Ix): with them the matrix was singular'));
+          }
+        }
+      }
       // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
       const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
       if (pzErrs.length) result.errors.unshift(...pzErrs);

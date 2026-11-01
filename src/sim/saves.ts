@@ -15,7 +15,7 @@ import type { Element, LtNetlist } from '../netlist/ltnetlist.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { ngNodeName, type NgspiceNetlist } from '../netlist/tongspice.ts';
 import { blockInstances, hierDevice } from './context.ts';
-import { verilogNodes } from './traces.ts';
+import { pinVector, verilogNodes } from './traces.ts';
 import { deviceVector, netVector, type BuiltSimulation } from './schematicSim.ts';
 
 /** Línea .save del usuario con una lista (no "all" ni "none") */
@@ -103,7 +103,7 @@ export function digitalNodes(ref: string, aliases?: Map<string, string>): string
 
 /** Referencias V()/I()/Ic()…/@dev[param] escritas en un texto (trazas, .meas, .control, .four) */
 export function textRefs(text: string): string[] {
-  return text.match(/\b(?:v|i|i[bcdegs]|dig)\s*\([^()]*\)|@[^\s[()]+\[[^\]]+\]/gi)?.map((r) => r.replace(/\s+/g, '')) ?? [];
+  return text.match(/\b(?:v|i|i[bcdegsx]|dig)\s*\([^()]*\)|@[^\s[()]+\[[^\]]+\]/gi)?.map((r) => r.replace(/\s+/g, '')) ?? [];
 }
 
 const TERMINAL = /^i([bcdegs])$/i;
@@ -133,6 +133,10 @@ export function refVectors(ref: string, lt: LtNetlist, ng: NgspiceNetlist): stri
   // los nodos digitales los filtra el motor al leerlos (digitalNodes)
   if (f === 'dig') return [];
   if (f === 'v') return args.filter((a) => a !== '0').map((a) => netVector(a));
+  if (f === 'ix') {
+    const v = args[0] ? pinVector({ lt, ng }, args[0]) : null;
+    return v ? [v] : [];
+  }
   const d = args[0] ? device(args[0]) : null;
   if (!d) return [];
   if (f === 'i') {
@@ -181,15 +185,19 @@ function elementSignals(elements: Element[], name: (e: Element) => string | unde
   for (const e of elements) {
     const p = e.prefix.toUpperCase();
     const nm = name(e);
-    // los subcircuitos (X) y los dispositivos A digitales no tienen corriente propia
+    // los dispositivos A digitales no tienen corriente propia
     for (const ref of elementRefs(nm ?? '', p)) out.push({ ref, kind: 'current', group });
+    // los subcircuitos, la de cada pin (adentro de una instancia, por número)
+    if (p === 'X' && nm) e.nodes.forEach((_, k) => out.push({ ref: `Ix(${nm}:${(!nm.includes('.') && e.pinNames[k]) || k + 1})`, kind: 'current', group }));
   }
   return out;
 }
 
 /** Todas las señales que se pueden guardar, por jerarquía (las de las instancias de subcircuitos del proyecto) */
 export function savableSignals(sim: Pick<BuiltSimulation, 'lt' | 'ng' | 'files' | 'digitalNets'>): SavableSignal[] {
-  const out = elementSignals(sim.lt.elements, (e) => e.name.replace(/§/g, ''), (n) => n, '');
+  // (los bloques Verilog no tienen corriente por pin: ver pinCurrents.ts)
+  const verilog = new Set(sim.lt.elements.filter((e) => e.prefix.toUpperCase() === 'X' && verilogNodes(sim as BuiltSimulation, e.value.trim().split(/\s+/)[0])).map((e) => e.name.replace(/§/g, '').toLowerCase()));
+  const out = elementSignals(sim.lt.elements, (e) => e.name.replace(/§/g, ''), (n) => n, '').filter((s) => !(s.ref.startsWith('Ix(') && verilog.has(s.ref.slice(3, s.ref.lastIndexOf(':')).toLowerCase())));
   // nodos digitales: las redes entre bloques Verilog y, de cada bloque, sus pines y cables con
   // nombre (los internos sin nombre de Yosys, nunca)
   for (const n of [...(sim.digitalNets ?? [])].sort()) out.push({ ref: `Dig(${n})`, kind: 'digital', group: '' });

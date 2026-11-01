@@ -1,5 +1,6 @@
 // Esquemático → simulación: netlist LTspice → ngspice, archivos de modelos de la librería
 // y nombres de vectores para las puntas de prueba.
+import { addPinCurrentSources } from '../netlist/pinCurrents.ts';
 import { linkDigitalNets } from '../hdl/digitalLinks.ts';
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
@@ -93,9 +94,10 @@ export interface BuiltSimulation {
 
 /**
  * `traces`: expresiones de las trazas que se van a mirar; los parámetros de dispositivo que usen
- * (@Q1[gm], #202) se piden con ".save" porque ngspice no los guarda solo.
+ * (@Q1[gm], #202) se piden con ".save" porque ngspice no los guarda solo. `pinCurrents: false`,
+ * sin las fuentes de 0 V en los pines de los subcircuitos (ver pinCurrents.ts)
  */
-export async function buildSimulation(doc: AscDoc, lib: Library, title: string, traces: string[] = []): Promise<BuiltSimulation> {
+export async function buildSimulation(doc: AscDoc, lib: Library, title: string, traces: string[] = [], opts: { pinCurrents?: boolean } = {}): Promise<BuiltSimulation> {
   const lt = ltNetlist(doc, lib);
   // los nombres de los PDK que piden las directivas (los de GF180, como nmos_3p3, no se reconocen
   // por el nombre como los sky130_fd_pr__…): definidos, sin aviso de modelo que falta
@@ -118,7 +120,8 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const prepared = prepareSimulation(ng, (rel) => texts[rel]);
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
-  const prep = { ...prepared, netlist: links.netlist, files: links.files };
+  // la corriente de cada pin de los subcircuitos (Ix(U1:OUT))
+  const prep = { ...prepared, netlist: opts.pinCurrents === false ? links.netlist : addPinCurrentSources(links.netlist, links.files), files: links.files };
   const analyses = lt.texts
     .filter((tt) => (tt.kind === 'directive' || isNgspiceComment(tt.text)) && !isControlBlock(tt.text))
     .flatMap((tt) => tt.text.split('\\n'))

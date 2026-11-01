@@ -8,6 +8,7 @@ import { blockInstances, scopeElement, scopeNet, hierDevice, type InstScope } fr
 import { ANALYSIS_LINE } from './analyses.ts';
 import { t } from '../i18n/i18n.ts';
 import { pinTerminal } from './traces.ts';
+import { pinCurrentVector, sharedPin } from '../netlist/pinCurrents.ts';
 
 export type Bias = Record<string, number>;
 
@@ -111,6 +112,11 @@ export function pinBias(sim: BuiltSimulation, bias: Bias, el: Element, pin: numb
   const term = pinTerminal(el.prefix, pin);
   const local = scope ? scopeElement(scope, el.name) : sim.ng.names.get(el.name)?.toLowerCase();
   const ng = local && (scope ? hierDevice(local) : local);
+  // subcircuitos: la corriente que entra al pin (Ix(U1:OUT))
+  if (/^X/i.test(el.prefix)) {
+    const i = ng ? bias[pinCurrentVector(ng, sharedPin(el.nodes, pin))] : undefined;
+    return i === undefined ? null : `I = ${fmt(i, 'A')}`;
+  }
   if (!term || !ng) return null;
   return `I${term} = ${fmt(bias[`@${ng}[i${term}]`], 'A')}`;
 }

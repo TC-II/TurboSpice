@@ -6,6 +6,7 @@ import { blockInstances, hierDevice, scopeElement, scopeElementOf, scopeNet, typ
 import { deviceParams, deviceTraceName, parseDeviceVector } from './deviceParams.ts';
 import { busRange, joinBits } from '../waveform/digital.ts';
 import { mergeEvents, sampleEvents } from '../waveform/series.ts';
+import { pinCurrentVector, sharedPin } from '../netlist/pinCurrents.ts';
 
 /** Parámetro de dispositivo de ngspice para Ic, Ib, Id… */
 const TERMINAL: Record<string, string> = { ic: 'ic', ib: 'ib', ie: 'ie', id: 'id', ig: 'ig', is: 'is' };
@@ -87,6 +88,11 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       const devName = deviceNgName(name);
       return wave([devName, name.toLowerCase()].map((d) => d && findVector(plot, `@${d}[${param}]`)).find((x) => x) || undefined);
     }
+    // corriente de un pin de un subcircuito: Ix(U1:OUT), Ix(U1:3), Ix(x_u1.u2:out) adentro de una instancia
+    if (f === 'ix') {
+      const pv = sim && pinVector(sim, args[0]);
+      return pv ? wave(findVector(plot, pv)) : null;
+    }
     // adentro de una instancia (#199): I(x_u1.r1) → @r.x_u1.r1[i], Ic(x_u1.q1) → @q.x_u1.q1[ic]
     const dev = !element(args[0]) && args[0].includes('.') ? hierDevice(args[0]) : null;
     if (dev) {
@@ -113,11 +119,31 @@ const PIN_TERMINALS: [RegExp, string[]][] = [
   [/^J/, ['d', 'g', 's']],
 ];
 
+/**
+ * Vector de ngspice de "U1:OUT" (Ix de LTspice): el pin por su nombre o su número (SpiceOrder).
+ * Adentro de una instancia, "x_u1.u2:out" (los nombres de pin, los del elemento de nivel superior
+ * con el mismo nombre de subcircuito no se conocen: ahí sólo el número)
+ */
+export function pinVector(sim: Pick<BuiltSimulation, 'lt' | 'ng'>, ref: string): string | null {
+  const m = /^(.+):([^:]+)$/.exec(ref.trim());
+  if (!m) return null;
+  const [, name, pin] = m;
+  const el = sim.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
+  const byNumber = /^\d+$/.test(pin) ? Number(pin) : undefined;
+  if (el) {
+    const ng = sim.ng.names.get(el.name);
+    const k = byNumber ?? el.pinNames.findIndex((p) => p.toLowerCase() === pin.toLowerCase()) + 1;
+    return ng && /^x/i.test(ng) && k > 0 ? pinCurrentVector(ng, sharedPin(el.nodes, k)) : null;
+  }
+  const h = name.includes('.') ? hierDevice(name) : null;
+  return h && byNumber ? pinCurrentVector(h, byNumber) : null;
+}
+
 /** Terminal de ese pin (SpiceOrder) de un transistor: 'c', 'b', 'e', 'd', 'g', 's'… */
 export const pinTerminal = (prefix: string, pin: number): string | undefined => PIN_TERMINALS.find(([re]) => re.test(prefix.toUpperCase()))?.[1][pin - 1];
 
 /** ¿Componente de varios pines? (la corriente se mide en cada pin, no en el cuerpo) */
-export const multiPinPrefix = (prefix: string) => PIN_TERMINALS.some(([re]) => re.test(prefix.toUpperCase()));
+export const multiPinPrefix = (prefix: string) => /^X/i.test(prefix) || PIN_TERMINALS.some(([re]) => re.test(prefix.toUpperCase()));
 
 /**
  * Expresión que mide la punta de prueba: V(red), I(elemento), o la corriente del pin de un
@@ -135,6 +161,8 @@ export function probeExpr(sim: BuiltSimulation, target: { net?: string; symbol?:
   if (!el?.name) return null;
   const p = el.prefix.toUpperCase();
   if (target.pin !== undefined) {
+    // subcircuitos: Ix(U1:OUT), con el nombre del pin (o su número si no tiene)
+    if (/^X/.test(p)) return `Ix(${el.name}:${el.pinNames[target.pin - 1] || target.pin})`;
     const term = PIN_TERMINALS.find(([re]) => re.test(p))?.[1][target.pin - 1];
     return term ? `I${term}(${el.name})` : null;
   }

@@ -395,6 +395,8 @@ export const es: Record<string, string> = {
   'Export to PDF…': 'Exportar a PDF…',
   'Symbol skin': 'Skin de los símbolos',
   'Style': 'Estilo',
+  'Download .tex (TikZ)': 'Descargar .tex (TikZ)',
+  'Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written': 'Archivo LaTeX standalone con el dibujo en TikZ; el texto entre $…$ va a LaTeX tal cual',
   'Tremor stroke': 'Trazo Tremor',
   'Wires and symbols drawn freehand (the same sheet always comes out the same)': 'Cables y símbolos a mano alzada (la misma hoja sale siempre igual)',
   'The drawing of the symbols; what a skin does not draw comes from Default': 'El dibujo de los símbolos; lo que un skin no dibuja sale del Default',

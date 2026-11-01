@@ -12,6 +12,7 @@ import { SchematicCanvas } from './SchematicCanvas.tsx';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AnnotationLayer, type Annotation } from './NetNames.tsx';
 import { download, schematicPng, sheetBox, sheetPdf, sheetSvg, type SheetFont } from './exportSchematic.ts';
+import { sheetTikz } from './tikz.ts';
 
 /** Capas opcionales de la hoja: apagadas de entrada */
 interface Layers {
@@ -115,12 +116,15 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
   const fit = page && stage.w && stage.h ? Math.min((stage.w - 48) / page.w, (stage.h - 48) / page.h, 3) : 1;
 
   const svgText = () => (svgRef.current && page ? sheetSvg(svgRef.current, page) : null);
-  const run = async (what: 'pdf' | 'svg' | 'png' | 'copy') => {
+  const run = async (what: 'pdf' | 'svg' | 'png' | 'copy' | 'tex') => {
     const text = svgText();
     if (!text || !page) return;
     setBusy(true);
     try {
-      if (what === 'svg') download(`${name}.svg`, new Blob([text], { type: 'image/svg+xml' }));
+      if (what === 'tex') {
+        if (!contentRef.current) return;
+        download(`${name}.tex`, new Blob([sheetTikz(contentRef.current, page, { name, skin: lib.skinName + (layers.tremor ? ' (Tremor)' : '') })], { type: 'application/x-tex' }));
+      } else if (what === 'svg') download(`${name}.svg`, new Blob([text], { type: 'image/svg+xml' }));
       else if (what === 'pdf') download(`${name}.pdf`, await sheetPdf(text, page, FONT));
       else {
         // el SVG mide en pt: 1 pt = 4/3 px CSS
@@ -187,6 +191,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
           <button className="primary" disabled={!page || busy || !font} onClick={() => run('pdf')}>{t('Download PDF')}</button>
           <button disabled={!page || busy} onClick={() => run('svg')}>{t('Download SVG')}</button>
           <button disabled={!page || busy} onClick={() => run('png')}>{t('Download PNG')}</button>
+          <button disabled={!page || busy} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>{t('Download .tex (TikZ)')}</button>
           <button disabled={!page || busy || !('ClipboardItem' in window)} onClick={() => run('copy')}>{t('Copy image')}</button>
         </section>
         <button className="export-close" onClick={onClose}>{t('Close')}</button>

@@ -139,6 +139,10 @@ check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'),
 const [sheetDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar SVG' }).click()]);
 const sheet = readFileSync(await sheetDl.path(), 'utf8');
 check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class='), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
+// #327: la misma hoja en TikZ, como .tex standalone
+const [texDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar .tex (TikZ)' }).click()]);
+const tex = readFileSync(await texDl.path(), 'utf8');
+check(texDl.suggestedFilename().endsWith('.tex') && tex.includes('\\documentclass[border=0pt]{standalone}') && tex.includes('\\begin{tikzpicture}') && /\\node\[[^\]]*\] at \([\d.-]+,[\d.-]+\) \{R1\}/.test(tex) && tex.includes('\\path['), `Descargar .tex (TikZ): standalone con caminos y rótulos (${tex.length} bytes)`);
 // #330: el trazo Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja
 await exportView.getByRole('checkbox', { name: 'Trazo Tremor' }).check();
 check((await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0, 'Trazo Tremor: los cables de la hoja salen a mano alzada; los del esquemático no');

@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -4018,31 +4018,6 @@ ${ltNetlistText(sim.built.lt)}
               }}
             />
           )}
-          {viewed && (
-            <div className="pick-banner history-banner">
-              {t('Run from')}{' '}{new Date(viewed.time).toLocaleString(locale())} {t('· read-only')}
-              <button onClick={() => restoreRun(viewed.id)}>{t('Restore')}</button>
-              <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
-            </div>
-          )}
-          {/* elegir en el esquemático no pone cartel: la barra de estado dice qué clickear (Esc cancela) */}
-          {valueOffer && !picking && (
-            <div className="pick-banner">
-              {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} {t('also in')}{' '}
-              {valueOffer.sims.length === 1 ? t('1 simulation') : t('{length} simulations', { length: valueOffer.sims.length })}
-              <button onClick={applyValueOffer} title={t('Change to {p0} in the other simulations', { p0: valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ') })}>
-                {t('Apply')}
-              </button>
-              <button onClick={() => setValueOffer(null)}>No</button>
-            </div>
-          )}
-          {offerView && !picking && (
-            <div className="pick-banner">
-              {t('There\'s a results view of')}{' '}{file.name} {t('saved in this browser. Add it to the .asc?')}
-              <button onClick={acceptOfferedView}>{t('Add')}</button>
-              <button onClick={() => setOfferView(null)}>No</button>
-            </div>
-          )}
           {/* Archivo › Importar a este proyecto */}
           <input
             ref={importInput}
@@ -4068,7 +4043,44 @@ ${ltNetlistText(sim.built.lt)}
               if (files.length) doImportLtspice(files);
             }}
           />
-          <HintBar sink={hoverSink} text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))} message={message} onDismiss={() => setMessage(undefined)} />
+          {/* los avisos y estados van todos en la barra de abajo, a la derecha (#342): también las
+              preguntas (aplicar un valor en las otras simulaciones, agregar una vista guardada) y
+              la corrida vieja que se está mirando. Elegir en el esquemático no pone cartel: la
+              barra dice qué clickear (Esc cancela) */}
+          <HintBar
+            sink={hoverSink}
+            text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))}
+            message={message}
+            onDismiss={() => setMessage(undefined)}
+            offers={
+              <>
+                {viewed && (
+                  <span className="status-offer history">
+                    {t('Run from')}{' '}{new Date(viewed.time).toLocaleString(locale())} {t('· read-only')}
+                    <button onClick={() => restoreRun(viewed.id)}>{t('Restore')}</button>
+                    <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
+                  </span>
+                )}
+                {valueOffer && !picking && (
+                  <span className="status-offer">
+                    {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} {t('also in')}{' '}
+                    {valueOffer.sims.length === 1 ? t('1 simulation') : t('{length} simulations', { length: valueOffer.sims.length })}
+                    <button onClick={applyValueOffer} title={t('Change to {p0} in the other simulations', { p0: valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ') })}>
+                      {t('Apply')}
+                    </button>
+                    <button onClick={() => setValueOffer(null)}>No</button>
+                  </span>
+                )}
+                {offerView && !picking && (
+                  <span className="status-offer">
+                    {t('There\'s a results view of')}{' '}{file.name} {t('saved in this browser. Add it to the .asc?')}
+                    <button onClick={acceptOfferedView}>{t('Add')}</button>
+                    <button onClick={() => setOfferView(null)}>No</button>
+                  </span>
+                )}
+              </>
+            }
+          />
         </div>
 
         {sim && !curSub && (
@@ -4632,7 +4644,7 @@ type Hover = { ref: ItemRef | null; at: Point } | null;
 
 /** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
 /** Barra de estado bajo el esquemático: la ayuda a la izquierda y los avisos a la derecha (#229: sin ventanas emergentes) */
-function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string; message?: string; onDismiss(): void }) {
+function HintBar({ sink, text, message, onDismiss, offers }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string; message?: string; onDismiss(): void; offers?: ReactNode }) {
   const [hover, setHover] = useState<Hover>(null);
   useEffect(() => {
     sink.current = setHover;
@@ -4651,6 +4663,7 @@ function HintBar({ sink, text, message, onDismiss }: { sink: MutableRefObject<((
   return (
     <div className="hint-bar">
       <span className="hint-text">{text(hover)}</span>
+      {offers}
       {message && (
         <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
           {message}

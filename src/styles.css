@@ -480,8 +480,6 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .field .with-pick { display: flex; gap: 4px; }
 .field .with-pick input { flex: 1; min-width: 0; }
 .pick-btn { padding: 2px 8px; font-size: 13px; }
-.pick-banner { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 3; padding: 6px 14px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; box-shadow: 0 4px 16px rgb(0 0 0 / 20%); display: flex; gap: 12px; align-items: center; }
-.pick-banner button { background: transparent; color: #fff; border-color: rgb(255 255 255 / 60%); padding: 1px 8px; }
 .pick-row { display: flex; flex-direction: column; gap: 6px; }
 
 /* ---------- Visor de resultados ---------- */
@@ -1129,7 +1127,6 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .history-actions { display: flex; gap: 6px; margin-top: 4px; }
 .history-actions button { font-size: 12px; padding: 2px 10px; }
 .history-hint { margin: 0; padding: 6px 12px; font-size: 11px; color: var(--fg-muted); border-top: 1px solid var(--border); }
-.history-banner { background: var(--diff-chg); }
 @media (max-width: 700px) { .canvas-wrap.with-history { padding-right: 0; } .history-panel { width: min(280px, 85%); box-shadow: -4px 0 16px rgb(0 0 0 / 20%); } }
 
 /* ---------- Idioma (#72) ---------- */
@@ -1142,8 +1139,6 @@ button.capsule-row-name:hover, button.capsule-row-name:focus-visible { backgroun
 .canvas-wrap { overflow: hidden; isolation: isolate; }
 .canvas-wrap.with-tree { padding-left: var(--tree-w); }
 .canvas-wrap.with-tree .hint-bar { left: var(--tree-w); }
-.canvas-wrap.with-hier > .pick-banner { top: 41px; z-index: 6; }
-.canvas-wrap.with-crumbs > .pick-banner { top: 74px; }
 .sub-hint { --sub-mode: #f59f00; position: absolute; top: 0; left: 0; right: 0; height: 31px; box-sizing: border-box; display: flex; align-items: center; gap: 10px; padding: 0 6px 0 12px; background: color-mix(in srgb, var(--sub-mode) 22%, var(--bg-alt)); border-bottom: 2px solid var(--sub-mode); z-index: 5; font-size: 13px; color: var(--fg); white-space: nowrap; }
 .canvas-wrap.with-tree > .sub-hint { left: var(--tree-w); }
 .sub-hint.verilog { --sub-mode: #c4a7f5; }
@@ -1696,4 +1691,9 @@ svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #
 .iconbar.sim-row > .bar-after { flex: 1 0 auto; max-width: 100%; scrollbar-width: thin; }
 .iconbar .simbar .sb-rows { flex: none; }
 @media (max-width: 700px) { .iconbar.sim-row { row-gap: 10px; } .iconbar.sim-row > .group:first-child { margin-bottom: 0; min-height: 34px; } }
+/* preguntas y estados en la barra de abajo, a la derecha (#342): antes eran carteles sueltos arriba */
+.hint-bar .status-offer { flex: none; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; pointer-events: auto; color: var(--fg); }
+.hint-bar .status-offer + .status-offer, .hint-bar .status-offer + .status-msg { margin-left: 12px; }
+.hint-bar .status-offer button { font-size: 11px; line-height: 14px; padding: 0 8px; }
+.hint-bar .status-offer.history { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--diff-chg) 30%, transparent); }
 .workspace.side .stb-view .pz-view.compact { flex: 1 1 auto; }

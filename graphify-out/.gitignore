@@ -1,2 +1,5 @@
 cache/
 .graphify_root
+.graphify_build_state.json
+.graphify_labels.pending.json
+20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]/

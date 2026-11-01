@@ -4,7 +4,7 @@
 // (y al revés).
 // Uso: node tests/e2e/saves.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { frames, launchBrowser, showSimCommand, simType, skipWelcome, until } from './lib.mjs';
+import { frames, launchBrowser, showSimCommand, simType, skipWelcome, steady, until } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -92,6 +92,22 @@ check(((await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.tri
 await page.mouse.move(r1.x, r1.y);
 await frames(page);
 check(((await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.trim())).join() === 'I(R1)', 'y sobre R1, la suya');
+
+// --- al simular queda en gris y la punta de prueba grafica; un click en el panel lo reactiva ---
+await page.getByRole('button', { name: 'Correr', exact: true }).click();
+await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+await steady(page);
+check((await panel.getAttribute('class')).includes('inactive'), 'al simular, el panel queda en gris');
+const out2 = await at(272, -32);
+await page.mouse.click(out2.x, out2.y);
+await until(async () => (await page.locator('.trace-chip .name').count()) === 1);
+check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)' && (await checked()) === 2, `la punta de prueba grafica V(out) sin cambiar lo elegido (${(await page.locator('.trace-chip .name').allTextContents()).join()})`);
+await panel.locator('.saves-title').click();
+check(!(await panel.getAttribute('class')).includes('inactive') && (await panel.locator('.saves-pick').getAttribute('aria-pressed')) === 'true', 'un click en el panel lo reactiva, eligiendo con la punta de prueba');
+await page.mouse.click(out2.x, out2.y);
+await until(async () => (await checked()) === 1);
+check(!(await row('V(out)').locator('input').isChecked()), 'y la punta vuelve a elegir (desmarca V(out))');
+await page.screenshot({ path: `${OUT}/senales-despues.png` });
 
 // --- «Todo» lo vuelve a guardar todo; se cierra con la cruz ---
 await panel.getByRole('radio', { name: /^Todo:/ }).click();

@@ -11,7 +11,7 @@ import { t } from '../i18n/i18n.ts';
 
 const key = (r: string) => r.toLowerCase();
 
-export function SavesPanel({ selection, mode, onMode, signals, max, onChange, hover, onHoverRow, picking, onPicking, blocked, onClose }: {
+export function SavesPanel({ selection, mode, onMode, signals, max, onChange, hover, onHoverRow, picking, onPicking, inactive, onActivate, blocked, onClose }: {
   /** lo elegido, tal como está en el esquemático (null: se guarda todo) */
   selection: string[] | null;
   /** «sólo lo elegido» sigue elegido aunque todavía no se haya marcado nada */
@@ -28,6 +28,9 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
   /** la punta de prueba elige señales en el esquemático */
   picking: boolean;
   onPicking(on: boolean): void;
+  /** después de simular: en gris, hasta que se hace click en el panel (#364) */
+  inactive: boolean;
+  onActivate(): void;
   /** por qué no se puede elegir ahora (adentro de un subcircuito) */
   blocked?: string;
   onClose(): void;
@@ -73,13 +76,19 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
   );
 
   return (
-    <aside className="saves-panel" aria-label={t('Saved signals')}>
+    <aside
+      className={`saves-panel${inactive ? ' inactive' : ''}`}
+      aria-label={t('Saved signals')}
+      onMouseDownCapture={() => inactive && onActivate()}
+      onFocusCapture={() => inactive && onActivate()}
+    >
       <header>
         <span className="saves-title">{t('Saved signals')}</span>
         <button className="close" onClick={onClose} aria-label={t('Close the saved signals')} title={t('Close the saved signals')}>
           <Icon name="close" size={14} />
         </button>
       </header>
+      {inactive && <p className="hint saves-inactive">{t('For the next run: click here to keep choosing (the probe plots meanwhile).')}</p>}
       <div className="saves-body">
         {blocked && <p className="hint">{blocked}</p>}
         {!blocked && (

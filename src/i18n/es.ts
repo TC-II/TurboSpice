@@ -2121,6 +2121,7 @@ export const es: Record<string, string> = {
   'Nothing to save there: click a wire (voltage) or a component (current)': 'Ahí no hay nada para guardar: hacé click en un cable (tensión) o en un componente (corriente)',
   'Click a wire (voltage) or a component (current) to save it, or again to stop saving it': 'Click en un cable (tensión) o en un componente (corriente) para guardarlo; otro click deja de guardarlo',
   'Close the saved signals': 'Cerrar las señales guardadas',
+  'For the next run: click here to keep choosing (the probe plots meanwhile).': 'Para la próxima corrida: hacé click acá para seguir eligiendo (mientras tanto, la punta de prueba grafica).',
   'Picking on the schematic': 'Eligiendo en el esquemático',
   'Click a wire for its voltage or a component for its current; click again to unselect.': 'Click en un cable para su tensión o en un componente para su corriente; otro click lo desmarca.',
   'With the probe, click a wire for its voltage or a component for its current.': 'Con la punta de prueba, click en un cable para su tensión o en un componente para su corriente.',

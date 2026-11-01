@@ -507,7 +507,9 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const [dialog, setDialog] = useState<Dialog | null>(null);
   // panel de señales guardadas (#364): «sólo lo elegido» aunque todavía no haya nada elegido, y
   // las señales del circuito con la netlist armada (para la punta de prueba)
-  const [saves, setSaves] = useState<{ mode: 'all' | 'some'; signals?: SavableSignal[]; built?: BuiltSimulation } | null>(null);
+  // Al simular queda en gris (`inactive`) y la punta de prueba vuelve a graficar; un click en el
+  // panel lo reactiva y, si se estaba eligiendo (`picking`), la punta vuelve a elegir
+  const [saves, setSaves] = useState<{ mode: 'all' | 'some'; signals?: SavableSignal[]; built?: BuiltSimulation; inactive?: boolean; picking?: boolean } | null>(null);
   const savesOpen = !!saves && !curSub;
   const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
@@ -525,7 +527,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const viewedDoc = useMemo(() => (viewed ? parseAsc(viewed.asc) : null), [viewed]);
   const doc = viewedDoc ?? liveDoc;
   /** Con el panel en «sólo lo elegido», la punta de prueba elige qué se guarda */
-  const savesPicking = savesOpen && tool.kind === 'probe' && (saves.mode === 'some' || !!saveSelection(doc.texts));
+  const savesPicking = savesOpen && !saves.inactive && tool.kind === 'probe' && (saves.mode === 'some' || !!saveSelection(doc.texts));
   const viewingRef = useRef(false);
   viewingRef.current = !!viewedDoc;
   /** la corrida anterior a la que se ve (o la última, para el actual) */
@@ -1333,6 +1335,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
     const doc = liveDoc;
     setViewRun('');
+    // el panel de señales guardadas queda para la próxima corrida: la punta de prueba grafica (#364)
+    setSaves((s) => s && { ...s, inactive: true, picking: savesPicking });
     aborting.current = false;
     setStatus({ kind: 'running', percent: 0, text: '' });
     setMessage(undefined);
@@ -2922,7 +2926,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
    */
   const openSaves = (choose?: boolean) => {
     if (curSub) return setMessage(t('The saved signals belong to the testbench: go up (Alt+↑) to change them'));
-    setSaves((s) => ({ ...s, mode: choose ? 'some' : (s?.mode ?? (saveSelection(doc.texts) ? 'some' : 'all')) }));
+    setSaves((s) => ({ ...s, inactive: false, mode: choose ? 'some' : (s?.mode ?? (saveSelection(doc.texts) ? 'some' : 'all')) }));
     if (choose) setTool({ kind: 'probe' });
   };
   const closeSaves = () => {
@@ -4421,6 +4425,11 @@ ${ltNetlistText(sim.built.lt)}
           hover={savesHover}
           onHoverRow={setRowHover}
           picking={savesPicking}
+          inactive={!!saves.inactive}
+          onActivate={() => {
+            setSaves((s) => s && { ...s, inactive: false });
+            if (saves.picking) setTool({ kind: 'probe' });
+          }}
           onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
           blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
           onClose={closeSaves}

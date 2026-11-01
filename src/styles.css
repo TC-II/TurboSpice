@@ -1632,6 +1632,10 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-row input { margin-top: 0; }
 /* la fila de lo que está bajo el mouse en el esquemático (o la que lo resalta) */
 .saves-row.hl, .saves-row:hover { background: color-mix(in srgb, var(--sch-hl) 18%, transparent); }
+/* después de simular (#364): en gris hasta que se hace click en el panel */
+.saves-panel.inactive .saves-body { opacity: 0.45; filter: grayscale(1); }
+.saves-panel.inactive { cursor: pointer; }
+.saves-inactive { margin: 0; padding: 6px 12px; border-bottom: 1px solid var(--border); }
 @media (max-width: 720px) { .work-row { flex-direction: column; } .saves-panel { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--border); } }
 /* con la punta de prueba, lo que no se guardó en la simulación (#314) */
 .schematic line.unsaved, .schematic .sym.unsaved { opacity: 0.35; }

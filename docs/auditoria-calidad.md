@@ -226,3 +226,9 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 | 5.1 | ✅ | `docs/PLAN.md` § Estructura al día (sin `src/analyses/`, `src/io/`, `.tsch` ni `build-library.ts`); `README.md` § Deploy con las dos ramas y los controles de la CI, y los comandos nuevos. |
 | 5.2 | ✅ | `graphify-out/` ya se regeneró en `dev` (desde `2b19d1b`). Queda versionado; conviene regenerarlo tras cambios grandes, como dice `CLAUDE.md`. |
 | 5.3 | ✅ | `CONTRIBUTING.md`: ramas, controles antes de subir, convenciones (commits, `t()`, números SI, tests). |
+
+### Fase 4
+
+| # | Estado | Detalle |
+|---|---|---|
+| 4.1 | ✅ | Carga diferida de lo que se usa a pedido: las traducciones (`es.ts`, 173 kB, sólo si la interfaz está en español: `loadTranslations()` en `main.tsx` antes de importar la app), el editor de símbolos y de modelos, el tutorial (`src/lazyViews.ts`) y el exportador TikZ. Camino de carga inicial: **1162 kB → 917 kB** (entrada 147 kB + `App` 770 kB), −21 %. Queda `roughPen.js` (44 kB): se usa al dibujar con el trazo Tremor y diferirlo pide re-render al terminar de bajar. |

@@ -260,7 +260,7 @@ export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Ana
             list="sim-probes"
             required
             pick={picker && { what: 'probe', picker }}
-            hint={probes.length ? undefined : t('Place a LoopProbe or DiffLoopProbe (Stability library) in series in the loop')}
+            hint={probes.length ? undefined : t('Place a LoopProbe or LoopProbe_Dif (Stability library) in series in the loop')}
             onChange={(probe) => {
               const d = probes.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
               set({ ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' });

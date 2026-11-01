@@ -79,7 +79,7 @@ describe('.stb', () => {
         { sym: 'voltage', name: 'V1', value: 'AC 1', nets: ['a', '0'] },
         { sym: 'res', name: 'R1', value: '1k', nets: ['a', 'p'] },
         { sym: 'res', name: 'R2', value: '1k', nets: ['a', 'n'] },
-        { sym: 'Stability/DiffLoopProbe', name: 'LP2', nets: ['p', 'n', 'q', 'm'] },
+        { sym: 'Stability/LoopProbe_Dif', name: 'LP2', nets: ['p', 'n', 'q', 'm'] },
         { sym: 'res', name: 'R3', value: '1k', nets: ['q', '0'] },
         { sym: 'res', name: 'R4', value: '1k', nets: ['m', '0'] },
       ],

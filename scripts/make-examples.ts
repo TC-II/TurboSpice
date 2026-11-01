@@ -293,11 +293,11 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   console.log(`Transistor amplifiers.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }
 
-// --- Loop stability: .stb con LoopProbe (simple) y DiffLoopProbe (diferencial), docs/estabilidad.md
+// --- Loop stability: .stb con LoopProbe (simple) y LoopProbe_Dif (diferencial), docs/estabilidad.md
 {
   const groups = [
     { id: newId('g'), name: 'Single-ended (LoopProbe)' },
-    { id: newId('g'), name: 'Differential (DiffLoopProbe)' },
+    { id: newId('g'), name: 'Differential (LoopProbe_Dif)' },
     { id: newId('g'), name: 'How the probes work' },
   ];
   const note = (d: AscDoc, lines: string[], y = 560): AscDoc => ({
@@ -324,9 +324,9 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     'Two-stage fully differential amplifier: the pair Q1/Q2 with RC1/RC2, then the PNP common emitters Q5/Q6 with Miller compensation (Cc1, Cc2).',
     'Q1 drives Q5 and Q2 drives Q6, so each output is in phase with its own side: the feedback crosses (outn to Q1, outp to Q2, by net labels) through R2/R1 (gain -10).',
     'Q7/Q8 are the output current sinks; the CMFB (Rcp, Rcn, Q9 to Q11) sets their base vb so that the outputs sit at Vcm.',
-    'LP1 (Stability > DiffLoopProbe) is in series in the differential output; the .stb picks the mode (dm or cm). DM: about 58° of margin.',
+    'LP1 (Stability > LoopProbe_Dif) is in series in the differential output; the .stb picks the mode (dm or cm). DM: about 58° of margin.',
   ];
-  // cómo funcionan las sondas: la DiffLoopProbe armada a mano (dos Balun y dos LoopProbe) en lugar de LP1
+  // cómo funcionan las sondas: la LoopProbe_Dif armada a mano (dos Balun y dos LoopProbe) en lugar de LP1
   const bal = parseAsc(readFileSync('examples/stability/balun.asc', 'utf8'));
   const byHand: AscDoc = (() => {
     const part = parseAsc(`Version 4
@@ -385,7 +385,7 @@ SYMATTR InstName B2
     'Double-click B1 to see its circuit (BalunCircuit: the Stability > Balun drawn as a subcircuit of this project). An ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)',
     'and the F sources put them back on the mode side as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Then V(p)·I(p) + V(n)·I(n) = V(d)·I(d) + V(c)·I(c):',
     'it conserves power, so it neither isolates nor loads, and unlike a transformer it passes DC. Here Vp and Vn are 120° apart: d is their difference and c their mean (1 V with a 0.25 V ripple).',
-    'A DiffLoopProbe is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.',
+    'A LoopProbe_Dif is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.',
   ];
   const sims: Sim[] = [
     bench(0, 'Loop gain (Tian)', setAnalysisLine(note(se, SE_NOTE), '.stb LP1 dec 50 10 100meg'), STB),
@@ -432,11 +432,11 @@ SYMATTR InstName B2
     }),
     bench(
       2,
-      'DiffLoopProbe by hand: DM',
+      'LoopProbe_Dif by hand: DM',
       setAnalysisLine(dnote(inside(byHand), ['LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn). Double-click any of them to see its circuit.', 'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.']), '.stb LPd dec 50 10 100meg'),
       STB,
     ),
-    bench(2, 'DiffLoopProbe by hand: CM', setAnalysisLine(dnote(inside(byHand), ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
+    bench(2, 'LoopProbe_Dif by hand: CM', setAnalysisLine(dnote(inside(byHand), ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
   ];
   const ls: Project = {
     name: 'Loop stability', created: t0, modified: t0, groups, files: SUBS,

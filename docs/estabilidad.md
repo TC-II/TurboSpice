@@ -25,13 +25,13 @@ En la librería **Stability**:
 - `LoopProbe`: en serie en el lazo. Adentro tiene `Vinj` (tensión en serie), `Vprb` (amperímetro) e
   `Iinj` (corriente a tierra), todas en 0. Fuera del `.stb` es un cable: no cambia `.op`, `.tran`,
   `.ac`, `.noise` ni ningún otro análisis.
-- `DiffLoopProbe`: en serie en un par diferencial. Tiene dos baluns ideales espalda con espalda,
+- `LoopProbe_Dif`: en serie en un par diferencial. Tiene dos baluns ideales espalda con espalda,
   armados con pares E + F (conservan la potencia: no aíslan ni cargan), con una `LoopProbe` en el
   modo diferencial (`xdm`) y otra en el común (`xcm`). El análisis elige el modo.
-- `Balun`: el balun ideal que usa la `DiffLoopProbe`, también como componente suelto. Separa (p, n)
+- `Balun`: el balun ideal que usa la `LoopProbe_Dif`, también como componente suelto. Separa (p, n)
   en el modo diferencial d = V(p) − V(n) y el común c = (V(p) + V(n))/2, con las corrientes duales
   I(d) = (I(p) − I(n))/2 e I(c) = I(p) + I(n). Pasa continua. El proyecto de ejemplo «Loop stability»
-  arma una `DiffLoopProbe` a mano con dos `Balun` y dos `LoopProbe` y da el mismo T.
+  arma una `LoopProbe_Dif` a mano con dos `Balun` y dos `LoopProbe` y da el mismo T.
 
 Subcircuitos: `library/sub/Stability/LoopProbe.lib`.
 

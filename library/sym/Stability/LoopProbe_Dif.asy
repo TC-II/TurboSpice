@@ -13,10 +13,10 @@ TEXT -28 32 Left 0 -
 TEXT 28 -32 Right 0 +
 TEXT 28 32 Right 0 -
 TEXT 0 -14 Center 0 DM/CM
-WINDOW 0 0 -52 Center 2
+WINDOW 0 0 -64 Center 2
 SYMATTR Prefix X
 SYMATTR InstName LP1
-SYMATTR SpiceModel DiffLoopProbe
+SYMATTR SpiceModel LoopProbe_Dif
 SYMATTR ModelFile Stability/LoopProbe.lib
 SYMATTR Description Differential loop gain probe (.stb): two ideal baluns back to back, with a probe in the differential mode and another in the common mode; the analysis chooses which one. In series in a differential pair, signal in at the left. Transparent in any other analysis.
 PIN -48 -32 NONE 0

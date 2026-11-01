@@ -2102,7 +2102,7 @@ export const es: Record<string, string> = {
   'Loop probe': 'Sonda de lazo',
   'Method': 'Método',
   'Mode': 'Modo',
-  'Place a LoopProbe or DiffLoopProbe (Stability library) in series in the loop': 'Poné una LoopProbe o DiffLoopProbe (librería Stability) en serie en el lazo',
+  'Place a LoopProbe or LoopProbe_Dif (Stability library) in series in the loop': 'Poné una LoopProbe o LoopProbe_Dif (librería Stability) en serie en el lazo',
   'Differential (DM)': 'Diferencial (DM)',
   'Common mode (CM)': 'Modo común (CM)',
   'Tian, A-β model: T = −Aβ (as Spectre stb; probe orientation does not matter)': 'Tian, modelo A-β: T = −Aβ (como stb de Spectre; no importa la orientación de la sonda)',
@@ -2137,7 +2137,7 @@ export const es: Record<string, string> = {
   'Too few points to fit a model of {L}': 'Muy pocos puntos para ajustar un modelo de {L}',
   'Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.': 'Polos y ceros de un ajuste racional de {L}(jω) (error {e}); línea: lugar de raíces de 1 + k·{L}, k de 0 a ∞. El margen supone estable lo que queda cerrado.',
   'Pick a loop probe on the schematic': 'Elegí una sonda de lazo en el esquemático',
-  'Click a loop probe (LoopProbe or DiffLoopProbe) to choose it · Esc cancels': 'Hacé click en una sonda de lazo (LoopProbe o DiffLoopProbe) para elegirla · Esc cancela',
+  'Click a loop probe (LoopProbe or LoopProbe_Dif) to choose it · Esc cancels': 'Hacé click en una sonda de lazo (LoopProbe o LoopProbe_Dif) para elegirla · Esc cancela',
   'Pick the loop probe on the schematic': 'Elegir la sonda de lazo en el esquemático',
   'Loop gain (.stb) with the single-ended and the differential loop probe: Tian and GFT methods, phase and gain margins, root locus and the step response that confirms them': 'Ganancia de lazo (.stb) con la sonda simple y la diferencial: métodos de Tian y GFT, márgenes de fase y de ganancia, lugar de raíces y la respuesta al escalón que los confirma',
   // diálogo de dispositivos de PDK (PdkDialog.tsx)

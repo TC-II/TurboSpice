@@ -27,9 +27,9 @@ Fc2 0 c Vsn 1
 
 * Sonda diferencial: dos baluns espalda con espalda (equivalen a una conexión directa) con una
 * sonda en el modo diferencial (Xdm) y otra en el modo común (Xcm). La señal entra por p1/n1.
-.subckt DiffLoopProbe p1 n1 p2 n2
+.subckt LoopProbe_Dif p1 n1 p2 n2
 X1 p1 n1 d1 c1 Balun
 X2 p2 n2 d2 c2 Balun
 Xdm d1 d2 LoopProbe
 Xcm c1 c2 LoopProbe
-.ends DiffLoopProbe
+.ends LoopProbe_Dif

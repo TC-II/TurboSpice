@@ -2593,7 +2593,7 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
     if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;
-    if (picking.what === 'probe') return /^(Diff)?LoopProbe$/i.test(a.get('SpiceModel') ?? '') ? (a.get('InstName') ?? null) : null;
+    if (picking.what === 'probe') return /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') ? (a.get('InstName') ?? null) : null;
     return /^[VI]$/i.test(a.get('Prefix') ?? '') ? (a.get('InstName') ?? null) : null;
   };
   useEffect(() => {
@@ -2826,8 +2826,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       // sondas de lazo del .stb (librería Stability)
       probes: doc.symbols
         .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
-        .filter((a) => /^(Diff)?LoopProbe$/i.test(a.get('SpiceModel') ?? ''))
-        .map((a) => ({ name: a.get('InstName') ?? '', diff: /^Diff/i.test(a.get('SpiceModel') ?? '') }))
+        .filter((a) => /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? ''))
+        .map((a) => ({ name: a.get('InstName') ?? '', diff: /^(LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') }))
         .filter((p, i, all) => p.name && all.findIndex((q) => q.name === p.name) === i),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4624,6 +4624,6 @@ function toolHint(tt: Tool): string {
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':
-      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : tt.what === 'probe' ? t('Click a loop probe (LoopProbe or DiffLoopProbe) to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
+      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : tt.what === 'probe' ? t('Click a loop probe (LoopProbe or LoopProbe_Dif) to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
   }
 }

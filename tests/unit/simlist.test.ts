@@ -104,11 +104,12 @@ describe('lista de simulaciones', () => {
     expect(l.active).toBe(first);
     expect(l.items.length).toBe(2);
   });
-  it('comando para una simulación nueva con las fuentes y redes del circuito', () => {
+  it('comando para una simulación nueva: redes y fuentes vacías, para que las elija el usuario (#338)', () => {
     const info = { nets: ['N001', 'in', 'out'], sources: ['V1', 'V2'] };
-    expect(defaultLine('dc', info)).toBe('.dc V1 0 5 0.1');
-    expect(defaultLine('tf', info)).toBe('.tf V(out) V1');
-    expect(defaultLine('pz', info)).toBe('.pz in 0 out 0 vol pz');
+    expect(defaultLine('dc', info)).toBe('.dc  0 5 0.1');
+    expect(defaultLine('tf', info)).toBe('.tf V() ');
+    expect(defaultLine('pz', info)).toBe('.pz  0  0 vol pz');
+    expect(parseAnalysis(defaultLine('pz', info))).toMatchObject({ inP: '', inN: '0', outP: '', outN: '0' });
     expect(defaultLine('tran', info)).toBe('.tran 10m');
   });
 });
@@ -229,11 +230,12 @@ describe('análisis incompletos', () => {
     expect(analysisProblem('.tf V(out) V1')).toBeUndefined();
     expect(analysisProblem('.dc  0 5 0.1')).toMatch(/fuente/);
   });
-  it('una simulación nueva toma los valores de otra, pero las redes y fuentes de este circuito', () => {
-    const info = { nets: ['0', 'Vx'], sources: ['V1'] };
-    expect(reuseLine('.tf V()', 'tf', info)).toBe('.tf V(Vx) V1');
-    expect(reuseLine('.tf V(out) V9', 'tf', info)).toBe('.tf V(Vx) V1');
-    expect(reuseLine('.dc V9 0 2 0.01', 'dc', info)).toBe('.dc V1 0 2 0.01');
-    expect(reuseLine('.noise V(out) V9 dec 7 1 1k', 'noise', info)).toBe('.noise V(Vx) V1 dec 7 1 1k');
+  it('una simulación nueva toma los valores de otra, pero sin sus redes ni fuentes (#338)', () => {
+    const info = { nets: ['0', 'Vx', 'out'], sources: ['V1'] };
+    expect(reuseLine('.tf V(out) V1', 'tf', info)).toBe('.tf V() ');
+    expect(reuseLine('.dc V1 0 2 0.01', 'dc', info)).toBe('.dc  0 2 0.01');
+    expect(reuseLine('.noise V(out) V1 dec 7 1 1k', 'noise', info)).toBe('.noise V()  dec 7 1 1k');
+    expect(reuseLine('.pz Vx 0 out 0 cur pol', 'pz', info)).toBe('.pz  0  0 cur pol');
+    expect(reuseLine('.stb LP1 dec 50 10 1g gft', 'stb', info)).toBe('.stb  dec 50 10 1g gft');
   });
 });

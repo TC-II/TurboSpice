@@ -221,72 +221,36 @@ export function followLine(l: SimList, line: string | null): SimList {
   return replace(l, cur.id, (s) => ({ ...s, line }));
 }
 
-const AUTO_NET = /^(N\d{3,}|NC_\d+)$/;
-
 /**
- * Comando para una simulación nueva de ese tipo, con la primera fuente del circuito y la red
- * "out" (o la primera con nombre) donde hacen falta
+ * Comando para una simulación nueva de ese tipo. Las redes y fuentes quedan vacías (#338): las
+ * elige el usuario (antes se tomaban la primera fuente y dos redes con nombre, que casi nunca eran
+ * las que había que medir). Las referencias (Input −, Output −) van en tierra.
  */
-export function defaultLine(kind: AnalysisKind, info: { nets: string[]; sources: string[] }): string {
-  const a = defaultAnalysis(kind);
-  const src = info.sources[0] ?? '';
-  // (la tierra no es una salida ni una entrada)
-  const named = info.nets.filter((n) => !AUTO_NET.test(n) && n !== '0');
-  const out = named.find((n) => /^out$/i.test(n)) ?? named[named.length - 1] ?? info.nets[0] ?? '';
-  const inp = named.find((n) => /^in$/i.test(n)) ?? named[0] ?? '';
-  switch (a.kind) {
-    case 'dc':
-      a.sweeps[0].src = src;
-      break;
-    case 'noise':
-    case 'tf':
-      a.out = out;
-      a.src = src;
-      break;
-    case 'sens':
-      a.out = out;
-      break;
-    case 'pz':
-      a.inP = inp;
-      a.outP = out;
-      break;
-  }
-  return formatAnalysis(a);
+export function defaultLine(kind: AnalysisKind, _info?: { nets: string[]; sources: string[] }): string {
+  return formatAnalysis(defaultAnalysis(kind));
 }
 
 /**
  * Comando para una simulación nueva a partir del de otro testbench del mismo tipo: se conservan sus
- * valores (tiempos, barridos), pero las redes y fuentes que no están en este circuito (o que
- * faltaban) pasan a las de `defaultLine`; si no, una línea rota se copiaba a todas las nuevas
+ * valores (tiempos, barridos) y las redes y fuentes que también están en este circuito; las demás
+ * quedan vacías, como en `defaultLine` (si no, una línea rota se copiaba a todas las nuevas)
  */
-export function reuseLine(line: string, kind: AnalysisKind, info: { nets: string[]; sources: string[] }): string {
-  const fresh = parseAnalysis(defaultLine(kind, info));
+export function reuseLine(line: string, kind: AnalysisKind, _info?: { nets: string[]; sources: string[] }): string {
   const a = parseAnalysis(line);
-  if (!a || !fresh || a.kind !== kind || fresh.kind !== kind) return defaultLine(kind, info);
-  const net = (v: string, d: string) => (v && (v === '0' || info.nets.some((n) => n.toLowerCase() === v.toLowerCase())) ? v : d);
-  const src = (v: string, d: string) => (v && info.sources.some((n) => n.toLowerCase() === v.toLowerCase()) ? v : d);
+  if (!a || a.kind !== kind) return defaultLine(kind);
   switch (a.kind) {
-    case 'dc': {
-      const f = fresh as typeof a;
-      const sweeps = a.sweeps.map((s, i) => ({ ...s, src: src(s.src, i ? '' : f.sweeps[0].src) })).filter((s, i) => i === 0 || s.src);
-      return formatAnalysis({ ...a, sweeps });
-    }
-    case 'noise': {
-      const f = fresh as typeof a;
-      return formatAnalysis({ ...a, out: net(a.out, f.out), ref: a.ref && net(a.ref, ''), src: src(a.src, f.src) });
-    }
-    case 'tf': {
-      const f = fresh as typeof a;
-      return formatAnalysis({ ...a, out: net(a.out, f.out), src: src(a.src, f.src) });
-    }
-    case 'sens': {
-      const f = fresh as typeof a;
-      return formatAnalysis({ ...a, out: net(a.out, f.out) });
-    }
-    case 'pz': {
-      const f = fresh as typeof a;
-      return formatAnalysis({ ...a, inP: net(a.inP, f.inP), inN: net(a.inN, '0'), outP: net(a.outP, f.outP), outN: net(a.outN, '0') });
-    }
+    case 'dc':
+      return formatAnalysis({ ...a, sweeps: [{ ...a.sweeps[0], src: '' }] });
+    case 'noise':
+      return formatAnalysis({ ...a, out: '', ref: '', src: '' });
+    case 'tf':
+      return formatAnalysis({ ...a, out: '', src: '' });
+    case 'sens':
+      return formatAnalysis({ ...a, out: '' });
+    case 'pz':
+      return formatAnalysis({ ...a, inP: '', inN: '0', outP: '', outN: '0' });
+    case 'stb':
+      return formatAnalysis({ ...a, probe: '', input: '', output: '' });
   }
   return formatAnalysis(a);
 }

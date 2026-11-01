@@ -1619,8 +1619,12 @@ svg.export-sheet * { vector-effect: none !important; }
 /* la letra que el PDF incrusta (Arimo), sólo en normal y negrita: la vista previa mide igual que el PDF */
 svg.export-sheet text { font-family: Arimo, Arial, sans-serif; font-weight: 400; }
 svg.export-sheet .directive text, svg.export-sheet .op-annotation text { font-weight: 700; }
-/* trazo Tremor (#330): los cables a mano alzada son polilíneas */
-svg.export-sheet .wires polyline { fill: none; stroke: var(--sch-sym); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* los cables, del mismo ancho exacto que los terminales de los skins (1.5), como en ASC-Parser */
+svg.export-sheet .wires line { stroke-width: 1.5; }
+svg.export-sheet .wires line.bus { stroke-width: 4.5; }
+/* trazo Tremor (#330): los cables a mano alzada son polilíneas, con la pluma de los símbolos
+   (penWidth de roughPen, 2.5): un cable más fino que el símbolo delataría la mano */
+svg.export-sheet .wires polyline { fill: none; stroke: var(--sch-sym); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 svg.export-sheet .wires polyline.bus { stroke-width: 4.5; }
 /* relleno opaco: svg2pdf no toma el semitransparente y el cable se vería a través del valor */
 svg.export-sheet .op-annotation rect { fill: #fff; }

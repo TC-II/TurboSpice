@@ -496,9 +496,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const warnShared = () => {
     const sub = pathRef.current[pathRef.current.length - 1]?.sub;
     if (!sub || warnedSubs.current.has(sub.toLowerCase())) return;
-    warnedSubs.current.add(sub.toLowerCase());
     const n = benchesUsing(projectRef.current, sub);
-    if (n > 1) setMessage(t('{name} is used in {n} testbenches: the changes apply to all of them', { name: sub, n }));
+    // (si todavía lo usa uno solo, se avisa cuando pase a usarse en varios)
+    if (n < 2) return;
+    warnedSubs.current.add(sub.toLowerCase());
+    setMessage(t('{name} is used in {n} testbenches: the changes apply to all of them', { name: sub, n }));
   };
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);

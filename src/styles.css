@@ -248,6 +248,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .buspin line { stroke: var(--sch-sym); stroke-width: 1.6; }
 .buspin .buswidth { fill: var(--sch-sym); stroke: none; }
 .junctions circle { fill: var(--sch-sym); stroke: none; }
+.junctions .skin { color: var(--sch-sym); }
 .wire-vertices rect { fill: var(--sch-sel); stroke: none; pointer-events: none; }
 .sym { color: var(--sch-sym); stroke: currentColor; }
 .sym .body { stroke-width: 1.4; }

@@ -32,3 +32,17 @@ describe('trazo Tremor (#330)', () => {
     expect(pts.length).toBeGreaterThan(2);
   });
 });
+
+describe('Tremor igual que en ASC-Parser (#330)', () => {
+  it('con la misma semilla, cada skin del Default sale con los mismos trazos que el original', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { default: RoughPen } = await import('../../src/schematic/roughPen.js');
+    const ds = (s: string) => [...s.matchAll(/ d="([^"]+)"|stroke-width="([^"]+)"/g)].map((m) => m[1] ?? m[2]).join('|');
+    for (const f of readdirSync('library/skins/default').filter((n) => n.endsWith('.svg'))) {
+      const name = f.slice(0, -4);
+      const seed = `${name.toLowerCase()}|128|-64`;
+      const orig = RoughPen.roughen(readFileSync(`library/skins/default/${f}`, 'utf8'), { pins: [[0, 0]], seed }).svg;
+      expect(ds(tremorSkin(skins[name], [[0, 0]], seed).body), name).toBe(ds(orig));
+    }
+  });
+});

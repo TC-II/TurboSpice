@@ -1,7 +1,7 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
 import { memo, useId, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
-import { WINDOW_ATTR, type AscDoc, type Flag, type Orient, type PinDef, type Point, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
+import { WINDOW_ATTR, baseName, type AscDoc, type Flag, type Orient, type PinDef, type Point, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
 import { orientMatrix, toWorld, transformAlign } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
@@ -108,7 +108,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
   mark?: Mark | 'removed';
 }) {
   const clean = lib.skin(inst.type);
-  const skin = clean && tremor ? tremorSkin(clean, def?.pins.map((p) => [p.x, p.y] as [number, number]) ?? [], `${inst.type}|${inst.x}|${inst.y}`) : clean;
+  const skin = clean && tremor ? tremorSkin(clean, def?.pins.map((p) => [p.x, p.y] as [number, number]) ?? [], `${baseName(inst.type).toLowerCase()}|${inst.x}|${inst.y}`) : clean;
   const cls = `sym${selected ? ' sel' : ''}${hover ? ' hover' : ''}${def ? '' : ' missing'}${mark ? ` diff-${mark}` : ''}${unsaved ? ' unsaved' : ''}`;
   if (!def) {
     return (
@@ -218,7 +218,7 @@ export function FlagView({ flag, doc, lib, selected, hover, mark, tremor }: { fl
   const cls = `flag${selected ? ' sel' : ''}${hover ? ' hover' : ''}${mark ? ` diff-${mark}` : ''}`;
   if (flag.name === '0') {
     const clean = lib.skin('GND');
-    const gnd = clean && tremor ? tremorSkin(clean, [[0, 0]], `GND|${flag.x}|${flag.y}`) : clean;
+    const gnd = clean && tremor ? tremorSkin(clean, [[0, 0]], `gnd|${flag.x}|${flag.y}`) : clean;
     return (
       <g className={cls} transform={matrix(GND_ROT[dir], flag.x, flag.y)}>
         {gnd ? <g className="skin" dangerouslySetInnerHTML={{ __html: gnd.body }} /> : <path d="M -16 0 H 16 M -9 6 H 9 M -3 12 H 3" />}
@@ -360,7 +360,17 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
           {flightFrom && netIslands(hl, doc, conn, flightFrom).map((q, i) => <path key={i} d={flightArc(flightFrom, q)} />)}
         </g>
       )}
-      <g className="junctions">{junctions.map(({ x, y }) => <circle key={`${x},${y}`} cx={x} cy={y} r={4} />)}</g>
+      <g className="junctions">
+        {junctions.map(({ x, y }) => {
+          // con Tremor, el punto de unión es el skin intersection a mano alzada, como en ASC-Parser
+          const dot = tremor && lib.skin('intersection');
+          return dot ? (
+            <g key={`${x},${y}`} className="skin" transform={`translate(${x} ${y})`} dangerouslySetInnerHTML={{ __html: tremorSkin(dot, [[0, 0]], `${x},${y}`).body }} />
+          ) : (
+            <circle key={`${x},${y}`} cx={x} cy={y} r={4} />
+          );
+        })}
+      </g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
           <SymbolView key={i} tremor={tremor} unsaved={unsaved?.symbols.has(i)} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />

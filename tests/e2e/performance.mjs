@@ -109,7 +109,9 @@ check((await transform()) === '', '150 ms después del último giro se aplica la
 const vw1 = Number((await svg.getAttribute('viewBox')).split(' ')[2]);
 const q1 = await docAt(Q);
 check(vw1 < vw0 * 0.75, `acercó (ancho ${vw0.toFixed(0)} → ${vw1.toFixed(0)})`);
-check(near(q1, q0, 1.5), `el punto bajo el cursor queda fijo (${q0.x.toFixed(1)},${q0.y.toFixed(1)} → ${q1.x.toFixed(1)},${q1.y.toFixed(1)})`);
+// tolerancia de 1,5 px de pantalla: alejado, una unidad del esquemático mide menos de un píxel
+const tolQ = Math.max(1.5, (1.5 * vw1) / box.width);
+check(near(q1, q0, tolQ), `el punto bajo el cursor queda fijo (${q0.x.toFixed(1)},${q0.y.toFixed(1)} → ${q1.x.toFixed(1)},${q1.y.toFixed(1)}, tolerancia ${tolQ.toFixed(1)})`);
 // alejar mucho: la rueda sobre el borde vacío (fuera del svg escalado) sigue haciendo zoom
 for (let i = 0; i < 6; i++) await page.mouse.wheel(0, 120);
 await page.waitForTimeout(400);

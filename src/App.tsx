@@ -131,6 +131,7 @@ import { loadView } from './schematic/autosave.ts';
 import { decode, decodeText } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
+import { SideSplit, useSideSize } from './ui/SideSplit.tsx';
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
@@ -566,6 +567,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const plotPanel = useRef<PlotPanelHandle>(null);
   const [resultsSide, setResultsSide] = useState(() => lsGet('turbospice.resultsSide') === '1');
   const sizeKey = resultsSide ? 'turbospice.resultsW' : 'turbospice.resultsH';
+  // el mapa de polos y la vista de Stability van al lado del gráfico (debajo, con los resultados
+  // al costado); su tamaño se cambia con un divisor y se recuerda (#336)
+  const splitDir = resultsSide ? 'column' : 'row';
+  const pzSplit = useSideSize('pz', splitDir);
+  const stbSplit = useSideSize('stb', splitDir);
   const [resultsH, setResultsH] = useState<number>(() => Number(lsGet(sizeKey)) || 0);
   useEffect(() => setResultsH(Number(lsGet(sizeKey)) || 0), [sizeKey]);
   // esquemático o resultados expandidos a toda la ventana (#24)
@@ -4175,10 +4181,19 @@ ${ltNetlistText(sim.built.lt)}
                 />
                 </Suspense>
               )}
+              {/* el mapa de polos o el de Stability al lado (o debajo) del gráfico, con un divisor (#336) */}
               {panel === 'plot' && plot && scale && withPz && pzSide && mode !== 'smith' && (
-                <PzPlane runs={pzAll} labels={labels} name={project.name} compact />
+                <>
+                  <SideSplit dir={splitDir} onSize={pzSplit.set} label={t('Resize the pole-zero map')} />
+                  <PzPlane runs={pzAll} labels={labels} name={project.name} compact style={pzSplit.style} />
+                </>
               )}
-              {panel === 'plot' && plot && scale && isStbPlot(plot) && mode !== 'smith' && <StbView plot={plot} name={project.name} />}
+              {panel === 'plot' && plot && scale && isStbPlot(plot) && mode !== 'smith' && (
+                <>
+                  <SideSplit dir={splitDir} onSize={stbSplit.set} label={t('Resize the stability view')} />
+                  <StbView plot={plot} name={project.name} style={stbSplit.style} />
+                </>
+              )}
               {panel === 'plot' && plot && !scale &&
                 (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} highlightDevice={lvNow ? undefined : hoverDev} />)}
               </ErrorBoundary>

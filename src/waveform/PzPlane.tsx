@@ -1,7 +1,9 @@
-// Mapa de polos (×) y ceros (○) en el plano s: aspecto 1:1, grilla con escala, zoom con la
-// rueda o con Shift+arrastre, paneo arrastrando, escala logarítmica opcional, guías de ζ y ω₀,
+// Mapa de polos (×) y ceros (○) en el plano s: ocupa toda su región (#335) con la misma escala en
+// los dos ejes, grilla con escala, zoom con la rueda o arrastrando un recuadro, paneo con el botón
+// derecho o el del medio (como en los gráficos), escala logarítmica opcional, guías de ζ y ω₀,
 // corridas de .step superpuestas y resaltado cruzado entre el mapa y la tabla.
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
+import { SideSplit, useSideSize } from '../ui/SideSplit.tsx';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { download, schematicPng, schematicSvg } from '../schematic/exportSchematic.ts';
 import { complexText, niceStep, pzCsv, pzRoots, rootInfo, ticks, unstable, type Root } from './pz.ts';
@@ -9,8 +11,6 @@ import { si } from './series.ts';
 import { PALETTE } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 
-/** lado máximo del área del mapa [px] */
-const MAX = 900;
 const ZETAS = [0.1, 0.2, 0.3, 0.5, 0.707];
 const HIT = 10;
 /** márgenes alrededor del área del mapa: las marcas de los ejes van afuera, como en los gráficos */
@@ -22,7 +22,7 @@ const GB = 20;
 interface View {
   cx: number;
   cy: number;
-  /** media ventana (igual en los dos ejes: aspecto 1:1) */
+  /** media ventana a lo largo del lado más corto del área (la escala es la misma en los dos ejes) */
   h: number;
 }
 type Drag = { mode: 'pan'; x0: number; y0: number; view: View } | { mode: 'box'; x0: number; y0: number; x1: number; y1: number };
@@ -34,17 +34,19 @@ interface Props {
   labels?: Map<string, string>;
   /** nombre base de los archivos exportados */
   name?: string;
-  /** al lado de otro gráfico: mapa más chico y sin tabla */
+  /** al lado de otro gráfico: sin tabla ni exportar */
   compact?: boolean;
   /** ramas del lugar de raíces (s en rad/s), dibujadas debajo de las raíces */
   locus?: { re: number; im: number }[][];
   /** la estabilidad (✓/⚠) se evalúa sólo con los polos de esta corrida (el lazo cerrado del .stb) */
   stableRun?: number;
+  /** tamaño elegido con el divisor de afuera (#336) */
+  style?: CSSProperties;
 }
 
 const fmtNum = (x: number, digits = 3) => (Number.isFinite(x) ? String(Number(x.toPrecision(digits))) : '—');
 
-export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, locus, stableRun }: Props) {
+export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, locus, stableRun, style }: Props) {
   const roots = useMemo(() => pzRoots(runs), [runs]);
   const [hz, setHz] = useState(false);
   const [log, setLog] = useState(false);
@@ -53,34 +55,35 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
   const [view, setView] = useState<View | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const svg = useRef<SVGSVGElement>(null);
-  // el área del mapa es cuadrada: con espacio al costado, la tabla va a la derecha y el mapa toma
-  // el alto; en un panel angosto (o más alto que ancho), la tabla va debajo
+  // el área del mapa toma todo el lugar que le deja su contenedor (#335); la tabla va a la
+  // derecha o, en un panel angosto (o más alto que ancho), debajo
   const root = useRef<HTMLDivElement>(null);
-  const tools = useRef<HTMLDivElement>(null);
-  const foot = useRef<HTMLDivElement>(null);
-  const [side, setSide] = useState(320);
+  const mapBox = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 320, h: 240 });
   const [stacked, setStacked] = useState(false);
   useEffect(() => {
     const el = root.current;
-    if (!el) return;
+    const box = mapBox.current;
+    if (!el || !box) return;
     const fit = () => {
-      const w = el.clientWidth;
-      const h = el.clientHeight - (tools.current?.offsetHeight ?? 0) - (foot.current?.offsetHeight ?? 0) - 12;
-      const st = !compact && (w < 620 || w < el.clientHeight * 1.15);
-      const p = compact ? Math.min(w - GL - GR, h - GT - GB) : st ? Math.min(w - GL - GR, h * 0.6 - GT - GB) : Math.min(h - GT - GB, w * 0.55 - GL - GR);
-      setStacked(st);
-      setSide(Math.round(Math.max(110, Math.min(MAX, p))));
+      setStacked(!compact && (el.clientWidth < 620 || el.clientWidth < el.clientHeight * 1.15));
+      const w = Math.max(60, Math.floor(box.clientWidth) - GL - GR);
+      const h = Math.max(60, Math.floor(box.clientHeight) - GT - GB);
+      setSize((o) => (o.w === w && o.h === h ? o : { w, h }));
     };
     const ro = new ResizeObserver(fit);
     ro.observe(el);
-    if (foot.current) ro.observe(foot.current);
+    ro.observe(box);
     return () => ro.disconnect();
   }, [compact]);
+  // la tabla, al lado o debajo del mapa, con un divisor (#336)
+  const tableSplit = useSideSize('pz-table', stacked ? 'column' : 'row');
   const rows = useRef<(HTMLTableRowElement | null)[]>([]);
   // el dibujo se hace en px reales para que los textos no cambien de tamaño
-  const W = side;
+  const W = size.w;
+  const H = size.h;
   const SW = W + GL + GR;
-  const SH = W + GT + GB;
+  const SH = H + GT + GB;
   const multi = runs.length > 1;
   const runLabel = (run: number) => labels?.get(runs[run]?.name) ?? runs[run]?.name ?? '';
   const color = (r: Root) => (multi ? PALETTE[r.run % PALETTE.length] : undefined);
@@ -106,11 +109,12 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     const xs = [0, ...pts.map((p) => p[0])];
     const ys = [0, ...pts.map((p) => p[1])];
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-    const h = (Math.max(x1 - x0, y1 - y0) / 2) * 1.25 || 1;
-    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, h };
+    // la escala más grande con la que entran todas las raíces en el rectángulo (con un margen)
+    const kk = Math.min(x1 > x0 ? W / ((x1 - x0) * 1.25) : Infinity, y1 > y0 ? H / ((y1 - y0) * 1.25) : Infinity);
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, h: Number.isFinite(kk) ? Math.min(W, H) / (2 * kk) : 1 };
     // pts depende de roots, unit, log y decade0
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roots, unit, log, decade0]);
+  }, [roots, unit, log, decade0, W, H]);
   // otras raíces o pasar a escala log: se vuelve a ajustar. Cambiar de rad/s a Hz no (#332): la
   // vista se convierte a la otra unidad (switchUnit). Las raíces se comparan por su valor (quien
   // llama puede armar las corridas de nuevo en cada render)
@@ -143,30 +147,30 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
   };
 
   // px, py: coordenadas dentro del área del mapa (el <g> la corre a los márgenes)
-  const k = W / (2 * v.h);
+  const k = Math.min(W, H) / (2 * v.h);
   const px = (x: number) => W / 2 + (x - v.cx) * k;
-  const py = (y: number) => W / 2 - (y - v.cy) * k;
-  const world = (sx: number, sy: number): [number, number] => [v.cx + (sx - W / 2) / k, v.cy - (sy - W / 2) / k];
+  const py = (y: number) => H / 2 - (y - v.cy) * k;
+  const world = (sx: number, sy: number): [number, number] => [v.cx + (sx - W / 2) / k, v.cy - (sy - H / 2) / k];
   const local = (e: { clientX: number; clientY: number }): [number, number] => {
     const b = svg.current!.getBoundingClientRect();
     return [((e.clientX - b.left) * SW) / b.width - GL, ((e.clientY - b.top) * SH) / b.height - GT];
   };
 
   // rueda: zoom alrededor del mouse (listener propio: React registra wheel como pasivo)
-  const viewRef = useRef({ v, W });
-  viewRef.current = { v, W };
+  const viewRef = useRef({ v, W, H });
+  viewRef.current = { v, W, H };
   useEffect(() => {
     const el = svg.current;
     if (!el) return;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
       const b = el.getBoundingClientRect();
-      const { v: c, W } = viewRef.current;
-      const kk = W / (2 * c.h);
+      const { v: c, W, H } = viewRef.current;
+      const kk = Math.min(W, H) / (2 * c.h);
       const sx = ((e.clientX - b.left) * (W + GL + GR)) / b.width - GL;
-      const sy = ((e.clientY - b.top) * (W + GT + GB)) / b.height - GT;
+      const sy = ((e.clientY - b.top) * (H + GT + GB)) / b.height - GT;
       const wx = c.cx + (sx - W / 2) / kk;
-      const wy = c.cy - (sy - W / 2) / kk;
+      const wy = c.cy - (sy - H / 2) / kk;
       const f = Math.exp(e.deltaY * 0.0015);
       setView({ cx: wx + (c.cx - wx) * f, cy: wy + (c.cy - wy) * f, h: c.h * f });
     };
@@ -183,24 +187,28 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     });
     return best;
   };
+  // como en los gráficos y el esquemático (#335): el botón derecho o el del medio panean y el
+  // izquierdo arrastra un recuadro de zoom
   const onDown = (e: RPointerEvent<SVGSVGElement>) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 && e.button !== 1 && e.button !== 2) return;
+    e.preventDefault();
     const [x, y] = local(e);
     e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag(e.shiftKey ? { mode: 'box', x0: x, y0: y, x1: x, y1: y } : { mode: 'pan', x0: x, y0: y, view: v });
+    setDrag(e.button === 0 ? { mode: 'box', x0: x, y0: y, x1: x, y1: y } : { mode: 'pan', x0: x, y0: y, view: v });
   };
   const onMove = (e: RPointerEvent<SVGSVGElement>) => {
     const [x, y] = local(e);
     if (!drag) return setHover(nearest(x, y));
     if (drag.mode === 'box') return setDrag({ ...drag, x1: x, y1: y });
-    const kk = W / (2 * drag.view.h);
+    const kk = Math.min(W, H) / (2 * drag.view.h);
     setView({ ...drag.view, cx: drag.view.cx - (x - drag.x0) / kk, cy: drag.view.cy + (y - drag.y0) / kk });
   };
   const onUp = () => {
     if (drag?.mode === 'box' && Math.abs(drag.x1 - drag.x0) > 4 && Math.abs(drag.y1 - drag.y0) > 4) {
       const [ax, ay] = world(drag.x0, drag.y0);
       const [bx, by] = world(drag.x1, drag.y1);
-      setView({ cx: (ax + bx) / 2, cy: (ay + by) / 2, h: Math.max(Math.abs(bx - ax), Math.abs(by - ay)) / 2 });
+      const kk = Math.min(W / Math.abs(bx - ax), H / Math.abs(by - ay));
+      setView({ cx: (ax + bx) / 2, cy: (ay + by) / 2, h: Math.min(W, H) / (2 * kk) });
     }
     setDrag(null);
   };
@@ -214,8 +222,8 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
   };
 
   // grilla
-  const [vx0, vx1, vy0, vy1] = [v.cx - v.h, v.cx + v.h, v.cy - v.h, v.cy + v.h];
-  const step = niceStep(2 * v.h, Math.max(3, Math.round(W / 70)));
+  const [vx0, vx1, vy0, vy1] = [v.cx - W / (2 * k), v.cx + W / (2 * k), v.cy - H / (2 * k), v.cy + H / (2 * k)];
+  const step = niceStep(2 * v.h, Math.max(3, Math.round(Math.min(W, H) / 70)));
   const far = Math.hypot(Math.max(Math.abs(vx0), Math.abs(vx1)), Math.max(Math.abs(vy0), Math.abs(vy1)));
   const decades = log ? ticks(1, Math.ceil(far), 1) : [];
   const circles = log ? decades : guides ? ticks(step, far, step) : [];
@@ -264,8 +272,8 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     </span>
   );
   return (
-    <div ref={root} className={`pz-view${compact ? ' compact' : ''}${stacked ? ' stacked' : ''}`}>
-      <div className="plot-tools pz-tools" ref={tools}>
+    <div ref={root} className={`pz-view${compact ? ' compact' : ''}${stacked ? ' stacked' : ''}`} style={style}>
+      <div className="plot-tools pz-tools">
         <button onClick={() => setView(null)} title={t('See all poles and zeros (double-click on the map)')}>
           {t('Fit')}
         </button>
@@ -313,8 +321,8 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
         )}
       </div>
       <div className="pz-body">
-        <div className="pz-side" style={{ width: SW }}>
-          <div className="pz-map">
+        <div className="pz-side">
+          <div className="pz-map" ref={mapBox}>
             <svg
               ref={svg}
               className={`pz-plane${drag?.mode === 'pan' ? ' panning' : ''}`}
@@ -328,17 +336,18 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
               onPointerUp={onUp}
               onPointerLeave={() => !drag && setHover(null)}
               onDoubleClick={() => setView(null)}
+              onContextMenu={(e) => e.preventDefault()}
             >
               <defs>
                 <clipPath id="pz-clip">
-                  <rect x={0} y={0} width={W} height={W} />
+                  <rect x={0} y={0} width={W} height={H} />
                 </clipPath>
               </defs>
               <g transform={`translate(${GL} ${GT})`}>
                 <g clipPath="url(#pz-clip)">
-                  {ox < W && <rect className="rhp" x={Math.max(0, ox)} y={0} width={W - Math.max(0, ox)} height={W} />}
+                  {ox < W && <rect className="rhp" x={Math.max(0, ox)} y={0} width={W - Math.max(0, ox)} height={H} />}
                   {xt.map((x) => (
-                    <line key={`gx${x}`} className="grid" x1={px(x)} x2={px(x)} y1={0} y2={W} />
+                    <line key={`gx${x}`} className="grid" x1={px(x)} x2={px(x)} y1={0} y2={H} />
                   ))}
                   {yt.map((y) => (
                     <line key={`gy${y}`} className="grid" x1={0} x2={W} y1={py(y)} y2={py(y)} />
@@ -364,14 +373,14 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
                       );
                     })}
                   <line x1={0} y1={oy} x2={W} y2={oy} className="axis" />
-                  <line x1={ox} y1={0} x2={ox} y2={W} className="axis" />
+                  <line x1={ox} y1={0} x2={ox} y2={H} className="axis" />
                   {log &&
                     decades.map((d) => (
                       <text key={`td${d}`} x={px(d) + 3} y={oy - 4}>
                         {si(10 ** (decade0 + d), 3)}
                       </text>
                     ))}
-                  <text className="axis-name" x={W - 6} y={Math.min(W - 6, Math.max(14, oy - 6))} textAnchor="end">
+                  <text className="axis-name" x={W - 6} y={Math.min(H - 6, Math.max(14, oy - 6))} textAnchor="end">
                     σ
                   </text>
                   <text className="axis-name" x={Math.min(W - 20, Math.max(6, ox + 6))} y={14}>
@@ -383,7 +392,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
                       className="locus"
                       points={br
                         .map((r) => toXY(r.re, r.im))
-                        .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - v.cx) < 50 * v.h && Math.abs(y - v.cy) < 50 * v.h)
+                        .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - v.cx) < 50 * v.h * Math.max(1, W / H) && Math.abs(y - v.cy) < 50 * v.h * Math.max(1, H / W))
                         .map(([x, y]) => `${px(x).toFixed(1)},${py(y).toFixed(1)}`)
                         .join(' ')}
                     />
@@ -415,9 +424,9 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
                     />
                   )}
                 </g>
-                <rect className="frame" x={0.5} y={0.5} width={W - 1} height={W - 1} />
+                <rect className="frame" x={0.5} y={0.5} width={W - 1} height={H - 1} />
                 {xt.map((x) => (
-                  <text key={`tx${x}`} x={px(x)} y={W + 14} textAnchor="middle">
+                  <text key={`tx${x}`} x={px(x)} y={H + 14} textAnchor="middle">
                     {si(x, 3)}
                   </text>
                 ))}
@@ -426,7 +435,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
                     {si(y, 3)}
                   </text>
                 ))}
-                <text x={-6} y={W + 14} textAnchor="end" className="unit">
+                <text x={-6} y={H + 14} textAnchor="end" className="unit">
                   {log ? `log ${unitText}` : unitText}
                 </text>
               </g>
@@ -447,13 +456,14 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
               </div>
             )}
           </div>
-          <div className="pz-foot" ref={foot}>
+          <div className="pz-foot">
             {compact && multi && legend}
-            {!compact && SW >= 380 &&<p className="hint pz-help">{t('Wheel: zoom · drag: pan · Shift+drag: zoom to a box · double-click: fit')}</p>}
+            {!compact && SW >= 380 && <p className="hint pz-help">{t('Wheel: zoom · right-drag: pan · drag: zoom to a box · double-click: fit')}</p>}
           </div>
         </div>
+        {!compact && <SideSplit dir={stacked ? 'column' : 'row'} onSize={tableSplit.set} min={120} reserve={200} label={t('Resize the table of poles and zeros')} />}
         {!compact && (
-          <div className="pz-table">
+          <div className="pz-table" style={tableSplit.style}>
             {bad.length > 0 && (
               <p className="pz-warn">
                 ⚠ {bad.length === 1 ? t('A pole') : t('{length} poles', { length: bad.length })} {t('in the right half-plane: the circuit is unstable')}

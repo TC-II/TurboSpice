@@ -591,7 +591,12 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-view.compact { flex: none; width: 340px; gap: 6px; }
 .pz-plane .locus { fill: none; stroke: var(--accent); stroke-width: 1.2; opacity: 0.55; vector-effect: non-scaling-stroke; }
 .stb-view { flex: none; width: 360px; display: flex; flex-direction: column; gap: 8px; min-height: 0; overflow: auto; }
-.stb-view .pz-view.compact { width: auto; flex: 1 1 auto; min-height: 260px; }
+.stb-view.multi { width: 600px; }
+.stb-view .pz-view.compact { width: auto; flex: 1 1 auto; min-height: 200px; }
+/* un mapa por modo, uno al lado del otro (#335) */
+.stb-maps { flex: 1 1 auto; display: flex; gap: 10px; min-height: 0; }
+.stb-map { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.stb-map > .stb-mode { align-self: center; }
 /* márgenes y estabilidad en una línea (#332) */
 .stb-summary { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center; gap: 2px 14px; font-size: 12px; margin: 0; color: var(--fg-muted); white-space: nowrap; }
 .stb-summary b { font-weight: 600; color: var(--fg); font-variant-numeric: tabular-nums; }
@@ -601,12 +606,9 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-view.compact .pz-foot { align-items: center; padding-top: 2px; }
 .pz-view.compact .pz-legend { justify-content: center; font-size: 12px; }
 .stb-warn { font-size: 12px; color: var(--err); margin: 0; }
-/* sonda diferencial (#333): una línea por modo; la del mapa de polos, resaltada */
-.stb-summary.mode { cursor: pointer; padding: 2px 6px; border-radius: 6px; border: 1px solid transparent; }
-.stb-summary.mode.active { border-color: var(--border); background: var(--bg-alt); }
+/* sonda diferencial (#333): una línea por modo */
+.stb-summary.mode { padding: 2px 6px; }
 .stb-mode { font-weight: 700; color: var(--accent); font-size: 11px; }
-.stb-modes { align-self: center; }
-.stb-modes button { font-size: 12px; padding: 2px 10px; }
 .stb-view .hint { font-size: 11px; margin: 0; }
 .results-body:has(> .stb-view) { flex-direction: row; gap: 12px; }
 .results-body:has(> .stb-view) > .plot-panel { min-width: 0; }
@@ -628,11 +630,11 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-glyph.zero { color: var(--accent); }
 .pz-body { flex: 1; display: flex; gap: 20px; min-height: 0; }
 .pz-view.stacked .pz-body { flex-direction: column; gap: 10px; }
-.pz-view.stacked .pz-side { align-self: center; }
-.pz-view.stacked .pz-table { align-self: stretch; flex: 0 1 auto; }
-.pz-side { display: flex; flex-direction: column; gap: 4px; flex: none; min-height: 0; max-width: 100%; }
-.pz-map { position: relative; }
-.pz-plane { display: block; max-width: 100%; height: auto; touch-action: none; cursor: crosshair; user-select: none; }
+.pz-view.stacked .pz-table { align-self: stretch; flex: 0 1 auto; max-width: none; max-height: 40%; }
+/* el mapa ocupa todo el lugar que queda (#335): el svg se dibuja al tamaño medido de .pz-map */
+.pz-side { display: flex; flex-direction: column; gap: 4px; flex: 1 1 0; min-width: 0; min-height: 0; }
+.pz-map { position: relative; flex: 1 1 0; min-height: 120px; min-width: 0; overflow: hidden; }
+.pz-plane { position: absolute; left: 0; top: 0; display: block; touch-action: none; cursor: crosshair; user-select: none; }
 .pz-plane.panning { cursor: grabbing; }
 .pz-plane .frame { fill: none; stroke: var(--border); }
 .pz-plane .rhp { fill: var(--err); opacity: 0.05; }
@@ -656,7 +658,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .pz-help { margin: 0; font-size: 11px; padding-left: 46px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pz-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--fg); }
 .pz-legend i, .pz-table td.run i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
-.pz-table { flex: 1 1 0; min-width: 0; min-height: 0; max-height: 100%; overflow: auto; align-self: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.pz-table { flex: 0 1 auto; max-width: 55%; min-width: 0; min-height: 0; max-height: 100%; overflow: auto; align-self: flex-start; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
 .pz-table table { width: 100%; border-collapse: collapse; font: 13px var(--mono); font-variant-numeric: tabular-nums; }
 .pz-table thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-alt); padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: left; font: 600 11px system-ui, sans-serif; color: var(--fg-muted); white-space: nowrap; }
 .pz-table td, .pz-table tbody th { padding: 5px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; text-align: left; }
@@ -1678,3 +1680,10 @@ svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #
 .menu-item.current > button { background: color-mix(in srgb, var(--fg) 9%, transparent); }
 /* lugar del ⌖ en una caja que no lo tiene, para alinear las cajas de una columna */
 .simbar .sb-field .pick-btn.pick-pad { visibility: hidden; pointer-events: none; }
+/* divisor entre el gráfico y lo que tiene al lado: mapa de polos, Stability, cursores, tabla (#336) */
+.side-split { flex: none; position: relative; z-index: 1; touch-action: none; border-radius: 3px; }
+.side-split.row { width: 6px; margin: 0 -3px; cursor: col-resize; align-self: stretch; }
+.side-split.column { height: 6px; margin: -3px 0; cursor: row-resize; }
+.side-split::before { content: ''; position: absolute; inset: -4px; }
+.side-split:hover, .side-split.dragging { background: color-mix(in srgb, var(--accent) 45%, transparent); }
+.workspace.side .stb-view .pz-view.compact { flex: 1 1 auto; }

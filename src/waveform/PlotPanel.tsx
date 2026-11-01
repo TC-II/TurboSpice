@@ -19,6 +19,7 @@ import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './df
 import { useTraceWidth } from './lineWidth.ts';
 import { Icon } from '../ui/icons.tsx';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
+import { SideSplit, useSideSize } from '../ui/SideSplit.tsx';
 import { locale, t } from '../i18n/i18n.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
@@ -694,6 +695,7 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     </>
   );
   const allVisible = data.flatMap((d) => d.curves.filter((c) => !c.hidden));
+  const readoutSplit = useSideSize('readouts', side ? 'column' : 'row');
   const fUnplaced = cursorMode && fCursors.a === undefined && fCursors.b === undefined;
 
   return (
@@ -798,8 +800,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           </Fragment>
         ))}
       </div>
+      {/* cursores y stats: el divisor cambia su ancho (o su alto) (#336) */}
+      {(cursorMode || (showStats && allVisible.length > 0)) && <SideSplit dir={side ? 'column' : 'row'} onSize={readoutSplit.set} min={100} reserve={200} label={t('Resize cursors and stats')} />}
       {(cursorMode || (showStats && allVisible.length > 0)) && (
-        <div className="readouts">
+        <div className="readouts" style={readoutSplit.style}>
           {cursorMode && (
             <section className="readout-card" aria-label={t('Cursors')}>
               <h4>{t('Cursors')}</h4>

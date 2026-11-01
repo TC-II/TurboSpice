@@ -1,8 +1,9 @@
 // Resultados de un .stb al lado del Bode de T: márgenes de fase y de ganancia, y el mapa de
 // polos y ceros de T (lazo abierto), los polos del lazo cerrado y el lugar de raíces de 1 + k·T,
 // a partir de un modelo racional ajustado a T(jω) (stbMath.ts). Con la sonda diferencial, lo mismo
-// para cada modo (DM y CM, #333): una línea de márgenes por modo y el mapa del modo elegido.
-import { useMemo, useState } from 'react';
+// para cada modo (DM y CM, #333): una línea de márgenes por modo y los dos mapas uno al lado del
+// otro (#335).
+import { useMemo, type CSSProperties } from 'react';
 import { isStbMain, type SimPlot, type SimVector } from '../engine/ngspice.ts';
 import { closedLoopRoots, fitRational, margins, modelZeros, rootLocus, type Complex } from '../sim/stbMath.ts';
 import { PzPlane } from './PzPlane.tsx';
@@ -81,7 +82,7 @@ const deg = (x: number) => `${x.toFixed(1)}°`;
 const rhp = (roots: Complex[]) => roots.filter((p) => p.re > 1e-9 * Math.hypot(p.re, p.im)).length;
 
 /** márgenes y estabilidad en una sola línea (#332); los otros cruces de 0 dB, en el tooltip */
-function Summary({ info, L, tag, active, onPick }: { info: StbInfo; L: string; tag?: string; active?: boolean; onPick?: () => void }) {
+function Summary({ info, L, tag }: { info: StbInfo; L: string; tag?: string }) {
   const pm = info.margins.phase;
   // margen de ganancia: el cruce de −180° más cercano por encima de la frecuencia de cruce
   const gm = info.margins.gain;
@@ -90,8 +91,7 @@ function Summary({ info, L, tag, active, onPick }: { info: StbInfo; L: string; t
   const rhpClosed = rhp(info.closed);
   return (
     <p
-      className={`stb-summary${tag ? ' mode' : ''}${active ? ' active' : ''}`}
-      onClick={onPick}
+      className={`stb-summary${tag ? ' mode' : ''}`}
       title={t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', { L, e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}
     >
       {tag && <span className="stb-mode">{tag}</span>}
@@ -107,46 +107,48 @@ function Summary({ info, L, tag, active, onPick }: { info: StbInfo; L: string; t
   );
 }
 
-export function StbView({ plot, name }: { plot: SimPlot; name: string }) {
+export function StbView({ plot, name, style }: { plot: SimPlot; name: string; style?: CSSProperties }) {
   const modes = useMemo(() => stbModes(plot), [plot]);
   const infos = useMemo(() => modes.map((m) => stbInfo(plot, m)), [plot, modes]);
-  // el modo del mapa de polos (con la sonda diferencial)
-  const [pick, setPick] = useState(0);
-  const sel = Math.min(pick, modes.length - 1);
-  const info = infos[sel];
-  if (!info) return null;
-  const mode = modes[sel];
-  const s = mode ? `_${mode.toUpperCase()}` : '';
-  const gft = plot.vectors.some((v) => v.name === `r${mode ? `_${mode}` : ''}`);
-  // la ganancia de lazo de los márgenes: Aβ (Tian, T = −Aβ) o R (GFT)
-  const L = (gft ? 'R' : 'Aβ') + s;
-  const rhpOpen = info.open ? rhp(info.open.poles) : 0;
-  const runs = info.open ? [rootsPlot(t('{L} (open loop)', { L }), info.open.poles, info.open.zeros), rootsPlot(t('closed loop'), info.closed)] : [];
-  const labels = new Map(runs.map((r) => [r.name, r.name]));
+  if (!infos.some(Boolean)) return null;
+  const multi = modes.length > 1;
+  // la ganancia de lazo de cada modo: Aβ (Tian, T = −Aβ) o R (GFT)
+  const loopName = (mode: string) => (plot.vectors.some((v) => v.name === `r${mode ? `_${mode}` : ''}`) ? 'R' : 'Aβ') + (mode ? `_${mode.toUpperCase()}` : '');
   return (
-    <div className="stb-view">
-      {modes.length > 1
-        ? modes.map((m, i) => {
-            const mi = infos[i];
-            const ms = `_${m.toUpperCase()}`;
-            return mi && <Summary key={m} info={mi} L={(gft ? 'R' : 'Aβ') + ms} tag={m.toUpperCase()} active={i === sel} onPick={() => setPick(i)} />;
-          })
-        : <Summary info={info} L={L} />}
-      {rhpOpen > 0 && <p className="stb-warn">⚠ {t('{L} has poles in the right half-plane (an inner loop is unstable): the margins read on the Bode plot are not valid; use the closed-loop poles.', { L })}</p>}
-      {modes.length > 1 && (
-        <span className="pz-seg stb-modes" role="group" aria-label={t('Mode')}>
-          {modes.map((m, i) => (
-            <button key={m} className={i === sel ? 'active' : ''} aria-pressed={i === sel} onClick={() => setPick(i)}>
-              {m === 'dm' ? t('Differential (DM)') : t('Common mode (CM)')}
-            </button>
-          ))}
-        </span>
-      )}
-      {info.open ? (
-        <PzPlane key={mode} runs={runs} labels={labels} name={`${name} stb${s.toLowerCase()}`} compact locus={info.locus} stableRun={1} />
-      ) : (
-        <p className="hint">{t('Too few points to fit a model of {L}', { L })}</p>
-      )}
+    <div className={`stb-view${multi ? ' multi' : ''}`} style={style}>
+      {modes.map((m, i) => {
+        const info = infos[i];
+        return info && <Summary key={m} info={info} L={loopName(m)} tag={multi ? m.toUpperCase() : undefined} />;
+      })}
+      {modes.map((m, i) => {
+        const info = infos[i];
+        const L = loopName(m);
+        return info?.open && rhp(info.open.poles) > 0 ? (
+          <p key={m} className="stb-warn">
+            ⚠ {t('{L} has poles in the right half-plane (an inner loop is unstable): the margins read on the Bode plot are not valid; use the closed-loop poles.', { L })}
+          </p>
+        ) : null;
+      })}
+      {/* con la sonda diferencial, el mapa de cada modo, uno al lado del otro (#335) */}
+      <div className="stb-maps">
+        {modes.map((m, i) => {
+          const info = infos[i];
+          if (!info) return null;
+          const L = loopName(m);
+          const runs = info.open ? [rootsPlot(t('{L} (open loop)', { L }), info.open.poles, info.open.zeros), rootsPlot(t('closed loop'), info.closed)] : [];
+          const labels = new Map(runs.map((r) => [r.name, r.name]));
+          return (
+            <div key={m} className="stb-map">
+              {multi && <span className="stb-mode" title={m === 'dm' ? t('Differential (DM)') : t('Common mode (CM)')}>{m.toUpperCase()}</span>}
+              {info.open ? (
+                <PzPlane runs={runs} labels={labels} name={`${name} stb${m ? `_${m}` : ''}`} compact locus={info.locus} stableRun={1} />
+              ) : (
+                <p className="hint">{t('Too few points to fit a model of {L}', { L })}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

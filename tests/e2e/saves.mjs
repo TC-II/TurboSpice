@@ -121,13 +121,13 @@ const longAsc = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 16 80 16', 'WIRE 80 16 
   'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
   'SYMBOL res 64 0 R0', 'SYMATTR InstName R1', 'SYMATTR Value 1k',
   'SYMBOL cap 144 16 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1n',
-  'TEXT 0 160 Left 2 !.tran 0 0.6'].join('\n') + '\n';
+  'TEXT 0 160 Left 2 !.tran 0 1.2'].join('\n') + '\n';
 await page.evaluate((t) => {
   const dt = new DataTransfer();
   dt.items.add(new File([t], 'Largo.asc'));
   window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
 }, longAsc);
-await page.locator('.texts .directive', { hasText: '.tran 0 0.6' }).waitFor();
+await page.locator('.texts .directive', { hasText: '.tran 0 1.2' }).waitFor();
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 const choose = page.getByRole('button', { name: /^Elegir señales \(hasta \d+\)$/ });
 await choose.waitFor({ timeout: 60000 });

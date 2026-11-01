@@ -2,7 +2,7 @@
 // arrastrar un tramo, Alt+click, deshacer; la netlist del archivo guardado no cambia.
 // Uso: node tests/e2e/wires.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { frames, skipWelcome, launchBrowser } from './lib.mjs';
+import { skipWelcome, launchBrowser } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { activeAsc, variantOf } from '../../src/project/project.ts';
@@ -57,7 +57,8 @@ const lib = new Library(buildBundle());
 let saves = 0;
 const saved = async () => {
   // Chrome descarta una descarga automática pegada a la anterior: un respiro entre guardados
-  await frames(page);
+  // (es un límite de tiempo del navegador: no hay condición que esperar)
+  await page.waitForTimeout(400);
   const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press('Control+s')]);
   const path = `${OUT}/wires-${saves++}.turbo`;
   await download.saveAs(path);

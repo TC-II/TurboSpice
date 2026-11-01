@@ -4,7 +4,7 @@
 // (buses con radix); el modo comportamiento (Icarus) corre retardos y $display; todo sigue ahí
 // después de recargar.
 // Uso: node tests/e2e/verilog.mjs [url]   (con `npm run preview` corriendo)
-import { autosaved, frames, steady, skipWelcome, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, skipWelcome, until, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -186,8 +186,7 @@ check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await p
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
 await code.fill('`timescale 1ns/1ps\nmodule pulso(input clk, output reg y);\n  initial y = 0;\n  always @(posedge clk) begin\n    #20 y = 1;\n    #10 y = 0;\n    $display("pulso");\n  end\nendmodule\n');
-await frames(page);
-check((await page.locator('.vm-suggest').count()) === 1, 'sugiere el modo comportamiento (tiene retardos # y $display)');
+check(await until(async () => (await page.locator('.vm-suggest').count()) === 1), 'sugiere el modo comportamiento (tiene retardos # y $display)');
 await page.locator('.vm-suggest button').click();
 await synthesize();
 check((await status()) === 'Compilado (Icarus)', `compila con Icarus (${await status()})`);

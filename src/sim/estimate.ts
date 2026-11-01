@@ -16,6 +16,12 @@ export const MAX_SIM_BYTES = 512 * 1024 ** 2;
  * llega a esto. Con la copia a la página el pico ronda el doble, cerca de lo que da wasm32 (4 GB).
  */
 export const FULL_SIM_BYTES = 1024 ** 3;
+/**
+ * Los límites de un transitorio que se simula punto a punto (streamPlan en engine/ngspice.ts): ngspice
+ * no guarda nada (con 1 GB de datos el motor quedaba en 16 MB en vez de 2 GB) y los puntos van a
+ * páginas que no se copian al crecer, así que entra el doble.
+ */
+export const simLimits = (streamed: boolean) => (streamed ? { max: 2 * MAX_SIM_BYTES, full: 2 * FULL_SIM_BYTES } : { max: MAX_SIM_BYTES, full: FULL_SIM_BYTES });
 /** Puntos por corrida: más tardan minutos en simular y no se pueden graficar con fluidez */
 export const MAX_POINTS = 2_000_000;
 /** Más puntos por década casi nunca aportan resolución */
@@ -162,7 +168,7 @@ export function countVectors(netlist: string, files: Record<string, string> = {}
   return count(top, new Set(), 0) + 1;
 }
 
-const fmtBytes = (b: number) =>
+export const fmtBytes = (b: number) =>
   b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace('.', ',')} GB` : `${Math.round(b / 1024 ** 2)} MB`;
 const fmtCount = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',')} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : String(n);

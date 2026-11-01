@@ -129,7 +129,8 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     const result = engine.simulate(req.netlist, icarus ? { ...req.opts, bias: undefined } : req.opts);
     const ms = performance.now() - t0;
     // Tras un error fatal ngspice queda en estado indefinido: instancia nueva para la próxima
-    if (result.aborted || icarus) ng = null;
+    // (y tras simular punto a punto: `.save none` queda puesto en ngspice para siempre)
+    if (result.aborted || result.reload || icarus) ng = null;
     const transfer = result.plots.flatMap((p) =>
       p.vectors.flatMap((v) => (v.imag ? [v.real.buffer, v.imag.buffer] : [v.real.buffer])),
     );

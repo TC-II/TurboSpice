@@ -8,18 +8,21 @@ import type { Library } from '../library/library.ts';
 import { onSegment, type Connectivity, type Net } from '../netlist/connectivity.ts';
 import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, visibleText, type ItemRef } from './geometry.ts';
+import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, unescapeAsc, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
 import { tremorSkin, tremorWire } from './tremor.ts';
+import { hasLatex, labelPlain, mathSvg, useMathJax } from './latex.ts';
 
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
 
 
 /** <text> con la semántica de alineación de LTspice (Left…VBottom, spec §7) */
-export function AlignedText({ x, y, align, size, children, className, label }: {
+export function AlignedText({ x, y, align, size, children, className, label, latex = true }: {
+  /** un $…$ se compone con LaTeX (MathJax, #328); las directivas no (en SPICE, $ es comentario) */
+  latex?: boolean;
   x: number;
   y: number;
   align: string;
@@ -31,22 +34,47 @@ export function AlignedText({ x, y, align, size, children, className, label }: {
    *  sí se oculta: así se guardan datos en el esquemático */
   label?: boolean;
 }) {
+  // (se vuelve a dibujar cuando llega MathJax)
+  useMathJax();
   if (align === 'Invisible' || (size <= 0 && !label)) return null;
   const vertical = align.startsWith('V');
   const base = vertical ? align.slice(1) : align;
   const anchor = base === 'Left' ? 'start' : base === 'Right' ? 'end' : 'middle';
   const baseline = base === 'Top' ? 'hanging' : base === 'Bottom' ? 'text-after-edge' : 'central';
+  const fs = fontSize(size);
+  const math = latex && typeof children === 'string' && hasLatex(children) ? mathSvg(children) : undefined;
+  if (math) {
+    // la fórmula (viewBox de MathJax, 1000 por em) alineada como lo estaría el texto
+    const k = fs / 1000;
+    const [w, h] = [math.w * k, math.h * k];
+    const x0 = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
+    const top = baseline === 'hanging' ? y : baseline === 'text-after-edge' ? y - h : y - h / 2;
+    return (
+      <g
+        className={`math fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
+        transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
+        data-tex={children}
+        data-x={x}
+        data-y={y}
+        data-anchor={anchor}
+        data-baseline={baseline}
+        data-size={fs}
+      >
+        <g transform={`translate(${x0} ${top}) scale(${k}) translate(${-math.minX} ${-math.minY})`} dangerouslySetInnerHTML={{ __html: math.body }} />
+      </g>
+    );
+  }
   return (
     <text
       x={x}
       y={y}
-      fontSize={fontSize(size)}
+      fontSize={fs}
       textAnchor={anchor}
       dominantBaseline={baseline}
       transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
       className={`fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
     >
-      {children}
+      {latex && typeof children === 'string' ? labelPlain(children) : children}
     </text>
   );
 }
@@ -130,7 +158,7 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     if (idx === 3 && !inst.attrs.has('Value') && HIDE_DEFAULT_VALUE.test(prefix)) continue;
     const raw = attrs.get(key);
     if (!raw) continue;
-    const text = idx === 3 ? displayValue(prefix, raw) : raw;
+    const text = unescapeAsc(idx === 3 ? displayValue(prefix, raw) : raw);
     const p = toWorld(inst, w.x, w.y);
     labels.push(
       <AlignedText key={idx} x={p.x} y={p.y} align={transformAlign(w.align, inst.orient)} size={w.size} label className={idx === grabWin ? 'win grab' : 'win'}>
@@ -230,7 +258,7 @@ export function FlagView({ flag, doc, lib, selected, hover, mark, tremor }: { fl
     <g className={cls}>
       <circle cx={flag.x} cy={flag.y} r={3.6} className="flagdot" />
       <AlignedText x={flag.x + t.dx} y={flag.y + t.dy} align={t.align} size={2} className="flagname">
-        {flag.ioPin ? `${flag.name} [${flag.ioPin}]` : flag.name}
+        {unescapeAsc(flag.ioPin ? `${flag.name} [${flag.ioPin}]` : flag.name)}
       </AlignedText>
     </g>
   );
@@ -401,7 +429,7 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             )}
             <g clipPath={t.box ? `url(#${clipId}t${i})` : undefined}>
               {textLines(t).map((line, j) => (
-                <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size}>
+                <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size} latex={t.kind === 'comment' && !isNgspiceComment(full.text)}>
                   {line}
                 </AlignedText>
               ))}

@@ -210,7 +210,7 @@ svg.editor.tool-comment { cursor: text; }
 svg.editor.tool-resize { cursor: nwse-resize; }
 svg.editor .text-bbox rect { fill: none; stroke: var(--accent); stroke-width: 0.6; stroke-dasharray: 3 2; vector-effect: non-scaling-stroke; pointer-events: none; }
 svg.editor .text-bbox rect.handle { fill: var(--bg); stroke-dasharray: none; stroke-width: 1.2; }
-svg.editor .inline-text textarea { box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0 0 0 0; border: 1px dashed var(--accent); border-radius: 0; outline: none; resize: none; overflow: hidden; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--sch-drawing, var(--fg)); font-family: system-ui, sans-serif; white-space: pre; }
+svg.editor .inline-text textarea { box-sizing: border-box; width: 100%; height: 100%; margin: 0; padding: 0 0 0 0; border: 1px dashed var(--accent); border-radius: 0; outline: none; resize: none; overflow: hidden; background: color-mix(in srgb, var(--bg) 85%, transparent); color: var(--sch-drawing, var(--fg)); font-family: var(--sch-font, system-ui, sans-serif); white-space: pre; }
 .text-menu select { flex: 1; min-width: 0; font-size: 13px; }
 /* borrar: el cursor es la × dibujada en la grilla */
 svg.editor.tool-delete { cursor: none; }
@@ -259,7 +259,8 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .schematic .skin { fill: currentColor; stroke: none; }
 .sym.sel { color: var(--sch-sel); }
 .sym.missing rect { stroke: var(--err); stroke-dasharray: 4 3; }
-.sym text, .flag text, .texts text { stroke: none; font-family: system-ui, sans-serif; }
+/* la letra del esquemático: Configuración › Letra del esquemático (#328) */
+.sym text, .flag text, .texts text { stroke: none; font-family: var(--sch-font, system-ui, sans-serif); }
 .sym text.win { fill: var(--sch-label); }
 .sym.sel text.win { fill: var(--sch-sel); }
 /* el rótulo de un componente seleccionado que se puede arrastrar (o se arrastra): verde */
@@ -277,6 +278,13 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .texts .directive text { fill: var(--sch-directive); font-weight: 600; }
 .texts .comment text { fill: var(--sch-drawing); }
 .texts .sel text { fill: var(--sch-sel); }
+/* LaTeX (#328): la fórmula toma el color del texto que reemplaza */
+.schematic .math { stroke: none; fill: var(--sch-label); }
+.sym .body .math { fill: currentColor; }
+.sym.sel .math.win, .sym.hover:not(.sel) .math.win, .flag.sel .math, .flag.hover:not(.sel) .math, .texts .sel .math { fill: var(--sch-sel); }
+.texts .comment .math { fill: var(--sch-drawing); }
+.texts .diff-changed .math, .sym.diff-changed .math.win { fill: var(--diff-chg); }
+.sym.diff-added .math.win { fill: var(--diff-add); }
 .net-hl line { stroke: var(--sch-hl); stroke-width: 3.2; }
 .net-hl circle { fill: var(--sch-hl); stroke: none; }
 /* halo de Virtuoso: la opacidad va en el grupo para que los trazos no se sumen donde se pisan */
@@ -1646,8 +1654,9 @@ svg.export-sheet {
 /* el trazo en unidades de la hoja (1 unidad = 1 pt): la vista previa escala como el PDF */
 svg.export-sheet * { vector-effect: none !important; }
 /* la letra que el PDF incrusta (Arimo), sólo en normal y negrita: la vista previa mide igual que el PDF */
-svg.export-sheet text { font-family: Arimo, Arial, sans-serif; font-weight: 400; }
-svg.export-sheet .directive text, svg.export-sheet .op-annotation text { font-weight: 700; }
+/* la letra de la hoja (#328), elegida en la vista: Latin Modern no tiene negrita (el PDF la saca normal) */
+svg.export-sheet text { font-family: var(--sheet-font, Arimo, Arial, sans-serif); font-weight: 400; }
+svg.export-sheet .directive text, svg.export-sheet .op-annotation text { font-weight: var(--sheet-bold, 700); }
 /* los cables, del mismo ancho exacto que los terminales de los skins (1.5), como en ASC-Parser */
 svg.export-sheet .wires line { stroke-width: 1.5; }
 svg.export-sheet .wires line.bus { stroke-width: 4.5; }

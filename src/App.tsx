@@ -92,6 +92,8 @@ import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems,
 import { parseSource } from './sim/sources.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { ExportView } from './schematic/ExportView.tsx';
+import { FONTS, fontChoice, loadFont } from './schematic/fonts.ts';
+import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
@@ -154,6 +156,8 @@ const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
 /** El skin de los símbolos elegido en Configuración (#329) */
 const SKIN_KEY = 'turbospice.skin';
+/** La letra del esquemático elegida en Configuración (#328) */
+const SCH_FONT_KEY = 'turbospice.schFont';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
@@ -433,6 +437,17 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const [, setSubTabs] = useState<string[]>([]);
   // el panel se muestra al acercar el mouse al borde izquierdo (si se tildó, en modo selección)
   const [hoverReveal, setHoverRevealState] = useState(() => lsGet('turbospice.treeHover') === '1');
+  // letra del esquemático (#328): una variable de CSS y la que mide los textos
+  const [schFont, setSchFontState] = useState(() => fontChoice(lsGet(SCH_FONT_KEY)).id);
+  useEffect(() => {
+    const c = fontChoice(schFont);
+    const apply = () => {
+      document.documentElement.style.setProperty('--sch-font', c.css);
+      setMeasureFont(c.css);
+    };
+    loadFont(c).then(apply, () => setMessage(t('Could not load the font «{name}»', { name: c.label })));
+  }, [schFont]); // eslint-disable-line react-hooks/exhaustive-deps
+  const setSchFont = (id: string) => (lsSet(SCH_FONT_KEY, id), setSchFontState(id));
   const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
   const [treePeek, setTreePeek] = useState(false);
@@ -4439,6 +4454,14 @@ ${ltNetlistText(sim.built.lt)}
             {
               title: t('Schematic'),
               rows: [
+                {
+                  kind: 'choice',
+                  label: t('Schematic font'),
+                  hint: t('The font of names, values, labels and comments on screen; text between $…$ is set with LaTeX'),
+                  value: schFont,
+                  options: FONTS.map((f) => ({ value: f.id, label: f.label })),
+                  onChange: setSchFont,
+                },
                 {
                   kind: 'choice',
                   label: t('Symbol skin'),

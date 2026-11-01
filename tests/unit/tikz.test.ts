@@ -28,3 +28,11 @@ describe('export a TikZ (#327)', () => {
     expect(Math.min(...a.segs.map((g) => g.p[1]))).toBeCloseTo(-10, 1);
   });
 });
+
+describe('TikZ con las reglas de $…$ de ASC-Parser (#328)', () => {
+  it('escapes resueltos y $ suelto literal', () => {
+    expect(texText('escapes: \\$ 50\\% R\\&D a\\_b')).toBe('escapes: \\$ 50\\% R\\&D a\\_b');
+    expect(texText('unbalanced $ stays')).toBe('unbalanced \\$ stays');
+    expect(texText('Right: $\\tau = RC$')).toBe('Right: $\\tau = RC$');
+  });
+});

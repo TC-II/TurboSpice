@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { wrapText } from '../../src/schematic/geometry.ts';
+import { ascLines, textLines, unescapeAsc, wrapText } from '../../src/schematic/geometry.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 
@@ -20,5 +20,20 @@ describe('TEXTBOX', () => {
     expect(doc.texts[0].box).toEqual({ w: 120, h: 48 });
     expect(doc.texts[1].box).toBeUndefined();
     expect(serializeAsc(doc)).toBe(asc);
+  });
+});
+
+describe('barras del .asc (LTspice las duplica al guardar)', () => {
+  // (en el .asc: \\ es una barra y \n un salto de línea; en JS cada barra va doble)
+  it('\\\\ es una barra y \\n separa líneas, de izquierda a derecha como ASC-Parser', () => {
+    expect(ascLines('$\\frac{g_{m1}\\\\cdot A_0}{\\\\sqrt{h_{fe1}}}$')).toEqual(['$\\frac{g_{m1}\\cdot A_0}{\\sqrt{h_{fe1}}}$']);
+    expect(ascLines('uno\\ndos')).toEqual(['uno', 'dos']);
+    // \\\\n: una barra y una n, no un salto de línea
+    expect(ascLines('$\\\\nu$')).toEqual(['$\\nu$']);
+    expect(unescapeAsc('C:\\\\lib\\\\x')).toBe('C:\\lib\\x');
+  });
+
+  it('textLines dibuja el texto ya leído', () => {
+    expect(textLines({ x: 0, y: 0, size: 2, align: 'Left', text: 'a\\\\cdot b\\nc' })).toEqual(['a\\cdot b', 'c']);
   });
 });

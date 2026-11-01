@@ -11,8 +11,10 @@ import { t } from '../i18n/i18n.ts';
 import { SchematicCanvas } from './SchematicCanvas.tsx';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AnnotationLayer, type Annotation } from './NetNames.tsx';
-import { download, schematicPng, sheetBox, sheetPdf, sheetSvg, type SheetFont } from './exportSchematic.ts';
+import { download, schematicPng, sheetBox, sheetPdf, sheetSvg } from './exportSchematic.ts';
 import { sheetTikz } from './tikz.ts';
+import { FONTS, fontChoice, loadFont } from './fonts.ts';
+import { useMathJax } from './latex.ts';
 
 /** Capas opcionales de la hoja: apagadas de entrada */
 interface Layers {
@@ -23,30 +25,16 @@ interface Layers {
   tremor: boolean;
 }
 
-/**
- * Letra de la hoja: Arimo (OFL, mide igual que Arial, con griegas). La vista previa la carga como
- * fuente web y el PDF la incrusta, así miden lo mismo
- */
-const FONT: SheetFont = {
-  family: 'Arimo',
-  files: { normal: `${import.meta.env.BASE_URL}fonts/Arimo-Regular.ttf`, bold: `${import.meta.env.BASE_URL}fonts/Arimo-Bold.ttf` },
+/** Letras de la hoja (#328): las que el PDF puede incrustar; de entrada, Latin Modern (la de LaTeX) */
+const SHEET_FONTS = FONTS.filter((f) => f.font);
+const SHEET_FONT_KEY = 'turbospice.sheetFont';
+const savedFont = () => {
+  try {
+    return localStorage.getItem(SHEET_FONT_KEY);
+  } catch {
+    return null;
+  }
 };
-let fontReady: Promise<void> | undefined;
-function loadFont(): Promise<void> {
-  fontReady ??= Promise.all(
-    Object.entries(FONT.files).map(async ([style, url]) => {
-      document.fonts.add(await new FontFace(FONT.family, `url(${url})`, { weight: style === 'bold' ? '700' : '400' }).load());
-    }),
-  ).then(
-    () => {},
-    (e) => {
-      // otro intento la próxima vez que se abra
-      fontReady = undefined;
-      throw e;
-    },
-  );
-  return fontReady;
-}
 
 /** Píxeles por punto del PNG (~288 ppp) */
 const PNG_SCALE = 4;
@@ -73,14 +61,30 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
   const contentRef = useRef<SVGGElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const [stage, setStage] = useState({ w: 0, h: 0 });
-  // la hoja se mide recién con la letra cargada (cambia el ancho de los textos)
-  const [font, setFont] = useState(false);
+  const [fontId, setFontId] = useState(() => (SHEET_FONTS.some((f) => f.id === savedFont()) ? savedFont()! : 'lmodern'));
+  const choice = fontChoice(fontId);
+  const FONT = choice.font!;
+  // la hoja se mide recién con la letra cargada (cambia el ancho de los textos), y con las fórmulas
+  const [font, setFont] = useState<string | null>(null);
   useEffect(() => {
-    loadFont().then(
-      () => setFont(true),
+    let alive = true;
+    loadFont(choice).then(
+      () => alive && setFont(choice.id),
       (e) => onMessage(t('Could not export: {p0}', { p0: (e as Error).message })),
     );
-  }, [onMessage]);
+    return () => {
+      alive = false;
+    };
+  }, [choice, onMessage]);
+  const mathVersion = useMathJax();
+  const pickFont = (id: string) => {
+    setFontId(id);
+    try {
+      localStorage.setItem(SHEET_FONT_KEY, id);
+    } catch {
+      // (sin recordarla)
+    }
+  };
 
   // sin las directivas, la hoja lleva sólo los comentarios
   const shown = useMemo(
@@ -96,7 +100,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
     if (!g) return;
     const b = g.getBBox();
     setPage(b.width || b.height ? sheetBox({ x: b.x, y: b.y, w: b.width, h: b.height }) : null);
-  }, [shown, op, cur, lib, font, layers.tremor]);
+  }, [shown, op, cur, lib, font, layers.tremor, mathVersion]);
 
   useEffect(() => {
     const el = stageRef.current;
@@ -156,6 +160,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
         <svg
           ref={svgRef}
           className="export-sheet"
+          style={{ '--sheet-font': choice.css, '--sheet-bold': choice.bold ? 700 : 400 } as React.CSSProperties}
           viewBox={page ? `${page.x} ${page.y} ${page.w} ${page.h}` : '0 0 1 1'}
           width={page ? page.w * fit : 0}
           height={page ? page.h * fit : 0}
@@ -178,6 +183,14 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
         </section>
         <section>
           <h3>{t('Style')}</h3>
+          <label className="choice">
+            {t('Font')}{' '}
+            <select value={choice.id} onChange={(e) => pickFont(e.target.value)}>
+              {SHEET_FONTS.map((f) => (
+                <option key={f.id} value={f.id}>{f.label}</option>
+              ))}
+            </select>
+          </label>
           {check('tremor', t('Tremor stroke'), true, t('Wires and symbols drawn freehand (the same sheet always comes out the same)'))}
         </section>
         <section>
@@ -188,7 +201,7 @@ export function ExportView({ doc, lib, conn, name, annotations, arrows, onClose,
           <p className="hint">{t('Fitted to the drawing on a 16 pt grid, one cell of margin')}</p>
         </section>
         <section className="export-actions">
-          <button className="primary" disabled={!page || busy || !font} onClick={() => run('pdf')}>{t('Download PDF')}</button>
+          <button className="primary" disabled={!page || busy || font !== choice.id} onClick={() => run('pdf')}>{t('Download PDF')}</button>
           <button disabled={!page || busy} onClick={() => run('svg')}>{t('Download SVG')}</button>
           <button disabled={!page || busy} onClick={() => run('png')}>{t('Download PNG')}</button>
           <button disabled={!page || busy} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>{t('Download .tex (TikZ)')}</button>

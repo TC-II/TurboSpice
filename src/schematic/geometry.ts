@@ -280,27 +280,59 @@ export const nearestFontIndex = (fs: number) => FONT_SIZE.reduce((best, _, i) =>
 export const illegibleSizes = (scale: number) => FONT_SIZE.filter((_, i) => fontSize(i) * scale < MIN_TEXT_PX).length;
 
 let measureCtx: CanvasRenderingContext2D | null | undefined;
+/** La letra del esquemático (Configuración, #328), con la que se miden los textos */
+let measureFont = 'system-ui, sans-serif';
+export const setMeasureFont = (css: string) => {
+  measureFont = css;
+};
 /** Ancho de una línea con la letra del esquemático (sin DOM, como en los tests: 0,6·fs por carácter) */
 export function textWidth(s: string, fs: number): number {
   if (measureCtx === undefined) measureCtx = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d');
   if (!measureCtx) return s.length * fs * 0.6;
-  measureCtx.font = `100px system-ui, sans-serif`;
+  measureCtx.font = `100px ${measureFont}`;
   return (measureCtx.measureText(s).width * fs) / 100;
 }
 
 type TextLike = { x: number; y: number; size: number; text: string; align: string; box?: { w: number; h: number } };
 
+/**
+ * Un texto del .asc como se lee: LTspice duplica la barra al guardar (`\cdot` queda `\\cdot`, una
+ * ruta `Misc\\signal`), así que `\\` es una barra; sin `newlines`, `\n` queda tal cual. Se recorre
+ * de izquierda a derecha, como en ASC-Parser (unescapeAscText): `\\n` es una barra y una n.
+ */
+export function unescapeAsc(s: string): string {
+  return s.includes('\\\\') ? s.replace(/\\\\/g, '\\') : s;
+}
+
+/** Las líneas de un TEXT del .asc: `\n` (una barra y n) separa líneas y `\\` es una barra */
+export function ascLines(s: string): string[] {
+  const out = [''];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '\\' && s[i + 1] === '\\') {
+      out[out.length - 1] += '\\';
+      i++;
+    } else if (s[i] === '\\' && s[i + 1] === 'n') {
+      out.push('');
+      i++;
+    } else out[out.length - 1] += s[i];
+  }
+  return out;
+}
+
 /** Líneas que se dibujan: con caja fija, el texto partido para entrar en su ancho */
 export function textLines(t: TextLike): string[] {
-  if (!t.box) return t.text.split('\\n');
+  const lines = ascLines(t.text);
+  if (!t.box) return lines;
   const fs = fontSize(t.size);
-  return wrapText(t.text, t.box.w, (s) => textWidth(s, fs)).split('\\n');
+  const w = t.box.w;
+  // (wrapText parte en `\n` literal: una barra y n que ya son texto no tienen que partir)
+  return lines.flatMap((l) => wrapText(l.replace(/\\n/g, '\0'), w, (s) => textWidth(s, fs)).split('\\n').map((x) => x.replace(/\0/g, '\\n')));
 }
 
 /** Caja de un texto libre (TEXT): la fija si tiene, si no la que ocupa el texto */
 export function textBox(t: TextLike): Box {
   const fs = fontSize(t.size);
-  const lines = t.text.split('\\n');
+  const lines = ascLines(t.text);
   const w = t.box ? t.box.w : Math.max(...lines.map((l) => textWidth(l, fs)));
   const h = t.box ? t.box.h : lines.length * fs * 1.2;
   const x1 = t.align === 'Right' ? t.x - w : t.align === 'Center' ? t.x - w / 2 : t.x;

@@ -1,0 +1,8 @@
+LatinModern-Regular.ttf: Latin Modern Roman 10pt (lmroman10-regular), the face a LaTeX document
+gets from \usepackage{lmodern}. Copied from ASC-Parser (Assets/Fonts/lmroman10-regular.ttf).
+
+Copyright 2003-2009 B. Jackowski and J. M. Nowacki (on behalf of TeX users groups).
+GUST Font License (GFL), a free license in the spirit of the LaTeX Project Public License:
+modification and redistribution are permitted.
+https://www.gust.org.pl/projects/e-foundry/latin-modern
+https://www.gust.org.pl/fonts/licenses/GUST-FONT-LICENSE.txt

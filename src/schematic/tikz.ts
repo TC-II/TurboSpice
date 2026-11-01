@@ -6,6 +6,8 @@
 // Unidades: bp (el punto del PDF), no pt: la hoja de 1 unidad = 1 pt del PDF sale igual de grande
 // (el pt de TeX es 1/72,27 pulgadas). El eje y de TikZ va para arriba: se escribe (x, −y).
 
+import { hasLatex, labelPlain, latexSpans, plainText } from './latex.ts';
+
 type Pt = [number, number];
 /** Un tramo de un camino: recta hasta p, o cúbica con sus dos puntos de control */
 type Seg = { p: Pt; c?: [Pt, Pt] };
@@ -63,11 +65,14 @@ export function texEscape(s: string): string {
   return out;
 }
 
-/** El texto de un rótulo para LaTeX: los $…$ tal cual (LaTeX del usuario), el resto escapado */
+/**
+ * El texto de un rótulo para LaTeX, con las reglas de ASC-Parser (latex.ts): los $…$ tal cual
+ * (LaTeX del usuario) y el resto, con sus escapes resueltos (`\%` es un %), escapado para TeX
+ */
 export function texText(s: string): string {
-  return s
-    .split(/(\$[^$]+\$)/)
-    .map((part) => (/^\$[^$]+\$$/.test(part) ? part : texEscape(part)))
+  if (!hasLatex(s)) return texEscape(labelPlain(s));
+  return latexSpans(s)
+    .map((part) => (part.latex ? `$${part.text}$` : texEscape(plainText(part.text))))
     .join('');
 }
 
@@ -309,8 +314,10 @@ export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: num
   const inv = base.inverse();
   const body: string[] = [];
   let images = 0;
-  for (const el of content.querySelectorAll<SVGGraphicsElement>(`${GRAPHIC}, image`)) {
+  for (const el of content.querySelectorAll<SVGGraphicsElement>(`${GRAPHIC}, image, .math`)) {
     if (el.closest('defs, clipPath, mask, marker, pattern')) continue;
+    // una fórmula (#328) va como su texto con $…$, para que la componga LaTeX; no sus caminos
+    if (el.parentElement?.closest('.math')) continue;
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) === 0) continue;
     const ctm = el.getCTM();
@@ -323,13 +330,14 @@ export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: num
       images++;
       continue;
     }
-    if (tag === 'text') {
-      const text = el.textContent ?? '';
+    const math = el.classList.contains('math');
+    if (tag === 'text' || math) {
+      const text = (math ? el.dataset.tex : el.textContent) ?? '';
       if (!text.trim()) continue;
-      const at = apply(m, [Number(el.getAttribute('x') ?? 0) || 0, Number(el.getAttribute('y') ?? 0) || 0]);
+      const at = apply(m, math ? [Number(el.dataset.x) || 0, Number(el.dataset.y) || 0] : [Number(el.getAttribute('x') ?? 0) || 0, Number(el.getAttribute('y') ?? 0) || 0]);
       const angle = (-Math.atan2(m[1], m[0]) * 180) / Math.PI;
-      const size = parseFloat(cs.fontSize) * scale;
-      const opts = [`anchor=${textAnchor(cs.textAnchor, cs.dominantBaseline)}`, 'inner sep=0pt', 'outer sep=0pt'];
+      const size = (math ? Number(el.dataset.size) || 16 : parseFloat(cs.fontSize)) * scale;
+      const opts = [`anchor=${math ? textAnchor(el.dataset.anchor ?? '', el.dataset.baseline ?? '') : textAnchor(cs.textAnchor, cs.dominantBaseline)}`, 'inner sep=0pt', 'outer sep=0pt'];
       if (Math.abs(angle) > 0.01) opts.push(`rotate=${tikzNum(angle)}`);
       const color = tikzColor(cs.fill);
       if (!color) continue;

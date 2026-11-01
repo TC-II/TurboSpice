@@ -13,6 +13,10 @@
 | `window-positions.json` | Posiciones óptimas de los rótulos por símbolo y orientación, de [ASC-Parser](https://github.com/javierpetrucci/ASC-Parser) (`engine/component_defaults.js`, Javier Petrucci); commit en `window-positions.source-commit`. Se actualiza con `npm run windows:import` | Con permiso del autor. |
 | `window-defaults.json` | Derivado por `scripts/derive-window-defaults.mjs` de esquemáticos `.asc` guardados por LTspice | Datos de posición observados (no contiene contenido de terceros). |
 
+`public/fonts/Arimo-*.ttf`: la letra de la hoja de **Exportar a PDF** (se incrusta en el PDF), de
+[Arimo](https://github.com/googlefonts/arimo) (The Arimo Project Authors), tomada del paquete npm
+`@expo-google-fonts/arimo`. SIL Open Font License 1.1, en `public/fonts/Arimo-OFL.txt`.
+
 La librería estándar de LTspice (`lib/cmp/standard.*`, `lib/sub`, `lib/sym` de Analog Devices) **no** se
 redistribuye: su licencia no lo permite. Cada usuario puede importar la de su propia instalación
 (**Archivo › Importar librería de LTspice**, `src/library/ltspiceLib.ts`): queda sólo en el IndexedDB de

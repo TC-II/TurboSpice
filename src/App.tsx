@@ -27,7 +27,7 @@ import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts'
 import { AppMenu, MenuButton, type MenuDef, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
-import { plainHash, readShareHash, shareHash } from './schematic/share.ts';
+import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
@@ -89,8 +89,8 @@ import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, patchLabels, setFlagName, setWindows, setShapeStyle, setSymbolAttrs, setSymbolType, setText, transformItems } from './schematic/edit.ts';
 import { parseSource } from './sim/sources.ts';
-import { ascBytes, pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
-import { schematicPdf } from './schematic/pdf.ts';
+import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { ExportView } from './schematic/ExportView.tsx';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
@@ -125,7 +125,7 @@ import { applyStudy, applyStudyCode, studyFromDoc } from './sim/study.ts';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
 import { decode, decodeText } from './asc/encoding.ts';
-import { download, exportSchematic, schematicSvg } from './schematic/exportSchematic.ts';
+import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, DriveDialog, importToDrive } from './cloud/AccountButton.tsx';
@@ -151,9 +151,6 @@ const DEFAULT_NAME = /^project( \d+)?$/i;
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
-/** Conversor de .asc a PDF vectorial (Exportar a PDF, Pro): recibe el circuito comprimido en el hash (#c=…&n=…) */
-const PDF_TOOL = 'https://javierpetrucci.github.io/ASC-Parser/';
-/** Conversor de .asc a PDF vectorial: recibe el circuito comprimido en el hash (#c=…&n=…) */
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
@@ -183,6 +180,7 @@ type Dialog =
   /** qué señales se guardan (#314); `signals` llega después de armar la netlist */
   | { kind: 'saves'; signals?: SavableSignal[] }
   | { kind: 'share'; url: string }
+  | { kind: 'export' }
   | { kind: 'help' }
   | { kind: 'userfiles' }
   | { kind: 'importinfo' }
@@ -1230,33 +1228,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
   };
 
-  // Exportar a PDF (Pro): abre ASC-Parser con el circuito en el hash, en el mismo formato del
-  // link de compartir (nunca viaja a un servidor), como en 548bdd8
-  const doExportPdfPro = async () => {
-    // la pestaña se abre ya, dentro del click, para que no la bloquee el navegador
-    const tab = window.open('', '_blank');
-    if (tab) tab.opener = null;
-    const { bytes } = ascBytes(doc, lib);
-    // ASC-Parser lee el .asc con deflate solo (sin el diccionario de los links de compartir)
-    const hash = await plainHash(bytes, ascName());
-    const url = `${PDF_TOOL}#${hash}`;
-    if (tab) tab.location.href = url;
-    else setMessage(t('The browser blocked the new tab: allow it to export to PDF.'));
-  };
-
-  // Exportar a PDF (rápido): la vista actual del esquemático (lo que se ve en pantalla), como
-  // un .pdf que se descarga (sin el diálogo de impresión); nada viaja a un servidor
-  const doExportPdf = async () => {
-    const svg = editor.current?.svg();
-    const vb = svg?.getAttribute('viewBox')?.split(/\s+/).map(Number);
-    if (!svg || !vb || vb.length !== 4) return;
-    const text = schematicSvg(svg, { x1: vb[0], y1: vb[1], x2: vb[0] + vb[2], y2: vb[1] + vb[3] });
-    try {
-      download(`${project.name}.pdf`, await schematicPdf(text));
-    } catch (e) {
-      setMessage(t('Could not export to PDF: {p0}', { p0: (e as Error).message }));
-    }
-  };
+  // Exportar (#326): la hoja a pantalla completa (PDF, SVG, PNG o portapapeles); nada viaja a un servidor
+  const doExport = () => setDialog({ kind: 'export' });
 
   const doRecent = async (i: number) => {
     const r = recent[i];
@@ -2071,13 +2044,14 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
   useEffect(() => {
     if (selection.length) setOpSel(undefined);
   }, [selection]);
-  const annotations = useMemo((): Annotation[] | undefined => {
-    if (!op || (!showOp && !opTags.pins.size && !opTags.moved.size)) return undefined;
+  // los valores del OP con `all` (el botón OP) o sólo los elegidos a mano; Exportar los pide todos
+  const opAnnotations = useCallback((all: boolean): Annotation[] | undefined => {
+    if (!op || (!all && !opTags.pins.size && !opTags.moved.size)) return undefined;
     const { built, bias, scope } = op;
     const out: Annotation[] = [];
     const shown = (target: OpPinTarget) => {
       const key = opPinKey(target);
-      return opTagVisible(opTags, key, showOp) ? key : undefined;
+      return opTagVisible(opTags, key, all) ? key : undefined;
     };
     const push = (a: Omit<Annotation, 'offset'>) => out.push({ ...a, offset: opTags.moved.get(a.key) });
     for (const n of netNames(doc, conn, new Map())) {
@@ -2110,7 +2084,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
       push({ key, at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
     }
     return out;
-  }, [showOp, opTags, op, doc, conn, lib]);
+  }, [opTags, op, doc, conn, lib]);
+  const annotations = useMemo(() => opAnnotations(showOp), [opAnnotations, showOp]);
 
   // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
   // fila de la tabla de resultados bajo el mouse: su red o sus flechas se resaltan en el esquemático
@@ -2767,11 +2742,6 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
     const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName(), allTraces());
     download(`${base}.cir`, new Blob([(await withVariants(built.netlist)).netlist], { type: 'text/plain' }));
   };
-  const exportImage = (f: 'svg' | 'png') => {
-    const svg = editor.current?.svg();
-    const box = editor.current?.contentBox();
-    if (svg && box) exportSchematic(svg, box, project.name, f);
-  };
 
   const openStudy = () => setDialog({ kind: 'study' });
   /**
@@ -3303,13 +3273,10 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         { label: t('Share link…'), onClick: doShare },
         { label: t('Import symbols and models'), title: t('Pending: not implemented yet (#{n})', { n: 304 }), disabled: true, onClick: () => {} },
         'sep',
-        { label: t('Export to PDF (Pro)'), title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdfPro },
-        { label: t('Export to PDF (Fast)'), title: t('Downloads a PDF of the current view of the schematic'), onClick: doExportPdf },
+        { label: t('Export to PDF…'), title: t('The schematic on a white sheet: PDF, SVG, PNG or the clipboard'), onClick: doExport },
         {
           label: t('Export'),
           items: [
-            { label: t('Export schematic to SVG'), onClick: () => exportImage('svg') },
-            { label: t('Export schematic to PNG'), onClick: () => exportImage('png') },
             { label: t('Export LTspice netlist (.net)'), onClick: () => exportNetlist('net') },
             { label: t('Export ngspice netlist (.cir)'), onClick: () => exportNetlist('cir') },
           ],
@@ -3476,11 +3443,8 @@ function SchematicMode({ engine, lib, slots, onNetlist }: {
         {
           icon: 'pdf',
           label: t('Export to PDF'),
-          title: t('Export to PDF'),
-          items: [
-            { label: 'Pro', title: t('Opens ASC-Parser with this circuit; nothing is uploaded to any server'), onClick: doExportPdfPro },
-            { label: t('Fast'), title: t('Downloads a PDF of the current view of the schematic'), onClick: doExportPdf },
-          ],
+          title: t('The schematic on a white sheet: PDF, SVG, PNG or the clipboard'),
+          onClick: doExport,
         },
         // con la sesión de Google, Abrir muestra «Mis simulaciones»; sin sesión, Abrir/Importar
         google.account
@@ -4536,6 +4500,18 @@ ${ltNetlistText(sim.built.lt)}
             setDialog(null);
             deleteVariant(dialog.id);
           }}
+        />
+      )}
+      {dialog?.kind === 'export' && (
+        <ExportView
+          doc={doc}
+          lib={lib}
+          conn={conn}
+          name={project.name}
+          annotations={opAnnotations(true)}
+          arrows={sim && (lvNow ? simScope : sim.doc === doc) ? currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements) : undefined}
+          onClose={() => setDialog(null)}
+          onMessage={setMessage}
         />
       )}
       {dialog?.kind === 'share' && (

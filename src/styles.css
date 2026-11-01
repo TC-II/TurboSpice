@@ -1595,3 +1595,31 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .simbar .sb-pdk button:disabled { opacity: 0.35; }
 .simbar .sb-pdk button.sb-pdk-all { font: 11px system-ui, sans-serif; border-left: 1px solid var(--border); border-radius: 0 6px 6px 0; margin-left: 2px; }
 .model-pins-lib { margin-top: 6px; }
+
+/* Exportar (#326): la hoja a pantalla completa con el tema de impresión (fondo blanco, todo negro) */
+.export-view { position: fixed; inset: 0; z-index: 60; display: flex; background: var(--bg-alt); }
+.export-stage { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: color-mix(in srgb, var(--fg) 12%, var(--bg)); }
+.export-empty { color: var(--fg-muted); }
+.export-panel { width: 260px; flex: none; display: flex; flex-direction: column; gap: 14px; padding: 18px 16px; border-left: 1px solid var(--border); background: var(--bg); overflow: auto; }
+.export-panel h2 { margin: 0; font-size: 17px; }
+.export-panel h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
+.export-panel section { display: flex; flex-direction: column; gap: 6px; }
+.export-panel label { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.export-panel label.disabled { color: var(--fg-muted); }
+.export-panel .hint { margin: 0; font-size: 12px; color: var(--fg-muted); }
+.export-actions button { width: 100%; }
+.export-close { margin-top: auto; }
+svg.export-sheet {
+  flex: none; background: #fff; box-shadow: 0 2px 14px rgb(0 0 0 / 25%);
+  --sch-bg: #ffffff; --sch-wire: #000; --sch-sym: #000; --sch-label: #000; --sch-directive: #000;
+  --sch-comment: #000; --sch-drawing: #000; --sch-hl: #000;
+}
+/* el trazo en unidades de la hoja (1 unidad = 1 pt): la vista previa escala como el PDF */
+svg.export-sheet * { vector-effect: none !important; }
+/* la letra que el PDF incrusta (Arimo), sólo en normal y negrita: la vista previa mide igual que el PDF */
+svg.export-sheet text { font-family: Arimo, Arial, sans-serif; font-weight: 400; }
+svg.export-sheet .directive text, svg.export-sheet .op-annotation text { font-weight: 700; }
+/* relleno opaco: svg2pdf no toma el semitransparente y el cable se vería a través del valor */
+svg.export-sheet .op-annotation rect { fill: #fff; }
+svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #000; color: #000 !important; }
+@media (max-width: 640px) { .export-view { flex-direction: column; } .export-panel { width: auto; border-left: none; border-top: 1px solid var(--border); max-height: 45vh; } }

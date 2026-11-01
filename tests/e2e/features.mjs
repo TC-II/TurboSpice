@@ -122,25 +122,20 @@ check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ by
 check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
 check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
-// Exportar a PDF: el botón despliega Pro (ASC-Parser con el circuito en el hash) y Rápido
-// (descarga un .pdf de la vista actual, sin imprimir)
+// Exportar a PDF (#326): la hoja a pantalla completa, con el PDF vectorial y el SVG de la hoja
 await page.getByRole('button', { name: 'Exportar a PDF' }).click();
-const [pdfDl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'Rápido' }).click()]);
-const pdfHead = await new Promise(async (res) => {
-  const chunks = [];
-  const st = await pdfDl.createReadStream();
-  st.on('data', (c) => chunks.push(c));
-  st.on('end', () => res(Buffer.concat(chunks).subarray(0, 8).toString('latin1')));
-});
-check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'), `Exportar a PDF › Rápido descarga un .pdf (${pdfDl.suggestedFilename()})`);
-await context.route('https://javierpetrucci.github.io/**', (r) => r.fulfill({ body: '<!doctype html><title>ASC-Parser</title>', contentType: 'text/html' }));
-await page.getByRole('button', { name: 'Exportar a PDF' }).click();
-const [pdfTab] = await Promise.all([context.waitForEvent('page'), page.getByRole('menuitem', { name: 'Pro' }).click()]);
-await pdfTab.waitForURL(/ASC-Parser\/#c=/).catch(() => {});
-await pdfTab.waitForLoadState('load').catch(() => {});
-check(/^https:\/\/javierpetrucci\.github\.io\/ASC-Parser\/#c=[\w-]+.*&n=[^&]+\.asc$/.test(pdfTab.url()), `Exportar a PDF › Pro abre ASC-Parser con el circuito en el hash (${pdfTab.url().slice(0, 60)}…)`);
-await pdfTab.close();
-await context.unroute('https://javierpetrucci.github.io/**');
+const exportView = page.getByRole('dialog', { name: 'Exportar' });
+await exportView.locator('button:enabled', { hasText: 'Descargar PDF' }).waitFor();
+check((await exportView.locator('svg.export-sheet .sym').count()) > 0 && /^\d+ × \d+ pt/.test(await exportView.locator('.hint').first().innerText()), 'Exportar a PDF abre la hoja a pantalla completa, con su tamaño en pt');
+check((await exportView.getByRole('checkbox', { name: 'Valores del punto de operación' }).isDisabled()) && !(await exportView.getByRole('checkbox', { name: 'Directivas SPICE' }).isChecked()), 'sin simular, el OP no se puede incluir; las directivas arrancan apagadas');
+const [pdfDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar PDF' }).click()]);
+const pdfHead = readFileSync(await pdfDl.path()).subarray(0, 8).toString('latin1');
+check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'), `Descargar PDF baja un .pdf (${pdfDl.suggestedFilename()})`);
+const [sheetDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar SVG' }).click()]);
+const sheet = readFileSync(await sheetDl.path(), 'utf8');
+check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class='), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
+await page.keyboard.press('Escape');
+check((await exportView.count()) === 0, 'Esc cierra la vista de export');
 const other = await context.newPage();
 watch(other);
 await other.goto(link);
@@ -741,8 +736,6 @@ await page.getByRole('button', { name: 'Listo', exact: true }).click();
   await other.close();
 }
 
-const svgOut = await downloaded(() => menu(page, 'Archivo', 'Exportar', 'Exportar esquemático a SVG'));
-check(svgOut.name === 'Examples.svg' && svgOut.text.includes('<svg') && svgOut.text.includes('>R1<') && !svgOut.text.includes('class='), `esquemático a SVG autónomo (${svgOut.text.length} bytes)`);
 const net = await downloaded(() => menu(page, 'Archivo', 'Exportar', 'Exportar netlist de LTspice (.net)'));
 check(/^R1 N002 N001 10$/m.test(net.text) && net.text.includes('.backanno'), `netlist de LTspice (.net): ${net.text.split('\n')[1]}`);
 await resultsMenu(page, 'Netlist');

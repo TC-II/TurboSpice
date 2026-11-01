@@ -3,13 +3,15 @@ import react from '@vitejs/plugin-react';
 import { execSync } from 'node:child_process';
 import { defineConfig } from 'vite';
 
-// rama de git al levantar el servidor local: en dev el logo sale blanco, como en /TurboSpice/dev/
+// el logo sale blanco en todo lo que no es main: el sitio /TurboSpice/dev/ (VITE_CHANNEL) y, en la
+// máquina, cualquier rama que no sea main (dev, un worktree, o uno sin rama: «detached HEAD»).
+// En la CI manda sólo VITE_CHANNEL (allí la rama puede no estar)
 let branch = '';
 try {
-  branch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
+  branch = execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf8' }).trim();
 } catch {}
 
-const isDev = process.env.VITE_CHANNEL === 'dev' || branch === 'dev';
+const isDev = process.env.VITE_CHANNEL === 'dev' || (!process.env.CI && branch !== '' && branch !== 'main');
 
 // en dev el favicon también sale blanco, para distinguir la pestaña
 const devFavicon = {
@@ -22,7 +24,7 @@ const devFavicon = {
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/TurboSpice/',
   plugins: [react(), devFavicon],
-  define: { 'import.meta.env.VITE_BRANCH': JSON.stringify(branch) },
+  define: { 'import.meta.env.VITE_LOGO_DEV': JSON.stringify(isDev) },
   worker: { format: 'es' },
   // Yosys (#209) busca su wasm con new URL(…, import.meta.url): sin pre-empaquetar, Vite lo sirve tal cual
   optimizeDeps: { exclude: ['@yowasp/yosys'] },

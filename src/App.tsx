@@ -1447,7 +1447,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
             ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
             : undefined,
       );
-      if (result.plots.length) {
+      setStopPlotted(false);
+      // frenado por memoria: la punta de prueba recién con «Plot up to here» (que lleva al gráfico)
+      if (result.plots.length && result.sizeStop) setPanel('problems');
+      else if (result.plots.length) {
         setTool({ kind: 'probe' });
         const nothingPlotted = !(remembered ?? panes).some((p) => p.traces.length) && !built.controlPanes.length;
         setPanel(errs.length ? 'problems' : meas?.rows.length && (nothingPlotted || (blk.table && !xy.length)) ? 'meas' : 'plot');
@@ -1480,6 +1483,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     };
   }, [doc]);
 
+  // frenada por memoria (#363): lo simulado hasta ahí se mira recién al elegir «Plot up to here»
+  const [stopPlotted, setStopPlotted] = useState(false);
+  const stopHidden = !!sim?.result.sizeStop && !stopPlotted;
+  const plotStop = () => {
+    setStopPlotted(true);
+    setPanel('plot');
+    setTool({ kind: 'probe' });
+  };
   // «Save only the last…»: se simula otra vez cuando el cambio de la línea ya llegó al documento
   const [runQueued, setRunQueued] = useState(false);
   const runRef = useRef(run);
@@ -3768,7 +3779,7 @@ ${ltNetlistText(sim.built.lt)}
               className={tool.kind === 'probe' ? 'active' : ''}
               aria-label={t('Measure')}
               title={sim ? t('Probe: click a wire (voltage) or a component (current)') : t('Probe: simulate first')}
-              disabled={!sim}
+              disabled={!sim || stopHidden}
               onClick={() => setTool(tool.kind === 'probe' ? { kind: 'select' } : { kind: 'probe' })}
             >
               <Icon name="probe" />
@@ -4279,6 +4290,11 @@ ${ltNetlistText(sim.built.lt)}
                         {p.size?.fit !== undefined ? (
                           // el transitorio que se cortó mientras simulaba: qué se puede hacer, como botones
                           <span className="size-actions">
+                            {sim.result.plots.length > 0 && (
+                              <button onClick={plotStop} title={t('Show in the plotter what was simulated up to the stop, with the probe to pick what to plot')}>
+                                {t('Plot up to here')}
+                              </button>
+                            )}
                             {p.size.chooseSignals && (
                               <button onClick={openSaves} title={t('Save only some signals: the plotted ones count too')}>
                                 {t('Choose signals (up to {n})', { n: p.size.fit })}

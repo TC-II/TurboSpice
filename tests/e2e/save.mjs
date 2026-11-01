@@ -236,8 +236,11 @@ async function newPage(context) {
 const dirty = async (page) => (await page.locator('.capsule-dirty').count()) > 0;
 const toast = async (page) => ((await page.locator('.status-msg').count()) ? (await page.locator('.status-msg').textContent()) : '');
 const waitToast = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('.status-msg')?.textContent ?? ''), re.source, { timeout: 10000 }).then(() => true, () => false);
-/** espera a que la app termine lo que estaba haciendo: se redibuja y termina el autoguardado en el navegador */
-const settle = (page) => autosaved(page);
+/** espera a que la app termine lo que estaba haciendo: nada subiendo a Drive (data-drive) y el autoguardado en el navegador terminado */
+const settle = async (page) => {
+  await page.waitForFunction(() => document.documentElement.dataset.drive !== 'busy', null, { timeout: 15000 });
+  await autosaved(page);
+};
 /** Un cambio en el circuito: una tierra nueva en un lugar libre */
 let groundAt = 0;
 async function edit(page) {
@@ -324,9 +327,7 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
     await save(page);
   }
   await page.waitForFunction(() => !document.querySelector('.capsule-dirty'), null, { timeout: 15000 }).catch(() => {});
-  // (y que la cola termine: Drive tiene el último estado y no hay subidas en vuelo; entre una
-  // subida y la siguiente de la cola hay un instante sin nada en vuelo)
-  await until(() => fake.inflight === 0 && flags(project(f.data)) === before + 5, 10000);
+  // (y que termine la cola de guardados: settle espera a que la app no tenga nada subiendo)
   await settle(page);
   fake.delay = 0;
   const n = fake.uploads().length - up1;

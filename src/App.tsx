@@ -33,8 +33,8 @@ import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceL
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
-import { SavesDialog } from './schematic/SavesDialog.tsx';
-import { elementRefs, savableSignals, saveSelection, setSaveSelection, toggleRefs, type SavableSignal } from './sim/saves.ts';
+import { SavesPanel } from './schematic/SavesPanel.tsx';
+import { elementRefs, savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
@@ -187,7 +187,6 @@ type Dialog =
   | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
   | { kind: 'control'; index: number }
   /** qué señales se guardan (#314); `signals` llega después de armar la netlist */
-  | { kind: 'saves'; signals?: SavableSignal[] }
   | { kind: 'share'; url: string }
   | { kind: 'export' }
   | { kind: 'help' }
@@ -506,6 +505,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const [tool, setToolState] = useState<Tool>({ kind: 'select' });
   const [selection, setSelection] = useState<ItemRef[]>([]);
   const [dialog, setDialog] = useState<Dialog | null>(null);
+  // panel de señales guardadas (#364): «sólo lo elegido» aunque todavía no haya nada elegido, y
+  // las señales del circuito con la netlist armada (para la punta de prueba)
+  const [saves, setSaves] = useState<{ mode: 'all' | 'some'; signals?: SavableSignal[]; built?: BuiltSimulation } | null>(null);
+  const savesOpen = !!saves && !curSub;
   const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [message, setMessage] = useState<string>();
@@ -521,6 +524,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const viewed = historyOpen && viewRun ? curRuns.find((r) => r.id === viewRun && !r.damaged) : undefined;
   const viewedDoc = useMemo(() => (viewed ? parseAsc(viewed.asc) : null), [viewed]);
   const doc = viewedDoc ?? liveDoc;
+  /** Con el panel en «sólo lo elegido», la punta de prueba elige qué se guarda */
+  const savesPicking = savesOpen && tool.kind === 'probe' && (saves.mode === 'some' || !!saveSelection(doc.texts));
   const viewingRef = useRef(false);
   viewingRef.current = !!viewedDoc;
   /** la corrida anterior a la que se ve (o la última, para el actual) */
@@ -2190,11 +2195,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // …y el componente de la fila (@Q1[gm], Ic(Q1), I(R1)); al revés, el componente bajo el mouse resalta sus filas
   const rowDev = rowHover ? rowDevice(rowHover) : null;
   const rowSymbol = rowDev && !lvNow ? doc.symbols.findIndex((s) => spiceName(s.attrs.get('InstName') ?? '').toUpperCase() === rowDev) : -1;
+  // (en el panel de señales guardadas, un subcircuito U1 es XU1, como en la netlist)
+  const rowElement = rowDev && rowSymbol < 0 && !curSub ? saves?.built?.lt.elements.find((e) => e.name.replace(/§/g, '').toUpperCase() === rowDev) : undefined;
   const [hoverDev, setHoverDev] = useState<string>();
   const onHoverSymbol = useCallback((i: number | undefined) => setHoverDev(i === undefined ? undefined : spiceName(docRef.current.symbols[i]?.attrs.get('InstName') ?? '') || undefined), []);
   const arrows = useMemo(() => {
     const rowCurrent = !!rowHover && /^I/i.test(rowHover);
-    if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
+    if (!sim || (lvNow ? !simScope : sim.doc.symbols !== doc.symbols) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
     const traces = panes.flatMap((p) => p.traces.map((tt, i) => ({ t: tt, color: traceColor(tt, i) }))).filter((x) => !x.t.hidden);
     // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
     const colorOf = (target: { symbol: number; pin?: number }) => {
@@ -2242,9 +2249,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
   // traza); sólo con la punta de prueba
-  // Con la punta de prueba y sólo las señales elegidas (#314): lo que no se guardó, atenuado
+  // Con la punta de prueba y sólo las señales elegidas (#314): lo que no se guardó, atenuado (no
+  // mientras se elige qué guardar: ahí lo elegido son las marcas del panel, #364)
   const unsaved = useMemo(() => {
-    if (tool.kind !== 'probe' || !sim || !plot || path.length || !saveSelection(sim.built.lt.texts)) return undefined;
+    if (tool.kind !== 'probe' || savesPicking || !sim || !plot || path.length || !saveSelection(sim.built.lt.texts)) return undefined;
     const names = new Set(plot.vectors.map((v) => v.name.toLowerCase()));
     const nets = new Set(conn.nets.map((n) => n.name).filter((n) => n && n !== '0' && !names.has(netVector(n))).map((n) => n.toLowerCase()));
     const symbols = new Set(
@@ -2254,7 +2262,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       }).map((e) => e.sym),
     );
     return { nets, symbols };
-  }, [tool.kind, sim, plot, path.length, conn]);
+  }, [tool.kind, savesPicking, sim, plot, path.length, conn]);
   const netColors = useMemo(() => {
     const m = new Map<string, string>();
     if (tool.kind !== 'probe') return m;
@@ -2454,6 +2462,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     }
   };
   const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
+    if (savesPicking) return pickSave(target);
     if (!sim || !plot) return;
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
     if (!scaleOf(plot) && op) return setOpTags((p) => toggleOpTag(p, target));
@@ -2562,7 +2571,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
    * el cociente
    */
   const onProbePair = (from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }) => {
-    if (!sim || !plot || pathRef.current.length || dftPick.current) return onProbe(from);
+    if (savesPicking || !sim || !plot || pathRef.current.length || dftPick.current) return onProbe(from);
     const sc = scaleOf(plot);
     if (!sc) return onProbe(from);
     const isV = (x: typeof from) => x.net !== undefined;
@@ -2907,13 +2916,51 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   /** Menú de simulación; con un tipo de análisis, abre en ese tipo */
   const openSimulation = (analysis?: AnalysisKind) => setDialog({ kind: 'sim', found: findAnalysis(doc), analysis });
   const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
-  const openSaves = () => {
+  /**
+   * Panel de señales guardadas (#314, #364), a la derecha de la simulación; `choose`: para elegir
+   * (desde «Choose signals»), con «sólo lo elegido» y la punta de prueba
+   */
+  const openSaves = (choose?: boolean) => {
     if (curSub) return setMessage(t('The saved signals belong to the testbench: go up (Alt+↑) to change them'));
-    setDialog({ kind: 'saves' });
-    buildSimulation(doc, lib, ascName())
-      .then((b) => setDialog((d) => (d?.kind === 'saves' ? { kind: 'saves', signals: savableSignals(b) } : d)))
-      .catch(() => setDialog((d) => (d?.kind === 'saves' ? { kind: 'saves', signals: [] } : d)));
+    setSaves((s) => ({ ...s, mode: choose ? 'some' : (s?.mode ?? (saveSelection(doc.texts) ? 'some' : 'all')) }));
+    if (choose) setTool({ kind: 'probe' });
   };
+  const closeSaves = () => {
+    setSaves(null);
+    setRowHover(null);
+    if (tool.kind === 'probe' && !sim) setTool({ kind: 'select' });
+  };
+  // las señales del circuito, de nuevo cuando cambia (no al cambiar sólo lo elegido)
+  useEffect(() => {
+    if (!savesOpen) return;
+    let live = true;
+    const id = setTimeout(() => {
+      buildSimulation(docRef.current, lib, ascName())
+        .then((b) => live && setSaves((s) => s && { ...s, signals: savableSignals(b), built: b }))
+        .catch(() => live && setSaves((s) => s && { ...s, signals: [], built: undefined }));
+    }, 150);
+    return () => {
+      live = false;
+      clearTimeout(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savesOpen, doc.symbols, doc.wires, doc.flags, lib]);
+  const pickSave = (target: { net?: string; symbol?: number; pin?: number }) => {
+    const b = saves?.built;
+    if (!b) return;
+    const refs = targetRefs(b, target);
+    if (!refs.length) return setMessage(t('Nothing to save there: click a wire (voltage) or a component (current)'));
+    commit(setSaveSelection(doc, toggleRefs(saveSelection(doc.texts) ?? [], refs)));
+  };
+  // lo que está bajo el mouse en el esquemático, para resaltar su fila
+  const [hoverTarget, setHoverTarget] = useState<{ net?: string; symbol?: number; pin?: number }>();
+  const savesHover = useMemo(() => {
+    const b = saves?.built;
+    const refs = hoverTarget && b ? targetRefs(b, hoverTarget) : [];
+    // el cuerpo de un componente: todas sus filas (con el nombre de la lista: XU1, no U1)
+    const el = hoverTarget?.symbol !== undefined && hoverTarget.pin === undefined ? b?.lt.elements.find((e) => e.sym === hoverTarget.symbol) : undefined;
+    return { refs, device: el?.name.replace(/§/g, '') };
+  }, [hoverTarget, saves?.built]);
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
   // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
@@ -3334,7 +3381,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     {
       label: t('Saved signals…'),
       title: t('Save everything, or only some voltages and currents (smaller simulations)'),
-      onClick: openSaves,
+      onClick: () => openSaves(),
     },
     { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
@@ -3848,6 +3895,7 @@ ${ltNetlistText(sim.built.lt)}
         <div id="sim-state-slot" className="sim-state-slot" />
       </div>
 
+      <div className="work-row">
       <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
         <div
           onMouseMove={(e) => {
@@ -4056,8 +4104,9 @@ ${ltNetlistText(sim.built.lt)}
               return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
             }}
             highlightNet={rowNet ?? traceNetShown}
-            highlightSymbol={rowSymbol >= 0 ? rowSymbol : undefined}
+            highlightSymbol={rowSymbol >= 0 ? rowSymbol : rowElement?.sym}
             onHoverSymbol={onHoverSymbol}
+            onHoverTarget={savesOpen ? setHoverTarget : undefined}
             netColors={netColors}
             netNames={shownNets}
             onNameNet={(at) => setDialog({ kind: 'flag', at })}
@@ -4124,7 +4173,7 @@ ${ltNetlistText(sim.built.lt)}
               barra dice qué clickear (Esc cancela) */}
           <HintBar
             sink={hoverSink}
-            text={(hover) => (tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))}
+            text={(hover) => (savesPicking ? t('Click a wire (voltage) or a component (current) to save it, or again to stop saving it') : tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))}
             message={message}
             onDismiss={() => setMessage(undefined)}
             offers={
@@ -4309,7 +4358,7 @@ ${ltNetlistText(sim.built.lt)}
                           // el transitorio que se cortó mientras simulaba: qué se puede hacer, como botones
                           <span className="size-actions">
                             {p.size.chooseSignals && (
-                              <button className="primary" onClick={openSaves} title={t('Save only some signals: the plotted ones count too')}>
+                              <button className="primary" onClick={() => openSaves(true)} title={t('Save only some signals: the plotted ones count too')}>
                                 {t('Choose signals (up to {n})', { n: p.size.fit })}
                               </button>
                             )}
@@ -4336,7 +4385,7 @@ ${ltNetlistText(sim.built.lt)}
                             )}
                           </span>
                         ) : p.big && (
-                          <button className="link" onClick={openSaves}>
+                          <button className="link" onClick={() => openSaves(true)}>
                             {t('choose saved signals')}
                           </button>
                         )}
@@ -4360,6 +4409,23 @@ ${ltNetlistText(sim.built.lt)}
             </div>
           </section>
         )}
+      </div>
+      {saves && (
+        <SavesPanel
+          selection={curSub ? null : saveSelection(doc.texts)}
+          mode={saves.mode}
+          onMode={(mode) => setSaves((s) => s && { ...s, mode })}
+          signals={curSub ? [] : saves.signals}
+          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected) : undefined}
+          onChange={(refs) => commit(setSaveSelection(doc, refs))}
+          hover={savesHover}
+          onHoverRow={setRowHover}
+          picking={savesPicking}
+          onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
+          blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
+          onClose={closeSaves}
+        />
+      )}
       </div>
 
       {dialog?.kind === 'picker' && (
@@ -4498,18 +4564,6 @@ ${ltNetlistText(sim.built.lt)}
             const text = controlBlock(body).split('\n').join('\\n');
             if (dialog.index >= 0) commit(setText(doc, dialog.index, { text, kind: 'comment' }));
             else setTool({ kind: 'text', text, textKind: 'comment' });
-          }}
-        />
-      )}
-      {dialog?.kind === 'saves' && (
-        <SavesDialog
-          initial={saveSelection(doc.texts)}
-          signals={dialog.signals}
-          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected) : undefined}
-          onClose={() => setDialog(null)}
-          onApply={(refs) => {
-            setDialog(null);
-            commit(setSaveSelection(doc, refs));
           }}
         />
       )}

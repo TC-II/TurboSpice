@@ -79,9 +79,9 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow, highlightDevice }: 
   );
 }
 
-/** Componente de una fila: "@Q1[gm]", "Ic(Q1)", "I(R1)" → "Q1"; null si no es de un componente */
+/** Componente de una fila: "@Q1[gm]", "Ic(Q1)", "I(R1)", "Ix(U1:OUT)" → "Q1"; null si no es de un componente */
 export function rowDevice(expr: string): string | null {
-  const m = /^@([^[\]\s]+)\[\w+\]$/.exec(expr) ?? /^I[a-z]?\(([^,()]+)\)$/i.exec(expr);
+  const m = /^@([^[\]\s]+)\[\w+\]$/.exec(expr) ?? /^I[a-z]?\(([^,():]+)(?::[^,()]*)?\)$/i.exec(expr);
   return m ? m[1].toUpperCase() : null;
 }
 

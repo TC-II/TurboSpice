@@ -118,7 +118,7 @@ jobs:
           - suite: edit-tools
             files: wires rotate shapes placing dialogs shortcuts
           - suite: study
-            files: templates deviceparams hierarchy
+            files: templates deviceparams hierarchy saves
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

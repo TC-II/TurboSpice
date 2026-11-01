@@ -171,6 +171,8 @@ interface Props {
   onHover?(h: { ref: ItemRef | null; at: Point } | null): void;
   /** componente bajo el mouse (con la selección o la punta de prueba), undefined al salir: para la tabla del .op */
   onHoverSymbol?(index: number | undefined): void;
+  /** red, componente o pin bajo el mouse (como los elige la punta de prueba), undefined al salir: para el panel de señales guardadas (#364) */
+  onHoverTarget?(target: { net?: string; symbol?: number; pin?: number } | undefined): void;
   /** componente resaltado desde afuera (la fila de la tabla de resultados bajo el mouse) */
   highlightSymbol?: number;
   /** cambios contra la corrida anterior (historial, #153) */
@@ -475,6 +477,7 @@ export function SchematicEditor(props: Props) {
   /** símbolo dueño del rótulo bajo el cursor (se resalta y el cursor indica que se puede mover) */
   const [hoverLabel, setHoverLabel] = useState<number | undefined>();
   const hoverSymOut = useRef<number | undefined>(undefined);
+  const hoverTargetOut = useRef('');
   const [grabLabel, setGrabLabel] = useState<{ sym: number; win: number } | undefined>();
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
@@ -1098,6 +1101,14 @@ export function SchematicEditor(props: Props) {
       hoverSymOut.current = hsym;
       props.onHoverSymbol?.(hsym);
     }
+    if (props.onHoverTarget) {
+      const ht = drag ? null : tool.kind === 'probe' ? probe : probeTarget(p, true);
+      const k = ht ? `${ht.net ?? ''}|${ht.symbol ?? ''}|${ht.pin ?? ''}` : '';
+      if (k !== hoverTargetOut.current) {
+        hoverTargetOut.current = k;
+        props.onHoverTarget(ht ?? undefined);
+      }
+    }
     if (tool.kind === 'probe') {
       setHoverNet(probe?.net);
       setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined ? 'i' : '');
@@ -1444,6 +1455,10 @@ export function SchematicEditor(props: Props) {
         lastHover.current = '';
         onHover?.(null);
         if (hoverSymOut.current !== undefined) props.onHoverSymbol?.((hoverSymOut.current = undefined));
+        if (hoverTargetOut.current) {
+          hoverTargetOut.current = '';
+          props.onHoverTarget?.(undefined);
+        }
       }}
       onDoubleClick={onDoubleClick}
       onContextMenu={(e) => e.preventDefault()}

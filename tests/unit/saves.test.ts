@@ -6,13 +6,14 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { addSubckt } from '../../src/project/subckt.ts';
 import { newProject } from '../../src/project/turbo.ts';
 import { buildSimulation } from '../../src/sim/schematicSim.ts';
-import { elementRefs, toggleRefs, savableSignals, saveRefs, saveSelection, setSaveSelection, textRefs } from '../../src/sim/saves.ts';
+import { elementRefs, targetRefs, toggleRefs, savableSignals, saveRefs, saveSelection, setSaveSelection, textRefs } from '../../src/sim/saves.ts';
 import { digitalNodes } from '../../src/sim/saves.ts';
 import { mergeEvents, sampleEvents } from '../../src/waveform/series.ts';
 import { traceResolver } from '../../src/sim/traces.ts';
 import { DIGITAL_TYPE } from '../../src/engine/ngspice.ts';
 import { evalTrace } from '../../src/waveform/expr.ts';
 import { visibleText } from '../../src/schematic/geometry.ts';
+import { rowDevice } from '../../src/waveform/ScalarViews.tsx';
 
 const lib = new Library(buildBundle());
 
@@ -106,6 +107,22 @@ describe('señales guardadas (#314)', () => {
     expect(toggleRefs(['V(a)'], ['I(R1)'])).toEqual(['V(a)', 'I(R1)']);
     expect(toggleRefs(['V(a)', 'I(R1)'], ['i(r1)'])).toEqual(['V(a)']);
     expect(toggleRefs(null, ['V(a)'])).toBeNull();
+  });
+
+  it('la punta de prueba del panel elige tensiones y corrientes (#364)', async () => {
+    const b = await build(TB('SYMBOL npn 200 0 R0\nSYMATTR InstName Q1\n'));
+    expect(targetRefs(b, { net: 'a' })).toEqual(['V(a)']);
+    expect(targetRefs(b, { net: '0' })).toEqual([]);
+    expect(targetRefs(b, { symbol: 0 })).toEqual(['I(V1)']);
+    // el cuerpo de un transistor, sus tres corrientes (el símbolo dice QN); un pin, la de ese terminal
+    expect(targetRefs(b, { symbol: 2 })).toEqual(['Ic(Q1)', 'Ib(Q1)', 'Ie(Q1)']);
+    expect(targetRefs(b, { symbol: 2, pin: 2 })).toEqual(['Ib(Q1)']);
+    // un subcircuito: sólo por pin, con el nombre de la lista (XU1)
+    expect(targetRefs(b, { symbol: 1 })).toEqual([]);
+    expect(targetRefs(b, { symbol: 1, pin: 1 })).toEqual(['Ix(XU1:in)']);
+    expect(savableSignals(b).map((s) => s.ref)).toContain('Ix(XU1:in)');
+    expect(rowDevice('Ix(U1:OUT)')).toBe('U1');
+    expect(elementRefs('M1', 'MN')).toEqual(['Id(M1)', 'Ig(M1)', 'Is(M1)']);
   });
 
   it('los nodos digitales elegidos van en un comentario aparte y el motor lee sólo esos', () => {

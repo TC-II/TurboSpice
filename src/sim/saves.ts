@@ -15,7 +15,7 @@ import type { Element, LtNetlist } from '../netlist/ltnetlist.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { ngNodeName, type NgspiceNetlist } from '../netlist/tongspice.ts';
 import { blockInstances, hierDevice } from './context.ts';
-import { pinVector, verilogNodes } from './traces.ts';
+import { pinVector, probeExpr, verilogNodes } from './traces.ts';
 import { deviceVector, netVector, type BuiltSimulation } from './schematicSim.ts';
 
 /** Línea .save del usuario con una lista (no "all" ni "none") */
@@ -162,7 +162,8 @@ const TERMINALS: Record<string, string[]> = { Q: ['Ic', 'Ib', 'Ie'], M: ['Id', '
 
 /** Referencias de corriente de un componente para el .save ("I(R1)", o "Ic(Q1)" "Ib(Q1)" "Ie(Q1)") */
 export function elementRefs(name: string, prefix: string): string[] {
-  const p = prefix.toUpperCase();
+  // (la letra: los símbolos de LTspice dicen QN, MP, JN…)
+  const p = prefix.slice(0, 1).toUpperCase();
   if (!name || ['X', 'A', 'K', 'U'].includes(p)) return [];
   return (TERMINALS[p] ?? ['I']).map((tt) => `${tt}(${name})`);
 }
@@ -175,6 +176,22 @@ export function toggleRefs(sel: string[] | null, refs: string[]): string[] | nul
   if (!sel) return sel;
   const has = (r: string) => sel.some((s) => s.toLowerCase() === r.toLowerCase());
   return refs.every(has) ? sel.filter((s) => !refs.some((r) => r.toLowerCase() === s.toLowerCase())) : [...sel, ...refs.filter((r) => !has(r))];
+}
+
+/**
+ * Señales que elige un click de la punta de prueba en el panel de señales guardadas (#364): un
+ * cable, su tensión; el pin de un transistor o subcircuito, la corriente de ese terminal; el
+ * cuerpo de un componente, sus corrientes
+ */
+export function targetRefs(sim: Pick<BuiltSimulation, 'lt'>, target: { net?: string; symbol?: number; pin?: number }): string[] {
+  if (target.net) return target.net === '0' ? [] : [`V(${target.net})`];
+  if (target.symbol === undefined) return [];
+  if (target.pin !== undefined) {
+    const e = probeExpr(sim as BuiltSimulation, target);
+    if (e) return [e.replace(/§/g, '')];
+  }
+  const el = sim.lt.elements.find((e) => e.sym === target.symbol);
+  return el ? elementRefs(el.name.replace(/§/g, ''), el.prefix) : [];
 }
 
 function elementSignals(elements: Element[], name: (e: Element) => string | undefined, net: (n: string) => string, group: string): SavableSignal[] {

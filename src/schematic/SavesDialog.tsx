@@ -7,9 +7,11 @@ import { t } from '../i18n/i18n.ts';
 
 const key = (r: string) => r.toLowerCase();
 
-export function SavesDialog({ initial, signals, onApply, onClose }: {
+export function SavesDialog({ initial, signals, max, onApply, onClose }: {
   /** lo elegido (null: se guarda todo) */
   initial: string[] | null;
+  /** cuántas entran en memoria, según la última simulación que se cortó por tamaño */
+  max?: number;
   /** las señales del circuito; undefined mientras se arma la netlist */
   signals: SavableSignal[] | undefined;
   onApply(refs: string[] | null): void;
@@ -58,6 +60,13 @@ export function SavesDialog({ initial, signals, onApply, onClose }: {
         {mode === 'some' && (
           <>
             <p className="hint">{t('What the plots, the .meas and the Studio use is always saved too. The unnamed internal nodes of Verilog blocks are never saved.')}</p>
+            {max !== undefined && (
+              <p className="hint saves-max">
+                {max >= 1
+                  ? t('The last simulation didn\'t fit in memory: at its pace, up to {max} signals fit (the plotted ones count too).', { max })
+                  : t('The last simulation didn\'t fit in memory even with one signal: save only the end with «Save from».')}
+              </p>
+            )}
             <div className="saves-tools">
               <input type="search" placeholder={t('Search')} aria-label={t('Search')} value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
               {shortcut(t('Top-level voltages'), all.filter((s) => !s.group && s.kind === 'voltage'), true)}
@@ -65,7 +74,9 @@ export function SavesDialog({ initial, signals, onApply, onClose }: {
               {shortcut(t('Digital signals between blocks'), all.filter((s) => !s.group && s.kind === 'digital'), true)}
               {shortcut(t('Nothing from subcircuits'), all.filter((s) => s.group), false)}
               {shortcut(t('None'), all, false)}
-              <span className="hint">{t('{n} selected', { n: refs.length })}</span>
+              <span className={max !== undefined && refs.length > max ? 'hint saves-over' : 'hint'}>
+                {max !== undefined ? t('{n} selected of at most {max}', { n: refs.length, max }) : t('{n} selected', { n: refs.length })}
+              </span>
             </div>
             <div className="saves-list">
               {!signals && <p className="hint">{t('Reading the circuit…')}</p>}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAnalysis } from '../../src/sim/analyses.ts';
-import { analysisPoints, checkSimSize, countVectors, MAX_POINTS, MAX_SIM_BYTES, sweepPoints } from '../../src/sim/estimate.ts';
+import { analysisPoints, checkSimSize, countVectors, MAX_POINTS, MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit, sweepPoints } from '../../src/sim/estimate.ts';
 
 const points = (line: string) => analysisPoints(parseAnalysis(line)!);
 
@@ -88,5 +88,32 @@ describe('chequeo de tamaño (#58)', () => {
     const to = r.errors[0].fix!.to;
     expect(to).toMatch(/^\.tran 0 1 0 \S+$/);
     expect(points(to) * 29 * 8).toBeLessThan(MAX_SIM_BYTES);
+  });
+});
+
+describe('transitorio cortado mientras simula porque no iba a entrar (#361)', () => {
+  // el cristal de 32 kHz: 15 s con un paso de unos 3 µs
+  const m = { percent: 1, points: 34288, projected: 3_594_452, vectors: 228 };
+
+  it('cuántas señales entran', () => {
+    expect(signalsThatFit(3_594_452)).toBe(17);
+    expect(signalsThatFit(1e9)).toBe(0);
+  });
+
+  it('el mensaje dice cuánto iba a guardar, cuántas señales entran y propone guardar el final', () => {
+    const p = measuredSizeProblem('.tran 0 15 0 uic', m);
+    expect(p.text).toContain('Se cortó al 1% del tiempo');
+    expect(p.text).toContain('3,6 M puntos × 228 señales');
+    expect(p.text).toContain('Entran hasta 17 señales');
+    expect(p.chooseSignals).toBe(true);
+    // con las 228 señales entra ≈ 0,9 s: se guarda el último medio segundo
+    expect(p.fix).toEqual({ from: '.tran 0 15 0 uic', to: '.tran 0 15 14.5 uic' });
+  });
+
+  it('sin lugar ni para una señal no propone elegirlas', () => {
+    const p = measuredSizeProblem('.tran 1u 100 0 10n', { percent: 2, projected: 1e9, vectors: 4 });
+    expect(p.chooseSignals).toBe(false);
+    expect(p.text).toContain('No entra ni una señal');
+    expect(p.fix?.to).toMatch(/^\.tran 1u 100 \S+ 10n$/);
   });
 });

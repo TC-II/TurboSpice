@@ -166,6 +166,8 @@ export interface SizeProblem {
   text: string;
   /** línea del esquemático y por cuál reemplazarla para bajar los puntos */
   fix?: { from: string; to: string };
+  /** proponer elegir las señales guardadas aunque ya haya una selección */
+  chooseSignals?: boolean;
 }
 
 export interface SizeCheck {
@@ -195,6 +197,54 @@ function fewerPoints(line: string, a: Analysis, factor: number): string | undefi
     return `.tran 0 ${a.tstop} ${a.tstart.trim() || '0'} ${step}${a.uic ? ' uic' : ''}${a.startup ? ' startup' : ''}`;
   }
   return undefined;
+}
+
+/** Lo que midió el motor al cortar un transitorio (ver SizeStop en engine/ngspice.ts) */
+export interface MeasuredSize {
+  percent: number;
+  projected: number;
+  vectors: number;
+}
+
+/** Cuántas señales entran en `maxBytes` con estos puntos (sin contar el tiempo) */
+export const signalsThatFit = (points: number, maxBytes = MAX_SIM_BYTES) => Math.max(0, Math.floor(maxBytes / (points * 8)) - 1);
+
+/** Un número redondo (1, 2, 5 × 10^k) que no pase de x */
+const roundDown = (x: number) => {
+  const e = 10 ** Math.floor(Math.log10(x));
+  return [5, 2, 1].map((m) => m * e).find((v) => v <= x) ?? e;
+};
+
+/**
+ * El transitorio que se cortó mientras simulaba porque no iba a entrar: cuánto iba a guardar,
+ * cuántas señales entran y, como alternativa, guardar sólo el final (tstart, «Save from»).
+ */
+export function measuredSizeProblem(line: string, m: MeasuredSize, maxBytes = MAX_SIM_BYTES): SizeProblem {
+  const bytes = m.projected * m.vectors * 8;
+  const fit = signalsThatFit(m.projected, maxBytes);
+  let text = t('Stopped at {pct}% of the time: at this rate «{line}» saves ≈ {points} points × {vectors} signals ≈ {size}, more than the browser can hold.', {
+    pct: m.percent < 10 ? m.percent.toFixed(1).replace(/\.0$/, '').replace('.', ',') : Math.round(m.percent),
+    line,
+    points: fmtCount(m.projected),
+    vectors: m.vectors,
+    size: fmtBytes(bytes),
+  });
+  text += fit >= 1 ? t(' Up to {n} signals fit (Simulate › Saved signals…; the plotted ones count too).', { n: fit }) : t(' Not even one signal fits over the whole time.');
+  // guardar sólo el final: la parte que entra con estas mismas señales (con margen)
+  const a = parseAnalysis(line);
+  let fix: SizeProblem['fix'];
+  if (a?.kind === 'tran') {
+    const tstop = parseSpiceNumber(a.tstop);
+    const tstart = a.tstart.trim() ? parseSpiceNumber(a.tstart) : 0;
+    const keep = roundDown(((tstop - tstart) * 0.8 * maxBytes) / bytes);
+    if (tstop > 0 && keep > 0 && keep < tstop - tstart) {
+      const from = formatSpiceNumber(Number((tstop - keep).toPrecision(6)));
+      const to = ['.tran', a.tstep.trim() || '0', a.tstop, from, ...(a.tmax.trim() ? [a.tmax] : []), ...(a.uic ? ['uic'] : []), ...(a.startup ? ['startup'] : [])].join(' ');
+      fix = { from: line, to };
+      text += t(' Or save only the last {keep} (Save from {from}).', { keep: formatSpiceNumber(keep) + 's', from });
+    }
+  }
+  return { text, fix, chooseSignals: fit >= 1 };
 }
 
 /**

@@ -56,6 +56,20 @@ export interface SimResult {
    * parámetros de dispositivo pedidos (`@q1[gm]`…), por nombre de vector en minúsculas.
    */
   bias?: Record<string, number>;
+  /** El transitorio se cortó porque, al ritmo que iba, no entraba en memoria (`maxBytes`) */
+  sizeStop?: SizeStop;
+}
+
+/** Lo que se midió al cortar un transitorio que no iba a entrar en memoria */
+export interface SizeStop {
+  /** porcentaje del tiempo simulado al cortar */
+  percent: number;
+  /** puntos guardados hasta ahí */
+  points: number;
+  /** puntos que habría guardado al final, a ese ritmo */
+  projected: number;
+  /** vectores que se guardan (con el tiempo) */
+  vectors: number;
 }
 
 export interface SimulateOptions {
@@ -72,6 +86,12 @@ export interface SimulateOptions {
    * un valor por punto del transitorio, así que pesan como una tensión (#314)
    */
   digital?: string[];
+  /**
+   * Bytes que pueden ocupar los resultados de un transitorio. Mientras simula se mide cuántos
+   * puntos va guardando y, si al final no van a entrar, se corta antes de quedarse sin memoria
+   * (`sizeStop`): ngspice elige el paso según el circuito y eso no se puede saber de antemano.
+   */
+  maxBytes?: number;
 }
 
 export interface NgspiceOptions {
@@ -103,6 +123,7 @@ interface EmModule {
   _ngSpice_Command(cmd: number): number;
   _ngGet_Vec_Info(name: number): number;
   _ngSpice_AllPlots(): number;
+  _ngSpice_CurPlot(): number;
   _ngSpice_AllVecs(plot: number): number;
   _ngSpice_AllEvtNodes(): number;
   _ngGet_Evt_NodeInfo(name: number): number;
@@ -126,6 +147,19 @@ const VI_REAL = 12;
 const VI_COMP = 16;
 const VI_LENGTH = 20;
 const VF_COMPLEX = 2;
+
+/** Cada cuánto se mide el transitorio en curso (ms) */
+const SIZE_CHECK_MS = 250;
+/** Avance mínimo (en % del tiempo simulado) antes de decidir con el ritmo medido */
+const SIZE_MIN_PERCENT = 0.5;
+
+/** Se tira desde el callback de progreso para cortar el transitorio (desarma el stack de ngspice) */
+class SizeStopSignal {
+  readonly stop: SizeStop;
+  constructor(stop: SizeStop) {
+    this.stop = stop;
+  }
+}
 
 export class Ngspice {
   private m: EmModule;
@@ -195,7 +229,9 @@ export class Ngspice {
     const sendStat = m.addFunction((ptr) => {
       const s = m.UTF8ToString(ptr);
       const pct = /([\d.]+)%/.exec(s);
-      this.opts.onStatus?.(s, pct ? parseFloat(pct[1]) : 0);
+      const percent = pct ? parseFloat(pct[1]) : 0;
+      this.opts.onStatus?.(s, percent);
+      if (this.size && /^\s*tran\b/i.test(s)) this.checkSize(percent);
       return 0;
     }, 'iiii');
     const controlledExit = m.addFunction((status) => {
@@ -264,15 +300,64 @@ export class Ngspice {
     // arrancar ngspice (y como LTspice); si no, la secuencia sigue de la simulación anterior
     this.command('setseed 1');
     this.writeFiles({ 'circuit.cir': netlist });
-    this.command(`source ${WORK_DIR}/circuit.cir`);
     const control = /^\s*\.control\b/im.test(netlist);
-    if (!this.aborted && !control) {
-      this.command('run');
+    this.size = opts.maxBytes ? { max: opts.maxBytes, last: 0, percent: 0, start: -1, points: 0 } : null;
+    let sizeStop: SizeStop | undefined;
+    try {
+      // (un .control corre sus análisis al leer la netlist)
+      this.command(`source ${WORK_DIR}/circuit.cir`);
+      if (!this.aborted && !control) this.command('run');
+    } catch (e) {
+      if (!(e instanceof SizeStopSignal)) throw e;
+      // ngspice quedó a mitad de un análisis: este módulo ya no sirve (el Worker crea otro)
+      sizeStop = e.stop;
+      this.aborted = true;
+    } finally {
+      this.size = null;
     }
     const plots = this.aborted ? [] : this.readPlots();
     const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias, opts.biasCommand) : undefined;
 
-    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias };
+    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias, ...(sizeStop ? { sizeStop } : {}) };
+  }
+
+  /** Medición del transitorio en curso (ver `maxBytes`); null si no se mide */
+  private size: { max: number; last: number; percent: number; start: number; points: number } | null = null;
+
+  /**
+   * Cuántos puntos lleva el transitorio en curso y cuántos va a tener, al ritmo medido desde que
+   * empezó a guardar (con tstart, antes no guarda nada). Si no van a entrar, lo corta.
+   */
+  private checkSize(percent: number): void {
+    const z = this.size!;
+    // una corrida nueva (.step, .control con varios tran): se empieza a medir de nuevo
+    if (percent < z.percent) z.start = -1;
+    z.percent = percent;
+    const now = Date.now();
+    if (now - z.last < SIZE_CHECK_MS) return;
+    z.last = now;
+    const m = this.m;
+    const plot = m.UTF8ToString(m._ngSpice_CurPlot());
+    if (!/^tran\d+$/i.test(plot)) return;
+    const p = m.stringToNewUTF8(plot);
+    const vectors = this.readStringArray(m._ngSpice_AllVecs(p)).length;
+    m._free(p);
+    const tp = m.stringToNewUTF8(`${plot}.time`);
+    const vi = m._ngGet_Vec_Info(tp);
+    m._free(tp);
+    const points = vi ? m.getValue(vi + VI_LENGTH, 'i32') : 0;
+    if (!points || !vectors) return;
+    if (z.start < 0) {
+      z.start = percent;
+      z.points = points;
+    }
+    const done = percent - z.start;
+    const bytes = (n: number) => n * vectors * 8;
+    // lo que ya guardó no entra, o al ritmo medido no va a entrar
+    const projected = done > 0 ? Math.round(points + ((100 - percent) * (points - z.points)) / done) : points;
+    if (bytes(points) > z.max || (done >= SIZE_MIN_PERCENT && bytes(projected) > z.max)) {
+      throw new SizeStopSignal({ percent, points, projected: Math.max(points, projected), vectors });
+    }
   }
 
   /**

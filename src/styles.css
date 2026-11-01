@@ -1436,12 +1436,13 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .sim-split > .menu-top > button { height: 100%; gap: 4px; padding: 4px 10px 4px 7px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .sim-split > .menu-top > button.labeled { border-right-width: 0; }
 .sim-split > button { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 4px 12px; }
-.sim-split > button.sim-progress { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--pct), transparent var(--pct)); }
-.sim-split > button.sim-progress { position: relative; overflow: hidden; }
-/* un brillo que lo cruza de izquierda a derecha mientras corre: da la idea de que avanza */
-.sim-split > button.sim-progress::after { content: ""; position: absolute; inset: 0; width: 40%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), transparent); transform: translateX(-100%); animation: sim-shine 1.4s ease-in-out infinite; pointer-events: none; }
-@keyframes sim-shine { to { transform: translateX(250%); } }
-@media (prefers-reduced-motion: reduce) { .sim-split > button.sim-progress::after { animation-duration: 4s; } }
+/* el avance (#363): la barra se llena con el %, y por detrás una sombra clara recorre todo el
+   trayecto (0 a 100 %) una y otra vez, para que se vea que corre aunque el % avance despacio */
+.iconbar .sim-split > button.sim-progress, .iconbar .sim-split > button.sim-progress:hover:not(:disabled) { position: relative; overflow: hidden; background: linear-gradient(to right, color-mix(in srgb, var(--accent) 24%, var(--bg)) var(--pct), var(--bg) var(--pct)); }
+.sim-split > button.sim-progress::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 45%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 38%, transparent) 50%, transparent); transform: translateX(-100%); animation: sim-shine 1.8s linear infinite; pointer-events: none; }
+.sim-split > button.sim-progress > * { position: relative; }
+@keyframes sim-shine { to { transform: translateX(calc(100% / 0.45)); } }
+@media (prefers-reduced-motion: reduce) { .sim-split > button.sim-progress::before { animation-duration: 5s; } }
 .sim-split > button.sim-progress .pct { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 .sim-split > button.primary { box-shadow: inset 1px 0 0 color-mix(in srgb, #fff 35%, var(--accent)); }
 .iconbar .sim-split > button.run-off { opacity: 1; color: var(--fg-muted); }

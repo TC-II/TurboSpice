@@ -1,6 +1,7 @@
 // .asc → netlist con la misma forma que genera LTspice (LTspice -netlist), que es la
 // referencia para validar. La traducción a ngspice está en tongspice.ts.
 import { baseName, type AscDoc, type SymbolDef } from '../asc/model.ts';
+import { spiceName, spiceValue } from './spiceName.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { connectivity, type Connectivity } from './connectivity.ts';
 import { busBits, busWidth, instArray, isBusName, pinNodes } from './bus.ts';
@@ -94,7 +95,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
         const pin = p.attrs.get('PinName') ?? '';
         const name = sub.flags.find((f) => f.name.toLowerCase() === pin.toLowerCase())?.name ?? pin;
         // un pin de bus (d[3:0]) son tantos puertos como bits: d[3] … d[0]
-        return busBits(name);
+        return busBits(spiceName(name));
       });
     warnings.push(...lt.warnings.map((w) => `${name}: ${w}`));
     for (const b of lt.blocks) if (!blocks.some((x) => x.name.toLowerCase() === b.name.toLowerCase())) blocks.push(b);
@@ -137,7 +138,8 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
     const prefix = blockNoPrefix ? 'X' : (attrs.get('Prefix') ?? '');
     // Símbolos sin prefijo o sin pines (decorativos, flechas, puntos) no generan línea
     if (!prefix || !def.pins.length) return;
-    const instName = attrs.get('InstName') ?? '';
+    // un nombre con $…$ (#328) va a la netlist simple: $ es comentario para ngspice
+    const instName = spiceName(attrs.get('InstName') ?? '');
 
     const P = prefix.toUpperCase();
     // dispositivos A (compuertas digitales): los pines sueltos y los que faltan van a 0, sin
@@ -219,7 +221,7 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       .join(' ')
       // LTspice escribe el prefijo micro como "u" en la netlist
       .replace(/[µμ]/g, 'u');
-    value = renameV(value);
+    value = renameV(spiceValue(value));
     // Bloque jerárquico: el subcircuito es el .asc con el nombre del símbolo
     if (def.symbolType.toUpperCase() === 'BLOCK') {
       const name = baseName(s.type);

@@ -93,6 +93,7 @@ import { parseSource } from './sim/sources.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { ExportView } from './schematic/ExportView.tsx';
 import { FONTS, fontChoice, loadFont } from './schematic/fonts.ts';
+import { spiceName } from './netlist/spiceName.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
@@ -2123,9 +2124,9 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const rowNet = rowHover ? /^V\(([^,()]+)\)$/i.exec(rowHover)?.[1] : undefined;
   // …y el componente de la fila (@Q1[gm], Ic(Q1), I(R1)); al revés, el componente bajo el mouse resalta sus filas
   const rowDev = rowHover ? rowDevice(rowHover) : null;
-  const rowSymbol = rowDev && !lvNow ? doc.symbols.findIndex((s) => s.attrs.get('InstName')?.toUpperCase() === rowDev) : -1;
+  const rowSymbol = rowDev && !lvNow ? doc.symbols.findIndex((s) => spiceName(s.attrs.get('InstName') ?? '').toUpperCase() === rowDev) : -1;
   const [hoverDev, setHoverDev] = useState<string>();
-  const onHoverSymbol = useCallback((i: number | undefined) => setHoverDev(i === undefined ? undefined : docRef.current.symbols[i]?.attrs.get('InstName')), []);
+  const onHoverSymbol = useCallback((i: number | undefined) => setHoverDev(i === undefined ? undefined : spiceName(docRef.current.symbols[i]?.attrs.get('InstName') ?? '') || undefined), []);
   const arrows = useMemo(() => {
     const rowCurrent = !!rowHover && /^I/i.test(rowHover);
     if (!sim || (lvNow ? !simScope : sim.doc !== doc) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
@@ -2622,9 +2623,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     if (picking.what === 'net') return net && (net !== '0' || picking.ground) ? net : null;
     if (symbol === undefined) return null;
     const a = effectiveAttrs(doc.symbols[symbol], lib.symbol(doc.symbols[symbol].type));
-    if (picking.what === 'component') return a.get('Prefix') ? (a.get('InstName') ?? null) : null;
-    if (picking.what === 'probe') return /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') ? (a.get('InstName') ?? null) : null;
-    return /^[VI]$/i.test(a.get('Prefix') ?? '') ? (a.get('InstName') ?? null) : null;
+    // (el nombre que ve el simulador: uno con $…$ va simple, spiceName)
+    const inst = a.get('InstName');
+    const name = inst === undefined ? null : spiceName(inst);
+    if (picking.what === 'component') return a.get('Prefix') ? name : null;
+    if (picking.what === 'probe') return /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') ? name : null;
+    return /^[VI]$/i.test(a.get('Prefix') ?? '') ? name : null;
   };
   useEffect(() => {
     if (!picking) return;
@@ -2851,13 +2855,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       sources: doc.symbols
         .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
         .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
-        .map((a) => a.get('InstName') ?? '')
+        .map((a) => spiceName(a.get('InstName') ?? ''))
         .filter(Boolean),
       // sondas de lazo del .stb (librería Stability)
       probes: doc.symbols
         .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
         .filter((a) => /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? ''))
-        .map((a) => ({ name: a.get('InstName') ?? '', diff: /^(LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') }))
+        .map((a) => ({ name: spiceName(a.get('InstName') ?? ''), diff: /^(LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') }))
         .filter((p, i, all) => p.name && all.findIndex((q) => q.name === p.name) === i),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

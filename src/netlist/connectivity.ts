@@ -6,6 +6,7 @@
 // - nombre de red: tierra > etiqueta (la primera en orden alfabético) > N001, N002…
 //   numeradas según el primer cable de cada red en el archivo.
 import { toWorld } from '../asc/transform.ts';
+import { spiceName } from './spiceName.ts';
 import type { AscDoc, Point, SymbolDef } from '../asc/model.ts';
 import { busBits, busWidth, instArray, isBusName } from './bus.ts';
 
@@ -161,7 +162,8 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
   const unnamed: Net[] = [];
   for (const n of nets) {
     if (n.labels.includes('0')) n.name = '0';
-    else if (n.labels.length) n.name = chosen.get(n)!.name;
+    // (una etiqueta con $…$ se dibuja como fórmula; a la netlist va su nombre simple, spiceName)
+    else if (n.labels.length) n.name = spiceName(chosen.get(n)!.name);
     else if (n.pins.length === 1 && !n.wires.length) n.name = ''; // pin suelto → NC_xx
     else unnamed.push(n);
   }

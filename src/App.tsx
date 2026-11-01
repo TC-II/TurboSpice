@@ -2528,6 +2528,9 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Caja de trazas de la barra de resultados
   const traceBox = useRef<TraceBoxHandle>(null);
+  // con el foco en la caja de trazas se está en modo punta de prueba (#341): un clic en una red la
+  // escribe en la caja, aunque la herramienta elegida sea la de selección
+  const [traceFocus, setTraceFocus] = useState(false);
   const [viewerTools, setViewerTools] = useState<HTMLElement | null>(null);
   const traceNames = useMemo(() => {
     const sc = plot && scaleOf(plot);
@@ -3961,7 +3964,7 @@ ${ltNetlistText(sim.built.lt)}
             lib={lib}
             conn={conn}
             commit={commit}
-            tool={tool}
+            tool={traceFocus && tool.kind === 'select' && sim ? { kind: 'probe' } : tool}
             setTool={setTool}
             selection={selection}
             setSelection={setSelection}
@@ -4104,7 +4107,8 @@ ${ltNetlistText(sim.built.lt)}
               )}
               {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
               {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
-              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={traceHints} onAdd={addExpr} />}
+              {/* en un .stb, el selector muestra sólo las magnitudes del lazo, sin los parámetros de los dispositivos (#337) */}
+              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={isStbPlot(plot) ? undefined : traceHints} onAdd={addExpr} onFocusChange={setTraceFocus} />}
               {panel === 'plot' && (
                 <>
                   {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, fft de ngspice, gráficos x-y */}

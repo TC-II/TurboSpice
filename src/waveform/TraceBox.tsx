@@ -1,7 +1,7 @@
 // Caja para agregar trazas (en la barra de resultados): una expresión que se agrega con Enter o
 // con el "+" del final. Con el foco en la caja, la punta de prueba escribe en ella en lugar de
 // graficar (para armar expresiones sin tipear los nombres).
-import { useImperativeHandle, useRef, useState, type Ref } from 'react';
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { t } from '../i18n/i18n.ts';
 
 export interface TraceBoxHandle {
@@ -14,7 +14,9 @@ export interface TraceBoxHandle {
   input(): HTMLInputElement | null;
 }
 
-export function TraceBox({ names, hints, onAdd, handle }: {
+export function TraceBox({ names, hints, onAdd, handle, onFocusChange }: {
+  /** el foco entra o sale de la caja (con el foco, el esquemático está en modo punta de prueba, #341) */
+  onFocusChange?(focused: boolean): void;
   /** nombres para autocompletar */
   names: string[];
   /** más nombres con su descripción (parámetros de dispositivo, #202) */
@@ -26,6 +28,10 @@ export function TraceBox({ names, hints, onAdd, handle }: {
   const [expr, setExpr] = useState('');
   const [error, setError] = useState<string>();
   const input = useRef<HTMLInputElement>(null);
+  // si la caja desaparece con el foco adentro, no llega el blur
+  const focusChange = useRef(onFocusChange);
+  focusChange.current = onFocusChange;
+  useEffect(() => () => focusChange.current?.(false), []);
 
   useImperativeHandle(handle, () => ({
     focus: () => input.current?.focus(),
@@ -74,6 +80,8 @@ export function TraceBox({ names, hints, onAdd, handle }: {
             setExpr(e.target.value);
             setError(undefined);
           }}
+          onFocus={() => onFocusChange?.(true)}
+          onBlur={() => onFocusChange?.(false)}
         />
         <button type="submit" className="expr-add" aria-label={t('Add trace')} title={t('Add the trace (Enter)')} disabled={!expr.trim()}>
           +

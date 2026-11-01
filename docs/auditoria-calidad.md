@@ -237,6 +237,9 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 
 ### Pendiente
 
+Seguimiento, con el detalle para retomarlo: **issue #344**.
+
+
 - **Fase 3** (partir `App.tsx`, `PlotPanel.tsx`, `SchematicEditor.tsx`): una extracción por PR. `App.tsx` cambia en la mitad de los commits de `dev`, así que conviene coordinar cada extracción para no pisar trabajo en curso.
 - **`tests/e2e/hierarchy.mjs`**: reescribirlo con el flujo de «Módulo nuevo» y volver a sumarlo a la CI.
 - **Prettier** (1.2): decisión del equipo.

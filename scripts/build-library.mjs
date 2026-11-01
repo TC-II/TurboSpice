@@ -55,9 +55,12 @@ export function normalizeSkin(svg) {
       return style ? ` style="${style}"` : '';
     })
     .replace(/\sid="[^"]*"/g, '');
+  // en un skin a color (Boca Jrs) el blanco es un color más (la flecha blanca sobre el azul): queda
+  // blanco; en uno en blanco y negro es el fondo, y en el tema oscuro sigue al fondo
+  const colored = /#(?!(?:000|fff|000000|ffffff)\b)[0-9a-f]{3}(?:[0-9a-f]{3})?\b/i.test(body);
   body = body
     .replace(/#000(000)?\b/gi, 'currentColor')
-    .replace(/(fill:\s*)#fff(fff)?\b/gi, '$1var(--sch-bg)')
+    .replace(/(fill:\s*)#fff(fff)?\b/gi, colored ? '$1#fff' : '$1var(--sch-bg)')
     .replace(/(stroke-width:\s*)(\d*\.?\d+)(px)?/gi, (m, pre, n) =>
       Number(n) < MIN_SKIN_STROKE ? `${pre}${MIN_SKIN_STROKE}px` : m)
     .replace(/\s+/g, ' ')

@@ -43,9 +43,12 @@ function fromPenSvg(svg: string, classes: Map<string, string>): string {
       .replace(/<svg[^>]*>/, '')
       .replace(/<\/svg>\s*$/, '')
       .replace(/<defs>[\s\S]*?<\/defs>/, '')
-      .replace(/<(\w+)([^>]*?)\sclass="(t\d+)"([^>]*)>/g, (_, tag: string, a: string, cls: string, b: string) =>
-        / stroke="/.test(a + b) ? `<${tag}${a}${b}>` : `<${tag}${a} style="${style.get(cls) ?? ''}"${b}>`,
-      ),
+      .replace(/<(\w+)([^>]*?)\sclass="(t\d+)"([^>]*)>/g, (_, tag: string, a: string, cls: string, b: string) => {
+        if (!/ stroke="/.test(a + b)) return `<${tag}${a} style="${style.get(cls) ?? ''}"${b}>`;
+        // roughPen traza todo con una pluma negra: un trazo blanco (Boca Jrs) sigue blanco
+        const white = /stroke:\s*#fff(fff)?\b/i.test(style.get(cls) ?? '');
+        return `<${tag}${white ? (a + b).replace(/ stroke="#000(000)?"/i, ' stroke="#fff"') : a + b}>`;
+      }),
   ).trim();
 }
 

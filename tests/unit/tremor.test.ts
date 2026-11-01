@@ -33,6 +33,24 @@ describe('trazo Tremor (#330)', () => {
   });
 });
 
+describe('el blanco de los skins a color (Boca Jrs)', () => {
+  const boca = buildBundle().skinSets!['Boca Jrs'];
+  it('la flecha blanca del BJT queda blanca (no toma el fondo, oscuro en el tema oscuro)', () => {
+    expect(boca.npn.body).toContain('fill: #fff');
+    expect(boca.npn.body).not.toContain('var(--sch-bg)');
+    expect(boca.res_pipe.body).not.toContain('var(--sch-bg)');
+  });
+
+  it('en un skin en blanco y negro el blanco sigue siendo el fondo', () => {
+    expect(skins.node.body).toContain('var(--sch-bg)');
+  });
+
+  it('a mano alzada, un trazo blanco sigue blanco (roughPen traza todo en negro)', () => {
+    const out = tremorSkin(boca.npn, [[64, 0], [0, 48], [64, 96]], 'npn|0|0');
+    expect(out.body).toMatch(/stroke="#fff"/);
+  });
+});
+
 describe('Tremor igual que en ASC-Parser (#330)', () => {
   it('con la misma semilla, cada skin del Default sale con los mismos trazos que el original', async () => {
     const { readdirSync, readFileSync } = await import('node:fs');

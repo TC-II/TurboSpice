@@ -5,7 +5,7 @@
 //   SpiceLine  parásitos (fuente de tensión)     "Rser=1 Cpar=1n"   ("load" en las de corriente)
 // Al leer se juntan los tres (también se acepta "… AC 1" dentro de Value, como en archivos viejos);
 // lo que no se reconoce devuelve null y la ventana lo muestra como texto, sin perderlo.
-import { fromRkm, parseSpiceNumber } from '../netlist/spicenum.ts';
+import { formatSi, fromRkm, parseSpiceNumber, SPICE_PREFIXES } from '../netlist/spicenum.ts';
 
 export type SourceKind = 'sine' | 'ac' | 'pulse' | 'dc' | 'exp' | 'sffm' | 'pwl';
 
@@ -187,10 +187,7 @@ export function spiceNumber(s: string): number {
 export function engNumber(x: number, digits = 3): string {
   if (!isFinite(x)) return '';
   if (Math.abs(x) < 1e-18) return '0';
-  const steps: [number, string][] = [[1e-15, 'f'], [1e-12, 'p'], [1e-9, 'n'], [1e-6, 'u'], [1e-3, 'm'], [1, ''], [1e3, 'k'], [1e6, 'Meg'], [1e9, 'G']];
-  let s = steps[0];
-  for (const q of steps) if (Math.abs(x) >= q[0] * 0.9995) s = q;
-  return `${Number((x / s[0]).toPrecision(digits))}${s[1]}`;
+  return formatSi(x, digits, SPICE_PREFIXES);
 }
 
 /** "1M" en una fuente es casi siempre un error: en SPICE es mili, no mega */

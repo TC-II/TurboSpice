@@ -185,7 +185,7 @@ Regla: **una extracción por PR, sin cambiar comportamiento**, con las 17 suites
 | Esperas fijas en e2e | 144 | < 30 |
 | Errores de tipos en tests/scripts | 32 | 0 |
 | Chunk de entrada | 949 kB | < 600 kB |
-| Tablas de sufijos SI | 7 | 1 |
+| Tablas de sufijos SI | 7 | 1 (hecho: 3 tablas con nombre, un solo núcleo) |
 | Vulnerabilidades dev altas/críticas | 3 | 0 |
 
 ## 6. Avance
@@ -210,3 +210,11 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 | 1.2 | ⏸️ | **Decisión del equipo.** Con la configuración que menos cambia (comillas simples, ancho 200), Prettier reformatea 118 archivos de `src/` (+5000/−2800 líneas). Hacerlo con ramas abiertas genera conflictos en todas; agregar sólo la configuración es peor, porque el formateo al guardar del editor reformatearía archivos enteros de a uno. Propuesta: elegir un momento sin ramas abiertas, aplicar `prettier --write` en un solo commit, agregarlo a `.git-blame-ignore-revs` y sumar `prettier --check` a la CI. |
 | 1.3 | ✅ | `@vitest/coverage-v8` y `npm run coverage`; la CI corre los unitarios con cobertura, publica el resumen en la página del run y el detalle como artefacto `coverage`. Línea de base (líneas de `src/`): **47 %** en total; `netlist` 96 %, `asc` 94 %, `sim` 89 %, `hdl` 65 %, `library` 65 %, `project` 60 %, `waveform` 35 %, `schematic` 31 %, `engine` 18 %, `ui` 6 %, `App.tsx`/`NetlistMode.tsx` 0 % (la interfaz la cubren los e2e). Sin umbral todavía. |
 | 1.4 | ✅ | vite 6.0.5 → 6.4.5 (misma serie: corrige todo lo del servidor de desarrollo), vitest 2.1.8 → 5.0.5, plugin-react 4.3.4 → 4.7.0; `fflate` y `playwright-core` fijos. `overrides` de `minimatch` a 11.0.3 (ESLint traía la 10.x, con un ReDoS moderado). `npm audit`: **0 vulnerabilidades** (antes 6, con 2 críticas y 1 alta). |
+
+### Fase 2
+
+| # | Estado | Detalle |
+|---|---|---|
+| 2.1 | ✅ | Un solo núcleo en `netlist/spicenum.ts`: `formatSi(x, cifras, tabla)` con tres tablas con nombre (`SPICE_PREFIXES` con `u`/`Meg`, `LTSPICE_PREFIXES` con `µ`/`Meg`, `DISPLAY_PREFIXES` con `µ`/`M`), `spiceSuffix` y `parseDisplayNumber`. `si`, `siValue`, `engValue` y `engNumber` quedan como envoltorios de una línea (no cambia ninguna llamada); `expr.ts` y `dft.ts` usan las tablas compartidas. Comparación contra las versiones anteriores sobre ~200 000 valores: `si` (el visor) idéntica; en las demás ningún valor cambia, sólo el texto en tres casos: `1meg` → `1Meg` en las tarjetas del Estudio, el redondeo a 1000 corregido (`siValue` podía mostrar «1000m») y ≥10¹² con `T` en vez de «1070G». Las expresiones del visor ahora leen `μ` (antes daban error) y `mil` como en SPICE (antes valía 1 m). Tests en `tests/unit/si.test.ts`. |
+| 2.2 | ✅ | Decisión: las dos convenciones de «M» se quedan (mili en SPICE, mega en el visor y sus campos), documentadas en `docs/compatibilidad-ltspice.md` § Números con prefijo SI. |
+| 2.3 | ✅ | `niceStep` (paso redondo para *n* divisiones) queda sólo en `waveform/pz.ts`; `SourceDialog.tsx` lo importa (y gana la guarda de rango vacío). El de `scales.ts`, que hace otra cosa (el paso lindo ≥ x, con 2,5), pasa a llamarse `niceStepAbove`. Las `addSim`/`duplicateSim`/`removeSim`/`renameSim`/`selectSim`/`withSims` de `sim/simList.ts` no las usa la interfaz (usa las de `project/project.ts`): quedan marcadas `@deprecated`, sólo para armar el formato viejo en los tests de la migración. |

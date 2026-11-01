@@ -2,6 +2,7 @@ import { DIGITAL_TYPE, type SimPlot, type SimVector } from '../engine/ngspice.ts
 import type { StepRuns } from '../netlist/step.ts';
 import { bitNodeName } from '../netlist/bus.ts';
 import { deviceTraceName, parseDeviceVector } from '../sim/deviceParams.ts';
+import { DISPLAY_PREFIXES, formatSi } from '../netlist/spicenum.ts';
 
 /** Tipo de vector propio (no de ngspice) para el eje X de los barridos de .step */
 export const STEP_SCALE = 1000;
@@ -67,17 +68,8 @@ export function displayName(v: SimVector): string {
   return n;
 }
 
-const SI = ['f', 'p', 'n', 'µ', 'm', '', 'k', 'M', 'G', 'T'];
-
-/** Formato con prefijo SI: 0.0047 → "4.7m" */
-export function si(x: number, digits = 4): string {
-  if (x === 0 || !Number.isFinite(x)) return String(x);
-  let e = Math.min(4, Math.max(-5, Math.floor(Math.log10(Math.abs(x)) / 3)));
-  let m = parseFloat((x / 10 ** (3 * e)).toPrecision(digits));
-  // el redondeo puede llegar a 1000 (0.99997 → "1000m"): pasa al prefijo siguiente
-  if (Math.abs(m) >= 1000 && e < 4) m = parseFloat((x / 10 ** (3 * ++e)).toPrecision(digits));
-  return `${m}${SI[e + 5]}`;
-}
+/** Formato con prefijo SI para mostrar en el visor (M = mega): 0.0047 → "4.7m" */
+export const si = (x: number, digits = 4): string => formatSi(x, digits, DISPLAY_PREFIXES);
 
 /**
  * Etiquetas de las marcas de un eje: un solo prefijo SI (el de la marca de mayor módulo) y los
@@ -103,7 +95,7 @@ export function axisTicks(tt: (number | null)[]): string[] {
   return tt.map((x) => {
     if (x == null || !Number.isFinite(x)) return '';
     const m = parseFloat((x / 10 ** (3 * e)).toFixed(dec));
-    return `${m === 0 ? '0' : m.toFixed(dec)}${m === 0 ? '' : SI[e + 5]}`;
+    return `${m === 0 ? '0' : m.toFixed(dec)}${m === 0 ? '' : DISPLAY_PREFIXES[e + 5]}`;
   });
 }
 
@@ -122,7 +114,7 @@ export function siFixed(x: number, digits = 4): string {
   // el redondeo puede llegar a 1000 (999.96 → "1000"): pasa al prefijo siguiente
   if (parseFloat(m) >= 1000 && e < 4) m = (a / 10 ** (3 * ++e)).toPrecision(digits);
   if (m.includes('e')) m = parseFloat(m).toString();
-  return `${x < 0 ? '-' : ' '}${m.slice(0, digits + 1).padEnd(digits + 1)}${SI[e + 5] || ' '}`;
+  return `${x < 0 ? '-' : ' '}${m.slice(0, digits + 1).padEnd(digits + 1)}${DISPLAY_PREFIXES[e + 5] || ' '}`;
 }
 
 /** Interpola linealmente (xs, ys) en los puntos xd (xs creciente). Fuera de rango: NaN */

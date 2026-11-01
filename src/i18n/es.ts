@@ -2116,6 +2116,7 @@ export const es: Record<string, string> = {
   'Place a LoopProbe or LoopProbe_Dif (Stability library) in series in the loop': 'Poné una LoopProbe o LoopProbe_Dif (librería Stability) en serie en el lazo',
   'Differential (DM)': 'Diferencial (DM)',
   'Common mode (CM)': 'Modo común (CM)',
+  'Differential probe: the differential (DM) and the common-mode (CM) loops are measured in the same run': 'Sonda diferencial: el lazo diferencial (DM) y el de modo común (CM) se miden en la misma corrida',
   'Tian, A-β model: T = −Aβ (as Spectre stb; probe orientation does not matter)': 'Tian, modelo A-β: T = −Aβ (como stb de Spectre; no importa la orientación de la sonda)',
   'Middlebrook\'s GFT, asymptotic model: R, G∞, G0 (signal must enter the probe by its arrow)': 'GFT de Middlebrook, modelo asintótico: R, G∞, G0 (la señal tiene que entrar a la sonda por su flecha)',
   'Closed-loop transfer (optional): G, G∞, G0 and R, and the equivalent A and β': 'Transferencia de lazo cerrado (opcional): G, G∞, G0 y R, y el A y el β equivalentes',

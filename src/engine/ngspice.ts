@@ -9,8 +9,11 @@ export interface NgspiceAssets {
   codemodels: Record<string, Uint8Array>;
 }
 
-/** Vectores que marcan el plot de resultados de un .stb: T (Tian) o R (GFT) */
-export const STB_MAIN = ['t', 'r'];
+/**
+ * Vectores que marcan el plot de resultados de un .stb: T (Tian) o R (GFT); con la sonda
+ * diferencial, uno por modo (r_dm, r_cm, #333)
+ */
+export const isStbMain = (name: string) => /^[tr](_[dc]m)?$/.test(name);
 
 export interface SimVector {
   name: string;
@@ -326,7 +329,7 @@ export class Ngspice {
         .map((n) => this.readVector(`${plot}.${n}`, n))
         .filter((v): v is SimVector => v !== null);
       // el plot de resultados de un .stb (setplot new lo llama "unknownN"): "stbN"
-      const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => STB_MAIN.includes(v.name));
+      const stb = /^unknown\d+$/i.test(plot) && vectors.some((v) => isStbMain(v.name));
       // sus vectores se muestran en mayúsculas, como la notación de los modelos (R, T, G, GINF…)
       if (stb) for (const v of vectors) if (v.name !== 'frequency') v.label = v.name.toUpperCase();
       plots.push({ name: stb ? `stb${plots.filter((p) => /^stb\d+$/.test(p.name)).length + 1}` : plot, vectors });

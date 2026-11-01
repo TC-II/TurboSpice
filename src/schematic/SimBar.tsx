@@ -7,7 +7,7 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { HoverPop, ProbePlacement, SimHelp } from './SimHelp.tsx';
-import { ANALYSES, formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type StbMode, type Sweep } from '../sim/analyses.ts';
+import { ANALYSES, formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type Sweep } from '../sim/analyses.ts';
 import type { Library } from '../library/library.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
@@ -78,7 +78,7 @@ const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefine
       : undefined;
 
 /** Campos de la barra por línea */
-function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
+function barRows(a: Analysis): BarField[][] {
   const text = (label: string, value: string, set: (v: string) => Analysis, o: Partial<Extract<BarField, { kind: 'text' }>> = {}): BarField => ({ kind: 'text', label, value, set, ...o });
   switch (a.kind) {
     case 'tran':
@@ -159,18 +159,13 @@ function barRows(a: Analysis, info: CircuitInfo): BarField[][] {
     case 'sp':
       return [...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })), [{ kind: 'check', label: t('Noise'), value: a.noise, set: (noise) => ({ ...a, noise }) }]];
     case 'stb':
-      // en columnas (ver COLUMNS): sonda y método; el modo (sonda diferencial); entrada y salida
-      // (sólo GFT); F start y F stop; barrido y puntos
+      // en columnas (ver COLUMNS): sonda y método; entrada y salida (sólo GFT); F start y F stop;
+      // barrido y puntos. La sonda diferencial mide los dos modos a la vez: no hay que elegir (#333)
       return [
         [
-          // la sonda diferencial lleva modo DM/CM; la simple, ninguno (como en el diálogo)
-          text(t('Loop probe'), a.probe, (probe) => {
-            const d = info.probes?.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
-            return { ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' };
-          }, { list: 'probes', required: true, width: 6, explain: 'probe' }),
+          text(t('Loop probe'), a.probe, (probe) => ({ ...a, probe }), { list: 'probes', required: true, width: 6, explain: 'probe' }),
           { kind: 'select', label: t('Method'), value: a.method, options: [['gft', 'GFT'], ['tian', 'Tian']], set: (method) => ({ ...a, method: method as StbMethod }) },
         ],
-        ...(a.mode ? [[{ kind: 'select', label: t('Mode'), value: a.mode, options: [['dm', 'DM'], ['cm', 'CM']], set: (mode: string) => ({ ...a, mode: mode as StbMode }) } as BarField]] : []),
         ...(a.method === 'gft'
           ? [
               [
@@ -257,7 +252,7 @@ export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCance
   // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
     picker(f.list === 'nets' ? 'net' : f.list === 'probes' ? 'probe' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));
-  const rows = sim && draft && control === undefined ? barRows(draft, info) : [];
+  const rows = sim && draft && control === undefined ? barRows(draft) : [];
   // en columnas, una caja sin ⌖ deja su lugar si otra de la columna lo tiene: así las cajas
   // quedan alineadas entre sí (Method bajo Loop probe), no con el ⌖
   const padPick = (r: BarField[]) => !!draft && COLUMNS.has(draft.kind) && r.some((x) => x.kind === 'text' && x.list);

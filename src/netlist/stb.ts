@@ -21,6 +21,9 @@
 // Los resultados quedan en un plot propio ("stbN" al leerlo, ver engine/ngspice.ts) con la
 // frecuencia como escala; los plots de las corridas se borran. Lo marca T (Tian) o R (GFT), y los
 // márgenes se calculan sobre R o Aβ = −T (waveform/StbView.tsx).
+// Con la sonda diferencial (LoopProbe_Dif) se miden los dos modos en la misma simulación (#333):
+// las corridas de inyección de cada sonda interna (xdm, xcm) y una sola con la entrada; en el plot,
+// lo que depende del modo lleva _dm o _cm (R_DM, T_CM, GINF_DM…) y G queda sin sufijo.
 import type { Analysis } from '../sim/analyses.ts';
 import { t } from '../i18n/i18n.ts';
 
@@ -39,81 +42,103 @@ export interface StbContext {
   input?: string;
   /** vector de ngspice de la salida ("v(out)") */
   output?: string;
+  /** la sonda es la diferencial (LoopProbe_Dif): se miden DM y CM */
+  diff?: boolean;
 }
+
+/** '' con la sonda simple; con la diferencial, cada modo */
+type StbProbeMode = '' | 'dm' | 'cm';
 
 /** Líneas del .control para un .stb (el número `n` hace únicos los nombres) o un error */
 export function stbControl(a: StbAnalysis, ctx: StbContext, n: number): string[] | string {
   if (!ctx.probe) return t('.stb: loop probe "{probe}" not found', { probe: a.probe });
-  // dentro de la sonda diferencial, la del modo elegido
-  const p = a.mode ? `${ctx.probe}.x${a.mode}` : ctx.probe;
+  // la sonda diferencial lleva adentro una sonda por modo: se miden siempre los dos (#333)
+  const modes: StbProbeMode[] = ctx.diff ? ['dm', 'cm'] : [''];
   const sweep = `ac ${a.sweep.type} ${a.sweep.points} ${a.sweep.start} ${a.sweep.stop}`;
   const gft = a.method === 'gft';
   const h = !!ctx.input && !!ctx.output;
   if (a.input && !ctx.input) return t('.stb: input source "{src}" not found', { src: a.input });
-  const v = (k: number) => `ts_stb${n}_${k}`;
+  const v = (k: string) => `ts_stb${n}_${k}`;
   const out: string[] = [`* .stb ${a.probe}`, ...ctx.sources.map((s) => `alter ${s} acmag=0`)];
-  const run = (k: number, on: string[], off: string[]) => {
+  const runs: string[] = [];
+  const run = (k: string, on: string[], off: string[]) => {
     out.push(...on, sweep, `set ${v(k)} = $curplot`, ...off);
+    runs.push(v(k));
   };
-  run(1, [`alter @v.${p}.vinj[acmag]=1`], [`alter @v.${p}.vinj[acmag]=0`]);
-  if (h) run(2, [`alter ${ctx.input} acmag=1`], [`alter ${ctx.input} acmag=0`]);
-  run(3, [`alter @i.${p}.iinj[acmag]=1`], [`alter @i.${p}.iinj[acmag]=0`]);
-  const q = (k: number, what: string) => `{$${v(k)}}.${what}`;
-  const x = `ts_${n}_`;
-  out.push(
-    `let ${x}vy1 = -${q(1, `v(${p}.x)`)}`,
-    `let ${x}iy1 = ${q(1, `i(v.${p}.vprb)`)}`,
-    `let ${x}vy3 = -${q(3, `v(${p}.x)`)}`,
-    `let ${x}iy3 = ${q(3, `i(v.${p}.vprb)`)}`,
-    `let ${x}d = ${x}vy1*${x}iy3-${x}vy3*${x}iy1`,
-  );
-  if (gft) out.push(`let ${x}dz = ${nz(`${x}d`)}`, `let ${x}g = 1/${x}dz-1`, `let ${x}lg = 1/${nz(`${x}g`)}`);
-  else out.push(`let ${x}den = ${x}vy1+${x}iy3-2*${x}d`, `let ${x}lg = 1/${nz(`${x}den`)}-1`);
-  if (h) {
-    out.push(`let ${x}vo2 = ${q(2, ctx.output!)}`, `let ${x}h = ${nz(`${x}vo2`)}`);
-    if (gft) {
-      out.push(
-        `let ${x}vy2 = -${q(2, `v(${p}.x)`)}`,
-        `let ${x}iy2 = ${q(2, `i(v.${p}.vprb)`)}`,
-        `let ${x}vo1 = ${q(1, ctx.output!)}`,
-        `let ${x}vo3 = ${q(3, ctx.output!)}`,
-        `let ${x}num = ${x}vo2*${x}d+${x}vo1*(${x}vy3*${x}iy2-${x}vy2*${x}iy3)+${x}vo3*(${x}vy2*${x}iy1-${x}vy1*${x}iy2)`,
-        // num = 0 exacto: la salida es el nodo de la sonda (G∞ = 0)
-        `let ${x}num = ${nz(`${x}num`)}`,
-      );
-    }
+  // corridas: inyección de tensión (1) y de corriente (3) en cada modo; la de la entrada (2), una
+  // sola para todos (las sondas quedan transparentes)
+  for (const m of modes) {
+    const p = m ? `${ctx.probe}.x${m}` : ctx.probe;
+    run(`${m}1`, [`alter @v.${p}.vinj[acmag]=1`], [`alter @v.${p}.vinj[acmag]=0`]);
+    run(`${m}3`, [`alter @i.${p}.iinj[acmag]=1`], [`alter @i.${p}.iinj[acmag]=0`]);
   }
-  // el plot de resultados
-  const cur = `{$${v(3)}}.${x}`;
-  out.push('setplot new', `let frequency = real(${q(1, 'frequency')})`, 'settype frequency frequency', 'setscale frequency');
-  if (!gft) {
-    // modelo A-β: T = −Aβ
-    out.push(`let ab = ${cur}lg`, 'let t = -ab');
-    if (h) out.push(`let g = ${cur}vo2`, 'let a = g*(1-t)', 'let ts_a = a', `let beta = -t/${nz('ts_a')}`, 'unlet ts_a');
-  } else {
-    // modelo asintótico
-    out.push(`let r = ${cur}lg`);
+  if (h) run('2', [`alter ${ctx.input} acmag=1`], [`alter ${ctx.input} acmag=0`]);
+  // los let quedan en el plot de la última corrida
+  const cur = `{$${runs[runs.length - 1]}}.`;
+  for (const m of modes) {
+    const p = m ? `${ctx.probe}.x${m}` : ctx.probe;
+    const q = (k: string, what: string) => `{$${v(k)}}.${what}`;
+    const x = `ts_${n}${m}_`;
+    out.push(
+      `let ${x}vy1 = -${q(`${m}1`, `v(${p}.x)`)}`,
+      `let ${x}iy1 = ${q(`${m}1`, `i(v.${p}.vprb)`)}`,
+      `let ${x}vy3 = -${q(`${m}3`, `v(${p}.x)`)}`,
+      `let ${x}iy3 = ${q(`${m}3`, `i(v.${p}.vprb)`)}`,
+      `let ${x}d = ${x}vy1*${x}iy3-${x}vy3*${x}iy1`,
+    );
+    if (gft) out.push(`let ${x}dz = ${nz(`${x}d`)}`, `let ${x}g = 1/${x}dz-1`, `let ${x}lg = 1/${nz(`${x}g`)}`);
+    else out.push(`let ${x}den = ${x}vy1+${x}iy3-2*${x}d`, `let ${x}lg = 1/${nz(`${x}den`)}-1`);
     if (h) {
-      out.push(
-        `let g = ${cur}vo2`,
-        `let ginf = ${cur}num/${cur}dz`,
-        'let ts_d0 = 1-' + `${cur}d`,
-        `let g0 = (g-ginf*${cur}d)/${nz('ts_d0')}`,
-        // sin camino directo G/num = 1 exacto: Rn infinita
-        `let ts_rn = ${cur}h/${cur}num-1`,
-        `let rn = 1/${nz('ts_rn')}`,
-        `let ts_rp = ginf/${cur}h-1`,
-        `let rp = 1/${nz('ts_rp')}`,
-        // A-β equivalente (el camino directo queda dentro de A)
-        `let beta = 1/${nz('ginf')}`,
-        'let ts_gg = ginf-g0',
-        `let a = ginf*(ginf*r+g0)/${nz('ts_gg')}`,
-        'let ab = a*beta',
-        'let t = -ab',
-        'unlet ts_d0 ts_rn ts_rp ts_gg',
-      );
+      out.push(`let ${x}vo2 = ${q('2', ctx.output!)}`, `let ${x}h = ${nz(`${x}vo2`)}`);
+      if (gft) {
+        out.push(
+          `let ${x}vy2 = -${q('2', `v(${p}.x)`)}`,
+          `let ${x}iy2 = ${q('2', `i(v.${p}.vprb)`)}`,
+          `let ${x}vo1 = ${q(`${m}1`, ctx.output!)}`,
+          `let ${x}vo3 = ${q(`${m}3`, ctx.output!)}`,
+          `let ${x}num = ${x}vo2*${x}d+${x}vo1*(${x}vy3*${x}iy2-${x}vy2*${x}iy3)+${x}vo3*(${x}vy2*${x}iy1-${x}vy1*${x}iy2)`,
+          // num = 0 exacto: la salida es el nodo de la sonda (G∞ = 0)
+          `let ${x}num = ${nz(`${x}num`)}`,
+        );
+      }
     }
   }
-  out.push(`destroy $${v(1)}${h ? ` $${v(2)}` : ''} $${v(3)}`);
+  // el plot de resultados; con la sonda diferencial, lo que depende del modo lleva _dm o _cm
+  out.push('setplot new', `let frequency = real({$${runs[0]}}.frequency)`, 'settype frequency frequency', 'setscale frequency');
+  // la transferencia de lazo cerrado es la misma para los dos modos
+  if (h) out.push(`let g = ${cur}ts_${n}${modes[0]}_vo2`);
+  for (const m of modes) {
+    const x = `${cur}ts_${n}${m}_`;
+    const s = m ? `_${m}` : '';
+    if (!gft) {
+      // modelo A-β: T = −Aβ
+      out.push(`let ab${s} = ${x}lg`, `let t${s} = -ab${s}`);
+      if (h) out.push(`let a${s} = g*(1-t${s})`, `let ts_a = a${s}`, `let beta${s} = -t${s}/${nz('ts_a')}`, 'unlet ts_a');
+    } else {
+      // modelo asintótico
+      out.push(`let r${s} = ${x}lg`);
+      if (h) {
+        out.push(
+          `let ginf${s} = ${x}num/${x}dz`,
+          'let ts_d0 = 1-' + `${x}d`,
+          `let g0${s} = (g-ginf${s}*${x}d)/${nz('ts_d0')}`,
+          // sin camino directo G/num = 1 exacto: Rn infinita
+          `let ts_rn = ${x}h/${x}num-1`,
+          `let rn${s} = 1/${nz('ts_rn')}`,
+          `let ts_rp = ginf${s}/${x}h-1`,
+          `let rp${s} = 1/${nz('ts_rp')}`,
+          // A-β equivalente (el camino directo queda dentro de A)
+          `let ts_gi = ginf${s}`,
+          `let beta${s} = 1/${nz('ts_gi')}`,
+          `let ts_gg = ginf${s}-g0${s}`,
+          `let a${s} = ginf${s}*(ginf${s}*r${s}+g0${s})/${nz('ts_gg')}`,
+          `let ab${s} = a${s}*beta${s}`,
+          `let t${s} = -ab${s}`,
+          'unlet ts_d0 ts_rn ts_rp ts_gi ts_gg',
+        );
+      }
+    }
+  }
+  out.push(`destroy ${runs.map((r) => `$${r}`).join(' ')}`);
   return out;
 }

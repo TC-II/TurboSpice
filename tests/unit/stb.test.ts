@@ -42,9 +42,11 @@ export const INVERTING = (analysis: string) =>
 
 describe('.stb', () => {
   it('se lee y se escribe', () => {
-    for (const l of ['.stb LP1 dec 100 1 100meg', '.stb LP1 dm dec 10 1 1g gft', '.stb LP1 dec 10 1 1g gft Vin V(out)']) expect(formatAnalysis(parseAnalysis(l)!)).toBe(l);
-    expect(parseAnalysis('.stb LP1 dec 10 1 1g')).toMatchObject({ method: 'tian', mode: '', probe: 'LP1' });
-    expect(parseAnalysis('.stb LP1 cm dec 10 1 1g gft Vin V(out)')).toMatchObject({ method: 'gft', mode: 'cm', input: 'Vin', output: 'out' });
+    for (const l of ['.stb LP1 dec 100 1 100meg', '.stb LP1 dec 10 1 1g gft', '.stb LP1 dec 10 1 1g gft Vin V(out)']) expect(formatAnalysis(parseAnalysis(l)!)).toBe(l);
+    expect(parseAnalysis('.stb LP1 dec 10 1 1g')).toMatchObject({ method: 'tian', probe: 'LP1' });
+    // el modo de antes de #333 (la sonda diferencial mide los dos): se acepta y no se escribe
+    expect(parseAnalysis('.stb LP1 cm dec 10 1 1g gft Vin V(out)')).toMatchObject({ method: 'gft', probe: 'LP1', input: 'Vin', output: 'out' });
+    expect(formatAnalysis(parseAnalysis('.stb LP1 dm dec 10 1 1g gft')!)).toBe('.stb LP1 dec 10 1 1g gft');
   });
 
   it('se traduce a un .control con las corridas de inyección', () => {
@@ -73,8 +75,9 @@ describe('.stb', () => {
     expect(ng.text).not.toMatch(/let ginf = /);
   });
 
-  it('sonda diferencial: inyecta en el modo elegido', () => {
-    const asc = ascOf(
+  // (#333) los dos modos en la misma simulación, con sus vectores _dm y _cm
+  const DIFF = (analysis: string) =>
+    ascOf(
       [
         { sym: 'voltage', name: 'V1', value: 'AC 1', nets: ['a', '0'] },
         { sym: 'res', name: 'R1', value: '1k', nets: ['a', 'p'] },
@@ -83,12 +86,30 @@ describe('.stb', () => {
         { sym: 'res', name: 'R3', value: '1k', nets: ['q', '0'] },
         { sym: 'res', name: 'R4', value: '1k', nets: ['m', '0'] },
       ],
-      [';.stb LP2 cm dec 10 1 1meg'],
+      [analysis],
     );
-    const ng = toNgspice(ltNetlist(parseAsc(asc), lib), 'stb', { resolve: (p) => lib.resolveModelFile(p) });
+
+  it('sonda diferencial: inyecta en los dos modos (también si la línea vieja elegía uno)', () => {
+    for (const line of [';.stb LP2 dec 10 1 1meg', ';.stb LP2 cm dec 10 1 1meg']) {
+      const ng = toNgspice(ltNetlist(parseAsc(DIFF(line)), lib), 'stb', { resolve: (p) => lib.resolveModelFile(p) });
+      expect(ng.warnings).toEqual([]);
+      for (const m of ['dm', 'cm']) {
+        expect(ng.text).toMatch(new RegExp(`alter @v\\.x_lp2\\.x${m}\\.vinj\\[acmag\\]=1`));
+        expect(ng.text).toMatch(new RegExp(`alter @i\\.x_lp2\\.x${m}\\.iinj\\[acmag\\]=1`));
+        expect(ng.text).toMatch(new RegExp(`let t_${m} = -ab_${m}`));
+      }
+      expect(ng.text).not.toMatch(/let t = /);
+    }
+  });
+
+  it('sonda diferencial con GFT y lazo cerrado: una sola corrida de la entrada, G común y el resto por modo', () => {
+    const ng = toNgspice(ltNetlist(parseAsc(DIFF(';.stb LP2 dec 10 1 1meg gft V1 V(q)')), lib), 'stb', { resolve: (p) => lib.resolveModelFile(p) });
     expect(ng.warnings).toEqual([]);
-    expect(ng.text).toMatch(/alter @v\.x_lp2\.xcm\.vinj\[acmag\]=1/);
-    expect(ng.text).not.toMatch(/xdm\.vinj/);
+    expect(ng.text.match(/alter v1 acmag=1/g)).toHaveLength(1);
+    expect(ng.text).toMatch(/let g = /);
+    for (const m of ['dm', 'cm']) for (const v of ['r', 'ginf', 'g0', 'rn', 'rp', 'beta', 'a', 'ab', 't']) expect(ng.text).toMatch(new RegExp(`let ${v}_${m} = `));
+    // las cinco corridas se borran
+    expect(ng.text).toMatch(/destroy \$ts_stb1_dm1 \$ts_stb1_dm3 \$ts_stb1_cm1 \$ts_stb1_cm3 \$ts_stb1_2/);
   });
 
   it('avisa si falta la sonda y no lo combina con .step', () => {

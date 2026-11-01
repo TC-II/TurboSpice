@@ -27,7 +27,8 @@ En la librería **Stability**:
   `.ac`, `.noise` ni ningún otro análisis.
 - `LoopProbe_Dif`: en serie en un par diferencial. Tiene dos baluns ideales espalda con espalda,
   armados con pares E + F (conservan la potencia: no aíslan ni cargan), con una `LoopProbe` en el
-  modo diferencial (`xdm`) y otra en el común (`xcm`). El análisis elige el modo.
+  modo diferencial (`xdm`) y otra en el común (`xcm`). El `.stb` mide siempre los dos modos en la
+  misma simulación (#333).
 - `Balun`: el balun ideal que usa la `LoopProbe_Dif`, también como componente suelto. Separa (p, n)
   en el modo diferencial d = V(p) − V(n) y el común c = (V(p) + V(n))/2, con las corrientes duales
   I(d) = (I(p) − I(n))/2 e I(c) = I(p) + I(n). Pasa continua. El proyecto de ejemplo «Loop stability»
@@ -38,11 +39,12 @@ Subcircuitos: `library/sub/Stability/LoopProbe.lib`.
 ## Sintaxis
 
 ```
-.stb <sonda> [dm|cm] <dec|oct|lin> <puntos> <f inicio> <f fin> [tian|gft [<fuente> V(<salida>)]]
+.stb <sonda> <dec|oct|lin> <puntos> <f inicio> <f fin> [tian|gft [<fuente> V(<salida>)]]
 ```
 
 Se guarda como comentario (`;.stb …`), igual que los otros análisis que sólo tiene ngspice:
-LTspice lo ignora y la sonda queda transparente.
+LTspice lo ignora y la sonda queda transparente. Las líneas viejas con `dm` o `cm` después de la
+sonda (antes se elegía un modo) se siguen leyendo: el modo se ignora y no se vuelve a escribir.
 
 ## Cómo se simula
 
@@ -64,6 +66,11 @@ LTspice lo ignora y la sonda queda transparente.
    - los márgenes y los polos se calculan sobre R (GFT) o Aβ = −T (Tian). Los vectores se muestran
      en mayúsculas (`R`, `T`, `G`, `GINF`…); en las expresiones da lo mismo `R` que `r`.
    Los plots de las corridas se borran.
+5. con la `LoopProbe_Dif` (#333), los pasos 2 y 3 se hacen para cada sonda interna (`xdm` y
+   `xcm`): cuatro corridas de inyección y, con entrada y salida, una sola con la entrada (en ella
+   las sondas son transparentes). Lo que depende del modo lleva el sufijo `_dm` o `_cm` (`R_DM`,
+   `R_CM`, `T_DM`, `GINF_CM`, `BETA_DM`…); `G` es la misma para los dos y va sin sufijo. Todos se
+   pueden graficar como traza.
 
 No se combina con un `.control` del usuario ni con `.step` (se avisa y no corre).
 
@@ -73,7 +80,9 @@ diferencial da el T del medio circuito.
 
 ## Resultados
 
-Al lado del Bode de `t` (Tian) o `r` (GFT) (`waveform/StbView.tsx`):
+Al lado del Bode de `t` (Tian) o `r` (GFT) (`waveform/StbView.tsx`). Con la sonda diferencial se
+abren dos panes, uno con la ganancia de lazo de DM y otro con la de CM; al costado va una línea
+de márgenes por modo y el mapa de polos del modo elegido (DM/CM):
 
 - márgenes (calculados sobre Aβ o R) de fase (en cada cruce de 0 dB) y de ganancia (en cada cruce de −180°);
 - un modelo racional de T por *vector fitting* (`sim/stbMath.ts`) en variables de estado,

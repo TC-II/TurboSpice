@@ -13,7 +13,7 @@ import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind, Point } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
-import { isStbPlot, StbView } from './waveform/StbView.tsx';
+import { isStbPlot, StbView, stbMainTraces } from './waveform/StbView.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
@@ -1395,15 +1395,16 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
       // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
       const remembered = shown && plotView[plotKind(shown.name)];
+      // .stb: la ganancia de lazo, R (GFT) o T (Tian); con la sonda diferencial, un pane por modo (#333)
+      const stbMain = isStbPlot(shown) ? stbMainTraces(shown) : [];
+      // vistas guardadas antes de que existieran T y R: la vieja "loopgain" pasa a la de ahora
+      const keptView = remembered && stbMain.length ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: stbMain[0] } : tr)) })) : remembered;
+      // (la vista que se usa tiene que traer alguna traza de este .stb: la de la sonda simple no sirve con la diferencial)
+      const fits = (pns: typeof panes) => pns.some((pn) => pn.traces.some((tr) => shown!.vectors.some((v) => v.name === tr.expr.trim().toLowerCase())));
       if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
-      // .stb: el Bode de la ganancia de lazo
-      else if (!remembered && isStbPlot(shown) && !panes.some((pn) => pn.traces.some((tr) => shown.vectors.some((v) => v.name === tr.expr.toLowerCase()))))
-        // GFT: R (modelo asintótico); Tian: T = −Aβ
-        setPanes([{ traces: [{ expr: shown.vectors.some((v) => v.name === 'r') ? 'R' : 'T' }] }]);
-      else if (remembered) {
-        // vistas guardadas antes de que existieran T y R: la vieja "loopgain" pasa a la de ahora
-        const main = isStbPlot(shown) ? (shown.vectors.some((v) => v.name === 'r') ? 'R' : 'T') : '';
-        setPanes(main ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: main } : tr)) })) : remembered);
+      else if (stbMain.length && !fits(keptView ?? panes)) setPanes(stbMain.map((expr) => ({ traces: [{ expr }] })));
+      else if (keptView) {
+        setPanes(keptView);
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
       } else if (built.controlPanes.length) setPanes(built.controlPanes);
       const errs = result.errors.length ? result.errors : [];

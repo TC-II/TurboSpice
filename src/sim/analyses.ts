@@ -30,12 +30,10 @@ export type Analysis =
   | { kind: 'pz'; inP: string; inN: string; outP: string; outN: string; type: 'vol' | 'cur'; which: 'pz' | 'pol' | 'zer' }
   | { kind: 'disto'; sweep: Sweep; f2overf1: string }
   | { kind: 'sp'; sweep: Sweep; noise: boolean }
-  | { kind: 'stb'; probe: string; mode: StbMode; sweep: Sweep; method: StbMethod; input: string; output: string };
+  | { kind: 'stb'; probe: string; sweep: Sweep; method: StbMethod; input: string; output: string };
 
 /** Método de la ganancia de lazo del .stb: Tian (el de Spectre) o el GFT de Middlebrook */
 export type StbMethod = 'tian' | 'gft';
-/** Con una sonda diferencial: modo diferencial o común ('' con la sonda simple) */
-export type StbMode = '' | 'dm' | 'cm';
 
 export type AnalysisKind = Analysis['kind'];
 
@@ -79,7 +77,7 @@ export function defaultAnalysis(kind: AnalysisKind): Analysis {
     case 'sp':
       return { kind, sweep: { ...SWEEP, points: '10', start: '1meg', stop: '1g' }, noise: false };
     case 'stb':
-      return { kind, probe: '', mode: '', sweep: { ...SWEEP, stop: '100meg' }, method: 'gft', input: '', output: '' };
+      return { kind, probe: '', sweep: { ...SWEEP, stop: '100meg' }, method: 'gft', input: '', output: '' };
   }
 }
 
@@ -124,7 +122,7 @@ export function formatAnalysis(a: Analysis): string {
       // la entrada y la salida (lazo cerrado) van detrás del método; Tian sin ellas no se escribe
       const io = a.input.trim() && a.output.trim() ? ` ${a.input.trim()} ${asVoltage(a.output.trim())}` : '';
       const method = a.method === 'gft' || io ? ` ${a.method}${io}` : '';
-      return `.stb ${a.probe}${a.mode ? ` ${a.mode}` : ''} ${sweepText(a.sweep)}${method}`;
+      return `.stb ${a.probe} ${sweepText(a.sweep)}${method}`;
     }
   }
 }
@@ -208,14 +206,14 @@ function parseIncomplete(tt: string[]): Analysis | null {
 }
 
 /**
- * ".stb LP1 [dm|cm] dec 100 1 100meg [tian|gft [Vin V(out)]]". Con `loose`, a la línea le pueden
- * faltar la sonda o valores del barrido.
+ * ".stb LP1 dec 100 1 100meg [tian|gft [Vin V(out)]]". Con `loose`, a la línea le pueden
+ * faltar la sonda o valores del barrido. Las líneas de antes de #333 elegían el modo de la sonda
+ * diferencial ("LP1 dm"): se aceptan y el modo se ignora (se miden los dos).
  */
 function parseStb(a: string[], loose = false): Analysis | null {
   const i = a.findIndex((x) => SWEEP_TYPE.test(x));
   if (i < 0) return loose ? { ...(defaultAnalysis('stb') as Extract<Analysis, { kind: 'stb' }>), probe: a[0] ?? '' } : null;
   const head = a.slice(0, i);
-  const mode = (head.find((x) => /^(dm|cm)$/i.test(x))?.toLowerCase() ?? '') as StbMode;
   const probe = head.find((x) => !/^(dm|cm)$/i.test(x)) ?? '';
   const sweep = loose ? looseSweep(a)! : parseSweep(a.slice(i));
   if (!sweep || (!loose && (!probe || head.length > 2))) return null;
@@ -223,7 +221,7 @@ function parseStb(a: string[], loose = false): Analysis | null {
   const gft = /^gft$/i.test(rest[0] ?? '');
   if (rest.length && !gft && !/^tian$/i.test(rest[0])) return null;
   const [input = '', output = ''] = rest.slice(1);
-  return { kind: 'stb', probe, mode, sweep, method: gft ? 'gft' : 'tian', input, output: unwrapV(output)[0] };
+  return { kind: 'stb', probe, sweep, method: gft ? 'gft' : 'tian', input, output: unwrapV(output)[0] };
 }
 
 function parseComplete(tt: string[]): Analysis | null {

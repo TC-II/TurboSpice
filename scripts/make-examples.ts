@@ -305,6 +305,8 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     texts: [...d.texts, { x: -64, y, align: 'Left', size: 2, kind: 'comment', text: lines.join('\\n') }],
   });
   const STB = { panes: [{ traces: [{ expr: 'T', color: '#1c7ed6' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
+  // con la LoopProbe_Dif, un pane por modo (#333)
+  const DSTB = { panes: [{ traces: [{ expr: 'T_DM', color: '#1c7ed6' }] }, { traces: [{ expr: 'T_CM', color: '#e8590c' }] }], active: 0, plot: 'stb1', mode: 'bode' } as SimView;
   const se = parseAsc(readFileSync('examples/stability/single.asc', 'utf8'));
   const df = parseAsc(readFileSync('examples/stability/diff.asc', 'utf8'));
   const bench = (g: number, name: string, doc: AscDoc, view?: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[g].id });
@@ -324,7 +326,7 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     'Two-stage fully differential amplifier: the pair Q1/Q2 with RC1/RC2, then the PNP common emitters Q5/Q6 with Miller compensation (Cc1, Cc2).',
     'Q1 drives Q5 and Q2 drives Q6, so each output is in phase with its own side: the feedback crosses (outn to Q1, outp to Q2, by net labels) through R2/R1 (gain -10).',
     'Q7/Q8 are the output current sinks; the CMFB (Rcp, Rcn, Q9 to Q11) sets their base vb so that the outputs sit at Vcm.',
-    'LP1 (Stability > LoopProbe_Dif) is in series in the differential output; the .stb picks the mode (dm or cm). DM: about 58° of margin.',
+    'LP1 (Stability > LoopProbe_Dif) is in series in the differential output; the .stb measures both modes in one run: T_DM (about 58° of margin) and T_CM.',
   ];
   // cómo funcionan las sondas: la LoopProbe_Dif armada a mano (dos Balun y dos LoopProbe) en lugar de LP1
   const bal = parseAsc(readFileSync('examples/stability/balun.asc', 'utf8'));
@@ -385,7 +387,7 @@ SYMATTR InstName B2
     'Double-click B1 to see its circuit (BalunCircuit: the Stability > Balun drawn as a subcircuit of this project). An ideal balun with controlled sources. Ec, Ep and En build V(p) = V(c) + V(d)/2 and V(n) = V(c) - V(d)/2; Vsp and Vsn measure I(p) and I(n)',
     'and the F sources put them back on the mode side as I(d) = (I(p) - I(n))/2 and I(c) = I(p) + I(n). Then V(p)·I(p) + V(n)·I(n) = V(d)·I(d) + V(c)·I(c):',
     'it conserves power, so it neither isolates nor loads, and unlike a transformer it passes DC. Here Vp and Vn are 120° apart: d is their difference and c their mean (1 V with a 0.25 V ripple).',
-    'A LoopProbe_Dif is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in one of them, so it cuts only one mode.',
+    'A LoopProbe_Dif is two baluns back to back (a direct connection) with a LoopProbe on d and another on c: the .stb injects in each of them in turn, so each measurement cuts only one mode.',
   ];
   const sims: Sim[] = [
     bench(0, 'Loop gain (Tian)', setAnalysisLine(note(se, SE_NOTE), '.stb LP1 dec 50 10 100meg'), STB),
@@ -402,18 +404,24 @@ SYMATTR InstName B2
       plot: 'tran1',
     }),
     bench(0, 'Closed-loop Bode', setAnalysisLine(se, '.ac dec 50 10 100meg'), { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'ac1', mode: 'bode' }),
-    bench(1, 'Differential-mode loop gain', setAnalysisLine(dnote(df, DF_NOTE), '.stb LP1 dm dec 50 10 100meg'), STB),
     bench(
       1,
-      'DM without enough Miller (Cc = 22p)',
-      setAnalysisLine(dnote(lowCc, ['With Cc1 = Cc2 = 22p the Miller capacitors no longer split the poles of the two stages: T crosses 0 dB near 2 MHz with about 15° of margin.']), '.stb LP1 dm dec 50 10 100meg'),
-      STB,
+      'Loop gain: DM and CM',
+      setAnalysisLine(
+        dnote(df, [
+          ...DF_NOTE,
+          'In CM the probe breaks every loop that goes through the outputs: the CMFB and the R2 feedback, which in CM is positive',
+          '(the outputs pull the bases up, the collectors go down and Q5/Q6 push the outputs further up). T_CM is their sum: about 110° of margin.',
+        ]),
+        '.stb LP1 dec 50 10 100meg',
+      ),
+      DSTB,
     ),
     bench(
       1,
-      'Common-mode loop gain',
-      setAnalysisLine(dnote(df, ['In CM the probe breaks every loop that goes through the outputs: the CMFB and the R2 feedback, which in CM is positive', '(the outputs pull the bases up, the collectors go down and Q5/Q6 push the outputs further up). T is their sum: about 110° of margin.']), '.stb LP1 cm dec 50 10 100meg'),
-      STB,
+      'DM without enough Miller (Cc = 22p)',
+      setAnalysisLine(dnote(lowCc, ['With Cc1 = Cc2 = 22p the Miller capacitors no longer split the poles of the two stages: T_DM crosses 0 dB near 2 MHz with about 15° of margin.']), '.stb LP1 dec 50 10 100meg'),
+      DSTB,
     ),
     bench(
       1,

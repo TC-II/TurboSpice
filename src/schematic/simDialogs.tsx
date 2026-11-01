@@ -125,7 +125,7 @@ export interface CircuitInfo {
   nets: string[];
   /** fuentes independientes V/I (InstName) */
   sources: string[];
-  /** sondas de lazo del .stb (diff: la diferencial, con modo DM/CM) */
+  /** sondas de lazo del .stb (diff: la diferencial, que mide DM y CM) */
   probes?: { name: string; diff: boolean }[];
 }
 
@@ -251,7 +251,7 @@ export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Ana
       );
     case 'stb': {
       const probes = info?.probes ?? [];
-      const diff = probes.find((p) => p.name.toLowerCase() === a.probe.toLowerCase())?.diff ?? !!a.mode;
+      const diff = probes.find((p) => p.name.toLowerCase() === a.probe.toLowerCase())?.diff;
       return (
         <>
           <Field
@@ -260,23 +260,9 @@ export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Ana
             list="sim-probes"
             required
             pick={picker && { what: 'probe', picker }}
-            hint={probes.length ? undefined : t('Place a LoopProbe or LoopProbe_Dif (Stability library) in series in the loop')}
-            onChange={(probe) => {
-              const d = probes.find((p) => p.name.toLowerCase() === probe.toLowerCase())?.diff;
-              set({ ...a, probe, mode: d === undefined ? a.mode : d ? a.mode || 'dm' : '' });
-            }}
+            hint={probes.length ? (diff ? t('Differential probe: the differential (DM) and the common-mode (CM) loops are measured in the same run') : undefined) : t('Place a LoopProbe or LoopProbe_Dif (Stability library) in series in the loop')}
+            onChange={(probe) => set({ ...a, probe })}
           />
-          {diff && (
-            <Select
-              label={t('Mode')}
-              value={a.mode || 'dm'}
-              options={[
-                ['dm', t('Differential (DM)')],
-                ['cm', t('Common mode (CM)')],
-              ]}
-              onChange={(mode) => set({ ...a, mode })}
-            />
-          )}
           <div className="stbm-row">
             <Select
               label={t('Method')}

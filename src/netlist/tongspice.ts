@@ -992,7 +992,10 @@ function stbBlock(lines: string[], lt: LtNetlist, names: Map<string, string>, o:
     const a = parseAnalysis(line);
     if (a?.kind !== 'stb') return warnings.push(t('{line}: invalid .stb', { line }));
     const output = a.output.trim() ? `v(${ngNodeName(a.output.trim()).toLowerCase()})` : undefined;
-    const r = stbControl(a, { probe: ng(a.probe), sources, input: a.input.trim() ? ng(a.input.trim()) : undefined, output }, i + 1);
+    const probe = ng(a.probe);
+    // la sonda diferencial, por su subcircuito (DiffLoopProbe: su nombre viejo)
+    const diff = !!probe && lt.elements.some((e) => names.get(e.name)?.toLowerCase() === probe && /^(LoopProbe_Dif|DiffLoopProbe)\b/i.test(e.value.trim()));
+    const r = stbControl(a, { probe, diff, sources, input: a.input.trim() ? ng(a.input.trim()) : undefined, output }, i + 1);
     if (typeof r === 'string') warnings.push(r);
     else body.push(...r);
   });

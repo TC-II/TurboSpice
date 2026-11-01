@@ -6,7 +6,6 @@ const ids = [...maps.base.keys()];
 const tally = (m) => { const o = {}; for (const s of m.values()) o[s] = (o[s] || 0) + 1; return o; };
 console.log("esquematicos comparados:", ids.length);
 for (const v of vars) console.log(String(v).padEnd(8), JSON.stringify(tally(maps[v])));
-const score = (s) => (s === "igual" ? 3 : s === "parecido" || s === "parecido-forma" ? 2 : s === "distinto" ? 1 : 0);
 const cnt = (s) => /igual|parecido/.test(s);
 console.log("\n-- simulan igual o parecido --");
 for (const v of vars) console.log(String(v).padEnd(8), ids.filter((i) => cnt(maps[v].get(i) ?? "")).length);

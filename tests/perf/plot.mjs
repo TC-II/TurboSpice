@@ -123,15 +123,17 @@ const cdp = await page.context().newCDPSession(page);
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
 console.log(`CPU ×${CPU} · ${URL}\n`);
 
-let t0 = Date.now();
-await profiled('sim', async () => {
-await page.locator('[aria-label="Correr"]:enabled').click();
-await page.locator('.results-panel').waitFor({ timeout: 120000 });
+// la caja de trazas del panel de resultados (afuera de profiled: se usa también después)
 const traceInput = page.locator('.results-panel input[type=text], .results-panel input:not([type])').first();
 const addTrace = async (expr) => {
   await traceInput.fill(expr);
   await traceInput.press('Enter');
 };
+
+let t0 = Date.now();
+await profiled('sim', async () => {
+await page.locator('[aria-label="Correr"]:enabled').click();
+await page.locator('.results-panel').waitFor({ timeout: 120000 });
 if (!TURBO) await addTrace('V(out)');
 await page.locator('.results-panel .pane-chart canvas').first().waitFor({ timeout: 120000 });
 await settle();

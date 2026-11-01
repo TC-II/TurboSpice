@@ -14,7 +14,7 @@ describe('símbolos agregados (#75)', () => {
     expect(bundle.skins[n], n).toBeDefined();
   });
 
-  it('se usan como en LTspice (con la ruta Misc\ que escribe LTspice)', () => {
+  it('se usan como en LTspice (con la ruta Misc\\ que escribe LTspice)', () => {
     const src = [
       'Version 4', 'SHEET 1 880 680',
       'SYMBOL Misc\\signal 0 0 R0', 'SYMATTR InstName V1',

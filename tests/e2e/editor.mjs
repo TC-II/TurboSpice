@@ -2,7 +2,7 @@
 // deshace/rehace, guarda el .asc y verifica el archivo.
 // Uso: node tests/e2e/editor.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, openExample, skipWelcome, launchBrowser } from './lib.mjs';
+import { menu, skipWelcome, launchBrowser } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';

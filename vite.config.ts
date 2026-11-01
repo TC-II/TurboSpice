@@ -27,5 +27,9 @@ export default defineConfig({
   // Yosys (#209) busca su wasm con new URL(…, import.meta.url): sin pre-empaquetar, Vite lo sirve tal cual
   optimizeDeps: { exclude: ['@yowasp/yosys'] },
   // los tests unitarios corren con la interfaz en español (sus mensajes esperados están en español)
-  test: { setupFiles: ['tests/setup-i18n.ts'] },
+  test: {
+    setupFiles: ['tests/setup-i18n.ts'],
+    // npm run coverage: cobertura de src/ (resumen en la consola, detalle en coverage/index.html)
+    coverage: { provider: 'v8', include: ['src/**/*.{ts,tsx}'], exclude: ['src/i18n/es.ts', 'src/schematic/roughPen.js'], reporter: ['text-summary', 'json-summary', 'html'] },
+  },
 });

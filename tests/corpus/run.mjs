@@ -25,8 +25,6 @@ const run = (cmd, a, opts) =>
 function summarizeRaw(p) {
   const r = readRaw(p);
   const n = r.np;
-  const step = Math.max(1, Math.floor(n / 4000));
-  const pick = (arr) => { const o = []; for (let i = 0; i < n; i += step) o.push(arr[i]); if ((n - 1) % step) o.push(arr[n - 1]); return o; };
   // por paso: sólo el primero completo (más el número de pasos)
   const end = r.steps.length > 1 ? r.steps[1] : n;
   const sub = (arr) => { const o = []; const s = Math.max(1, Math.floor(end / 4000)); for (let i = 0; i < end; i += s) o.push(arr[i]); if ((end - 1) % s) o.push(arr[end - 1]); return o; };

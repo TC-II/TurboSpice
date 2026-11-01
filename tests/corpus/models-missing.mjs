@@ -21,7 +21,7 @@ const cf = new Set(cmp.flatMap(([, v]) => [...v.files]));
 console.log('\nEN LTspice/cmp Y NO EN library/cmp:', cmp.length, 'modelos en', cf.size, 'archivos');
 console.log(cmp.map(([n, v]) => `${n}|${LT.get(n)}|${v.files.size}`).join('\n'));
 const inTs = rows.filter(([n]) => TS.has(n)); console.log('\nYA EN library/cmp pero no encontrados:', inTs.map(([n, v]) => n + ' ' + v.files.size).join(' · '));
-const junk = (n) => !/^[A-Z0-9][\w\-\/]*[A-Z0-9]$/.test(n) || /^[0-9A-F]{2}$/.test(n) || /^(N\d+|R|C|VCC|VDD|OR|AND|XOR|DFLOP|TCLIB|ANT|INT|VGA)$/.test(n);
+const junk = (n) => !/^[A-Z0-9][\w\-/]*[A-Z0-9]$/.test(n) || /^[0-9A-F]{2}$/.test(n) || /^(N\d+|R|C|VCC|VDD|OR|AND|XOR|DFLOP|TCLIB|ANT|INT|VGA)$/.test(n);
 const isFile = (n) => /\.(LIB|SUB|MOD|CIR|TXT|INC|FAM|BOYLE|\d+)$/.test(n);
 const ok = rows.filter(([n, v]) => v.ltOk.size && !junk(n));
 const okM = ok.filter(([n]) => !isFile(n)), okF = ok.filter(([n]) => isFile(n));

@@ -93,7 +93,7 @@ export function logLabeled(ticks: (number | null)[]): boolean[] {
 }
 
 /** Paso «lindo» (1, 2, 2,5 o 5 por una potencia de 10) mayor o igual que `raw` */
-export function niceStep(raw: number): number {
+export function niceStepAbove(raw: number): number {
   if (!(raw > 0) || !Number.isFinite(raw)) return 1;
   const p = 10 ** Math.floor(Math.log10(raw));
   for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= raw * (1 - 1e-12)) return m * p;
@@ -123,7 +123,7 @@ export interface Aligned {
  */
 export function alignScales(left: Range, right: Range, divs = [4, 5, 6, 7, 8]): Aligned {
   const fit = ([a, b]: Range, n: number) => {
-    let s = niceStep((b - a) / n);
+    let s = niceStepAbove((b - a) / n);
     for (let guard = 0; guard < 20; guard++) {
       const lo = Math.floor(clean(a / s)) * s;
       if (lo + n * s >= b - Math.abs(s) * 1e-9) {
@@ -135,7 +135,7 @@ export function alignScales(left: Range, right: Range, divs = [4, 5, 6, 7, 8]): 
         if (b <= 0) from = Math.min(from, -n * s);
         return { from, s, waste: (n * s - (b - a)) / (n * s) };
       }
-      s = niceStep(s * 1.000001);
+      s = niceStepAbove(s * 1.000001);
     }
     return { from: a, s: (b - a) / n, waste: 0 };
   };
@@ -161,7 +161,7 @@ export function alignScales(left: Range, right: Range, divs = [4, 5, 6, 7, 8]): 
 /** Marcas lindas dentro de [min, max], unas `n` divisiones */
 export function niceTicks(min: number, max: number, n: number): number[] {
   if (!(max > min)) return [min];
-  const s = niceStep((max - min) / Math.max(1, n));
+  const s = niceStepAbove((max - min) / Math.max(1, n));
   const from = Math.ceil(clean(min / s)) * s;
   return steps(from, s, Math.floor(clean((max - from) / s)));
 }

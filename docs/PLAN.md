@@ -25,17 +25,28 @@ fabricantes que lo permitan), registrados en `library/LICENSES.md`.
 
 ## Estructura
 
+Al día con el código (2026-11); el detalle de cada módulo, en `graphify-out/GRAPH_REPORT.md`.
+
 ```
-engine/          build.sh, spinit, smoke/ (tests contra ngspice nativo)
-library/         models/<origen>/, symbols/*.json, LICENSES.md, index.json (generado)
-scripts/         build-library.ts
-src/engine/      ngspice.ts (wrapper API), worker.ts, client.ts
-src/schematic/   modelo de datos, editor SVG, herramientas
-src/netlist/     conectividad (union-find) → netlist SPICE
-src/analyses/    diálogos y generación de cada análisis
-src/waveform/    visor (uPlot), cursores, expresiones
-src/io/          .tsch, importador .asc/.asy, share-URL
-src/library/     catálogo, buscador, modelos del usuario
+engine/          build.sh (ngspice + Icarus a WASM), spinit, osdi/, icarus/, smoke/ (contra ngspice nativo)
+library/         sym/ (.asy), skins/ (SVG), sub/ (modelos), cmp/ (listas de valores), LICENSES.md
+examples/        .asc y proyectos de ejemplo (adc/, filters/, pdk/, stability/, transistors/)
+scripts/         build-library.mjs (bundle de la librería), fetch-engine.mjs, i18n/, generadores
+src/App.tsx      la app: modos, proyecto, simulación, menús y atajos (ver auditoría, fase 3)
+src/asc/         modelo del documento, parser y serializador .asc/.asy, codificación
+src/schematic/   editor SVG, herramientas, diálogos, barra de simulación, Estudio, compartir
+src/netlist/     conectividad, netlist estilo LTspice, traducción a ngspice, números SPICE (spicenum.ts)
+src/sim/         análisis, lista de simulaciones, .meas, punto de operación, Estudio (bloques)
+src/engine/      cliente del worker de ngspice (worker.ts, client.ts, protocol.ts)
+src/waveform/    visor (uPlot), paneles, cursores, expresiones, DFT, polos y ceros, Smith
+src/project/     proyecto .turbo, testbenches, subcircuitos, editores de modelos y símbolos
+src/hdl/         Verilog: Yosys, Icarus y cosimulación
+src/library/     catálogo de símbolos y modelos, PDK, librería de LTspice del usuario
+src/cloud/       Google Drive y librería del usuario
+src/tutorial/    tutorial interactivo
+src/i18n/        t() y traducciones (es.ts)
+src/ui/          componentes comunes (menús, barra, divisores)
+tests/           unit/ (vitest), e2e/ (Playwright), corpus/, hdl/, pdk/, perf/, fixtures/
 ```
 
 ## Análisis soportados
@@ -72,9 +83,9 @@ src/library/     catálogo, buscador, modelos del usuario
 
 ## Librería de modelos
 
-- `scripts/build-library.ts` parsea `library/models/` → `index.json` (nombre, tipo, pines, origen, licencia).
+- `scripts/build-library.mjs` arma `public/library/bundle.json` con `library/sym`, `skins`, `sub` y `cmp` (símbolos, dibujos, qué `.subckt`/`.model` define cada archivo y las listas de valores).
 - En runtime: buscador sobre el catálogo; al simular se hace fetch de los archivos usados y se escriben en el FS.
-- Modelos del usuario (`.lib/.mod/.sub`, arrastrar o pegar) embebidos en el `.tsch`.
+- Modelos del usuario (`.lib/.mod/.sub`, arrastrar o pegar) guardados en el proyecto `.turbo` (ver `docs/turbo-formato.md`) o en *Mis símbolos y modelos*.
 - Asistente para mapear pines de un subckt a un símbolo.
 - Importador local de LTspice: `.asy` + modelos → IndexedDB; avisa encriptados / primitivas sólo-LTspice.
 

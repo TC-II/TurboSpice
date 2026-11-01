@@ -40,7 +40,7 @@ export function SmithChart({ plot, panes, resolver }: { plot: SimPlot; panes: Pa
           ))}
         </g>
         {traces.map(({ t: tt, i }) => {
-          let pts = '';
+          let pts: string;
           try {
             const w = evalTrace(tt.expr, { resolve: resolver(plot), scale: scale!.real, scaleName: scale!.name });
             pts = Array.from(w.re, (re, k) => p(re, w.im?.[k] ?? 0)).join(' ');

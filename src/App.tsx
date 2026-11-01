@@ -82,7 +82,6 @@ import { isNativeSwitch, isTcSwitch, SwitchDialog } from './schematic/SwitchDial
 import { setSwModel } from './schematic/switchModel.ts';
 import { ProjectCapsule } from './project/ProjectCapsule.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
-import { Tutorial } from './tutorial/Tutorial.tsx';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { SimBar } from './schematic/SimBar.tsx';
@@ -99,12 +98,11 @@ import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
-import { SymbolEditor } from './project/SymbolEditor.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
 import { addModelModule, adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, removeModelModule, renameModelModule, storeModelSymbol, storeModelText } from './project/modelModule.ts';
-import { ModelEditor } from './project/ModelEditor.tsx';
+import { ModelEditor, SymbolEditor, Tutorial } from './lazyViews.ts';
 import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, removeSubckt, renameSubckt, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages, validSubcktName } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
@@ -447,7 +445,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       setMeasureFont(c.css);
     };
     loadFont(c).then(apply, () => setMessage(t('Could not load the font «{name}»', { name: c.label })));
-  }, [schFont]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [schFont]);
   const setSchFont = (id: string) => (lsSet(SCH_FONT_KEY, id), setSchFontState(id));
   const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
@@ -2745,7 +2743,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     } catch {
       // sin permiso o sin API de imágenes: se sigue con el texto
     }
-    let text = '';
+    let text: string;
     try {
       text = await navigator.clipboard.readText();
     } catch {
@@ -3606,7 +3604,11 @@ ${ltNetlistText(sim.built.lt)}
 
   return (
     <div className="schematic-mode">
-      {tutorialOpen && <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />}
+      {tutorialOpen && (
+        <Suspense fallback={null}>
+          <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />
+        </Suspense>
+      )}
       {slots.tools && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
       {slots.right &&
         createPortal(
@@ -3867,6 +3869,7 @@ ${ltNetlistText(sim.built.lt)}
             }}
           />
           {curSub && symText && (
+            <Suspense fallback={null}>
             <SymbolEditor
               name={curSub}
               text={symText}
@@ -3880,8 +3883,10 @@ ${ltNetlistText(sim.built.lt)}
               onWidth={setSymW}
               onAddPort={addPort}
             />
+            </Suspense>
           )}
           {curModel && modelModuleFile(project, curModel) && (
+            <Suspense fallback={null}>
             <ModelEditor
               name={curModel}
               text={modelModuleFile(project, curModel)!.text}
@@ -3900,6 +3905,7 @@ ${ltNetlistText(sim.built.lt)}
               onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
               onClose={() => setCurModel('')}
             />
+            </Suspense>
           )}
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
           {curVerilog && (

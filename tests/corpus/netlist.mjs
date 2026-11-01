@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';

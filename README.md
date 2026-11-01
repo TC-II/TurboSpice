@@ -5,7 +5,7 @@ Simulador de circuitos tipo LTspice que corre **100% en el navegador**: el motor
 
 Editor de esquemáticos con `.asc` de LTspice como formato nativo (ida y vuelta), todos los análisis de
 ngspice, visor de resultados, Estudio (barridos, tolerancias, mediciones, bloques) y links para
-compartir. Ver [docs/PLAN.md](docs/PLAN.md), [docs/compatibilidad-ltspice.md](docs/compatibilidad-ltspice.md) y el manual de ngspice-47 en [docs/ngspice/](docs/ngspice/README.md).
+compartir. Ver [docs/PLAN.md](docs/PLAN.md), [CONTRIBUTING.md](CONTRIBUTING.md), [docs/compatibilidad-ltspice.md](docs/compatibilidad-ltspice.md) y el manual de ngspice-47 en [docs/ngspice/](docs/ngspice/README.md).
 
 ## Desarrollo
 
@@ -19,6 +19,9 @@ npm run dev              # http://localhost:5173/TurboSpice/
 npm run build            # sitio estático en dist/
 npm run preview & npm run e2e   # e2e en Chromium (CHROMIUM=/ruta si no está en /usr/bin/chromium)
 npm test                 # tests unitarios (vitest)
+npm run typecheck        # tipos de src/, tests y scripts
+npm run lint             # ESLint
+npm run coverage         # unitarios con cobertura (coverage/index.html)
 ```
 
 ## Idiomas
@@ -29,8 +32,11 @@ Los textos nuevos se escriben en inglés con `t()` y su traducción va en `src/i
 
 ## Deploy
 
-`.github/workflows/deploy.yml` compila el motor (cacheado), corre los tests y publica `dist/`
-en GitHub Pages en cada push a `main`. En el repo: *Settings → Pages → Source: GitHub Actions*.
+`.github/workflows/deploy.yml` compila el motor (cacheado) y corre los controles: tipos (también
+de los tests), ESLint, traducciones, smoke del motor, Verilog, tests unitarios con cobertura y los
+e2e en Chrome. En cada push a `main` o `dev` publica en GitHub Pages las dos ramas juntas: `main`
+en `/TurboSpice/` y `dev` en `/TurboSpice/dev/`. En un PR corre todo menos la publicación.
+En el repo: *Settings → Pages → Source: GitHub Actions*.
 
 ## Google Drive (opcional)
 

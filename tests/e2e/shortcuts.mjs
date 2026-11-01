@@ -94,9 +94,10 @@ check((await viewBox()) === fitted, 'Shift+Z vuelve a la vista anterior');
 
 // --- grilla y pines sueltos ---
 const grid = () => svg.locator('rect[fill="url(#grid)"]').count();
-check((await grid()) === 1, 'grilla visible');
+// la grilla arranca oculta; Ctrl+G la muestra y la vuelve a ocultar
+check((await grid()) === 0, 'grilla oculta al empezar');
 await page.keyboard.press('Control+g');
-check((await grid()) === 0, 'Ctrl+G oculta la grilla');
+check((await grid()) === 1, 'Ctrl+G muestra la grilla');
 await page.keyboard.press('Control+g');
 await page.keyboard.press('r');
 const free = await at(320, 0);
@@ -110,9 +111,11 @@ await page.keyboard.press('Control+u');
 
 // --- M: mover sin estirar cables; S: arrastrar estirando ---
 const symPos = () => page.evaluate(() => document.querySelector('svg.editor .symbols').innerHTML.replace(/ sel/g, ''));
-const wires = () => svg.locator('.wires line').count();
+// largo total de los cables: mover sin estirar lo conserva aunque un pin, al soltarse en medio de
+// un cable, lo parta en dos (unión en T); estirar lo cambia
+const wireLength = () => page.evaluate(() => [...document.querySelectorAll('svg.editor .wires line')].reduce((n, l) => n + Math.abs(+l.getAttribute('x2') - +l.getAttribute('x1')) + Math.abs(+l.getAttribute('y2') - +l.getAttribute('y1')), 0));
 const before = await symPos();
-const nWires = await wires();
+const lenBefore = await wireLength();
 await page.keyboard.press('m');
 const r2 = await at(320, 8); // la R nueva queda centrada en el click: origen (304,-48)
 await page.mouse.click(r2.x, r2.y);
@@ -120,7 +123,8 @@ const dst = await at(256, 8); // a la izquierda: a la derecha puede quedar fuera
 await page.mouse.move(dst.x, dst.y, { steps: 4 });
 await page.mouse.click(dst.x, dst.y);
 await page.keyboard.press('Escape');
-check((await symPos()) !== before && (await wires()) === nWires, 'M: click, sigue al cursor y se suelta con otro click');
+const [movedM, lenM] = [(await symPos()) !== before, await wireLength()];
+check(movedM && lenM === lenBefore, `M: click, sigue al cursor y se suelta con otro click, sin estirar cables (se movió: ${movedM}, largo de cables ${lenBefore} → ${lenM})`);
 await page.keyboard.press('Control+z');
 check((await symPos()) === before, 'Ctrl+Z deshace el movimiento');
 

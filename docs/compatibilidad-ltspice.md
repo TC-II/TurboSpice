@@ -191,6 +191,21 @@ bloque lo reemplaza); con `run`, es justamente lo que `run` corre. Al pasar el t
 simple, el `.control` se guarda en el comentario con datos `;.ctloff …` (no se dibuja ni se ejecuta) y
 vuelve al elegir otra vez Complex simulation.
 
+## Números con prefijo SI (`netlist/spicenum.ts`)
+
+Hay dos convenciones y conviven a propósito:
+
+- **SPICE** (valores de componentes, directivas, fuentes, Estudio): `M` y `m` son **mili** y mega se
+  escribe `Meg`; también se leen `mil` (25,4 µ), `u`, `µ` y `μ`. Lo que TurboSpice escribe en un
+  campo SPICE sale con `u` y `Meg` (`formatSi(…, SPICE_PREFIXES)`); los pasos de `.step` se muestran
+  como en LTspice, con `µ` y `Meg`. El diálogo de fuentes avisa si un valor como `1M` parece un mega.
+- **Visor** (ejes, cursores, mediciones y sus campos, como los de la DFT): `M` es **mega**, como en
+  cualquier instrumento, y los campos leen lo que muestran (`parseDisplayNumber`; `meg` también vale).
+  Las expresiones de trazas (`V(out)*1k`) siguen la convención SPICE.
+
+Las tablas de prefijos y el formato están en un solo lugar (`formatSi` y sus tres tablas); cada
+función de formato (`si`, `siValue`, `engValue`, `engNumber`) elige una.
+
 ## Traducción a ngspice (lo implícito de LTspice, explícito)
 
 | LTspice | ngspice |

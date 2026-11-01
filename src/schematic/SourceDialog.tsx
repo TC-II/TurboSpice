@@ -22,6 +22,7 @@ import {
 import { labelRows, Modal } from './dialogs.tsx';
 import { KINDS } from './sourceIcons.tsx';
 import { t } from '../i18n/i18n.ts';
+import { niceStep } from '../waveform/pz.ts';
 
 /** Valores por defecto de cada forma de onda al elegirla por primera vez */
 const DEFAULT_ARGS: Partial<Record<SourceKind, string[]>> = {
@@ -843,14 +844,6 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
       </div>
     </>
   );
-}
-
-/** Paso "lindo" (1, 2 o 5 × 10^n) para unas `n` divisiones de `span` */
-function niceStep(span: number, n: number) {
-  const raw = span / n;
-  const p = 10 ** Math.floor(Math.log10(raw));
-  const m = raw / p;
-  return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
 }
 
 /** Grilla gruesa (con escala numérica) y fina del gráfico del PWL */

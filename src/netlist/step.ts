@@ -6,7 +6,7 @@
 //   .step temp -40 85 25
 //   .step NPN 2N2222(VAF) 50 100 25 (parámetro de un modelo)
 // Varios .step se anidan; el primero es el que varía más rápido (bucle interno).
-import { formatSpiceNumber, parseSpiceNumber } from './spicenum.ts';
+import { formatSi, formatSpiceNumber, LTSPICE_PREFIXES, parseSpiceNumber } from './spicenum.ts';
 import { t } from '../i18n/i18n.ts';
 
 export type StepTarget =
@@ -82,13 +82,8 @@ export function stepLabel(tt: StepTarget): string {
   }
 }
 
-const SI = ['f', 'p', 'n', 'µ', 'm', '', 'k', 'Meg', 'G', 'T'];
 /** 2200 → "2.2k" (como muestra LTspice los pasos) */
-export function siValue(x: number): string {
-  if (x === 0 || !Number.isFinite(x)) return String(x);
-  const e = Math.min(4, Math.max(-5, Math.floor(Math.log10(Math.abs(x)) / 3)));
-  return `${parseFloat((x / 10 ** (3 * e)).toPrecision(6))}${SI[e + 5]}`;
-}
+export const siValue = (x: number): string => formatSi(x, 6, LTSPICE_PREFIXES);
 
 export interface StepRuns {
   /** qué se barre en cada .step ("R", "V1", "temp", "2N2222(VAF)") */

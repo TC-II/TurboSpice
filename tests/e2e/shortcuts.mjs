@@ -2,7 +2,7 @@
 // resultados (con el mouse sobre los gráficos) y modo Netlist.
 // Uso: node tests/e2e/shortcuts.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { menu, openExample, resultsView, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, menu, openExample, resultsView, skipWelcome, launchBrowser } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -40,7 +40,7 @@ const onSchematic = async () => {
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
 };
 const modal = page.locator('.modal');
-const settle = () => page.waitForTimeout(100);
+const settle = () => frames(page);
 
 // --- diálogos ---
 await onSchematic();
@@ -199,9 +199,9 @@ const cb = await chart.boundingBox();
 const xAt = async (fx) => {
   // (moverse antes a otro lado: sin movimiento uPlot no actualiza el valor bajo el mouse)
   await page.mouse.move(cb.x + cb.width * 0.9, cb.y + cb.height / 2);
-  await page.waitForTimeout(50);
+  await frames(page);
   await page.mouse.move(cb.x + cb.width * fx, cb.y + cb.height / 2);
-  await page.waitForTimeout(80);
+  await frames(page);
   return page.locator('.xval').first().textContent();
 };
 const x0 = await xAt(0.5);

@@ -5,7 +5,7 @@
 // Uso: [BROWSER=firefox] node tests/e2e/save.mjs [url]   (con `npm run preview` corriendo; el build necesita
 // VITE_GOOGLE_CLIENT_ID, cualquiera sirve: no se habla con Google)
 import { readFileSync } from 'node:fs';
-import { launchBrowser, menu, skipWelcome } from './lib.mjs';
+import { autosaved, frames, launchBrowser, menu, skipWelcome, until } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await launchBrowser();
@@ -236,7 +236,8 @@ async function newPage(context) {
 const dirty = async (page) => (await page.locator('.capsule-dirty').count()) > 0;
 const toast = async (page) => ((await page.locator('.status-msg').count()) ? (await page.locator('.status-msg').textContent()) : '');
 const waitToast = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('.status-msg')?.textContent ?? ''), re.source, { timeout: 10000 }).then(() => true, () => false);
-const settle = (page, ms = 600) => page.waitForTimeout(ms);
+/** espera a que la app termine lo que estaba haciendo: se redibuja y termina el autoguardado en el navegador */
+const settle = (page) => autosaved(page);
 /** Un cambio en el circuito: una tierra nueva en un lugar libre */
 let groundAt = 0;
 async function edit(page) {
@@ -245,7 +246,7 @@ async function edit(page) {
   await page.mouse.click(box.x + 60 + 40 * (groundAt++ % 10), box.y + box.height - 60);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(150);
+  await frames(page);
 }
 /** Cierra el aviso anterior, para esperar el de esta acción */
 async function clearToast(page) {
@@ -301,7 +302,7 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   const before = flags(p1);
   const rev0 = f.rev;
   // Drive real sube `version` solo, después de escribir: el segundo guardado no es un conflicto (#176)
-  await settle(page, 800);
+  await settle(page);
   await edit(page);
   const up0 = fake.uploads().length;
   await save(page);
@@ -323,7 +324,10 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
     await save(page);
   }
   await page.waitForFunction(() => !document.querySelector('.capsule-dirty'), null, { timeout: 15000 }).catch(() => {});
-  await settle(page, 1500);
+  // (y que la cola termine: Drive tiene el último estado y no hay subidas en vuelo; entre una
+  // subida y la siguiente de la cola hay un instante sin nada en vuelo)
+  await until(() => fake.inflight === 0 && flags(project(f.data)) === before + 5, 10000);
+  await settle(page);
   fake.delay = 0;
   const n = fake.uploads().length - up1;
   check(fake.maxInflight === 1, `Drive: con Ctrl+S seguidos nunca hay dos llamadas a la vez (máx ${fake.maxInflight})`);
@@ -335,6 +339,8 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   await page.evaluate(() => sessionStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'expired', expires: Date.now() + 3600e3 })));
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
+  // (que termine de restaurar la sesión antes de seguir)
+  await settle(page);
   await edit(page);
   const up2 = fake.uploads().length;
   await save(page);
@@ -385,7 +391,7 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   const up4 = fake.uploads().length;
   page.answers.push('Sample Project', false);
   await saveAs(page);
-  await settle(page, 1500);
+  await settle(page);
   check(page.dialogs.some((d) => /^confirm: .*Sample Project\.turbo/.test(d)), `Drive: Guardar como con un nombre existente pregunta si reemplazar (${page.dialogs.slice(-2).join(' / ')})`);
   check(fake.uploads().length === up4 && fake.projects().length === count, 'Drive: al cancelar, no se sube nada');
   page.answers.push('Sample Project', true);
@@ -407,7 +413,8 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   const up5 = fake.uploads().length;
   page.answers.push(false);
   await saveAs(page);
-  await settle(page, 800);
+  // (que no suba nada sólo se prueba dejando pasar un rato)
+  await page.waitForTimeout(800);
   check(fake.uploads().length === up5, 'Drive: cancelar el nombre de Guardar como no sube nada');
 
   // -- abrir desde Drive lo guardado: mismo proyecto
@@ -437,20 +444,20 @@ const openMySims = async (page) => {
   const d = page.getByRole('dialog').filter({ has: page.locator('.drive-browser') });
   await d.waitFor();
   await page.waitForFunction(() => !!document.querySelector('.drive-list, .drive-browser .hint + .hint'), null, { timeout: 10000 }).catch(() => {});
-  await page.waitForTimeout(200);
+  await frames(page);
   return d;
 };
 const listed = (d) => d.locator('.drive-open > span:first-child').allTextContents();
 /** espera a que termine la acción del diálogo (el «Renombrando…», «Duplicando…») */
 const idle = async (d) => {
-  await d.page().waitForTimeout(150);
+  await frames(d.page());
   await d.page().waitForFunction(() => !document.querySelector('.drive-browser')?.closest('.modal, [role=dialog]')?.querySelector('.buttons .hint'), null, { timeout: 10000 }).catch(() => {});
-  await d.page().waitForTimeout(150);
+  await frames(d.page());
 };
 const simulate = async (p) => {
   await p.locator('[aria-label="Correr"]:enabled').click();
   await p.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
-  await p.waitForTimeout(1500);
+  await settle(p);
 };
 const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Google Drive' });
 
@@ -494,7 +501,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const ups = fake.uploads().length;
   await save(page);
   await waitToast(page, /Google Drive/);
-  await page.waitForTimeout(300);
+  await settle(page);
   check(fake.uploads().length === ups + 1 && f.name === 'Filtro final.turbo' && project(f.data)?.name === 'Filtro final' && !fake.byName('Sample Project.turbo'), `Mis simulaciones: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`);
 
   // -- abrir otro desde la lista
@@ -507,7 +514,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await edit(page);
   await save(page);
   await waitToast(page, /Google Drive/);
-  await page.waitForTimeout(300);
+  await settle(page);
   check(opened.rev !== openedRev && project(fake.byName('Filtro final.turbo').data)?.name === 'Filtro final', 'Mis simulaciones: y guardar va a ese archivo, no al anterior');
 
   // -- abrir con cambios sin guardar: pregunta; cancelar no abre
@@ -515,12 +522,14 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   d = await openMySims(page);
   page.answers.push(false);
   await d.getByRole('button', { name: /^Filtro final\.turbo/ }).click();
-  await page.waitForTimeout(500);
+  await until(() => page.dialogs.at(-1)?.startsWith('confirm:'));
+  await frames(page);
   check((await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'), 'Mis simulaciones: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)');
 
   // -- papelera, sobre el abierto: cancelar no borra; aceptar sí
   page.answers.push(false);
   await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
+  // (que no borre sólo se prueba dejando pasar un rato)
   await page.waitForTimeout(300);
   check(!opened.trashed, 'Mis simulaciones: cancelar la papelera no borra');
   page.answers.push(true);
@@ -532,7 +541,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const ups2 = fake.uploads().length;
   await save(page);
   await waitToast(page, /Google Drive/);
-  await page.waitForTimeout(300);
+  await settle(page);
   const again = fake.byName('Sample Project (copia) (2).turbo');
   check(fake.uploads().length === ups2 + 1 && fake.uploads().at(-1).method === 'POST' && !!again && again.id !== opened.id, 'Mis simulaciones: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)');
   check(!page.errors.length, `Mis simulaciones: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
@@ -552,10 +561,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   }
   const lib = lines.join('');
   await page.locator('input[type=file][accept*=".lib"]:not([data-subckt-import])').setInputFiles({ name: 'grande.lib', mimeType: 'text/plain', buffer: Buffer.from(lib, 'utf8') });
-  await page.waitForTimeout(1500);
+  await settle(page);
   await save(page);
   await waitToast(page, /Google Drive/);
-  await page.waitForTimeout(500);
+  await settle(page);
   const f = fake.byName('Sample Project.turbo');
   const res = fake.log.filter((l) => l.resumable);
   check(res.length === 2 && res[0].method === 'POST' && res[1].method === 'PUT', `≥ 5 MB: sube por partes (metadatos + contenido: ${res.map((l) => l.method)}; ${await toast(page)})`);
@@ -568,14 +577,15 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await edit(page);
   await save(page);
   await waitToast(page, /Google Drive/);
-  await page.waitForTimeout(500);
+  await settle(page);
   const res2 = fake.log.filter((l) => l.resumable).slice(2);
   check(res2.length === 2 && res2[0].method === 'PATCH' && res2[0].path.endsWith(`/${f?.id}`) && fake.projects().length === 1, `≥ 5 MB: el segundo guardado reemplaza el mismo archivo por partes (${res2.map((l) => `${l.method} ${l.path}`)})`);
   // abrirlo de nuevo desde Drive, en otra pestaña
   const other = await newPage(context);
   const d = await openMySims(other);
   await d.getByRole('button', { name: /^Sample Project\.turbo/ }).click();
-  await other.waitForTimeout(2500);
+  await d.waitFor({ state: 'detached', timeout: 15000 });
+  await settle(other);
   check((await other.locator('.capsule-project').textContent()) === 'Sample Project' && !(await dirty(other)) && !other.errors.length, '≥ 5 MB: se vuelve a abrir desde Drive sin errores');
   check(!page.errors.length, `≥ 5 MB: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
   await context.close();
@@ -594,7 +604,8 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const b = await newPage(context);
   const d = await openMySims(b);
   await d.getByRole('button', { name: /^Sample Project\.turbo/ }).click();
-  await b.waitForTimeout(1500);
+  await d.waitFor({ state: 'detached', timeout: 15000 });
+  await settle(b);
   // A cambia y simula: se guarda solo
   await edit(a);
   const ups = fake.uploads().length;
@@ -609,8 +620,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   check(await dirty(b), 'Dos pestañas: B sigue marcado sin guardar');
   // B recarga la versión de Drive (la de A)
   await conflictOf(b).getByRole('button', { name: 'Recargar la de Drive' }).click();
-  await b.waitForTimeout(1500);
-  check(!(await dirty(b)) && (await conflictOf(b).count()) === 0, 'Dos pestañas: «Recargar la de Drive» trae la versión de A');
+  check(await until(async () => !(await dirty(b)) && (await conflictOf(b).count()) === 0, 10000), 'Dos pestañas: «Recargar la de Drive» trae la versión de A');
   // ahora B, al día, simula y se guarda solo; A, que quedó vieja, pregunta
   await edit(b);
   await simulate(b);
@@ -646,12 +656,12 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   fake.offline = false;
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
-  await page.waitForTimeout(800);
-  check((await page.locator('svg.editor .sym').count()) === syms && (await dirty(page)), `Sin conexión: al recargar se recupera el trabajo sin guardar (${syms} símbolos; ${await toast(page)})`);
+  // (que termine de restaurar la sesión antes de seguir)
+  await settle(page);
+  check(await until(async () => (await page.locator('svg.editor .sym').count()) === syms && (await dirty(page))), `Sin conexión: al recargar se recupera el trabajo sin guardar (${syms} símbolos; ${await toast(page)})`);
   await save(page);
   check(await waitToast(page, /Google Drive/), `Sin conexión: al volver la conexión, Ctrl+S guarda (${await toast(page)})`);
-  await page.waitForTimeout(300);
-  check(!(await dirty(page)) && !f.data.equals(before), 'Sin conexión: y queda guardado');
+  check(await until(async () => !(await dirty(page)) && !f.data.equals(before)), 'Sin conexión: y queda guardado');
   await context.close();
 }
 
@@ -668,23 +678,29 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await setToken(50 * 60_000);
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
+  // (que termine de restaurar la sesión antes de seguir)
+  await settle(page);
   const r0 = await requests();
   await page.mouse.click(400, 700);
   await page.keyboard.press('Escape');
+  // (que no pida otro sólo se prueba dejando pasar un rato)
   await page.waitForTimeout(500);
   check((await requests()) === r0, 'Sesión: con el token al día, un click no pide otro');
   // por vencer (5 min): el primer click lo renueva, sin aviso, y el guardado usa el nuevo
   await setToken(5 * 60_000);
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
+  // (que termine de restaurar la sesión antes de seguir)
+  await settle(page);
   const r1 = await requests();
   await page.mouse.click(400, 700);
-  await page.waitForTimeout(500);
+  await until(async () => (await requests()) === r1 + 1 && (await tokenNow())?.value !== 'tokOld');
   const t = await tokenNow();
   check((await requests()) === r1 + 1 && t?.value !== 'tokOld' && t.expires - Date.now() > 50 * 60_000, `Sesión: con el token por vencer, el primer click lo renueva (${t?.value})`);
   await page.mouse.click(400, 700);
   await page.keyboard.press('a');
   await page.keyboard.press('Escape');
+  // (ídem: que no lo vuelva a pedir)
   await page.waitForTimeout(300);
   check((await requests()) === r1 + 1, 'Sesión: y no lo vuelve a pedir en cada click');
   await edit(page);
@@ -695,9 +711,11 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await setToken(-60_000);
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
+  // (que termine de restaurar la sesión antes de seguir)
+  await settle(page);
   const r2 = await requests();
   await page.locator('svg.editor').click({ position: { x: 300, y: 600 } });
-  await page.waitForTimeout(500);
+  await until(async () => ((await tokenNow())?.expires ?? 0) > Date.now() + 50 * 60_000);
   // (al cargar, la sincronización de «My symbols and models» ya puede haberlo pedido)
   const t2 = await tokenNow();
   check((await requests()) >= r2 && t2?.value !== 'tokOld' && t2.expires > Date.now() + 50 * 60_000, 'Sesión: con el token vencido, después del primer gesto hay uno válido');
@@ -801,7 +819,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const other = await newPage(context);
   await other.locator('input[type=file][accept*=".turbo"]').setInputFiles({ name: 'Sample Project.turbo', mimeType: 'application/json', buffer: saved });
   await other.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Sample Project');
-  await settle(other, 800);
+  await settle(other);
   const [dl2] = await Promise.all([other.waitForEvent('download', { timeout: 10000 }), save(other)]);
   const again = project(readFileSync(await dl2.path()));
   const strip = (x) => JSON.stringify({ ...x, modified: 0, created: 0 });

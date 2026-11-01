@@ -997,11 +997,16 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
   // pilas de deshacer no se guardan, #154)
+  // (data-autosave en <html>: «pending» hasta que termina el último guardado, «saved» después; lo esperan los e2e)
+  const autosaveSeq = useRef(0);
   useEffect(() => {
     if (!restored) return;
+    const seq = ++autosaveSeq.current;
+    document.documentElement.dataset.autosave = 'pending';
     const tt = setTimeout(() => {
       serializeTurbo(snapshot())
         .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
+        .then(() => seq === autosaveSeq.current && (document.documentElement.dataset.autosave = 'saved'))
         .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);

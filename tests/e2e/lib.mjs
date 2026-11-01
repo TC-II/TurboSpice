@@ -70,7 +70,7 @@ export async function openExample(page, name) {
       await page.getByRole('button', { name: 'Panel del proyecto', exact: true }).click();
       await page.locator('.project-tree').waitFor({ state: 'detached' });
       // (el esquemático se reacomoda al cerrarse el panel)
-      await page.waitForTimeout(500);
+      await steady(page);
     }
   } else await menu(page, 'Ejemplos', variant);
   await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.capsule-variant')?.textContent === v, variant);
@@ -91,4 +91,46 @@ export const FIREFOX = (process.env.BROWSER ?? process.env.npm_config_browser) =
 export async function launchBrowser() {
   const { chromium, firefox } = await import('playwright-core');
   return FIREFOX ? firefox.launch() : chromium.launch({ executablePath: process.env.CHROMIUM ?? '/usr/bin/chromium' });
+}
+
+// --- Esperas por condición (fase 4.2 de la auditoría): en vez de pausas fijas ---
+
+/** Espera a que el navegador pinte `n` cuadros: lo que React y uPlot redibujan tras un evento ya está en el DOM */
+export const frames = (page, n = 2) =>
+  page.evaluate((k) => new Promise((done) => {
+    const step = (i) => (i ? requestAnimationFrame(() => step(i - 1)) : done());
+    step(k);
+  }), n);
+
+/**
+ * Reintenta `fn` (async, devuelve algo «verdadero» cuando se cumple) hasta que se cumpla o pase `timeout`.
+ * Devuelve el último valor: se usa dentro de un check, `check(await until(() => …), '…')`.
+ */
+export async function until(fn, timeout = 5000) {
+  const end = Date.now() + timeout;
+  for (;;) {
+    const v = await fn();
+    if (v || Date.now() > end) return v;
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+/** Espera a que el autoguardado en el navegador termine (data-autosave="saved" en <html>, ver App.tsx) */
+export async function autosaved(page) {
+  await frames(page);
+  await page.waitForFunction(() => document.documentElement.dataset.autosave === 'saved', null, { timeout: 10000 });
+}
+
+
+/** Espera a que el esquemático deje de reacomodarse (el viewBox igual en tres lecturas seguidas): al abrir o cerrar paneles se reajusta un instante después */
+export async function steady(page, timeout = 3000) {
+  const view = () => page.locator('svg.editor').getAttribute('viewBox');
+  const end = Date.now() + timeout;
+  let last = await view();
+  for (let same = 0; same < 3 && Date.now() < end; ) {
+    await new Promise((r) => setTimeout(r, 50));
+    const v = await view();
+    same = v === last ? same + 1 : 0;
+    last = v;
+  }
 }

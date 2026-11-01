@@ -232,7 +232,7 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 | # | Estado | Detalle |
 |---|---|---|
 | 4.1 | ✅ | Carga diferida de lo que se usa a pedido: las traducciones (`es.ts`, 173 kB, sólo si la interfaz está en español: `loadTranslations()` en `main.tsx` antes de importar la app), el editor de símbolos y de modelos, el tutorial (`src/lazyViews.ts`) y el exportador TikZ. Camino de carga inicial: **1162 kB → 917 kB** (entrada 147 kB + `App` 770 kB), −21 %. Queda `roughPen.js` (44 kB): se usa al dibujar con el trazo Tremor y diferirlo pide re-render al terminar de bajar. |
-| 4.2 | ⏳ | Pendiente: reemplazar las ~144 esperas fijas de los e2e por esperas de condición. Pide iterar contra la CI (las suites que simulan necesitan el motor). |
+| 4.2 | ✅ | De 146 esperas fijas a 6, todas justificadas: 4 en `save` prueban que algo *no* pasa (no sube, no borra, no pide otro token), la de `menu()` respeta la espera de doble clic de la lista de simulaciones (#151) y una en `features` separa dos clics para que no cuenten como doble clic. Ayudantes en `tests/e2e/lib.mjs`: `frames` (dos cuadros pintados: lo que React y uPlot redibujan tras un evento), `until` (reintenta una condición), `steady` (el esquemático dejó de reacomodarse; después de simular se reajusta un instante después) y `autosaved` (la app marca `data-autosave="pending"|"saved"` en `<html>`). En `save`, los guardados en cola se esperan hasta que Drive tiene el último estado. Tiempo de las 16 suites que corren en local (sin `verilog`): 206 s → ~145 s (tres pasadas sin fallas). |
 | 4.3 | ✅ | Sin cambios: el `new Function('u', 'return import(u)')` de `engine/worker.ts` y `hdl/yosysWorker.ts` ya está justificado en el código (el servidor de desarrollo de Vite le agrega `?import` a un `import()` con URL variable y rechaza los archivos de `public/`; `/* @vite-ignore */` no lo evita). Si algún día se agrega una CSP, va a necesitar `'unsafe-eval'` en los workers o servir el motor fuera de `public/`. |
 
 ### Pendiente
@@ -242,4 +242,3 @@ Seguimiento, con el detalle para retomarlo: **issue #344**.
 
 - **Fase 3** (partir `App.tsx`, `PlotPanel.tsx`, `SchematicEditor.tsx`): una extracción por PR. `App.tsx` cambia en la mitad de los commits de `dev`, así que conviene coordinar cada extracción para no pisar trabajo en curso.
 - **Prettier** (1.2): decisión del equipo.
-- **4.2**: esperas fijas de los e2e.

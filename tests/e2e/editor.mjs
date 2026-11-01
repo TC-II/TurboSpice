@@ -2,7 +2,7 @@
 // deshace/rehace, guarda el .asc y verifica el archivo.
 // Uso: node tests/e2e/editor.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { menu, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, menu, skipWelcome, steady, launchBrowser } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -46,7 +46,7 @@ for (let last = '', i = 0; i < 20; i++) {
   const vb = await svg.getAttribute('viewBox');
   if (vb === last) break;
   last = vb;
-  await page.waitForTimeout(100);
+  await frames(page);
 }
 const at = async (x, y) => {
   const box = await svg.boundingBox();
@@ -57,7 +57,7 @@ const click = async (x, y) => {
   const p = await at(x, y);
   // colocar usa la última posición del puntero: primero se mueve, como una persona
   await page.mouse.move(p.x, p.y);
-  await page.waitForTimeout(30);
+  await frames(page);
   await page.mouse.click(p.x, p.y);
 };
 
@@ -97,7 +97,7 @@ const setValue = async (x, y, v) => {
   const p = await at(x, y);
   await page.locator('.modal').waitFor({ state: 'detached' });
   await page.mouse.move(p.x, p.y);
-  await page.waitForTimeout(100);
+  await frames(page);
   await page.mouse.dblclick(p.x, p.y);
   await page.locator('.modal label.attr-row input:not([type=checkbox])').nth(1).fill(v, { timeout: 5000 });
   await page.keyboard.press('Enter');
@@ -110,7 +110,7 @@ const p = await at(0, 56);
 const src = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
 await page.locator('.modal').waitFor({ state: 'detached' });
 await page.mouse.move(p.x, p.y);
-await page.waitForTimeout(100);
+await frames(page);
 await page.mouse.dblclick(p.x, p.y);
 await src.waitFor({ timeout: 5000 });
 check((await src.getByRole('tab', { selected: true }).textContent()) === 'Seno', 'una fuente nueva abre en Seno');
@@ -121,7 +121,7 @@ const sourceValue = async () => {
   await page.evaluate(() => document.activeElement?.blur?.());
   // y con la punta de prueba el doble click mide: Esc vuelve a seleccionar
   await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
+  await frames(page);
   const q = await at(0, 56);
   await page.mouse.dblclick(q.x, q.y);
   await src.waitFor({ timeout: 5000 });
@@ -142,7 +142,8 @@ await page.screenshot({ path: `${OUT}/editor-1.png` });
 await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 check((await page.locator('.status.ok').count()) === 1, `simulación: ${await page.locator('.status').textContent()}`);
-await page.waitForTimeout(300);
+// (al abrirse los resultados el esquemático se reacomoda)
+await steady(page);
 await click(96, -32);
 const chips = await page.locator('.trace-chip .name').allTextContents();
 // los pines se tocan sin cable: como en LTspice, la red se llama P001 (#109)

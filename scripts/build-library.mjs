@@ -74,9 +74,18 @@ export function buildBundle() {
   for (const p of walk(join(LIB, 'sym'))) {
     if (p.toLowerCase().endsWith('.asy')) symbols[rel(join(LIB, 'sym'), p).replace(/\.asy$/i, '')] = readText(p);
   }
-  const skins = {};
-  for (const p of walk(join(LIB, 'skins', 'default'))) {
-    if (p.toLowerCase().endsWith('.svg')) skins[rel(join(LIB, 'skins', 'default'), p).replace(/\.svg$/i, '')] = normalizeSkin(readText(p));
+  const readSkins = (dir) => {
+    const out = {};
+    for (const p of walk(dir)) {
+      if (p.toLowerCase().endsWith('.svg')) out[rel(dir, p).replace(/\.svg$/i, '')] = normalizeSkin(readText(p));
+    }
+    return out;
+  };
+  const skins = readSkins(join(LIB, 'skins', 'default'));
+  // los otros skins (#329), cada uno en su carpeta: lo que no dibujan sale del Default
+  const skinSets = {};
+  for (const e of readdirSync(join(LIB, 'skins'), { withFileTypes: true })) {
+    if (e.isDirectory() && e.name !== 'default' && !e.name.startsWith('.')) skinSets[e.name] = readSkins(join(LIB, 'skins', e.name));
   }
   const subs = {};
   for (const p of walk(join(LIB, 'sub'))) {
@@ -95,7 +104,7 @@ export function buildBundle() {
     ltspice: JSON.parse(readFileSync(join(LIB, 'window-defaults.json'), 'utf8')),
     preferred: JSON.parse(readFileSync(join(LIB, 'window-positions.json'), 'utf8')),
   };
-  return { symbols, skins, windowDefaults, subs, cmp };
+  return { symbols, skins, skinSets, windowDefaults, subs, cmp };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

@@ -11,12 +11,17 @@ export interface LibraryBundle {
   symbols: Record<string, string>;
   /** nombre base → contenido SVG ya normalizado (sin <style>, colores en currentColor) */
   skins: Record<string, { viewBox: string; body: string }>;
+  /** los otros skins (#329), por nombre de carpeta: sólo los dibujos que cambian */
+  skinSets?: Record<string, Record<string, { viewBox: string; body: string }>>;
   windowDefaults: WindowDefaults;
   /** ruta relativa a library/sub (p.ej. "TCLib/Black_Box.lib") → definiciones */
   subs: Record<string, { subckts: string[]; models: string[] }>;
   /** library/cmp: archivo (standard.bjt…) → texto; las listas de las que se elige un valor */
   cmp?: Record<string, string>;
 }
+
+/** El skin de library/skins/default */
+export const DEFAULT_SKIN = 'Default';
 
 /** Carpeta, dentro de los archivos de modelos, de los .model de library/cmp */
 export const CMP_DIR = 'cmp/';
@@ -51,7 +56,17 @@ export class Library implements SymbolSource {
   /** type tal como viene del .asc → su símbolo (se pide miles de veces por render, #182) */
   private resolved = new Map<string, SymbolDef | undefined>();
   /** Sube cada vez que cambia qué símbolo resuelve un tipo (para cachés por documento, #183) */
-  rev = 0;
+  get rev(): number {
+    return this.revs.n;
+  }
+  // (en un objeto: la misma cuenta para las vistas con otro skin, withSkin)
+  private revs = { n: 0 };
+  /** El skin elegido (#329): sus dibujos ganan a los del Default; sin él, el Default */
+  private skinSet?: Record<string, { viewBox: string; body: string }>;
+  /** Nombre del skin elegido */
+  skinName = DEFAULT_SKIN;
+  /** La librería de la que salió esta vista con otro skin (withSkin) */
+  private root?: Library;
   private cmpCache = new Map<CmpKind, CmpPart[]>();
   /** library/cmp: archivo → texto (los pasivos llegan después, addCmp) */
   private cmpFiles: Record<string, string>;
@@ -116,7 +131,7 @@ export class Library implements SymbolSource {
 
   private symbolsChanged(): void {
     this.resolved.clear();
-    this.rev++;
+    this.revs.n++;
   }
 
   private lookup(type: string): SymbolDef | undefined {
@@ -255,7 +270,29 @@ export class Library implements SymbolSource {
   skin(type: string) {
     // un símbolo puede usar el dibujo de otro (SYMATTR Skin nmos4: los de PDK, sky130/nfet_01v8)
     const name = this.symbol(type)?.attrs.get('Skin') ?? baseName(type);
-    return this.bundle.skins[name] ?? this.bundle.skins[name.toLowerCase()];
+    const set = this.skinSet;
+    return set?.[name] ?? set?.[name.toLowerCase()] ?? this.bundle.skins[name] ?? this.bundle.skins[name.toLowerCase()];
+  }
+
+  /** Los skins que se pueden elegir: el Default y los de library/skins (#329) */
+  skinNames(): string[] {
+    return [DEFAULT_SKIN, ...Object.keys(this.bundle.skinSets ?? {}).sort()];
+  }
+
+  /**
+   * La misma librería dibujada con otro skin (#329): un objeto nuevo, para que se vuelva a dibujar
+   * lo que depende de ella, que comparte todo lo demás (símbolos, modelos, archivos del usuario).
+   * Un nombre que no existe vuelve al Default.
+   */
+  withSkin(name: string): Library {
+    const set = this.bundle.skinSets?.[name];
+    // hereda de la librería original: lee sus mapas y sus métodos los cambian en el lugar
+    const root = this.root ?? this;
+    const l = Object.create(root) as Library;
+    l.root = root;
+    l.skinSet = set;
+    l.skinName = set ? name : DEFAULT_SKIN;
+    return l;
   }
 
   /**

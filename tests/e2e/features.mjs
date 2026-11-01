@@ -51,6 +51,11 @@ const hoverWas = await hoverBox.isChecked();
 await hoverBox.click();
 check((await hoverBox.isChecked()) !== hoverWas && (await page.evaluate(() => localStorage.getItem('turbospice.treeHover'))) === (hoverWas ? '0' : '1'), 'Configuración abre una ventana con la opción como casilla, que se guarda');
 await hoverBox.click();
+// #329: el skin de los símbolos se elige ahí y se aplica en el momento
+const skinSel = page.locator('.modal').getByRole('combobox', { name: /Skin de los símbolos/ });
+await skinSel.selectOption('Boca Jrs');
+check((await page.locator('svg.editor .skin').evaluateAll((gs) => gs.some((g) => g.innerHTML.includes('#103f79')))) && (await page.evaluate(() => localStorage.getItem('turbospice.skin'))) === 'Boca Jrs', 'Configuración › Skin de los símbolos: Boca Jrs se aplica y se recuerda');
+await skinSel.selectOption('Default');
 await page.locator('.modal').getByRole('button', { name: 'Cerrar', exact: true }).click();
 check((await page.locator('.modal').count()) === 0, 'y se cierra con Cerrar');
 const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));

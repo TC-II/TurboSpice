@@ -151,6 +151,8 @@ const DEFAULT_NAME = /^project( \d+)?$/i;
 
 const BASE = import.meta.env.BASE_URL;
 const REPO = 'https://github.com/TC-II/TurboSpice';
+/** El skin de los símbolos elegido en Configuración (#329) */
+const SKIN_KEY = 'turbospice.skin';
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
 // y los ejemplos sueltos, una variante cada uno de Examples.turbo
 const SAMPLE = 'Sample Project.turbo';
@@ -324,7 +326,8 @@ export function App() {
         const l = new Library(b);
         for (const f of await loadUserFiles()) registerUserFile(l, f);
         engine.start();
-        setLib(l);
+        const skin = lsGet(SKIN_KEY);
+        setLib(skin ? l.withSkin(skin) : l);
         // las listas de pasivos (para elegir el valor) llegan después, sin demorar el esquemático (#189)
         fetch(`${BASE}library/cmp-passives.json`)
           .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
@@ -368,7 +371,16 @@ export function App() {
       {mode === 'netlist' && <NetlistMode engine={engine} />}
       {mode === 'schematic' &&
         (lib ? (
-          <SchematicMode engine={engine} lib={lib} slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot, tools: toolsSlot }} onNetlist={() => setMode('netlist')} />
+          <SchematicMode
+            engine={engine}
+            lib={lib}
+            slots={{ menu: menuSlot, tabs: tabsSlot, right: rightSlot, tools: toolsSlot }}
+            onNetlist={() => setMode('netlist')}
+            onSkin={(name) => {
+              lsSet(SKIN_KEY, name);
+              setLib((l) => l && l.withSkin(name));
+            }}
+          />
         ) : (
           <p className="empty pad">{libError ?? t('Loading library…')}</p>
         ))}
@@ -376,12 +388,14 @@ export function App() {
   );
 }
 
-function SchematicMode({ engine, lib, slots, onNetlist }: {
+function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   engine: EngineClient;
   lib: Library;
   slots: { menu: HTMLElement | null; tabs: HTMLElement | null; right: HTMLElement | null; tools: HTMLElement | null };
   /** pasar al editor de netlist */
   onNetlist(): void;
+  /** elegir el skin de los símbolos (#329) */
+  onSkin(name: string): void;
 }) {
   const history = useHistory<AscDoc>(emptyDoc());
   // el circuito que se edita; `doc` es el que se ve (otro mientras se mira una corrida vieja)
@@ -4421,6 +4435,19 @@ ${ltNetlistText(sim.built.lt)}
       {dialog?.kind === 'settings' && (
         <SettingsDialog
           sections={[
+            {
+              title: t('Schematic'),
+              rows: [
+                {
+                  kind: 'choice',
+                  label: t('Symbol skin'),
+                  hint: t('The drawing of the symbols; what a skin does not draw comes from Default'),
+                  value: lib.skinName,
+                  options: lib.skinNames().map((s) => ({ value: s, label: s })),
+                  onChange: onSkin,
+                },
+              ],
+            },
             {
               title: t('Project panel'),
               rows: [{ kind: 'checkbox', label: t('Show the project panel when the mouse approaches the edge (in select mode)'), checked: hoverReveal, onChange: setHoverReveal }],

@@ -393,6 +393,8 @@ export const es: Record<string, string> = {
   'Export poles and zeros': 'Exportar polos y ceros',
   'Export to PDF': 'Exportar a PDF',
   'Export to PDF…': 'Exportar a PDF…',
+  'Symbol skin': 'Skin de los símbolos',
+  'The drawing of the symbols; what a skin does not draw comes from Default': 'El dibujo de los símbolos; lo que un skin no dibuja sale del Default',
   'The schematic on a white sheet: PDF, SVG, PNG or the clipboard': 'El esquemático en una hoja blanca: PDF, SVG, PNG o el portapapeles',
   'Include': 'Incluir',
   'Operating point values': 'Valores del punto de operación',

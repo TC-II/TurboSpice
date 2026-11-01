@@ -11,6 +11,11 @@ import { t } from '../i18n/i18n.ts';
  * nuevo conviven) y después se copian a la página: el pico es varias veces esto.
  */
 export const MAX_SIM_BYTES = 512 * 1024 ** 2;
+/**
+ * «Seguir igual» (un transitorio que al ritmo medido no entraba): se sigue hasta que lo guardado
+ * llega a esto. Con la copia a la página el pico ronda el doble, cerca de lo que da wasm32 (4 GB).
+ */
+export const FULL_SIM_BYTES = 1024 ** 3;
 /** Puntos por corrida: más tardan minutos en simular y no se pueden graficar con fluidez */
 export const MAX_POINTS = 2_000_000;
 /** Más puntos por década casi nunca aportan resolución */
@@ -168,6 +173,12 @@ export interface SizeProblem {
   fix?: { from: string; to: string };
   /** proponer elegir las señales guardadas aunque ya haya una selección */
   chooseSignals?: boolean;
+  /** cuántas señales entran (el transitorio cortado mientras simulaba) */
+  fit?: number;
+  /** cuánto del final entra, para el botón de `fix` («0.5s») */
+  keep?: string;
+  /** se puede seguir igual: el corte fue por lo proyectado, no porque se llenó la memoria */
+  resume?: boolean;
 }
 
 export interface SizeCheck {
@@ -204,6 +215,10 @@ export interface MeasuredSize {
   percent: number;
   projected: number;
   vectors: number;
+  /** puntos guardados al cortar */
+  points?: number;
+  /** se llenó la memoria («seguir igual»), no se proyectó */
+  full?: boolean;
 }
 
 /** Cuántas señales entran en `maxBytes` con estos puntos (sin contar el tiempo) */
@@ -216,35 +231,40 @@ const roundDown = (x: number) => {
 };
 
 /**
- * El transitorio que se cortó mientras simulaba porque no iba a entrar: cuánto iba a guardar,
- * cuántas señales entran y, como alternativa, guardar sólo el final (tstart, «Save from»).
+ * El transitorio que se cortó mientras simulaba porque no iba a entrar: cuánto iba a guardar y lo
+ * que se puede hacer (los botones de Problemas): elegir menos señales, guardar sólo el final
+ * (tstart, «Save from») o seguir igual hasta llenar la memoria.
  */
 export function measuredSizeProblem(line: string, m: MeasuredSize, maxBytes = MAX_SIM_BYTES): SizeProblem {
   const bytes = m.projected * m.vectors * 8;
   const fit = signalsThatFit(m.projected, maxBytes);
-  let text = t('Stopped at {pct}% of the time: at this rate «{line}» saves ≈ {points} points × {vectors} signals ≈ {size}, more than the browser can hold.', {
-    pct: m.percent < 10 ? m.percent.toFixed(1).replace(/\.0$/, '').replace('.', ',') : Math.round(m.percent),
-    line,
-    points: fmtCount(m.projected),
-    vectors: m.vectors,
-    size: fmtBytes(bytes),
-  });
-  text += fit >= 1 ? t(' Up to {n} signals fit (Simulate › Saved signals…; the plotted ones count too).', { n: fit }) : t(' Not even one signal fits over the whole time.');
+  const pct = m.percent < 10 ? m.percent.toFixed(1).replace(/\.0$/, '').replace('.', ',') : Math.round(m.percent);
+  const text = m.full
+    ? t('Stopped at {pct}% of the time: the results of «{line}» filled the memory ({size}). The plots show what was simulated up to there.', { pct, line, size: fmtBytes((m.points ?? m.projected) * m.vectors * 8) })
+    : t('Stopped at {pct}% of the time: at this rate «{line}» would save ≈ {points} points × {vectors} signals ≈ {size}, more than the browser can hold ({max}). The plots show what was simulated up to there.', {
+        pct,
+        line,
+        points: fmtCount(m.projected),
+        vectors: m.vectors,
+        size: fmtBytes(bytes),
+        max: fmtBytes(maxBytes),
+      });
   // guardar sólo el final: la parte que entra con estas mismas señales (con margen)
   const a = parseAnalysis(line);
   let fix: SizeProblem['fix'];
+  let keep: string | undefined;
   if (a?.kind === 'tran') {
     const tstop = parseSpiceNumber(a.tstop);
     const tstart = a.tstart.trim() ? parseSpiceNumber(a.tstart) : 0;
-    const keep = roundDown(((tstop - tstart) * 0.8 * maxBytes) / bytes);
-    if (tstop > 0 && keep > 0 && keep < tstop - tstart) {
-      const from = formatSpiceNumber(Number((tstop - keep).toPrecision(6)));
+    const k = roundDown(((tstop - tstart) * 0.8 * maxBytes) / bytes);
+    if (tstop > 0 && k > 0 && k < tstop - tstart) {
+      const from = formatSpiceNumber(Number((tstop - k).toPrecision(6)));
       const to = ['.tran', a.tstep.trim() || '0', a.tstop, from, ...(a.tmax.trim() ? [a.tmax] : []), ...(a.uic ? ['uic'] : []), ...(a.startup ? ['startup'] : [])].join(' ');
       fix = { from: line, to };
-      text += t(' Or save only the last {keep} (Save from {from}).', { keep: formatSpiceNumber(keep) + 's', from });
+      keep = formatSpiceNumber(k) + 's';
     }
   }
-  return { text, fix, chooseSignals: fit >= 1 };
+  return { text, fix, keep, fit, chooseSignals: fit >= 1, resume: !m.full };
 }
 
 /**

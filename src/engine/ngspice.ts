@@ -70,6 +70,8 @@ export interface SizeStop {
   projected: number;
   /** vectores que se guardan (con el tiempo) */
   vectors: number;
+  /** se llenó la memoria de verdad (con `project: false`), no se proyectó */
+  full?: boolean;
 }
 
 export interface SimulateOptions {
@@ -92,6 +94,11 @@ export interface SimulateOptions {
    * (`sizeStop`): ngspice elige el paso según el circuito y eso no se puede saber de antemano.
    */
   maxBytes?: number;
+  /**
+   * Cortar también si, al ritmo medido, no va a entrar (por defecto). Sin esto («seguir igual»)
+   * sólo se corta cuando lo guardado llega a `maxBytes`. En los dos casos se devuelve lo simulado.
+   */
+  project?: boolean;
 }
 
 export interface NgspiceOptions {
@@ -156,8 +163,10 @@ const SIZE_MIN_PERCENT = 0.5;
 /** Se tira desde el callback de progreso para cortar el transitorio (desarma el stack de ngspice) */
 class SizeStopSignal {
   readonly stop: SizeStop;
-  constructor(stop: SizeStop) {
+  readonly plots: SimPlot[];
+  constructor(stop: SizeStop, plots: SimPlot[]) {
     this.stop = stop;
+    this.plots = plots;
   }
 }
 
@@ -301,8 +310,9 @@ export class Ngspice {
     this.command('setseed 1');
     this.writeFiles({ 'circuit.cir': netlist });
     const control = /^\s*\.control\b/im.test(netlist);
-    this.size = opts.maxBytes ? { max: opts.maxBytes, last: 0, percent: 0, start: -1, points: 0 } : null;
+    this.size = opts.maxBytes ? { max: opts.maxBytes, project: opts.project ?? true, last: 0, percent: 0, start: -1, points: 0 } : null;
     let sizeStop: SizeStop | undefined;
+    let partial: SimPlot[] = [];
     try {
       // (un .control corre sus análisis al leer la netlist)
       this.command(`source ${WORK_DIR}/circuit.cir`);
@@ -311,22 +321,24 @@ export class Ngspice {
       if (!(e instanceof SizeStopSignal)) throw e;
       // ngspice quedó a mitad de un análisis: este módulo ya no sirve (el Worker crea otro)
       sizeStop = e.stop;
+      partial = e.plots;
       this.aborted = true;
     } finally {
       this.size = null;
     }
-    const plots = this.aborted ? [] : this.readPlots();
+    const plots = sizeStop ? partial : this.aborted ? [] : this.readPlots();
     const bias = opts.bias && !this.aborted && !control ? this.operatingPoint(opts.bias, opts.biasCommand) : undefined;
 
     return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias, ...(sizeStop ? { sizeStop } : {}) };
   }
 
   /** Medición del transitorio en curso (ver `maxBytes`); null si no se mide */
-  private size: { max: number; last: number; percent: number; start: number; points: number } | null = null;
+  private size: { max: number; project: boolean; last: number; percent: number; start: number; points: number } | null = null;
 
   /**
    * Cuántos puntos lleva el transitorio en curso y cuántos va a tener, al ritmo medido desde que
-   * empezó a guardar (con tstart, antes no guarda nada). Si no van a entrar, lo corta.
+   * empezó a guardar (con tstart, antes no guarda nada). Si no van a entrar, lo corta y se queda
+   * con lo simulado hasta ahí (los vectores siguen en la memoria de ngspice: se leen antes de cortar).
    */
   private checkSize(percent: number): void {
     const z = this.size!;
@@ -355,9 +367,25 @@ export class Ngspice {
     const bytes = (n: number) => n * vectors * 8;
     // lo que ya guardó no entra, o al ritmo medido no va a entrar
     const projected = done > 0 ? Math.round(points + ((100 - percent) * (points - z.points)) / done) : points;
-    if (bytes(points) > z.max || (done >= SIZE_MIN_PERCENT && bytes(projected) > z.max)) {
-      throw new SizeStopSignal({ percent, points, projected: Math.max(points, projected), vectors });
+    const full = bytes(points) > z.max;
+    if (full || (z.project && done >= SIZE_MIN_PERCENT && bytes(projected) > z.max)) {
+      throw new SizeStopSignal({ percent, points, projected: Math.max(points, projected), vectors, ...(full ? { full } : {}) }, this.partialPlots());
     }
+  }
+
+  /**
+   * Lo simulado del transitorio en curso, al cortarlo: los plots tal como están, con todos los
+   * vectores del último del largo del más corto (ngspice agrega un punto vector por vector)
+   */
+  private partialPlots(): SimPlot[] {
+    const plots = this.readPlots();
+    const last = plots.at(-1);
+    if (last && /^tran\d+$/i.test(last.name)) {
+      const analog = last.vectors.filter((v) => !v.x);
+      const n = Math.min(...analog.map((v) => v.real.length));
+      for (const v of analog) if (v.real.length > n) v.real = v.real.slice(0, n);
+    }
+    return plots;
   }
 
   /**

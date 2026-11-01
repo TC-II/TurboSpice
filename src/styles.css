@@ -771,11 +771,7 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .sim-state.ok { border-color: var(--ok); }
 .sim-state.err { border-color: var(--err); }
 /* corriendo: arco naranja que se desvanece hacia la cola, con la cabeza redondeada */
-.sim-state.running { border-color: transparent; animation: sim-spin 0.8s linear infinite; }
-.sim-state.running::before { content: ""; position: absolute; inset: calc(var(--sim-t) * -1); border-radius: 50%; background: conic-gradient(from 0deg, transparent 0deg, var(--sim-run) 358deg); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--sim-t) - 0.5px), #000 calc(100% - var(--sim-t))); mask: radial-gradient(farthest-side, transparent calc(100% - var(--sim-t) - 0.5px), #000 calc(100% - var(--sim-t))); }
-.sim-state.running::after { content: ""; position: absolute; top: calc(var(--sim-t) * -1); left: calc(50% - var(--sim-t) / 2); width: var(--sim-t); height: var(--sim-t); border-radius: 50%; background: var(--sim-run); }
-@keyframes sim-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .sim-state.running { animation-duration: 2.4s; } }
+.sim-state.running { visibility: hidden; }
 .simbar .sb-field .pick-btn { padding: 0 3px; line-height: 1; color: var(--fg-muted); }
 .icon { display: block; flex: none; }
 .shortcuts { border-collapse: collapse; font-size: 13px; width: 100%; }
@@ -796,6 +792,10 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
 .problems .kind { font-size: 11px; padding: 0 6px; border-radius: 999px; flex: none; }
 .problems .kind.err { color: var(--err); border: 1px solid var(--err); }
 .problems .kind.warn { color: #e67700; border: 1px solid #e67700; }
+.problems li:has(.size-actions) { flex-wrap: wrap; }
+.problems .size-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 2px 52px; }
+.problems .size-actions button { font-size: 12px; padding: 3px 10px; }
+.problems .size-actions button:first-child { background: var(--accent); border-color: var(--accent); color: #fff; }
 .problems button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; }
 .workspace.side { flex-direction: row; }
 .workspace.side .splitter { width: 6px; height: auto; margin: 0 0 0 -3px; cursor: col-resize; }
@@ -1436,6 +1436,8 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .sim-split > .menu-top > button { height: 100%; gap: 4px; padding: 4px 10px 4px 7px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .sim-split > .menu-top > button.labeled { border-right-width: 0; }
 .sim-split > button { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 4px 12px; }
+.sim-split > button.sim-progress { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) var(--pct), transparent var(--pct)); }
+.sim-split > button.sim-progress .pct { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 .sim-split > button.primary { box-shadow: inset 1px 0 0 color-mix(in srgb, #fff 35%, var(--accent)); }
 .iconbar .sim-split > button.run-off { opacity: 1; color: var(--fg-muted); }
 /* la barra de la simulación tiene la misma altura con cualquier análisis (la de Noise: dos

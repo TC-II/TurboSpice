@@ -38,7 +38,7 @@ import { elementRefs, savableSignals, saveSelection, setSaveSelection, toggleRef
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
-import { MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit } from './sim/estimate.ts';
+import { FULL_SIM_BYTES, MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit } from './sim/estimate.ts';
 import { ANALYSES, ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { controlText, hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
@@ -1313,7 +1313,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
    *  con .save los parámetros de dispositivo que usen (#202) */
   const allTraces = () => [panes, ...Object.values(plotView), ...panesByKind.current.values()].flatMap((ps) => ps.flatMap((p) => p.traces.map((tt) => tt.expr)));
-  const run = async () => {
+  /** `unlimited`: «seguir igual» con un transitorio que no entraba, hasta llenar la memoria */
+  const run = async ({ unlimited = false }: { unlimited?: boolean } = {}) => {
     // se simula el circuito actual (aunque se esté mirando una corrida vieja)
     // los subcircuitos no se simulan solos (#180): se simula desde un testbench
     if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
@@ -1354,7 +1355,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       const incomplete = analysisProblem(lineOf(simAsc) ?? '');
       const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
       // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
-      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: MAX_SIM_BYTES });
+      const run = (b: BuiltSimulation) => engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: unlimited ? FULL_SIM_BYTES : MAX_SIM_BYTES, project: !unlimited });
       let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
       // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
       // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
@@ -1369,7 +1370,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
           }
         }
       }
-      // cortado porque no iba a entrar: cuánto iba a guardar, cuántas señales entran, guardar el final
+      // cortado porque no iba a entrar: cuánto iba a guardar y qué hacer; los plots traen lo simulado
       if (result.sizeStop) {
         const big = measuredSizeProblem(lineOf(simAsc) ?? '.tran', result.sizeStop);
         built.tooBig = [...built.tooBig, big];
@@ -1432,11 +1433,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
       } else if (built.controlPanes.length) setPanes(built.controlPanes);
       const errs = result.errors.length ? result.errors : [];
-      setStatus(errs.length && !result.plots.length ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
+      setStatus(errs.length && (!result.plots.length || result.sizeStop) ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
       // símbolos faltantes: el circuito simulado no es el del esquemático, el aviso va primero (#108)
       const missing = built.missingSymbols;
       setMessage(
-        errs.length && !result.plots.length
+        errs.length && (!result.plots.length || result.sizeStop)
           ? t('{p0} — see the Errors tab', { p0: errs[0] })
           : missing.length
           ? missing.length === 1
@@ -1478,6 +1479,16 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       onChange: (corner: string) => commit(writeData(doc, 'pdk', corner === 'tt' ? undefined : { corner })),
     };
   }, [doc]);
+
+  // «Save only the last…»: se simula otra vez cuando el cambio de la línea ya llegó al documento
+  const [runQueued, setRunQueued] = useState(false);
+  const runRef = useRef(run);
+  runRef.current = run;
+  useEffect(() => {
+    if (!runQueued) return;
+    setRunQueued(false);
+    runRef.current();
+  }, [runQueued]);
 
   const aborting = useRef(false);
   const abort = () => {
@@ -3467,7 +3478,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
         const big = sim.built.tooBig?.find((f) => f.text === p.text);
         // demasiado grande con todo guardado: elegir qué guardar (#314)
-        return { ...p, sym: el?.sym, fix: big?.fix, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
+        return { ...p, sym: el?.sym, fix: big?.fix, size: big, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
       })
     : [];
   const goTo = (sym: number) => {
@@ -3727,8 +3738,15 @@ ${ltNetlistText(sim.built.lt)}
               <Icon name="caret" size={14} /> {t('New')}
             </MenuButton>
             {running ? (
-              <button className="labeled" onClick={abort} aria-label={t('Abort')} title={t('Abort the simulation (Alt+S)')}>
-                <Icon name="stop" /> {t('Abort')}
+              // el avance va en el botón (el % del tiempo o del barrido que lleva), que sigue cortando
+              <button
+                className="labeled sim-progress"
+                onClick={abort}
+                aria-label={t('Abort')}
+                title={t('Abort the simulation (Alt+S)')}
+                style={{ '--pct': `${status.kind === 'running' ? Math.min(100, status.percent) : 0}%` } as React.CSSProperties}
+              >
+                <Icon name="stop" /> <span className="pct">{status.kind === 'running' ? `${Math.floor(status.percent)} %` : t('Abort')}</span>
               </button>
             ) : (
               <button
@@ -4258,12 +4276,37 @@ ${ltNetlistText(sim.built.lt)}
                             {t('show on the schematic')}
                           </button>
                         )}
-                        {p.big && (
+                        {p.size?.fit !== undefined ? (
+                          // el transitorio que se cortó mientras simulaba: qué se puede hacer, como botones
+                          <span className="size-actions">
+                            {p.size.chooseSignals && (
+                              <button onClick={openSaves} title={t('Save only some signals: the plotted ones count too')}>
+                                {t('Choose signals (up to {n})', { n: p.size.fit })}
+                              </button>
+                            )}
+                            {p.fix && p.size.keep && (
+                              <button
+                                onClick={() => {
+                                  commit(replaceLine(doc, p.fix!.from, p.fix!.to));
+                                  setRunQueued(true);
+                                }}
+                                title={t('Change the analysis to «{p0}» and simulate again', { p0: p.fix.to })}
+                              >
+                                {t('Save only the last {keep}', { keep: p.size.keep })}
+                              </button>
+                            )}
+                            {p.size.resume && (
+                              <button onClick={() => run({ unlimited: true })} title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", { size: '1 GB' })}>
+                                {t('Continue anyway')}
+                              </button>
+                            )}
+                          </span>
+                        ) : p.big && (
                           <button className="link" onClick={openSaves}>
                             {t('choose saved signals')}
                           </button>
                         )}
-                        {p.fix && (
+                        {p.fix && p.size?.fit === undefined && (
                           <button
                             className="link"
                             onClick={() => {

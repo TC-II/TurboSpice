@@ -278,6 +278,32 @@ check(await page.getByRole('menu', { name: 'Nueva simulación' }).isVisible(), '
 await page.keyboard.press('Escape');
 await page.screenshot({ path: `${OUT}/simulaciones.png` });
 
+// --- #361 y #363: un transitorio que al ritmo medido no entra en memoria se frena enseguida, con lo
+// simulado hasta ahí y lo que se puede hacer como botones; mientras corre, el % va en el botón ---
+const longAsc = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 16 80 16', 'WIRE 80 16 160 16', 'WIRE 0 96 80 96', 'WIRE 80 96 160 96', 'WIRE 160 80 160 96', 'FLAG 0 96 0',
+  'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
+  'SYMBOL res 64 0 R0', 'SYMATTR InstName R1', 'SYMATTR Value 1k',
+  'SYMBOL cap 144 16 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1n',
+  'TEXT 0 160 Left 2 !.tran 0 5'].join('\n') + '\n';
+await page.evaluate((t) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([t], 'Largo.asc'));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+}, longAsc);
+await page.locator('.texts .directive', { hasText: '.tran 0 5' }).waitFor();
+await page.getByRole('button', { name: 'Correr', exact: true }).click();
+await page.locator('.sim-progress').waitFor({ timeout: 10000 });
+check(/^\d+ %$/.test((await page.locator('.sim-progress .pct').textContent()).trim()), `mientras corre, el botón muestra el avance (${await page.locator('.sim-progress .pct').textContent()})`);
+await page.locator('.problems li', { hasText: 'Se frenó al' }).waitFor({ timeout: 60000 });
+const stopText = await page.locator('.problems li', { hasText: 'Se frenó al' }).innerText();
+check(/a este ritmo «\.tran 0 5» guardaría .* \(512 MB\)\. Los gráficos muestran lo simulado hasta ahí/.test(stopText), `se frena y dice cuánto iba a guardar (${stopText.split('\n')[0]})`);
+const stopButtons = await page.locator('.problems .size-actions button').allTextContents();
+check(stopButtons.join('|') === 'Guardar sólo los últimos 0.2s|Seguir igual', `lo que se puede hacer, como botones (${stopButtons.join(' | ')})`);
+check((await page.locator('.sim-state.err').count()) === 1, 'el aro queda en error');
+await probe(40, 16);
+check((await chipNames()).length === 1, `lo simulado hasta el freno se grafica (${(await chipNames()).join()})`);
+await page.screenshot({ path: `${OUT}/freno-memoria.png` });
+
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 await browser.close();
 console.log(failed ? `\n${failed} fallo(s)` : '\nE2E simulación OK');

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseAnalysis } from '../../src/sim/analyses.ts';
-import { analysisPoints, checkSimSize, countVectors, MAX_POINTS, MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit, sweepPoints } from '../../src/sim/estimate.ts';
+import { analysisPoints, checkSimSize, countVectors, FULL_SIM_BYTES, MAX_POINTS, MAX_SIM_BYTES, measuredSizeProblem, signalsThatFit, sweepPoints } from '../../src/sim/estimate.ts';
 
 const points = (line: string) => analysisPoints(parseAnalysis(line)!);
 
@@ -100,20 +100,31 @@ describe('transitorio cortado mientras simula porque no iba a entrar (#361)', ()
     expect(signalsThatFit(1e9)).toBe(0);
   });
 
-  it('el mensaje dice cuánto iba a guardar, cuántas señales entran y propone guardar el final', () => {
+  it('el mensaje dice cuánto iba a guardar y que se ve lo simulado; los botones, cuántas entran y cuánto del final', () => {
     const p = measuredSizeProblem('.tran 0 15 0 uic', m);
-    expect(p.text).toContain('Se cortó al 1% del tiempo');
+    expect(p.text).toContain('Se frenó al 1% del tiempo');
     expect(p.text).toContain('3,6 M puntos × 228 señales');
-    expect(p.text).toContain('Entran hasta 17 señales');
+    expect(p.text).toContain('(512 MB)');
+    expect(p.text).toContain('Los gráficos muestran lo simulado hasta ahí');
+    expect(p.fit).toBe(17);
     expect(p.chooseSignals).toBe(true);
+    expect(p.resume).toBe(true);
     // con las 228 señales entra ≈ 0,9 s: se guarda el último medio segundo
+    expect(p.keep).toBe('0.5s');
     expect(p.fix).toEqual({ from: '.tran 0 15 0 uic', to: '.tran 0 15 14.5 uic' });
   });
 
   it('sin lugar ni para una señal no propone elegirlas', () => {
     const p = measuredSizeProblem('.tran 1u 100 0 10n', { percent: 2, projected: 1e9, vectors: 4 });
     expect(p.chooseSignals).toBe(false);
-    expect(p.text).toContain('No entra ni una señal');
+    expect(p.fit).toBe(0);
     expect(p.fix?.to).toMatch(/^\.tran 1u 100 \S+ 10n$/);
+  });
+
+  it('«seguir igual» que llenó la memoria: dice cuánto guardó y ya no ofrece seguir', () => {
+    const p = measuredSizeProblem('.tran 0 15 0 uic', { percent: 23, points: 590_000, projected: 2_560_000, vectors: 228, full: true }, FULL_SIM_BYTES);
+    expect(p.text).toContain('Se frenó al 23% del tiempo');
+    expect(p.text).toContain('llenaron la memoria (1,0 GB)');
+    expect(p.resume).toBe(false);
   });
 });

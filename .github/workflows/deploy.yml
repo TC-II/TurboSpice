@@ -62,8 +62,15 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # tsc -b (en npm run build) sólo mira src/: esto suma los tests unitarios y los scripts .ts
+      - name: Tipos de los tests y los scripts
+        run: npx tsc -p tsconfig.test.json
+      - name: Traducciones (textos en español fuera de es.ts o sin traducir)
+        run: node scripts/i18n/check.mjs
       - name: Smoke test del motor
         run: npm run smoke
+      - name: Verilog (Yosys + Icarus + ngspice)
+        run: npm run hdl
       - run: npm test --if-present
       # Los modelos de PDK (open_pdks) se bajan una vez por versión: gf180 pesa 170 MB
       - name: Caché de los PDK
@@ -92,16 +99,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [features, save, panes, verilog, examples, simulation, editor]
+        # cada entrada corre tests/e2e/<suite>.mjs, o las de `files` en un mismo runner (las cortas)
+        suite: [features, save, panes, verilog, examples, simulation, editor, edit-tools, study, performance]
         include:
-          - suite: examples
-            out: test-results
-          - suite: editor
-            out: test-results
-          - suite: simulation
-            out: test-results
-          - suite: features
-            out: test-results
+          - suite: edit-tools
+            files: wires rotate shapes placing dialogs shortcuts
+          - suite: study
+            files: templates deviceparams hierarchy
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -119,7 +123,13 @@ jobs:
         run: |
           npx vite preview --port 4173 --strictPort &
           timeout 30 bash -c 'until curl -sf http://localhost:4173/TurboSpice/ >/dev/null; do sleep 1; done'
-          node tests/e2e/${{ matrix.suite }}.mjs http://localhost:4173/TurboSpice/ ${{ matrix.out }}
+          rc=0
+          for f in ${{ matrix.files || matrix.suite }}; do
+            echo "::group::$f"
+            node tests/e2e/$f.mjs http://localhost:4173/TurboSpice/ test-results || { rc=1; echo "::error::E2E $f falló"; }
+            echo "::endgroup::"
+          done
+          exit $rc
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

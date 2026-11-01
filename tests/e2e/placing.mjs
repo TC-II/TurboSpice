@@ -8,7 +8,8 @@ import { skipWelcome, launchBrowser } from './lib.mjs';
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
 const browser = await launchBrowser();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+// 1600 de ancho: a 1280 la barra pasa el grupo de dibujo (con Figuras) a «Más herramientas»
+const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
 await skipWelcome(page);
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
@@ -76,7 +77,10 @@ await page.mouse.click(body.x + body.width / 2, body.y + body.height / 2, { butt
 // en un testbench de un grupo (#180) aparece un menú: Editar… o propagar al grupo
 const ctxMenu = page.locator('.ctx-menu');
 if (await ctxMenu.count()) {
-  check(/^Propagar \S+ en /.test((await ctxMenu.locator('button.ctx-primary').textContent()) ?? ''), 'en un grupo, el click derecho ofrece un botón para propagar el valor a los otros testbenches (#229)');
+  // el botón dice «Propagar»; qué y a dónde va en su title («Propagar V1=… en «grupo»»)
+  const primary = ctxMenu.locator('button.ctx-primary');
+  const [label, title] = [(await primary.textContent()) ?? '', (await primary.getAttribute('title')) ?? ''];
+  check(label === 'Propagar' && /^Propagar \S.* en «/.test(title), `en un grupo, el click derecho ofrece un botón para propagar el valor a los otros testbenches (#229) (${label} / ${title})`);
   await ctxMenu.getByRole('menuitem').first().click();
 }
 check((await page.locator('[role=dialog]').count()) === 1, 'click derecho (sin arrastrar) sobre un componente lo edita');

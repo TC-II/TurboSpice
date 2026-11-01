@@ -187,3 +187,17 @@ Regla: **una extracción por PR, sin cambiar comportamiento**, con las 17 suites
 | Chunk de entrada | 949 kB | < 600 kB |
 | Tablas de sufijos SI | 7 | 1 |
 | Vulnerabilidades dev altas/críticas | 3 | 0 |
+
+## 6. Avance
+
+### Fase 0 (sobre `dev`, 2026-11-01)
+
+| # | Estado | Detalle |
+|---|---|---|
+| 0.1 | ✅ | La matriz e2e corre las 17 suites: las 7 de antes y tres entradas nuevas: `edit-tools` (wires, rotate, shapes, placing, dialogs, shortcuts), `study` (templates, deviceparams, hierarchy) y `performance`. El job `build` corre además `npm run hdl` después del smoke. `placing.mjs` estaba desfasado de la interfaz: el botón de propagar (#229) ahora dice «Propagar» y el detalle va en su `title`, y a 1280 px la barra pasa el grupo de dibujo (con Figuras) a «Más herramientas», así que el test usa 1600 px. |
+| 0.2 | ✅ | `tsconfig.test.json` (src + `tests/unit` + `scripts/**/*.ts`), con tipos para `scripts/build-library.mjs` y `tests/corpus/compare.mjs` (`.d.mts`). `npm run typecheck` chequea los dos proyectos y la CI corre el de tests. Se corrigieron los errores reales: el fixture de proyecto v1 sin `groups` y la recursión sin tipo de `i18n-audit.test.ts`. |
+| 0.3 | ✅ | `scripts/i18n/check.mjs` también sale con error si falta una traducción, y la CI lo corre. Tenía un falso positivo: no leía las claves sin comillas de `es.ts` (`Rectangular: …`). El comentario de netlist `* PDK …, esquina …` pasó a inglés (`corner`) y se permite el `sin(2*pi*V(` del modulador. En `dev` ya estaba traducido «Fast». |
+| 0.4 | ✅ | En `dev` ya se habían resuelto `tests/setup-i18n.ts` (fuera del `.gitignore`) y `.claude/launch.json` (ignorado). Se borraron `docs/issues-open*.json`, que eran la salida de una carga de issues ya hecha y siguen en la historia de git. |
+
+Observación de producto que surgió de 0.1: a 1280 px de ancho, un tamaño común en notebooks, la barra
+de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) en «Más herramientas».

@@ -6,6 +6,7 @@ import { t } from '../i18n/i18n.ts';
 import { EXT, projectName, serializeTurbo, type Project } from '../project/turbo.ts';
 import { DEFAULT_NAME, DEFAULT_PROJECT } from './constants.ts';
 import type { Dialog, FileState } from './types.ts';
+import { useEvent } from './useEvent.ts';
 
 export interface DriveDeps {
   /** hay sesión de Google */
@@ -82,9 +83,10 @@ export function useDrive({ account, file, setFile, dirty, setDirty, editRev, pro
   };
   // al simular se guarda solo en Drive (después de que la corrida entró al proyecto)
   const [autoDrive, setAutoDrive] = useState(0);
+  const autoSave = useEvent(() => account && fileRef.current.driveId && queueDriveSave(true));
   useEffect(() => {
-    if (autoDrive && account && fileRef.current.driveId) queueDriveSave(true);
-  }, [autoDrive]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (autoDrive) autoSave();
+  }, [autoDrive, autoSave]);
   /** Conflicto: recargar la versión de Drive, guardar la mía como copia o sobrescribir */
   const resolveDriveConflict = async (how: 'reload' | 'copy' | 'overwrite') => {
     setDriveConflict(null);
@@ -135,7 +137,7 @@ export function useDrive({ account, file, setFile, dirty, setDirty, editRev, pro
   // Con sesión de Google, un proyecto nuevo («project») con cambios se guarda solo en el Drive con
   // un nombre libre («Project 2», «Project 3»…), para que el autoguardado no pise otro
   const autoNaming = useRef(false);
-  useEffect(() => {
+  const autoName = useEvent(() => {
     const f = fileRef.current;
     if (!account || !dirty || f.driveId || autoNaming.current || !DEFAULT_NAME.test(projectRef.current.name)) return;
     autoNaming.current = true;
@@ -150,7 +152,8 @@ export function useDrive({ account, file, setFile, dirty, setDirty, editRev, pro
     })()
       .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
       .finally(() => (autoNaming.current = false));
-  }, [account, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => autoName(), [account, dirty, autoName]);
 
   const openDriveFile = async (d: DriveFile) => {
     if (!confirmDiscard()) return;

@@ -8,6 +8,7 @@ import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs } from '../sim/saves.ts';
 import { buildSimulation } from '../sim/schematicSim.ts';
 import type { SavesState, SimRun } from './types.ts';
+import { useEvent } from './useEvent.ts';
 
 export interface SavesPanelDeps {
   saves: SavesState | null;
@@ -43,11 +44,12 @@ export function useSavesPanel({ saves, setSaves, savesOpen, curSub, doc, docRef,
     if (tool.kind === 'probe' && !sim) setTool({ kind: 'select' });
   };
   // las señales del circuito, de nuevo cuando cambia (no al cambiar sólo lo elegido)
+  const fileName = useEvent(ascName);
   useEffect(() => {
     if (!savesOpen) return;
     let live = true;
     const id = setTimeout(() => {
-      buildSimulation(docRef.current, lib, ascName())
+      buildSimulation(docRef.current, lib, fileName())
         .then((b) => live && setSaves((s) => s && { ...s, signals: savableSignals(b), built: b }))
         .catch(() => live && setSaves((s) => s && { ...s, signals: [], built: undefined }));
     }, 150);
@@ -55,8 +57,7 @@ export function useSavesPanel({ saves, setSaves, savesOpen, curSub, doc, docRef,
       live = false;
       clearTimeout(id);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savesOpen, doc.symbols, doc.wires, doc.flags, lib]);
+  }, [savesOpen, doc.symbols, doc.wires, doc.flags, lib, docRef, setSaves, fileName]);
   const pickSave = (target: { net?: string; symbol?: number; pin?: number }) => {
     const b = saves?.built;
     if (!b) return;

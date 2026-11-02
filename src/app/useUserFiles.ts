@@ -11,6 +11,7 @@ import { makeSymbol, schematicPorts, subcktPins } from '../library/makeSymbol.ts
 import { loadUserFiles, saveUserFiles, type UserFile } from '../schematic/autosave.ts';
 import type { UserFileInfo } from '../schematic/dialogs.tsx';
 import { registerUserFile, userFileKind } from './helpers.ts';
+import { useEvent } from './useEvent.ts';
 
 /** `account`: la cuenta de Google con sesión (si hay); `libVersion` cambia cada vez que cambia la librería */
 export function useUserFiles(lib: Library, account: string | undefined, setMessage: (m?: string) => void) {
@@ -22,6 +23,8 @@ export function useUserFiles(lib: Library, account: string | undefined, setMessa
   // con sesión de Google, «My symbols and models» vive en Drive (USER_LIBRARY_NAME), el mismo para
   // todos los proyectos; al entrar se une con lo que haya en este navegador
   const userLibId = useRef<string>();
+  // (la librería de este momento: con otro skin es otra, sin volver a sincronizar)
+  const currentLib = useEvent(() => lib);
   useEffect(() => {
     userLibId.current = undefined;
     if (!account) return;
@@ -30,7 +33,7 @@ export function useUserFiles(lib: Library, account: string | undefined, setMessa
       const remote = await pullUserLibrary(drive);
       const merged = mergeUserFiles(remote.files ?? [], await loadUserFiles());
       if (off) return;
-      for (const f of merged) registerUserFile(lib, f);
+      for (const f of merged) registerUserFile(currentLib(), f);
       setUserFiles(merged);
       saveUserFiles(merged);
       setLibVersion((v) => v + 1);
@@ -39,7 +42,7 @@ export function useUserFiles(lib: Library, account: string | undefined, setMessa
     return () => {
       off = true;
     };
-  }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [account, currentLib, setMessage]);
   const storeUserFiles = (next: UserFile[]) => {
     setUserFiles(next);
     saveUserFiles(next);

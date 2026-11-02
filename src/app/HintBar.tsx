@@ -4,6 +4,7 @@ import type { Point } from '../asc/model.ts';
 import type { ItemRef } from '../schematic/geometry.ts';
 import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { t } from '../i18n/i18n.ts';
+import { useEvent } from './useEvent.ts';
 
 export type Hover = { ref: ItemRef | null; at: Point } | null;
 
@@ -20,11 +21,12 @@ export function HintBar({ sink, text, message, onDismiss, offers }: { sink: Muta
   const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
   // los avisos se van solos; los largos y los errores duran más para poder leerlos
   const ms = message ? Math.min(45000, Math.max(error ? 30000 : 18000, message.length * 210)) : 0;
+  const dismiss = useEvent(onDismiss);
   useEffect(() => {
     if (!message) return;
-    const id = setTimeout(onDismiss, ms);
+    const id = setTimeout(dismiss, ms);
     return () => clearTimeout(id);
-  }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [message, ms, dismiss]);
   return (
     <div className="hint-bar">
       <span className="hint-text">{text(hover)}</span>

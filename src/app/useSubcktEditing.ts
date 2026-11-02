@@ -14,6 +14,7 @@ import type { Project } from '../project/turbo.ts';
 import { addFlag } from '../schematic/edit.ts';
 import { fetchModelFile } from '../sim/schematicSim.ts';
 import { ascText } from './helpers.ts';
+import { useEvent } from './useEvent.ts';
 
 export interface SubcktEditingDeps {
   project: Project;
@@ -39,7 +40,7 @@ export function useSubcktEditing({ project, projectRef, setProjectState, editPro
   const curVerilog = curModule?.kind === 'verilog' ? curModule : undefined;
   const subPorts = useMemo(() => (curVerilog ? verilogPorts(curVerilog, subcktSymbolText(project, curSub)).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []), [curSub, curVerilog, liveDoc, project]);
   const subPortsKey = subPorts.join(',');
-  useEffect(() => {
+  const syncPorts = useEvent(() => {
     if (!curSub || curVerilog) return;
     const p = storeSubckt(projectRef.current, curSub, ascText(docRef.current));
     if (!symbolOutdated(p, curSub)) return;
@@ -50,7 +51,8 @@ export function useSubcktEditing({ project, projectRef, setProjectState, editPro
     lib.setProjectFiles(next.files);
     const stale = staleInstances(next, curSub, lib, (_, nm) => nm ?? '');
     if (stale.length) setMessage(t('The ports of {name} changed: {insts} must be rewired (marked in the project panel)', { name: curSub, insts: stale.map((u) => u.inst).join(', ') }));
-  }, [curSub, subPortsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => syncPorts(), [curSub, subPortsKey, syncPorts]);
   const editSymbol = (text: string) => {
     if (!curSub) return;
     const p = storeSymbol(projectRef.current, curSub, text);

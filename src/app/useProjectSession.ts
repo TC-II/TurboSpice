@@ -24,6 +24,7 @@ import { asPlotView, emptyPanes, viewFromDoc, withView, type Pane, type PlotStat
 import { BASE, SAMPLE } from './constants.ts';
 import { ascText } from './helpers.ts';
 import type { FileState, HierLevel, SimRun } from './types.ts';
+import { useEvent } from './useEvent.ts';
 
 export interface ProjectSessionDeps {
   lib: Library;
@@ -175,7 +176,7 @@ export function useProjectSession(d: ProjectSessionDeps) {
   };
 
   // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
-  const openShared = useCallback(async (): Promise<boolean> => {
+  const openShared = useEvent(async (): Promise<boolean> => {
     let shared;
     try {
       shared = await readShareHash(location.hash);
@@ -196,14 +197,14 @@ export function useProjectSession(d: ProjectSessionDeps) {
     remember(loadDoc(d, f.name), { name: `${projectName(f.name)}${EXT}` });
     warnMissing(f.doc);
     return true;
-  }, [loadDoc]);
+  });
 
   // Primer documento: el del link, el último en el que se estaba trabajando (autoguardado)
   // o un ejemplo. Nada de esto pisa lo que el usuario ya haya empezado a hacer.
   const touched = useRef(false);
   touched.current ||= docKey > 0 || history.version > 0;
   const [restored, setRestored] = useState(false);
-  useEffect(() => {
+  const restore = useEvent(() => {
     (async () => {
       setRecent(await loadRecent());
       const session = await loadProjectSession();
@@ -235,34 +236,38 @@ export function useProjectSession(d: ProjectSessionDeps) {
     })()
       .catch(() => {})
       .finally(() => setRestored(true));
-  }, []); // sólo al montar
+  });
+  // sólo al montar (restore es estable)
+  useEffect(() => restore(), [restore]);
 
   // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
   // pilas de deshacer no se guardan, #154)
   // (data-autosave en <html>: «pending» hasta que termina el último guardado, «saved» después; lo esperan los e2e)
   const autosaveSeq = useRef(0);
+  const projectNow = useEvent(snapshot);
   useEffect(() => {
     if (!restored) return;
     const seq = ++autosaveSeq.current;
     document.documentElement.dataset.autosave = 'pending';
     const tt = setTimeout(() => {
-      serializeTurbo(snapshot())
+      serializeTurbo(projectNow())
         .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
         .then(() => seq === autosaveSeq.current && (document.documentElement.dataset.autosave = 'saved'))
         .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);
-  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
+  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode, projectNow]);
 
   // Migración: vista guardada en el navegador para este nombre de archivo (versiones
   // anteriores) y el .asc no trae la suya: se ofrece incorporarla
-  useEffect(() => {
+  const offerSavedView = useEvent(() => {
     if (!doc.symbols.length || viewFromDoc(doc)) return;
     loadView(file.name).then((v) => {
       const pv = asPlotView(v);
       if (pv) setOfferView((cur) => cur ?? pv);
     });
-  }, [docKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => offerSavedView(), [docKey, offerSavedView]);
 
   // Un link compartido abierto con la app ya cargada
   useEffect(() => {

@@ -117,6 +117,7 @@ import { ProjectPanel } from './app/ProjectPanel.tsx';
 import { runHistoryActions } from './app/runHistory.ts';
 import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
 import { useProjectFiles } from './app/useProjectFiles.ts';
+import { useEvent } from './app/useEvent.ts';
 
 
 export function App() {
@@ -289,16 +290,16 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const viewingRef = useRef(false);
   viewingRef.current = !!viewedDoc;
   /** la corrida anterior a la que se ve (o la última, para el actual) */
-  const prevRun = (r?: (typeof curRuns)[number]) => curRuns.slice(0, r ? curRuns.indexOf(r) : curRuns.length).reverse().find((x) => !x.damaged);
+  const prevRun = useCallback((r?: (typeof curRuns)[number]) => curRuns.slice(0, r ? curRuns.indexOf(r) : curRuns.length).reverse().find((x) => !x.damaged), [curRuns]);
   // cambios contra la corrida anterior (#153): resaltados en el esquemático
   const historyDiff = useMemo(() => {
     const prev = historyOpen ? prevRun(viewed) : undefined;
     return prev ? diffCircuits(parseAsc(prev.asc), doc) : undefined;
-  }, [historyOpen, viewed, curRuns, doc]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [historyOpen, viewed, prevRun, doc]);
   const currentChanges = useMemo(() => {
     const last = historyOpen ? prevRun() : undefined;
     return last ? runSummary(diffCircuits(parseAsc(last.asc), liveDoc).summary, last.files, runFilesOf(project, ascText(liveDoc))) : undefined;
-  }, [historyOpen, curRuns, liveDoc, project.files]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [historyOpen, prevRun, liveDoc, project]);
   // adentro de un subcircuito (#180) el comando es el del testbench (lo que se simula)
   const tbDoc = useMemo(() => (curSub ? parseAsc(activeAsc(variant)) : null), [curSub, variant]);
   // (#241: COMPLEX_LINE si el testbench es una Complex simulation)
@@ -395,8 +396,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       alive = false;
     };
   }, [doc, lib, ltIndex, setLibVersion]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib, libVersion]);
+  // (libVersion: la librería cambia por dentro al agregar símbolos y modelos; con cada cambio se recalcula)
+  const lt = useMemo(() => {
+    void libVersion;
+    return ltNetlist(doc, lib);
+  }, [doc, lib, libVersion]);
   const conn = lt.conn;
   const [showNets, setShowNets] = useState(false);
   const shownNets = useMemo(() => (showNets ? netNames(doc, conn, lt.ncNames) : undefined), [showNets, doc, conn, lt]);
@@ -456,13 +460,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     const ids = [...new Set(changes.flatMap((c) => simsWithValue(v, c)))];
     setValueOffer(ids.length ? { changes, sims: ids } : null);
   };
+  const historyCommit = history.commit;
   const commit = useCallback(
     (next: AscDoc) => {
       if (viewingRef.current) return setMessage(t('This is a previous run (read-only): Restore brings it to the present'));
       offerValues.current?.(docRef.current, next);
-      history.commit(next);
+      historyCommit(next);
     },
-    [history.commit],
+    [historyCommit],
   );
 
   useEffect(() => {
@@ -530,7 +535,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // (guardada en el .asc, ;.pdk); el PDK, de los símbolos o de esa directiva
   const pdkBar = useMemo(() => {
     return pdkBarOf(doc, commit);
-  }, [doc]);
+  }, [doc, commit]);
 
   const stopHidden = !!sim?.result.sizeStop && !stopPlotted;
   // hasta qué instante llegó (el último tiempo del transitorio frenado)
@@ -608,13 +613,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   });
   // En la base, escribir un comando de análisis (a mano o con el diálogo) crea la primera
   // simulación con ese circuito; la base se queda sin el comando
-  useEffect(() => {
+  const firstSim = useEvent(() => {
     if (sims.active || !docLine) return;
     const p0 = projectRef.current;
     const v = variantOf(p0);
     const r = addProjectSim({ ...p0, variants: p0.variants.map((x) => (x.id === v.id ? { ...x, base: ascText(removeAnalysis(doc)) } : x)) }, ascText(doc));
     editProject(r.project);
-  }, [docLine]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => firstSim(), [docLine, firstSim]);
   const { newSim, newEmptyBench, renameBench, newGroup, renameGroupTo, groupAction, moveBench, benchItem, benchAction, deleteSim, simAllCorners, deleteVariant } = benchActions({
     ...{ doc, docLine, curSub, sims, commit, projectRef, pathRef, stacks, kept, editProject, setProjectState, snapshot, markDirty, leave, enter, go, goSim, setDialog, setMessage },
     // (declaradas más abajo)
@@ -695,11 +701,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
   // editando, con su texto actual)
+  const toUsage = useEvent(goUsage);
   const treeSubs = useMemo((): TreeSub[] => {
     if (!treeOpen) return [];
-    return treeSubsOf(project, curSub, liveDoc, lib, goUsage);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [treeOpen, project, curSub, liveDoc, libVersion]);
+    void libVersion;
+    return treeSubsOf(project, curSub, liveDoc, lib, toUsage);
+  }, [treeOpen, project, curSub, liveDoc, lib, libVersion, toUsage]);
   const toggleTree = () => {
     lsSet('turbospice.tree', treeOpen ? '0' : '1');
     setTreePref(!treeOpen);
@@ -756,8 +763,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // Redes y fuentes del circuito, para los selectores del menú de simulación
   // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
   const info = useMemo(
-    (): CircuitInfo => circuitInfoOf(conn, doc, lib),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    (): CircuitInfo => {
+      void libVersion;
+      return circuitInfoOf(conn, doc, lib);
+    },
     [conn, doc, lib, libVersion],
   );
   const circuitInfo = () => info;

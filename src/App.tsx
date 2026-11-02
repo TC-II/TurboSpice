@@ -5,7 +5,7 @@ import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts
 import { EngineClient } from './engine/client.ts';
 import { DIGITAL_TYPE, type SimPlot, type SimResult } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
-import { ltNetlist, ltNetlistText, missingSymbolIn } from './netlist/ltnetlist.ts';
+import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasCommand, biasParams, elementBias, netBias, pinBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
@@ -33,8 +33,8 @@ import { serializeAsc } from './asc/serialize.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { elementRefs, savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, removeAnalysis, replaceLine, setAnalysisLine } from './schematic/directivesEdit.ts';
-import { fmtBytes, measuredSizeProblem, signalsThatFit, simLimits } from './sim/estimate.ts';
+import { findAnalysis, findControl, removeAnalysis, setAnalysisLine } from './schematic/directivesEdit.ts';
+import { measuredSizeProblem, signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
 import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
@@ -85,7 +85,6 @@ import { parseSource } from './sim/sources.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
-import { DISPLAY_PREFIXES, formatSi } from './netlist/spicenum.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
@@ -148,6 +147,7 @@ import { useShortcuts } from './app/shortcuts.ts';
 import { useDrive } from './app/useDrive.ts';
 import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 import { SimRow } from './app/SimRow.tsx';
+import { ProblemsList, simProblems } from './app/Problems.tsx';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -2883,18 +2883,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Problemas de la última simulación: avisos de la traducción y errores de ngspice; los que
   // nombran un componente llevan a él
-  const problems = sim
-    ? [
-        ...sim.result.errors.map((text) => ({ kind: 'err' as const, text })),
-        ...sim.built.warnings.filter((text) => !sim.result.errors.includes(text)).map((text) => ({ kind: missingSymbolIn(text) !== null ? ('err' as const) : ('warn' as const), text })),
-      ].map((p) => {
-        const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
-        const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
-        const big = sim.built.tooBig?.find((f) => f.text === p.text);
-        // demasiado grande con todo guardado: elegir qué guardar (#314)
-        return { ...p, sym: el?.sym, fix: big?.fix, size: big, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
-      })
-    : [];
+  const problems = simProblems(sim);
   const goTo = (sym: number) => {
     const s = doc.symbols[sym];
     if (!s) return;
@@ -3528,70 +3517,7 @@ ${ltNetlistText(sim.built.lt)}
               {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
               {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
               {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}
-              {panel === 'problems' &&
-                (problems.length ? (
-                  <ul className="problems">
-                    {problems.map((p, i) => (
-                      <li key={i}>
-                        <span className={`kind ${p.kind}`}>{p.kind === 'err' ? 'error' : t('warning')}</span>
-                        <span>{p.text}</span>
-                        {p.sym !== undefined && (
-                          <button className="link" onClick={() => goTo(p.sym!)}>
-                            {t('show on the schematic')}
-                          </button>
-                        )}
-                        {p.size?.fit !== undefined ? (
-                          // el transitorio que se cortó mientras simulaba: qué se puede hacer, como botones
-                          <span className="size-actions">
-                            {p.size.chooseSignals && (
-                              <button className="primary" onClick={() => openSaves(true)} title={t('Save only some signals: the plotted ones count too')}>
-                                {t('Choose signals (up to {n})', { n: p.size.fit })}
-                              </button>
-                            )}
-                            {stopTime !== undefined && (
-                              <button className={p.size.chooseSignals ? '' : 'primary'} onClick={plotStop} title={t('Show in the plotter what was simulated up to the stop, with the probe to pick what to plot')}>
-                                {t('Plot up to {time}', { time: `${formatSi(stopTime, 3, DISPLAY_PREFIXES)}s` })}
-                              </button>
-                            )}
-                            {p.fix && p.size.keep && (
-                              <button
-                                onClick={() => {
-                                  commit(replaceLine(doc, p.fix!.from, p.fix!.to));
-                                  setRunQueued(true);
-                                }}
-                                title={t('Change the analysis to «{p0}» and simulate again', { p0: p.fix.to })}
-                              >
-                                {t('Save only the last {keep}', { keep: p.size.keep })}
-                              </button>
-                            )}
-                            {p.size.resume && (
-                              <button onClick={() => run({ unlimited: true })} title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", { size: fmtBytes(simLimits(!!streamPlan(sim.built.netlist)).full) })}>
-                                {t('Continue anyway')}
-                              </button>
-                            )}
-                          </span>
-                        ) : p.big && (
-                          <button className="link" onClick={() => openSaves(true)}>
-                            {t('choose saved signals')}
-                          </button>
-                        )}
-                        {p.fix && p.size?.fit === undefined && (
-                          <button
-                            className="link"
-                            onClick={() => {
-                              commit(replaceLine(doc, p.fix!.from, p.fix!.to));
-                              setMessage(t('Changed to «{p0}»: simulate again with Alt+R', { p0: p.fix!.to }));
-                            }}
-                          >
-                            {t('use «')}{p.fix.to}»
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="empty pad">{t('No problems.')}</p>
-                ))}
+              {panel === 'problems' && <ProblemsList {...{ problems, sim, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage }} />}
             </div>
           </section>
         )}

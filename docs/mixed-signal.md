@@ -113,8 +113,17 @@ SAT/RND eligen saturar y redondear.
   (Yosys no los lee en `-chparam`: `synthesize` los escribe como valor por omisión del parameter). W
   cambia los buses, así que se cambia en el `.v` del proyecto.
 - **Graficar el valor real**: `signed(Dig(y[15:0]), 16)/32768` (la función `signed(x, bits)` de las
-  trazas lee un bus en complemento a dos). Conviene graficar la salida de un registro (un z⁻¹): la de un
-  sumador tiene las carreras de sus compuertas.
+  trazas lee un bus en complemento a dos). Conviene graficar la salida de un registro (un z⁻¹): sintetizada,
+  la de un sumador tiene las carreras de sus compuertas.
+- **Un solo módulo de Icarus** (`hdl/cosimMerge.ts`): al simular, las instancias de nivel superior de
+  los bloques DSP (dos o más) se reemplazan por una sola (`xdsp`), de un módulo generado
+  (`dsp_cosim`) que las instancia y cablea como en el esquemático, y que corre como un d_cosim. Los
+  nodos que usa algo más de la netlist son puertos; las redes internas que piden las trazas también,
+  con alias para sus nombres de antes (`Dig(x24.q[15:0])`, `Dig(x[15:0])`): una traza nueva de una red
+  interna necesita volver a simular. No se hace si ya hay otro bloque de comportamiento (Icarus corre
+  uno por simulación) ni con pines inout. La netlist lo dice en un comentario. Medido en la app con el
+  FIR de 8 taps (100 µs con un seno): el motor pasa de ~2,7 s a ~0,14 s y armar la netlist, de ~1,3 s a
+  ~0,07 s (con la síntesis de las variantes ya hecha).
 - **Ejemplo** «DSP» (Archivo › Ejemplos, `scripts/make-dsp.ts` + `scripts/dsp/project.ts`): FIR de 8 taps
   (impulso, banda de paso y de rechazo), IIR de primer orden y biquad Butterworth (Q2.14), CIC N = 2,
   R = 8, y un mezclador con dos NCO. Los esquemáticos se dibujan en el script como diagrama de bloques.

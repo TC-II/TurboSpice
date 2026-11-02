@@ -93,7 +93,11 @@ export interface BuiltSimulation {
 }
 
 /** Las instancias de un módulo Verilog con otro parameter (useVerilog.withVariants): su síntesis va al archivo del módulo */
-export type Variants = (netlist: string, files: Record<string, string>) => Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }>;
+export type Variants = (
+  netlist: string,
+  files: Record<string, string>,
+  traces: string[],
+) => Promise<{ netlist: string; files: Record<string, string>; warnings: string[]; aliases?: Map<string, string> }>;
 
 /**
  * `traces`: expresiones de las trazas que se van a mirar; los parámetros de dispositivo que usen
@@ -120,10 +124,12 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const texts = Object.fromEntries(await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)));
   const base = prepareSimulation(ng, (rel) => texts[rel]);
   // las instancias de Verilog con otro parameter, antes de las redes digitales: también tienen su copia sin puentes
-  const v = opts.variants && (await opts.variants(base.netlist, base.files));
+  const v = opts.variants && (await opts.variants(base.netlist, base.files, traces));
   const prepared = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
+  // (los nombres de las redes que quedaron adentro del módulo DSP de Icarus, cosimMerge.ts)
+  for (const [k, a] of v?.aliases ?? []) links.aliases.set(k, a);
   // la corriente de cada pin de los subcircuitos (Ix(U1:OUT))
   const prep = { ...prepared, netlist: opts.pinCurrents === false ? links.netlist : addPinCurrentSources(links.netlist, links.files), files: links.files };
   const analyses = lt.texts

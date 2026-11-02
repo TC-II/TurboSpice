@@ -277,7 +277,7 @@ function biquad(src: Source) {
   output(s, y);
   s.clock(-96, 528);
   s.text(-136, -176, ';Biquad Butterworth low-pass, direct form I: fc = 50 kHz at fs = 1 MHz. Coefficients in Q2.14 (F = 14), the feedback ones with their sign changed', 3);
-  s.text(-136, 704, '!.tran 0 40u');
+  s.text(-136, 704, '!.tran 0 60u');
   return s.done(2100, 800);
 }
 

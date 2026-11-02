@@ -831,6 +831,7 @@ export const es: Record<string, string> = {
   'Poles and zeros of a transfer function (.pz).': 'Polos y ceros de una función de transferencia (.pz).',
   'Poles only': 'Sólo polos',
   'Ports:': 'Puertos:',
+  'Compiling {n} DSP blocks into one Icarus module…': 'Compilando {n} bloques DSP en un solo módulo de Icarus…',
   'signed(x, bits) needs two arguments': 'signed(x, bits) necesita dos argumentos',
   'pow(x, y) needs two arguments': 'pow(x, y) necesita dos argumentos',
   'Power': 'Potencia',

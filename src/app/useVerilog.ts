@@ -3,6 +3,7 @@
 import { useRef, type MutableRefObject } from 'react';
 import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
 import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
+import { mergeCosim, mergedLine, MERGED_LINE, MERGED_TOP } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import { t } from '../i18n/i18n.ts';
@@ -62,18 +63,51 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
    * (en memoria mientras no cambie el código), y los bloques de comportamiento necesitan su .vvp
    */
   const variantCache = useRef(new Map<string, { subckt: string; vvp?: string }>());
-  const withVariants: Variants = async (netlist, inFiles) => {
+  const mergeCache = useRef(new Map<string, { subckt: string; vvp: string; pins: { name: string }[] }>());
+  const withVariants: Variants = async (input, inFiles, traces) => {
     const p = projectRef.current;
     const mods = verilogModules(p).filter((f) => f.synth);
+    let netlist = input;
+    let aliases: Map<string, string> | undefined;
+    const merged: string[] = [];
+    // los bloques de la biblioteca DSP, en un solo módulo de Icarus (#366, cosimMerge.ts); no si
+    // ya hay otro bloque de comportamiento (Icarus corre uno por simulación)
+    const behavioral = mods.some((f) => f.synth!.vvp && new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$)`, 'im').test(netlist));
+    const m =
+      !behavioral &&
+      mergeCosim(
+        netlist,
+        mods.map((f) => ({ name: moduleOf(f), pins: f.synth!.pins, params: f.synth!.params })),
+        (name) => /^dsp_/i.test(name),
+        traces,
+      );
+    let vvp: string | undefined;
+    if (m) {
+      // (el generado primero: su timescale vale para los que siguen)
+      const sources = { [`${m.top}.v`]: m.verilog, ...verilogSources(p) };
+      const k = JSON.stringify(sources);
+      let hit = mergeCache.current.get(k);
+      if (!hit) {
+        setStatus({ kind: 'running', percent: 0, text: t('Compiling {n} DSP blocks into one Icarus module…', { n: m.instances.length }) });
+        const r = await compileBehavioral(sources, `${m.top}.v`, m.top, vvpFileOf(m.top));
+        if (!r.block || !r.vvp) throw new Error(`${m.top}: ${r.error}`);
+        hit = { subckt: r.block.subckt, vvp: r.vvp, pins: r.block.pins };
+        mergeCache.current.set(k, hit);
+      }
+      netlist = m.netlist.replace(MERGED_LINE, `* DSP library blocks in one Icarus module (${m.top}): ${m.instances.join(' ')}\n${mergedLine(m, hit.pins)}`);
+      merged.push(hit.subckt);
+      vvp = hit.vvp;
+      aliases = m.aliases;
+    }
     const v = applyVariants(
       netlist,
       mods.map((f) => ({ name: moduleOf(f), params: f.synth!.params })),
     );
-    const files: Record<string, string> = { ...inFiles };
+    const files: Record<string, string> = { ...inFiles, ...(vvp ? { [vvpFileOf(MERGED_TOP)]: vvp } : {}) };
     for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
     const subs: string[] = [];
     /** .subckt de variantes que van al final de la netlist (su módulo no está en ningún archivo) */
-    const inline: string[] = [];
+    const inline: string[] = [...merged];
     for (const n of v.needs) {
       const f = verilogFile(p, n.module)!;
       const k = `${n.name}\u0000${f.hdl ?? ''}\u0000${f.text}`;
@@ -102,7 +136,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
     const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
-    return { netlist: withSubckts(v.netlist, inline), files, warnings: v.warnings };
+    return { netlist: withSubckts(v.netlist, inline), files, warnings: v.warnings, ...(aliases ? { aliases } : {}) };
   };
   return { synthModule, synthAndReport, synthStale, withVariants };
 }

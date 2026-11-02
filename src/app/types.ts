@@ -6,6 +6,7 @@ import type { saveFile } from '../schematic/fileio.ts';
 import type { FoundLine } from '../schematic/directivesEdit.ts';
 import type { AnalysisKind } from '../sim/analyses.ts';
 import type { MeasTable } from '../sim/measResults.ts';
+import type { SavableSignal } from '../sim/saves.ts';
 import type { BuiltSimulation } from '../sim/schematicSim.ts';
 
 export type Dialog =
@@ -64,4 +65,14 @@ export interface FileState {
   driveId?: string;
   /** versión del archivo en Drive cuando se abrió o guardó: si cambió, otro lo modificó (#156) */
   driveVersion?: string;
+}
+
+/** El panel de señales guardadas (#314, #364): qué se guarda y, armada la netlist, lo que se puede guardar */
+export interface SavesState {
+  mode: 'all' | 'some';
+  signals?: SavableSignal[];
+  built?: BuiltSimulation;
+  /** gris mientras se simula: la punta de prueba grafica */
+  inactive?: boolean;
+  picking?: boolean;
 }

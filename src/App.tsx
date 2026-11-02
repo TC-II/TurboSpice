@@ -13,8 +13,7 @@ import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, pzRuns, rowDevice } from './waveform/ScalarViews.tsx';
-import { isStbPlot, stbMainTraces } from './waveform/StbView.tsx';
-import { isPzBodePlot, pzMarks, pzRoots } from './waveform/pz.ts';
+import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
 import type { PartGroup } from './schematic/PartTable.tsx';
@@ -24,16 +23,16 @@ import { AppMenu } from './ui/Menu.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
 import { readShareHash } from './schematic/share.ts';
 import { loadLtspiceIndex, prefetchLtspice, type LtspiceIndex } from './library/ltspiceLib.ts';
-import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, saveProjectSession, saveResult, type RecentFile } from './schematic/autosave.ts';
+import { addRecent, loadProjectSession, loadRecent, loadResult, loadUserFiles, saveProjectSession, type RecentFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
-import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
+import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis } from './schematic/directivesEdit.ts';
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, keepResult, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, simName, type SimList, type SimView } from './sim/simList.ts';
 import { hasParkedControl, isComplexLine, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -42,7 +41,6 @@ import {
   mergeFiles,
   projectFileKind,
   lineOf,
-  recordRun,
   selectSim as selectProjectSim,
   setSimAsc,
   simOf,
@@ -110,8 +108,8 @@ import { vvpFileOf, applySynth, isStale, moduleOf, verilogFile, verilogModules, 
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
 import { busNames } from './waveform/digital.ts';
 import type { SynthResult } from './hdl/yosys.ts';
-import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
-import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
+import { BASE, DEFAULT_PROJECT, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
+import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, registerUserFile } from './app/helpers.ts';
 import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
@@ -122,7 +120,6 @@ import { useDrive } from './app/useDrive.ts';
 import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 import { SimRow } from './app/SimRow.tsx';
 import { simProblems } from './app/Problems.tsx';
-import { runTestbench } from './app/simulate.ts';
 import { useUserFiles } from './app/useUserFiles.ts';
 import { moduleActions } from './app/modules.ts';
 import { navigation } from './app/navigation.ts';
@@ -139,6 +136,7 @@ import { clipboardActions } from './app/clipboard.ts';
 import { tutorialState } from './app/tutorialProbe.ts';
 import { savingActions } from './app/saving.ts';
 import { projectFileActions } from './app/projectFiles.ts';
+import { runActions } from './app/runActions.ts';
 
 
 export function App() {
@@ -332,7 +330,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // las señales del circuito con la netlist armada (para la punta de prueba)
   // Al simular queda en gris (`inactive`) y la punta de prueba vuelve a graficar; un click en el
   // panel lo reactiva y, si se estaba eligiendo (`picking`), la punta vuelve a elegir
-  const [saves, setSaves] = useState<{ mode: 'all' | 'some'; signals?: SavableSignal[]; built?: BuiltSimulation; inactive?: boolean; picking?: boolean } | null>(null);
+  const [saves, setSaves] = useState<SavesState | null>(null);
   const savesOpen = !!saves && !curSub;
   const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
@@ -884,108 +882,15 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
    *  con .save los parámetros de dispositivo que usen (#202) */
   const allTraces = () => [panes, ...Object.values(plotView), ...panesByKind.current.values()].flatMap((ps) => ps.flatMap((p) => p.traces.map((tt) => tt.expr)));
-  /** `unlimited`: «seguir igual» con un transitorio que no entraba, hasta llenar la memoria */
-  const run = async ({ unlimited = false }: { unlimited?: boolean } = {}) => {
-    // se simula el circuito actual (aunque se esté mirando una corrida vieja)
-    // los subcircuitos no se simulan solos (#180): se simula desde un testbench
-    if (pathRef.current.length) return setMessage(t('Subcircuits are not simulated on their own: go up to a testbench (Alt+↑) to simulate'));
-    const doc = liveDoc;
-    setViewRun('');
-    // el panel de señales guardadas queda para la próxima corrida: la punta de prueba grafica (#364)
-    setSaves((s) => s && { ...s, inactive: true, picking: savesPicking });
-    aborting.current = false;
-    setStatus({ kind: 'running', percent: 0, text: '' });
-    setMessage(undefined);
-    engine.onStatus = (text, percent) => setStatus({ kind: 'running', percent, text });
-    // simulación de la lista a la que van los resultados
-    const id = sims.active;
-    // el circuito exacto que se simula queda en el historial de la simulación (#152)
-    const simAsc = ascText(doc);
-    if (id) {
-      const last = prevRun();
-      const p0 = snapshot();
-      const files = runFilesOf(p0, simAsc);
-      editProject(recordRun(p0, id, simAsc, Date.now(), last ? runSummary(diffCircuits(parseAsc(last.asc), doc).summary, last.files, files) : undefined, files).project);
-      setAutoDrive((n) => n + 1);
-    }
-    try {
-      const { built, result, ms, meas, blk, xy } = await runTestbench({
-        ...{ doc, simAsc, lib, ltIndex, engine, unlimited, ascName, allTraces, synthStale, withVariants },
-        onBias: (built, bias) => setOpPoint({ doc, built, bias }),
-      });
-      // los resultados de la última corrida quedan en el navegador (no van en el .turbo); los muy
-      // grandes no: guardarlos los copia entera otra vez (y la base del navegador puede no admitirlos)
-      if (id) {
-        const bytes = result.plots.reduce((n, pl) => n + pl.vectors.reduce((k, v) => k + v.real.byteLength + (v.imag?.byteLength ?? 0), 0), 0);
-        if (bytes <= MAX_CACHED_BYTES) saveResult(id, { asc: simAsc, result: { result, meas }, time: Date.now() });
-        else dropResult(id);
-      }
-      // si mientras tanto se eligió otra simulación, los resultados quedan guardados para ésta
-      if (simsRef.current.active !== id) {
-        if (simsRef.current.items.some((s) => s.id === id)) keepResult(kept.current, id, { built, result, doc, meas });
-        setStatus({ kind: 'done', ms });
-        return;
-      }
-      // Al abrirse el panel de resultados el lienzo se achica: reajustar la vista
-      if (!sim) setTimeout(() => editor.current?.fit(), 50);
-      // al simular se ven los dos: esquemático y resultados en pantalla partida
-      if (expanded) setExpanded('');
-      setSim({ built, result, doc, meas });
-      setHiddenRuns(new Set());
-      paneUndo.current = { past: [], future: [] };
-      // se muestra la última corrida con eje X; los plots sintéticos ("op vs R", "meas vs R")
-      // sólo si no hay otra cosa
-      const realRuns = result.plots.filter((p) => scaleOf(p) && /^[a-z]+\d+$/i.test(p.name));
-      const withScale = xy.length ? xy : realRuns.length ? realRuns : result.plots.filter((p) => scaleOf(p));
-      // con .pz se abre el mapa de polos y ceros aunque haya otros análisis
-      const pzs = result.plots.filter(isPzPlot);
-      const pzBodes = result.plots.filter(isPzBodePlot);
-      const shown = pzBodes[pzBodes.length - 1] ?? pzs[pzs.length - 1] ?? withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
-      setPlotName(shown?.name ?? '');
-      // Qué graficar: la vista recordada para este análisis, o lo que pida el .control con
-      // "plot", o lo que ya se estaba mirando (las trazas que no existan avisan en su chip)
-      const remembered = shown && plotView[plotKind(shown.name)];
-      // .stb: la ganancia de lazo, R (GFT) o T (Tian); con la sonda diferencial, un pane por modo (#333)
-      const stbMain = isStbPlot(shown) ? stbMainTraces(shown) : [];
-      // vistas guardadas antes de que existieran T y R: la vieja "loopgain" pasa a la de ahora
-      const keptView = remembered && stbMain.length ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: stbMain[0] } : tr)) })) : remembered;
-      // (la vista que se usa tiene que traer alguna traza de este .stb: la de la sonda simple no sirve con la diferencial)
-      const fits = (pns: typeof panes) => pns.some((pn) => pn.traces.some((tr) => shown!.vectors.some((v) => v.name === tr.expr.trim().toLowerCase())));
-      if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
-      else if (stbMain.length && !fits(keptView ?? panes)) setPanes(stbMain.map((expr) => ({ traces: [{ expr }] })));
-      else if (isPzBodePlot(shown) && !fits(keptView ?? panes)) setPanes([{ traces: [{ expr: 'h' }] }]);
-      else if (keptView) {
-        setPanes(keptView);
-        if (built.controlPanes.length) built.warnings.push(t('Using the remembered view instead of the .control "plot" commands'));
-      } else if (built.controlPanes.length) setPanes(built.controlPanes);
-      const errs = result.errors.length ? result.errors : [];
-      setStatus(errs.length && (!result.plots.length || result.sizeStop) ? { kind: 'error', message: errs[0] } : { kind: 'done', ms });
-      // símbolos faltantes: el circuito simulado no es el del esquemático, el aviso va primero (#108)
-      const missing = built.missingSymbols;
-      setMessage(
-        errs.length && (!result.plots.length || result.sizeStop)
-          ? t('{p0} — see the Errors tab', { p0: errs[0] })
-          : missing.length
-          ? missing.length === 1
-            ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
-            : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
-          : built.warnings.length
-            ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
-            : undefined,
-      );
-      setStopPlotted(false);
-      // frenado por memoria: la punta de prueba recién con «Plot up to here» (que lleva al gráfico)
-      if (result.plots.length && result.sizeStop) setPanel('problems');
-      else if (result.plots.length) {
-        setTool({ kind: 'probe' });
-        const nothingPlotted = !(remembered ?? panes).some((p) => p.traces.length) && !built.controlPanes.length;
-        setPanel(errs.length ? 'problems' : meas?.rows.length && (nothingPlotted || (blk.table && !xy.length)) ? 'meas' : 'plot');
-      } else setPanel(errs.length ? 'problems' : 'log');
-    } catch (e) {
-      // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
-      if (!aborting.current) setStatus({ kind: 'error', message: (e as Error).message });
-    }
-  };
+  // frenada por memoria (#363): lo simulado hasta ahí se mira recién al elegir «Plot up to here»
+  const [stopPlotted, setStopPlotted] = useState(false);
+  const aborting = useRef(false);
+  // Deshacer / rehacer los cambios de la vista de resultados (trazas, paneles, colores)
+  const paneUndo = useRef<{ past: Pane[][]; future: Pane[][] }>({ past: [], future: [] });
+  const run = runActions({
+    ...{ engine, lib, ltIndex, liveDoc, pathRef, sims, simsRef, sim, kept, aborting, paneUndo, editor, savesPicking, setSaves, setStatus, setViewRun, setMessage, prevRun, snapshot, editProject, setAutoDrive },
+    ...{ ascName, allTraces, synthStale, withVariants, setOpPoint, expanded, setExpanded, setSim, setHiddenRuns, setPlotName, plotView, panes, setPanes, setStopPlotted, setPanel, setTool },
+  });
 
   // la esquina del PDK (docs/pdk.md): la de una directiva .lib, si hay, o la elegida en la barra
   // (guardada en el .asc, ;.pdk); el PDK, de los símbolos o de esa directiva
@@ -1009,8 +914,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     };
   }, [doc]);
 
-  // frenada por memoria (#363): lo simulado hasta ahí se mira recién al elegir «Plot up to here»
-  const [stopPlotted, setStopPlotted] = useState(false);
   const stopHidden = !!sim?.result.sizeStop && !stopPlotted;
   // hasta qué instante llegó (el último tiempo del transitorio frenado)
   const stopTime = useMemo(() => {
@@ -1037,7 +940,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     runRef.current();
   }, [runQueued]);
 
-  const aborting = useRef(false);
   const abort = () => {
     engine.abort();
     aborting.current = true;
@@ -1052,8 +954,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     setPanel(sim.result.errors.length ? 'problems' : 'log');
   };
 
-  // Deshacer / rehacer los cambios de la vista de resultados (trazas, paneles, colores)
-  const paneUndo = useRef<{ past: Pane[][]; future: Pane[][] }>({ past: [], future: [] });
   const editPanes = (next: Pane[]) => {
     paneUndo.current.past.push(panes);
     paneUndo.current.future = [];

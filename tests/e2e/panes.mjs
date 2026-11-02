@@ -2,7 +2,7 @@
 // carriles se estiran), doble clic los iguala, y el orden de las trazas de un panel (el de dibujo:
 // la última queda encima) se cambia arrastrando una sobre otra o con «Traer al frente».
 // Uso: node tests/e2e/panes.mjs [url]   (con `npm run preview` corriendo)
-import { autosaved, frames, steady, skipWelcome, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await launchBrowser();
@@ -21,7 +21,7 @@ const check = (ok, msg) => {
 const heights = () => page.locator('.panes > .pane').evaluateAll((ps) => ps.map((p) => Math.round(p.getBoundingClientRect().height)));
 const chips = (i = 0) => page.locator('.panes > .pane').nth(i).locator('.trace-chip .name').allTextContents();
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 // el sigma-delta del proyecto «ADC»: un panel analógico (V(vin), V(out), V(int)) y uno digital
 await page.getByRole('button', { name: 'Menú', exact: true }).click();

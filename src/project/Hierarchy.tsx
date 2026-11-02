@@ -45,7 +45,7 @@ export interface TreeBench {
 
 export type BenchItem = 'sim' | 'schematic' | 'params' | 'history' | 'study';
 
-/** Tipos de módulo: glifo (texto o ícono), etiqueta de la fila, nombre en el menú «+ New» y ayuda */
+/** Tipos de módulo: glifo (texto o ícono), etiqueta de la fila, nombre en el menú «+ New» (que también importa) y ayuda */
 const KIND: Record<'subckt' | 'model' | 'verilog', { glyph: React.ReactNode; label(): string; name(): string; title(): string }> = {
   subckt: { glyph: '▭', label: () => t('subcir'), name: () => t('Subcircuit'), title: () => t('Subcircuit: schematic and its symbol') },
   model: { glyph: <Icon name="component" size={13} />, label: () => t('model'), name: () => t('Model'), title: () => t('Model: netlist (.subckt or .model) and its symbol') },
@@ -456,9 +456,6 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
         <h4>
           {t('Modules')}
           <span className="tree-adds">
-            <button className="tree-add" onClick={onImport} title={t('Import subcircuits: .zip, .asc (+ .asy), .lib/.sub')}>
-              {t('Import')}
-            </button>
             <span className="tree-newmenu" onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setNewMenu(false)}>
               <button className="tree-add" onClick={() => setNewMenu(!newMenu)} aria-haspopup="menu" aria-expanded={newMenu} title={t('New module')}>
                 + {t('New')} ▾
@@ -474,12 +471,21 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
                       <span className="tree-glyph">{KIND[k].glyph}</span> {KIND[k].name()}
                     </button>
                   ))}
+                  <span className="tree-menu-sep" role="separator" />
+                  {/* importar: qué acepta y adónde va cada cosa, a la vista (no sólo en el título) */}
+                  <button role="menuitem" className="tree-menu-import" onClick={() => { setNewMenu(false); onImport(); }} title={t('An .asc becomes a subcircuit here (with its .asy, or a generated symbol); .lib, .sub and other netlists go to the project files and their .subckt and .model are used from Component…; a .zip can bring all of them')}>
+                    <span className="tree-glyph">⇪</span>
+                    <span>
+                      {t('Import files…')}
+                      <small>{t('.asc, .asy, .lib, .sub, .zip…')}</small>
+                    </span>
+                  </button>
                 </span>
               )}
             </span>
           </span>
         </h4>
-        {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet: create one with «+ New» or import it.')}</p>}
+        {subs.length ? <ul>{roots.map((s) => node(s, 0, []))}</ul> : <p className="tree-meta tree-empty">{t('None yet: create or import one with «+ New».')}</p>}
       </section>
     </aside>
   );

@@ -98,7 +98,12 @@ export function projectFileActions({ google, project, variant, sims, curSim, rec
     }
   };
 
-  const doNew = () => confirmDiscard() && loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
+  /** Proyecto nuevo, vacío (false: el usuario no quiso descartar los cambios) */
+  const doNew = () => {
+    if (!confirmDiscard()) return false;
+    loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
+    return true;
+  };
 
   /** Abre un proyecto de public/examples, opcionalmente en una de sus variantes */
   const doExample = async (name: string, variant?: string) => {

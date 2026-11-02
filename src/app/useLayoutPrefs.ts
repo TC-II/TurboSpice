@@ -27,14 +27,16 @@ export function useLayoutPrefs(hasSubs: boolean, setMessage: (m?: string) => voi
   const traceW = useTraceWidth();
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
   const [treePeek, setTreePeek] = useState(false);
-  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto para quien entra por
-  // primera vez (así ve los testbenches del proyecto de ejemplo) y, si no, abierto si hay subcircuitos
+  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos. Quien
+  // entra por primera vez lo ve abierto, como al crear un proyecto nuevo (y así queda)
   const [treePref, setTreePref] = useState<boolean | null>(() => {
     const v = lsGet('turbospice.tree');
     return v === '1' ? true : v === '0' ? false : lsGet('turbospice.welcomed') ? null : true;
   });
-  // (desde la segunda visita ya no cuenta como primera)
-  useEffect(() => lsSet('turbospice.welcomed', '1'), []);
+  useEffect(() => {
+    if (!lsGet('turbospice.welcomed') && lsGet('turbospice.tree') === null) lsSet('turbospice.tree', '1');
+    lsSet('turbospice.welcomed', '1');
+  }, []);
   const treeOpen = treePref ?? hasSubs;
   // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
   // ancho del panel del símbolo (se arrastra su borde izquierdo)

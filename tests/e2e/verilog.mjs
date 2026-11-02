@@ -4,7 +4,7 @@
 // (buses con radix); el modo comportamiento (Icarus) corre retardos y $display; todo sigue ahí
 // después de recargar.
 // Uso: node tests/e2e/verilog.mjs [url]   (con `npm run preview` corriendo)
-import { autosaved, frames, steady, skipWelcome, until, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, skipWelcome, until, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -86,13 +86,13 @@ const synthesize = async () => {
   await page.waitForFunction(() => /Sintetizado|Compilado|Falló/.test(document.querySelector('.vm-status')?.textContent ?? ''), null, { timeout: 120000 });
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 
 // --- módulo nuevo: pregunta esquemático o Verilog ---
 await openTree();
 await page.locator('.tree-newmenu .tree-add').click();
-check((await page.getByRole('menuitem').count()) === 3, 'módulo nuevo: el menú ofrece subcircuito, modelo o Verilog');
+check((await page.getByRole('menuitem').count()) === 4 && (await page.getByRole('menuitem', { name: /Importar archivos/ }).count()) === 1, 'módulo nuevo: el menú ofrece subcircuito, modelo, Verilog e importar archivos');
 await page.locator('.tree-newmenu .tree-add').click();
 await newModule('div4', 'Verilog');
 check((await page.locator('.verilog-module strong').textContent()) === 'div4.v', 'abre la vista del módulo Verilog (código en lugar del esquemático)');

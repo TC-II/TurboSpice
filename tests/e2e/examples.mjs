@@ -2,7 +2,7 @@
 // Uso: node tests/e2e/examples.mjs [url] [carpeta-capturas]
 // Requiere un Chromium instalado (CHROMIUM o /usr/bin/chromium) y `npm run preview` corriendo.
 import { mkdirSync } from 'node:fs';
-import { menu, skipWelcome, launchBrowser } from './lib.mjs';
+import { menu, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -19,7 +19,7 @@ for (const scheme of ['light', 'dark']) {
   page.on('response', (r) => r.status() >= 400 && consoleErrors.push(`HTTP ${r.status()} ${r.url()}`));
   page.on('pageerror', (e) => consoleErrors.push(e.message));
 
-  await page.goto(URL);
+  await page.goto(sampleUrl(URL));
   await menu(page, 'Ver', 'Editor de netlist (SPICE)');
   await page.getByText('Listo').waitFor({ timeout: 30000 });
   const examples = await page.locator('select[aria-label="Ejemplos"] option').allTextContents();

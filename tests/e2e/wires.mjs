@@ -2,7 +2,7 @@
 // arrastrar un tramo, Alt+click, deshacer; la netlist del archivo guardado no cambia.
 // Uso: node tests/e2e/wires.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { skipWelcome, launchBrowser } from './lib.mjs';
+import { skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { activeAsc, variantOf } from '../../src/project/project.ts';
@@ -31,7 +31,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.getByRole('button', { name: 'Nuevo' }).click();
 const svg = page.locator('svg.editor');
 const at = async (x, y) => {

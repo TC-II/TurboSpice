@@ -2,7 +2,7 @@
 // semilla fija), serie de simulaciones y búsqueda / ajuste con bloques, sobre el filtro RC.
 // Uso: node tests/e2e/templates.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { launchBrowser, openExample, resultsMenu, skipWelcome } from './lib.mjs';
+import { launchBrowser, openExample, resultsMenu, skipWelcome, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -23,7 +23,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 
 /** Abre el filtro RC limpio y el Estudio, y elige una plantilla */

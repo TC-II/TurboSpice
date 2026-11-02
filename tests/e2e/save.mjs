@@ -5,7 +5,7 @@
 // Uso: [BROWSER=firefox] node tests/e2e/save.mjs [url]   (con `npm run preview` corriendo; el build necesita
 // VITE_GOOGLE_CLIENT_ID, cualquiera sirve: no se habla con Google)
 import { readFileSync } from 'node:fs';
-import { autosaved, frames, launchBrowser, menu, skipWelcome, until } from './lib.mjs';
+import { autosaved, frames, launchBrowser, menu, skipWelcome, until, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await launchBrowser();
@@ -227,7 +227,7 @@ async function newPage(context) {
     return d.type() === 'prompt' ? d.accept(a ?? d.defaultValue()) : d.accept();
   });
   page.errors = errors;
-  await page.goto(URL);
+  await page.goto(sampleUrl(URL));
   await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
   await page.locator('svg.editor .sym').first().waitFor();
   return page;
@@ -672,6 +672,8 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const fake = new FakeDrive();
   const context = await driveContext(fake);
   const page = await newPage(context);
+  // (al recargar se restaura la sesión: que ya esté guardada en el navegador)
+  await autosaved(page);
   const setToken = (ms) => page.evaluate((ms) => sessionStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'tokOld', expires: Date.now() + ms })), ms);
   const requests = () => page.evaluate(() => window.__tokenRequests ?? 0);
   const tokenNow = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('turbospice.google.token') ?? 'null'));

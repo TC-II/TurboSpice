@@ -2,7 +2,7 @@
 // en las fuentes se elige si se ven el nombre y el valor (#71).
 // Uso: node tests/e2e/dialogs.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { openExample, skipWelcome, launchBrowser } from './lib.mjs';
+import { openExample, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -20,7 +20,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 // el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)
 await openExample(page, 'RC Filter');

@@ -7,7 +7,10 @@ export const skipWelcome = async (target) => {
   await spanishUi(target);
   await target.addInitScript(() => localStorage.setItem('turbospice.welcomed', '1'));
 };
-/** Ver › Mostrar las directivas en el esquemático (#48): para los tests que leen el .tran dibujado */
+/** La URL que abre el proyecto de muestra (el pasabajos RC) del que parten los e2e: la primera
+ *  visita abre un proyecto vacío */
+export const sampleUrl = (url) => `${url}${url.includes('?') ? '&' : '?'}example=${encodeURIComponent('Sample Project.turbo')}`;
+/** Ver › Mostrar directivas (#48): para los tests que leen el .tran dibujado */
 export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 
 /** Recorre un desplegable ya abierto: los submenús con hover, el último ítem con click */

@@ -107,7 +107,8 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
     { label: t('Line style…'), onClick: () => openLineStyle() },
   ];
   // Desplegable de Simular: los tipos de análisis (configuran la simulación del testbench, con
-  // sus parámetros en la barra), los comandos a mano y los análisis programados. Los testbenches
+  // sus parámetros en la barra), las señales guardadas, solas, y al final los comandos a mano y los
+  // análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
     ...ANALYSES.map((x) => ({ label: x.label, lead: <AnalysisIcon kind={x.kind} />, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), current: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
@@ -119,14 +120,14 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
       onClick: complexSim,
     },
     'sep',
-    { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
     {
       label: t('Saved signals…'),
       title: t('Save everything, or only some voltages and currents (smaller simulations)'),
       onClick: () => openSaves(),
     },
-    { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     'sep',
+    { label: t('Simulation command…'), shortcut: 'A', onClick: () => openSimulation() },
+    { label: t('SPICE directive…'), shortcut: '.', onClick: () => setDialog({ kind: 'text', textKind: 'directive' }) },
     { label: t('Studio…'), shortcut: 'Alt+E', onClick: openStudy },
     { label: t('.control block…'), shortcut: 'Alt+C', onClick: openControl },
   ];
@@ -229,14 +230,14 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
     {
       label: t('View'),
       items: [
-        { label: t('Highlight the net under the cursor'), shortcut: 'H', onClick: () => setNetHover((v) => !v), checked: netHover },
+        { label: t('Highlight net'), title: t('Highlight the net under the cursor'), shortcut: 'H', onClick: () => setNetHover((v) => !v), checked: netHover },
         'sep',
         { label: t('Fit to view'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { label: t('Zoom to a box'), shortcut: 'Z', onClick: zoomBox },
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: t('Show the directives on the schematic'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'), onClick: toggleSimCommand, checked: showSimCommand },
+        { label: t('Show directives'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'), onClick: toggleSimCommand, checked: showSimCommand },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },

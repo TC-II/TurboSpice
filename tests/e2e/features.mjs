@@ -4,7 +4,7 @@
 // colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { autosaved, frames, steady, menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, until, launchBrowser, FIREFOX } from './lib.mjs';
+import { autosaved, frames, steady, menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, until, launchBrowser, FIREFOX, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -30,7 +30,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
 
@@ -1093,7 +1093,7 @@ check((await page.locator('.study-card').count()) === 3 && (await page.getByLabe
 await page.getByLabel('Activar Barrido de R1').uncheck();
 await page.getByRole('button', { name: '+ Tolerancias' }).click();
 await page.getByRole('button', { name: 'Todos los capacitores 10 %' }).click();
-await page.getByLabel('Corridas').fill('30');
+await page.getByLabel('Corridas', { exact: true }).fill('30');
 check(await page.getByText('30 corridas en total').isVisible(), 'el barrido desactivado no cuenta');
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check((await page.locator('svg.editor .sym text.win', { hasText: '{mc(1u,0.1)}' }).count()) === 1, 'C1 con tolerancia: {mc(1u,0.1)}');
@@ -1142,11 +1142,11 @@ await page.getByLabel('Señal 1 del panel 1', { exact: true }).fill('V(out)');
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 // #48: el comando de simulación no se dibuja (se configura en la barra de Simular)…
 check((await page.locator('svg.editor .texts text', { hasText: /^\.(tran|ac) / }).count()) === 0, 'el comando de simulación no se ve en el esquemático');
-// …salvo con Ver › Mostrar las directivas en el esquemático
-await menu(page, 'Ver', 'Mostrar las directivas en el esquemático');
+// …salvo con Ver › Mostrar directivas
+await menu(page, 'Ver', 'Mostrar directivas');
 check((await page.locator('svg.editor .texts .directive', { hasText: '.tran 20m' }).count()) === 1, 'el .tran sigue siendo la directiva (la que corre LTspice)');
 check((await page.locator('svg.editor .texts .ngspice', { hasText: 'análisis adicionales' }).count()) === 1, 'el .ac queda como comentario que sólo corre TurboSpice');
-await menu(page, 'Ver', 'Mostrar las directivas en el esquemático');
+await menu(page, 'Ver', 'Mostrar directivas');
 check((await page.locator('svg.editor .texts text', { hasText: /^\.(tran|ac) / }).count()) === 0, 'y se vuelve a ocultar');
 await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -1399,14 +1399,16 @@ await page.locator('svg.editor .sym').first().waitFor();
   await page.keyboard.press('Control+z');
 }
 
-// primera visita: sin pantalla de bienvenida, abre el proyecto de muestra; "Acerca de" directo en el menú
+// primera visita: sin pantalla de bienvenida, un proyecto vacío (como Nuevo proyecto) con el panel
+// del proyecto abierto; "Acerca de" directo en el menú
 const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 await spanishUi(fresh);
 const fp = await fresh.newPage();
 await fp.goto(URL);
 await fp.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await fp.getByRole('dialog').count()) === 0, 'la primera visita no abre ningún diálogo');
-check((await fp.locator('.capsule-project').textContent()) === 'Sample Project', `la primera visita abre el proyecto de muestra (${await fp.locator('.capsule-project').textContent()})`);
+check((await fp.locator('.capsule-project').textContent()) === 'Project' && (await fp.locator('svg.editor .sym').count()) === 0, `la primera visita abre un proyecto vacío (${await fp.locator('.capsule-project').textContent()})`);
+check((await fp.locator('.project-tree').count()) === 1, 'la primera visita muestra el panel del proyecto abierto');
 await menu(fp, 'Acerca de TurboSpice');
 check(await fp.getByRole('dialog', { name: 'Acerca de TurboSpice' }).waitFor({ timeout: 5000 }).then(() => true, () => false), 'Menú › Acerca de abre el diálogo');
 await fp.keyboard.press('Escape');

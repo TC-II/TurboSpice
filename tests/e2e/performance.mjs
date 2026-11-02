@@ -4,7 +4,7 @@
 // y la segunda carga no lo vuelve a bajar.
 // Uso: node tests/e2e/performance.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { frames, launchBrowser, skipWelcome, until } from './lib.mjs';
+import { frames, launchBrowser, skipWelcome, until, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -28,7 +28,7 @@ const check = (ok, msg) => {
 // la librería de arranque no trae las listas de pasivos: llegan aparte, después (#189)
 const libRequests = [];
 page.on('request', (r) => /library\/(bundle|cmp-passives)\.json/.test(r.url()) && libRequests.push(r.url().split('/').pop()));
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
 await page.locator('svg.editor .sym').first().waitFor();
 await frames(page);

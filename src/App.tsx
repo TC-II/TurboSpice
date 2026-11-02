@@ -22,9 +22,9 @@ import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu } from './ui/Menu.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
-import { readShareHash, shareHash } from './schematic/share.ts';
-import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
-import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, type RecentFile } from './schematic/autosave.ts';
+import { readShareHash } from './schematic/share.ts';
+import { loadLtspiceIndex, prefetchLtspice, type LtspiceIndex } from './library/ltspiceLib.ts';
+import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, saveProjectSession, saveResult, type RecentFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
@@ -138,6 +138,7 @@ import { contextMenus } from './app/contextMenus.ts';
 import { clipboardActions } from './app/clipboard.ts';
 import { tutorialState } from './app/tutorialProbe.ts';
 import { savingActions } from './app/saving.ts';
+import { projectFileActions } from './app/projectFiles.ts';
 
 
 export function App() {
@@ -873,78 +874,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
 
 
-  // carpeta lib de LTspice (lib/sym, lib/sub, lib/cmp): de Analog Devices, no se redistribuye; queda
-  // en el IndexedDB de este navegador y no se sube a ningún lado
-  const doImportLtspice = async (files: File[]) => {
-    try {
-      setMessage(t('Importing the LTspice library…'));
-      const index = await importLtspiceLibrary(files, (done, total) => setMessage(t('Importing the LTspice library: {done} of {total} files…', { done, total })));
-      setLtIndex(index);
-      setMessage(t('LTspice library imported: {symbols} symbols and {models} model files. It stays only in this browser.', { symbols: index.count.symbols, models: index.count.models }));
-    } catch (e) {
-      setMessage(t('Could not import the LTspice library: {p0}', { p0: (e as Error).message }));
-    }
-  };
-  const doRemoveLtspice = async () => {
-    await removeLtspiceLibrary();
-    setLtIndex(undefined);
-    setMessage(t('The LTspice library was removed from this browser (what\'s already loaded goes away when the page reloads)'));
-  };
-
-  // el link y el PDF llevan el circuito que se está viendo, como .asc
-  const ascName = () => `${project.name}.asc`;
-  // el link lleva el proyecto entero (.turbo): variantes, simulaciones, archivos del proyecto
-  const doShare = async () => {
-    const { bytes } = await turboBytes(`${project.name}${EXT}`);
-    const hash = await shareHash(bytes, `${project.name}${EXT}`);
-    setDialog({ kind: 'share', url: `${location.origin}${location.pathname}#${hash}` });
-  };
-
-  // Exportar (#326): la hoja a pantalla completa (PDF, SVG, PNG o portapapeles); nada viaja a un servidor
-  const doExport = () => setDialog({ kind: 'export' });
+  const { doImportLtspice, doRemoveLtspice, ascName, doShare, doExport, exportName, doRecent, doNew, doExample } = projectFileActions({
+    curSim: activeSim(sims),
+    ...{ google, project, variant, sims, recent, setLtIndex, turboBytes, confirmDiscard, openBytes, remember, loadDoc, loadProject, markDirty, setDialog, setMessage },
+    warnMissing: (d) => warnMissing(d), // (declarada más abajo)
+  });
   const exporting = dialog?.kind === 'export';
-  /** nombre de lo que se exporta: «Workbench - Testbench» (sin los caracteres que no van en un archivo) */
-  const exportName = () => {
-    const me = variant.sims.find((x) => x.id === sims.active);
-    const bench = project.groups.find((g) => g.id === me?.group)?.name;
-    const tb = (curSim && simName(curSim)) || t('No analysis');
-    return [bench, tb].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '_').trim() || project.name;
-  };
-
-  const doRecent = async (i: number) => {
-    const r = recent[i];
-    if (!r || !confirmDiscard()) return;
-    // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
-    const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
-    const driveVersion = bytes && r.driveId && google.account ? await drive.meta(r.driveId).then((m) => m.version, () => undefined) : undefined;
-    const at = { handle: r.handle as FileState['handle'], driveId: r.driveId, driveVersion };
-    try {
-      if (bytes) return await openBytes(bytes, r.name, at);
-      // la copia guardada en recientes
-      if (!r.turbo) {
-        const d = parseAsc(r.asc);
-        remember(loadDoc(d, r.name), { name: `${projectName(r.name)}${EXT}` });
-        return warnMissing(d);
-      }
-      const { project: parsed, warnings } = await parseTurbo(r.asc);
-      const p = { ...parsed, name: projectName(r.name) };
-      loadProject(p, { name: r.name, ...at });
-      if (r.unsaved) markDirty();
-      else remember(p, { name: r.name, ...at });
-      if (warnings.length) setMessage(warnings.join(' · '));
-    } catch (e) {
-      setMessage(t('Could not open: {p0}', { p0: (e as Error).message }));
-    }
-  };
-
-  const doNew = () => confirmDiscard() && loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
-
-  /** Abre un proyecto de public/examples, opcionalmente en una de sus variantes */
-  const doExample = async (name: string, variant?: string) => {
-    if (!confirmDiscard()) return;
-    const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
-    return openBytes(new Uint8Array(b), name, {}, variant);
-  };
 
   /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
    *  con .save los parámetros de dispositivo que usen (#202) */

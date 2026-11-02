@@ -1,43 +1,43 @@
-# Graph Report - TurboSpice  (2026-10-31)
+# Graph Report - TurboSpice  (2026-11-02)
 
 ## Corpus Check
-- 422 files · ~869,934 words
+- 502 files · ~941,943 words
 - Verdict: corpus is large enough that graph structure adds value.
-- Unclassified: 395 file(s) not represented in the graph (top: .asy 215, .asc 70, .lib 47)
+- Unclassified: 402 file(s) not represented in the graph (top: .asy 214, .asc 70, .lib 48)
 
 ## Summary
-- 4831 nodes · 12053 edges · 234 communities (219 shown, 15 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 251 edges (avg confidence: 0.87)
+- 5716 nodes · 15964 edges · 249 communities (235 shown, 14 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 374 edges (avg confidence: 0.89)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `2b19d1b5`
+- Built from commit: `bb9bf317`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - autosave.ts
 - Editor de modelos SPICE
-- .symbol
+- ItemRef
 - project/project.ts
 - Cosimulación Icarus-ngspice
 - r1
 - Diálogo de fuentes
-- turbo.ts
-- 13.5 Commands
+- share.ts
+- Library
 - Modo esquemático y utilidades
 - Diálogos de la interfaz
 - analyses.ts
 - traces.ts
-- bias.ts
+- simulate.ts
 - Edición de cables y segmentos
-- App.tsx
+- useOpPoint.ts
 - i18n.ts
 - resolve.ts
 - Cuenta de Google y Drive
 - Álgebra de Laplace
 - subckt-export.mjs
-- ref_node_fs
+- exchange.ts
 - Directivas y análisis del Estudio
 - E2E: funcionalidades
 - view.ts
@@ -47,30 +47,30 @@
 - ngspice.ts
 - geometry.ts
 - SchematicEditor.tsx
-- diff.ts
+- modelModule.ts
 - parseAsc
-- explicit.mjs
+- build-library.mjs
 - Exportar esquemático y polos-ceros
 - E2E: guardado en Drive
-- series.ts
+- ResultsPanel.tsx
 - Panel de Estudio
 - blocks.test.ts
 - Plantillas de Estudio
 - INDEX.md
-- model.ts
-- Mediciones .meas
+- studyActions.ts
+- meas.ts
 - Compilador de bloques
 - 2 Circuit Description
 - 8.2 Analog Models
 - ref_node_path
-- view.ts
+- PlotPanel.tsx
 - vitest
 - Módulos Verilog del proyecto
 - 14 Ngspice User Interfaces
 - curves.ts
 - PaneView
 - Manual de ngspice-47 — índice
-- PlotPanel.tsx
+- markers.ts
 - NetNames.tsx
 - Bloques con Blockly
 - shapes.test.ts
@@ -83,19 +83,19 @@
 - 28.1 Ngspice Installation under Linux (and other ’UNIXes’)
 - 8.4 Digital Models
 - Chequeo de traducciones
-- Generación de ejemplos
-- i18n.ts
-- PdkDialog.tsx
+- turbo.ts
+- SchematicEditor.tsx
+- SwitchDialog.tsx
 - Estimación de tamaño de simulación
 - 24.6.2 The Port Table
 - Auditoría de modelos faltantes
 - Benchmark de la app
 - Configuración de TypeScript
 - package.json
-- .symbol
+- rotate.test.ts
 - 1.2 Supported Analyses
 - 27.06-mosfets.md
-- E2E: jerarquía
+- frames
 - Pruebas smoke del motor
 - Scripts de npm
 - 5.2 Exxxx: non-linear voltage source
@@ -106,41 +106,41 @@
 - Worker del corpus
 - Auditoría de i18n
 - Pasos del workflow CI
-- StbModelsInfo.tsx
+- MenuActions
 - Generador de símbolos base
 - Nodos flotantes
 - 3.3 Elementary Devices
-- E2E: editor
+- Project
 - Despliegue a Pages
 - StbView.tsx
 - 24.7.1 Macros
 - 7.6 MOSFETs
 - E2E: diálogos
-- Pruebas E2E de Verilog
-- EditorHandle
-- extract.ts
+- PaneView.tsx
+- tikz.ts
+- Ngspice
 - Pruebas E2E de formas
 - Perfilado de arrastre
 - Parámetros de pasos de CI
 - Conversión del manual ngspice
 - 16 TCLspice
-- scan.mjs
+- Formato `.turbo`: proyectos, testbenches, subcircuitos e historial
 - Despliegue en Pages
 - site
 - drive.ts
-- L
+- SimPlot
 - 25.3 Code Model Error Messages
 - 15.3.2 Exported functions
-- Análisis comparativo de simulaciones
+- AppDialogs
 - ref_node_fs
 - Compatibilidad con LTspice
-- netlist.test.ts
+- EditorArea.tsx
 - Decimación de formas de onda
 - Jobs de build y E2E
 - 27.04-transmission-lines.md
-- API del panel de gráficos
+- toolbars.ts
 - Configuración de suite CI
-- README.md
+- modules.ts
 - 4.1 Independent Sources for Voltage or Current
 - Build de OpenVAF
 - Build de Icarus
@@ -168,18 +168,18 @@
 - 18 Statistical circuit analysis
 - Formato `.turbo`: proyectos, testbenches, subcircuitos e historial
 - userLibrary.ts
-- 7.3 BJT
-- 8.3 Hybrid Models
+- Correr TurboSpice en Windows
+- README.md
 - 13.6 Control Structures
-- DigitalLanes.tsx
+- curves.ts
 - 15 ngspice as shared library or dynamic link
 - 19 Circuit optimization with ngspice
 - 11.1 Simulator Variables (.options)
 - 11.5 Safe Operating Area (SOA) warning messages
-- Correr TurboSpice en Windows
+- baseName
 - build-pdk.ts
 - build-pdk-gf180.ts
-- wires.mjs
+- ShortcutActions
 - 15.4 General remarks on using the API
 - 17 Example Circuits
 - 27.5.1 BJT - Bipolar Junction Transistor
@@ -207,25 +207,25 @@
 - 26.13 OPTIONS
 - 26.14 OUTPUT
 - 26.16 X.MESH, Y.MESH
-- 26.19 NUMOS
+- si
 - TraceBox.tsx
 - 11.7 Measuring current through device terminals
 - 13.4 Command Interpretation
 - step.ts
 - 26.2 BOUNDARY, INTERFACE
-- 26.10 METHOD
+- SchematicMode
 - 26.15 TITLE
 - locale
 - SchematicCanvas.tsx
 - schematicSim.ts
-- 21 XSPICE Basics
+- spicenum.ts
 - 26.3 COMMENT
 - pdf.ts
 - 26.01-specification.md
 - 26.08-end.md
 - Oauth2
-- saves.ts
-- stbMath.ts
+- AscDoc
+- model.ts
 - google/README.md
 - VerilogModule.tsx
 - placing.mjs
@@ -234,69 +234,83 @@
 - ref_node_child_process
 - Análisis de estabilidad (`.stb`)
 - benchParams.ts
-- pdf.ts
-- Step
+- expr.ts
+- Connectivity
 - wires.mjs
-- FakeWorker
-- ltspiceLib.ts
-- prepareSimulation
-- gen-pdk-symbols.mjs
-- yosys.ts
+- exportSchematic.ts
+- App.tsx
+- useLayoutPrefs.ts
+- useProjectSession
+- simulation.mjs
 - units.mjs
 - TurboSpice
-- netlist/digital.ts
+- useVerilog.ts
 - stb.ts
-- 21 XSPICE Basics
-- PDK (sky130 y GF180MCU)
-- TraceBoxHandle
+- SimHelp.tsx
+- 4. Plan propuesto
+- ProjectPanel
 - PermissionHandle
+- navigation
+- corpus/run.mjs
+- scan.mjs
+- roughPen.d.ts
+- idealdiode.ts
+- build-share-dict.mjs
+- prepare.mjs
+- useProjectFiles.ts
+- equivalence.mjs
+- .prettierrc.json
+- tsconfig.test.json
+- Componentes de terceros
+- 6. Avance
+- Oauth2
 
 ## God Nodes (most connected - your core abstractions)
-1. `SchematicMode()` - 373 edges
-2. `t()` - 292 edges
-3. `13.5 Commands` - 111 edges
-4. `parseAsc()` - 97 edges
-5. `Library` - 85 edges
-6. `SchematicEditor()` - 78 edges
-7. `vitest` - 77 edges
-8. `AscDoc` - 57 edges
-9. `react` - 49 edges
-10. `serializeAsc()` - 47 edges
+1. `t()` - 379 edges
+2. `SchematicMode()` - 141 edges
+3. `Library` - 128 edges
+4. `parseAsc()` - 118 edges
+5. `AscDoc` - 117 edges
+6. `13.5 Commands` - 111 edges
+7. `react` - 96 edges
+8. `Project` - 95 edges
+9. `AppDialogs()` - 86 edges
+10. `vitest` - 84 edges
 
 ## Surprising Connections (you probably didn't know these)
+- `5. Métricas para seguir el avance` --references--> `SchematicMode()`  [INFERRED]
+  docs/auditoria-calidad.md → src/App.tsx
+- `Fase 5` --references--> `t()`  [INFERRED]
+  docs/auditoria-calidad.md → src/i18n/i18n.ts
 - `Resultados` --references--> `t()`  [INFERRED]
   docs/estabilidad.md → src/i18n/i18n.ts
 - `Idiomas` --references--> `t()`  [INFERRED]
   README.md → src/i18n/i18n.ts
 - `Buses (`netlist/bus.ts`)` --references--> `ngNodeName()`  [INFERRED]
   docs/compatibilidad-ltspice.md → src/netlist/tongspice.ts
-- `Editor de esquemáticos` --references--> `L()`  [INFERRED]
-  docs/PLAN.md → scripts/gen-ltspice-symbols.mjs
-- `7. Importar y exportar` --references--> `files()`  [INFERRED]
-  docs/turbo-formato.md → scripts/i18n/scan.mjs
 
 ## Import Cycles
 - 2-file cycle: `src/sim/saves.ts -> src/sim/schematicSim.ts -> src/sim/saves.ts`
 - 2-file cycle: `src/schematic/dialogs.tsx -> src/ui/SlideConfirm.tsx -> src/schematic/dialogs.tsx`
 - 3-file cycle: `src/sim/saves.ts -> src/sim/traces.ts -> src/sim/schematicSim.ts -> src/sim/saves.ts`
 
-## Communities (234 total, 15 thin omitted)
+## Communities (249 total, 14 thin omitted)
 
 ### Community 0 - "autosave.ts"
-Cohesion: 0.20
-Nodes (23): addRecent(), CachedResult, db(), del(), done(), dropResult(), get(), loadProjectSession() (+15 more)
+Cohesion: 0.22
+Nodes (21): addRecent(), CachedResult, db(), del(), done(), dropResult(), get(), loadProjectSession() (+13 more)
 
 ### Community 1 - "Editor de modelos SPICE"
-Cohesion: 0.10
-Nodes (59): subcktPins(), AttrInput(), ModelEditor(), addModelModule(), adoptModelSymbol(), isModelModule(), key(), MODEL_ATTRS (+51 more)
+Cohesion: 0.14
+Nodes (49): Fase 4 — Rendimiento de carga y robustez de e2e (≈3–4 días), addPin(), addShape(), addText(), adoptSymbol(), assignPin(), copySym(), formatParamList() (+41 more)
 
-### Community 2 - ".symbol"
-Cohesion: 0.07
-Nodes (32): Shape, addText(), fixedPoints(), hitTest(), ItemRef, wireVertexAt(), AlignedText(), arcPath() (+24 more)
+### Community 2 - "ItemRef"
+Cohesion: 0.06
+Nodes (8): clipboardActions(), ClipboardDeps, clipboardImage(), extractItems(), EditorHandle, Box, ItemRef, Props
 
 ### Community 3 - "project/project.ts"
-Cohesion: 0.11
-Nodes (50): runs(), activeAsc(), addGroup(), addSim(), applyValues(), ATTR_KEYS, blankVariant(), cloneVariant() (+42 more)
+Cohesion: 0.09
+Nodes (54): runs(), activeAsc(), addGroup(), addSim(), applyValues(), ATTR_KEYS, blankVariant(), cloneVariant() (+46 more)
 
 ### Community 4 - "Cosimulación Icarus-ngspice"
 Cohesion: 0.07
@@ -308,179 +322,179 @@ Nodes (8): andX(), arcPath(), orBack(), pt(), r1(), svgDoc(), toAsy(), toSvg()
 
 ### Community 6 - "Diálogo de fuentes"
 Cohesion: 0.10
-Nodes (43): fromRkm(), CsvImport(), csvPoints(), DEFAULT_ARGS, Dim(), FieldDef, FieldKey, fullLine() (+35 more)
+Nodes (41): sourceSyntax(), CsvImport(), csvPoints(), DEFAULT_ARGS, Dim(), FieldDef, FieldKey, fullLine() (+33 more)
 
-### Community 7 - "turbo.ts"
-Cohesion: 0.08
-Nodes (40): asBenches(), BenchGroup, EXT, FileRun, FileSim, FORMAT, Hash, hashCache (+32 more)
+### Community 7 - "share.ts"
+Cohesion: 0.20
+Nodes (15): isTurboText(), compactTurbo(), dict1(), expandTurbo(), fromBase64Url(), ID_KEYS, isObj(), Json (+7 more)
 
-### Community 8 - "13.5 Commands"
-Cohesion: 0.07
-Nodes (40): vitest, buildBundle(), LIB, MIN_SKIN_STROKE, normalizeSkin(), readText(), rel(), ROOT (+32 more)
+### Community 8 - "Library"
+Cohesion: 0.04
+Nodes (63): vitest, buildBundle(), normalizeSkin(), rel(), walk(), registerUserFile(), ORIENTS, SymbolSource (+55 more)
 
 ### Community 9 - "Modo esquemático y utilidades"
-Cohesion: 0.15
-Nodes (34): verilogPorts(), makeSymbol(), schematicPorts(), changedFiles(), runSummary(), benchesUsing(), childSubckts(), freeSubcktName() (+26 more)
+Cohesion: 0.13
+Nodes (43): TP, treeSubsOf(), Usage, tutorialState(), verilogPorts(), schematicPorts(), modelModuleName(), modelModules() (+35 more)
 
 ### Community 10 - "Diálogos de la interfaz"
-Cohesion: 0.07
-Nodes (49): Cambiar de idioma, Control, Cómo se hizo la conversión, Idiomas de la interfaz (#72), App(), t(), FileConflictDialog(), BenchParamsDialog() (+41 more)
+Cohesion: 0.08
+Nodes (54): Cambiar de idioma, Control, Cómo se hizo la conversión, Idiomas de la interfaz (#72), FileConflictAsk, t(), cmpApply(), pdkOfSymbol() (+46 more)
 
 ### Community 11 - "analyses.ts"
-Cohesion: 0.09
-Nodes (43): BarField, barRows(), COLUMNS, fieldProblem(), POINTS, SimBar(), SimState, STARTUP_TITLE (+35 more)
+Cohesion: 0.11
+Nodes (29): BarField, barRows(), COLUMNS, fieldProblem(), PickPad(), POINTS, SimBar(), SimState (+21 more)
 
 ### Community 12 - "traces.ts"
-Cohesion: 0.14
-Nodes (26): addPinCurrentSources(), pinCurrentVector(), pinSourceName(), sharedPin(), words(), deviceVector(), elementVector(), digitalProbeExpr() (+18 more)
+Cohesion: 0.09
+Nodes (44): DIGITAL_TYPE, SimVector, Element, addPinCurrentSources(), pinCurrentVector(), pinSourceName(), sharedPin(), words() (+36 more)
 
-### Community 13 - "bias.ts"
-Cohesion: 0.14
-Nodes (26): Block, Element, ngNodeName(), Bias, biasCommand(), biasParams(), bjtRegion(), circuitDirectives() (+18 more)
+### Community 13 - "simulate.ts"
+Cohesion: 0.11
+Nodes (29): Problem, ProblemsList(), simProblems(), RunOptions, runTestbench(), streamPlan(), missingSymbolIn(), biasCommand() (+21 more)
 
 ### Community 14 - "Edición de cables y segmentos"
-Cohesion: 0.16
-Nodes (37): Wire, onSegment(), addFlag(), addWire(), cutNew(), cutPieces(), cutThroughBodies(), dcSourcesAsCell() (+29 more)
+Cohesion: 0.11
+Nodes (54): Wire, isMirrored(), mirrorX(), rotateCW(), onSegment(), Extracted, extractSubckt(), isAuto() (+46 more)
 
-### Community 15 - "App.tsx"
-Cohesion: 0.05
-Nodes (88): ascCache, ascText(), clipboardImage(), Dialog, EXAMPLES, FileState, HintBar(), Hover (+80 more)
+### Community 15 - "useOpPoint.ts"
+Cohesion: 0.17
+Nodes (22): OpPointDeps, useOpPoint(), netNames(), Bias, instScope(), scopeElementOf(), SizeProblem, hideOpTag() (+14 more)
 
 ### Community 16 - "i18n.ts"
-Cohesion: 0.22
-Nodes (8): es, Lang, lang, LANGS, locale(), HistoryPanel(), HistoryPick, when()
+Cohesion: 0.13
+Nodes (14): react-dom, es, es, Lang, lang, LANGS, loadTranslations(), locale() (+6 more)
 
 ### Community 17 - "resolve.ts"
-Cohesion: 0.27
-Nodes (14): defaultWindows(), effectiveWindows(), ExplicitResult, explicitSymbol(), ltspiceDefaultAs(), ltspiceWindows(), makeExplicit(), NETLIST_ATTRS (+6 more)
+Cohesion: 0.14
+Nodes (24): usePicker(), defaultWindows(), effectiveAttrs(), effectiveWindows(), ExplicitResult, explicitSymbol(), ltspiceDefaultAs(), ltspiceWindows() (+16 more)
 
 ### Community 18 - "Cuenta de Google y Drive"
-Cohesion: 0.08
-Nodes (30): AccountButton(), Avatar(), DriveFile, FOLDER_NAME, Account, CLIENT_ID, drive, getToken() (+22 more)
+Cohesion: 0.11
+Nodes (26): Modos, AccountButton(), Avatar(), Account, CLIENT_ID, getToken(), initial(), listeners (+18 more)
 
 ### Community 19 - "Álgebra de Laplace"
 Cohesion: 0.14
 Nodes (39): addC(), addP(), addR(), closing(), Coef, constOf(), constR(), divC() (+31 more)
 
 ### Community 20 - "subckt-export.mjs"
-Cohesion: 0.08
-Nodes (24): readRaw(), args, conc, groups, jobs, one(), queue, RES (+16 more)
+Cohesion: 0.12
+Nodes (13): readRaw(), conn, dir, doc, ex, lib, LTSPICE, ng (+5 more)
 
-### Community 21 - "ref_node_fs"
-Cohesion: 0.08
-Nodes (51): canEncodeCp1252(), CP1252_REVERSE, cp1252Byte(), decode(), decodeText(), detectEncoding(), encode(), emptyDoc() (+43 more)
+### Community 21 - "exchange.ts"
+Cohesion: 0.12
+Nodes (28): ImportExportDeps, useImportExport(), changedFiles(), exportAllZip(), exportSubcktNetlist(), exportSubcktZip(), exportVariantZip(), Imported (+20 more)
 
 ### Community 22 - "Directivas y análisis del Estudio"
 Cohesion: 0.08
-Nodes (53): belowTexts(), DATA_TAGS, DataTag, dataText(), fromBase64(), isDataText(), isDataTextOf(), placeDataTexts() (+45 more)
+Nodes (52): belowTexts(), DATA_TAGS, DataTag, dataText(), fromBase64(), isDataText(), isDataTextOf(), placeDataTexts() (+44 more)
 
 ### Community 23 - "E2E: funcionalidades"
-Cohesion: 0.05
-Nodes (20): [a2, b2], canvas, code2, cursorHead(), errors, fftPick, headA(), headB() (+12 more)
+Cohesion: 0.04
+Nodes (30): [a2, b2], canvas, code2, cursorHead(), errors, exportView, fftPick, headA() (+22 more)
 
 ### Community 24 - "view.ts"
-Cohesion: 0.12
-Nodes (25): traceLabel(), isDigitalExpr(), exportPng(), PlotPanel(), Props, safeRange(), acceptsTrace(), addTraceTo() (+17 more)
+Cohesion: 0.16
+Nodes (21): Radix, addTraceTo(), asDft(), asPlotView(), colorFor(), colorize(), controlPlots(), CursorKey (+13 more)
 
 ### Community 25 - "Árbol del proyecto"
-Cohesion: 0.10
-Nodes (31): react, HierLevel, BenchItem, go(), KIND, Level, loadCollapsed(), ProjectTree() (+23 more)
+Cohesion: 0.08
+Nodes (33): AppBarRight(), ViewTabs(), SimRow(), SimRowProps, Toggle, getLang(), BenchItem, KIND (+25 more)
 
 ### Community 26 - "Lista de simulaciones"
-Cohesion: 0.12
-Nodes (35): parseAnalysis(), activeSim(), addSim(), analysisDetail(), analysisProblem(), compact(), defaultLine(), duplicateSim() (+27 more)
+Cohesion: 0.08
+Nodes (53): ANALYSES, AnalysisKind, asVoltage(), DcSweep, defaultAnalysis(), formatAnalysis(), isV(), looseSweep() (+45 more)
 
 ### Community 27 - "gen-ltspice-symbols.mjs"
-Cohesion: 0.10
-Nodes (22): andGate, arrow(), ASC_PARSER_SKINS, bjt(), counter, dflop, diffSigns, downArrow() (+14 more)
+Cohesion: 0.08
+Nodes (42): andGate, arrow(), ASC_PARSER_SKINS, bjt(), bufTri(), C(), cathode(), counter (+34 more)
 
 ### Community 28 - "ngspice.ts"
-Cohesion: 0.07
-Nodes (23): EngineClient, friendly(), Pending, Req, SimOutcome, DIGITAL_TYPE, EmModule, Ngspice (+15 more)
+Cohesion: 0.10
+Nodes (21): EngineClient, friendly(), Pending, Req, SimOutcome, NgspiceAssets, NgspiceFactory, NgspiceOptions (+13 more)
 
 ### Community 29 - "geometry.ts"
-Cohesion: 0.06
-Nodes (53): Reglas que salieron de la auditoría, FlagDir, WINDOW_ATTR, instancePinIssues(), PinIssue, same(), staleInstances(), Usage (+45 more)
+Cohesion: 0.08
+Nodes (38): FlagDir, SchText, transformPivot(), InlineText, alignedBox(), ascLines(), baselineOffset(), boxOf() (+30 more)
 
 ### Community 30 - "SchematicEditor.tsx"
 Cohesion: 0.02
 Nodes (111): 13.5.100 Transpose: Swap the elements in a multi-dimensional data set, 13.5.101 Unalias: Retract an alias, 13.5.102 Undefine: Retract a definition, 13.5.103 Unlet: Delete the specified vector(s), 13.5.104 Unset: Clear a variable, 13.5.105 Version: Print the version of ngspice, 13.5.106 Where: Identify troublesome node or device, 13.5.107 Wrdata: Write data to a file (simple table) (+103 more)
 
-### Community 31 - "diff.ts"
-Cohesion: 0.29
-Nodes (8): attrsKey(), diffCircuits(), extra(), instOf(), Mark, plural(), wireKey(), doc()
+### Community 31 - "modelModule.ts"
+Cohesion: 0.12
+Nodes (49): makeSymbol(), subcktPins(), ATTR_HELP, AttrInput(), ModelEditor(), READ_ONLY, SIDES, SIZES (+41 more)
 
 ### Community 32 - "parseAsc"
-Cohesion: 0.13
-Nodes (23): attrValue(), badByDoc, fields(), num(), parseAsc(), parseAsy(), parseShape(), parseWindow() (+15 more)
+Cohesion: 0.08
+Nodes (37): ShapeKind, attrValue(), badByDoc, badLines(), fields(), num(), parseAsc(), parseAsy() (+29 more)
 
-### Community 33 - "explicit.mjs"
-Cohesion: 0.13
-Nodes (10): args, candidates, failures, hasXvfb, lib, LTSPICE, walk(), failures (+2 more)
+### Community 33 - "build-library.mjs"
+Cohesion: 0.07
+Nodes (37): LIB, MIN_SKIN_STROKE, readText(), ROOT, canEncodeCp1252(), CP1252_REVERSE, cp1252Byte(), decode() (+29 more)
 
 ### Community 34 - "Exportar esquemático y polos-ceros"
-Cohesion: 0.13
-Nodes (28): SimPlot, download(), exportSchematic(), PROPS, schematicPng(), schematicSvg(), Ctx, CurveContext (+20 more)
+Cohesion: 0.11
+Nodes (30): RunRecord, schematicPng(), lsGet(), lsSet(), SideSplit(), SplitDir, useSideSize(), CSV_HEAD (+22 more)
 
 ### Community 35 - "E2E: guardado en Drive"
-Cohesion: 0.09
-Nodes (10): attachDrive(), clearToast(), driveContext(), FakeDrive, matches(), meta(), parseMultipart(), save() (+2 more)
+Cohesion: 0.10
+Nodes (13): autosaved(), attachDrive(), clearToast(), driveContext(), FakeDrive, matches(), meta(), parseMultipart() (+5 more)
 
-### Community 36 - "series.ts"
-Cohesion: 0.11
-Nodes (32): SimVector, EXAMPLES, defaultTraces(), NetlistMode(), ScalarTable(), Status, StatusText(), ErrorBoundary (+24 more)
+### Community 36 - "ResultsPanel.tsx"
+Cohesion: 0.06
+Nodes (23): PANEL_NAMES, ResultsPanel(), ResultsPanelProps, SideSize, EXAMPLES, defaultTraces(), NetlistMode(), ScalarTable() (+15 more)
 
 ### Community 37 - "Panel de Estudio"
 Cohesion: 0.15
-Nodes (32): AnalysisCard(), Card(), cleanPlot(), isNumeric(), kindOf(), MeasureCard(), PickInput(), plain() (+24 more)
+Nodes (33): AnalysisCard(), Card(), cleanPlot(), isNumeric(), kindOf(), MeasureCard(), PickInput(), plain() (+25 more)
 
 ### Community 38 - "blocks.test.ts"
 Cohesion: 0.03
-Nodes (45): 7.1 Instance lines and .model lines, 7 Device Models, 7.7 Power MOSFET model (VDMOS), 7 Device Models, 8.7 Automatic insertion of bridging devices, 8 Mixed-Mode and Behavioral Modeling, 13.1 Introduction, 13 Interactive Interpreter (+37 more)
+Nodes (49): 7.1 Instance lines and .model lines, 7 Device Models, 7.7 Power MOSFET model (VDMOS), 7 Device Models, 8.7 Automatic insertion of bridging devices, 8 Mixed-Mode and Behavioral Modeling, 13.1 Introduction, 13 Interactive Interpreter (+41 more)
 
 ### Community 39 - "Plantillas de Estudio"
 Cohesion: 0.09
-Nodes (36): StudyInfo, MeasAnalysis, StudySweep, ToleranceItem, BLOCK_MEASURES, addMeasures(), addSweeps(), blocksCanExpress() (+28 more)
+Nodes (31): Study, BlockJson, CompiledBlocks, WorkspaceJson, addMeasures(), addSweeps(), compOf(), defaultOptions() (+23 more)
 
 ### Community 40 - "INDEX.md"
 Cohesion: 0.04
 Nodes (48): 12.10.1 Introduction, 12.10.2 Internals, 12.10.3 Some results, 12.10.4 Usage, 12.10.5 Literature, 12.10 Ngspice on multi-core processors using OpenMP, 12.11.10 HSPICE Compatibility mode, 12.11.1 Compatibility mode (+40 more)
 
-### Community 41 - "model.ts"
-Cohesion: 0.12
-Nodes (30): AscDoc, DataFlag, DrawnShapeKind, SchText, ShapeKind, SymText, lineOf(), active() (+22 more)
+### Community 41 - "studyActions.ts"
+Cohesion: 0.17
+Nodes (18): studyActions(), StudyDeps, controlHooks(), active(), findControl(), setSymbolAttrs(), CircuitInfo, body() (+10 more)
 
-### Community 42 - "Mediciones .meas"
-Cohesion: 0.05
-Nodes (68): AGG, Aggregate, aggregate(), ANALYSIS_OF, cross(), Crossing, evalMeasures(), evalOne() (+60 more)
+### Community 42 - "meas.ts"
+Cohesion: 0.12
+Nodes (27): AGG, Aggregate, aggregate(), ANALYSIS_OF, cross(), Crossing, evalMeasures(), evalOne() (+19 more)
 
 ### Community 43 - "Compilador de bloques"
-Cohesion: 0.12
-Nodes (27): formatSpiceNumber(), SweepTarget, allBlocks(), asCards(), blockMeasure(), BLOCKS_MARK, chain(), COLORS (+19 more)
+Cohesion: 0.10
+Nodes (31): MEASURE_KINDS, MeasureKind, StudySweep, SweepTarget, allBlocks(), asCards(), BLOCK_MEASURES, blockMeasure() (+23 more)
 
 ### Community 44 - "2 Circuit Description"
-Cohesion: 0.13
-Nodes (31): byLabel(), bySel(), Chapter, CHAPTER_XP, chapters(), CLEAN_XP, directive(), kind() (+23 more)
+Cohesion: 0.07
+Nodes (52): Tutorial, byLabel(), bySel(), Chapter, CHAPTER_XP, chapters(), CLEAN_XP, directive() (+44 more)
 
 ### Community 45 - "8.2 Analog Models"
 Cohesion: 0.04
 Nodes (47): 2.10 .LIB, 2.11.1 .param line, 2.11.2 Brace expressions in circuit elements:, 2.11.3 Subcircuit parameters, 2.11.4 Symbol scope, 2.11.5 Syntax of expressions, 2.11.6 Reserved words, 2.11.7 A word of caution on the three ngspice expression parsers (+39 more)
 
 ### Community 46 - "ref_node_path"
-Cohesion: 0.13
-Nodes (11): count, esc(), files, lines, files, host, ls, ROOT (+3 more)
+Cohesion: 0.22
+Nodes (6): files, host, ls, ROOT, texts, versions
 
-### Community 47 - "view.ts"
-Cohesion: 0.08
-Nodes (43): deviceExprUnit(), curveOn(), dftCurves(), dftSampling(), evalOn(), evaluated, exprUnit(), I_TERM (+35 more)
+### Community 47 - "PlotPanel.tsx"
+Cohesion: 0.10
+Nodes (33): parseDisplayNumber(), curveOn(), traceLabel(), Analysis, besselI0(), cosines(), defaultFs(), dft() (+25 more)
 
 ### Community 48 - "vitest"
 Cohesion: 0.05
 Nodes (38): 8.2.10 Multi_input_PWL_block, 8.2.11 Analog Switch, 8.2.12 Alternative Analog Switch, 8.2.13 Zener Diode, 8.2.14 Current Limiter, 8.2.15 Hysteresis Block, 8.2.16 Differentiator, 8.2.17 Integrator (+30 more)
 
 ### Community 49 - "Módulos Verilog del proyecto"
-Cohesion: 0.14
-Nodes (24): applySynth(), IOPIN, isStale(), key(), looksBehavioral(), moduleOf(), portsOf(), setHdlMode() (+16 more)
+Cohesion: 0.21
+Nodes (17): applySynth(), IOPIN, key(), looksBehavioral(), portsOf(), setHdlMode(), storeVerilog(), symbolParams() (+9 more)
 
 ### Community 50 - "14 Ngspice User Interfaces"
 Cohesion: 0.06
@@ -491,52 +505,52 @@ Cohesion: 0.07
 Nodes (30): 10 Digital Device Models, 11 Analyses and Output Control (batch, 12 Starting ngspice, 13 Interactive Interpreter, 14 Ngspice User Interfaces, 15 ngspice as shared library or dynamic link, 16 TCLspice, 17 Example Circuits (+22 more)
 
 ### Community 52 - "PaneView"
-Cohesion: 0.16
-Nodes (21): BY_LETTER, DeviceParam, deviceParams(), deviceRefs(), deviceTraceName(), LABELS, paramUnit(), parseDeviceVector() (+13 more)
+Cohesion: 0.21
+Nodes (16): BY_LETTER, deviceExprUnit(), DeviceParam, deviceParams(), deviceTraceName(), LABELS, paramUnit(), parseDeviceVector() (+8 more)
 
 ### Community 53 - "Manual de ngspice-47 — índice"
 Cohesion: 0.07
 Nodes (28): 28.1.1 Prerequisites, 28.1.2 Install from Git, 28.1.3 Install from a tarball, e.g. from ngspice-47.tar.gz, 28.1.4 Compilation using an user defined directory tree for object files, 28.1.5 ngspice as a shared library, 28.1.6 Relative paths for spinit and code models, 28.1.7 Installation on Red Hat or Oracle Linux (and similar, e.g. Centos), 28.1.8.1 Options Specific to Using Ngspice (+20 more)
 
-### Community 54 - "PlotPanel.tsx"
-Cohesion: 0.09
-Nodes (45): uplot@1.6.31, uplot, Radix, addMarker(), asMarkers(), crossings(), delta(), horizontalCuts() (+37 more)
+### Community 54 - "markers.ts"
+Cohesion: 0.18
+Nodes (22): addMarker(), asMarkers(), crossings(), delta(), horizontalCuts(), MarkCurve, Marker, MarkerAxis (+14 more)
 
 ### Community 55 - "NetNames.tsx"
-Cohesion: 0.13
-Nodes (20): Point, PinRef, snap(), snapPoint(), anchor(), Annotation, annotationBox(), AnnotationLayer() (+12 more)
+Cohesion: 0.18
+Nodes (14): anchor(), Annotation, annotationBox(), AnnotationLayer(), Box, clampSnap(), key(), LayerProps (+6 more)
 
 ### Community 56 - "Bloques con Blockly"
-Cohesion: 0.09
-Nodes (25): defineBlocks(), isDark(), sourceOptions(), StudyBlocks(), targetOptions(), theme(), Study, blockDefinitions() (+17 more)
+Cohesion: 0.12
+Nodes (21): defineBlocks(), isDark(), sourceOptions(), StudyBlocks(), targetOptions(), theme(), StudyInfo, MeasAnalysis (+13 more)
 
 ### Community 57 - "shapes.test.ts"
-Cohesion: 0.21
-Nodes (18): duplicateItems(), nameLetter(), pasteItems(), arcAngles(), mapShape(), resizeShape(), segDist(), segInBox() (+10 more)
+Cohesion: 0.17
+Nodes (19): Shape, allItems(), setShapeStyle(), arcPath(), ShapeView(), arcAngles(), lineDash(), resizeShape() (+11 more)
 
 ### Community 58 - "icarus.ts"
-Cohesion: 0.17
-Nodes (10): clean(), compileIcarus(), firstError(), IcarusLoader, IcarusPort, IcarusResult, iconfig(), parseVvp() (+2 more)
+Cohesion: 0.15
+Nodes (11): clean(), compileIcarus(), EmProgram, firstError(), IcarusLoader, IcarusPort, IcarusResult, iconfig() (+3 more)
 
 ### Community 59 - "E2E: rendimiento"
-Cohesion: 0.11
-Nodes (12): C, engineRequests, errors, libRequests, lines, P, Q, svg (+4 more)
+Cohesion: 0.08
+Nodes (19): Cómo se mide, Lo que queda (medido, sin arreglar), Rendimiento, Resultados (CPU 4×, esquemático grande), Segunda tanda (#195), C, engineRequests, errors (+11 more)
 
 ### Community 60 - "E2E: atajos de teclado"
-Cohesion: 0.08
-Nodes (15): Cómo se mide, Lo que queda (medido, sin arreglar), Rendimiento, Resultados (CPU 4×, esquemático grande), Segunda tanda (#195), resultsView(), transform(), at() (+7 more)
+Cohesion: 0.11
+Nodes (9): at(), chart, errors, modal, [movedM, lenM], mv, results, svg (+1 more)
 
 ### Community 61 - "E2E: simulación"
-Cohesion: 0.07
-Nodes (29): FIXTURE_EXAMPLES, menu(), openExample(), pick(), resultsMenu(), showSimCommand(), simCommand(), simType() (+21 more)
+Cohesion: 0.08
+Nodes (27): Fase 4, FIXTURE_EXAMPLES, menu(), openExample(), pick(), resultsMenu(), resultsView(), sampleUrl() (+19 more)
 
 ### Community 62 - "Benchmark del gráfico"
-Cohesion: 0.13
-Nodes (16): args, ASC, bytes, clickTime(), CPU, DEFAULT, errors, fineWheel() (+8 more)
+Cohesion: 0.11
+Nodes (17): args, ASC, bytes, clickTime(), CPU, DEFAULT, errors, fineWheel() (+9 more)
 
 ### Community 63 - "tongspice.ts"
-Cohesion: 0.08
-Nodes (43): busBitNode(), B_FUNCTIONS, bTable(), bypassGrounded(), capacitorIcs(), controlRunWarnings(), controlUsesRun(), convertElements() (+35 more)
+Cohesion: 0.06
+Nodes (58): stripLtspiceInfo(), collectModels(), logicalLines(), merge(), ModelDef, parseAko(), parseParams(), replaceAko() (+50 more)
 
 ### Community 64 - "28.1 Ngspice Installation under Linux (and other ’UNIXes’)"
 Cohesion: 0.07
@@ -547,24 +561,24 @@ Cohesion: 0.07
 Nodes (27): 24.6.1.1 C Function Name, 24.6.1.2 SPICE Model Name, 24.6.1 The Name Table, 24.6.2.1 Port Name, 24.6.2.2 Description, 24.6.2.3 Direction, 24.6.2.4 Default Type, 24.6.2.5 Allowed Types (+19 more)
 
 ### Community 66 - "Chequeo de traducciones"
-Cohesion: 0.13
-Nodes (12): ALLOW, english, es, found, j, missing, ROOT, spanish() (+4 more)
+Cohesion: 0.12
+Nodes (14): typescript@5.7.2, typescript, ALLOW, english, es, found, j, missing (+6 more)
 
-### Community 67 - "Generación de ejemplos"
-Cohesion: 0.05
-Nodes (37): AMPS, ce, COLORS, COMMENTS, example(), EXAMPLES, examplesProject(), FILTERS (+29 more)
+### Community 67 - "turbo.ts"
+Cohesion: 0.04
+Nodes (67): build(), lib, read(), TraceSpec, view(), withVerilog(), AMPS, ce (+59 more)
 
-### Community 68 - "i18n.ts"
+### Community 68 - "SchematicEditor.tsx"
+Cohesion: 0.11
+Nodes (45): inverseOffset(), toWorld(), transformOffset(), instancePinIssues(), CurrentArrowsLayer(), addText(), setText(), setWindows() (+37 more)
+
+### Community 69 - "SwitchDialog.tsx"
 Cohesion: 0.19
-Nodes (19): Practice, Probe, ChapterProgress, connectProgress(), emptyProgress(), loadProgress(), mergeProgress(), onError() (+11 more)
-
-### Community 69 - "PdkDialog.tsx"
-Cohesion: 0.10
-Nodes (36): SymbolInst, TextWindow, effectiveAttrs(), shownAlign(), WindowDefaults, cmpApply(), LibraryBundle, formatParamList() (+28 more)
+Nodes (14): Field, field(), Id, isNativeSwitch(), isTcSwitch(), SW_FIELDS, SwitchDialog(), SwitchDrawing() (+6 more)
 
 ### Community 70 - "Estimación de tamaño de simulación"
-Cohesion: 0.16
-Nodes (20): parseSpiceNumber(), SUFFIX, fixTran(), ltspiceTmax(), Analysis, analysisPoints(), BRANCHES, checkSimSize() (+12 more)
+Cohesion: 0.15
+Nodes (23): parseSpiceNumber(), sinePeriods(), Sweep, analysisPoints(), BRANCHES, checkSimSize(), countVectors(), CURRENTS (+15 more)
 
 ### Community 71 - "24.6.2 The Port Table"
 Cohesion: 0.07
@@ -583,12 +597,12 @@ Cohesion: 0.11
 Nodes (17): compilerOptions, allowImportingTsExtensions, isolatedModules, jsx, lib, module, moduleResolution, noEmit (+9 more)
 
 ### Community 75 - "package.json"
-Cohesion: 0.12
-Nodes (21): devDependencies, playwright-core@^1.49.1, @types/node@22.10.2, @types/react@18.3.12, @types/react-dom@18.3.1, typescript@5.7.2, vite@6.0.5, @vitejs/plugin-react@4.3.4 (+13 more)
+Cohesion: 0.08
+Nodes (34): devDependencies, eslint@10.14.0, @eslint/js@10.0.1, eslint-plugin-react-hooks@7.1.1, globals@17.14.0, playwright-core@1.49.1, prettier@3.3.3, @types/node@22.10.2 (+26 more)
 
-### Community 76 - ".symbol"
-Cohesion: 0.09
-Nodes (40): Orient, ALIGNS, inverseOffset(), isMirrored(), localAlign(), MIRROR, mirrorX(), orientMatrix() (+32 more)
+### Community 76 - "rotate.test.ts"
+Cohesion: 0.11
+Nodes (17): GRID, ALIGNS, localAlign(), MIRROR, ROT90, rotationSteps(), transformAlign(), setWindow() (+9 more)
 
 ### Community 77 - "1.2 Supported Analyses"
 Cohesion: 0.08
@@ -598,17 +612,17 @@ Nodes (25): 1.1.1 Analog Simulation, 1.1.2 Matrix solvers, 1.1.3 Device Models f
 Cohesion: 0.05
 Nodes (38): 27.6.1.1 MOS1 instance parameters, 27.6.1.2 MOS1 model parameters, 27.6.1 MOS1 - Level 1 MOSFET model with Meyer capacitance model, 27.6.2.1 MOS 2 instance parameters, 27.6.2.2 MOS2 model parameters, 27.6.2 MOS2 - Level 2 MOSFET model with Meyer capacitance model, 27.6.3.1 MOS3 instance parameters, 27.6.3.2 MOS3 model parameters (+30 more)
 
-### Community 79 - "E2E: jerarquía"
-Cohesion: 0.12
-Nodes (9): before, errors, inside, inst, r, subText, svg, top (+1 more)
+### Community 79 - "frames"
+Cohesion: 0.05
+Nodes (34): add(), errors, simulate(), v, at(), click(), setValue(), sourceValue() (+26 more)
 
 ### Community 80 - "Pruebas smoke del motor"
 Cohesion: 0.14
 Nodes (11): CASES, cmTotal, codemodels, compareNative(), DIST, HERE, nativeVersion, normName() (+3 more)
 
 ### Community 81 - "Scripts de npm"
-Cohesion: 0.11
-Nodes (18): scripts, assets, build, corpus, dev, e2e, e2e:firefox, engine (+10 more)
+Cohesion: 0.09
+Nodes (22): scripts, assets, build, corpus, coverage, dev, e2e, e2e:firefox (+14 more)
 
 ### Community 82 - "5.2 Exxxx: non-linear voltage source"
 Cohesion: 0.20
@@ -627,8 +641,8 @@ Cohesion: 0.08
 Nodes (23): 7.6.1 MOSFET devices, 7.6.2.1 MOS Level 1, 7.6.2.2 MOS Level 2, 7.6.2.3 MOS Level 3, 7.6.2.4 MOS Level 6, 7.6.2.5 Notes on Level 1-6 models, 7.6.2.6 MOS Level 9, 7.6.2 MOSFET models (NMOS/PMOS) (+15 more)
 
 ### Community 86 - "cmp.test.ts"
-Cohesion: 0.21
-Nodes (16): CMP_COLUMNS, CMP_FILES, cmpCell(), CmpColumn, CmpKind, CmpPart, compareCells(), kindOfFile() (+8 more)
+Cohesion: 0.17
+Nodes (15): App(), CMP_COLUMNS, CMP_FILES, cmpCell(), cmpChoicesFor(), CmpColumn, CmpKind, CmpPart (+7 more)
 
 ### Community 87 - "Worker del corpus"
 Cohesion: 0.13
@@ -642,9 +656,9 @@ Nodes (11): enWords, esWords, files, parsed, rel(), SAME_IN_BOTH, spanish(), SPA
 Cohesion: 0.27
 Nodes (14): steps, steps, steps, BASE_PATH, CHROMIUM, VITE_CHANNEL, VITE_GOOGLE_CLIENT_ID, steps (+6 more)
 
-### Community 90 - "StbModelsInfo.tsx"
-Cohesion: 0.26
-Nodes (8): react-dom, ABeta(), Arrow(), Asymptotic(), StbModelsInfo(), Sum(), Props, State
+### Community 90 - "MenuActions"
+Cohesion: 0.07
+Nodes (3): buildMenus(), MenuActions, Theme
 
 ### Community 91 - "Generador de símbolos base"
 Cohesion: 0.18
@@ -658,17 +672,17 @@ Nodes (11): dcGroups(), fixFloatingNodes(), FLOAT_R, floatingNodes(), isGround()
 Cohesion: 0.08
 Nodes (23): 16.1 tclspice framework, 16.2 tclspice documentation, 16.3 spicetoblt, 16.4 Running TCLspice, 16.5.1.1 Invocation:, 16.5.1.2 testbench1.tcl, 16.5.1 Active capacitor measurement, 16.5.2.1 Invocation: (+15 more)
 
-### Community 94 - "E2E: editor"
-Cohesion: 0.18
-Nodes (12): ascEntry, at(), click(), doc, errors, lib, net, saved (+4 more)
+### Community 94 - "Project"
+Cohesion: 0.10
+Nodes (9): benchActions(), BenchDeps, DriveDeps, useDrive(), SubcktEditingDeps, useSubcktEditing(), Project, fetchModelFile() (+1 more)
 
 ### Community 95 - "Despliegue a Pages"
 Cohesion: 0.15
 Nodes (12): env, EMSDK_VERSION, name, on, pull_request, push, workflow_dispatch, permissions (+4 more)
 
 ### Community 96 - "StbView.tsx"
-Cohesion: 0.20
-Nodes (17): STB_MAIN, closedLoopRoots(), Complex, eigenvalues(), Margins, margins(), modelZeros(), rootLocus() (+9 more)
+Cohesion: 0.09
+Nodes (43): Icarus en WebAssembly (`engine/icarus/`), Interfaz eléctrica (`electrical.ts`), Módulos Verilog, Nodos digitales (XSPICE) y el visor, parameter por instancia (`variants.ts`), Simulación mixta: nodos digitales, Verilog y Verilog-A (#209), Verilog-A (OSDI), isStbMain() (+35 more)
 
 ### Community 97 - "24.7.1 Macros"
 Cohesion: 0.08
@@ -682,37 +696,41 @@ Nodes (21): 15.3.2.10 char* ngSpice_CurPlot(void), 15.3.2.11 char** ngSpice_AllP
 Cohesion: 0.19
 Nodes (10): adv, dialog, edit(), errors, openV1(), real, rightEdit(), show (+2 more)
 
-### Community 100 - "Pruebas E2E de Verilog"
-Cohesion: 0.17
-Nodes (6): chip, code, errors, inst, newModule(), openTree()
+### Community 100 - "PaneView.tsx"
+Cohesion: 0.13
+Nodes (33): Fase 3, Fase 3 — Partir los monolitos (incremental, 1–2 semanas repartidas), uplot, Curve, PaneData, bandwidth3dB(), cursorDiff(), nearestIndex() (+25 more)
 
-### Community 102 - "extract.ts"
-Cohesion: 0.36
-Nodes (8): GRID, Extracted, extractSubckt(), isAuto(), snap(), deleteItems(), instLetter(), nextInstName()
+### Community 101 - "tikz.ts"
+Cohesion: 0.11
+Nodes (34): cache, hasLatex(), labelPlain(), labelTex(), latexSpans(), listeners, loadMathJax(), MathSvg (+26 more)
+
+### Community 102 - "Ngspice"
+Cohesion: 0.14
+Nodes (4): EmModule, Ngspice, SizeStopSignal, Stream
 
 ### Community 103 - "Pruebas E2E de formas"
 Cohesion: 0.18
 Nodes (8): ASC, at(), click(), errors, modal, real, shapes, svg
 
 ### Community 104 - "Perfilado de arrastre"
-Cohesion: 0.18
-Nodes (9): byId, events, open(), parent, self, settle(), t0, total (+1 more)
+Cohesion: 0.17
+Nodes (10): playwright-core, byId, events, open(), parent, self, settle(), t0 (+2 more)
 
 ### Community 105 - "Parámetros de pasos de CI"
 Cohesion: 0.18
 Nodes (11): with, cache, if-no-files-found, key, name, node-version, path, pattern (+3 more)
 
 ### Community 106 - "Conversión del manual ngspice"
-Cohesion: 0.20
-Nodes (8): chapters, cmp(), convert(), idx, index, lines, outDir, raw
+Cohesion: 0.18
+Nodes (9): Librería de modelos, chapters, cmp(), convert(), idx, index, lines, outDir (+1 more)
 
 ### Community 107 - "16 TCLspice"
 Cohesion: 0.10
 Nodes (19): 4.1.10 Arbitrary Phase Sources, 4.1.11 RF Port, 4.1.1 Pulse, 4.1.2 Sinusoidal, 4.1.3 Exponential, 4.1.4 Piece-Wise Linear, 4.1.5 Single-Frequency FM, 4.1.6 Amplitude modulated source (AM) (+11 more)
 
-### Community 108 - "scan.mjs"
-Cohesion: 0.07
-Nodes (35): 10. Implementación (22/10/2026), 1. Vocabulario, 2. Estructura del JSON, 3. Reglas de comportamiento, 4. Archivos del proyecto (`files`), 5. Deshacer, 7. Importar y exportar, 8. Sin migración (+27 more)
+### Community 108 - "Formato `.turbo`: proyectos, testbenches, subcircuitos e historial"
+Cohesion: 0.15
+Nodes (14): 10. Implementación (22/10/2026), 1. Vocabulario, 3. Reglas de comportamiento, 4. Archivos del proyecto (`files`), 5. Deshacer, 7. Importar y exportar, 8. Sin migración, 9. Partes (un issue cada una) (+6 more)
 
 ### Community 109 - "Despliegue en Pages"
 Cohesion: 0.22
@@ -723,12 +741,12 @@ Cohesion: 0.40
 Nodes (5): site, continue-on-error, if, needs, runs-on
 
 ### Community 111 - "drive.ts"
-Cohesion: 0.13
-Nodes (12): 6. Guardado y Google Drive, ApiFile, DriveClient, DriveUser, fromApi(), mimeOf(), multipart(), qString() (+4 more)
+Cohesion: 0.10
+Nodes (18): 6. Guardado y Google Drive, DriveDialog(), importToDrive(), ApiFile, DriveClient, DriveFile, DriveUser, FOLDER_NAME (+10 more)
 
-### Community 112 - "L"
-Cohesion: 0.15
-Nodes (20): bufTri(), C(), cathode(), diamond(), diode(), diodeUp(), flopBox(), grid() (+12 more)
+### Community 112 - "SimPlot"
+Cohesion: 0.11
+Nodes (17): ProbeDeps, useProbe(), TraceDeps, useTraces(), SimPlot, download(), deviceRefs(), Ctx (+9 more)
 
 ### Community 113 - "25.3 Code Model Error Messages"
 Cohesion: 0.12
@@ -738,21 +756,21 @@ Nodes (16): 25.1 Preprocessor Error Messages, 25.2 Simulator Error Messages, 25.
 Cohesion: 0.08
 Nodes (23): 27.3.1.1 ASRC instance parameters, 27.3.1 Bxxxx - Arbitrary source (ASRC), 27.3.2.1 Isource instance parameters, 27.3.2 Isource - Independent current source, 27.3.3.1 Vsource instance parameters, 27.3.3 Vsource - Independent voltage source, 27.3.4.1 CCCS instance parameters, 27.3.4 Fxxxx: Current-Controlled Current Source (CCCS) (+15 more)
 
-### Community 115 - "Análisis comparativo de simulaciones"
-Cohesion: 0.25
-Nodes (6): compareSim(), groups, interp(), jobs, report, SP
+### Community 115 - "AppDialogs"
+Cohesion: 0.09
+Nodes (3): AppDialogs(), AppDialogsProps, setFlagName()
 
 ### Community 116 - "ref_node_fs"
-Cohesion: 0.06
-Nodes (35): build(), lib, read(), TraceSpec, view(), withVerilog(), codemodels, DST (+27 more)
+Cohesion: 0.03
+Nodes (61): codemodels, DST, hashes, ROOT, SRC, OUT, result, sorted (+53 more)
 
 ### Community 117 - "Compatibilidad con LTspice"
 Cohesion: 0.10
-Nodes (17): Archivo `.asc`, Buses (`netlist/bus.ts`), Compatibilidad con LTspice, Conectividad y netlist (como `LTspice -netlist`), Directivas que sólo tiene ngspice, Estudio (barridos, tolerancias, mediciones), Guardado "todo explícito", Herramientas (+9 more)
+Nodes (19): Archivo `.asc`, Buses (`netlist/bus.ts`), Compatibilidad con LTspice, Conectividad y netlist (como `LTspice -netlist`), Directivas que sólo tiene ngspice, Estudio (barridos, tolerancias, mediciones), Guardado "todo explícito", Herramientas (+11 more)
 
-### Community 118 - "netlist.test.ts"
-Cohesion: 0.11
-Nodes (19): compareNetlists(), normalizeLtspice(), readNet(), args, CACHE, failures, lib, limit (+11 more)
+### Community 118 - "EditorArea.tsx"
+Cohesion: 0.10
+Nodes (18): useSchematic(), EditorArea(), EditorAreaProps, EP, HP, TextMenuAt, ModuleEditors(), ModuleEditorsProps (+10 more)
 
 ### Community 119 - "Decimación de formas de onda"
 Cohesion: 0.31
@@ -766,13 +784,17 @@ Nodes (8): runs-on, name, needs, runs-on, timeout-minutes, jobs, build, e2e
 Cohesion: 0.08
 Nodes (25): 27.4.1.1 CplLines instance parameters, 27.4.1.2 CplLines model parameters, 27.4.1 CplLines - Simple Coupled Multiconductor Lines, 27.4.2.1 LTRA instance parameters, 27.4.2.2 LTRA model parameters, 27.4.2 LTRA - Lossy transmission line, 27.4.3.1 Tranline instance parameters, 27.4.3 Tranline - Lossless transmission line (+17 more)
 
+### Community 122 - "toolbars.ts"
+Cohesion: 0.10
+Nodes (8): ResultsView, buildResultsItems(), buildToolGroups(), ResultsMenuDeps, Toggle, ToolActions, GoogleState, PlotPanelHandle
+
 ### Community 123 - "Configuración de suite CI"
 Cohesion: 0.20
-Nodes (11): strategy, base, branch, channel, out, suite, include, suite (+3 more)
+Nodes (11): strategy, base, branch, channel, files, suite, include, suite (+3 more)
 
-### Community 124 - "README.md"
-Cohesion: 0.10
-Nodes (11): Tests, errors, v, launchBrowser(), skipWelcome(), spanishUi(), errors, at() (+3 more)
+### Community 124 - "modules.ts"
+Cohesion: 0.11
+Nodes (12): ascCache, ascText(), moduleActions(), ModuleDeps, runHistoryActions(), RunHistoryDeps, RunRecord, isModelModule() (+4 more)
 
 ### Community 125 - "4.1 Independent Sources for Voltage or Current"
 Cohesion: 0.12
@@ -819,8 +841,8 @@ Cohesion: 0.10
 Nodes (19): 27.2.1.1 Resistor instance parameters, 27.2.1.2 Resistor model parameters, 27.2.1 Resistor, 27.2.2.1 Capacitor instance parameters, 27.2.2.2 Capacitor model parameters, 27.2.2 Capacitor - Fixed capacitor, 27.2.3.1 Inductor instance parameters, 27.2.3.2 Inductor model parameters (+11 more)
 
 ### Community 139 - "24.9.2 Function Library"
-Cohesion: 0.15
-Nodes (13): compileBehavioral(), getWorker(), NoId, pending, request(), synthesizeVerilog(), EmProgram, RunYosys (+5 more)
+Cohesion: 0.13
+Nodes (19): compileBehavioral(), getWorker(), NoId, pending, request(), synthesizeVerilog(), HdlBlock, YosysJson (+11 more)
 
 ### Community 140 - "11.3 Analyses"
 Cohesion: 0.15
@@ -859,8 +881,8 @@ Cohesion: 0.17
 Nodes (11): 19.1 Optimization of a circuit, 19.2 ngspice optimizer using ngspice scripts, 19.3 ngspice optimizer using tclspice, 19.4 ngspice optimizer using a Python script, 19.5.1 Three stage operational amplifier, 19.5.2 Digital inverter, 19.5.3 Bandpass, 19.5.4 Class-E power amplifier (+3 more)
 
 ### Community 149 - "18 Statistical circuit analysis"
-Cohesion: 0.35
-Nodes (9): find(), mergeUserFiles(), parseUserLibrary(), pullUserLibrary(), pushUserLibrary(), USER_LIBRARY_NAME, UserLibraryJson, userLibraryText() (+1 more)
+Cohesion: 0.26
+Nodes (12): userFileKind(), useUserFiles(), find(), mergeUserFiles(), parseUserLibrary(), pullUserLibrary(), pushUserLibrary(), USER_LIBRARY_NAME (+4 more)
 
 ### Community 150 - "Formato `.turbo`: proyectos, testbenches, subcircuitos e historial"
 Cohesion: 0.18
@@ -870,21 +892,21 @@ Nodes (10): 11.1.1 General Options, 11.1.2.1 Matrix Conditioning info, 11.1.2 OP
 Cohesion: 0.18
 Nodes (10): 11.5.1 Resistor and Capacitor SOA model parameters, 11.5.2 Diode SOA model parameters, 11.5.3.1 Gummel-Poon (levels 1 and 2), 11.5.3.2 HICUM (level 8), 11.5.3.3 VBIC (levels 4 and 9), 11.5.3 BJT SOA model parameters, 11.5.4 MOS SOA model parameters, 11.5.5 VDMOS SOA model parameters (+2 more)
 
-### Community 152 - "7.3 BJT"
-Cohesion: 0.18
-Nodes (9): Compilar el motor en local (opcional), Correr TurboSpice en Windows, Día a día (cambios en el sitio), Primera vez, Si modificás el motor, Decisiones y detalles, Diferencias con LTspice detectadas, Motor: ngspice → WebAssembly (+1 more)
+### Community 152 - "Correr TurboSpice en Windows"
+Cohesion: 0.25
+Nodes (7): Fase 1, Compilar el motor en local (opcional), Correr TurboSpice en Windows, Día a día (cambios en el sitio), Primera vez, Si modificás el motor, engine()
 
-### Community 153 - "8.3 Hybrid Models"
-Cohesion: 0.13
-Nodes (9): Capítulos más útiles para TurboSpice, Licencia, Manual de ngspice-47, Origen y licencias de la librería, Componentes de terceros, Dependencias de la interfaz (npm), Librería de componentes, ejemplos y casos de prueba, Modelos de PDK (+1 more)
+### Community 153 - "README.md"
+Cohesion: 0.09
+Nodes (14): Antes de subir, Convenciones, Cómo contribuir a TurboSpice, Ramas, Referencias, Hallazgos (borrador), Capítulos más útiles para TurboSpice, Licencia (+6 more)
 
 ### Community 154 - "13.6 Control Structures"
 Cohesion: 0.20
 Nodes (9): 6.1 Lossless Transmission Lines, 6.2.1 Lossy Transmission Line Model (LTRA), 6.2 Lossy Transmission Lines, 6.3.1 Uniform Distributed RC Model (URC), 6.3 Uniform Distributed RC Lines, 6.4.1 Single Lossy Transmission Line (TXL), 6.4.2 Coupled Multiconductor Line (CPL), 6.4 KSPICE Lossy Transmission Lines (+1 more)
 
-### Community 155 - "DigitalLanes.tsx"
-Cohesion: 0.17
-Nodes (15): Curve, digitalWidth(), formatRadix(), LOGIC_X, LOGIC_Z, logicState(), RADIXES, radixLabel (+7 more)
+### Community 155 - "curves.ts"
+Cohesion: 0.15
+Nodes (22): dftCurves(), dftSampling(), evalOn(), evaluated, exprUnit(), I_TERM, isCurrentExpr(), paneCurves() (+14 more)
 
 ### Community 156 - "15 ngspice as shared library or dynamic link"
 Cohesion: 0.22
@@ -900,23 +922,19 @@ Nodes (9): 27.5.1.1 BJT instance parameters, 27.5.1.2 BJT model parameters, 27.5
 
 ### Community 159 - "11.5 Safe Operating Area (SOA) warning messages"
 Cohesion: 0.22
-Nodes (9): Análisis soportados, Decisiones, Estructura, Fases, Librería de modelos, Licencias de modelos, Riesgos, TurboSpice — Plan maestro (+1 more)
-
-### Community 160 - "Correr TurboSpice en Windows"
-Cohesion: 0.12
-Nodes (6): registerUserFile(), baseName(), symbolPath(), Library, prefetchLtspice(), ng()
+Nodes (8): Análisis soportados, Decisiones, Estructura, Fases, Licencias de modelos, Riesgos, TurboSpice — Plan maestro, Visor de formas de onda
 
 ### Community 161 - "build-pdk.ts"
-Cohesion: 0.17
-Nodes (14): build(), CORNERS, libSection(), rel(), ROOT, splitUnits(), SRC, statements() (+6 more)
+Cohesion: 0.26
+Nodes (10): build(), libSection(), OPEN_PDKS, rel(), ROOT, splitUnits(), SRC, statements() (+2 more)
 
 ### Community 162 - "build-pdk-gf180.ts"
-Cohesion: 0.16
-Nodes (13): fetchCiel(), fetchSources(), build(), CACHE, CORNERS, fetchGf180(), MODELS, ROOT (+5 more)
+Cohesion: 0.17
+Nodes (12): fetchCiel(), fetchSources(), build(), CACHE, CORNERS, fetchGf180(), MODELS, ROOT (+4 more)
 
-### Community 163 - "wires.mjs"
-Cohesion: 0.13
-Nodes (12): Hallazgos (borrador), Icarus en WebAssembly (`engine/icarus/`), Interfaz eléctrica (`electrical.ts`), Modos, Módulos Verilog, Nodos digitales (XSPICE) y el visor, parameter por instancia (`variants.ts`), Simulación mixta: nodos digitales, Verilog y Verilog-A (#209) (+4 more)
+### Community 163 - "ShortcutActions"
+Cohesion: 0.11
+Nodes (5): isTyping(), ShortcutActions, Toggle, useShortcuts(), PlotAction
 
 ### Community 164 - "15.4 General remarks on using the API"
 Cohesion: 0.25
@@ -1026,9 +1044,9 @@ Nodes (5): 26.10.1 DESCRIPTION, 26.10.2 Parameters, 26.10.3 Examples, 26.10 METH
 Cohesion: 0.33
 Nodes (5): 26.15.1 DESCRIPTION, 26.15.2 EXAMPLES, 26.15.3 BUGS, 26.15 TITLE, 26 CIDER User’s Manual
 
-### Community 191 - "26.19 NUMOS"
-Cohesion: 0.34
-Nodes (14): PaneView(), alignScales(), clean(), exactRange(), extent(), logLabeled(), mapTicks(), niceStep() (+6 more)
+### Community 191 - "si"
+Cohesion: 0.11
+Nodes (35): formatRadix(), logicState(), DigitalLanes(), niceTicks(), Range, runs(), PaneView(), PALETTE (+27 more)
 
 ### Community 192 - "TraceBox.tsx"
 Cohesion: 0.40
@@ -1043,16 +1061,16 @@ Cohesion: 0.40
 Nodes (4): 26.3.1 DESCRIPTION, 26.3.2 EXAMPLES, 26.3 COMMENT, 26 CIDER User’s Manual
 
 ### Community 195 - "step.ts"
-Cohesion: 0.19
-Nodes (14): MAX_RUNS, parseStep(), SI, siValue(), Step, StepHooks, stepLabel(), StepPlan (+6 more)
+Cohesion: 0.23
+Nodes (12): formatSpiceNumber(), MAX_RUNS, parseStep(), Step, StepHooks, stepLabel(), StepPlan, stepPlan() (+4 more)
 
 ### Community 196 - "26.2 BOUNDARY, INTERFACE"
-Cohesion: 0.17
-Nodes (8): base, files, out, FILE, out, ROOT, SRC, table
+Cohesion: 0.29
+Nodes (5): FILE, out, ROOT, SRC, table
 
-### Community 197 - "26.10 METHOD"
-Cohesion: 0.20
-Nodes (9): args, assets, codemodels, DIST, examples, lib, reasons, ROOT (+1 more)
+### Community 197 - "SchematicMode"
+Cohesion: 0.10
+Nodes (14): Arquitectura y mantenibilidad, circuitInfoOf(), runActions(), RunDeps, SchematicMode(), useHistory(), isTyping(), lsGet() (+6 more)
 
 ### Community 198 - "26.15 TITLE"
 Cohesion: 0.50
@@ -1063,39 +1081,43 @@ Cohesion: 0.50
 Nodes (3): 26.8.1 DESCRIPTION, 26.8 END, 26 CIDER User’s Manual
 
 ### Community 200 - "SchematicCanvas.tsx"
-Cohesion: 0.11
-Nodes (36): Flag, PinDef, SymbolDef, SymbolSource, bitNodeName(), busBits(), busWidth(), instArray() (+28 more)
+Cohesion: 0.07
+Nodes (46): Flag, PinDef, SymbolInst, WINDOW_ATTR, orientMatrix(), isNgspiceComment(), CircuitDiff, pngWithText() (+38 more)
 
 ### Community 201 - "schematicSim.ts"
+Cohesion: 0.11
+Nodes (32): Cómo está hecho, PDK (sky130 y GF180MCU), Pendiente, Pruebas, Uso, pdkBarOf(), isPdkDevice(), loadPdk() (+24 more)
+
+### Community 202 - "spicenum.ts"
+Cohesion: 0.17
+Nodes (20): TurboSpice — notas para agentes, Fase 2, Números con prefijo SI (`netlist/spicenum.ts`), DISPLAY_PREFIXES, DISPLAY_SUFFIX, formatSi(), LTSPICE_PREFIXES, SiPrefixes (+12 more)
+
+### Community 208 - "AscDoc"
+Cohesion: 0.08
+Nodes (38): SchematicContext, SchematicCtx, ContextMenuDeps, contextMenus(), SavesState, SimRun, HighlightDeps, useHighlights() (+30 more)
+
+### Community 209 - "model.ts"
 Cohesion: 0.13
-Nodes (28): Uso, isPdkDevice(), loadPdk(), normalize(), PDK_CORNERS, PdkCorner, pdkDevices(), pdkIncludes() (+20 more)
-
-### Community 208 - "saves.ts"
-Cohesion: 0.20
-Nodes (14): NgspiceNetlist, SizeProblem, DIGITAL_SAVE, elementRefs(), elementSignals(), findSaveText(), isDig(), lines() (+6 more)
-
-### Community 209 - "stbMath.ts"
-Cohesion: 0.33
-Nodes (11): basis(), basisPoles(), Crossing, evalModel(), fitRational(), fitWith(), leastSquares(), RationalModel (+3 more)
+Nodes (22): DataFlag, DrawnShapeKind, Orient, Point, SymbolDef, SymText, TextWindow, connectivity() (+14 more)
 
 ### Community 210 - "google/README.md"
-Cohesion: 0.22
-Nodes (9): dependencies, blockly@13.3.0, fflate@^0.8.3, react@18.3.1, react-dom@18.3.1, @yowasp/yosys@0.70.1258, blockly, fflate (+1 more)
+Cohesion: 0.12
+Nodes (16): dependencies, blockly@13.3.0, fflate@0.8.3, jspdf@4.2.1, mathjax-full@3.2.2, react@18.3.1, react-dom@18.3.1, svg2pdf.js@2.9.0 (+8 more)
 
 ### Community 211 - "VerilogModule.tsx"
 Cohesion: 0.29
 Nodes (6): ELECTRICAL, ELECTRICAL_NAMES, ElectricalParam, FAMILIES, ParamField(), VerilogModule()
 
 ### Community 212 - "placing.mjs"
-Cohesion: 0.17
-Nodes (8): ctxMenu, errors, ghost, input, mid, real, svg, tops
+Cohesion: 0.10
+Nodes (13): Tests, launchBrowser(), skipWelcome(), spanishUi(), errors, ctxMenu, errors, ghost (+5 more)
 
 ### Community 213 - "ContextMenu.tsx"
 Cohesion: 0.48
 Nodes (4): ContextItem, ContextMenu(), EditRow(), text()
 
 ### Community 214 - "expcmp.mjs"
-Cohesion: 0.25
+Cohesion: 0.29
 Nodes (5): diff, ids, load(), maps, vars
 
 ### Community 215 - "ref_node_child_process"
@@ -1107,32 +1129,36 @@ Cohesion: 0.18
 Nodes (10): Análisis de estabilidad (`.stb`), Cómo se simula, Limitaciones, Resultados, Sintaxis, Sondas, Editor de esquemáticos, modBox() (+2 more)
 
 ### Community 217 - "benchParams.ts"
-Cohesion: 0.67
-Nodes (5): benchParams(), benchVariables(), isParam(), lines(), setBenchParams()
+Cohesion: 0.50
+Nodes (7): treeBenchesOf(), parseParamList(), benchParams(), benchVariables(), isParam(), lines(), setBenchParams()
 
-### Community 218 - "pdf.ts"
-Cohesion: 0.60
-Nodes (3): A4, jpegPdf(), schematicPdf()
+### Community 218 - "expr.ts"
+Cohesion: 0.13
+Nodes (24): C, cdiv(), cmul(), cpow(), derivative(), ev(), EvalContext, evalTrace() (+16 more)
+
+### Community 219 - "Connectivity"
+Cohesion: 0.17
+Nodes (13): Reglas que salieron de la auditoría, HintBar(), Hover, toolHint(), StatusBar(), StatusBarProps, Connectivity, ValueChange (+5 more)
 
 ### Community 220 - "wires.mjs"
 Cohesion: 0.24
 Nodes (6): at(), click(), drag(), errors, lib, svg
 
-### Community 222 - "ltspiceLib.ts"
-Cohesion: 0.44
-Nodes (8): db(), importLtspiceLibrary(), libRelative(), loadLtspiceIndex(), LtspiceIndex, readFile(), removeLtspiceLibrary(), request()
+### Community 221 - "exportSchematic.ts"
+Cohesion: 0.14
+Nodes (17): base64(), BASELINE, crc32(), CRC_TABLE, CREATED_WITH, inlineStyled(), PROPS, rdf() (+9 more)
 
-### Community 223 - "prepareSimulation"
-Cohesion: 0.42
-Nodes (8): collectModels(), logicalLines(), merge(), ModelDef, parseAko(), parseParams(), replaceAko(), prepareSimulation()
+### Community 222 - "App.tsx"
+Cohesion: 0.06
+Nodes (51): react, ADC, AMPS, BASE, DEFAULT_NAME, DEFAULT_PROJECT, EXAMPLES, EXAMPLES_TURBO (+43 more)
 
-### Community 224 - "gen-pdk-symbols.mjs"
-Cohesion: 0.32
-Nodes (6): INST, params(), res3, SYM, symbol(), writePdk()
+### Community 223 - "useLayoutPrefs.ts"
+Cohesion: 0.16
+Nodes (16): SCH_FONT_KEY, lsGet(), lsSet(), useTheme(), useLayoutPrefs(), SheetFont, FontChoice, fontChoice() (+8 more)
 
-### Community 225 - "yosys.ts"
-Cohesion: 0.36
-Nodes (7): HdlBlock, YosysJson, yosysScript(), plain(), synthesize(), SynthResult, Tree
+### Community 225 - "simulation.mjs"
+Cohesion: 0.13
+Nodes (13): activeRow, at(), benchRows(), errors, goBench(), items(), openPanel(), probe() (+5 more)
 
 ### Community 226 - "units.mjs"
 Cohesion: 0.29
@@ -1142,41 +1168,93 @@ Nodes (7): all, dir, index, instance(), op(), PDK, PRIM
 Cohesion: 0.33
 Nodes (6): Deploy, Desarrollo, Google Drive (opcional), Idiomas, Licencia, TurboSpice
 
-### Community 228 - "netlist/digital.ts"
-Cohesion: 0.40
-Nodes (5): FLOPS, GATES, params(), SPECIAL, translateDigital()
+### Community 228 - "useVerilog.ts"
+Cohesion: 0.20
+Nodes (13): useVerilog(), VerilogDeps, isStale(), moduleOf(), verilogModules(), verilogSources(), vvpFileOf(), applyVariants() (+5 more)
 
 ### Community 229 - "stb.ts"
-Cohesion: 0.40
-Nodes (5): nz(), StbAnalysis, StbContext, stbControl(), stbBlock()
+Cohesion: 0.29
+Nodes (7): nz(), StbAnalysis, StbContext, stbControl(), StbProbeMode, stbBlock(), Analysis
 
-### Community 230 - "21 XSPICE Basics"
-Cohesion: 0.40
-Nodes (4): 21.1 ngspice with the XSPICE option, 21.2 The XSPICE Code Model Subsystem, 21.3 XSPICE Top-Level Diagram, 21 XSPICE Basics
+### Community 230 - "SimHelp.tsx"
+Cohesion: 0.30
+Nodes (14): ABeta(), Arrow(), Asymptotic(), Eq(), Frac(), G0(), Ginf(), HELP (+6 more)
 
-### Community 231 - "PDK (sky130 y GF180MCU)"
-Cohesion: 0.40
-Nodes (4): Cómo está hecho, PDK (sky130 y GF180MCU), Pendiente, Pruebas
+### Community 231 - "4. Plan propuesto"
+Cohesion: 0.14
+Nodes (13): 1. Qué se corrió, 2. Fortalezas (mantener), 3. Hallazgos, 4. Plan propuesto, 5. Métricas para seguir el avance, Auditoría de calidad y consistencia — TurboSpice, Calidad de pruebas y CI, Consistencia del repositorio y la documentación (+5 more)
+
+### Community 232 - "ProjectPanel"
+Cohesion: 0.25
+Nodes (3): ProjectPanel(), ProjectPanelProps, QuickOpen()
+
+### Community 235 - "corpus/run.mjs"
+Cohesion: 0.18
+Nodes (11): args, conc, groups, jobs, one(), queue, RES, run() (+3 more)
+
+### Community 236 - "scan.mjs"
+Cohesion: 0.23
+Nodes (11): context(), insideFunction(), ROOT, scan(), SKIP, spanish(), SRC, UI_ATTRS (+3 more)
+
+### Community 237 - "roughPen.d.ts"
+Cohesion: 0.24
+Nodes (11): Field, fnv1a(), makeTaper(), makeWarp(), mulberry32(), penStroke(), Pt, Rand (+3 more)
+
+### Community 238 - "idealdiode.ts"
+Cohesion: 0.27
+Nodes (10): 2. Estructura del JSON, current(), IDEAL_PARAMS, IdealDiodeResult, IdealModel, joinContinuations(), minR(), parseModelParams() (+2 more)
+
+### Community 239 - "build-share-dict.mjs"
+Cohesion: 0.20
+Nodes (8): count, esc(), files, lines, base, files, out, f()
+
+### Community 240 - "prepare.mjs"
+Cohesion: 0.18
+Nodes (10): by, dirs, jobs, MIR, REPOS, SIB, SP, sueltos (+2 more)
+
+### Community 241 - "useProjectFiles.ts"
+Cohesion: 0.39
+Nodes (4): ProjectFilesDeps, useProjectFiles(), PROJECT_DIR, mergeFiles()
+
+### Community 242 - "equivalence.mjs"
+Cohesion: 0.33
+Nodes (5): CORNERS, circuit(), orig, ours, run()
+
+### Community 243 - ".prettierrc.json"
+Cohesion: 0.33
+Nodes (5): endOfLine, printWidth, quoteProps, semi, singleQuote
+
+### Community 244 - "tsconfig.test.json"
+Cohesion: 0.33
+Nodes (5): ./tsconfig.json, compilerOptions, types, extends, include
+
+### Community 245 - "Componentes de terceros"
+Cohesion: 0.33
+Nodes (5): Componentes de terceros, Dependencias de la interfaz (npm), Librería de componentes, ejemplos y casos de prueba, Modelos de PDK, Motor de simulación (`public/engine/`, compilado por `engine/build.sh`)
+
+### Community 246 - "6. Avance"
+Cohesion: 0.50
+Nodes (4): 6. Avance, Fase 0 (sobre `dev`, 2026-11-01), Fase 5, Pendiente
 
 ## Knowledge Gaps
-- **7 isolated node(s):** `PATH`, `LLVM_SYS_211_PREFIX`, `PATH`, `DOWNSAMPLER`, `FLASHENC` (+2 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2042 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **15 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **8 isolated node(s):** `PATH`, `LLVM_SYS_211_PREFIX`, `PATH`, `DOWNSAMPLER`, `FLASHENC` (+3 more)
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 2205 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `Diálogos de la interfaz` to `Editor de modelos SPICE`, `project/project.ts`, `25.3 Code Model Error Messages`, `turbo.ts`, `13.5 Commands`, `Modo esquemático y utilidades`, `Diálogo de fuentes`, `analyses.ts`, `bias.ts`, `App.tsx`, `i18n.ts`, `Cuenta de Google y Drive`, `Álgebra de Laplace`, `ref_node_fs`, `Directivas y análisis del Estudio`, `view.ts`, `Árbol del proyecto`, `Lista de simulaciones`, `DigitalLanes.tsx`, `ngspice.ts`, `geometry.ts`, `diff.ts`, `parseAsc`, `Exportar esquemático y polos-ceros`, `series.ts`, `Panel de Estudio`, `Plantillas de Estudio`, `Mediciones .meas`, `Compilador de bloques`, `2 Circuit Description`, `view.ts`, `Módulos Verilog del proyecto`, `PaneView`, `PlotPanel.tsx`, `NetNames.tsx`, `Bloques con Blockly`, `shapes.test.ts`, `tongspice.ts`, `26.19 NUMOS`, `step.ts`, `Generación de ejemplos`, `PdkDialog.tsx`, `Estimación de tamaño de simulación`, `SchematicCanvas.tsx`, `schematicSim.ts`, `VerilogModule.tsx`, `ContextMenu.tsx`, `cmp.test.ts`, `Análisis de estabilidad (`.stb`)`, `StbModelsInfo.tsx`, `ltspiceLib.ts`, `prepareSimulation`, `StbView.tsx`, `yosys.ts`, `TurboSpice`, `netlist/digital.ts`, `stb.ts`, `extract.ts`, `scan.mjs`, `drive.ts`?**
-  _High betweenness centrality (0.372) - this node is a cross-community bridge._
-- **Are the 9 inferred relationships involving `SchematicMode()` (e.g. with `Reglas que salieron de la auditoría` and `.parts()`) actually correct?**
-  _`SchematicMode()` has 9 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `t()` connect `Diálogos de la interfaz` to `Editor de modelos SPICE`, `ItemRef`, `project/project.ts`, `Diálogo de fuentes`, `share.ts`, `Library`, `Modo esquemático y utilidades`, `analyses.ts`, `traces.ts`, `simulate.ts`, `Edición de cables y segmentos`, `i18n.ts`, `Cuenta de Google y Drive`, `Álgebra de Laplace`, `exchange.ts`, `Directivas y análisis del Estudio`, `Árbol del proyecto`, `Lista de simulaciones`, `ngspice.ts`, `geometry.ts`, `modelModule.ts`, `parseAsc`, `build-library.mjs`, `Exportar esquemático y polos-ceros`, `ResultsPanel.tsx`, `Panel de Estudio`, `Plantillas de Estudio`, `studyActions.ts`, `meas.ts`, `Compilador de bloques`, `2 Circuit Description`, `PlotPanel.tsx`, `Módulos Verilog del proyecto`, `PaneView`, `markers.ts`, `NetNames.tsx`, `Bloques con Blockly`, `shapes.test.ts`, `tongspice.ts`, `turbo.ts`, `SwitchDialog.tsx`, `Estimación de tamaño de simulación`, `cmp.test.ts`, `MenuActions`, `Project`, `StbView.tsx`, `PaneView.tsx`, `drive.ts`, `SimPlot`, `AppDialogs`, `EditorArea.tsx`, `toolbars.ts`, `modules.ts`, `25.3 Code Model Error Messages`, `24.9.2 Function Library`, `18 Statistical circuit analysis`, `curves.ts`, `ShortcutActions`, `si`, `step.ts`, `SchematicMode`, `SchematicCanvas.tsx`, `schematicSim.ts`, `spicenum.ts`, `AscDoc`, `VerilogModule.tsx`, `ContextMenu.tsx`, `Análisis de estabilidad (`.stb`)`, `benchParams.ts`, `expr.ts`, `Connectivity`, `App.tsx`, `useLayoutPrefs.ts`, `useProjectSession`, `TurboSpice`, `useVerilog.ts`, `stb.ts`, `SimHelp.tsx`, `ProjectPanel`, `navigation`, `idealdiode.ts`, `useProjectFiles.ts`, `6. Avance`?**
+  _High betweenness centrality (0.420) - this node is a cross-community bridge._
+- **Are the 7 inferred relationships involving `t()` (e.g. with `Fase 5` and `Cómo se simula`) actually correct?**
+  _`t()` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `PATH`, `LLVM_SYS_211_PREFIX`, `PATH` to the rest of the system?**
-  _7 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _8 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Editor de modelos SPICE` be split into smaller, more focused modules?**
-  _Cohesion score 0.1020979020979021 - nodes in this community are weakly interconnected._
-- **Why does `Idiomas de la interfaz (#72)` connect `Diálogos de la interfaz` to `8.3 Hybrid Models`, `README.md`?**
-  _High betweenness centrality (0.189) - this node is a cross-community bridge._
-- **Are the 6 inferred relationships involving `t()` (e.g. with `Cómo se simula` and `Resultados`) actually correct?**
-  _`t()` has 6 INFERRED edges - model-reasoned connections that need verification._
-- **Should `.symbol` be split into smaller, more focused modules?**
-  _Cohesion score 0.07138047138047138 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13800904977375567 - nodes in this community are weakly interconnected._
+- **Why does `Idiomas de la interfaz (#72)` connect `Diálogos de la interfaz` to `README.md`, `placing.mjs`?**
+  _High betweenness centrality (0.185) - this node is a cross-community bridge._
+- **Are the 6 inferred relationships involving `SchematicMode()` (e.g. with `5. Métricas para seguir el avance` and `Arquitectura y mantenibilidad`) actually correct?**
+  _`SchematicMode()` has 6 INFERRED edges - model-reasoned connections that need verification._
+- **Should `ItemRef` be split into smaller, more focused modules?**
+  _Cohesion score 0.0613107822410148 - nodes in this community are weakly interconnected._

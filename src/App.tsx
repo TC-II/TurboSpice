@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
-import { DIGITAL_TYPE, type SimPlot, type SimResult } from './engine/ngspice.ts';
+import { DIGITAL_TYPE, type SimPlot } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames } from './schematic/NetNames.tsx';
@@ -21,9 +21,8 @@ import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu } from './ui/Menu.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
-import { readShareHash } from './schematic/share.ts';
 import { loadLtspiceIndex, prefetchLtspice, type LtspiceIndex } from './library/ltspiceLib.ts';
-import { addRecent, loadProjectSession, loadRecent, loadResult, loadUserFiles, saveProjectSession, type RecentFile } from './schematic/autosave.ts';
+import { loadUserFiles } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { saveSelection, setSaveSelection } from './sim/saves.ts';
@@ -41,7 +40,6 @@ import {
   mergeFiles,
   projectFileKind,
   lineOf,
-  selectSim as selectProjectSim,
   setSimAsc,
   simOf,
   simsWithValue,
@@ -52,15 +50,14 @@ import {
   type ValueChange,
 } from './project/project.ts';
 import { runFilesOf, runSummary } from './project/exchange.ts';
-import { asBenches, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from './project/turbo.ts';
+import { EXT, newProject, type Project } from './project/turbo.ts';
 import { isNativeSwitch, isTcSwitch } from './schematic/SwitchDialog.tsx';
 import { HistoryPanel } from './project/HistoryPanel.tsx';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { allItems, dcSourcesAsCell, deleteItems, setText, transformItems } from './schematic/edit.ts';
-import { readAsc } from './schematic/fileio.ts';
+import { allItems, deleteItems, setText, transformItems } from './schematic/edit.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
@@ -82,13 +79,11 @@ import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { type Resolver } from './waveform/expr.ts';
-import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { addTraceTo, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
 import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { moveOpTag } from './sim/opPins.ts';
-import { type MeasTable } from './sim/measResults.ts';
-import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
@@ -97,10 +92,10 @@ import { AccountButton } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
-import { getLang, locale, setLang, t } from './i18n/i18n.ts';
+import { locale, t } from './i18n/i18n.ts';
 import { moduleOf } from './hdl/project.ts';
 import { busNames } from './waveform/digital.ts';
-import { BASE, DEFAULT_PROJECT, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
+import { BASE, DEFAULT_PROJECT, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, registerUserFile } from './app/helpers.ts';
@@ -135,6 +130,7 @@ import { useVerilog } from './app/useVerilog.ts';
 import { studyActions } from './app/studyActions.ts';
 import { useSavesPanel } from './app/useSavesPanel.ts';
 import { useSubcktEditing } from './app/useSubcktEditing.ts';
+import { useProjectSession } from './app/useProjectSession.ts';
 
 
 export function App() {
@@ -558,230 +554,21 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     );
   }, [engine]);
 
-  /** Muestra la vista guardada de una simulación (o una vacía) */
-  const showView = (v?: SimView) => {
-    setPanes(v?.panes ?? emptyPanes());
-    setActivePane(v?.active ?? 0);
-    setPlotName(v?.plot ?? '');
-    setMode(v?.mode ?? 'bode');
-    plotState.current = v?.plotState;
-    panesByKind.current.clear();
-  };
-
-  /**
-   * Resultados de la última corrida guardados en el navegador (no van en el .turbo): se
-   * muestran si son del circuito que se está viendo
-   */
-  const restoreCached = (simId: string, asc: string) => {
-    loadResult<{ result: SimResult; meas: MeasTable | null }>(simId)
-      .then(async (c) => {
-        const d = docRef.current;
-        if (!c || c.asc !== asc || simsRef.current.active !== simId || ascText(d) !== asc) return;
-        const built = await buildSimulation(d, lib, `${projectRef.current.name}.asc`);
-        if (simsRef.current.active !== simId || docRef.current !== d) return;
-        setSim({ built, result: c.result.result, doc: d, meas: c.result.meas });
-      })
-      .catch(() => {});
-  };
-
-  /** Abre un proyecto: se ve el circuito de la simulación activa de su variante activa */
-  const loadProject = (p0: Project, f: FileState) => {
-    const p = asBenches(p0);
-    stacks.current.clear();
-    kept.current.clear();
-    const v = variantOf(p);
-    const s = simOf(v);
-    quietDoc.current = true;
-    history.reset(parseAsc(activeAsc(v)));
-    setProjectState(p);
-    setDirty(false);
-    setFile(f);
-    setSelection([]);
-    setSim(null);
-    showView(s?.view);
-    setOfferView(null);
-    setValueOffer(null);
-    setHistoryOpen(false);
-    setViewRun('');
-    setTool({ kind: 'select' });
-    setDocKey((k) => k + 1);
-    if (s) restoreCached(s.id, s.asc);
-  };
-
-  /** Un .asc pasa a ser un proyecto nuevo (se guarda aparte, como .turbo) */
-  const loadDoc = (d0: AscDoc, ascName: string): Project => {
-    // las fuentes V con valor DC se muestran como Cell (#121)
-    const p = projectFromAsc(dcSourcesAsCell(d0, lib), ascName);
-    loadProject(p, { name: `${projectName(ascName)}${EXT}` });
-    return p;
-  };
-
   // Tutorial interactivo (Academia): abierto y la foto del estado que mira (se arma antes del render)
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const tutorialProbe = useRef<() => TutorialProbe>();
   const readTutorialProbe = useCallback(() => tutorialProbe.current!(), []);
-  /** Proyecto de práctica de una misión: vacío o con un circuito. El actual, si tenía cambios, queda en Recientes */
-  const loadPractice = (name: string, asc: string | null) => {
-    if (dirty) remember(snapshot(), file, true);
-    // (desde adentro de un subcircuito: se vuelve al testbench del proyecto nuevo)
-    pathRef.current = [];
-    setPath([]);
-    setCurModel('');
-    if (asc) loadDoc(parseAsc(asc), `${name}.asc`);
-    else loadProject(withGroups(newProject(name)), { name: `${name}${EXT}` });
-    setTimeout(() => editor.current?.fit(), 80);
-  };
 
-  const [recent, setRecent] = useState<RecentFile[]>([]);
-  const remember = useCallback((p: Project, f: FileState, unsaved = false) => {
-    serializeTurbo(p)
-      .then((turbo) => addRecent({ name: f.name, asc: turbo, turbo: true, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }))
-      .then(setRecent);
-  }, []);
-
-  /** Abre los bytes de un .turbo o de un .asc (`at`: dónde está el archivo, si es un .turbo) */
-  const openBytes = async (bytes: Uint8Array, name: string, at: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'> = {}, variant?: string) => {
-    const utf8 = new TextDecoder().decode(bytes);
-    if (/\.turbo$/i.test(name) || isTurboText(utf8)) {
-      const { project: parsed, warnings } = await parseTurbo(utf8);
-      // el nombre del proyecto es el del archivo (un .turbo duplicado o renombrado en Drive, o
-      // copiado en el disco, todavía tiene adentro el nombre de antes)
-      const named = /\.turbo$/i.test(name) ? { ...parsed, name: projectName(name) } : parsed;
-      // (los ejemplos se abren en el testbench con ese nombre)
-      const bench = variant ? named.variants[0].sims.find((x) => x.name === variant)?.id : undefined;
-      const p = bench ? selectProjectSim(named, bench) : named;
-      const f: FileState = { name: /\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`, ...at };
-      loadProject(p, f);
-      remember(p, f);
-      if (warnings.length) setMessage(warnings.join(' · '));
-      return;
-    }
-    const r = readAsc(bytes, name);
-    const p = loadDoc(r.doc, name);
-    remember(p, { name: `${projectName(name)}${EXT}` });
-    warnMissing(r.doc);
-  };
-
-  // Circuito compartido en el hash del link (#c=…): se abre y se limpia el hash
-  const openShared = useCallback(async (): Promise<boolean> => {
-    let shared;
-    try {
-      shared = await readShareHash(location.hash);
-    } catch {
-      setMessage(t('The link doesn\'t contain a valid circuit'));
-    }
-    if (shared === undefined && !/[#&]c=/.test(location.hash)) return false;
-    window.history.replaceState(null, '', location.pathname + location.search);
-    if (!shared) return false;
-    if (/\.turbo$/i.test(shared.name) || isTurboText(new TextDecoder().decode(shared.bytes))) {
-      await openBytes(shared.bytes, shared.name);
-      return true;
-    }
-    const f = readAsc(shared.bytes, shared.name);
-    // links viejos: la vista venía aparte (&v=…); ahora va dentro del .asc
-    const view = asPlotView(shared.view);
-    const d = view && !viewFromDoc(f.doc) ? withView(f.doc, view) : f.doc;
-    remember(loadDoc(d, f.name), { name: `${projectName(f.name)}${EXT}` });
-    warnMissing(f.doc);
-    return true;
-  }, [loadDoc]);
-
-  // Primer documento: el del link, el último en el que se estaba trabajando (autoguardado)
-  // o un ejemplo. Nada de esto pisa lo que el usuario ya haya empezado a hacer.
-  const touched = useRef(false);
-  touched.current ||= docKey > 0 || history.version > 0;
-  const [restored, setRestored] = useState(false);
-  useEffect(() => {
-    (async () => {
-      setRecent(await loadRecent());
-      const session = await loadProjectSession();
-      if (await openShared()) {
-        // el trabajo sin guardar anterior queda en recientes
-        if (session?.dirty) addRecent({ name: session.name, asc: session.turbo, turbo: true, time: session.time, unsaved: true }).then(setRecent);
-        return;
-      }
-      if (touched.current) return;
-      if (session) {
-        try {
-          const { project: p, warnings } = await parseTurbo(session.turbo);
-          if (touched.current) return;
-          loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
-          setDirty(session.dirty);
-          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: new Date(session.time).toLocaleString(locale()) })] : []), ...warnings];
-          if (notes.length) setMessage(notes.join(' · '));
-          return;
-        } catch {
-          // sesión ilegible: seguir con el ejemplo
-        }
-      }
-      const b = await (await fetch(`${BASE}examples/${encodeURIComponent(SAMPLE)}`)).arrayBuffer();
-      if (touched.current) return;
-      // sin pasar por recientes: es lo que se ve al entrar, no algo que abrió el usuario
-      const { project: sample } = await parseTurbo(new TextDecoder().decode(b));
-      if (touched.current) return;
-      loadProject(sample, { name: SAMPLE });
-    })()
-      .catch(() => {})
-      .finally(() => setRestored(true));
-  }, []); // sólo al montar
-
-  // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
-  // pilas de deshacer no se guardan, #154)
-  // (data-autosave en <html>: «pending» hasta que termina el último guardado, «saved» después; lo esperan los e2e)
-  const autosaveSeq = useRef(0);
-  useEffect(() => {
-    if (!restored) return;
-    const seq = ++autosaveSeq.current;
-    document.documentElement.dataset.autosave = 'pending';
-    const tt = setTimeout(() => {
-      serializeTurbo(snapshot())
-        .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
-        .then(() => seq === autosaveSeq.current && (document.documentElement.dataset.autosave = 'saved'))
-        .catch((e) => console.error(e));
-    }, 600);
-    return () => clearTimeout(tt);
-  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode]);
-
-  // Migración: vista guardada en el navegador para este nombre de archivo (versiones
-  // anteriores) y el .asc no trae la suya: se ofrece incorporarla
-  useEffect(() => {
-    if (!doc.symbols.length || viewFromDoc(doc)) return;
-    loadView(file.name).then((v) => {
-      const pv = asPlotView(v);
-      if (pv) setOfferView((cur) => cur ?? pv);
-    });
-  }, [docKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Un link compartido abierto con la app ya cargada
-  useEffect(() => {
-    const h = () => {
-      if (/[#&]c=/.test(location.hash) && confirmDiscard()) openShared();
-    };
-    window.addEventListener('hashchange', h);
-    return () => window.removeEventListener('hashchange', h);
+  // paneles de cada tipo de análisis (al cambiar de plot se recuperan los de ese tipo)
+  const panesByKind = useRef(new Map<string, Pane[]>());
+  const { showView, restoreCached, loadProject, loadDoc, loadPractice, recent, remember, openBytes, switchLang } = useProjectSession({
+    ...{ lib, history, stacks, kept, quietDoc, docRef, projectRef, simsRef, pathRef, plotState, panesByKind, editor, doc, docKey, project, file, dirty, panes, activePane, plotName, mode },
+    ...{ setPanes, setActivePane, setPlotName, setMode, setSim, setProjectState, setDirty, setFile, setSelection, setOfferView, setValueOffer, setHistoryOpen, setViewRun, setTool, setDocKey, setPath, setCurModel, setMessage },
+    // (declaradas más abajo)
+    snapshot: () => snapshot(),
+    confirmDiscard: () => confirmDiscard(),
+    warnMissing: (d) => warnMissing(d),
   });
-
-  // Aviso al cerrar con cambios sin guardar (no al recargar para cambiar de idioma: se guardó todo)
-  const reloading = useRef(false);
-  useEffect(() => {
-    const h = (e: BeforeUnloadEvent) => {
-      if (dirty && !reloading.current) e.preventDefault();
-    };
-    window.addEventListener('beforeunload', h);
-    return () => window.removeEventListener('beforeunload', h);
-  }, [dirty]);
-
-  /**
-   * Cambiar de idioma (#72): el idioma se fija al cargar la página, así que se guarda el proyecto
-   * (con lo que se está editando) y se recarga; el autoguardado lo trae de vuelta con sus resultados
-   */
-  const switchLang = async () => {
-    const turbo = await serializeTurbo(snapshot());
-    await saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() });
-    setLang(getLang() === 'en' ? 'es' : 'en');
-    reloading.current = true;
-    location.reload();
-  };
 
   const { confirmDiscard, doOpen, doImport, snapshot, turboBytes, turboName, savedAs, doSaveLocal } = savingActions({
     ...{ dirty, setDirty, file, setFile, projectRef, setProjectState, pathRef, docRef, sims, remember, setDialog, setMessage },
@@ -894,8 +681,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   };
 
   const plot = sim?.result.plots.find((p) => p.name === plotName);
-  // paneles de cada tipo de análisis (al cambiar de plot se recuperan los de ese tipo)
-  const panesByKind = useRef(new Map<string, Pane[]>());
   const selectPlot = (name: string, next?: Pane[]) => {
     if (plotName) panesByKind.current.set(plotKind(plotName), panes);
     setPlotName(name);

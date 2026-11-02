@@ -129,7 +129,6 @@ import { AccountButton, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
-import { uniqueName, type DriveFile } from './cloud/drive.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
@@ -140,7 +139,7 @@ import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
 import { busBits, isBusName } from './netlist/bus.ts';
 import type { SynthResult } from './hdl/yosys.ts';
-import { BASE, DEFAULT_NAME, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
+import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, clipboardImage, registerUserFile, userFileKind } from './app/helpers.ts';
@@ -148,6 +147,7 @@ import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
 import { useShortcuts } from './app/shortcuts.ts';
+import { useDrive } from './app/useDrive.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -953,142 +953,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     }
   };
 
-  // --- Google Drive (#156) ---
-  // Sobre el mismo archivo los guardados van en cola: nunca dos subidas a la vez, y si llegan
-  // varios mientras se sube, después se manda sólo el último. Antes de subir se compara la versión
-  // del archivo en Drive con la que se abrió: si cambió, no se pisa y se pregunta.
-  const fileRef = useRef(file);
-  fileRef.current = file;
-  const snapshotRef = useRef(snapshot);
-  snapshotRef.current = snapshot;
-  const driveBusy = useRef(false);
-  const drivePending = useRef<{ auto: boolean } | null>(null);
-  const [driveConflict, setDriveConflict] = useState<{ name: string } | null>(null);
-  const saveToDrive = async (auto: boolean, force = false) => {
-    const f = fileRef.current;
-    if (!f.driveId) return;
-    const name = turboName(f.name);
-    // un número es el `version` de Drive que guardaban las versiones anteriores (sube solo, #176):
-    // no sirve para comparar con la revisión del contenido
-    if (!force && f.driveVersion && !/^\d+$/.test(f.driveVersion)) {
-      const m = await drive.meta(f.driveId);
-      if (m.version && m.version !== f.driveVersion) return setDriveConflict({ name: m.name });
-    }
-    const rev = editRev.current;
-    const p = { ...snapshotRef.current(), name: projectName(name) };
-    const r = await drive.save(name, new TextEncoder().encode(await serializeTurbo(p)), f.driveId);
-    const saved = { ...fileRef.current, name: r.name, driveId: r.id, driveVersion: r.version };
-    fileRef.current = saved;
-    setFile(saved);
-    if (editRev.current === rev) setDirty(false);
-    if (!auto) {
-      remember(p, saved);
-      setMessage(t('Saved to Google Drive: {name}', { name: r.name }));
-    }
-  };
-  const queueDriveSave = (auto: boolean, force = false) => {
-    if (driveBusy.current) {
-      drivePending.current = { auto: (drivePending.current?.auto ?? true) && auto };
-      return;
-    }
-    driveBusy.current = true;
-    // (data-drive en <html>: «busy» mientras sube o hay guardados en cola; lo esperan los e2e)
-    document.documentElement.dataset.drive = 'busy';
-    saveToDrive(auto, force)
-      .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
-      .finally(() => {
-        driveBusy.current = false;
-        const next = drivePending.current;
-        drivePending.current = null;
-        if (next) queueDriveSave(next.auto);
-        else document.documentElement.dataset.drive = 'idle';
-      });
-  };
-  // al simular se guarda solo en Drive (después de que la corrida entró al proyecto)
-  const [autoDrive, setAutoDrive] = useState(0);
-  useEffect(() => {
-    if (autoDrive && google.account && fileRef.current.driveId) queueDriveSave(true);
-  }, [autoDrive]); // eslint-disable-line react-hooks/exhaustive-deps
-  /** Conflicto: recargar la versión de Drive, guardar la mía como copia o sobrescribir */
-  const resolveDriveConflict = async (how: 'reload' | 'copy' | 'overwrite') => {
-    setDriveConflict(null);
-    const f = fileRef.current;
-    if (!f.driveId) return;
-    try {
-      if (how === 'overwrite') return queueDriveSave(false, true);
-      if (how === 'reload') {
-        // lo de acá queda en recientes, por las dudas
-        remember(snapshotRef.current(), f, true);
-        return await openBytes(await drive.download(f.driveId), f.name, { driveId: f.driveId, driveVersion: (await drive.meta(f.driveId)).version });
-      }
-      const name = uniqueName(t('{p0} (copy){EXT}', { p0: projectName(f.name), EXT }), (await drive.list()).map((x) => x.name));
-      const { p, bytes } = await turboBytes(name);
-      const r = await drive.save(name, bytes);
-      savedAs({ ...f, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
-    } catch (e) {
-      setMessage(`Google Drive: ${(e as Error).message}`);
-    }
-  };
-
-  /** Guardar en la carpeta TurboSpice del Drive: sobre el mismo archivo (en cola), o uno nuevo */
-  const doSaveDrive = async (saveAs = false) => {
-    if (!saveAs && file.driveId) return queueDriveSave(false);
-    let name = turboName(file.name);
-    let id: string | undefined;
-    if (!id && saveAs) {
-      const n = window.prompt(t('Project name in Google Drive'), projectName(name))?.trim();
-      if (!n) return;
-      name = turboName(n);
-    }
-    try {
-      const { p, bytes } = await turboBytes(name);
-      if (!id) {
-        const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
-        if (same) {
-          if (!window.confirm(t('There\'s already a «{name}» in Google Drive. Replace it?', { name: same.name }))) return;
-          id = same.id;
-        }
-      }
-      const r = await drive.save(name, bytes, id);
-      savedAs({ ...file, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
-    } catch (e) {
-      setMessage(t('Could not save to Google Drive: {p0}', { p0: (e as Error).message }));
-    }
-  };
-
-  // Con sesión de Google, un proyecto nuevo («project») con cambios se guarda solo en el Drive con
-  // un nombre libre («Project 2», «Project 3»…), para que el autoguardado no pise otro
-  const autoNaming = useRef(false);
-  useEffect(() => {
-    const f = fileRef.current;
-    if (!google.account || !dirty || f.driveId || autoNaming.current || !DEFAULT_NAME.test(projectRef.current.name)) return;
-    autoNaming.current = true;
-    (async () => {
-      const taken = new Set((await drive.list()).map((x) => x.name.toLowerCase()));
-      let n = DEFAULT_PROJECT;
-      for (let i = 2; taken.has(`${n}${EXT}`.toLowerCase()); i++) n = `${DEFAULT_PROJECT} ${i}`;
-      if (fileRef.current.driveId) return;
-      const { p, bytes } = await turboBytes(`${n}${EXT}`);
-      const r = await drive.save(`${n}${EXT}`, bytes);
-      savedAs({ ...fileRef.current, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
-    })()
-      .catch((e: Error) => setMessage(t('Could not save to Google Drive: {message}', { message: e.message })))
-      .finally(() => (autoNaming.current = false));
-  }, [google.account, dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { driveConflict, setDriveConflict, setAutoDrive, resolveDriveConflict, doSaveDrive, openDriveFile } = useDrive({
+    ...{ account: google.account, file, setFile, dirty, setDirty, editRev, projectRef, snapshot, turboBytes, turboName, savedAs, remember, openBytes, confirmDiscard, setDialog, setMessage },
+  });
 
   // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
 
-  const openDriveFile = async (d: DriveFile) => {
-    if (!confirmDiscard()) return;
-    try {
-      const bytes = await drive.download(d.id);
-      setDialog(null);
-      await openBytes(bytes, d.name, /\.turbo$/i.test(d.name) ? { driveId: d.id, driveVersion: d.version ?? (await drive.meta(d.id)).version } : {});
-    } catch (e) {
-      setMessage(t('Could not open from Google Drive: {p0}', { p0: (e as Error).message }));
-    }
-  };
 
   // carpeta lib de LTspice (lib/sym, lib/sub, lib/cmp): de Analog Devices, no se redistribuye; queda
   // en el IndexedDB de este navegador y no se sube a ningún lado

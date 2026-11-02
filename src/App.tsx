@@ -149,6 +149,7 @@ import { ProblemsList, simProblems } from './app/Problems.tsx';
 import { runTestbench } from './app/simulate.ts';
 import { useUserFiles } from './app/useUserFiles.ts';
 import { moduleActions } from './app/modules.ts';
+import { navigation } from './app/navigation.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1212,115 +1213,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const liveView = (): SimView => ({ panes, active: activePane, plot: plotName, mode, plotState: plotState.current });
   // Cada simulación tiene su circuito (#151) y su pila de deshacer (#154): cambiar de simulación
   // guarda lo que se está editando (circuito, vista, pila y resultados) y trae lo de la otra
-  const keyOf = (p: Project) => {
-    const v = variantOf(p);
-    return `${v.id}/${v.activeSim || 'base'}`;
-  };
-  /** Deja la simulación que se está viendo: devuelve el proyecto con su estado guardado */
-  const leave = (): Project => {
-    let p = snapshot();
-    const lv = pathRef.current[pathRef.current.length - 1];
-    stacks.current.set(lv ? subKey(lv.sub) : keyOf(p), history.state);
-    if (lv) p = syncSymbol(p, lv.sub);
-    if (sim && sims.active) keepResult(kept.current, sims.active, sim);
-    return p;
-  };
-  /** Muestra la simulación activa del proyecto (o la base): su circuito, pila, vista y resultados */
-  const enter = (p: Project, refit = false) => {
-    pathRef.current = [];
-    setPath([]);
-    const v = variantOf(p);
-    const s = simOf(v);
-    const h = stacks.current.get(keyOf(p));
-    quietDoc.current = true;
-    if (h && ascText(h.present) === activeAsc(v)) history.restore(h);
-    else history.reset(parseAsc(activeAsc(v)));
-    setProjectState(p);
-    const r = s ? kept.current.get(s.id) : undefined;
-    if (s) kept.current.delete(s.id);
-    setSim(r ?? null);
-    showView(s?.view);
-    setSelection([]);
-    setValueOffer(null);
-    setViewRun('');
-    if (refit) setDocKey((k) => k + 1);
-    // (sin encuadrar, la vista sigue la del testbench anterior: si su circuito no se ve, se encuadra)
-    else setTimeout(() => editor.current?.fitIfLost(), 50);
-    if (s && !r) restoreCached(s.id, s.asc);
-  };
-  /** Pasa a otra simulación de la variante ('' = el circuito base) */
-  const goSim = (id: string) => id !== sims.active && enter(selectProjectSim(leave(), id));
-
-  // --- Jerarquía (#180) ---------------------------------------------------------------------
-  const subKey = (name: string) => `sub:${name.toLowerCase()}`;
-  const levelKey = (ls: HierLevel[]) => (ls.length ? ls.map((l) => `${l.inst ?? ''}:${l.sub}`.toLowerCase()).join('/') : `tb:${keyOf(projectRef.current)}`);
-  /** Si cambiaron los puertos del subcircuito, regenera su símbolo (y avisa) */
-  const syncSymbol = (p: Project, name: string): Project => {
-    if (!symbolOutdated(p, name)) return p;
-    // (un módulo Verilog pone su símbolo al día al sintetizarse)
-    if (verilogFile(p, name)) return updateSymbol(p, name);
-    const f = subcktFile(p, name);
-    setMessage(t('Symbol {name} updated with the ports: {ports}', { name, ports: f ? subcktPorts(parseAsc(f.text)).join(', ') : '' }));
-    return updateSymbol(p, name);
-  };
-  /** Pasa a otro nivel de la jerarquía (vacío = el testbench), guardando lo que se edita */
-  const go = (next: HierLevel[], select?: number) => {
-    const cur = pathRef.current;
-    const v = editor.current?.view();
-    if (v) levelViews.current.set(levelKey(cur), v);
-    let p = snapshot();
-    const lv = cur[cur.length - 1];
-    stacks.current.set(lv ? subKey(lv.sub) : keyOf(p), history.state);
-    if (lv && !next.some((l) => l.sub.toLowerCase() === lv.sub.toLowerCase())) p = syncSymbol(p, lv.sub);
-    const target = next[next.length - 1];
-    const mf = target ? moduleFile(p, target.sub) : undefined;
-    // un módulo Verilog no tiene esquemático (se ve su código): el editor queda con uno vacío
-    const text = target ? (mf?.kind === 'verilog' ? EMPTY_ASC : mf?.text) : activeAsc(variantOf(p));
-    if (text === undefined) return;
-    const h = stacks.current.get(target ? subKey(target.sub) : keyOf(p));
-    quietDoc.current = true;
-    if (h && ascText(h.present) === text) history.restore(h);
-    else history.reset(parseAsc(text));
-    if (p !== projectRef.current) {
-      setProjectState(p);
-      projectRef.current = p;
-    }
-    if (target) setSubTabs((ts) => (ts.some((x) => x.toLowerCase() === target.sub.toLowerCase()) ? ts : [...ts, target.sub]));
-    pathRef.current = next;
-    setPath(next);
-    setSelection(select === undefined ? [] : [{ kind: 'symbol', index: select }]);
-    setTool({ kind: 'select' });
-    setViewRun('');
-    setValueOffer(null);
-    // misma posición y zoom que la última vez en ese nivel (si no, ajustar)
-    setDocKey((k) => k + 1);
-    const saved = levelViews.current.get(levelKey(next));
-    if (saved) requestAnimationFrame(() => requestAnimationFrame(() => editor.current?.setView(saved)));
-    // al entrar a un subcircuito aparece el panel del símbolo y el esquemático se angosta después de
-    // ajustar: se vuelve a ajustar con el ancho final (si no, lo dibujado queda detrás del panel)
-    else setTimeout(() => editor.current?.fit(), 120);
-  };
-  const goUp = () => pathRef.current.length && go(pathRef.current.slice(0, -1));
-  /** Abre un subcircuito sin instancia (desde el panel, una pestaña o Ctrl+P) */
-  const openSub = (name: string, select?: number) => {
-    const cur = pathRef.current;
-    const i = cur.findIndex((l) => l.sub.toLowerCase() === name.toLowerCase());
-    go(i >= 0 ? cur.slice(0, i + 1) : [{ sub: name, prefix: '', ports: new Map() }], select);
-  };
-  /** Doble clic / E / Enter sobre una instancia de un subcircuito del proyecto: bajar */
-  const descend = (si: number): boolean => {
-    const s = docRef.current.symbols[si];
-    const f = s && moduleFile(projectRef.current, s.type);
-    if (!f) return false;
-    const parent = pathRef.current[pathRef.current.length - 1];
-    const el = lt.elements.find((e) => e.sym === si);
-    const ng = el ? el.name.replace(/§/g, '_').toLowerCase() : '';
-    const up = (node: string) => (node === '0' ? '0' : (parent?.ports.get(node.toLowerCase()) ?? `${parent?.prefix ?? ''}${node}`));
-    const ports = new Map<string, string>();
-    el?.pinNames.forEach((pn, i) => pn && ports.set(pn.toLowerCase(), up(el.nodes[i])));
-    go([...pathRef.current, { sub: subName(f.name), inst: s.attrs.get('InstName') ?? el?.name ?? '?', prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`, ports: parent && !parent.inst ? new Map() : ports }]);
-    return true;
-  };
+  const { leave, enter, goSim, subKey, go, goUp, openSub, descend } = navigation({
+    ...{ history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt },
+    ...{ setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setMessage },
+  });
   const { checkSubName, newSubckt, createModule, renameSub, deleteSub, newModel, renameModel, deleteModel } = moduleActions({
     ...{ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport },
   });

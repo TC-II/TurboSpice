@@ -178,8 +178,8 @@ Regla: **una extracción por PR, sin cambiar comportamiento**, con las 17 suites
 
 | Métrica | Hoy | Meta |
 |---|---|---|
-| Líneas de `App.tsx` | 4361 (2026-11-02: 3426) | < 1000 |
-| Hooks en `SchematicMode` | 93 | < 25 por componente |
+| Líneas de `App.tsx` | 4361 (2026-11-02: 970 ✅) | < 1000 |
+| Hooks en `SchematicMode` | 93 (2026-11-02: 34 `useState`/`useRef`, 96 llamadas a hooks en total) | < 25 por componente |
 | `eslint-disable` | 5 (sin linter) | 0 con linter activo |
 | Suites e2e en CI | 7/17 | 17/17 |
 | Esperas fijas en e2e | 144 | < 30 |
@@ -231,7 +231,7 @@ de herramientas esconde todo el grupo de dibujo (Cable, Componente, Tierra…) e
 
 | # | Estado | Detalle |
 |---|---|---|
-| 3.1 | 🔄 | `App.tsx`: **4908 → 3426 líneas** en 12 extracciones, una por commit y sin cambios de comportamiento (las 17 suites e2e pasan). Lo nuevo vive en `src/app/`: `constants.ts`, `types.ts`, `storage.ts` (localStorage y tema), `helpers.ts`, `HintBar.tsx` (barra de estado), `AppDialogs.tsx` (todos los diálogos), `menus.tsx` (`buildMenus`), `shortcuts.ts` (`useShortcuts`), `useDrive.ts` (guardado en Drive: cola, conflictos, nombre automático), `AppBarSlots.tsx` (tema, idioma, compartir y vistas), `SimRow.tsx` (barra de simulación), `Problems.tsx` (problemas de la corrida y su lista), `simulate.ts` (`runTestbench`: armar, correr y procesar una simulación) y `useUserFiles.ts` («My symbols and models» y su copia en Drive). Por ahora las partes reciben lo que usan por props (con `{...{ a, b }}` en la llamada); el paso siguiente es que los hooks de cada dominio sean dueños de su estado. Falta: jerarquía y módulos (~250 líneas), testbenches y grupos, importar/exportar, punta de prueba, punto de operación, el área del esquemático y el cuerpo del panel de resultados. Siguen los 13 `eslint-disable` de `exhaustive-deps`, ahora repartidos: 9 en `App.tsx`, 2 en `useDrive.ts`, 1 en `useUserFiles.ts` y 1 en `HintBar.tsx`. |
+| 3.1 | 🔄 | `App.tsx`: **4908 → 970 líneas** (meta < 1000 ✅) en 43 extracciones, una por commit y sin cambios de comportamiento (las 17 suites e2e pasan después de cada tanda). Lo que salió vive en `src/app/` (46 archivos, ~6000 líneas), por dominio: **proyecto y sesión** (`useProjectSession`: cargar, recientes, restaurar al entrar, autoguardado, idioma; `saving`, `projectFiles`, `useProjectFiles`, `useImportExport`, `useDrive`, `useUserFiles`); **navegación y jerarquía** (`navigation`, `modules`, `benches`, `useSubcktEditing`, `ModuleEditors`, `ProjectPanel`, `projectTree`); **simulación** (`runActions` y `simulate`: correr y mostrar; `useVerilog`, `studyActions`, `circuitInfo`, `runHistory`, `Problems`); **resultados** (`ResultsPanel`, `useTraces`, `useProbe`, `useOpPoint`, `useHighlights`, `useSavesPanel`); **edición** (`clipboard`, `contextMenus`, `usePicker`, `EditorArea`); **interfaz** (`AppDialogs`, `menus`, `toolbars`, `shortcuts`, `AppBarSlots`, `SimRow`, `StatusBar`, `HintBar`, `FileInputs`, `useLayoutPrefs`, `tutorialProbe`). Las partes reciben lo que usan por props o por un objeto de dependencias (`{...{ a, b }}` en la llamada); las que se declaran más abajo en `SchematicMode` van envueltas (`() => f()`). Falta: que el estado compartido (documento, proyecto, simulación) tenga dueño propio (`useReducer` + contexto por dominio), con lo que bajan los 34 `useState`/`useRef` (96 hooks en total) que quedan en `SchematicMode` y las listas de props; y los 13 `eslint-disable` de `exhaustive-deps` (6 en `App.tsx`, 7 en `src/app/`). |
 
 ### Fase 4
 

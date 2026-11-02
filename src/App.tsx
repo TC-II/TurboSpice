@@ -101,7 +101,6 @@ import { AccountButton } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
-import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 import { compileBehavioral, synthesizeVerilog } from './hdl/client.ts';
 import { vvpFileOf, applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogPorts, verilogSources } from './hdl/project.ts';
@@ -112,7 +111,7 @@ import { BASE, DEFAULT_PROJECT, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/con
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, registerUserFile } from './app/helpers.ts';
-import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
+import { type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
 import { useShortcuts } from './app/shortcuts.ts';
@@ -137,6 +136,8 @@ import { tutorialState } from './app/tutorialProbe.ts';
 import { savingActions } from './app/saving.ts';
 import { projectFileActions } from './app/projectFiles.ts';
 import { runActions } from './app/runActions.ts';
+import { FileInputs } from './app/FileInputs.tsx';
+import { StatusBar } from './app/StatusBar.tsx';
 
 
 export function App() {
@@ -1891,68 +1892,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
               }}
             />
           )}
-          {/* Archivo › Importar a este proyecto */}
-          <input
-            ref={importInput}
-            type="file"
-            hidden
-            multiple
-            accept=".turbo,.zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt,.lb"
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = '';
-              if (files.length) importFiles(files);
-            }}
-          />
-          {/* carpeta lib de LTspice (Archivo → Importar librería de LTspice) */}
-          <input
-            ref={ltInput}
-            type="file"
-            hidden
-            {...{ webkitdirectory: '', directory: '' }}
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = '';
-              if (files.length) doImportLtspice(files);
-            }}
-          />
-          {/* los avisos y estados van todos en la barra de abajo, a la derecha (#342): también las
-              preguntas (aplicar un valor en las otras simulaciones, agregar una vista guardada) y
-              la corrida vieja que se está mirando. Elegir en el esquemático no pone cartel: la
-              barra dice qué clickear (Esc cancela) */}
-          <HintBar
-            sink={hoverSink}
-            text={(hover) => (savesPicking ? t('Click a wire (voltage) or a component (current) to save it, or again to stop saving it') : tool.kind === 'select' ? (hover?.ref ? hoverInfo(doc, lib, conn, hover.ref).join(' · ') : hover ? hoverCoords(hover.at) : '') : toolHint(tool))}
-            message={message}
-            onDismiss={() => setMessage(undefined)}
-            offers={
-              <>
-                {viewed && (
-                  <span className="status-offer history">
-                    {t('Run from')}{' '}{new Date(viewed.time).toLocaleString(locale())} {t('· read-only')}
-                    <button onClick={() => restoreRun(viewed.id)}>{t('Restore')}</button>
-                    <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
-                  </span>
-                )}
-                {valueOffer && !picking && (
-                  <span className="status-offer">
-                    {valueOffer.changes.map((c) => `${c.inst} = ${c.from}`).join(', ')} {t('also in')}{' '}
-                    {valueOffer.sims.length === 1 ? t('1 simulation') : t('{length} simulations', { length: valueOffer.sims.length })}
-                    <button onClick={applyValueOffer} title={t('Change to {p0} in the other simulations', { p0: valueOffer.changes.map((c) => `${c.inst} = ${c.to}`).join(', ') })}>
-                      {t('Apply')}
-                    </button>
-                    <button onClick={() => setValueOffer(null)}>No</button>
-                  </span>
-                )}
-                {offerView && !picking && (
-                  <span className="status-offer">
-                    {t('There\'s a results view of')}{' '}{file.name} {t('saved in this browser. Add it to the .asc?')}
-                    <button onClick={acceptOfferedView}>{t('Add')}</button>
-                    <button onClick={() => setOfferView(null)}>No</button>
-                  </span>
-                )}
-              </>
-            }
+          <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
+          <StatusBar
+            picking={!!picking}
+            fileName={file.name}
+            {...{ hoverSink, savesPicking, tool, doc, lib, conn, message, setMessage, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, offerView, acceptOfferedView, setOfferView }}
           />
         </div>
 

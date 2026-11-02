@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -148,6 +148,7 @@ import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
 import { useShortcuts } from './app/shortcuts.ts';
 import { useDrive } from './app/useDrive.ts';
+import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1949,25 +1950,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // Schematic | Results: la unión entre las dos pestañas cae sobre el borde derecho de la cápsula
   // del proyecto (que mide --tree-w), sea cual sea el ancho del logo o del texto en cada idioma
-  const viewTabs = useRef<HTMLElement>(null);
-  useLayoutEffect(() => {
-    const align = () => {
-      const nav = viewTabs.current;
-      const first = nav?.firstElementChild;
-      if (!nav || !first) return;
-      nav.style.marginLeft = '';
-      // en pantallas angostas la barra se reacomoda: correrlas la haría desbordar
-      if (matchMedia('(max-width: 700px)').matches) return;
-      const treeW = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tree-w'));
-      const gap = parseFloat(getComputedStyle(nav).columnGap) || 0;
-      const shift = treeW - (first.getBoundingClientRect().right + gap / 2);
-      if (shift > 0) nav.style.marginLeft = `${shift}px`;
-    };
-    align();
-    document.fonts?.ready.then(align);
-    addEventListener('resize', align);
-    return () => removeEventListener('resize', align);
-  });
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
 
   // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
@@ -2889,26 +2871,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const schematicShown = !sim || expanded !== 'results';
   const resultsShown = !!sim && expanded !== 'schematic';
   const toggleResultsPanel = () => setExpanded(toggleResults(expanded));
-  // Botones de vista (#55): el botón entero hace lo mismo. Si la vista no está, se agrega en
-  // pantalla partida; si ya están las dos, la cruz la cierra; si es la única, no hace nada
-  const viewsBoth = schematicShown && resultsShown;
-  const showSchematicView = () => {
-    if (!sim) return;
-    if (!schematicShown) setExpanded('');
-    else if (resultsShown) setExpanded('results');
-  };
-  const showResultsView = () => {
-    if (!sim) return;
-    if (!resultsShown) setExpanded('');
-    else if (schematicShown) setExpanded('schematic');
-  };
-  const viewCls = (shown: boolean) => [shown && 'active', shown && !viewsBoth && 'alone'].filter(Boolean).join(' ');
-  // segmento de la derecha del botón: cruz si la vista se ve, flechita si no. Siempre está (con
-  // el mismo ancho) para que el botón no cambie de tamaño al presionarlo
-  const viewAct = (shown: boolean, enabled: boolean) => {
-    const on = enabled && !(shown && !viewsBoth);
-    return <span className={on ? 'view-act' : 'view-act idle'} aria-hidden="true">{on && <Icon name={shown ? 'close' : 'caret'} size={12} />}</span>;
-  };
   const setSide = (side: boolean) => {
     lsSet('turbospice.resultsSide', side ? '1' : '0');
     setResultsSide(side);
@@ -3111,66 +3073,8 @@ ${ltNetlistText(sim.built.lt)}
       )}
       {/* exportando, la barra de la app queda (marca y estilo) con las herramientas de la vista previa */}
       {slots.tools && !exporting && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
-      {slots.right &&
-        createPortal(
-          <>
-            <button
-              className="theme-btn"
-              aria-label={t('Change theme')}
-              title={t('Theme: {p0}', { p0: theme === 'auto' ? t('automatic (system)') : theme === 'light' ? t('light') : t('dark') })}
-              onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
-            >
-              <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
-              {theme === 'auto' && <span className="auto">A</span>}
-            </button>
-            <button
-              className="lang-btn"
-              aria-label={t('Change language')}
-              title={t('Language: English · Spanish (the page reloads; your work is kept)')}
-              onClick={switchLang}
-            >
-              <span className={getLang() === 'en' ? 'on' : ''}>EN</span>
-              <span className={getLang() === 'es' ? 'on' : ''}>ES</span>
-            </button>
-            {!exporting && <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
-              <Icon name="share" />
-              <span className="txt">{t('Share')}</span>
-            </button>}
-          </>,
-          slots.right,
-        )}
-      {slots.tabs &&
-        !exporting &&
-        createPortal(
-          <>
-            {/* vistas: con las dos prendidas, pantalla partida */}
-            <nav className="tabs view-tabs" aria-label={t('Views')} ref={viewTabs}>
-              <button className={viewCls(schematicShown)} aria-pressed={schematicShown} onClick={showSchematicView} title={!sim ? t('Schematic') : viewsBoth ? t('Close the schematic (the results stay full screen)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}>
-                {t('Schematic')}
-                {viewAct(schematicShown, true)}
-              </button>
-              <button
-                className={viewCls(resultsShown)}
-                aria-pressed={resultsShown}
-                disabled={!sim}
-                onClick={showResultsView}
-                title={!sim ? t('No results yet: simulate first') : viewsBoth ? t('Close the results (the schematic stays full screen)') : resultsShown ? t('Results') : t('Add the results in split screen (Ctrl+0)')}
-              >
-                {t('Results')}
-                {viewAct(resultsShown, !!sim)}
-              </button>
-            </nav>
-            <div className="layout-btns" role="group" aria-label={t('Results layout')}>
-              <button className={resultsSide ? 'active' : ''} aria-pressed={resultsSide} aria-label={t('Results on the side')} title={t('Results on the side')} onClick={() => setSide(true)}>
-                <Icon name="layoutSide" size={16} />
-              </button>
-              <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label={t('Results below')} title={t('Results below')} onClick={() => setSide(false)}>
-                <Icon name="layoutStack" size={16} />
-              </button>
-            </div>
-          </>,
-          slots.tabs,
-        )}
+      {slots.right && <AppBarRight slot={slots.right} {...{ theme, setTheme, switchLang, exporting, doShare }} />}
+      {slots.tabs && !exporting && <ViewTabs slot={slots.tabs} hasSim={!!sim} {...{ schematicShown, resultsShown, setExpanded, resultsSide, setSide }} />}
       {/* segunda barra: el proyecto (árbol y cápsula) y la simulación */}
       <div className="iconbar sim-row" role="toolbar" aria-label={t('Simulation')}>
         <div className="group">

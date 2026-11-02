@@ -27,7 +27,6 @@ import { type CircuitInfo } from './schematic/simDialogs.tsx';
 import { findControl, removeAnalysis } from './schematic/directivesEdit.ts';
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
-import { ANALYSIS_LINE } from './sim/analyses.ts';
 import { activeSim, type SimList, type SimView } from './sim/simList.ts';
 import { simLine } from './sim/complexSim.ts';
 import {
@@ -43,10 +42,8 @@ import {
 } from './project/project.ts';
 import { runFilesOf, runSummary } from './project/exchange.ts';
 import { EXT, newProject, type Project } from './project/turbo.ts';
-import { isNativeSwitch, isTcSwitch } from './schematic/SwitchDialog.tsx';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
-import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { allItems, transformItems } from './schematic/edit.ts';
 import type { ItemRef } from './schematic/geometry.ts';
@@ -55,7 +52,7 @@ import { type TreeSub } from './project/Hierarchy.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { isModelModule } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
-import { benchesUsing, subcktFile, subName, usages } from './project/subckt.ts';
+import { benchesUsing } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -602,32 +599,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const liveView = (): SimView => ({ panes, active: activePane, plot: plotName, mode, plotState: plotState.current });
   // Cada simulación tiene su circuito (#151) y su pila de deshacer (#154): cambiar de simulación
   // guarda lo que se está editando (circuito, vista, pila y resultados) y trae lo de la otra
-  const { leave, enter, goSim, subKey, go, goUp, openSub, descend } = navigation({
-    ...{ history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt },
+  const { leave, enter, goSim, subKey, go, goUp, openSub, descend, goUsage } = navigation({
+    ...{ history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt, lib },
     ...{ setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setMessage },
   });
   const { checkSubName, newSubckt, createModule, renameSub, deleteSub, newModel, renameModel, deleteModel } = moduleActions({
     ...{ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport },
   });
-  /** Ir a una instancia de un subcircuito (desde «usado en») */
-  const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
-    const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
-    if (u.where.kind === 'subckt') {
-      const f = subcktFile(projectRef.current, u.where.name);
-      return f && openSub(u.where.name, find(f.text));
-    }
-    const w = u.where;
-    if (w.kind === 'sim' && w.sim !== variantOf(projectRef.current).activeSim) goSim(w.sim);
-    else if (pathRef.current.length) go([]);
-    requestAnimationFrame(() => {
-      const i = find(ascText(docRef.current));
-      if (i >= 0) {
-        setSelection([{ kind: 'symbol', index: i }]);
-        const s = docRef.current.symbols[i];
-        editor.current?.centerOn(symbolBox(s, lib.symbol(s.type), lib));
-      }
-    });
-  };
   // En la base, escribir un comando de análisis (a mano o con el diálogo) crea la primera
   // simulación con ese circuito; la base se queda sin el comando
   useEffect(() => {
@@ -651,9 +629,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // menú del botón derecho de un comentario (tamaño, alineación)
   const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
   const closeTextMenu = useCallback(() => setTextMenu(null), []);
-  const { netMenu, symbolMenu } = contextMenus({
-    ...{ doc, lib, curSub, sims, commit, snapshot, editProject, setCtxMenu, setMessage },
-    editItem: (ref) => editItem(ref), // (declarada más abajo)
+  const { netMenu, symbolMenu, editItem } = contextMenus({
+    ...{ doc, lib, curSub, sims, commit, snapshot, editProject, setCtxMenu, setMessage, setDialog, selection, openLineStyle },
   });
   /** El nombre del proyecto es el del archivo: en Drive se renombra ya; en el equipo, al guardar */
   const renameProject = async (name: string) => {
@@ -747,27 +724,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const partGroups = (s: SymbolInst): PartGroup[] =>
     cmpChoicesFor(effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '', s.type).map((c) => ({ kind: c.kind, label: c.label, parts: lib.parts(c.kind).filter(c.accept) }));
 
-  const editItem = (ref: ItemRef) => {
-    if (ref.kind === 'symbol') {
-      // las fuentes independientes (V, I) tienen su ventana de configuración
-      const s = doc.symbols[ref.index];
-      const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
-      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) || isNativeSwitch(prefix) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
-    }
-    else if (ref.kind === 'text') {
-      const tt = doc.texts[ref.index];
-      const ls = tt.text.split('\\n');
-      // Como en LTspice: un comando de análisis abre el menú de simulación
-      if (isControlBlock(tt.text)) setDialog({ kind: 'control', index: ref.index });
-      else if (ls.length === 1 && ANALYSIS_LINE.test(ls[0])) setDialog({ kind: 'sim', found: { text: ref.index, line: 0, value: ls[0].trim() } });
-      else setDialog({ kind: 'text', index: ref.index, textKind: tt.kind });
-    } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
-    else if (ref.kind === 'shape') {
-      // doble click en una figura de la selección: el estilo va a todas las seleccionadas
-      const sel = selection.filter((r) => r.kind === 'shape').map((r) => r.index);
-      openLineStyle(sel.includes(ref.index) ? sel : [ref.index]);
-    }
-  };
 
 
   const missingSymbols = (d: AscDoc) => [...new Set(d.symbols.filter((x) => !lib.symbol(x.type)).map((x) => `${baseName(x.type)}.asy`))];

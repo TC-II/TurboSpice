@@ -1,15 +1,16 @@
 // Moverse por el proyecto: cambiar de testbench (cada uno con su circuito, su pila de deshacer y sus
 // resultados, #151 #154) y de nivel de la jerarquía (#180), guardando lo que se estaba editando
 import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
-import type { AscDoc } from '../asc/model.ts';
+import { baseName, type AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { verilogFile } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
+import type { Library } from '../library/library.ts';
 import type { ltNetlist } from '../netlist/ltnetlist.ts';
 import { activeAsc, selectSim as selectProjectSim, simOf, variantOf } from '../project/project.ts';
-import { moduleFile, subName, subcktFile, subcktPorts, symbolOutdated, updateSymbol } from '../project/subckt.ts';
+import { moduleFile, subName, subcktFile, subcktPorts, symbolOutdated, updateSymbol, type usages } from '../project/subckt.ts';
 import { EMPTY_ASC, type Project } from '../project/turbo.ts';
-import type { ItemRef } from '../schematic/geometry.ts';
+import { symbolBox, type ItemRef } from '../schematic/geometry.ts';
 import type { EditorHandle, Tool, View as EditorView } from '../schematic/SchematicEditor.tsx';
 import type { History } from '../schematic/useHistory.ts';
 import { keepResult, type SimList, type SimView } from '../sim/simList.ts';
@@ -34,6 +35,7 @@ export interface NavigationDeps {
   sim: SimRun | null;
   sims: SimList;
   lt: ReturnType<typeof ltNetlist>;
+  lib: Library;
   setProjectState(p: Project): void;
   setPath(p: HierLevel[]): void;
   setSubTabs: Dispatch<SetStateAction<string[]>>;
@@ -49,7 +51,7 @@ export interface NavigationDeps {
 }
 
 export function navigation(d: NavigationDeps) {
-  const { history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt } = d;
+  const { history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt, lib } = d;
   const { setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setMessage } = d;
   const keyOf = (p: Project) => {
     const v = variantOf(p);
@@ -160,5 +162,24 @@ export function navigation(d: NavigationDeps) {
     go([...pathRef.current, { sub: subName(f.name), inst: s.attrs.get('InstName') ?? el?.name ?? '?', prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`, ports: parent && !parent.inst ? new Map() : ports }]);
     return true;
   };
-  return { leave, enter, goSim, subKey, go, goUp, openSub, descend };
+  /** Ir a una instancia de un subcircuito (desde «usado en») */
+  const goUsage = (u: ReturnType<typeof usages>[number], name: string) => {
+    const find = (asc: string) => parseAsc(asc).symbols.findIndex((s) => s.attrs.get('InstName') === u.inst && subName(baseName(s.type)).toLowerCase() === name.toLowerCase());
+    if (u.where.kind === 'subckt') {
+      const f = subcktFile(projectRef.current, u.where.name);
+      return f && openSub(u.where.name, find(f.text));
+    }
+    const w = u.where;
+    if (w.kind === 'sim' && w.sim !== variantOf(projectRef.current).activeSim) goSim(w.sim);
+    else if (pathRef.current.length) go([]);
+    requestAnimationFrame(() => {
+      const i = find(ascText(docRef.current));
+      if (i >= 0) {
+        setSelection([{ kind: 'symbol', index: i }]);
+        const s = docRef.current.symbols[i];
+        editor.current?.centerOn(symbolBox(s, lib.symbol(s.type), lib));
+      }
+    });
+  };
+  return { leave, enter, goSim, subKey, go, goUp, openSub, descend, goUsage };
 }

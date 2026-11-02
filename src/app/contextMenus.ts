@@ -12,6 +12,10 @@ import { elementRefs, saveSelection, setSaveSelection, toggleRefs } from '../sim
 import type { SimList } from '../sim/simList.ts';
 import { parseSource } from '../sim/sources.ts';
 import type { ContextItem } from '../ui/ContextMenu.tsx';
+import { isControlBlock } from '../netlist/directives.ts';
+import { isNativeSwitch, isTcSwitch } from '../schematic/SwitchDialog.tsx';
+import { ANALYSIS_LINE } from '../sim/analyses.ts';
+import type { Dialog } from './types.ts';
 
 export interface ContextMenuDeps {
   doc: AscDoc;
@@ -21,12 +25,37 @@ export interface ContextMenuDeps {
   commit(d: AscDoc): void;
   snapshot(): Project;
   editProject(p: Project): void;
-  editItem(ref: ItemRef): void;
+  setDialog(d: Dialog | null): void;
+  selection: ItemRef[];
+  /** el estilo de línea de esas figuras */
+  openLineStyle(shapes?: number[]): void;
   setCtxMenu(m: { at: { x: number; y: number }; items: ContextItem[] }): void;
   setMessage(m?: string): void;
 }
 
-export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editProject, editItem, setCtxMenu, setMessage }: ContextMenuDeps) {
+export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editProject, setCtxMenu, setMessage, setDialog, selection, openLineStyle }: ContextMenuDeps) {
+  /** Doble clic en un elemento: su diálogo (un comando de análisis abre el de simulación, como en LTspice) */
+  const editItem = (ref: ItemRef) => {
+    if (ref.kind === 'symbol') {
+      // las fuentes independientes (V, I) tienen su ventana de configuración
+      const s = doc.symbols[ref.index];
+      const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
+      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) || isNativeSwitch(prefix) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
+    }
+    else if (ref.kind === 'text') {
+      const tt = doc.texts[ref.index];
+      const ls = tt.text.split('\\n');
+      // Como en LTspice: un comando de análisis abre el menú de simulación
+      if (isControlBlock(tt.text)) setDialog({ kind: 'control', index: ref.index });
+      else if (ls.length === 1 && ANALYSIS_LINE.test(ls[0])) setDialog({ kind: 'sim', found: { text: ref.index, line: 0, value: ls[0].trim() } });
+      else setDialog({ kind: 'text', index: ref.index, textKind: tt.kind });
+    } else if (ref.kind === 'flag') setDialog({ kind: 'flag', index: ref.index });
+    else if (ref.kind === 'shape') {
+      // doble click en una figura de la selección: el estilo va a todas las seleccionadas
+      const sel = selection.filter((r) => r.kind === 'shape').map((r) => r.index);
+      openLineStyle(sel.includes(ref.index) ? sel : [ref.index]);
+    }
+  };
   /**
    * Ítem del botón derecho para guardar o dejar de guardar unas señales, sólo si el testbench
    * guarda lo elegido (#314)
@@ -109,5 +138,5 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
     });
     return true;
   };
-  return { netMenu, symbolMenu };
+  return { netMenu, symbolMenu, editItem };
 }

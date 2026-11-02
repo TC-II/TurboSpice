@@ -11,6 +11,14 @@ export const skipWelcome = async (target) => {
  *  visita abre un proyecto vacío */
 export const sampleUrl = (url) => `${url}${url.includes('?') ? '&' : '?'}example=${encodeURIComponent('Sample Project.turbo')}`;
 /** Ver › Mostrar directivas (#48): para los tests que leen el .tran dibujado */
+/** Proyecto nuevo con el botón Nuevo de la barra; si no entra (a 1280 px el grupo Archivo es el
+ *  primero en pasar a «Más herramientas»), desde ese desplegable */
+export async function newProject(page) {
+  const button = page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Nuevo', exact: true });
+  if (await button.count()) return button.click();
+  await page.getByRole('button', { name: 'Más herramientas' }).click();
+  await page.getByRole('menuitem', { name: 'Nuevo', exact: true }).click();
+}
 export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 
 /** Recorre un desplegable ya abierto: los submenús con hover, el último ítem con click */

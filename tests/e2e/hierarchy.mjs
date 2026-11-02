@@ -3,7 +3,7 @@
 // lugar y medir adentro (tensiones, corrientes, punto de operación y flechas de corriente).
 // Uso: node tests/e2e/hierarchy.mjs [url]   (con `npm run preview` corriendo)
 import { readFileSync } from 'node:fs';
-import { frames, steady, menu, skipWelcome, launchBrowser, FIREFOX, sampleUrl } from './lib.mjs';
+import { frames, steady, menu, skipWelcome, launchBrowser, FIREFOX, sampleUrl, newProject } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -62,7 +62,7 @@ SYMATTR InstName R2
 SYMATTR Value 2k
 TEXT 0 300 Left 2 !.tran 1m
 `;
-await page.getByRole('button', { name: 'Nuevo' }).click();
+await newProject(page);
 await page.evaluate((t) => navigator.clipboard.writeText(t), flat);
 await page.keyboard.press('Control+v');
 await page.keyboard.press('Escape');

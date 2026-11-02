@@ -90,15 +90,27 @@ describe('valores amigables', () => {
 
 describe('barra de herramientas (#38)', () => {
   it('los grupos que no entran pasan al desplegable, de derecha a izquierda', async () => {
-    const { groupsThatFit } = await import('../../src/ui/Toolbar.tsx');
+    const { visibleGroups } = await import('../../src/ui/Toolbar.tsx');
     const w = [100, 70, 230, 100, 70];
-    expect(groupsThatFit(w, 600)).toBe(5);
-    expect(groupsThatFit(w, 570)).toBe(5);
+    const count = (avail: number, moreW?: number) => visibleGroups(w, avail, moreW).filter(Boolean).length;
+    expect(count(600)).toBe(5);
+    expect(count(570)).toBe(5);
     // si no entran todos, se reserva lugar para el botón "Más herramientas"
-    expect(groupsThatFit(w, 569, 40)).toBe(4);
-    expect(groupsThatFit(w, 500, 40)).toBe(3);
-    expect(groupsThatFit(w, 200, 40)).toBe(1);
-    expect(groupsThatFit(w, 100, 40)).toBe(0);
+    expect(count(569, 40)).toBe(4);
+    expect(count(500, 40)).toBe(3);
+    expect(count(200, 40)).toBe(1);
+    expect(count(100, 40)).toBe(0);
+    expect(visibleGroups(w, 500, 40)).toEqual([true, true, true, false, false]);
+  });
+
+  it('con prioridades se esconden primero los de menos prioridad: a 1280 px queda Dibujo', async () => {
+    const { visibleGroups } = await import('../../src/ui/Toolbar.tsx');
+    // archivo, historial, dibujo y editar, como en la barra del esquemático
+    const w = [147, 79, 283, 250];
+    const prio = [0, 2, 3, 1];
+    expect(visibleGroups(w, 520, 38, prio)).toEqual([false, true, true, false]);
+    expect(visibleGroups(w, 680, 38, prio)).toEqual([false, true, true, true]);
+    expect(visibleGroups(w, 330, 38, prio)).toEqual([false, false, true, false]);
   });
 
   it('menús: cada tipo de análisis tiene su ítem en la flecha de Simular', async () => {

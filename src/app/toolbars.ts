@@ -63,6 +63,8 @@ export function buildToolGroups({
     {
       id: 'file',
       label: t('File'),
+      // si falta lugar, lo primero que pasa a «Más herramientas» (también está en el menú y con atajos)
+      priority: 0,
       tools: [
         { icon: 'new', label: t('New'), title: t('New project'), onClick: doNew },
         { icon: 'save', label: t('Save'), title: google.account ? t('Save to Google Drive') : t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
@@ -81,6 +83,8 @@ export function buildToolGroups({
     {
       id: 'history',
       label: t('History'),
+      // deshacer y rehacer, antes que Dibujo
+      priority: 2,
       tools: [
         { icon: 'undo', label: t('Undo'), title: t('Undo'), shortcut: 'Ctrl+Z', onClick: history.undo, disabled: !history.canUndo },
         { icon: 'redo', label: t('Redo'), title: t('Redo'), shortcut: 'Ctrl+Shift+Z', onClick: history.redo, disabled: !history.canRedo },
@@ -89,6 +93,8 @@ export function buildToolGroups({
     {
       id: 'draw',
       label: t('Drawing'),
+      // lo último que se esconde: se dibuja con estas
+      priority: 3,
       tools: [
         { icon: 'select', label: t('Select'), title: t('Select and move'), shortcut: 'Esc', onClick: () => setTool({ kind: 'select' }), active: tool.kind === 'select' },
         { icon: 'wire', label: t('Wire'), title: t('Wire'), shortcut: 'W', onClick: () => setTool({ kind: 'wire', start: null }), active: tool.kind === 'wire' },
@@ -104,6 +110,8 @@ export function buildToolGroups({
     {
       id: 'edit',
       label: t('Editing'),
+      // después de Archivo (todo con atajo: M, Ctrl+R, Ctrl+E, Supr…)
+      priority: 1,
       tools: [
         { icon: 'fit', label: t('Fit'), title: t('Fit to view (Z: zoom to a box, Shift+Z: previous zoom)'), shortcut: t('Space'), onClick: () => editor.current?.fit() },
         { icon: 'grid', label: t('Grid'), title: t('Show or hide the grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), active: showGrid },

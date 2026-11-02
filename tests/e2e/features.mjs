@@ -4,7 +4,7 @@
 // colapsar los resultados sin perderlos (#36).
 // Uso: node tests/e2e/features.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { autosaved, frames, steady, menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, until, launchBrowser, FIREFOX, sampleUrl } from './lib.mjs';
+import { autosaved, frames, steady, menu, openExample, resultsMenu, resultsView, simCommand, skipWelcome, spanishUi, until, launchBrowser, FIREFOX, sampleUrl, newProject } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -211,6 +211,8 @@ check(
 check(tex.includes('% Created with TurboSpice https://tc-ii.github.io/TurboSpice/'), 'el .tex dice que se hizo con TurboSpice');
 // #330: el skin Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja, y sugiere su letra
 await exportView.getByLabel('Skin').selectOption('Tremor');
+// (el trazo, roughPen.js, se baja la primera vez que se elige Tremor)
+await until(async () => (await exportView.locator('svg.export-sheet .wires polyline').count()) > 0);
 check(
   (await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0,
   'Skin Tremor: los cables de la hoja salen a mano alzada; los del esquemático no',
@@ -1217,7 +1219,7 @@ await page.keyboard.press('Escape');
 // circuito que usa los dos: V1=3 → div (2 V) → amp3 (6 V)
 const top =
   'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nWIRE 32 0 96 0\nWIRE 160 0 224 0\nFLAG -96 64 0\nFLAG 32 0 b\nFLAG 224 0 c\nSYMBOL voltage -96 -32 R0\nSYMATTR InstName V1\nSYMATTR Value 3\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMBOL amp3 128 0 R0\nSYMATTR InstName X2\nTEXT -96 128 Left 2 !.op\n';
-await page.getByRole('button', { name: 'Nuevo' }).click();
+await newProject(page);
 await page.evaluate((t) => navigator.clipboard.writeText(t), top);
 await page.keyboard.press('Control+v');
 await page.getByLabel('Correr', { exact: true }).click();

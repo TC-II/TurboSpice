@@ -2,7 +2,7 @@
 // deshace/rehace, guarda el .asc y verifica el archivo.
 // Uso: node tests/e2e/editor.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { frames, menu, skipWelcome, steady, launchBrowser, sampleUrl } from './lib.mjs';
+import { frames, menu, skipWelcome, steady, launchBrowser, sampleUrl, newProject } from './lib.mjs';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { decode } from '../../src/asc/encoding.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -37,7 +37,7 @@ const check = (ok, msg) => {
 
 await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
-await page.getByRole('button', { name: 'Nuevo' }).click();
+await newProject(page);
 
 const svg = page.locator('svg.editor');
 // la vista se reajusta al documento vacío un cuadro después: esperar a que quede quieta

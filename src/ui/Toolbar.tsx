@@ -1,5 +1,6 @@
-// Barra de herramientas por grupos de íconos. Si falta lugar, los grupos pasan (de derecha a
-// izquierda) a un desplegable "Más herramientas"; lo que va en `fixed` queda siempre a la vista
+// Barra de herramientas por grupos de íconos. Si falta lugar, los grupos pasan (los de menos
+// prioridad primero; con la misma, de derecha a izquierda) a un desplegable "Más herramientas";
+// lo que va en `fixed` queda siempre a la vista
 // y lo que va en `after` (a la derecha) ocupa el lugar que sobra, con un mínimo reservado.
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, type IconName } from './icons.tsx';
@@ -26,6 +27,8 @@ export interface ToolGroup {
   id: string;
   label: string;
   tools: ToolDef[];
+  /** si falta lugar, los de menos prioridad pasan primero a «Más herramientas» (sin ella, 0) */
+  priority?: number;
 }
 
 export const toolTitle = (tt: { title: string; shortcut?: string }) => (tt.shortcut ? `${tt.title} (${tt.shortcut})` : tt.title);
@@ -49,21 +52,27 @@ const MORE_W = 38;
 /** Ancho mínimo que se reserva para lo de la derecha (`after`) */
 const AFTER_MIN = 480;
 
-/** Cuántos grupos (de izquierda a derecha) entran en `avail`; si no entran todos, se reserva
- * lugar para el botón "Más herramientas" */
-export function groupsThatFit(widths: number[], avail: number, moreW = MORE_W): number {
-  if (widths.reduce((a, b) => a + b, 0) <= avail) return widths.length;
-  let used = moreW;
-  let n = 0;
-  while (n < widths.length && used + widths[n] <= avail) used += widths[n++];
-  return n;
+/** Qué grupos se ven en `avail`: si no entran todos, se reserva lugar para el botón "Más
+ * herramientas" y se esconden primero los de menos prioridad (con la misma, el de más a la derecha) */
+export function visibleGroups(widths: number[], avail: number, moreW = MORE_W, priority: number[] = widths.map(() => 0)): boolean[] {
+  const shown = widths.map(() => true);
+  const total = widths.reduce((a, b) => a + b, 0);
+  if (total <= avail) return shown;
+  let used = moreW + total;
+  const order = widths.map((_, i) => i).sort((a, b) => priority[a] - priority[b] || b - a);
+  for (const i of order) {
+    if (used <= avail) break;
+    shown[i] = false;
+    used -= widths[i];
+  }
+  return shown;
 }
 
 export function Toolbar({ label, groups, lead, fixed, after }: { label: string; groups: ToolGroup[]; lead?: ReactNode; fixed?: ReactNode; after?: ReactNode }) {
   const bar = useRef<HTMLDivElement>(null);
   // ancho de cada grupo la última vez que se vio (los ocultos no se pueden medir)
   const widths = useRef(new Map<string, number>());
-  const [shown, setShown] = useState(groups.length);
+  const [shown, setShown] = useState<boolean[]>([]);
 
   useLayoutEffect(() => {
     const el = bar.current;
@@ -76,12 +85,14 @@ export function Toolbar({ label, groups, lead, fixed, after }: { label: string; 
       // lo de la derecha se achica (sus campos pasan a más filas) hasta su mínimo
       const afterW = el.querySelector(':scope > .bar-after') ? AFTER_MIN : 0;
       const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - fixedW - afterW;
-      setShown(
-        groupsThatFit(
-          groups.map((g) => widths.current.get(g.id) ?? 0),
-          avail,
-        ),
+      const next = visibleGroups(
+        groups.map((g) => widths.current.get(g.id) ?? 0),
+        avail,
+        MORE_W,
+        groups.map((g) => g.priority ?? 0),
       );
+      // (el efecto corre en cada render: el mismo resultado no vuelve a renderizar)
+      setShown((prev) => (prev.length === next.length && prev.every((v, i) => v === next[i]) ? prev : next));
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -89,7 +100,9 @@ export function Toolbar({ label, groups, lead, fixed, after }: { label: string; 
     return () => ro.disconnect();
   });
 
-  const hidden = groups.slice(shown);
+  // (antes de medir, o con grupos nuevos, se ven todos)
+  const isShown = (i: number) => shown[i] ?? true;
+  const hidden = groups.filter((_, i) => !isShown(i));
   const moreItems: MenuItem[] = hidden.flatMap((g, i) => [
     ...(i ? ['sep' as const] : []),
     ...g.tools.map(
@@ -103,13 +116,15 @@ export function Toolbar({ label, groups, lead, fixed, after }: { label: string; 
   return (
     <div className="iconbar" role="toolbar" aria-label={label} ref={bar}>
       {lead && <div className="group lead">{lead}</div>}
-      {groups.slice(0, shown).map((g) => (
-        <div key={g.id} className="group" role="group" aria-label={g.label} data-group={g.id}>
-          {g.tools.map((tt) => (
-            <ToolButton key={tt.label} tool={tt} />
-          ))}
-        </div>
-      ))}
+      {groups
+        .filter((_, i) => isShown(i))
+        .map((g) => (
+          <div key={g.id} className="group" role="group" aria-label={g.label} data-group={g.id}>
+            {g.tools.map((tt) => (
+              <ToolButton key={tt.label} tool={tt} />
+            ))}
+          </div>
+        ))}
       {hidden.length > 0 && (
         <div className="group more">
           <MenuButton items={moreItems} label={t('More tools')} title={t('More tools: {p0}', { p0: hidden.map((g) => g.label.toLowerCase()).join(', ') })}>

@@ -8,8 +8,8 @@ import { skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
 const browser = await launchBrowser();
-// 1600 de ancho: a 1280 la barra pasa el grupo de dibujo (con Figuras) a «Más herramientas»
-const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+// a 1280 de ancho el grupo de dibujo (con Figuras) entra en la barra; a «Más herramientas» va Editar
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 await skipWelcome(page);
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));

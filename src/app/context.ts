@@ -32,6 +32,6 @@ export const SchematicContext = createContext<SchematicCtx | null>(null);
 
 export function useSchematic(): SchematicCtx {
   const c = useContext(SchematicContext);
-  if (!c) throw new Error('useSchematic fuera de SchematicMode');
+  if (!c) throw new Error('useSchematic outside SchematicMode');
   return c;
 }

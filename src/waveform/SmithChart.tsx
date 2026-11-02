@@ -36,7 +36,9 @@ export function SmithChart({ plot, panes, resolver }: { plot: SimPlot; panes: Pa
             }),
           )}
           {R_CIRCLES.map((r) => (
-            <text key={`t${r}`} x={((r - 1) / (r + 1)) * S + 2} y={-3}>{r}</text>
+            <text key={`t${r}`} x={((r - 1) / (r + 1)) * S + 2} y={-3}>
+              {r}
+            </text>
           ))}
         </g>
         {traces.map(({ t: tt, i }) => {
@@ -52,9 +54,15 @@ export function SmithChart({ plot, panes, resolver }: { plot: SimPlot; panes: Pa
       </svg>
       <ul className="smith-legend">
         {traces.map(({ t: tt, i }) => (
-          <li key={tt.expr} style={{ color: traceColor(tt, i) }}>{tt.expr}</li>
+          <li key={tt.expr} style={{ color: traceColor(tt, i) }}>
+            {tt.expr}
+          </li>
         ))}
-        {scale && <li className="hint">{scale.name}: {si(scale.real[0])} … {si(scale.real[scale.real.length - 1])}</li>}
+        {scale && (
+          <li className="hint">
+            {scale.name}: {si(scale.real[0])} … {si(scale.real[scale.real.length - 1])}
+          </li>
+        )}
       </ul>
     </div>
   );

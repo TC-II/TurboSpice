@@ -87,8 +87,7 @@ export function axisTicks(tt: (number | null)[]): string[] {
     const d = Math.abs(v[i] - v[i - 1]);
     if (d > 0) step = Math.min(step, d);
   }
-  const decimals = (ee: number) =>
-    Number.isFinite(step) ? Math.min(9, Math.max(0, -Math.floor(Math.log10(step / 10 ** (3 * ee)) + 1e-9))) : 0;
+  const decimals = (ee: number) => (Number.isFinite(step) ? Math.min(9, Math.max(0, -Math.floor(Math.log10(step / 10 ** (3 * ee)) + 1e-9))) : 0);
   // 999.97m con 2 decimales redondea a 1000.00m: sube de prefijo
   if (e < 4 && Math.round((max / 10 ** (3 * e)) * 10 ** decimals(e)) / 10 ** decimals(e) >= 1000) e++;
   const dec = decimals(e);

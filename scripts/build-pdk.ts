@@ -79,9 +79,7 @@ export function translate(text: string, onlyFixes = false): string {
       if (/^\s*\*/.test(line)) return line;
       if (/^\s*include\s/i.test(line)) return `* ${line}`;
       if (onlyFixes) return line;
-      return line
-        .replace(/\s+\$.*$/, '')
-        .replace(/\blevel\s*=\s*(\d+(?:\.\d*)?e[+-]?\d+)/gi, (_, n) => `level = ${Math.round(Number(n))}`);
+      return line.replace(/\s+\$.*$/, '').replace(/\blevel\s*=\s*(\d+(?:\.\d*)?e[+-]?\d+)/gi, (_, n) => `level = ${Math.round(Number(n))}`);
     })
     .join('\n');
 }
@@ -107,11 +105,12 @@ export function subckts(text: string, file: string): Subckt[] {
     if (!/^\.subckt\s/i.test(lines[i])) continue;
     let head = lines[i];
     while (i + 1 < lines.length && /^\+/.test(lines[i + 1])) head += ' ' + lines[++i].slice(1);
-    const [, name, ...rest] = head.replace(/\s*=\s*/g, '=').trim().split(/\s+/);
+    const [, name, ...rest] = head
+      .replace(/\s*=\s*/g, '=')
+      .trim()
+      .split(/\s+/);
     const pins = rest.filter((t) => !t.includes('=') && !/^params:$/i.test(t));
-    const params = Object.fromEntries(
-      rest.filter((t) => t.includes('=')).map((t) => t.split('=') as [string, string]),
-    );
+    const params = Object.fromEntries(rest.filter((t) => t.includes('=')).map((t) => t.split('=') as [string, string]));
     out.push({ name, pins, params, file });
   }
   return out;
@@ -267,11 +266,7 @@ export function build(out = OUT, onlyFixes = false) {
       const m = INCLUDE.exec(line);
       return m ? `.include "${copy(normalize(join(modelsDir, m[1])))}"` : line;
     });
-    const header = [
-      `* sky130, esquina ${corner}. Generado por scripts/build-pdk.ts desde`,
-      `* open_pdks ${OPEN_PDKS} (sky130A, de ciel-releases)`,
-      '* (Apache-2.0). No editar: se regenera.',
-    ];
+    const header = [`* sky130, esquina ${corner}. Generado por scripts/build-pdk.ts desde`, `* open_pdks ${OPEN_PDKS} (sky130A, de ciel-releases)`, '* (Apache-2.0). No editar: se regenera.'];
     writeFileSync(join(out, `${corner}.spice`), [...header, ...body, ''].join('\n'));
     corners.push({ name: corner, file: `${corner}.spice`, ...splitUnits(out, corner, body) });
   }
@@ -282,14 +277,10 @@ export function build(out = OUT, onlyFixes = false) {
     pdk: 'sky130',
     source: { open_pdks: OPEN_PDKS, from: `${RELEASES}/sky130-${OPEN_PDKS}`, license: 'Apache-2.0' },
     corners,
-    devices: [...devices.values()]
-      .filter((d) => d.name.startsWith('sky130_fd_pr__'))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    devices: [...devices.values()].filter((d) => d.name.startsWith('sky130_fd_pr__')).sort((a, b) => a.name.localeCompare(b.name)),
     // Modelos sueltos (diodos, BJT…) que se instancian directo, sin subcircuito. Los binned
     // (nombre.N) los elige ngspice solo y no se listan.
-    models: [...models.values()]
-      .filter((m) => !devices.has(m.name))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+    models: [...models.values()].filter((m) => !devices.has(m.name)).sort((a, b) => a.name.localeCompare(b.name)),
     files: files.length,
     bytes,
   };

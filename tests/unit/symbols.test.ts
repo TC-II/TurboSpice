@@ -16,13 +16,23 @@ describe('símbolos agregados (#75)', () => {
 
   it('se usan como en LTspice (con la ruta Misc\\ que escribe LTspice)', () => {
     const src = [
-      'Version 4', 'SHEET 1 880 680',
-      'SYMBOL Misc\\signal 0 0 R0', 'SYMATTR InstName V1',
-      'SYMBOL Misc\\cell 128 0 R0', 'SYMATTR InstName V2', 'SYMATTR Value 9',
-      'SYMBOL voltage2 256 0 R0', 'SYMATTR InstName V3',
-      'SYMBOL Misc\\xtal 384 0 R0', 'SYMATTR InstName C1', 'SYMATTR Value 10p',
-      'SYMBOL nm_nobulk 512 0 R0', 'SYMATTR InstName M1', 'FLAG 560 96 0',
-      'SYMBOL pm_nobulk 640 0 R0', 'SYMATTR InstName M2',
+      'Version 4',
+      'SHEET 1 880 680',
+      'SYMBOL Misc\\signal 0 0 R0',
+      'SYMATTR InstName V1',
+      'SYMBOL Misc\\cell 128 0 R0',
+      'SYMATTR InstName V2',
+      'SYMATTR Value 9',
+      'SYMBOL voltage2 256 0 R0',
+      'SYMATTR InstName V3',
+      'SYMBOL Misc\\xtal 384 0 R0',
+      'SYMATTR InstName C1',
+      'SYMATTR Value 10p',
+      'SYMBOL nm_nobulk 512 0 R0',
+      'SYMATTR InstName M1',
+      'FLAG 560 96 0',
+      'SYMBOL pm_nobulk 640 0 R0',
+      'SYMATTR InstName M2',
       '',
     ].join('\n');
     const net = ltNetlistText(ltNetlist(parseAsc(src), lib));

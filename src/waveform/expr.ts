@@ -30,15 +30,11 @@ type Node =
   | { t: 'un'; op: string; a: Node }
   | { t: 'bin'; op: string; a: Node; b: Node };
 
-
 /** Funciones que reciben nombres de nodos/elementos y no expresiones */
 // Dig(q): nodo digital de XSPICE (#209); D() es la derivada, como en LTspice
 const isRefFn = (fn: string) => /^(v|i[bcdegsx]?|dig)$/i.test(fn);
 
-export const FUNCTIONS = [
-  'db', 'mag', 'abs', 'ph', 'phase', 're', 'real', 'im', 'imag', 'sqrt', 'exp', 'ln', 'log', 'log10',
-  'sin', 'cos', 'tan', 'atan', 'sgn', 'd', 'integ', 'min', 'max', 'pow',
-];
+export const FUNCTIONS = ['db', 'mag', 'abs', 'ph', 'phase', 're', 'real', 'im', 'imag', 'sqrt', 'exp', 'ln', 'log', 'log10', 'sin', 'cos', 'tan', 'atan', 'sgn', 'd', 'integ', 'min', 'max', 'pow'];
 
 export class ExprError extends Error {}
 
@@ -272,13 +268,13 @@ function ev(n: Node, ctx: EvalContext): C {
       if (v === 'j') return { re: fill(1, 0), im: fill(1, 1) };
       // un nombre suelto es un nodo, como en LTspice ("out" = V(out))
       const w = ctx.resolve('V', [n.name], n.run);
-      if (!w) throw new ExprError(t('{name}{p1} doesn\'t exist', { name: n.name, p1: n.run ? `@${n.run}` : '' }));
+      if (!w) throw new ExprError(t("{name}{p1} doesn't exist", { name: n.name, p1: n.run ? `@${n.run}` : '' }));
       return { re: w.re, im: w.im ?? null };
     }
     case 'ref': {
       const w = ctx.resolve(n.fn, n.args, n.run);
-      if (!w && n.fn === '@') throw new ExprError(t('{name}{p1} doesn\'t exist', { name: `@${n.args[0]}[${n.args[1]}]`, p1: n.run ? `@${n.run}` : '' }));
-      if (!w) throw new ExprError(t('{fn}({p1}){p2} doesn\'t exist', { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
+      if (!w && n.fn === '@') throw new ExprError(t("{name}{p1} doesn't exist", { name: `@${n.args[0]}[${n.args[1]}]`, p1: n.run ? `@${n.run}` : '' }));
+      if (!w) throw new ExprError(t("{fn}({p1}){p2} doesn't exist", { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
       // un nodo digital dentro de una cuenta: en escalones sobre el eje X
       if (w.x) return { re: sampleEvents(w.x, w.re, ctx.scale), im: null };
       return { re: w.re, im: w.im ?? null };

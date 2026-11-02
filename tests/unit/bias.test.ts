@@ -43,7 +43,14 @@ describe('punto de operación que se anota (t = 0 en un .tran)', () => {
 });
 
 describe('corriente del OP en el pin de un transistor', () => {
-  const sim = { ng: { names: new Map([['Q1', 'q1'], ['R1', 'r1']]) } } as unknown as BuiltSimulation;
+  const sim = {
+    ng: {
+      names: new Map([
+        ['Q1', 'q1'],
+        ['R1', 'r1'],
+      ]),
+    },
+  } as unknown as BuiltSimulation;
   const q = { name: 'Q1', prefix: 'QN', nodes: ['c', 'b', 'e'] } as unknown as Element;
   const bias = { '@q1[ic]': 1e-3, '@q1[ib]': 1e-5, '@q1[ie]': -1.01e-3 };
   it('cada pin (SpiceOrder) da la de su terminal', () => {

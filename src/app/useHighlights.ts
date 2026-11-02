@@ -62,19 +62,20 @@ export function useHighlights({ doc, docRef, lib, conn, path, lvNow, curSub, sim
     const all = currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements);
     const perSym = new Map<number, number>();
     for (const a of all) perSym.set(a.sym, (perSym.get(a.sym) ?? 0) + 1);
-    return all.map((a) => {
-      // la corriente del componente (sin pin) sólo colorea la flecha si es la única: en uno con
-      // varios terminales (Q, M, X…) pintaría todas, y es la de un solo terminal
-      const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? (perSym.get(a.sym) === 1 ? colorOf({ symbol: a.sym }) : undefined);
-      const isRow = (target: { symbol: number; pin?: number }) => {
-        const expr = rowCurrent ? probeExpr(sim.built, target, simScope) : undefined;
-        return !!expr && sameExpr(expr, rowHover!);
-      };
-      const hl = isRow({ symbol: a.sym, pin: a.pin }) || (perSym.get(a.sym) === 1 && isRow({ symbol: a.sym }));
-      return { ...a, ...(color ? { color } : {}), ...(hl ? { hl } : {}) };
-    }).filter((a) => showOp || tool.kind === 'probe' || a.hl);
+    return all
+      .map((a) => {
+        // la corriente del componente (sin pin) sólo colorea la flecha si es la única: en uno con
+        // varios terminales (Q, M, X…) pintaría todas, y es la de un solo terminal
+        const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? (perSym.get(a.sym) === 1 ? colorOf({ symbol: a.sym }) : undefined);
+        const isRow = (target: { symbol: number; pin?: number }) => {
+          const expr = rowCurrent ? probeExpr(sim.built, target, simScope) : undefined;
+          return !!expr && sameExpr(expr, rowHover!);
+        };
+        const hl = isRow({ symbol: a.sym, pin: a.pin }) || (perSym.get(a.sym) === 1 && isRow({ symbol: a.sym }));
+        return { ...a, ...(color ? { color } : {}), ...(hl ? { hl } : {}) };
+      })
+      .filter((a) => showOp || tool.kind === 'probe' || a.hl);
   }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope, rowHover]);
-
 
   // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
   // traza); sólo con la punta de prueba
@@ -83,12 +84,19 @@ export function useHighlights({ doc, docRef, lib, conn, path, lvNow, curSub, sim
   const unsaved = useMemo(() => {
     if (tool.kind !== 'probe' || savesPicking || !sim || !plot || path.length || !saveSelection(sim.built.lt.texts)) return undefined;
     const names = new Set(plot.vectors.map((v) => v.name.toLowerCase()));
-    const nets = new Set(conn.nets.map((n) => n.name).filter((n) => n && n !== '0' && !names.has(netVector(n))).map((n) => n.toLowerCase()));
+    const nets = new Set(
+      conn.nets
+        .map((n) => n.name)
+        .filter((n) => n && n !== '0' && !names.has(netVector(n)))
+        .map((n) => n.toLowerCase()),
+    );
     const symbols = new Set(
-      sim.built.lt.elements.filter((e) => {
-        const v = elementVector(sim.built, e.name);
-        return v && !names.has(v) && ![...names].some((n) => n.startsWith(`${v.replace(/\[.*$/, '')}[`));
-      }).map((e) => e.sym),
+      sim.built.lt.elements
+        .filter((e) => {
+          const v = elementVector(sim.built, e.name);
+          return v && !names.has(v) && ![...names].some((n) => n.startsWith(`${v.replace(/\[.*$/, '')}[`));
+        })
+        .map((e) => e.sym),
     );
     return { nets, symbols };
   }, [tool.kind, savesPicking, sim, plot, path.length, conn]);
@@ -103,11 +111,12 @@ export function useHighlights({ doc, docRef, lib, conn, path, lvNow, curSub, sim
       if (n.startsWith(lv.prefix)) return n.slice(lv.prefix.length);
       return [...lv.ports].find(([, up]) => up.toLowerCase() === n)?.[0];
     };
-    for (const p of panes) p.traces.forEach((tt, i) => {
-      const n = /^V\(([^()]+)\)$/i.exec(tt.expr.trim());
-      const name = n && local(n[1].toLowerCase());
-      if (name && !tt.hidden && !m.has(name)) m.set(name, traceColor(tt, i));
-    });
+    for (const p of panes)
+      p.traces.forEach((tt, i) => {
+        const n = /^V\(([^()]+)\)$/i.exec(tt.expr.trim());
+        const name = n && local(n[1].toLowerCase());
+        if (name && !tt.hidden && !m.has(name)) m.set(name, traceColor(tt, i));
+      });
     return m;
   }, [panes, tool.kind, path]);
   // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla

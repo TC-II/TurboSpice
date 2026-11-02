@@ -8,9 +8,21 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   { linterOptions: { reportUnusedDisableDirectives: 'error' } },
   {
-    ignores: ['dist/', 'node_modules/', 'engine/', 'public/', 'graphify-out/', 'docs/', 'library/', 'examples/', 'test-results/', '.cache/', '.claude/',
+    ignores: [
+      'dist/',
+      'node_modules/',
+      'engine/',
+      'public/',
+      'graphify-out/',
+      'docs/',
+      'library/',
+      'examples/',
+      'test-results/',
+      '.cache/',
+      '.claude/',
       // port tal cual de ASC-Parser (engine/rough_pen.js): se mantiene igual al original
-      'src/schematic/roughPen.js'],
+      'src/schematic/roughPen.js',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

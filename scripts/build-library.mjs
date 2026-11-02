@@ -51,7 +51,10 @@ export function normalizeSkin(svg) {
     .replace(/<svg[^>]*>/, '')
     .replace(/<\/svg>\s*$/, '')
     .replace(/\sclass="([^"]+)"/g, (_, cls) => {
-      const style = cls.split(/\s+/).map((c) => rules.get(c) ?? '').join('');
+      const style = cls
+        .split(/\s+/)
+        .map((c) => rules.get(c) ?? '')
+        .join('');
       return style ? ` style="${style}"` : '';
     })
     .replace(/\sid="[^"]*"/g, '');
@@ -61,8 +64,7 @@ export function normalizeSkin(svg) {
   body = body
     .replace(/#000(000)?\b/gi, 'currentColor')
     .replace(/(fill:\s*)#fff(fff)?\b/gi, colored ? '$1#fff' : '$1var(--sch-bg)')
-    .replace(/(stroke-width:\s*)(\d*\.?\d+)(px)?/gi, (m, pre, n) =>
-      Number(n) < MIN_SKIN_STROKE ? `${pre}${MIN_SKIN_STROKE}px` : m)
+    .replace(/(stroke-width:\s*)(\d*\.?\d+)(px)?/gi, (m, pre, n) => (Number(n) < MIN_SKIN_STROKE ? `${pre}${MIN_SKIN_STROKE}px` : m))
     .replace(/\s+/g, ' ')
     .trim();
   return { viewBox, body };
@@ -125,7 +127,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   cpSync(join(LIB, 'sub'), subOut, { recursive: true });
   cpSync(join(LIB, 'cmp'), join(subOut, 'cmp'), { recursive: true });
   console.log(
-    `librería: ${Object.keys(bundle.symbols).length} símbolos, ${Object.keys(bundle.skins).length} skins, ` +
-      `${Object.keys(bundle.subs).length} archivos de modelos → ${relative(ROOT, out)}`,
+    `librería: ${Object.keys(bundle.symbols).length} símbolos, ${Object.keys(bundle.skins).length} skins, ` + `${Object.keys(bundle.subs).length} archivos de modelos → ${relative(ROOT, out)}`,
   );
 }

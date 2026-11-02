@@ -34,7 +34,15 @@ for (let i = 0; i < lines.length; i++) {
 for (let k = 0; k < chapters.length; k++) chapters[k].end = k + 1 < chapters.length ? chapters[k + 1].start : lines.length;
 
 const slug = (s) =>
-  s.normalize('NFKD').replace(/[^\w\s-]/g, '').trim().toLowerCase().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 48).replace(/-$/, '');
+  s
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 48)
+    .replace(/-$/, '');
 const cmp = (a, b) => {
   for (let i = 0; i < Math.max(a.length, b.length); i++) if ((a[i] ?? -1) !== (b[i] ?? -1)) return (a[i] ?? -1) - (b[i] ?? -1);
   return 0;
@@ -68,7 +76,10 @@ function convert(ch) {
     }
     out.push(line);
   }
-  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return out
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 rmSync(outDir, { recursive: true, force: true });

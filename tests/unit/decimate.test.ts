@@ -4,7 +4,7 @@ import { decimator } from '../../src/waveform/decimate.ts';
 /** Paso variable (como el de una transitoria) y dos curvas */
 function wave(n: number) {
   let seed = 1;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const x = new Float64Array(n);
   for (let i = 1; i < n; i++) x[i] = x[i - 1] + 0.1 + rnd() * (i % 1000 < 50 ? 5 : 0.5);
   const a = x.map((t) => Math.sin(t / 50) + 0.3 * (rnd() - 0.5));
@@ -31,7 +31,11 @@ describe('decimator', () => {
   it('cada píxel de uPlot tiene el mismo mínimo y máximo que con todos los datos', () => {
     const lo = x[30_000] + 0.05;
     const hi = x[170_000] - 0.05;
-    for (const [cols, offset] of [[500, 0], [497, 57], [612, 80.5]]) {
+    for (const [cols, offset] of [
+      [500, 0],
+      [497, 57],
+      [612, 80.5],
+    ]) {
       const [ox, ...oy] = d.view(lo, hi, cols, false, offset);
       expect(ox.length).toBeLessThan(cols * 4 + 20);
       // el píxel de cada punto, como lo redondea uPlot

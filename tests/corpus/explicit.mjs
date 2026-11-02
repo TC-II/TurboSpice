@@ -53,9 +53,7 @@ for (const root of args) {
       const def = lib.symbol(s.type);
       if (!def) return;
       const t = again.symbols[i];
-      const same =
-        key(effectiveAttrs(s, def)) === key(effectiveAttrs(t, def)) &&
-        key(effectiveWindows(s, def, lib.windowDefaults)) === key(effectiveWindows(t, def, lib.windowDefaults));
+      const same = key(effectiveAttrs(s, def)) === key(effectiveAttrs(t, def)) && key(effectiveWindows(s, def, lib.windowDefaults)) === key(effectiveWindows(t, def, lib.windowDefaults));
       if (!same) failures.push(`${file}: ${s.type} ${s.attrs.get('InstName')} cambió al guardar`);
     });
     if (!missing.length) {

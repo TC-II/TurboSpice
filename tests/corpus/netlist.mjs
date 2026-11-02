@@ -107,8 +107,6 @@ for (const root of args) {
 process.stderr.write('\n');
 failures.slice(0, show).forEach((f) => console.log('✗', f));
 const ok = n - skipped;
-console.log(
-  `\n${ok} netlists comparadas (${skipped} sin netlist de LTspice): ${iso} equivalentes, ${exact} idénticas incluidos nombres de nodos`,
-);
+console.log(`\n${ok} netlists comparadas (${skipped} sin netlist de LTspice): ${iso} equivalentes, ${exact} idénticas incluidos nombres de nodos`);
 if (!XVFB) console.log('(sin xvfb-run: sólo se compararon las netlists ya cacheadas; instalar xorg-server-xvfb)');
 process.exit(iso === ok ? 0 : 1);

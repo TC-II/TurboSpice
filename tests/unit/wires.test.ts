@@ -201,7 +201,11 @@ describe('mover componentes conserva las uniones', () => {
       const d = load(f);
       const ref = net(d);
       d.symbols.forEach((_, i) => {
-        for (const [dx, dy] of [[32, 0], [0, -48], [64, 32]]) {
+        for (const [dx, dy] of [
+          [32, 0],
+          [0, -48],
+          [64, 32],
+        ]) {
           total++;
           const m = moveItems(d, [{ kind: 'symbol', index: i }], dx, dy, true, lib);
           expect(noZero(m)).toBe(true);
@@ -237,7 +241,11 @@ WIRE 16 96 16 144
 WIRE 16 144 96 144
 SYMBOL res 0 0 R0
 `);
-    const all = [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 0 }, { kind: 'wire', index: 2 }] as const;
+    const all = [
+      { kind: 'symbol', index: 0 },
+      { kind: 'wire', index: 0 },
+      { kind: 'wire', index: 2 },
+    ] as const;
     const solo = moveItems(d, [{ kind: 'symbol', index: 0 }], 0, 16, true, lib);
     const m = moveItems(d, [...all], 0, 16, true, lib);
     expect(ws(m).sort()).toEqual(ws(solo).sort());
@@ -251,8 +259,22 @@ FLAG 16 -64 0
 SYMBOL res 0 0 R0
 SYMBOL res 0 160 R0
 `);
-    const m = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 0 }, { kind: 'wire', index: 1 }], 0, 32, true, lib);
-    expect(ws(m).sort()).toEqual([[16, -64, 16, 48], [16, 128, 16, 176]]);
+    const m = moveItems(
+      d,
+      [
+        { kind: 'symbol', index: 0 },
+        { kind: 'wire', index: 0 },
+        { kind: 'wire', index: 1 },
+      ],
+      0,
+      32,
+      true,
+      lib,
+    );
+    expect(ws(m).sort()).toEqual([
+      [16, -64, 16, 48],
+      [16, 128, 16, 176],
+    ]);
     expect(net(m)).toBe(net(d));
   });
 
@@ -265,7 +287,18 @@ WIRE 16 144 96 144
 WIRE 16 96 16 144
 SYMBOL res 0 0 R0
 `);
-    const m = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 2 }, { kind: 'wire', index: 5 }], 32, 0, true, lib);
+    const m = moveItems(
+      d,
+      [
+        { kind: 'symbol', index: 0 },
+        { kind: 'wire', index: 2 },
+        { kind: 'wire', index: 5 },
+      ],
+      32,
+      0,
+      true,
+      lib,
+    );
     expect(ws(m)).toContainEqual([48, -32, 48, 16]);
     expect(ws(m)).toContainEqual([48, 96, 48, 144]);
     expect(ortho(m)).toBe(true);
@@ -282,9 +315,24 @@ WIRE 16 96 16 144
 SYMBOL res 0 0 R0
 `);
     const out: Wire[] = [];
-    const up = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 2 }, { kind: 'wire', index: 5 }], 0, -16, true, lib, out);
+    const up = moveItems(
+      d,
+      [
+        { kind: 'symbol', index: 0 },
+        { kind: 'wire', index: 2 },
+        { kind: 'wire', index: 5 },
+      ],
+      0,
+      -16,
+      true,
+      lib,
+      out,
+    );
     const sel = wiresOn(up, out).map((index) => ({ kind: 'wire' as const, index }));
-    expect(sel.map((r) => ws(up)[r.index]).sort()).toEqual([[16, -32, 16, 0], [16, 80, 16, 144]]);
+    expect(sel.map((r) => ws(up)[r.index]).sort()).toEqual([
+      [16, -32, 16, 0],
+      [16, 80, 16, 144],
+    ]);
     const m = moveItems(up, [{ kind: 'symbol', index: 0 }, ...sel], -32, 0, true, lib);
     expect(ws(m)).toContainEqual([-16, -32, -16, 0]);
     expect(ws(m)).toContainEqual([-16, 80, -16, 144]);
@@ -301,12 +349,31 @@ WIRE 16 96 16 144
 SYMBOL res 0 0 R0
 `);
     const out: Wire[] = [];
-    const m = moveItems(d, [{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 2 }, { kind: 'wire', index: 5 }], -32, 16, true, lib, out);
+    const m = moveItems(
+      d,
+      [
+        { kind: 'symbol', index: 0 },
+        { kind: 'wire', index: 2 },
+        { kind: 'wire', index: 5 },
+      ],
+      -32,
+      16,
+      true,
+      lib,
+      out,
+    );
     expect(ws(m)).toContainEqual([-16, -32, -16, 32]);
     expect(ws(m)).toContainEqual([-16, 112, -16, 144]);
     expect(ortho(m)).toBe(true);
     expect(net(m)).toBe(net(d));
-    expect(wiresOn(m, out).map((i) => ws(m)[i]).sort()).toEqual([[-16, -32, -16, 32], [-16, 112, -16, 144]]);
+    expect(
+      wiresOn(m, out)
+        .map((i) => ws(m)[i])
+        .sort(),
+    ).toEqual([
+      [-16, -32, -16, 32],
+      [-16, 112, -16, 144],
+    ]);
   });
 
   it('Ctrl+mover (sin estirar) no deja nodos', () => {
@@ -344,7 +411,17 @@ SYMATTR InstName R3
     expect(net(m)).toBe(net(d));
     // y un cable que llega en T al medio de un cable movido, también
     const t = asc('WIRE 0 0 128 0\nWIRE 64 0 64 64\nFLAG 0 0 a\nFLAG 64 64 b\n');
-    const mt = moveItems(t, [{ kind: 'wire', index: 0 }, { kind: 'flag', index: 0 }], 0, -32, true, lib);
+    const mt = moveItems(
+      t,
+      [
+        { kind: 'wire', index: 0 },
+        { kind: 'flag', index: 0 },
+      ],
+      0,
+      -32,
+      true,
+      lib,
+    );
     expect(sameConnections(t, mt, lib)).toBe(true);
   });
 });
@@ -356,7 +433,10 @@ describe('un cable no atraviesa componentes (#45)', () => {
 
   it('dibujar un cable a través de una resistencia deja dos cables, sin nodos, con R en serie', () => {
     const d = addWire(R, { x: 16, y: -64 }, { x: 16, y: 176 }, lib);
-    expect(ws(d)).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+    expect(ws(d)).toEqual([
+      [16, -64, 16, 16],
+      [16, 96, 16, 176],
+    ]);
     expect(junctionPoints(d, lib)).toEqual([]);
     expect(net(d)).toBe(net(series));
     expect(net(d)).toMatch(/^R1 a b /m);
@@ -367,13 +447,19 @@ describe('un cable no atraviesa componentes (#45)', () => {
     const [p, q] = pinPoints(h.symbols[0], lib.symbol('res')).sort((a, b) => a.x - b.x);
     expect(p.y).toBe(q.y);
     const d = addWire(h, { x: q.x + 64, y: p.y }, { x: p.x - 64, y: p.y }, lib);
-    expect(ws(d)).toEqual([[q.x + 64, p.y, q.x, p.y], [p.x, p.y, p.x - 64, p.y]]);
+    expect(ws(d)).toEqual([
+      [q.x + 64, p.y, q.x, p.y],
+      [p.x, p.y, p.x - 64, p.y],
+    ]);
   });
 
   it('un transistor: el cable que pasa por colector y emisor se corta, la base queda', () => {
     // npn: C (64,0), B (0,48), E (64,96)
     const q = asc('SYMBOL npn 0 0 R0\nSYMATTR InstName Q1\n');
-    expect(ws(addWire(q, { x: 64, y: -64 }, { x: 64, y: 160 }, lib))).toEqual([[64, -64, 64, 0], [64, 96, 64, 160]]);
+    expect(ws(addWire(q, { x: 64, y: -64 }, { x: 64, y: 160 }, lib))).toEqual([
+      [64, -64, 64, 0],
+      [64, 96, 64, 160],
+    ]);
     // pasar sólo por la base (T) no corta nada
     expect(ws(addWire(q, { x: 0, y: 48 }, { x: -64, y: 48 }, lib))).toEqual([[0, 48, -64, 48]]);
   });
@@ -390,26 +476,39 @@ describe('un cable no atraviesa componentes (#45)', () => {
 
   it('un corto que ya estaba en el archivo no se toca al dibujar otro cable', () => {
     const short = asc('WIRE 16 -64 16 176\nSYMBOL res 0 0 R0\n');
-    expect(ws(addWire(short, { x: 200, y: 0 }, { x: 300, y: 0 }, lib))).toEqual([[16, -64, 16, 176], [200, 0, 300, 0]]);
+    expect(ws(addWire(short, { x: 200, y: 0 }, { x: 300, y: 0 }, lib))).toEqual([
+      [16, -64, 16, 176],
+      [200, 0, 300, 0],
+    ]);
   });
 
   it('mover un componente sobre un cable lo deja en serie (estirando o no)', () => {
     const d = asc('WIRE 16 -64 16 176\nSYMBOL res -96 0 R0\nSYMATTR InstName R1\nFLAG 16 -64 a\nFLAG 16 176 b\n');
     for (const drag of [true, false]) {
       const m = moveItems(d, [{ kind: 'symbol', index: 0 }], 96, 0, drag, lib);
-      expect(ws(m), `drag ${drag}`).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+      expect(ws(m), `drag ${drag}`).toEqual([
+        [16, -64, 16, 16],
+        [16, 96, 16, 176],
+      ]);
       expect(net(m)).toMatch(/^R1 a b /m);
     }
   });
 
   it('mover un cable sobre un componente también lo parte', () => {
     const d = asc('WIRE 112 -64 112 176\nSYMBOL res 0 0 R0\n');
-    expect(ws(moveItems(d, [{ kind: 'wire', index: 0 }], -96, 0, false, lib))).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
+    expect(ws(moveItems(d, [{ kind: 'wire', index: 0 }], -96, 0, false, lib))).toEqual([
+      [16, -64, 16, 16],
+      [16, 96, 16, 176],
+    ]);
   });
 
   // #50: colocar, pegar, duplicar o rotar un componente sobre un cable tampoco lo deja en corto
   const wire2 = asc('WIRE 16 -64 16 176\nFLAG 16 -64 a\nFLAG 16 176 b\nWIRE 200 0 300 0\n');
-  const cutWires = [[16, -64, 16, 16], [16, 96, 16, 176], [200, 0, 300, 0]];
+  const cutWires = [
+    [16, -64, 16, 16],
+    [16, 96, 16, 176],
+    [200, 0, 300, 0],
+  ];
 
   it('colocar un componente sobre un cable lo parte en sus pines', () => {
     const d = placeSymbol(wire2, 'res', { x: 0, y: 0 }, 'R0', lib);
@@ -417,28 +516,47 @@ describe('un cable no atraviesa componentes (#45)', () => {
     expect(net(d)).toMatch(/^R1 a b /m);
     // sobre un cable que sólo toca un pin (T): se parte en el pin, como al cruzar otro cable
     const t = placeSymbol(asc('WIRE -64 96 96 96\n'), 'res', { x: 0, y: 0 }, 'R0', lib);
-    expect(ws(t)).toEqual([[-64, 96, 16, 96], [16, 96, 96, 96]]);
+    expect(ws(t)).toEqual([
+      [-64, 96, 16, 96],
+      [16, 96, 96, 96],
+    ]);
   });
 
   it('soltar un pin en el medio de un cable al moverlo lo parte ahí', () => {
     const d = asc('WIRE -64 -32 96 -32\nSYMBOL res 0 64 R0\n');
     const m = moveItems(d, [{ kind: 'symbol', index: 0 }], 0, -112, true, lib);
-    expect(ws(m).filter((w) => w[1] === -32 && w[3] === -32).sort()).toEqual([[-64, -32, 16, -32], [16, -32, 96, -32]]);
+    expect(
+      ws(m)
+        .filter((w) => w[1] === -32 && w[3] === -32)
+        .sort(),
+    ).toEqual([
+      [-64, -32, 16, -32],
+      [16, -32, 96, -32],
+    ]);
   });
 
   it('pegar un componente sobre un cable lo parte; las referencias siguen a los cables pegados', () => {
     const frag = asc('SYMBOL res 0 0 R0\nSYMATTR InstName R1\nWIRE 400 0 400 64\n');
     const r = pasteItems(wire2, frag, { x: 0, y: 0 }, lib);
     expect(ws(r.doc)).toEqual([...cutWires, [400, 0, 400, 64]]);
-    expect(r.refs).toEqual([{ kind: 'symbol', index: 0 }, { kind: 'wire', index: 3 }]);
+    expect(r.refs).toEqual([
+      { kind: 'symbol', index: 0 },
+      { kind: 'wire', index: 3 },
+    ]);
     expect(net(r.doc)).toMatch(/^R1 a b /m);
   });
 
   it('pegar un cable que atraviesa un componente lo parte en tramos seleccionados', () => {
     const d = asc('SYMBOL res 0 0 R0\n');
     const r = pasteItems(d, asc('WIRE 16 -64 16 176\n'), { x: 16, y: -64 }, lib);
-    expect(ws(r.doc)).toEqual([[16, -64, 16, 16], [16, 96, 16, 176]]);
-    expect(r.refs).toEqual([{ kind: 'wire', index: 0 }, { kind: 'wire', index: 1 }]);
+    expect(ws(r.doc)).toEqual([
+      [16, -64, 16, 16],
+      [16, 96, 16, 176],
+    ]);
+    expect(r.refs).toEqual([
+      { kind: 'wire', index: 0 },
+      { kind: 'wire', index: 1 },
+    ]);
   });
 
   it('duplicar un componente que cae sobre un cable lo parte', () => {
@@ -453,11 +571,12 @@ describe('un cable no atraviesa componentes (#45)', () => {
     const [p, q] = pinPoints(transformItems(asc('SYMBOL res 0 0 R0\n'), one, 'rotate', lib).symbols[0], lib.symbol('res'));
     const [l, r] = p.x < q.x ? [p, q] : [q, p];
     expect(l.y).toBe(r.y);
-    const d = asc(
-      `SYMBOL res 0 0 R0\nSYMATTR InstName R1\nWIRE ${l.x - 64} ${l.y} ${r.x + 64} ${r.y}\nFLAG ${l.x - 64} ${l.y} a\nFLAG ${r.x + 64} ${r.y} b\n`,
-    );
+    const d = asc(`SYMBOL res 0 0 R0\nSYMATTR InstName R1\nWIRE ${l.x - 64} ${l.y} ${r.x + 64} ${r.y}\nFLAG ${l.x - 64} ${l.y} a\nFLAG ${r.x + 64} ${r.y} b\n`);
     const m = transformItems(d, one, 'rotate', lib);
-    expect(ws(m)).toEqual([[l.x - 64, l.y, l.x, l.y], [r.x, r.y, r.x + 64, r.y]]);
+    expect(ws(m)).toEqual([
+      [l.x - 64, l.y, l.x, l.y],
+      [r.x, r.y, r.x + 64, r.y],
+    ]);
     expect(net(m)).toMatch(/^R1 (a b|b a) /m);
   });
 });
@@ -490,7 +609,9 @@ describe('cambio de símbolo (fuente V ↔ Cell, #120)', () => {
   });
 
   it('una tierra o un pin apoyados en el pin que se mueve (sin cable) quedan unidos con un tramo', () => {
-    const d = asc('SYMBOL voltage 0 0 R0\nSYMATTR InstName V1\nSYMATTR Value 5\nWIRE 0 16 0 -32\nFLAG 0 96 0\nSYMBOL voltage 200 0 R0\nSYMATTR InstName V2\nSYMATTR Value 1\nSYMBOL res 184 80 R0\nSYMATTR InstName R1\nWIRE 200 16 200 -32\nFLAG 200 176 0\n');
+    const d = asc(
+      'SYMBOL voltage 0 0 R0\nSYMATTR InstName V1\nSYMATTR Value 5\nWIRE 0 16 0 -32\nFLAG 0 96 0\nSYMBOL voltage 200 0 R0\nSYMATTR InstName V2\nSYMATTR Value 1\nSYMBOL res 184 80 R0\nSYMATTR InstName R1\nWIRE 200 16 200 -32\nFLAG 200 176 0\n',
+    );
     const m = dcSourcesAsCell(d, lib);
     expect(m.symbols.map((s) => s.type)).toEqual(['cell', 'cell', 'res']);
     // (las mismas redes; ahora alguna tiene un cable que antes no tenía)

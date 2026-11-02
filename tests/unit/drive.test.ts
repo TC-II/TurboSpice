@@ -66,7 +66,15 @@ describe('Google Drive', () => {
   it('lista sólo los .asc de la carpeta', async () => {
     const { fn, calls } = fakeFetch([
       (c) => (q(c).includes("name = 'TurboSpice'") ? json({ files: [{ id: 'F1' }] }) : undefined),
-      (c) => (q(c).includes("'F1' in parents") ? json({ files: [{ id: '1', name: 'a.asc' }, { id: '2', name: 'notas.txt' }] }) : undefined),
+      (c) =>
+        q(c).includes("'F1' in parents")
+          ? json({
+              files: [
+                { id: '1', name: 'a.asc' },
+                { id: '2', name: 'notas.txt' },
+              ],
+            })
+          : undefined,
     ]);
     expect(await new DriveClient(async () => 'tok', fn).list()).toEqual([{ id: '1', name: 'a.asc' }]);
     expect(new URL(calls[1].url).searchParams.get('orderBy')).toBe('modifiedTime desc');

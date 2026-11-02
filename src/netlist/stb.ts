@@ -29,7 +29,6 @@ import { t } from '../i18n/i18n.ts';
 
 export type StbAnalysis = Extract<Analysis, { kind: 'stb' }>;
 
-
 /** `x` sin ceros exactos, para dividir por él (ngspice corta todo el .control con "out of range for divide") */
 const nz = (x: string) => `(${x}+1e-300*(mag(${x}) lt 1e-300))`;
 

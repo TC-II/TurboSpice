@@ -49,10 +49,14 @@ for (const j of jobs) {
   const utf16 = buf[1] === 0;
   const text = utf16 ? buf.toString('utf16le') : buf.toString('latin1');
   const lines = text.split(/\r?\n/);
-  const textIdx = (pfx) => lines.map((l, i) => [l, i]).filter(([l]) => {
-    const m = /^TEXT\s+\S+\s+\S+\s+\S+\s+\S+\s+([!;])(.*)$/.exec(l);
-    return m && m[1] === pfx && m[2].split('\\n').every((x) => ANA.test(x.trim()) || x.trim() === '') && ANA.test(m[2].trim());
-  }).map(([, i]) => i);
+  const textIdx = (pfx) =>
+    lines
+      .map((l, i) => [l, i])
+      .filter(([l]) => {
+        const m = /^TEXT\s+\S+\s+\S+\s+\S+\s+\S+\s+([!;])(.*)$/.exec(l);
+        return m && m[1] === pfx && m[2].split('\\n').every((x) => ANA.test(x.trim()) || x.trim() === '') && ANA.test(m[2].trim());
+      })
+      .map(([, i]) => i);
   const active = textIdx('!');
   const commented = textIdx(';');
   commented.forEach((ci, k) => {

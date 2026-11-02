@@ -12,7 +12,8 @@ const SRC = join(ROOT, 'src');
 const SKIP = [/[\\/]i18n[\\/]/, /vite-env\.d\.ts$/];
 
 const ACCENT = /[áéíóúñ¿¡ÁÉÍÓÚÑü]/;
-const STOP = /\b(de|la|el|los|las|que|con|para|sin|una|un|se|en|por|del|al|no|es|hay|más|este|esta|esto|lo|su|sus|como|ya|si|son|desde|hasta|cada|otro|otra|todos|todas|abrir|guardar|borrar|simular|nuevo|nueva|archivo|ver|elegir|agregar|quitar|cambiar)\b/i;
+const STOP =
+  /\b(de|la|el|los|las|que|con|para|sin|una|un|se|en|por|del|al|no|es|hay|más|este|esta|esto|lo|su|sus|como|ya|si|son|desde|hasta|cada|otro|otra|todos|todas|abrir|guardar|borrar|simular|nuevo|nueva|archivo|ver|elegir|agregar|quitar|cambiar)\b/i;
 const UI_ATTRS = new Set(['title', 'label', 'aria-label', 'placeholder', 'alt', 'message', 'help', 'hint', 'description', 'action', 'text', 'empty', 'caption', 'header', 'name']);
 const UI_PROPS = new Set(['label', 'title', 'help', 'hint', 'message', 'description', 'text', 'tip', 'tooltip', 'placeholder', 'caption', 'detail', 'summary', 'unitLabel', 'name']);
 const UI_CALLS = new Set(['setMessage', 'confirm', 'prompt', 'alert', 'Error', 'push', 'warn', 'fail', 'setError', 'onError', 't']);

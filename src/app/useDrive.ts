@@ -29,7 +29,24 @@ export interface DriveDeps {
   setMessage(m?: string): void;
 }
 
-export function useDrive({ account, file, setFile, dirty, setDirty, editRev, projectRef, snapshot, turboBytes, turboName, savedAs, remember, openBytes, confirmDiscard, setDialog, setMessage }: DriveDeps) {
+export function useDrive({
+  account,
+  file,
+  setFile,
+  dirty,
+  setDirty,
+  editRev,
+  projectRef,
+  snapshot,
+  turboBytes,
+  turboName,
+  savedAs,
+  remember,
+  openBytes,
+  confirmDiscard,
+  setDialog,
+  setMessage,
+}: DriveDeps) {
   // --- Google Drive (#156) ---
   // Sobre el mismo archivo los guardados van en cola: nunca dos subidas a la vez, y si llegan
   // varios mientras se sube, después se manda sólo el último. Antes de subir se compara la versión
@@ -99,7 +116,10 @@ export function useDrive({ account, file, setFile, dirty, setDirty, editRev, pro
         remember(snapshotRef.current(), f, true);
         return await openBytes(await drive.download(f.driveId), f.name, { driveId: f.driveId, driveVersion: (await drive.meta(f.driveId)).version });
       }
-      const name = uniqueName(t('{p0} (copy){EXT}', { p0: projectName(f.name), EXT }), (await drive.list()).map((x) => x.name));
+      const name = uniqueName(
+        t('{p0} (copy){EXT}', { p0: projectName(f.name), EXT }),
+        (await drive.list()).map((x) => x.name),
+      );
       const { p, bytes } = await turboBytes(name);
       const r = await drive.save(name, bytes);
       savedAs({ ...f, name: r.name, driveId: r.id, driveVersion: r.version }, p, t(' to Google Drive'));
@@ -123,7 +143,7 @@ export function useDrive({ account, file, setFile, dirty, setDirty, editRev, pro
       if (!id) {
         const same = (await drive.list()).find((f) => f.name.toLowerCase() === name.toLowerCase());
         if (same) {
-          if (!window.confirm(t('There\'s already a «{name}» in Google Drive. Replace it?', { name: same.name }))) return;
+          if (!window.confirm(t("There's already a «{name}» in Google Drive. Replace it?", { name: same.name }))) return;
           id = same.id;
         }
       }

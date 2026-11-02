@@ -33,12 +33,21 @@ export function shapeOutline(s: Shape): Point[] {
   const c = s.coords;
   switch (s.kind) {
     case 'LINE':
-      return [{ x: c[0], y: c[1] }, { x: c[2], y: c[3] }];
+      return [
+        { x: c[0], y: c[1] },
+        { x: c[2], y: c[3] },
+      ];
     case 'PATH':
       return shapePoints(s);
     case 'RECTANGLE':
     case 'IMAGE':
-      return [{ x: c[0], y: c[1] }, { x: c[2], y: c[1] }, { x: c[2], y: c[3] }, { x: c[0], y: c[3] }, { x: c[0], y: c[1] }];
+      return [
+        { x: c[0], y: c[1] },
+        { x: c[2], y: c[1] },
+        { x: c[2], y: c[3] },
+        { x: c[0], y: c[3] },
+        { x: c[0], y: c[1] },
+      ];
     case 'CIRCLE':
     case 'ARC': {
       const { cx, cy, rx, ry, a0, span } =
@@ -74,7 +83,12 @@ function segInBox(a: Point, b: Point, box: Box): boolean {
   let t1 = 1;
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  for (const [pq, q] of [[-dx, a.x - box.x1], [dx, box.x2 - a.x], [-dy, a.y - box.y1], [dy, box.y2 - a.y]]) {
+  for (const [pq, q] of [
+    [-dx, a.x - box.x1],
+    [dx, box.x2 - a.x],
+    [-dy, a.y - box.y1],
+    [dy, box.y2 - a.y],
+  ]) {
     if (pq === 0) {
       if (q < 0) return false;
       continue;

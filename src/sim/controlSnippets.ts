@@ -16,7 +16,7 @@ export const CONTROL_SNIPPETS: Snippet[] = [
   },
   {
     label: t('Sweep a component'),
-    help: t('Changes a component\'s value and simulates at each step: one result per value (tran1, tran2…).'),
+    help: t("Changes a component's value and simulates at each step: one result per value (tran1, tran2…)."),
     code: 'foreach val 500 1k 2k\n  alter R1 $val\n  run\nend',
   },
   {

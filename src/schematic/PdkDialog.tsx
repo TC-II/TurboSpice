@@ -47,7 +47,15 @@ const stored = (text: string, f: Field) => {
   return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(s) ? `${s}${f.suffix}` : s;
 };
 
-export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced, onClose }: {
+export function PdkDialog({
+  inst,
+  def,
+  lib,
+  windowDefaults,
+  onApply,
+  onAdvanced,
+  onClose,
+}: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   lib: Library;
@@ -77,7 +85,10 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
   // variantes: los símbolos de la misma carpeta con el mismo dibujo y los mismos parámetros
   const variants = useMemo(() => {
     const dir = inst.type.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase();
-    const sameParams = (d: SymbolDef) => parseParamList(d.attrs.get('SpiceLine') ?? '').map(([k]) => k.toLowerCase()).join() === defaults.map(([k]) => k.toLowerCase()).join();
+    const sameParams = (d: SymbolDef) =>
+      parseParamList(d.attrs.get('SpiceLine') ?? '')
+        .map(([k]) => k.toLowerCase())
+        .join() === defaults.map(([k]) => k.toLowerCase()).join();
     return lib
       .symbolPaths()
       .filter((p) => p.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase() === dir)
@@ -86,7 +97,10 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
   }, [inst.type]);
   const current = variants.find((v) => (v.def.attrs.get('Value') ?? '').toLowerCase() === model.toLowerCase()) ?? variants.find((v) => v.path === inst.type);
   const desc = (current?.def ?? def)?.attrs.get('Description') ?? '';
-  const title = desc.replace(/^(sky130|GF180MCU)\s+/, '').replace(/\s*\([^)]*\)\.?.*$/, '').replace(/;.*$/, '');
+  const title = desc
+    .replace(/^(sky130|GF180MCU)\s+/, '')
+    .replace(/\s*\([^)]*\)\.?.*$/, '')
+    .replace(/;.*$/, '');
 
   // lo que dan las medidas
   const num = (key: string) => {
@@ -140,7 +154,10 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
           <div className="pdk-variants" role="radiogroup" aria-label={t('Variant')}>
             {variants.map((v) => {
               const value = v.def.attrs.get('Value') ?? '';
-              const d = (v.def.attrs.get('Description') ?? '').replace(/^(sky130|GF180MCU)\s+/, '').replace(/\s*\([^)]*\)\.?.*$/, '').replace(/;.*$/, '');
+              const d = (v.def.attrs.get('Description') ?? '')
+                .replace(/^(sky130|GF180MCU)\s+/, '')
+                .replace(/\s*\([^)]*\)\.?.*$/, '')
+                .replace(/;.*$/, '');
               return (
                 <button
                   type="button"
@@ -167,7 +184,13 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
           <label key={f.key} className="attr-row pdk-field">
             <span title={f.tip}>{f.label}</span>
             <span className="pdk-input" title={f.tip}>
-              <input value={vals[f.key] ?? ''} spellCheck={false} inputMode="decimal" placeholder={shown(defaults.find(([k]) => k === f.key)?.[1] ?? '1', f)} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} />
+              <input
+                value={vals[f.key] ?? ''}
+                spellCheck={false}
+                inputMode="decimal"
+                placeholder={shown(defaults.find(([k]) => k === f.key)?.[1] ?? '1', f)}
+                onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })}
+              />
               {f.unit && <em>{f.unit}</em>}
             </span>
             <span className="attr-vis" />
@@ -199,8 +222,12 @@ export function PdkDialog({ inst, def, lib, windowDefaults, onApply, onAdvanced,
             {t('All attributes…')}
           </button>
           <span style={{ flex: 1 }} />
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary">{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary">
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>

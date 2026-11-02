@@ -15,7 +15,14 @@ const POP_W = 440;
  * mouse está en el ancla o en el globo: al salir se cierra con una demora corta, así se puede
  * cruzar el hueco entre los dos y leer, desplazar o seleccionar.
  */
-export function HoverPop({ pop, children, className, label, width = POP_W, focusable = true }: {
+export function HoverPop({
+  pop,
+  children,
+  className,
+  label,
+  width = POP_W,
+  focusable = true,
+}: {
   pop: ReactNode;
   children: ReactNode;
   className?: string;
@@ -140,12 +147,23 @@ function ABeta({ lib, probe }: { lib?: Library; probe?: boolean }) {
   return (
     <svg viewBox={`0 14 ${342 + d} 120`} className="stbm-svg" role="img" aria-label={probe ? t('Where the loop probe goes') : t('A-β model')}>
       <Arrow id={probe ? 'stbm-p' : 'stbm-a'} />
-      <text x={6} y={46} className="stbm-io" dominantBaseline="central">x</text>
+      <text x={6} y={46} className="stbm-io" dominantBaseline="central">
+        x
+      </text>
       <line x1={22} y1={46} x2={63} y2={46} markerEnd={m} />
-      <Sum x={78} y={46} signs={[['+', -16, -12], ['−', -13, 17]]} />
+      <Sum
+        x={78}
+        y={46}
+        signs={[
+          ['+', -16, -12],
+          ['−', -13, 17],
+        ]}
+      />
       <line x1={91} y1={46} x2={128} y2={46} markerEnd={m} />
       <polygon points="130,20 130,72 190,46" className="stbm-amp" />
-      <Lbl x={150} y={46}>A</Lbl>
+      <Lbl x={150} y={46}>
+        A
+      </Lbl>
       {probe ? (
         <>
           <line x1={190} y1={46} x2={200} y2={46} />
@@ -157,10 +175,14 @@ function ABeta({ lib, probe }: { lib?: Library; probe?: boolean }) {
         <line x1={190} y1={46} x2={out + 46} y2={46} markerEnd={m} />
       )}
       <circle cx={out} cy={46} r={3} className="stbm-dot" />
-      <text x={out + 52} y={46} className="stbm-io" dominantBaseline="central">y</text>
+      <text x={out + 52} y={46} className="stbm-io" dominantBaseline="central">
+        y
+      </text>
       <polyline points={`${out},46 ${out},112 ${150 + d / 2 + 34},112`} markerEnd={m} />
       <rect x={150 + d / 2 - 32} y={94} width={64} height={36} rx={6} className="stbm-fb" />
-      <Lbl x={150 + d / 2} y={112}>β</Lbl>
+      <Lbl x={150 + d / 2} y={112}>
+        β
+      </Lbl>
       <polyline points={`${150 + d / 2 - 32},112 78,112 78,61`} markerEnd={m} />
     </svg>
   );
@@ -171,31 +193,58 @@ function Asymptotic() {
   return (
     <svg viewBox="0 12 380 180" className="stbm-svg" role="img" aria-label={t('Asymptotic gain model')}>
       <Arrow id="stbm-g" />
-      <text x={6} y={110} className="stbm-io" dominantBaseline="central">x</text>
+      <text x={6} y={110} className="stbm-io" dominantBaseline="central">
+        x
+      </text>
       <line x1={22} y1={110} x2={75} y2={110} markerEnd={m} />
       <circle cx={46} cy={110} r={3} className="stbm-dot" />
       <polyline points="46,110 46,40 138,40" markerEnd={m} />
       <rect x={140} y={22} width={64} height={36} rx={6} className="stbm-ff" />
       <Lbl x={172} y={40}>
-        G<tspan className="stbm-sub" dy={4}>0</tspan>
+        G
+        <tspan className="stbm-sub" dy={4}>
+          0
+        </tspan>
       </Lbl>
       <polyline points="204,40 290,40 290,95" markerEnd={m} />
-      <Sum x={90} y={110} signs={[['+', -16, -12], ['−', -13, 17]]} />
+      <Sum
+        x={90}
+        y={110}
+        signs={[
+          ['+', -16, -12],
+          ['−', -13, 17],
+        ]}
+      />
       <line x1={103} y1={110} x2={126} y2={110} markerEnd={m} />
       <polygon points="128,78 128,142 204,110" className="stbm-amp" />
       <Lbl x={156} y={110} small>
-        R·G<tspan className="stbm-sub" dy={3}>∞</tspan>
+        R·G
+        <tspan className="stbm-sub" dy={3}>
+          ∞
+        </tspan>
       </Lbl>
       <line x1={204} y1={110} x2={275} y2={110} markerEnd={m} />
       {/* igual que el restador, con + en las dos entradas */}
-      <Sum x={290} y={110} signs={[['+', -16, -12], ['+', 12, -16]]} />
+      <Sum
+        x={290}
+        y={110}
+        signs={[
+          ['+', -16, -12],
+          ['+', 12, -16],
+        ]}
+      />
       <line x1={303} y1={110} x2={350} y2={110} markerEnd={m} />
       <circle cx={326} cy={110} r={3} className="stbm-dot" />
-      <text x={356} y={110} className="stbm-io" dominantBaseline="central">y</text>
+      <text x={356} y={110} className="stbm-io" dominantBaseline="central">
+        y
+      </text>
       <polyline points="326,110 326,172 242,172" markerEnd={m} />
       <rect x={176} y={154} width={64} height={36} rx={6} className="stbm-fb" />
       <Lbl x={208} y={172} small>
-        1/G<tspan className="stbm-sub" dy={3}>∞</tspan>
+        1/G
+        <tspan className="stbm-sub" dy={3}>
+          ∞
+        </tspan>
       </Lbl>
       <polyline points="176,172 90,172 90,125" markerEnd={m} />
     </svg>
@@ -207,7 +256,11 @@ export function ProbePlacement({ lib }: { lib?: Library }) {
   return (
     <>
       <ABeta lib={lib} probe />
-      <p>{t('Insert a LoopProbe (or LoopProbe_Dif for a differential loop) from the Component menu, Stability library, in series anywhere in the loop, with its arrow in the direction of the signal. In any other analysis it is a short circuit.')}</p>
+      <p>
+        {t(
+          'Insert a LoopProbe (or LoopProbe_Dif for a differential loop) from the Component menu, Stability library, in series anywhere in the loop, with its arrow in the direction of the signal. In any other analysis it is a short circuit.',
+        )}
+      </p>
     </>
   );
 }
@@ -223,7 +276,24 @@ function StbHelp({ lib }: { lib?: Library }) {
         <h4>{t('GFT → asymptotic gain model')}</h4>
         <Asymptotic />
         <Eq>
-          <V v="G" /> = <Ginf /> <Frac n={<V v="R" />} d={<>1 + <V v="R" /></>} /> + <Frac n={<G0 />} d={<>1 + <V v="R" /></>} />
+          <V v="G" /> = <Ginf />{' '}
+          <Frac
+            n={<V v="R" />}
+            d={
+              <>
+                1 + <V v="R" />
+              </>
+            }
+          />{' '}
+          +{' '}
+          <Frac
+            n={<G0 />}
+            d={
+              <>
+                1 + <V v="R" />
+              </>
+            }
+          />
         </Eq>
         <p>{t('R: return ratio; G∞: gain when R → ∞ (= 1/β); G0: gain when R = 0 (direct path).')}</p>
       </section>
@@ -234,7 +304,25 @@ function StbHelp({ lib }: { lib?: Library }) {
           <V v="T" /> = −<V v="A" />
           <V v="β" />
           <span className="mx-gap" />
-          <V v="G" /> = <Frac n={<V v="A" />} d={<>1 + <V v="A" /><V v="β" /></>} /> = <Frac n={<V v="A" />} d={<>1 − <V v="T" /></>} />
+          <V v="G" /> ={' '}
+          <Frac
+            n={<V v="A" />}
+            d={
+              <>
+                1 + <V v="A" />
+                <V v="β" />
+              </>
+            }
+          />{' '}
+          ={' '}
+          <Frac
+            n={<V v="A" />}
+            d={
+              <>
+                1 − <V v="T" />
+              </>
+            }
+          />
         </Eq>
         <p>{t('A: amplifier block; β: feedback block. With an input and an output it gives A = G·(1 − T) and β = −T/A.')}</p>
       </section>
@@ -243,7 +331,20 @@ function StbHelp({ lib }: { lib?: Library }) {
         <Eq>
           <V v="β" /> = <Frac n="1" d={<Ginf />} />
           <span className="mx-gap" />
-          <V v="A" /> = <Frac n={<><Ginf />(<Ginf /><V v="R" /> + <G0 />)</>} d={<><Ginf /> − <G0 /></>} />
+          <V v="A" /> ={' '}
+          <Frac
+            n={
+              <>
+                <Ginf />(<Ginf />
+                <V v="R" /> + <G0 />)
+              </>
+            }
+            d={
+              <>
+                <Ginf /> − <G0 />
+              </>
+            }
+          />
         </Eq>
         <p>{t('Without direct path (G0 = 0) both models are the same: A = G∞·R, Aβ = R and T = −R. With G0 ≠ 0 the equivalent A absorbs the direct path.')}</p>
       </section>
@@ -253,10 +354,7 @@ function StbHelp({ lib }: { lib?: Library }) {
 
 /** Lo justo de cada análisis: qué calcula y qué hace falta en el circuito */
 const HELP: Record<Exclude<AnalysisKind, 'stb'>, () => string[]> = {
-  tran: () => [
-    t('Simulates the circuit over time, from 0 to the stop time.'),
-    t('Save from: results before that time are not kept. Maximum step: limits the time step (useful for fast edges).'),
-  ],
+  tran: () => [t('Simulates the circuit over time, from 0 to the stop time.'), t('Save from: results before that time are not kept. Maximum step: limits the time step (useful for fast edges).')],
   ac: () => [t('Small-signal frequency response around the operating point (Bode plot).'), t('The excitation source needs "AC 1" in its value.')],
   op: () => [t('DC voltages and currents of every node and component.'), t('After running, annotate them on the schematic (OP) or click with the probe.')],
   dc: () => [t('Sweeps a source (and optionally a second one, nested) and solves the operating point at each step.'), t('Typical use: transfer and I–V curves.')],

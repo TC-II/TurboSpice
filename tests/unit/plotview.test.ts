@@ -81,19 +81,13 @@ describe('diferencia de cursores (B − A, #246)', () => {
 
 describe('vista de ploteo', () => {
   it('plot en .control: un panel por línea', () => {
-    expect(controlPlots('run\nplot v(out) in xlimit 0 1m\nplot i(v1) ylog\nprint x')).toEqual([
-      { traces: [{ expr: 'V(out)' }, { expr: 'V(in)' }] },
-      { traces: [{ expr: 'I(v1)' }] },
-    ]);
+    expect(controlPlots('run\nplot v(out) in xlimit 0 1m\nplot i(v1) ylog\nprint x')).toEqual([{ traces: [{ expr: 'V(out)' }, { expr: 'V(in)' }] }, { traces: [{ expr: 'I(v1)' }] }]);
   });
 
   it('.plt de LTspice: lee paneles, trazas y colores; escribe y relee igual', () => {
     const plt = `[Transient Analysis]\r\n{\r\n   Npanes: 2\r\n   Active Pane: 1\r\n   {\r\n      traces: 2 {524290,0,"V(out)"} {524292,0,"V(in)"}\r\n      X: ('m',0,0,0.01,0.1)\r\n   },\r\n   {\r\n      traces: 1 {34603010,0,"I(L1)"}\r\n   }\r\n}\r\n[AC Analysis]\r\n{\r\n   Npanes: 1\r\n   {\r\n      traces: 1 {2,0,"V(out)/V(in)"}\r\n   }\r\n}\r\n`;
     const v = parsePlt(plt);
-    expect(v.tran).toEqual([
-      { traces: [{ expr: 'V(out)' }, { expr: 'V(in)', color: '#ff0000' }] },
-      { traces: [{ expr: 'I(L1)' }] },
-    ]);
+    expect(v.tran).toEqual([{ traces: [{ expr: 'V(out)' }, { expr: 'V(in)', color: '#ff0000' }] }, { traces: [{ expr: 'I(L1)' }] }]);
     expect(v.ac).toEqual([{ traces: [{ expr: 'V(out)/V(in)' }] }]);
     expect(parsePlt(serializePlt(v))).toEqual(v);
   });
@@ -126,7 +120,16 @@ describe('colores de las trazas (#51)', () => {
   });
 
   it('el .plt conserva los colores de la paleta propia', () => {
-    const v = { tran: [{ traces: [{ expr: 'V(a)', color: PALETTE[2] }, { expr: 'V(b)', color: PALETTE[0] }] }] };
+    const v = {
+      tran: [
+        {
+          traces: [
+            { expr: 'V(a)', color: PALETTE[2] },
+            { expr: 'V(b)', color: PALETTE[0] },
+          ],
+        },
+      ],
+    };
     const back = parsePlt(serializePlt(v)).tran[0].traces;
     expect(back.map((t) => t.color)).toEqual(['#ff0000', '#00a000']);
   });

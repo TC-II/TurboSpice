@@ -80,19 +80,19 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
         it.edit ? (
           <EditRow key={i} it={it} v={edited} setV={setEdited} onClose={onClose} />
         ) : (
-        <button
-          key={i}
-          role="menuitem"
-          disabled={it.disabled}
-          title={it.short ? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined) : it.title}
-          className={it.primary ? 'ctx-primary' : undefined}
-          onClick={() => {
-            onClose();
-            it.onClick(editItem ? edited : undefined);
-          }}
-        >
-          {it.short ?? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined)}
-        </button>
+          <button
+            key={i}
+            role="menuitem"
+            disabled={it.disabled}
+            title={it.short ? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined) : it.title}
+            className={it.primary ? 'ctx-primary' : undefined}
+            onClick={() => {
+              onClose();
+              it.onClick(editItem ? edited : undefined);
+            }}
+          >
+            {it.short ?? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined)}
+          </button>
         ),
       )}
     </div>

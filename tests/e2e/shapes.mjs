@@ -64,7 +64,10 @@ await page.keyboard.press('Space');
 await frames(page);
 check((await shapes.count()) === 4, 'se dibujan las 4 figuras');
 const style = await shapes.evaluateAll((els) => els.map((e) => [getComputedStyle(e).stroke, getComputedStyle(e).strokeDasharray]));
-check(style.every(([s]) => s !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(s)), 'las figuras tienen trazo visible');
+check(
+  style.every(([s]) => s !== 'none' && !/rgba\(0, 0, 0, 0\)/.test(s)),
+  'las figuras tienen trazo visible',
+);
 check(style[1][1].startsWith('2') && style[3][1].startsWith('10') && style[0][1] === 'none', 'estilos de línea: puntos, guiones, sólida');
 
 // --- elegir por el trazo, no por el interior ---

@@ -8,12 +8,16 @@ export function FileConflictDialog({ name, onChoose }: { name: string; onChoose(
   return (
     <Modal title={t('Duplicate file')} onClose={() => onChoose('keep')}>
       <p>
-        {t('The project already has a')}{' '}<code>{name}</code> {t('with different content. What should we do with the new one?')}
+        {t('The project already has a')} <code>{name}</code> {t('with different content. What should we do with the new one?')}
       </p>
       <div className="buttons">
-        <button onClick={() => onChoose('keep')} autoFocus>{t('Keep the existing one')}</button>
+        <button onClick={() => onChoose('keep')} autoFocus>
+          {t('Keep the existing one')}
+        </button>
         <button onClick={() => onChoose('rename')}>{t('Add it with another name')}</button>
-        <button className="primary" onClick={() => onChoose('replace')}>{t('Replace')}</button>
+        <button className="primary" onClick={() => onChoose('replace')}>
+          {t('Replace')}
+        </button>
       </div>
     </Modal>
   );

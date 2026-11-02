@@ -50,11 +50,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
       const shown = withScale[withScale.length - 1] ?? result.plots[result.plots.length - 1];
       setPlotName(shown?.name ?? '');
       setSelected({});
-      setStatus(
-        result.errors.length && !result.plots.length
-          ? { kind: 'error', message: result.errors[0] }
-          : { kind: 'done', ms },
-      );
+      setStatus(result.errors.length && !result.plots.length ? { kind: 'error', message: result.errors[0] } : { kind: 'done', ms });
     } catch (err) {
       // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
       if (!aborting.current) setStatus({ kind: 'error', message: (err as Error).message });
@@ -131,17 +127,17 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
   return (
     <div className="netlist-mode">
       <header className="toolbar-row">
-        <select
-          aria-label={t('Examples')}
-          onChange={(e) => setNetlist(EXAMPLES[e.target.value])}
-          defaultValue={FIRST}
-        >
+        <select aria-label={t('Examples')} onChange={(e) => setNetlist(EXAMPLES[e.target.value])} defaultValue={FIRST}>
           {Object.keys(EXAMPLES).map((k) => (
-            <option key={k} value={k}>{t(k)}</option>
+            <option key={k} value={k}>
+              {t(k)}
+            </option>
           ))}
         </select>
         {running ? (
-          <button onClick={abort} title={t('Abort (Alt+S)')}>{t('Abort')}</button>
+          <button onClick={abort} title={t('Abort (Alt+S)')}>
+            {t('Abort')}
+          </button>
         ) : (
           <button className="primary" onClick={simulate} disabled={status.kind === 'loading'} title={t('Simulate (Alt+R / Ctrl+Enter)')}>
             {t('Simulate')}
@@ -161,7 +157,9 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !running) simulate();
             }}
           />
-          <pre className="log" ref={logRef} tabIndex={-1} title={t('ngspice log (Ctrl+L)')}>{log.join('\n')}</pre>
+          <pre className="log" ref={logRef} tabIndex={-1} title={t('ngspice log (Ctrl+L)')}>
+            {log.join('\n')}
+          </pre>
         </section>
 
         <section className="results">
@@ -221,11 +219,7 @@ export function ScalarTable({ plot }: { plot: SimPlot }) {
         {plot.vectors.map((v) => (
           <tr key={v.name}>
             <th>{displayName(v)}</th>
-            <td>
-              {Array.from(v.real, (re, i) =>
-                v.imag ? `${si(re)} ${v.imag[i] < 0 ? '−' : '+'} j${si(Math.abs(v.imag[i]))}` : si(re),
-              ).join(', ')}
-            </td>
+            <td>{Array.from(v.real, (re, i) => (v.imag ? `${si(re)} ${v.imag[i] < 0 ? '−' : '+'} j${si(Math.abs(v.imag[i]))}` : si(re))).join(', ')}</td>
           </tr>
         ))}
       </tbody>
@@ -240,9 +234,17 @@ export function StatusText({ status }: { status: Status }) {
     case 'idle':
       return <span className="status">{t('Ready')}</span>;
     case 'running':
-      return <span className="status">{t('Simulating…')}{' '}{status.percent ? `${status.percent.toFixed(0)}%` : ''}</span>;
+      return (
+        <span className="status">
+          {t('Simulating…')} {status.percent ? `${status.percent.toFixed(0)}%` : ''}
+        </span>
+      );
     case 'done':
-      return <span className="status ok">{t('Done in')}{' '}{status.ms.toFixed(0)} ms</span>;
+      return (
+        <span className="status ok">
+          {t('Done in')} {status.ms.toFixed(0)} ms
+        </span>
+      );
     case 'error':
       return <span className="status err">{status.message}</span>;
     case 'aborted':

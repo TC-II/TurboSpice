@@ -64,7 +64,10 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
   const withVariants = async (netlist: string): Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }> => {
     const p = projectRef.current;
     const mods = verilogModules(p).filter((f) => f.synth);
-    const v = applyVariants(netlist, mods.map((f) => ({ name: moduleOf(f), params: f.synth!.params })));
+    const v = applyVariants(
+      netlist,
+      mods.map((f) => ({ name: moduleOf(f), params: f.synth!.params })),
+    );
     const files: Record<string, string> = {};
     for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
     const subs: string[] = [];
@@ -73,7 +76,9 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       const k = `${n.name}\u0000${f.hdl ?? ''}\u0000${f.text}`;
       let hit = variantCache.current.get(k);
       if (!hit) {
-        const label = `${moduleOf(f)} (${Object.entries(n.params).map(([a, b]) => `${a}=${b}`).join(' ')})`;
+        const label = `${moduleOf(f)} (${Object.entries(n.params)
+          .map(([a, b]) => `${a}=${b}`)
+          .join(' ')})`;
         setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: label }) });
         const r =
           f.hdl === 'behavioral'
@@ -87,9 +92,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       if (hit.vvp) files[vvpFileOf(n.name)] = hit.vvp;
     }
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
-    const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) =>
-      mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)),
-    );
+    const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
     return { netlist: withSubckts(v.netlist, subs), files, warnings: v.warnings };
   };

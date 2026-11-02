@@ -95,7 +95,6 @@ export function histogram(values: number[], bins = 12): { from: number; to: numb
   return out;
 }
 
-
 /** Gráficos "y en función de x" de un programa de bloques: puntos impresos en el log (TS-XY id x y) */
 export function xyPlotsFromLog(log: string[], specs: { id: number; x: string; y: string }[]): SimPlot[] {
   if (!specs.length) return [];
@@ -174,9 +173,12 @@ export function blockResultsFromLog(log: string[]): { table: MeasTable | null; p
 export function measCsv(table: MeasTable): string {
   const cell = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
   const head = ['run', ...table.names];
-  const lines = table.rows.map((r) => [r.label ?? r.plot, ...table.names.map((n) => {
-    const v = measNumber(r.values.get(n));
-    return Number.isFinite(v) ? String(v) : '';
-  })]);
+  const lines = table.rows.map((r) => [
+    r.label ?? r.plot,
+    ...table.names.map((n) => {
+      const v = measNumber(r.values.get(n));
+      return Number.isFinite(v) ? String(v) : '';
+    }),
+  ]);
   return [head, ...lines].map((l) => l.map(cell).join(',')).join('\n') + '\n';
 }

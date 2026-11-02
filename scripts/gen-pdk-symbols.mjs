@@ -25,13 +25,10 @@ const base = (name) => {
 const INST = { nmos4: 'XM1', pmos4: 'XM1', res2: 'XR1', cap: 'XC1', npn4: 'XQ1', pnp: 'XQ1', pnp4: 'XQ1', diode: 'D1' };
 
 // resistencia de 3 terminales: la de res2 y el cuerpo a la derecha
-const res3 = Object.assign([
-  ...base('res2').map((l) => l.replace('PinName A', 'PinName R0').replace('PinName B', 'PinName R1')),
-  'LINE Normal 32 32 48 32',
-  'PIN 48 32 NONE 0',
-  'PINATTR PinName B',
-  'PINATTR SpiceOrder 3',
-], { skin: undefined, inst: 'XR1' });
+const res3 = Object.assign(
+  [...base('res2').map((l) => l.replace('PinName A', 'PinName R0').replace('PinName B', 'PinName R1')), 'LINE Normal 32 32 48 32', 'PIN 48 32 NONE 0', 'PINATTR PinName B', 'PINATTR SpiceOrder 3'],
+  { skin: undefined, inst: 'XR1' },
+);
 
 const symbol = (lines, attrs) =>
   ['Version 4', 'SymbolType CELL', ...lines.filter((l) => !/^PIN/.test(l)), ...attrs.map(([k, v]) => `SYMATTR ${k} ${v}`), ...lines.filter((l) => /^PIN/.test(l))].join('\n') + '\n';

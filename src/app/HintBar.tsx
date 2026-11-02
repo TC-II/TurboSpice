@@ -10,7 +10,19 @@ export type Hover = { ref: ItemRef | null; at: Point } | null;
 
 /** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
 /** Barra de estado bajo el esquemático: la ayuda a la izquierda y los avisos a la derecha (#229: sin ventanas emergentes) */
-export function HintBar({ sink, text, message, onDismiss, offers }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string; message?: string; onDismiss(): void; offers?: ReactNode }) {
+export function HintBar({
+  sink,
+  text,
+  message,
+  onDismiss,
+  offers,
+}: {
+  sink: MutableRefObject<((h: Hover) => void) | undefined>;
+  text(hover: Hover): string;
+  message?: string;
+  onDismiss(): void;
+  offers?: ReactNode;
+}) {
   const [hover, setHover] = useState<Hover>(null);
   useEffect(() => {
     sink.current = setHover;
@@ -72,8 +84,8 @@ export function toolHint(tt: Tool): string {
     case 'shape': {
       const n = tt.pts.length;
       if (tt.shape === 'ARC' && n >= 2) return t('{p0} · right-click cancels', { p0: n === 2 ? t("Click the arc's start point") : t('Click the end point (counterclockwise)') });
-      if (n) return t('Click to finish{p0} · right-click cancels', { p0: tt.shape === 'ARC' ? t(' the arc\'s box') : '' });
-      const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t('the arc (its ellipse\'s box)') }[tt.shape];
+      if (n) return t('Click to finish{p0} · right-click cancels', { p0: tt.shape === 'ARC' ? t(" the arc's box") : '' });
+      const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t("the arc (its ellipse's box)") }[tt.shape];
       return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
     }
     case 'pencil':
@@ -81,6 +93,12 @@ export function toolHint(tt: Tool): string {
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':
-      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : tt.what === 'probe' ? t('Click a loop probe (LoopProbe or LoopProbe_Dif) to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
+      return tt.what === 'net'
+        ? t('Click a wire or pin to choose its net · Esc cancels')
+        : tt.what === 'source'
+          ? t('Click a V or I source to choose it · Esc cancels')
+          : tt.what === 'probe'
+            ? t('Click a loop probe (LoopProbe or LoopProbe_Dif) to choose it · Esc cancels')
+            : t('Click a component to choose it · Esc cancels');
   }
 }

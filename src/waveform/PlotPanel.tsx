@@ -13,7 +13,23 @@ import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, sampleEvents, scaleOf, si, siFixed } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
-import { PALETTE, acceptsTrace, colorFor, sameDft, cursorForClick, isDftPane, reorderTrace, sameTrace, traceColor, type CursorKey, type Cursors, type Pane, type PlotState, type Trace, type TraceDft } from './view.ts';
+import {
+  PALETTE,
+  acceptsTrace,
+  colorFor,
+  sameDft,
+  cursorForClick,
+  isDftPane,
+  reorderTrace,
+  sameTrace,
+  traceColor,
+  type CursorKey,
+  type Cursors,
+  type Pane,
+  type PlotState,
+  type Trace,
+  type TraceDft,
+} from './view.ts';
 import { addMarker, asMarkers, delta, horizontalCuts, markerName, markerValue, pickCurve, remapPanes, sameMarker, verticalCuts, type Marker, type MarkerAxis, type MarkerKind } from './markers.ts';
 import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
 import { useTraceWidth } from './lineWidth.ts';
@@ -125,7 +141,26 @@ const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curv
 const AXIS_X_BAND = 28;
 const AXIS_Y_BAND = 44;
 
-export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode, active, setActive, onHoverExpr, handle, marks, initial, onState, onFocusTrace, onDftPicking, side, toolsHost }: Props) {
+export function PlotPanel({
+  plot,
+  runs,
+  labels,
+  panes,
+  setPanes,
+  resolver,
+  mode,
+  active,
+  setActive,
+  onHoverExpr,
+  handle,
+  marks,
+  initial,
+  onState,
+  onFocusTrace,
+  onDftPicking,
+  side,
+  toolsHost,
+}: Props) {
   const [dftOpen, setDftOpen] = useState(false);
   // ⌖: elegir con un click en su cápsula la traza cuya DFT se agrega (#245)
   const [dftPicking, setDftPicking] = useState(false);
@@ -441,7 +476,10 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
     if (isTran && tt.dft) items.push({ label: t('Edit the DFT (window and sampling)'), onClick: () => startDftEdit(i, ti) });
     const label = data[i]?.curves.find((c) => c.trace === ti)?.label;
     if (label !== undefined)
-      for (const [k, name] of [['ta', 'A'], ['tb', 'B']] as const)
+      for (const [k, name] of [
+        ['ta', 'A'],
+        ['tb', 'B'],
+      ] as const)
         items.push({
           label: t('Cursor {name} on this trace', { name }),
           onClick: () => (isF(i) ? (setCursorMode(true), setFCursors((c) => ({ ...c, [k]: label }))) : startCursors({ [k]: label })),
@@ -502,7 +540,12 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           charts.current.forEach((u, k) => {
             const xr = isF(k) ? (fRanges[k] ?? null) : xRange;
             if (!xr) return;
-            const e = extent(data[k].x, data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => curveOn(c, data[k].x)), xr[0], xr[1]);
+            const e = extent(
+              data[k].x,
+              data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => curveOn(c, data[k].x)),
+              xr[0],
+              xr[1],
+            );
             if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
           });
           return zoomTo(xRange, ys);
@@ -592,14 +635,18 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
       <button
         className={cursorMode ? 'active' : ''}
         onClick={() => setCursorMode((v) => !v)}
-        title={t('Cursors: first click = cursor A, second = cursor B, then a click moves the nearest one; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)')}
+        title={t(
+          'Cursors: first click = cursor A, second = cursor B, then a click moves the nearest one; dragging a line moves it (Alt: to the simulated points, arrows: point by point; C; Shift+C clears them)',
+        )}
       >
         {t('Cursors')}
       </button>
       <button
         className={markerMode ? 'active' : ''}
         onClick={() => setMarkerMode((v) => !v)}
-        title={t('Markers: a click puts a marker on the trace. With the mouse over the plot: M marker, V and H vertical and horizontal lines (select one to read where it cuts the traces), A and D two markers and their differences; drag them to move them (Delete removes the selected one, Shift+M all of them)')}
+        title={t(
+          'Markers: a click puts a marker on the trace. With the mouse over the plot: M marker, V and H vertical and horizontal lines (select one to read where it cuts the traces), A and D two markers and their differences; drag them to move them (Delete removes the selected one, Shift+M all of them)',
+        )}
       >
         {t('Markers')}
       </button>
@@ -638,7 +685,9 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
           <select value={dftWindow} aria-label={t('Window')} onChange={(e) => setDftWindow(e.target.value as DftWindow)}>
             <optgroup label={t('Window')}>
               {WINDOWS.map(([w]) => (
-                <option key={w} value={w}>{windowName[w]}</option>
+                <option key={w} value={w}>
+                  {windowName[w]}
+                </option>
               ))}
             </optgroup>
           </select>
@@ -701,126 +750,124 @@ export function PlotPanel({ plot, runs, labels, panes, setPanes, resolver, mode,
   return (
     <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`} data-marker-readings={markers.length ? markerReadings(markers, data).join('\n') : undefined}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
-      {(zoomMode || removing) && (
-        <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t('Click a trace\'s name to remove it · Esc finishes')}</p>
-      )}
+      {(zoomMode || removing) && <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t("Click a trace's name to remove it · Esc finishes")}</p>}
       {plot.info && <p className="hint plot-info">{plot.info}</p>}
       {/* cursores y medidas: a la derecha de los paneles con los resultados abajo (son anchos y
           bajos); debajo con los resultados al costado */}
       <div className={`plot-main${side ? '' : ' beside'}`}>
-      <div className="panes" ref={panesRef}>
-        {panes.map((p, i) => (
-          <Fragment key={i}>
-          {i > 0 && (
-            <div
-              className="pane-split"
-              role="separator"
-              aria-orientation="horizontal"
-              aria-label={t('Resize panes {a} and {b}', { a: i, b: i + 1 })}
-              tabIndex={0}
-              title={t('Drag to change the height of the panes · double-click: equal heights')}
-              onPointerDown={(e) => startSplit(i - 1, e)}
-              onDoubleClick={resetSizes}
-              onKeyDown={(e) => {
-                if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-                e.preventDefault();
-                resizePanes(i - 1, e.key === 'ArrowUp' ? -16 : 16, true);
-              }}
-            />
-          )}
-          <PaneView
-            index={i}
-            pane={p}
-            data={data[i]}
-            active={i === active && panes.length > 1}
-            onActivate={() => setActive(i)}
-            // el único panel también se borra (#312): queda uno vacío, donde cae lo próximo que se mida
-            canRemove={panes.length > 1 || p.traces.length > 0}
-            onRemove={() => {
-              setPanes(panes.length > 1 ? panes.filter((_, k) => k !== i) : [{ traces: [] }]);
-              setMarkers((old) => remapPanes(old, { remove: i }));
-              // (el zoom de los paneles de DFT que siguen se corre con ellos)
-              setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
-            }}
-            onChange={(f) => update(i, f)}
-            onDropTrace={(from, ti) => moveTrace(from, ti, i)}
-            xRange={isF(i) ? (fRanges[i] ?? null) : range}
-            yRange={yRanges[i] ?? null}
-            rRange={rRanges[i] ?? null}
-            onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : (setRRanges({}), zoomTo(null, {})))}
-            onWheelZoom={(r) => queueWheel((w) => (isF(i) ? (w.f[i] = r) : (w.x = { v: r })))}
-            onWheelY={(r) => queueWheel((w) => (w.y[i] = r))}
-            onWheelR={(r) => queueWheel((w) => (w.r[i] = r))}
-            wheelPending={() => wheelPending(i)}
-            onBoxZoom={(x, y) => {
-              setZoomMode(false);
-              if (isF(i)) {
-                if (x) setFRange(i, x);
-                if (y) setYRanges({ ...zoomNow.current.y, [i]: y });
-                return;
-              }
-              zoomTo(x ?? zoomNow.current.x, y ? { ...zoomNow.current.y, [i]: y } : zoomNow.current.y);
-            }}
-            zoomMode={zoomMode}
-            removing={removing}
-            onPickTrace={dftPicking && !isF(i) && !dftError ? addDft : undefined}
-            samples={dftPreview && !dftError && !isF(i) && !p.digital ? { ...dftPreview, n: dftN } : undefined}
-            labelOf={(tt) => traceLabel(tt, allTraces)}
-            traceActions={(ti) => traceActions(i, ti)}
-            showGrid={showGrid}
-            cursorMode={cursorMode}
-            cursors={isF(i) ? fCursors : cursors}
-            onCursor={(c) => (isF(i) ? setFCursors : setCursors)((old) => ({ ...old, ...c }))}
-            previewX={isF(i) ? undefined : previewX}
-            onHoverX={unplaced && !isF(i) ? setHoverX : undefined}
-            syncKey={isF(i) ? 'turbospice-dft' : 'turbospice'}
-            onHoverExpr={onHoverExpr}
-            marks={marks}
-            register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
-            markerMode={markerMode}
-            markers={markers.filter((m) => m.pane === i)}
-            allMarkers={markers}
-            selMarker={selMarker}
-            onSelectMarker={setSelMarker}
-            onMoveMarker={(m, patch) => setMarkers((old) => old.map((o) => (sameMarker(o, m) ? { ...o, ...patch } : o)))}
-            onPlaceMarker={(px, py) => placeMarker('m', { pane: i, px, py })}
-            onPointer={(p) => {
-              if (p) pointer.current = { pane: i, ...p };
-              else if (pointer.current?.pane === i) pointer.current = null;
-            }}
-            onAddBelow={
-              i === panes.length - 1
-                ? () => {
-                    setPanes([...panes, { traces: [] }]);
-                    setActive(panes.length);
+        <div className="panes" ref={panesRef}>
+          {panes.map((p, i) => (
+            <Fragment key={i}>
+              {i > 0 && (
+                <div
+                  className="pane-split"
+                  role="separator"
+                  aria-orientation="horizontal"
+                  aria-label={t('Resize panes {a} and {b}', { a: i, b: i + 1 })}
+                  tabIndex={0}
+                  title={t('Drag to change the height of the panes · double-click: equal heights')}
+                  onPointerDown={(e) => startSplit(i - 1, e)}
+                  onDoubleClick={resetSizes}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+                    e.preventDefault();
+                    resizePanes(i - 1, e.key === 'ArrowUp' ? -16 : 16, true);
+                  }}
+                />
+              )}
+              <PaneView
+                index={i}
+                pane={p}
+                data={data[i]}
+                active={i === active && panes.length > 1}
+                onActivate={() => setActive(i)}
+                // el único panel también se borra (#312): queda uno vacío, donde cae lo próximo que se mida
+                canRemove={panes.length > 1 || p.traces.length > 0}
+                onRemove={() => {
+                  setPanes(panes.length > 1 ? panes.filter((_, k) => k !== i) : [{ traces: [] }]);
+                  setMarkers((old) => remapPanes(old, { remove: i }));
+                  // (el zoom de los paneles de DFT que siguen se corre con ellos)
+                  setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
+                }}
+                onChange={(f) => update(i, f)}
+                onDropTrace={(from, ti) => moveTrace(from, ti, i)}
+                xRange={isF(i) ? (fRanges[i] ?? null) : range}
+                yRange={yRanges[i] ?? null}
+                rRange={rRanges[i] ?? null}
+                onZoom={(r) => (isF(i) ? setFRange(i, r) : r ? zoomTo(r) : (setRRanges({}), zoomTo(null, {})))}
+                onWheelZoom={(r) => queueWheel((w) => (isF(i) ? (w.f[i] = r) : (w.x = { v: r })))}
+                onWheelY={(r) => queueWheel((w) => (w.y[i] = r))}
+                onWheelR={(r) => queueWheel((w) => (w.r[i] = r))}
+                wheelPending={() => wheelPending(i)}
+                onBoxZoom={(x, y) => {
+                  setZoomMode(false);
+                  if (isF(i)) {
+                    if (x) setFRange(i, x);
+                    if (y) setYRanges({ ...zoomNow.current.y, [i]: y });
+                    return;
                   }
-                : undefined
-            }
-          />
-          </Fragment>
-        ))}
-      </div>
-      {/* cursores y stats: el divisor cambia su ancho (o su alto) (#336) */}
-      {(cursorMode || (showStats && allVisible.length > 0)) && <SideSplit dir={side ? 'column' : 'row'} onSize={readoutSplit.set} min={100} reserve={200} label={t('Resize cursors and stats')} />}
-      {(cursorMode || (showStats && allVisible.length > 0)) && (
-        <div className="readouts" style={readoutSplit.style}>
-          {cursorMode && (
-            <section className="readout-card" aria-label={t('Cursors')}>
-              <h4>{t('Cursors')}</h4>
-              {timeData.length > 0 && <CursorTable data={timeData} cursors={previewX !== undefined ? { ...cursors, a: previewX } : cursors} preview={unplaced} setCursors={setCursors} />}
-              {freqData.length > 0 && !fUnplaced && <CursorTable data={freqData} cursors={fCursors} setCursors={setFCursors} />}
-              {unplaced && <p className="hint">{t('Click on the plot to set cursor A, then click again for B. Drag the lines to move them.')}</p>}
-            </section>
-          )}
-          {showStats && allVisible.length > 0 && (
-            <section className="readout-card" aria-label={t('Stats')}>
-              <h4>{t('Stats')}</h4>
-              <StatsTable data={timeData} range={range} />
-              {data.map((d, k) => (isF(k) ? <StatsTable key={k} data={[d]} range={fRanges[k] ?? null} /> : null))}
-            </section>
-          )}
+                  zoomTo(x ?? zoomNow.current.x, y ? { ...zoomNow.current.y, [i]: y } : zoomNow.current.y);
+                }}
+                zoomMode={zoomMode}
+                removing={removing}
+                onPickTrace={dftPicking && !isF(i) && !dftError ? addDft : undefined}
+                samples={dftPreview && !dftError && !isF(i) && !p.digital ? { ...dftPreview, n: dftN } : undefined}
+                labelOf={(tt) => traceLabel(tt, allTraces)}
+                traceActions={(ti) => traceActions(i, ti)}
+                showGrid={showGrid}
+                cursorMode={cursorMode}
+                cursors={isF(i) ? fCursors : cursors}
+                onCursor={(c) => (isF(i) ? setFCursors : setCursors)((old) => ({ ...old, ...c }))}
+                previewX={isF(i) ? undefined : previewX}
+                onHoverX={unplaced && !isF(i) ? setHoverX : undefined}
+                syncKey={isF(i) ? 'turbospice-dft' : 'turbospice'}
+                onHoverExpr={onHoverExpr}
+                marks={marks}
+                register={(u) => (u ? charts.current.set(i, u) : charts.current.delete(i))}
+                markerMode={markerMode}
+                markers={markers.filter((m) => m.pane === i)}
+                allMarkers={markers}
+                selMarker={selMarker}
+                onSelectMarker={setSelMarker}
+                onMoveMarker={(m, patch) => setMarkers((old) => old.map((o) => (sameMarker(o, m) ? { ...o, ...patch } : o)))}
+                onPlaceMarker={(px, py) => placeMarker('m', { pane: i, px, py })}
+                onPointer={(p) => {
+                  if (p) pointer.current = { pane: i, ...p };
+                  else if (pointer.current?.pane === i) pointer.current = null;
+                }}
+                onAddBelow={
+                  i === panes.length - 1
+                    ? () => {
+                        setPanes([...panes, { traces: [] }]);
+                        setActive(panes.length);
+                      }
+                    : undefined
+                }
+              />
+            </Fragment>
+          ))}
         </div>
-      )}
+        {/* cursores y stats: el divisor cambia su ancho (o su alto) (#336) */}
+        {(cursorMode || (showStats && allVisible.length > 0)) && <SideSplit dir={side ? 'column' : 'row'} onSize={readoutSplit.set} min={100} reserve={200} label={t('Resize cursors and stats')} />}
+        {(cursorMode || (showStats && allVisible.length > 0)) && (
+          <div className="readouts" style={readoutSplit.style}>
+            {cursorMode && (
+              <section className="readout-card" aria-label={t('Cursors')}>
+                <h4>{t('Cursors')}</h4>
+                {timeData.length > 0 && <CursorTable data={timeData} cursors={previewX !== undefined ? { ...cursors, a: previewX } : cursors} preview={unplaced} setCursors={setCursors} />}
+                {freqData.length > 0 && !fUnplaced && <CursorTable data={freqData} cursors={fCursors} setCursors={setFCursors} />}
+                {unplaced && <p className="hint">{t('Click on the plot to set cursor A, then click again for B. Drag the lines to move them.')}</p>}
+              </section>
+            )}
+            {showStats && allVisible.length > 0 && (
+              <section className="readout-card" aria-label={t('Stats')}>
+                <h4>{t('Stats')}</h4>
+                <StatsTable data={timeData} range={range} />
+                {data.map((d, k) => (isF(k) ? <StatsTable key={k} data={[d]} range={fRanges[k] ?? null} /> : null))}
+              </section>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -957,19 +1004,24 @@ function PaneView(props: {
     const extents = new Map<string, Range | null>();
     const fullY = (scale: string) => {
       if (!extents.has(scale)) {
-        const e = extent(data.x, data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => curveOn(c, data.x)));
+        const e = extent(
+          data.x,
+          data.curves.filter((c) => !c.hidden && c.axis === scale).map((c) => curveOn(c, data.x)),
+        );
         // dB y grados que varían menos que el ruido numérico (un pasatodo: |H| = 0 dB ± 1e-15) son
         // una recta (±1 dB o ±1° a su alrededor): sin esto el eje se estira hasta mostrar ese ruido
         const flat = e && (scale === 'ph' || (scale === 'y' && data.yUnit === 'dB')) && e[1] - e[0] < 1e-6;
-        const mid = e ? Math.round((e[0] + e[1]) / 2 * 1e6) / 1e6 : 0;
+        const mid = e ? Math.round(((e[0] + e[1]) / 2) * 1e6) / 1e6 : 0;
         extents.set(scale, flat ? [mid - 1, mid + 1] : e);
       }
       return extents.get(scale)!;
     };
-    const whole = (scale: string): uPlot.Range.Function => (u, min, max) => {
-      const e = fullY(scale);
-      return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
-    };
+    const whole =
+      (scale: string): uPlot.Range.Function =>
+      (u, min, max) => {
+        const e = fullY(scale);
+        return safeRange(u, e?.[0] ?? min, e?.[1] ?? max, scale);
+      };
     // Dos escalas Y sin zoom: rangos y marcas elegidos para que las dos usen la misma grilla (#300).
     // Con zoom en alguna, las marcas de la derecha van a la altura de las de la izquierda.
     let aligned: Aligned | null | undefined;
@@ -1127,7 +1179,12 @@ function PaneView(props: {
       height: Math.max(80, el.clientHeight),
       legend: { show: false },
       scales: {
-        x: { time: false, distr: data.log ? 3 : 1, range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax, ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}) },
+        x: {
+          time: false,
+          distr: data.log ? 3 : 1,
+          range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax,
+          ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}),
+        },
         y: { range: (u, min, max) => yRef.current ?? alignedY()?.left ?? whole('y')(u, min, max, 'y') },
         i: { range: (u, min, max) => rRef.current ?? (rightScale === 'i' ? alignedY()?.right : null) ?? whole('i')(u, min, max, 'i') },
         ph: { range: (u, min, max) => rRef.current ?? (rightScale === 'ph' ? alignedY()?.right : null) ?? whole('ph')(u, min, max, 'ph') },
@@ -1144,10 +1201,18 @@ function PaneView(props: {
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
         },
-        { scale: 'y', values: ticks('Y'), ...(hasRight ? { splits: leftSplits } : {}), stroke: muted, grid: { stroke: grid, width: 1, show: showGrid }, ticks: { stroke: grid, width: 1 }, size: 58, label: data.yUnit || undefined, labelSize: 14 },
-        ...(hasRight
-          ? [{ scale: rightScale, side: 1, values: ticks('R'), splits: rightSplits, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis]
-          : []),
+        {
+          scale: 'y',
+          values: ticks('Y'),
+          ...(hasRight ? { splits: leftSplits } : {}),
+          stroke: muted,
+          grid: { stroke: grid, width: 1, show: showGrid },
+          ticks: { stroke: grid, width: 1 },
+          size: 58,
+          label: data.yUnit || undefined,
+          labelSize: 14,
+        },
+        ...(hasRight ? [{ scale: rightScale, side: 1, values: ticks('R'), splits: rightSplits, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis] : []),
       ],
       series: [
         { label: data.xName },
@@ -1387,15 +1452,17 @@ function PaneView(props: {
     // muchos puntos: uPlot recibe sólo lo visible, a lo sumo 4 puntos por columna de píxeles (el
     // mismo dibujo; si no, recorre todo en cada cuadro de la rueda o del paneo). Con huecos o
     // escalones (digital) va todo.
-    const dec = data.x.length > DECIMATE_FROM && finite && !data.curves.some((c) => c.digital) ? decimator(data.x, data.curves.map((c) => c.y)) : null;
+    const dec =
+      data.x.length > DECIMATE_FROM && finite && !data.curves.some((c) => c.digital)
+        ? decimator(
+            data.x,
+            data.curves.map((c) => c.y),
+          )
+        : null;
     const firstX = opts.scales!.x;
     let redecimate = 0;
     // (antes de crear el gráfico no se sabe dónde queda el área: de sobra, el ancho entero)
-    const u: uPlot = new uPlot(
-      opts,
-      (dec ? dec.view(firstX.min ?? x0, firstX.max ?? x1, Math.max(100, el.clientWidth) * devicePixelRatio, data.log) : [data.x, ...ys]) as uPlot.AlignedData,
-      el,
-    );
+    const u: uPlot = new uPlot(opts, (dec ? dec.view(firstX.min ?? x0, firstX.max ?? x1, Math.max(100, el.clientWidth) * devicePixelRatio, data.log) : [data.x, ...ys]) as uPlot.AlignedData, el);
     /** lo visible en [min, max], en las columnas de píxeles del área del gráfico */
     const view = (min: number, max: number) => dec!.view(min, max, u.bbox.width, data.log, u.bbox.left) as uPlot.AlignedData;
     setX.current = (min, max) => {
@@ -1894,13 +1961,13 @@ function PaneView(props: {
                 </select>
               )}
               {/* el lugar del valor queda reservado aunque el mouse no esté sobre el gráfico */}
-          {err ? (
-            <span className="err">{err}</span>
-          ) : pane.digital ? (
-            <span className={`val${hover === null ? ' idle' : ''}`}>{hover === null ? ' ' : formatRadix(v, c?.bits ?? 1, tt.radix)}</span>
-          ) : (
-            <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>
-          )}
+              {err ? (
+                <span className="err">{err}</span>
+              ) : pane.digital ? (
+                <span className={`val${hover === null ? ' idle' : ''}`}>{hover === null ? ' ' : formatRadix(v, c?.bits ?? 1, tt.radix)}</span>
+              ) : (
+                <span className={`val${hover === null ? ' idle' : ''}`}>{fix(v, unitOf(c))}</span>
+              )}
               <button className="x" aria-label={t('Remove {expr}', { expr: props.labelOf(tt) })} onClick={() => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) }))}>
                 ✕
               </button>
@@ -1910,10 +1977,12 @@ function PaneView(props: {
         {/* la DFT bajo el mouse: su fundamental y THD, en el lugar del valor de X */}
         {chipHover !== null && data.info?.[chipHover] ? (
           <span className="xval dft-info">{data.info[chipHover]}</span>
-        ) : data.x.length > 0 && (
-          <span className={`xval${hover === null || data.x[hover] === undefined ? ' idle' : ''}`}>
-            {data.xName} = {fix(hover !== null ? (data.x[hover] ?? NaN) : NaN, xUnit(data.xName))}
-          </span>
+        ) : (
+          data.x.length > 0 && (
+            <span className={`xval${hover === null || data.x[hover] === undefined ? ' idle' : ''}`}>
+              {data.xName} = {fix(hover !== null ? (data.x[hover] ?? NaN) : NaN, xUnit(data.xName))}
+            </span>
+          )
         )}
         {runLegend.length > 1 && (
           <span className="run-legend">
@@ -1961,9 +2030,7 @@ function PaneView(props: {
           }}
         />
       ) : (
-        <p className="empty pane-empty">
-          {pane.traces.length ? t('No trace can be plotted in this analysis.') : t('Empty pane: probe with the probe tool, type an expression or drag a trace here.')}
-        </p>
+        <p className="empty pane-empty">{pane.traces.length ? t('No trace can be plotted in this analysis.') : t('Empty pane: probe with the probe tool, type an expression or drag a trace here.')}</p>
       )}
       {edit &&
         createPortal(
@@ -2010,7 +2077,10 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
   const xu = xUnit(data[0]?.xName);
   const traceSelect = (k: 'ta' | 'tb', name: string) => (
     <select value={cursors[k] ?? ''} aria-label={t('Cursor {name} trace', { name })} onChange={(e) => setCursors((c) => ({ ...c, [k]: e.target.value || undefined }))}>
-      <option value="">{name}{t(': no trace')}</option>
+      <option value="">
+        {name}
+        {t(': no trace')}
+      </option>
       {labels.map((l) => (
         <option key={l} value={l}>
           {name}: {l}
@@ -2060,7 +2130,9 @@ function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[];
           })}
           <tr className="dx">
             <td>{data[0]?.xName}</td>
-            <td className={preview ? 'xa preview' : 'xa'} title={preview ? t('Follows the mouse: click to fix it') : undefined}>{fix(a ?? NaN, xu)}</td>
+            <td className={preview ? 'xa preview' : 'xa'} title={preview ? t('Follows the mouse: click to fix it') : undefined}>
+              {fix(a ?? NaN, xu)}
+            </td>
             <td className="xb">{fix(b ?? NaN, xu)}</td>
             <td className="xd">{fix(dx, xu)}</td>
             <td className="xf">{fix(cursorDiff(a ?? NaN, b ?? NaN, NaN, NaN).freq, xu === 's' ? 'Hz' : '')}</td>
@@ -2095,8 +2167,12 @@ function StatsTable({ data, range }: { data: PaneData[]; range: Range | null }) 
           return (
             <tr key={i}>
               <td style={{ color: c.color }}>{c.label}</td>
-              <td>{fmt(s.min)} @ {fmt(s.xMin)}</td>
-              <td>{fmt(s.max)} @ {fmt(s.xMax)}</td>
+              <td>
+                {fmt(s.min)} @ {fmt(s.xMin)}
+              </td>
+              <td>
+                {fmt(s.max)} @ {fmt(s.xMax)}
+              </td>
               <td>{fmt(s.pp)}</td>
               <td>{db(d, c) ? '—' : fmt(s.avg)}</td>
               <td>{db(d, c) ? '—' : fmt(s.rms)}</td>
@@ -2155,8 +2231,7 @@ function markerReadings(markers: Marker[], data: PaneData[]): string[] {
     if (!d) continue;
     const xu = xUnit(d.xName);
     if (m.kind === 'v')
-      for (const c of verticalCuts(m.x!, d.x, d.curves))
-        rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(m.x!, xu), y: fix(c.y, unitOf(d, c.axis)) });
+      for (const c of verticalCuts(m.x!, d.x, d.curves)) rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(m.x!, xu), y: fix(c.y, unitOf(d, c.axis)) });
     else if (m.kind === 'h') {
       const cuts = horizontalCuts(m.y!, m.axis ?? 'y', d.x, d.curves, 8);
       if (!cuts.length) rows.push({ m, trace: '—', x: '—', y: fix(m.y!, unitOf(d, m.axis ?? 'y')) });
@@ -2165,7 +2240,7 @@ function markerReadings(markers: Marker[], data: PaneData[]): string[] {
       const c = d.curves.find((o) => o.label === m.trace);
       const y = markerValue(m, d.x, d.curves);
       rows.push({ m, trace: m.trace ?? '', color: c?.color, x: fix(m.x!, xu), y: fix(y, c ? unitOf(d, c.axis) : '') });
-      if (c && (m.kind === 'a' || m.kind === 'd')) (m.kind === 'a' ? (a = { x: m.x!, y, d, axis: c.axis }) : (dm = { x: m.x!, y, d, axis: c.axis }));
+      if (c && (m.kind === 'a' || m.kind === 'd')) m.kind === 'a' ? (a = { x: m.x!, y, d, axis: c.axis }) : (dm = { x: m.x!, y, d, axis: c.axis });
     }
   }
   const dd = a && dm ? delta(a, dm) : null;

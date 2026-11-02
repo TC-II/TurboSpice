@@ -114,25 +114,30 @@ export function moduleActions({ projectRef, editProject, snapshot, docRef, histo
       setCurModel(name);
     });
   const renameModel = (from: string) =>
-    askSubName(t('Rename model'), from, (to) => {
-      if (to === from) return;
-      const retype = (asc: string) => {
-        const d = parseAsc(asc);
-        let changed = false;
-        for (const s of d.symbols)
-          if (baseName(s.type).toLowerCase() === from.toLowerCase()) {
-            s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
-            changed = true;
-          }
-        return changed ? serializeAsc(d) : asc;
-      };
-      // lo que se está editando también se renombra (se guarda antes)
-      const p = renameModelModule(snapshot(), from, to, retype);
-      projectRef.current = p;
-      editProject(p);
-      history.reset(parseAsc(retype(ascText(docRef.current))));
-      if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
-    }, from);
+    askSubName(
+      t('Rename model'),
+      from,
+      (to) => {
+        if (to === from) return;
+        const retype = (asc: string) => {
+          const d = parseAsc(asc);
+          let changed = false;
+          for (const s of d.symbols)
+            if (baseName(s.type).toLowerCase() === from.toLowerCase()) {
+              s.type = s.type.slice(0, s.type.length - baseName(s.type).length) + to;
+              changed = true;
+            }
+          return changed ? serializeAsc(d) : asc;
+        };
+        // lo que se está editando también se renombra (se guarda antes)
+        const p = renameModelModule(snapshot(), from, to, retype);
+        projectRef.current = p;
+        editProject(p);
+        history.reset(parseAsc(retype(ascText(docRef.current))));
+        if (curModel.toLowerCase() === from.toLowerCase()) setCurModel(to);
+      },
+      from,
+    );
   const deleteModel = (name: string) => {
     const n = usages(projectRef.current, name, (asc, nm) => nm || lineOf(asc)).length;
     setDialog({

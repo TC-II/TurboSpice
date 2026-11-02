@@ -37,7 +37,15 @@ export type MenuItem =
 export type MenuDef = { label: string; items: MenuItem[] } | { label: string; onClick(): void; icon?: IconName };
 
 /** Botón que despliega una lista de menú */
-export function MenuButton({ items, label, title, className, disabled, openRef, children }: {
+export function MenuButton({
+  items,
+  label,
+  title,
+  className,
+  disabled,
+  openRef,
+  children,
+}: {
   items: MenuItem[];
   /** Nombre accesible del botón y de la lista */
   label: string;
@@ -111,7 +119,13 @@ export function AppMenu({ menus }: { menus: MenuDef[] }) {
   );
 }
 
-function MenuList({ items, close, label, autoFocus, onBack }: {
+function MenuList({
+  items,
+  close,
+  label,
+  autoFocus,
+  onBack,
+}: {
   items: MenuItem[];
   close(): void;
   label: string;
@@ -171,13 +185,7 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
         it === 'sep' ? (
           <div key={i} className="menu-sep" role="separator" />
         ) : 'items' in it ? (
-          <div
-            key={i}
-            data-i={i}
-            className="menu-item has-sub"
-            onPointerEnter={(e) => mouse(e) && setSub({ i, focus: false })}
-            onPointerLeave={(e) => mouse(e) && setSub(null)}
-          >
+          <div key={i} data-i={i} className="menu-item has-sub" onPointerEnter={(e) => mouse(e) && setSub({ i, focus: false })} onPointerLeave={(e) => mouse(e) && setSub(null)}>
             <button
               role="menuitem"
               aria-haspopup="menu"
@@ -258,10 +266,22 @@ function MenuList({ items, close, label, autoFocus, onBack }: {
               >
                 <span className={it.lead ? 'menu-lead-label' : undefined}>
                   {checks && <span className="check-mark">{it.checked ? '✓' : ''}</span>}
-                  {it.lead && <span className="menu-lead" aria-hidden>{it.lead}</span>}
+                  {it.lead && (
+                    <span className="menu-lead" aria-hidden>
+                      {it.lead}
+                    </span>
+                  )}
                   {it.label}
                 </span>
-                {it.shortcut ? <span className="sc">{it.shortcut}</span> : it.icon && <span className="sc menu-icon"><Icon name={it.icon} size={14} /></span>}
+                {it.shortcut ? (
+                  <span className="sc">{it.shortcut}</span>
+                ) : (
+                  it.icon && (
+                    <span className="sc menu-icon">
+                      <Icon name={it.icon} size={14} />
+                    </span>
+                  )
+                )}
               </button>
             )}
             {!!it.actions?.length && (

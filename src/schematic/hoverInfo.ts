@@ -33,7 +33,10 @@ export function hoverInfo(doc: AscDoc, lib: Library, conn: Connectivity, ref: It
       if (!w) return [];
       const net = conn.netAt({ x: w.x1, y: w.y1 });
       const out = [t('Wire'), t('net {p0}', { p0: netLabel(net?.name) }), `(${w.x1}, ${w.y1}) → (${w.x2}, ${w.y2})`, t('length {p0}', { p0: Math.hypot(w.x2 - w.x1, w.y2 - w.y1) })];
-      if (net) out.push(t('{length} pin{p1}, {length2} wire{p3} in the net', { length: net.pins.length, p1: net.pins.length === 1 ? '' : 'es', length2: net.wires.length, p3: net.wires.length === 1 ? '' : 's' }));
+      if (net)
+        out.push(
+          t('{length} pin{p1}, {length2} wire{p3} in the net', { length: net.pins.length, p1: net.pins.length === 1 ? '' : 'es', length2: net.wires.length, p3: net.wires.length === 1 ? '' : 's' }),
+        );
       return out;
     }
     case 'flag': {

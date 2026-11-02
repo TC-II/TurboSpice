@@ -68,7 +68,10 @@ const mc1 = await measRows();
 const vals = (await page.locator('.meas-table tbody tr td:nth-child(2)').allTextContents()).map(parseFloat);
 const yields = (await page.locator('.meas-table tbody tr td:nth-child(3)').allTextContents()).map(parseFloat);
 check(mc1.length === 50 && Math.max(...vals) > Math.min(...vals), `Monte Carlo: 50 corridas distintas (${Math.min(...vals)} … ${Math.max(...vals)})`);
-check(yields.every((y) => y === 0 || y === 1 || y === 0.5), `rendimiento: 1 o 0 por corrida (${[...new Set(yields)].join(', ')})`);
+check(
+  yields.every((y) => y === 0 || y === 1 || y === 0.5),
+  `rendimiento: 1 o 0 por corrida (${[...new Set(yields)].join(', ')})`,
+);
 check((await page.locator('.histogram').count()) >= 1, 'Monte Carlo: histograma');
 await page.screenshot({ path: `${OUT}/template-montecarlo.png` });
 await page.keyboard.press('Control+1');
@@ -84,7 +87,10 @@ for (const k of ['Simulación 1', 'Simulación 2', 'Simulación 3']) check((awai
 await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
 check(await simulate(), 'serie: simula sin errores');
 const plots = await page.locator('select[aria-label="Plot"] option').allTextContents();
-check(['tran', 'ac', 'op'].every((k) => plots.some((p) => p.startsWith(k))), `serie: un resultado por análisis (${plots.join(', ')})`);
+check(
+  ['tran', 'ac', 'op'].every((k) => plots.some((p) => p.startsWith(k))),
+  `serie: un resultado por análisis (${plots.join(', ')})`,
+);
 const serRows = await measRows();
 check(serRows.length >= 2, `serie: mediciones de cada análisis (${serRows.join(' | ')})`);
 await page.keyboard.press('Control+1');
@@ -107,7 +113,16 @@ check(found && Math.abs(parseFloat(found[2]) - 0.9) < 0.005 && parseFloat(found[
 await page.keyboard.press('Control+1');
 
 // --- el resto: cada una se inserta y simula sin errores ---
-for (const name of ['Barrido anidado', 'Barrido de temperatura', 'Peor caso / esquinas', 'Medición vs. parámetro', 'Respuesta al escalón', 'Respuesta en frecuencia', 'Distorsión', 'Impedancias / PSRR / CMRR']) {
+for (const name of [
+  'Barrido anidado',
+  'Barrido de temperatura',
+  'Peor caso / esquinas',
+  'Medición vs. parámetro',
+  'Respuesta al escalón',
+  'Respuesta en frecuencia',
+  'Distorsión',
+  'Impedancias / PSRR / CMRR',
+]) {
   await template(name);
   await page.getByRole('button', { name: 'Insertar' }).click();
   await page.getByRole('button', { name: 'Aplicar', exact: true }).click();

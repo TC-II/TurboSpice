@@ -53,10 +53,7 @@ export function build(out = OUT) {
   const secs = sections(readFileSync(join(MODELS, 'sm141064_mim.spice'), 'utf8'), sections(readFileSync(join(MODELS, 'sm141064.spice'), 'utf8')));
   rmSync(out, { recursive: true, force: true });
   mkdirSync(join(out, 'sections'), { recursive: true });
-  writeFileSync(
-    join(out, 'design.spice'),
-    readFileSync(join(MODELS, 'design.spice'), 'utf8').replace(/^((?:\.param\s+|\+\s*)sw_stat_(?:global|mismatch)\s*=\s*)1\b/gim, '$10'),
-  );
+  writeFileSync(join(out, 'design.spice'), readFileSync(join(MODELS, 'design.spice'), 'utf8').replace(/^((?:\.param\s+|\+\s*)sw_stat_(?:global|mismatch)\s*=\s*)1\b/gim, '$10'));
   for (const [name, lines] of secs) writeFileSync(join(out, 'sections', `${name}.spice`), lines.join('\n') + '\n');
 
   // dispositivos: los de todas las secciones (los binned, nombre.N, son un mismo modelo)

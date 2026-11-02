@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { addPin, addShape, addText, copySym, pasteSym, setText, symTexts, moveParamWindow, removeShape, resizeBody, setShape, setSymParams, symParamWindow, symPins, symShapes } from '../../src/project/symbolEdit.ts';
+import {
+  addPin,
+  addShape,
+  addText,
+  copySym,
+  pasteSym,
+  setText,
+  symTexts,
+  moveParamWindow,
+  removeShape,
+  resizeBody,
+  setShape,
+  setSymParams,
+  symParamWindow,
+  symPins,
+  symShapes,
+} from '../../src/project/symbolEdit.ts';
 import { addFlag, setFlagName } from '../../src/schematic/edit.ts';
 import { emptyDoc } from '../../src/asc/model.ts';
 
@@ -44,7 +60,10 @@ describe('rótulo de los parámetros del símbolo (WINDOW 39)', () => {
     expect(symParamWindow(resizeBody(s, { x1: -48, y1: -32, x2: 48, y2: 64 }))?.y).toBe(88);
     s = moveParamWindow(s, 64, -48);
     expect(symParamWindow(s)).toEqual({ x: 64, y: -48, align: 'Top', size: 2 });
-    s = setSymParams(s, [['G', '2'], ['R', '1k']]);
+    s = setSymParams(s, [
+      ['G', '2'],
+      ['R', '1k'],
+    ]);
     expect(symParamWindow(s)).toMatchObject({ x: 64, y: -48 });
     expect(symParamWindow(resizeBody(s, { x1: -48, y1: -32, x2: 48, y2: 64 }))).toMatchObject({ x: 64, y: -48 });
   });

@@ -17,7 +17,10 @@ export const showSimCommand = (target) => target.addInitScript(() => localStorag
 async function pick(page, path) {
   for (const [i, label] of path.entries()) {
     const menus = page.getByRole('menu');
-    const item = menus.getByRole('menuitem', { name: label, exact: true }).or(menus.getByRole('menuitemcheckbox', { name: label, exact: true })).last();
+    const item = menus
+      .getByRole('menuitem', { name: label, exact: true })
+      .or(menus.getByRole('menuitemcheckbox', { name: label, exact: true }))
+      .last();
     if (i < path.length - 1) await item.hover();
     else {
       await item.click();
@@ -100,10 +103,14 @@ export async function launchBrowser() {
 
 /** Espera a que el navegador pinte `n` cuadros: lo que React y uPlot redibujan tras un evento ya está en el DOM */
 export const frames = (page, n = 2) =>
-  page.evaluate((k) => new Promise((done) => {
-    const step = (i) => (i ? requestAnimationFrame(() => step(i - 1)) : done());
-    step(k);
-  }), n);
+  page.evaluate(
+    (k) =>
+      new Promise((done) => {
+        const step = (i) => (i ? requestAnimationFrame(() => step(i - 1)) : done());
+        step(k);
+      }),
+    n,
+  );
 
 /**
  * Reintenta `fn` (async, devuelve algo «verdadero» cuando se cumple) hasta que se cumpla o pase `timeout`.
@@ -123,7 +130,6 @@ export async function autosaved(page) {
   await frames(page);
   await page.waitForFunction(() => document.documentElement.dataset.autosave === 'saved', null, { timeout: 10000 });
 }
-
 
 /** Espera a que el esquemático deje de reacomodarse (el viewBox igual en tres lecturas seguidas): al abrir o cerrar paneles se reajusta un instante después */
 export async function steady(page, timeout = 3000) {

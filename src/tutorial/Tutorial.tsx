@@ -79,7 +79,18 @@ function Confetti() {
       {bits.map((b, i) => (
         <span
           key={i}
-          style={{ left: `${b.left}%`, background: b.color, width: b.w, height: b.w * 0.45, animationDelay: `${b.delay}s`, animationDuration: `${b.dur}s`, '--drift': `${b.drift}px`, '--spin': `${b.spin}deg` } as React.CSSProperties}
+          style={
+            {
+              left: `${b.left}%`,
+              background: b.color,
+              width: b.w,
+              height: b.w * 0.45,
+              animationDelay: `${b.delay}s`,
+              animationDuration: `${b.dur}s`,
+              '--drift': `${b.drift}px`,
+              '--spin': `${b.spin}deg`,
+            } as React.CSSProperties
+          }
         />
       ))}
     </div>,
@@ -118,9 +129,17 @@ function Spotlight({ find }: { find: () => Element | null }) {
   );
 }
 
-type View = { kind: 'hub' } | { kind: 'intro'; ch: number } | { kind: 'play'; ch: number; step: number } | { kind: 'done'; ch: number; stars: number; xp: number; levelUp: string | null; first: boolean };
+type View =
+  | { kind: 'hub' }
+  | { kind: 'intro'; ch: number }
+  | { kind: 'play'; ch: number; step: number }
+  | { kind: 'done'; ch: number; stars: number; xp: number; levelUp: string | null; first: boolean };
 
-export function Tutorial({ probe, onPractice, onClose }: {
+export function Tutorial({
+  probe,
+  onPractice,
+  onClose,
+}: {
   /** foto del estado de la app */
   probe(): Probe;
   /** abre un proyecto de práctica (el actual queda en Recientes) */
@@ -350,8 +369,16 @@ export function Tutorial({ probe, onPractice, onClose }: {
             <label className="tut-check">
               <input type="checkbox" checked={prog.sound} onChange={(e) => save((p) => ({ ...p, sound: e.target.checked }))} /> {t('Sounds')}
             </label>
-            <span className="tut-ranks" title={levels().map((l, i) => `${i + 1}. ${l.name} (${l.xp} XP)`).join('\n')}>
-              {t('Ranks')}: {levels().map((l) => l.name).join(' → ')}
+            <span
+              className="tut-ranks"
+              title={levels()
+                .map((l, i) => `${i + 1}. ${l.name} (${l.xp} XP)`)
+                .join('\n')}
+            >
+              {t('Ranks')}:{' '}
+              {levels()
+                .map((l) => l.name)
+                .join(' → ')}
             </span>
             <button
               className="link"
@@ -387,9 +414,7 @@ export function Tutorial({ probe, onPractice, onClose }: {
             </li>
           ))}
         </ol>
-        <p className="tut-reward">
-          {t('Reward: up to {xp} XP and the «{badge}» badge', { xp: c.steps.length * (STEP_XP + CLEAN_XP) + CHAPTER_XP, badge: c.badge })}
-        </p>
+        <p className="tut-reward">{t('Reward: up to {xp} XP and the «{badge}» badge', { xp: c.steps.length * (STEP_XP + CLEAN_XP) + CHAPTER_XP, badge: c.badge })}</p>
         <p className="tut-note">{t('It starts from scratch, in a new project: «{name}». Your current project stays in the menu, Recent.', { name: practiceName })}</p>
         <div className="tut-actions">
           <button onClick={() => setView({ kind: 'hub' })}>{t('Back')}</button>

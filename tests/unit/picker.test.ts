@@ -3,28 +3,13 @@
 import { describe, expect, it } from 'vitest';
 import { pickerItems, searchRank, type PickerItem } from '../../src/schematic/dialogs.tsx';
 
-const PATHS = [
-  'Digital/and',
-  'Misc/DIAC',
-  'OpAmps/opamp',
-  'TCLib/OA_Ideal',
-  'TCLib/Special/Characters/Goku',
-  'TCLib/Special/arrow',
-  'bi',
-  'res',
-  'zener',
-];
+const PATHS = ['Digital/and', 'Misc/DIAC', 'OpAmps/opamp', 'TCLib/OA_Ideal', 'TCLib/Special/Characters/Goku', 'TCLib/Special/arrow', 'bi', 'res', 'zener'];
 const desc = (p: string) => (p === 'res' ? 'Resistor' : p === 'TCLib/Special/Characters/Goku' ? 'Goku' : '');
 const show = (items: PickerItem[]) => items.map((it) => (it.kind === 'up' ? '..' : it.kind === 'dir' ? `[${it.path}]` : it.path));
 
 describe('explorador de componentes', () => {
   it('en la raíz: carpetas, sueltos y después el contenido de las carpetas, sin Characters ni OpAmps (su carpeta, al fondo)', () => {
-    expect(show(pickerItems(PATHS, '', '', desc))).toEqual([
-      '[Digital]', '[Misc]', '[TCLib]',
-      'bi', 'res', 'zener',
-      'Digital/and', 'Misc/DIAC', 'TCLib/OA_Ideal', 'TCLib/Special/arrow',
-      '[OpAmps]',
-    ]);
+    expect(show(pickerItems(PATHS, '', '', desc))).toEqual(['[Digital]', '[Misc]', '[TCLib]', 'bi', 'res', 'zener', 'Digital/and', 'Misc/DIAC', 'TCLib/OA_Ideal', 'TCLib/Special/arrow', '[OpAmps]']);
   });
 
   it('dentro de una carpeta: subir, subcarpetas, sueltos y Characters al fondo', () => {

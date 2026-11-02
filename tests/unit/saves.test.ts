@@ -140,16 +140,24 @@ describe('señales guardadas (#314)', () => {
 
   it('un nodo digital queda en sus cambios y V() lo lleva a la grilla', () => {
     const time = Float64Array.of(0, 1, 2, 3, 4);
-    const plot = { name: 'tran1', vectors: [
-      { name: 'time', type: 1, real: time },
-      { name: 'q', type: DIGITAL_TYPE, real: Float64Array.of(0, 1), x: Float64Array.of(0, 2.5) },
-    ] };
+    const plot = {
+      name: 'tran1',
+      vectors: [
+        { name: 'time', type: 1, real: time },
+        { name: 'q', type: DIGITAL_TYPE, real: Float64Array.of(0, 1), x: Float64Array.of(0, 2.5) },
+      ],
+    };
     const r = traceResolver(null, plot);
     const dig = evalTrace('Dig(q)', { resolve: r, scale: time, scaleName: 'time' });
     expect([...dig.x!]).toEqual([0, 2.5]);
     expect([...evalTrace('V(q)', { resolve: r, scale: time, scaleName: 'time' }).re]).toEqual([0, 0, 0, 1, 1]);
     expect([...evalTrace('Dig(q)*2', { resolve: r, scale: time, scaleName: 'time' }).re]).toEqual([0, 0, 0, 2, 2]);
     expect([...sampleEvents(Float64Array.of(0, 2), Float64Array.of(1, 0), Float64Array.of(1, 2, 3))]).toEqual([1, 0, 0]);
-    expect([...mergeEvents([{ x: Float64Array.of(0, 2), y: Float64Array.of(0, 1) }, { x: Float64Array.of(0, 1), y: Float64Array.of(1, 0) }]).x]).toEqual([0, 1, 2]);
+    expect([
+      ...mergeEvents([
+        { x: Float64Array.of(0, 2), y: Float64Array.of(0, 1) },
+        { x: Float64Array.of(0, 1), y: Float64Array.of(1, 0) },
+      ]).x,
+    ]).toEqual([0, 1, 2]);
   });
 });

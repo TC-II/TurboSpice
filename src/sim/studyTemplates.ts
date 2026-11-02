@@ -207,7 +207,9 @@ export const STUDY_TEMPLATES: StudyTemplate[] = [
   {
     id: 'montecarlo',
     label: 'Monte Carlo',
-    help: t('R ±5 % and C/L ±10 % (uniform), 50 runs with a fixed seed: overlaid curves, histogram and statistics of the measurement (mean, σ, min/max). With a specification, the "yield" column is 1 when the run meets it: its mean is the yield.'),
+    help: t(
+      'R ±5 % and C/L ±10 % (uniform), 50 runs with a fixed seed: overlaid curves, histogram and statistics of the measurement (mean, σ, min/max). With a specification, the "yield" column is 1 when the run meets it: its mean is the yield.',
+    ),
     fields: ['signal', 'analysis', 'spec'],
     build: (st, c, o) => {
       const name = namer(st);
@@ -230,7 +232,9 @@ export const STUDY_TEMPLATES: StudyTemplate[] = [
   {
     id: 'worst',
     label: t('Worst case / corners'),
-    help: t('Every combination of the tolerance extremes (2ⁿ runs, up to 6 components): the best and worst curves and a table per corner (Measurements). Remove components from the tolerance card to reduce the runs.'),
+    help: t(
+      'Every combination of the tolerance extremes (2ⁿ runs, up to 6 components): the best and worst curves and a table per corner (Measurements). Remove components from the tolerance card to reduce the runs.',
+    ),
     fields: ['signal', 'analysis'],
     build: (st, c, o) => {
       let out = withAnalyses(st, [o.analysis]);
@@ -262,7 +266,9 @@ export const STUDY_TEMPLATES: StudyTemplate[] = [
   {
     id: 'search',
     label: t('Search / fit'),
-    help: t('Bisection (blocks): changes the component until the measurement reaches the target value (e.g. R for a given gain, C for f−3dB = 1 kHz). It prints the value found and plots the intermediate runs. Works whether the measurement grows or falls with the value.'),
+    help: t(
+      'Bisection (blocks): changes the component until the measurement reaches the target value (e.g. R for a given gain, C for f−3dB = 1 kHz). It prints the value found and plots the intermediate runs. Works whether the measurement grows or falls with the value.',
+    ),
     fields: ['target', 'signal', 'analysis', 'goal'],
     blocksOnly: true,
     blocks: (c, o) => searchBlocks(c, o),
@@ -295,7 +301,9 @@ export const STUDY_TEMPLATES: StudyTemplate[] = [
   {
     id: 'freq',
     label: t('Frequency response'),
-    help: t('.ac with the Bode plot of the output, the gain in band (maximum) and the cutoff frequency (−3 dB). The input source needs "AC 1". For a loop gain, add the phase margin in a measurement card.'),
+    help: t(
+      '.ac with the Bode plot of the output, the gain in band (maximum) and the cutoff frequency (−3 dB). The input source needs "AC 1". For a loop gain, add the phase margin in a measurement card.',
+    ),
     fields: ['signal'],
     build: (st, _c, o) => {
       const name = namer(st);
@@ -310,7 +318,9 @@ export const STUDY_TEMPLATES: StudyTemplate[] = [
   {
     id: 'distortion',
     label: t('Distortion'),
-    help: t('.tran stepping the parameter "amp" (write {amp} as the amplitude of the input source) and, after each run, a Fourier analysis of the output: the THD of each amplitude is in the Log. Set the fundamental frequency of the source.'),
+    help: t(
+      '.tran stepping the parameter "amp" (write {amp} as the amplitude of the input source) and, after each run, a Fourier analysis of the output: the THD of each amplitude is in the Log. Set the fundamental frequency of the source.',
+    ),
     fields: ['signal', 'freq'],
     build: (st, _c, o) => {
       let out = withAnalyses(st, ['tran']);

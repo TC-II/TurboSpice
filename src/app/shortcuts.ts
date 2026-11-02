@@ -58,8 +58,51 @@ export interface ShortcutActions {
 
 /** Instala los atajos; se vuelven a instalar en cada render, con las acciones de ese render */
 export function useShortcuts(a: ShortcutActions) {
-  const { dialog, history, status, running, selection, allRuns, hasNets, area, editor, plotPanel, pltInput, viewerKeys, simulate, abort, showLog, doSave, doOpen, setQuickOpen, goUp, reapplyView, undoPanes } = a;
-  const { setDialog, setMessage, rotateOrMirror, copySelection, paste, setTool, selectAll, setSelection, setShowGrid, setShowLoose, setShowNets, setNetHover, openControl, openStudy, openSimulation, zoomBox, descend, startMove, shapeTool, deleteSelection } = a;
+  const {
+    dialog,
+    history,
+    status,
+    running,
+    selection,
+    allRuns,
+    hasNets,
+    area,
+    editor,
+    plotPanel,
+    pltInput,
+    viewerKeys,
+    simulate,
+    abort,
+    showLog,
+    doSave,
+    doOpen,
+    setQuickOpen,
+    goUp,
+    reapplyView,
+    undoPanes,
+  } = a;
+  const {
+    setDialog,
+    setMessage,
+    rotateOrMirror,
+    copySelection,
+    paste,
+    setTool,
+    selectAll,
+    setSelection,
+    setShowGrid,
+    setShowLoose,
+    setShowNets,
+    setNetHover,
+    openControl,
+    openStudy,
+    openSimulation,
+    zoomBox,
+    descend,
+    startMove,
+    shapeTool,
+    deleteSelection,
+  } = a;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (dialog || isTyping(e)) return;
@@ -122,7 +165,7 @@ export function useShortcuts(a: ShortcutActions) {
               if (!e.shiftKey) return;
               handled();
               if (allRuns.length > 1) setDialog({ kind: 'runs' });
-              else setMessage(t('This analysis doesn\'t have several runs (.step)'));
+              else setMessage(t("This analysis doesn't have several runs (.step)"));
               return;
             case 'o':
               return handled(), pltInput.current?.click();

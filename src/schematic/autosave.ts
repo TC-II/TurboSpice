@@ -97,7 +97,10 @@ const quiet = <T>(p: Promise<T>, fallback: T) => p.catch(() => fallback);
 export const loadSession = () => quiet(get<Session>(SESSION), undefined);
 
 export function saveSession(s: Session): Promise<void> {
-  return quiet(put(SESSION, s).catch(() => put(SESSION, { ...s, handle: undefined })), undefined);
+  return quiet(
+    put(SESSION, s).catch(() => put(SESSION, { ...s, handle: undefined })),
+    undefined,
+  );
 }
 
 export const loadRecent = async () => (await quiet(get<RecentFile[]>(RECENT), undefined)) ?? [];
@@ -105,7 +108,15 @@ export const loadRecent = async () => (await quiet(get<RecentFile[]>(RECENT), un
 /** Agrega (o sube al principio) un archivo a recientes */
 export async function addRecent(f: RecentFile): Promise<RecentFile[]> {
   const list = [f, ...(await loadRecent()).filter((r) => r.name !== f.name || !!r.unsaved !== !!f.unsaved)].slice(0, MAX_RECENT);
-  await quiet(put(RECENT, list).catch(() => put(RECENT, list.map((r) => ({ ...r, handle: undefined })))), undefined);
+  await quiet(
+    put(RECENT, list).catch(() =>
+      put(
+        RECENT,
+        list.map((r) => ({ ...r, handle: undefined })),
+      ),
+    ),
+    undefined,
+  );
   return list;
 }
 
@@ -162,7 +173,10 @@ export interface ProjectSession {
 export const loadProjectSession = () => quiet(get<ProjectSession>('project'), undefined);
 
 export function saveProjectSession(s: ProjectSession): Promise<void> {
-  return quiet(put('project', s).catch(() => put('project', { ...s, handle: undefined })), undefined);
+  return quiet(
+    put('project', s).catch(() => put('project', { ...s, handle: undefined })),
+    undefined,
+  );
 }
 
 /**

@@ -76,7 +76,26 @@ export interface ProjectSessionDeps {
 
 export function useProjectSession(d: ProjectSessionDeps) {
   const { lib, history, stacks, kept, quietDoc, docRef, projectRef, simsRef, pathRef, plotState, panesByKind, editor, doc, docKey, project, file, dirty, panes, activePane, plotName, mode } = d;
-  const { setPanes, setActivePane, setPlotName, setMode, setSim, setProjectState, setDirty, setFile, setSelection, setOfferView, setValueOffer, setHistoryOpen, setViewRun, setTool, setDocKey, setPath, setCurModel, setMessage } = d;
+  const {
+    setPanes,
+    setActivePane,
+    setPlotName,
+    setMode,
+    setSim,
+    setProjectState,
+    setDirty,
+    setFile,
+    setSelection,
+    setOfferView,
+    setValueOffer,
+    setHistoryOpen,
+    setViewRun,
+    setTool,
+    setDocKey,
+    setPath,
+    setCurModel,
+    setMessage,
+  } = d;
   const { snapshot, confirmDiscard, warnMissing } = d;
   /** Muestra la vista guardada de una simulación (o una vacía) */
   const showView = (v?: SimView) => {
@@ -184,7 +203,7 @@ export function useProjectSession(d: ProjectSessionDeps) {
     try {
       shared = await readShareHash(location.hash);
     } catch {
-      setMessage(t('The link doesn\'t contain a valid circuit'));
+      setMessage(t("The link doesn't contain a valid circuit"));
     }
     if (shared === undefined && !/[#&]c=/.test(location.hash)) return false;
     window.history.replaceState(null, '', location.pathname + location.search);

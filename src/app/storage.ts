@@ -16,7 +16,6 @@ export const lsSet = (k: string, v: string) => {
   }
 };
 
-
 export type Theme = 'auto' | 'light' | 'dark';
 
 /** Tema claro/oscuro elegido en la app (por defecto, el del sistema) */

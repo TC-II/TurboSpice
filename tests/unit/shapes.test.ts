@@ -10,15 +10,7 @@ import { arcAngles, resizeShape, shapeDist, shapeHandles, shapeInBox } from '../
 
 const lib = new Library(buildBundle());
 
-const ASC = [
-  'Version 4',
-  'SHEET 1 880 680',
-  'LINE Normal 0 0 64 0',
-  'RECTANGLE Normal 96 -32 192 32 2',
-  'CIRCLE Normal 224 -32 288 32',
-  'ARC Normal 320 -32 384 32 384 0 352 -32 1',
-  '',
-].join('\r\n');
+const ASC = ['Version 4', 'SHEET 1 880 680', 'LINE Normal 0 0 64 0', 'RECTANGLE Normal 96 -32 192 32 2', 'CIRCLE Normal 224 -32 288 32', 'ARC Normal 320 -32 384 32 384 0 352 -32 1', ''].join('\r\n');
 
 const shapeRefs = (n: number): ItemRef[] => Array.from({ length: n }, (_, index) => ({ kind: 'shape', index }));
 
@@ -113,7 +105,12 @@ describe('figuras de LTspice', () => {
 describe('cambiar el tamaño de una figura (#318)', () => {
   it('rectángulo: la esquina arrastrada sigue al cursor y la opuesta queda', () => {
     const r = { kind: 'RECTANGLE' as const, coords: [0, 0, 64, 32] };
-    expect(shapeHandles(r)).toEqual([{ x: 0, y: 0 }, { x: 64, y: 0 }, { x: 64, y: 32 }, { x: 0, y: 32 }]);
+    expect(shapeHandles(r)).toEqual([
+      { x: 0, y: 0 },
+      { x: 64, y: 0 },
+      { x: 64, y: 32 },
+      { x: 0, y: 32 },
+    ]);
     expect(resizeShape(r, 2, { x: 96, y: 48 })?.coords).toEqual([0, 0, 96, 48]);
     expect(resizeShape(r, 0, { x: 64, y: 16 })).toBeNull();
   });

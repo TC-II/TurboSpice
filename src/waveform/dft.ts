@@ -201,7 +201,7 @@ export const parseSi = parseDisplayNumber;
 export function niceAbove(x: number): number {
   if (!(x > 0) || !Number.isFinite(x)) return x;
   const p = 10 ** Math.floor(Math.log10(x));
-  return ([1, 2, 5, 10].map((m) => m * p).find((v) => v >= x * (1 - 1e-12)) ?? 10 * p);
+  return [1, 2, 5, 10].map((m) => m * p).find((v) => v >= x * (1 - 1e-12)) ?? 10 * p;
 }
 
 /**

@@ -18,19 +18,29 @@ const { buildSimulation } = await imp('src/sim/schematicSim.ts');
 const [file, out] = process.argv.slice(2);
 const r = { file, stage: 'parse' };
 const save = () => writeFileSync(out, JSON.stringify(r));
-process.on('uncaughtException', (e) => { r.exception = String(e?.stack ?? e).slice(0, 1500); save(); process.exit(0); });
+process.on('uncaughtException', (e) => {
+  r.exception = String(e?.stack ?? e).slice(0, 1500);
+  save();
+  process.exit(0);
+});
 
 globalThis.fetch = async (url) => {
   const rel = decodeURIComponent(String(url).replace(/^.*?library\/sub\//, ''));
   try {
     const b = readFileSync(join(ROOT, 'public', 'library', 'sub', rel));
     return { ok: true, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) };
-  } catch { return { ok: false }; }
+  } catch {
+    return { ok: false };
+  }
 };
 
 const text = decode(new Uint8Array(readFileSync(file))).text;
 const doc = parseAsc(text);
-const norm = (t) => t.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '').join('\n');
+const norm = (t) =>
+  t
+    .split(/\r\n|\r|\n/)
+    .filter((l) => l.trim() !== '')
+    .join('\n');
 r.roundtrip = norm(serializeAsc(doc)) === norm(text);
 
 const lib = new Library(buildBundle());
@@ -53,7 +63,11 @@ r.stage = 'netlist';
 const lt = ltNetlist(doc, lib);
 r.ltNet = ltNetlistText(lt);
 r.hasSim = doc.texts.some((t) => t.kind === 'directive' && /(^|\\n)\s*\.(tran|ac|dc|op|noise|tf)\b/i.test(t.text));
-if (!r.hasSim) { r.stage = 'done'; save(); process.exit(0); }
+if (!r.hasSim) {
+  r.stage = 'done';
+  save();
+  process.exit(0);
+}
 
 r.stage = 'build';
 const sim = await buildSimulation(doc, lib, basename(file));
@@ -61,12 +75,20 @@ r.ngNet = sim.netlist;
 if (process.env.DUMP) writeFileSync(process.env.DUMP, JSON.stringify({ netlist: sim.netlist, files: sim.files }));
 r.warnings = sim.warnings;
 r.tooBig = sim.tooBig;
-if (sim.tooBig.length) { r.stage = 'done'; save(); process.exit(0); }
+if (sim.tooBig.length) {
+  r.stage = 'done';
+  save();
+  process.exit(0);
+}
 
 r.stage = 'simulate';
 const DIST = join(ROOT, 'engine', 'dist-engine');
 const { default: factory } = await import(pathToFileURL(join(DIST, 'ngspice.mjs')).href);
-const codemodels = Object.fromEntries(readdirSync(DIST).filter((f) => f.endsWith('.cm')).map((f) => [f, new Uint8Array(readFileSync(join(DIST, f)))]));
+const codemodels = Object.fromEntries(
+  readdirSync(DIST)
+    .filter((f) => f.endsWith('.cm'))
+    .map((f) => [f, new Uint8Array(readFileSync(join(DIST, f)))]),
+);
 const ng = await Ngspice.create(factory, { spinit: readFileSync(join(DIST, 'spinit'), 'utf8'), codemodels });
 ng.writeFiles(sim.files);
 const t0 = Date.now();
@@ -75,7 +97,10 @@ if (process.env.TMAX) {
   // experimento: paso máximo como LTspice ≈ min(tstop/1024, T_sine/8.7)
   const { parseSpiceNumber, formatSpiceNumber } = await imp('src/netlist/spicenum.ts');
   let tmin = Infinity;
-  for (const m of netlist.matchAll(/SINE\s*\(\s*(\S+)\s+(\S+)\s+([^\s)]+)/gi)) { const f = parseSpiceNumber(m[3]); if (f > 0) tmin = Math.min(tmin, 1 / f); }
+  for (const m of netlist.matchAll(/SINE\s*\(\s*(\S+)\s+(\S+)\s+([^\s)]+)/gi)) {
+    const f = parseSpiceNumber(m[3]);
+    if (f > 0) tmin = Math.min(tmin, 1 / f);
+  }
   netlist = netlist.replace(/^\.tran\s+(.*)$/im, (l, a) => {
     const args = a.split(/\s+/);
     const nums = args.filter((x) => !/^[a-z]/i.test(x));
@@ -100,9 +125,16 @@ r.plots = res.plots.map((p) => ({
   vectors: p.vectors.map((v) => {
     const n = v.real.length;
     const step = Math.max(1, Math.floor(n / 4000));
-    const re = [], im = [];
-    for (let i = 0; i < n; i += step) { re.push(v.real[i]); if (v.imag) im.push(v.imag[i]); }
-    if ((n - 1) % step) { re.push(v.real[n - 1]); if (v.imag) im.push(v.imag[n - 1]); }
+    const re = [],
+      im = [];
+    for (let i = 0; i < n; i += step) {
+      re.push(v.real[i]);
+      if (v.imag) im.push(v.imag[i]);
+    }
+    if ((n - 1) % step) {
+      re.push(v.real[n - 1]);
+      if (v.imag) im.push(v.imag[n - 1]);
+    }
     return { name: v.name, re, im: v.imag ? im : undefined };
   }),
 }));

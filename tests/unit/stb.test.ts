@@ -118,4 +118,3 @@ describe('.stb', () => {
     expect(missing.text).not.toMatch(/\.control/);
   });
 });
-

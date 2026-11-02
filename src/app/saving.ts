@@ -78,11 +78,16 @@ export function savingActions({ dirty, setDirty, file, setFile, projectRef, setP
     try {
       // el proyecto se arma con el nombre que se eligió en el diálogo (Guardar como)
       let p: Project | undefined;
-      const r = await saveFile(async (chosen) => {
-        const tb = await turboBytes(chosen);
-        p = tb.p;
-        return tb.bytes;
-      }, name, file.handle, saveAs);
+      const r = await saveFile(
+        async (chosen) => {
+          const tb = await turboBytes(chosen);
+          p = tb.p;
+          return tb.bytes;
+        },
+        name,
+        file.handle,
+        saveAs,
+      );
       if (r && p) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, p);
     } catch (e) {
       setMessage(t('Could not save: {p0}', { p0: (e as Error).message }));

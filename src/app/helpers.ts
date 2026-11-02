@@ -12,8 +12,7 @@ export const ascText = (d: AscDoc) => {
   return tt;
 };
 
-export const isTyping = (e: KeyboardEvent) =>
-  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
+export const isTyping = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
 
 /** Registra un archivo del usuario en la librería (símbolo, modelos o bloque) */
 export function registerUserFile(lib: Library, f: UserFile) {

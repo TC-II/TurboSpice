@@ -51,25 +51,57 @@ describe('testbenches (#180)', () => {
   });
 
   it('el «Testbench N» por defecto de archivos viejos pasa a ser automático; los propios quedan', () => {
-    const old: Project = { ...newProject('P'), variants: [{ id: BENCHES, name: 'P', base: EMPTY_ASC, activeSim: 'x1', sims: [
-      { id: 'x1', name: 'Testbench 3', asc: asc('.tran 100m'), runs: [] },
-      { id: 'x2', name: 'Mi bode', asc: asc('.ac dec 10 100 100k'), runs: [] },
-    ] }] };
+    const old: Project = {
+      ...newProject('P'),
+      variants: [
+        {
+          id: BENCHES,
+          name: 'P',
+          base: EMPTY_ASC,
+          activeSim: 'x1',
+          sims: [
+            { id: 'x1', name: 'Testbench 3', asc: asc('.tran 100m'), runs: [] },
+            { id: 'x2', name: 'Mi bode', asc: asc('.ac dec 10 100 100k'), runs: [] },
+          ],
+        },
+      ],
+    };
     const p = asBenches({ ...old, variants: [{ ...old.variants[0], id: 'v' }], activeVariant: 'v' });
-    expect(p.variants[0].sims.map((s) => [s.name, simLabel(s)])).toEqual([[undefined, 'Tran 0 - 100m'], ['Mi bode', 'Mi bode']]);
+    expect(p.variants[0].sims.map((s) => [s.name, simLabel(s)])).toEqual([
+      [undefined, 'Tran 0 - 100m'],
+      ['Mi bode', 'Mi bode'],
+    ]);
     expect(isDefaultBenchName('Testbench 12')).toBe(true);
     expect(isDefaultBenchName('Testbench A')).toBe(false);
   });
 
   it('las variantes (versión 1) se aplanan: cada simulación es un testbench', () => {
-    const v = (id: string, name: string, sims: string[]) => ({ id, name, base: asc(''), activeSim: sims.length ? `${id}s1` : '', sims: sims.map((l, i) => ({ id: `${id}s${i}`, asc: asc(l), runs: [] })) });
+    const v = (id: string, name: string, sims: string[]) => ({
+      id,
+      name,
+      base: asc(''),
+      activeSim: sims.length ? `${id}s1` : '',
+      sims: sims.map((l, i) => ({ id: `${id}s${i}`, asc: asc(l), runs: [] })),
+    });
     // un proyecto de la versión 1 no tiene `groups` (asBenches lo crea)
-    const old: Omit<Project, 'groups'> = { name: 'P', created: 0, modified: 0, files: [], activeVariant: 'b', variants: [v('a', 'Pasabajos', ['.tran 10m', '.ac dec 10 1 1meg']), v('b', 'Pasaaltos', ['.op']), v('c', 'Vacía', [])] };
+    const old: Omit<Project, 'groups'> = {
+      name: 'P',
+      created: 0,
+      modified: 0,
+      files: [],
+      activeVariant: 'b',
+      variants: [v('a', 'Pasabajos', ['.tran 10m', '.ac dec 10 1 1meg']), v('b', 'Pasaaltos', ['.op']), v('c', 'Vacía', [])],
+    };
     const p = asBenches(old as Project);
     expect(p.variants).toHaveLength(1);
     expect(p.variants[0].id).toBe(BENCHES);
     // una variante con varias simulaciones es un grupo
-    expect(p.variants[0].sims.map((s) => [s.name, s.group])).toEqual([[undefined, 'g_a'], [undefined, 'g_a'], ['Pasaaltos', undefined], ['Vacía', undefined]]);
+    expect(p.variants[0].sims.map((s) => [s.name, s.group])).toEqual([
+      [undefined, 'g_a'],
+      [undefined, 'g_a'],
+      ['Pasaaltos', undefined],
+      ['Vacía', undefined],
+    ]);
     expect(p.groups).toEqual([{ id: 'g_a', name: 'Pasabajos' }]);
     // el activo es el de la variante activa
     expect(simOfActive(p)).toBe('bs0');
@@ -138,7 +170,10 @@ describe('corridas', () => {
     p = recordRun(p, id, asc('.ac dec 10 1 1meg'), 2000).project;
     expect(variantOf(p).sims[1].runs.map((r) => r.time)).toEqual([2000]);
     p = recordRun(p, id, asc('.ac dec 10 1 1meg', 2), 3000, '+W').project;
-    expect(variantOf(p).sims[1].runs.map((r) => [r.time, r.summary])).toEqual([[2000, undefined], [3000, '+W']]);
+    expect(variantOf(p).sims[1].runs.map((r) => [r.time, r.summary])).toEqual([
+      [2000, undefined],
+      [3000, '+W'],
+    ]);
   });
 });
 
@@ -154,7 +189,19 @@ describe('aviso de valores', () => {
   const withR = (value: string, line = '.tran 10m'): string =>
     serializeAsc({
       ...emptyDoc(),
-      symbols: [{ type: 'res', x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', 'R1'], ['Value', value]]) }],
+      symbols: [
+        {
+          type: 'res',
+          x: 0,
+          y: 0,
+          orient: 'R0',
+          windows: new Map(),
+          attrs: new Map([
+            ['InstName', 'R1'],
+            ['Value', value],
+          ]),
+        },
+      ],
       texts: [{ x: 0, y: 200, align: 'Left', size: 2, kind: 'directive', text: line }],
     });
   it('detecta el cambio, encuentra las otras simulaciones y lo aplica', () => {
@@ -198,7 +245,19 @@ describe('grupos y propagar valores (#180)', () => {
   const withR = (value: string, line: string): string =>
     serializeAsc({
       ...emptyDoc(),
-      symbols: [{ type: 'res', x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', 'R1'], ['Value', value]]) }],
+      symbols: [
+        {
+          type: 'res',
+          x: 0,
+          y: 0,
+          orient: 'R0',
+          windows: new Map(),
+          attrs: new Map([
+            ['InstName', 'R1'],
+            ['Value', value],
+          ]),
+        },
+      ],
       texts: [{ x: 0, y: 200, align: 'Left', size: 2, kind: 'directive', text: line }],
     });
   it('propaga sólo dentro del grupo y a los que tienen el componente', async () => {
@@ -212,14 +271,27 @@ describe('grupos y propagar valores (#180)', () => {
     const g = addGroup(p, 'Filtro');
     p = setBenchGroup(setBenchGroup(g.project, a, g.id), b.id, g.id);
     expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([b.id]);
-    p = propagateAttrs(p, [b.id], 'R1', 'res', new Map([['InstName', 'R1'], ['Value', '2k2']]));
+    p = propagateAttrs(
+      p,
+      [b.id],
+      'R1',
+      'res',
+      new Map([
+        ['InstName', 'R1'],
+        ['Value', '2k2'],
+      ]),
+    );
     const val = (id: string) => parseAsc(variantOf(p).sims.find((s) => s.id === id)!.asc).symbols[0].attrs.get('Value');
     expect([val(b.id), val(c.id)]).toEqual(['2k2', '1k']);
     // el último grupo no se saca; con otro, sus testbenches pasan a ése
     expect(removeGroup(p, g.id)).toBe(p);
     const h = addGroup(p, 'Otro');
     p = removeGroup(h.project, g.id);
-    expect(variantOf(p).sims.filter((s) => s.group === h.id).map((s) => s.id)).toEqual([a, b.id]);
+    expect(
+      variantOf(p)
+        .sims.filter((s) => s.group === h.id)
+        .map((s) => s.id),
+    ).toEqual([a, b.id]);
     expect(groupPeersWith(p, a, 'R1', 'res')).toEqual([b.id]);
   });
   it('placeBench: reordena dentro del grupo y mueve entre grupos (#218)', async () => {
@@ -243,7 +315,11 @@ describe('grupos y propagar valores (#180)', () => {
     expect(variantOf(p).sims.find((s) => s.id === a)!.group).toBe(g2.id);
     p = placeBench(p, b.id, g2.id, a);
     expect(order(p)).toEqual([c.id, b.id, a]);
-    expect(variantOf(p).sims.filter((s) => s.group === g2.id).map((s) => s.id)).toEqual([b.id, a]);
+    expect(
+      variantOf(p)
+        .sims.filter((s) => s.group === g2.id)
+        .map((s) => s.id),
+    ).toEqual([b.id, a]);
   });
   it('withGroups: todo testbench queda en un grupo (crea «Group 1» si no hay)', async () => {
     const { withGroups, addGroup } = await import('../../src/project/project.ts');
@@ -260,7 +336,10 @@ describe('grupos y propagar valores (#180)', () => {
   it('parámetros y variables del testbench', async () => {
     const { benchParams, benchVariables, setBenchParams } = await import('../../src/schematic/benchParams.ts');
     const d = parseAsc(withR('{R}', '.tran 1m\\n.param R=1k C=1n\\n.step param G list 1 2'));
-    expect(benchParams(d)).toEqual([['R', '1k'], ['C', '1n']]);
+    expect(benchParams(d)).toEqual([
+      ['R', '1k'],
+      ['C', '1n'],
+    ]);
     expect(benchVariables(d).map((v) => v.name)).toEqual(['G']);
     const e = setBenchParams(d, [['R', '2k']]);
     expect(benchParams(e)).toEqual([['R', '2k']]);

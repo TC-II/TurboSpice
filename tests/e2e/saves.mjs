@@ -88,10 +88,13 @@ check((await page.locator('svg.editor .symbols > g.hover').count()) === 1, 'pasa
 const n1 = await at(0, -16);
 await page.mouse.move(n1.x, n1.y);
 await frames(page);
-check(((await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.trim())).join() === 'V(N001)', `pasar sobre el cable resalta su fila (${(await panel.locator('.saves-row.hl').allTextContents()).join()})`);
+check(
+  (await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.trim()).join() === 'V(N001)',
+  `pasar sobre el cable resalta su fila (${(await panel.locator('.saves-row.hl').allTextContents()).join()})`,
+);
 await page.mouse.move(r1.x, r1.y);
 await frames(page);
-check(((await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.trim())).join() === 'I(R1)', 'y sobre R1, la suya');
+check((await panel.locator('.saves-row.hl').allTextContents()).map((s) => s.trim()).join() === 'I(R1)', 'y sobre R1, la suya');
 
 // --- al simular queda en gris y la punta de prueba grafica; un click en el panel lo reactiva ---
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
@@ -101,9 +104,15 @@ check((await panel.getAttribute('class')).includes('inactive'), 'al simular, el 
 const out2 = await at(272, -32);
 await page.mouse.click(out2.x, out2.y);
 await until(async () => (await page.locator('.trace-chip .name').count()) === 1);
-check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)' && (await checked()) === 2, `la punta de prueba grafica V(out) sin cambiar lo elegido (${(await page.locator('.trace-chip .name').allTextContents()).join()})`);
+check(
+  (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out)' && (await checked()) === 2,
+  `la punta de prueba grafica V(out) sin cambiar lo elegido (${(await page.locator('.trace-chip .name').allTextContents()).join()})`,
+);
 await panel.locator('.saves-title').click();
-check(!(await panel.getAttribute('class')).includes('inactive') && (await panel.locator('.saves-pick').getAttribute('aria-pressed')) === 'true', 'un click en el panel lo reactiva, eligiendo con la punta de prueba');
+check(
+  !(await panel.getAttribute('class')).includes('inactive') && (await panel.locator('.saves-pick').getAttribute('aria-pressed')) === 'true',
+  'un click en el panel lo reactiva, eligiendo con la punta de prueba',
+);
 await page.mouse.click(out2.x, out2.y);
 await until(async () => (await checked()) === 1);
 check(!(await row('V(out)').locator('input').isChecked()), 'y la punta vuelve a elegir (desmarca V(out))');
@@ -117,11 +126,27 @@ check((await panel.count()) === 0, 'la cruz cierra el panel');
 
 // --- #363: un transitorio frenado por memoria ofrece elegir; el panel dice cuántas entran y avisa
 // en rojo si se pasa ---
-const longAsc = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 16 80 16', 'WIRE 80 16 160 16', 'WIRE 0 96 80 96', 'WIRE 80 96 160 96', 'WIRE 160 80 160 96', 'FLAG 0 96 0',
-  'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
-  'SYMBOL res 64 0 R0', 'SYMATTR InstName R1', 'SYMATTR Value 1k',
-  'SYMBOL cap 144 16 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1n',
-  'TEXT 0 160 Left 2 !.tran 0 1.2'].join('\n') + '\n';
+const longAsc =
+  [
+    'Version 4',
+    'SHEET 1 880 680',
+    'WIRE 0 16 80 16',
+    'WIRE 80 16 160 16',
+    'WIRE 0 96 80 96',
+    'WIRE 80 96 160 96',
+    'WIRE 160 80 160 96',
+    'FLAG 0 96 0',
+    'SYMBOL voltage 0 0 R0',
+    'SYMATTR InstName V1',
+    'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
+    'SYMBOL res 64 0 R0',
+    'SYMATTR InstName R1',
+    'SYMATTR Value 1k',
+    'SYMBOL cap 144 16 R0',
+    'SYMATTR InstName C1',
+    'SYMATTR Value 1n',
+    'TEXT 0 160 Left 2 !.tran 0 1.2',
+  ].join('\n') + '\n';
 await page.evaluate((t) => {
   const dt = new DataTransfer();
   dt.items.add(new File([t], 'Largo.asc'));
@@ -134,7 +159,10 @@ await choose.waitFor({ timeout: 60000 });
 const fit = Number(/\d+/.exec(await choose.textContent())[0]);
 await choose.click();
 await panel.waitFor();
-check(await panel.getByRole('radio', { name: 'Sólo las señales elegidas' }).isChecked() && (await panel.locator('.saves-pick').getAttribute('aria-pressed')) === 'true', '«Elegir señales» abre el panel para elegir, con la punta de prueba');
+check(
+  (await panel.getByRole('radio', { name: 'Sólo las señales elegidas' }).isChecked()) && (await panel.locator('.saves-pick').getAttribute('aria-pressed')) === 'true',
+  '«Elegir señales» abre el panel para elegir, con la punta de prueba',
+);
 await row('I(C1)').waitFor();
 check((await checked()) === 0, 'sin nada marcado');
 check((await panel.locator('.saves-count').textContent()).startsWith(`0 elegidas de ${fit} como máximo`), `dice cuántas entran (${await panel.locator('.saves-count').textContent()})`);

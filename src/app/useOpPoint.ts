@@ -51,11 +51,7 @@ export function useOpPoint({ lvNow, sim, opPoint, doc, conn, lib, showOp, docKey
       }
       return undefined;
     }
-    return sim?.result.bias && sameCircuit(sim.doc, doc)
-      ? { built: sim.built, bias: sim.result.bias }
-      : opPoint && sameCircuit(opPoint.doc, doc)
-        ? opPoint
-        : undefined;
+    return sim?.result.bias && sameCircuit(sim.doc, doc) ? { built: sim.built, bias: sim.result.bias } : opPoint && sameCircuit(opPoint.doc, doc) ? opPoint : undefined;
   }, [sim, opPoint, doc, lvNow, scopeIn]);
   const bias = op?.bias;
   const describe = useMemo(() => {
@@ -86,46 +82,49 @@ export function useOpPoint({ lvNow, sim, opPoint, doc, conn, lib, showOp, docKey
     if (selection.length) setOpSel(undefined);
   }, [selection]);
   // los valores del OP con `all` (el botón OP) o sólo los elegidos a mano; Exportar los pide todos
-  const opAnnotations = useCallback((all: boolean): Annotation[] | undefined => {
-    if (!op || (!all && !opTags.pins.size && !opTags.moved.size)) return undefined;
-    const { built, bias, scope } = op;
-    const out: Annotation[] = [];
-    const shown = (target: OpPinTarget) => {
-      const key = opPinKey(target);
-      return opTagVisible(opTags, key, all) ? key : undefined;
-    };
-    const push = (a: Omit<Annotation, 'offset'>) => out.push({ ...a, offset: opTags.moved.get(a.key) });
-    for (const n of netNames(doc, conn, new Map())) {
-      const key = shown({ net: n.name });
-      if (!key) continue;
-      const b = scope ? scopedNetBias(bias, scope, n.name) : netBias(bias, n.name);
-      if (b?.short) push({ key, at: n.at, text: b.short, kind: 'v' });
-    }
-    for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
-      // transistores: la corriente de cada pin, junto al pin (como la punta de prueba en los demás análisis)
-      if (multiPinPrefix(el.prefix)) {
-        const s = doc.symbols[el.sym];
-        const def = s && lib.symbol(s.type);
-        if (!def) continue;
-        pinPoints(s, def).forEach((at, k) => {
-          const pin = Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1);
-          const key = shown({ symbol: el.sym, pin });
-          if (!key) return;
-          const text = pinBias(built, bias, el, pin, scope);
-          if (text) push({ key, at: { x: at.x + 4, y: at.y - 4 }, text, kind: 'i' });
-        });
-        continue;
+  const opAnnotations = useCallback(
+    (all: boolean): Annotation[] | undefined => {
+      if (!op || (!all && !opTags.pins.size && !opTags.moved.size)) return undefined;
+      const { built, bias, scope } = op;
+      const out: Annotation[] = [];
+      const shown = (target: OpPinTarget) => {
+        const key = opPinKey(target);
+        return opTagVisible(opTags, key, all) ? key : undefined;
+      };
+      const push = (a: Omit<Annotation, 'offset'>) => out.push({ ...a, offset: opTags.moved.get(a.key) });
+      for (const n of netNames(doc, conn, new Map())) {
+        const key = shown({ net: n.name });
+        if (!key) continue;
+        const b = scope ? scopedNetBias(bias, scope, n.name) : netBias(bias, n.name);
+        if (b?.short) push({ key, at: n.at, text: b.short, kind: 'v' });
       }
-      const key = /^[RLVIDQMJ]/i.test(el.prefix) ? shown({ symbol: el.sym }) : undefined;
-      if (!key) continue;
-      const b = elementBias(built, bias, el, scope);
-      const s = doc.symbols[el.sym];
-      if (!b?.short || !s) continue;
-      const box = symbolBox(s, lib.symbol(s.type), lib);
-      push({ key, at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
-    }
-    return out;
-  }, [opTags, op, doc, conn, lib]);
+      for (const el of scope ? scope.block.lt.elements : built.lt.elements) {
+        // transistores: la corriente de cada pin, junto al pin (como la punta de prueba en los demás análisis)
+        if (multiPinPrefix(el.prefix)) {
+          const s = doc.symbols[el.sym];
+          const def = s && lib.symbol(s.type);
+          if (!def) continue;
+          pinPoints(s, def).forEach((at, k) => {
+            const pin = Number(def.pins[k].attrs.get('SpiceOrder') ?? k + 1);
+            const key = shown({ symbol: el.sym, pin });
+            if (!key) return;
+            const text = pinBias(built, bias, el, pin, scope);
+            if (text) push({ key, at: { x: at.x + 4, y: at.y - 4 }, text, kind: 'i' });
+          });
+          continue;
+        }
+        const key = /^[RLVIDQMJ]/i.test(el.prefix) ? shown({ symbol: el.sym }) : undefined;
+        if (!key) continue;
+        const b = elementBias(built, bias, el, scope);
+        const s = doc.symbols[el.sym];
+        if (!b?.short || !s) continue;
+        const box = symbolBox(s, lib.symbol(s.type), lib);
+        push({ key, at: { x: box.x2 + 4, y: (box.y1 + box.y2) / 2 }, text: b.short, kind: 'i' });
+      }
+      return out;
+    },
+    [opTags, op, doc, conn, lib],
+  );
   const annotations = useMemo(() => opAnnotations(showOp), [opAnnotations, showOp]);
   return { simScope, op, bias, describe, setOpTags, opSel, setOpSel, opAnnotations, annotations };
 }

@@ -83,7 +83,11 @@ const GATES: Record<string, string> = {
 };
 
 /** Identificador de Verilog (también \escapado) → nombre de nodo válido en ngspice */
-const ident = (s: string) => s.replace(/^\\/, '').toLowerCase().replace(/[^a-z0-9_]/g, '_');
+const ident = (s: string) =>
+  s
+    .replace(/^\\/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '_');
 
 /** Módulo de más arriba: el que tiene el atributo top (hierarchy) o el único que hay */
 function topModule(json: YosysJson): [string, YosysModule] {
@@ -268,13 +272,7 @@ export function yosysToSubckt(json: YosysJson, source: string): HdlBlock {
  * eléctrica son los mismos que en un bloque sintetizado; d_cosim toma los bits de entrada, salida
  * e inout en ese orden, cada puerto del bit más significativo al menos.
  */
-export function cosimSubckt(
-  module: string,
-  ports: { name: string; dir: PinDir; bits: number }[],
-  params: Record<string, string>,
-  vvpFile: string,
-  source: string,
-): HdlBlock {
+export function cosimSubckt(module: string, ports: { name: string; dir: PinDir; bits: number }[], params: Record<string, string>, vvpFile: string, source: string): HdlBlock {
   const name = ident(module);
   const used = new Set<string>();
   const unique = (base: string) => {
@@ -310,7 +308,9 @@ export function cosimSubckt(
     '.model hdl_in bidi_bridge(direction=1 in_low={vil} in_high={vih} rise_delay=1e-12 fall_delay=1e-12)',
     ...(pins.some((p) => p.dir === 'out') ? ['.model hdl_dac dac_bridge(out_low={vol} out_high={voh} out_undef={(vol+voh)/2} t_rise={tr} t_fall={tf})'] : []),
     ...(pins.some((p) => p.dir === 'inout')
-      ? ['.model hdl_io bidi_bridge(direction=2 strength=1 in_low={vil} in_high={vih} out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf} rise_delay=1e-12 fall_delay=1e-12)']
+      ? [
+          '.model hdl_io bidi_bridge(direction=2 strength=1 in_low={vil} in_high={vih} out_low={vol} out_high={voh} drive_low={iol} drive_high={ioh} t_rise={tr} t_fall={tf} rise_delay=1e-12 fall_delay=1e-12)',
+        ]
       : []),
     // (ngspice pasa a minúsculas los textos de los parámetros: las rutas van en minúsculas)
     `.model hdl_cosim d_cosim(simulation="${lib}/ivlng.so" sim_args=["${vvpFile.toLowerCase()}"] lib_args=["${lib}/libvvp.so" "${lib}/ivlng"] delay={tpd})`,

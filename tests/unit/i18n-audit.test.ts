@@ -41,7 +41,11 @@ const inT = (n: ts.Node) => {
 // Vocabulario castellano: palabras de las traducciones que no aparecen en ningún texto en inglés
 const words = (x: string) => x.toLowerCase().match(/\p{L}{4,}/gu) ?? [];
 const enWords = new Set(Object.keys(es).flatMap(words));
-const esWords = new Set(Object.values(es).flatMap(words).filter((w) => !enWords.has(w)));
+const esWords = new Set(
+  Object.values(es)
+    .flatMap(words)
+    .filter((w) => !enWords.has(w)),
+);
 const spanish = (x: string) => /[áéíóúñ¿¡]/i.test(x) || words(x).some((w) => esWords.has(w));
 
 // Textos en castellano que no son de la interfaz: marcas del formato del .asc y del .control (se
@@ -53,7 +57,27 @@ const SPANISH_OK = [
   /^generation:/, // opciones de Icarus Verilog (-g…), no son de la interfaz
 ];
 // Textos de la interfaz que son iguales en los dos idiomas (siglas, unidades, sintaxis de SPICE)
-const SAME_IN_BOTH = new Set(['Turbo', 'Spice', 'TurboSpice', 'Netlist', 'ngspice', 'FFT', 'Log', 'Offset', 'Ton', 'Rser [Ω]', 'Rser', 'Ron', 'Roff', 'InstName', 'Cpar [F]', 'Cpar', 'Normal (tol = 3σ)', 'rad/s', 'A ⇄ B']);
+const SAME_IN_BOTH = new Set([
+  'Turbo',
+  'Spice',
+  'TurboSpice',
+  'Netlist',
+  'ngspice',
+  'FFT',
+  'Log',
+  'Offset',
+  'Ton',
+  'Rser [Ω]',
+  'Rser',
+  'Ron',
+  'Roff',
+  'InstName',
+  'Cpar [F]',
+  'Cpar',
+  'Normal (tol = 3σ)',
+  'rad/s',
+  'A ⇄ B',
+]);
 
 describe('idioma de la interfaz: sin mezclar inglés y español', () => {
   it('cada t("…") tiene su traducción en es.ts', () => {

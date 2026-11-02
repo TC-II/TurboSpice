@@ -14,7 +14,13 @@ export interface TraceBoxHandle {
   input(): HTMLInputElement | null;
 }
 
-export function TraceBox({ names, hints, onAdd, handle, onFocusChange }: {
+export function TraceBox({
+  names,
+  hints,
+  onAdd,
+  handle,
+  onFocusChange,
+}: {
   /** el foco entra o sale de la caja (con el foco, el esquemático está en modo punta de prueba, #341) */
   onFocusChange?(focused: boolean): void;
   /** nombres para autocompletar */
@@ -91,9 +97,11 @@ export function TraceBox({ names, hints, onAdd, handle, onFocusChange }: {
         {names.map((n) => (
           <option key={n} value={n} />
         ))}
-        {[...(hints ?? [])].filter(([n]) => !names.includes(n)).map(([n, label]) => (
-          <option key={n} value={n} label={label} />
-        ))}
+        {[...(hints ?? [])]
+          .filter(([n]) => !names.includes(n))
+          .map(([n, label]) => (
+            <option key={n} value={n} label={label} />
+          ))}
       </datalist>
       {error && <span className="hint warn">{error}</span>}
     </form>

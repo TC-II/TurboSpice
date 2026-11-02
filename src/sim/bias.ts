@@ -187,9 +187,7 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope
           `Vds,sat = ${derived ? 'Vgs − Vth = ' : ''}${fmt(vdsat, 'V')}`,
           `gm = ${fmt(p('gm'), 'S')}`,
           `gds = ${fmt(p('gds'), 'S')}`,
-          ...(vgs !== undefined && vds !== undefined && von !== undefined && vdsat !== undefined
-            ? [t('Region: {p0}', { p0: mosRegion(vgs, vds, von, vdsat, pol) })]
-            : []),
+          ...(vgs !== undefined && vds !== undefined && von !== undefined && vdsat !== undefined ? [t('Region: {p0}', { p0: mosRegion(vgs, vds, von, vdsat, pol) })] : []),
         ],
         short: fmt(p('id'), 'A'),
       };
@@ -197,7 +195,12 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope
     case 'j':
       return {
         title,
-        lines: [`Id = ${fmt(p('id'), 'A')}`, `Vgs = ${fmt(p('vgs'), 'V')}`, `Vds = ${fmt(p('vgs') !== undefined && p('vgd') !== undefined ? p('vgs') - p('vgd') : undefined, 'V')}`, `gm = ${fmt(p('gm'), 'S')}`],
+        lines: [
+          `Id = ${fmt(p('id'), 'A')}`,
+          `Vgs = ${fmt(p('vgs'), 'V')}`,
+          `Vds = ${fmt(p('vgs') !== undefined && p('vgd') !== undefined ? p('vgs') - p('vgd') : undefined, 'V')}`,
+          `gm = ${fmt(p('gm'), 'S')}`,
+        ],
         short: fmt(p('id'), 'A'),
       };
     default:

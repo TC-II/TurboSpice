@@ -58,7 +58,13 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
   const run = (b: BuiltSimulation) => {
     const lim = simLimits(!!streamPlan(b.netlist));
-    return engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: unlimited ? lim.full : lim.max, project: !unlimited });
+    return engine.simulate(b.netlist, b.files, {
+      bias: biasParams(b),
+      biasCommand: biasCommand(b.netlist).cmd,
+      digital: b.digitalSaves,
+      maxBytes: unlimited ? lim.full : lim.max,
+      project: !unlimited,
+    });
   };
   let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
   // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un

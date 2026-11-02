@@ -29,7 +29,12 @@ const wireKey = (w: Wire) => {
   const b = `${w.x2},${w.y2}`;
   return a < b ? `${a}|${b}` : `${b}|${a}`;
 };
-const attrsKey = (s: SymbolInst) => [...s.attrs].filter(([k]) => k !== 'InstName').map(([k, v]) => `${k}=${v}`).sort().join('\n');
+const attrsKey = (s: SymbolInst) =>
+  [...s.attrs]
+    .filter(([k]) => k !== 'InstName')
+    .map(([k, v]) => `${k}=${v}`)
+    .sort()
+    .join('\n');
 
 /** Multiconjunto: claves de `b` que no están en `a` (con sus índices) */
 function extra<T>(a: T[], b: T[], key: (x: T) => string): number[] {

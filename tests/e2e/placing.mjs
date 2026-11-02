@@ -52,7 +52,10 @@ await page.keyboard.press('Escape');
 // --- #65: I, O y U ---
 await page.keyboard.press('i');
 await page.mouse.move(mid.x + 8, mid.y);
-check((await ghost.locator('.sym text.win').allTextContents()).some((t) => /^I\d+$/.test(t)), 'I: fuente de corriente');
+check(
+  (await ghost.locator('.sym text.win').allTextContents()).some((t) => /^I\d+$/.test(t)),
+  'I: fuente de corriente',
+);
 await page.keyboard.press('Escape');
 for (const k of ['o', 'u']) {
   await page.keyboard.press(k);
@@ -96,15 +99,24 @@ for (const q of ['', 'res', 'zzzzqq', 'npn']) {
   await input.fill(q);
   tops.push((await input.boundingBox()).y);
 }
-check(tops.every((t) => t === tops[0]), `la caja de búsqueda no se mueve (${tops.join(', ')})`);
+check(
+  tops.every((t) => t === tops[0]),
+  `la caja de búsqueda no se mueve (${tops.join(', ')})`,
+);
 await page.keyboard.press('Escape');
 
 // --- #64: botón de figuras en la barra, después de Texto ---
-const names = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+const names = await page
+  .getByRole('toolbar', { name: 'Herramientas' })
+  .getByRole('button')
+  .evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(names.indexOf('Figuras') === names.indexOf('Texto') + 1 && names.indexOf('Directiva') === names.indexOf('Figuras') + 1, 'Figuras entre Texto y Directiva');
 await page.getByRole('button', { name: 'Figuras' }).click();
 const items = await page.getByRole('menu').getByRole('menuitem').allTextContents();
-check(['Línea', 'Rectángulo', 'Círculo', 'Arco', 'Estilo de línea'].every((l) => items.some((t) => t.includes(l))), `el menú tiene las figuras (${items.join(' | ')})`);
+check(
+  ['Línea', 'Rectángulo', 'Círculo', 'Arco', 'Estilo de línea'].every((l) => items.some((t) => t.includes(l))),
+  `el menú tiene las figuras (${items.join(' | ')})`,
+);
 await page.getByRole('menuitem', { name: /Círculo/ }).click();
 check((await svg.getAttribute('class')).includes('tool-shape'), 'elegir Círculo empieza a dibujarlo');
 

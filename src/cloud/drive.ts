@@ -167,13 +167,12 @@ export class DriveClient {
         body: JSON.stringify(meta),
       });
       const at = start.headers.get('Location');
-      if (!at) throw new Error(t('Google Drive: didn\'t say where to upload the file'));
+      if (!at) throw new Error(t("Google Drive: didn't say where to upload the file"));
       return this.file(at, { method: 'PUT', headers: { 'Content-Type': mime }, body: bytes as BlobPart });
     }
     const { body, contentType } = multipart(meta, bytes, undefined, mime);
     return this.file(`${target}?uploadType=multipart&fields=${FIELDS}`, { method, headers: { 'Content-Type': contentType }, body: body as BlobPart });
   }
-
 }
 
 /** Nombre que no choca con los de la carpeta: «x.asc», «x (2).asc»… (.turbo se respeta; sin extensión, .asc) */
@@ -189,10 +188,7 @@ export function uniqueName(name: string, taken: string[]): string {
 /** Cuerpo multipart/related (metadatos JSON + contenido) para las subidas de Drive */
 export function multipart(meta: object, bytes: Uint8Array, boundary = `turbospice${Math.random().toString(36).slice(2)}`, mime = ASC_MIME) {
   const enc = new TextEncoder();
-  const head = enc.encode(
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
-      `--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`,
-  );
+  const head = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` + `--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`);
   const tail = enc.encode(`\r\n--${boundary}--\r\n`);
   const body = new Uint8Array(head.length + bytes.length + tail.length);
   body.set(head, 0);

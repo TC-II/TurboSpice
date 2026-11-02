@@ -34,10 +34,12 @@ type BarField =
   /** casillas una debajo de la otra */
   | { kind: 'checks'; label: string; checks: Extract<BarField, { kind: 'check' }>[]; /** una al lado de la otra (si no, apiladas) */ inline?: boolean };
 
-const UIC_TITLE =
-  t('UIC (use initial conditions): doesn\'t compute the operating point. It starts with everything at 0 except the initial conditions (IC= on capacitors and inductors, .ic); sources are already at their value from t=0.');
-const STARTUP_TITLE =
-  t('startup (from LTspice): computes the operating point with the schematic\'s DC sources at 0 and brings them to their value in a 20 µs ramp. SINE, PULSE, PWL… sources and those inside subcircuits don\'t change. Useful to see sources, oscillators and PLLs starting up.');
+const UIC_TITLE = t(
+  "UIC (use initial conditions): doesn't compute the operating point. It starts with everything at 0 except the initial conditions (IC= on capacitors and inductors, .ic); sources are already at their value from t=0.",
+);
+const STARTUP_TITLE = t(
+  "startup (from LTspice): computes the operating point with the schematic's DC sources at 0 and brings them to their value in a 20 µs ramp. SINE, PULSE, PWL… sources and those inside subcircuits don't change. Useful to see sources, oscillators and PLLs starting up.",
+);
 
 const POINTS: Record<Sweep['type'], string> = { dec: t('Points/decade'), oct: t('Points/octave'), lin: t('Points') };
 
@@ -73,10 +75,10 @@ const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefine
   f.required && !f.value.trim()
     ? t('{what} is missing', { what: f.label })
     : f.notGround && f.value.trim() === '0'
-      ? t('{what} can\'t be ground (0): choose a node', { what: f.label })
-    : f.numeric && f.value.trim() && !isNum(f.value)
-      ? t('{what}: "{v}" isn\'t a number', { what: f.label, v: f.value })
-      : undefined;
+      ? t("{what} can't be ground (0): choose a node", { what: f.label })
+      : f.numeric && f.value.trim() && !isNum(f.value)
+        ? t('{what}: "{v}" isn\'t a number', { what: f.label, v: f.value })
+        : undefined;
 
 /** Campos de la barra por línea */
 function barRows(a: Analysis): BarField[][] {
@@ -123,10 +125,7 @@ function barRows(a: Analysis): BarField[][] {
       // en columnas (ver COLUMNS): fuente; salida y referencia; F start y F stop; barrido y puntos
       return [
         [text(t('Source'), a.src, (src) => ({ ...a, src }), { list: 'sources', required: true })],
-        [
-          text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }),
-          text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') }),
-        ],
+        [text(t('Output'), a.out, (out) => ({ ...a, out }), { list: 'nets', required: true }), text(t('Reference'), a.ref, (ref) => ({ ...a, ref }), { list: 'nets', placeholder: t('ground') })],
         ...sweepCols(a.sweep, (sweep) => ({ ...a, sweep })),
       ];
     }
@@ -142,17 +141,33 @@ function barRows(a: Analysis): BarField[][] {
     case 'pz':
       return [
         // en columnas (ver COLUMNS): entrada + y −, salida + y −, transferencia y qué calcular
-        [
-          text(t('Input +'), a.inP, (inP) => ({ ...a, inP }), { list: 'nets', required: true, notGround: true }),
-          text(t('Input −'), a.inN, (inN) => ({ ...a, inN }), { list: 'nets', required: true }),
-        ],
+        [text(t('Input +'), a.inP, (inP) => ({ ...a, inP }), { list: 'nets', required: true, notGround: true }), text(t('Input −'), a.inN, (inN) => ({ ...a, inN }), { list: 'nets', required: true })],
         [
           text(t('Output +'), a.outP, (outP) => ({ ...a, outP }), { list: 'nets', required: true, notGround: true }),
           text(t('Output −'), a.outN, (outN) => ({ ...a, outN }), { list: 'nets', required: true }),
         ],
         [
-          { kind: 'select', label: t('Transfer'), value: a.type, options: [['vol', 'V/V'], ['cur', 'V/I']], set: (type) => ({ ...a, type: type as 'vol' }) },
-          { kind: 'select', label: t('Compute'), value: a.which, options: [['pz', t('poles and zeros')], ['pol', t('poles')], ['zer', t('zeros')]], set: (which) => ({ ...a, which: which as 'pz' }) },
+          {
+            kind: 'select',
+            label: t('Transfer'),
+            value: a.type,
+            options: [
+              ['vol', 'V/V'],
+              ['cur', 'V/I'],
+            ],
+            set: (type) => ({ ...a, type: type as 'vol' }),
+          },
+          {
+            kind: 'select',
+            label: t('Compute'),
+            value: a.which,
+            options: [
+              ['pz', t('poles and zeros')],
+              ['pol', t('poles')],
+              ['zer', t('zeros')],
+            ],
+            set: (which) => ({ ...a, which: which as 'pz' }),
+          },
         ],
       ];
     case 'disto':
@@ -165,7 +180,16 @@ function barRows(a: Analysis): BarField[][] {
       return [
         [
           text(t('Loop probe'), a.probe, (probe) => ({ ...a, probe }), { list: 'probes', required: true, width: 6, explain: 'probe' }),
-          { kind: 'select', label: t('Method'), value: a.method, options: [['gft', 'GFT'], ['tian', 'Tian']], set: (method) => ({ ...a, method: method as StbMethod }) },
+          {
+            kind: 'select',
+            label: t('Method'),
+            value: a.method,
+            options: [
+              ['gft', 'GFT'],
+              ['tian', 'Tian'],
+            ],
+            set: (method) => ({ ...a, method: method as StbMethod }),
+          },
         ],
         ...(a.method === 'gft'
           ? [
@@ -195,7 +219,20 @@ export type SimState = 'idle' | 'running' | 'ok' | 'err';
 
 const STATE_TEXT: Record<SimState, string> = { idle: t('Not run'), running: t('Simulating…'), ok: t('Done'), err: 'Error' };
 
-export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCancel, control, pdk, onAllCorners, onStudio, onApply }: {
+export function SimBar({
+  sim,
+  info,
+  lib,
+  state,
+  stateDetail,
+  picker,
+  onPickCancel,
+  control,
+  pdk,
+  onAllCorners,
+  onStudio,
+  onApply,
+}: {
   /** para dibujar componentes en la ayuda (la LoopProbe) */
   lib?: Library;
   /** la simulación elegida (sin ninguna, la barra queda vacía hasta elegir un tipo) */
@@ -297,7 +334,11 @@ export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCance
           className="sb-pdk"
           role="radiogroup"
           aria-label={t('{pdk} corner', { pdk: pdk.name })}
-          title={pdk.fixed ? t('Set by the directive {line}', { line: pdk.fixed }) : t('Process corner of the {pdk} models: typical, fast or slow NMOS and PMOS (first letter NMOS, second PMOS)', { pdk: pdk.name })}
+          title={
+            pdk.fixed
+              ? t('Set by the directive {line}', { line: pdk.fixed })
+              : t('Process corner of the {pdk} models: typical, fast or slow NMOS and PMOS (first letter NMOS, second PMOS)', { pdk: pdk.name })
+          }
         >
           <span className="chip pdk-chip">{pdk.name}</span>
           {pdk.corners.map((c) => (
@@ -314,29 +355,50 @@ export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCance
             </button>
           ))}
           {onAllCorners && (
-            <button type="button" className="sb-pdk-all" title={t('Create one testbench per corner from this one')} aria-label={t('Create one testbench per corner from this one')} onClick={onAllCorners}>
+            <button
+              type="button"
+              className="sb-pdk-all"
+              title={t('Create one testbench per corner from this one')}
+              aria-label={t('Create one testbench per corner from this one')}
+              onClick={onAllCorners}
+            >
               {t('All')}
             </button>
           )}
         </div>
       )}
-      <datalist id="bar-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="bar-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="bar-probes">{(info.probes ?? []).map((p) => <option key={p.name} value={p.name} />)}</datalist>
-      {!sim ? (
-        <span className="sb-hint">{t('Select simulation type')}</span>
-      ) : null}
+      <datalist id="bar-nets">
+        {info.nets.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="bar-sources">
+        {info.sources.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="bar-probes">
+        {(info.probes ?? []).map((p) => (
+          <option key={p.name} value={p.name} />
+        ))}
+      </datalist>
+      {!sim ? <span className="sb-hint">{t('Select simulation type')}</span> : null}
       {sim && control !== undefined && (
         <span className="sb-complex">
           <button type="button" className="sb-studio" onClick={onStudio} aria-label={t('Open the Studio')} title={t('Complex simulation: click to open the Studio')}>
             <Icon name="study" size={16} /> {t('Complex simulation')}
           </button>
-          <pre className="sb-control-pop" role="tooltip">{control}</pre>
+          <pre className="sb-control-pop" role="tooltip">
+            {control}
+          </pre>
         </span>
       )}
       {sim && control === undefined && (
         // varias filas (DC, ruido…): en grilla, para que los cuadros queden alineados en columnas
-        <div className={draft && COLUMNS.has(draft.kind) ? 'sb-rows sb-cols' : gridCols ? 'sb-rows sb-grid' : 'sb-rows'} style={gridCols ? { gridTemplateColumns: `repeat(${gridCols}, auto auto)` } : undefined}>
+        <div
+          className={draft && COLUMNS.has(draft.kind) ? 'sb-rows sb-cols' : gridCols ? 'sb-rows sb-grid' : 'sb-rows'}
+          style={gridCols ? { gridTemplateColumns: `repeat(${gridCols}, auto auto)` } : undefined}
+        >
           {!draft && <code className="sb-line">{line}</code>}
           {draft && !rows.length && <span className="sb-hint">{draft.kind === 'op' ? t('Run and pick to inspect the nodes') : t('No parameters')}</span>}
           {rows.map((r, i) => (
@@ -358,61 +420,65 @@ export function SimBar({ sim, info, lib, state, stateDetail, picker, onPickCance
                   <label key={f.label} className="sb-field">
                     <span>{f.label}</span>
                     <span className="sb-box">
-                    <select value={f.value} aria-label={f.label} onChange={(e) => change(f.set(e.target.value))}>
-                      {f.options.map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                    {padPick(r) && <PickPad />}
+                      <select value={f.value} aria-label={f.label} onChange={(e) => change(f.set(e.target.value))}>
+                        {f.options.map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                      {padPick(r) && <PickPad />}
                     </span>
                   </label>
                 ) : (
                   <label key={f.label} className="sb-field">
                     <span>{f.label}</span>
-                    {withExplain(f,
-                    <span className="sb-box">
-                    <input
-                      value={f.value}
-                      aria-label={f.label}
-                      className={fieldProblem(f) ? 'missing' : undefined}
-                      // con globo explicativo, el título del navegador sobra
-                      title={f.explain && !f.value.trim() ? undefined : fieldProblem(f)}
-                      aria-invalid={!!fieldProblem(f) || undefined}
-                      placeholder={f.placeholder}
-                      spellCheck={false}
-                      size={f.width ?? 7}
-                      list={f.list && `bar-${f.list}`}
-                      onChange={(e) => setDraft(f.set(e.target.value.trim()))}
-                      // con el cursor en un campo de red o fuente se elige en el esquemático: un clic
-                      // ahí completa el campo, y también se puede escribir
-                      onFocus={() => f.list && pick(f)}
-                      onBlur={(e) => {
-                        apply();
-                        // el foco se fue a otro control (al hacer clic en el esquemático no hay otro)
-                        if (f.list && e.relatedTarget) onPickCancel?.();
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') apply();
-                        if (e.key === 'Escape') setDraft(parseAnalysis(line));
-                      }}
-                    />
-                    {/* como en el menú completo: elegir la red o la fuente en el esquemático */}
-                    {f.list && (
-                      <button
-                        type="button"
-                        className="pick-btn"
-                        title={f.list === 'nets' ? t('Pick the net on the schematic') : f.list === 'probes' ? t('Pick the loop probe on the schematic') : t('Pick the source on the schematic')}
-                        aria-label={t('Pick {label} on the schematic', { label: f.label })}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          pick(f);
-                        }}
-                      >
-                        ⌖
-                      </button>
+                    {withExplain(
+                      f,
+                      <span className="sb-box">
+                        <input
+                          value={f.value}
+                          aria-label={f.label}
+                          className={fieldProblem(f) ? 'missing' : undefined}
+                          // con globo explicativo, el título del navegador sobra
+                          title={f.explain && !f.value.trim() ? undefined : fieldProblem(f)}
+                          aria-invalid={!!fieldProblem(f) || undefined}
+                          placeholder={f.placeholder}
+                          spellCheck={false}
+                          size={f.width ?? 7}
+                          list={f.list && `bar-${f.list}`}
+                          onChange={(e) => setDraft(f.set(e.target.value.trim()))}
+                          // con el cursor en un campo de red o fuente se elige en el esquemático: un clic
+                          // ahí completa el campo, y también se puede escribir
+                          onFocus={() => f.list && pick(f)}
+                          onBlur={(e) => {
+                            apply();
+                            // el foco se fue a otro control (al hacer clic en el esquemático no hay otro)
+                            if (f.list && e.relatedTarget) onPickCancel?.();
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') apply();
+                            if (e.key === 'Escape') setDraft(parseAnalysis(line));
+                          }}
+                        />
+                        {/* como en el menú completo: elegir la red o la fuente en el esquemático */}
+                        {f.list && (
+                          <button
+                            type="button"
+                            className="pick-btn"
+                            title={f.list === 'nets' ? t('Pick the net on the schematic') : f.list === 'probes' ? t('Pick the loop probe on the schematic') : t('Pick the source on the schematic')}
+                            aria-label={t('Pick {label} on the schematic', { label: f.label })}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              pick(f);
+                            }}
+                          >
+                            ⌖
+                          </button>
+                        )}
+                        {!f.list && padPick(r) && <PickPad />}
+                      </span>,
                     )}
-                    {!f.list && padPick(r) && <PickPad />}
-                    </span>)}
                   </label>
                 ),
               )}

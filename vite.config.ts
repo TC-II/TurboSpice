@@ -16,8 +16,7 @@ const isDev = process.env.VITE_CHANNEL === 'dev' || (!process.env.CI && branch !
 // en dev el favicon también sale blanco, para distinguir la pestaña
 const devFavicon = {
   name: 'dev-favicon',
-  transformIndexHtml: (html: string) =>
-    isDev ? html.replace('favicon.svg?v=2', 'favicon-dev.svg') : html,
+  transformIndexHtml: (html: string) => (isDev ? html.replace('favicon.svg?v=2', 'favicon-dev.svg') : html),
 };
 
 // GitHub Pages sirve el sitio en /<repo>/

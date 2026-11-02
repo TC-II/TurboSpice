@@ -69,10 +69,22 @@ describe('escalas del visor', () => {
   it('alignScales: las dos escalas con la misma cantidad de divisiones y pasos lindos (#300)', () => {
     const nice = (v: number) => [1, 2, 2.5, 5].some((m) => Math.abs(v / 10 ** Math.floor(Math.log10(v)) - m) < 1e-9);
     const cases: [number, number][][] = [
-      [[-60, 3], [-180, 0]],
-      [[0, 1.2], [-0.003, 0.0045]],
-      [[-1.1, 1.1], [0, 270]],
-      [[12, 13], [-5e-6, 5e-6]],
+      [
+        [-60, 3],
+        [-180, 0],
+      ],
+      [
+        [0, 1.2],
+        [-0.003, 0.0045],
+      ],
+      [
+        [-1.1, 1.1],
+        [0, 270],
+      ],
+      [
+        [12, 13],
+        [-5e-6, 5e-6],
+      ],
     ];
     for (const [l, r] of cases) {
       const a = alignScales(l, r);

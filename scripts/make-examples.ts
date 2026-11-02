@@ -147,7 +147,15 @@ const inv: AscDoc = setVal(
     ...inv0,
     symbols: inv0.symbols.map((s) =>
       /OA_Ideal/i.test(s.type)
-        ? { ...s, type: 'OA_Sample', attrs: new Map([['InstName', 'U1'], ['Value', 'Avol=1Meg Vsat=5'], ['Value2', 'GBWP=10Meg']]) }
+        ? {
+            ...s,
+            type: 'OA_Sample',
+            attrs: new Map([
+              ['InstName', 'U1'],
+              ['Value', 'Avol=1Meg Vsat=5'],
+              ['Value2', 'GBWP=10Meg'],
+            ]),
+          }
         : s,
     ),
   },
@@ -181,7 +189,14 @@ p = renameSim(p, variantOf(p).activeSim, 'Amplifier');
 p = addSim(p, serializeAsc(setAnalysisLine(ce, '.op')), 'Bias point')!.project;
 p = selectSim(p, variantOf(p).sims[0].id);
 
-p = { ...p, activeVariant: p.variants[0].id, files: [{ name: 'OA_Sample.asy', kind: 'symbol', text: OA_ASY }, { name: 'OA_Sample.sub', kind: 'model', text: OA_SUB }] };
+p = {
+  ...p,
+  activeVariant: p.variants[0].id,
+  files: [
+    { name: 'OA_Sample.asy', kind: 'symbol', text: OA_ASY },
+    { name: 'OA_Sample.sub', kind: 'model', text: OA_SUB },
+  ],
+};
 const sample = await serializeTurbo({ ...p, created: t0, modified: t0 + 10800e3 });
 writeFileSync('public/examples/Sample Project.turbo', sample);
 console.log(`Sample Project.turbo: ${p.variants.length} variantes, ${p.variants.reduce((n, v) => n + v.sims.length, 0)} simulaciones, ${(sample.length / 1024).toFixed(1)} kB`);
@@ -243,14 +258,18 @@ const traces = (exprs: string[]) => exprs.map((expr, i) => ({ expr, color: COLOR
     return out;
   });
   const tf: Project = {
-    name: 'Transfer functions', created: t0, modified: t0, groups,
+    name: 'Transfer functions',
+    created: t0,
+    modified: t0,
+    groups,
     // el operacional de los pasatodo: sin polos (OA_Ideal tiene uno, que en el mapa de polos y
     // ceros aparece lejísimos y aplasta a los demás)
     files: [
       { name: 'OA_NoPole.asy', kind: 'symbol', text: readFileSync('examples/filters/OA_NoPole.asy', 'utf8') },
       { name: 'OA_NoPole.sub', kind: 'model', text: readFileSync('examples/filters/OA_NoPole.sub', 'utf8') },
     ],
-    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'Transfer functions', base: sims[0].asc, activeSim: sims[0].id, sims }],
+    activeVariant: BENCHES,
+    variants: [{ id: BENCHES, name: 'Transfer functions', base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
   const text = await serializeTurbo(tf);
   writeFileSync('public/examples/Transfer functions.turbo', text);
@@ -266,8 +285,13 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   { name: 'Common base / gate', file: 'cb', sine: 'SINE(0 10m 1k)' },
 ];
 {
-  const IN = '#2f9e44', BJT = '#1c7ed6', MOS = '#e8590c';
-  const outs = [{ expr: 'V(out_bjt)', color: BJT }, { expr: 'V(out_mos)', color: MOS }];
+  const IN = '#2f9e44',
+    BJT = '#1c7ed6',
+    MOS = '#e8590c';
+  const outs = [
+    { expr: 'V(out_bjt)', color: BJT },
+    { expr: 'V(out_mos)', color: MOS },
+  ];
   const groups = AMPS.map((a) => ({ id: newId('g'), name: a.name }));
   const sims: Sim[] = AMPS.flatMap((a, i) => {
     const base = parseAsc(readFileSync(`examples/transistors/${a.file}.asc`, 'utf8'));
@@ -275,9 +299,7 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     return [
       bench('Waveforms', setAnalysisLine(hideWaveValues(setVal(base, 'VIN', a.sine)), '.tran 5m'), {
         // (en el seguidor, la entrada junto a las salidas: se ve que la siguen)
-        ...(a.file === 'cc'
-          ? { panes: [{ traces: [{ expr: 'V(in)', color: IN }, ...outs] }], active: 0 }
-          : { panes: [{ traces: [{ expr: 'V(in)', color: IN }] }, { traces: outs }], active: 1 }),
+        ...(a.file === 'cc' ? { panes: [{ traces: [{ expr: 'V(in)', color: IN }, ...outs] }], active: 0 } : { panes: [{ traces: [{ expr: 'V(in)', color: IN }] }, { traces: outs }], active: 1 }),
         plot: 'tran1',
       }),
       bench('Frequency response', setAnalysisLine(base, '.ac dec 50 1 100Meg'), { panes: [{ traces: outs }], active: 0, plot: 'ac1', mode: 'bode' }),
@@ -285,8 +307,13 @@ const AMPS: { name: string; file: string; sine: string }[] = [
     ];
   });
   const amps: Project = {
-    name: 'Transistor amplifiers', created: t0, modified: t0, groups, files: [],
-    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'Transistor amplifiers', base: sims[0].asc, activeSim: sims[0].id, sims }],
+    name: 'Transistor amplifiers',
+    created: t0,
+    modified: t0,
+    groups,
+    files: [],
+    activeVariant: BENCHES,
+    variants: [{ id: BENCHES, name: 'Transistor amplifiers', base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
   const text = await serializeTurbo(amps);
   writeFileSync('public/examples/Transistor amplifiers.turbo', text);
@@ -321,7 +348,18 @@ const AMPS: { name: string; file: string; sine: string }[] = [
   const dnote = (d: AscDoc, lines: string[]) => note(d, lines, 1072);
   const lowCc = setVal(setVal(df, 'Cc1', '22p'), 'Cc2', '22p');
   const dmStep = (d: AscDoc) => step(step(d, 'Vp', 'PULSE(0 10m 0.5u 10n 10n 2u 4u) AC 0.5'), 'Vn', 'PULSE(0 -10m 0.5u 10n 10n 2u 4u) AC 0.5 180');
-  const TRAN = { panes: [{ traces: [{ expr: 'V(outp)', color: '#1c7ed6' }, { expr: 'V(outn)', color: '#e8590c' }] }], active: 0, plot: 'tran1' } as SimView;
+  const TRAN = {
+    panes: [
+      {
+        traces: [
+          { expr: 'V(outp)', color: '#1c7ed6' },
+          { expr: 'V(outn)', color: '#e8590c' },
+        ],
+      },
+    ],
+    active: 0,
+    plot: 'tran1',
+  } as SimView;
   const DF_NOTE = [
     'Two-stage fully differential amplifier: the pair Q1/Q2 with RC1/RC2, then the PNP common emitters Q5/Q6 with Miller compensation (Cc1, Cc2).',
     'Q1 drives Q5 and Q2 drives Q6, so each output is in phase with its own side: the feedback crosses (outn to Q1, outp to Q2, by net labels) through R2/R1 (gain -10).',
@@ -394,15 +432,59 @@ SYMATTR InstName B2
     bench(
       0,
       'GFT: G, G∞, G0 and R',
-      setAnalysisLine(note(se, ['Middlebrook\'s GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):', 'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.', 'It also gives the equivalent A-β model: β = 1/G∞ and A = G∞·(G∞·R + G0)/(G∞ - G0) (A = G∞·R without direct path), with T = -Aβ.']), '.stb LP1 dec 50 10 100meg gft V1 V(out)'),
-      { panes: [{ traces: [{ expr: 'R', color: '#1c7ed6' }] }, { traces: [{ expr: 'G', color: '#2f9e44' }, { expr: 'GINF', color: '#e8590c' }] }, { traces: [{ expr: 'A', color: '#7048e8' }, { expr: 'BETA', color: '#0c8599' }] }], active: 0, plot: 'stb1', mode: 'bode' },
+      setAnalysisLine(
+        note(se, [
+          "Middlebrook's GFT with input V1 and output V(out): it gives the asymptotic gain model G = G∞·R/(1+R) + G0/(1+R):",
+          'G (closed loop), G∞ (ideal, -R2/R1 = -1), G0 (direct path) and R (return ratio). The probe must be at the error point and the signal must enter by its arrow; check G∞ first.',
+          'It also gives the equivalent A-β model: β = 1/G∞ and A = G∞·(G∞·R + G0)/(G∞ - G0) (A = G∞·R without direct path), with T = -Aβ.',
+        ]),
+        '.stb LP1 dec 50 10 100meg gft V1 V(out)',
+      ),
+      {
+        panes: [
+          { traces: [{ expr: 'R', color: '#1c7ed6' }] },
+          {
+            traces: [
+              { expr: 'G', color: '#2f9e44' },
+              { expr: 'GINF', color: '#e8590c' },
+            ],
+          },
+          {
+            traces: [
+              { expr: 'A', color: '#7048e8' },
+              { expr: 'BETA', color: '#0c8599' },
+            ],
+          },
+        ],
+        active: 0,
+        plot: 'stb1',
+        mode: 'bode',
+      },
     ),
-    bench(0, 'Gain -10: more margin', setAnalysisLine(note(setVal(se, 'R2', '10k'), ['With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.']), '.stb LP1 dec 50 10 100meg'), STB),
-    bench(0, 'Step response', setAnalysisLine(note(step(se, 'V1', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 1'), ['The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.']), '.tran 20u'), {
-      panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }],
-      active: 0,
-      plot: 'tran1',
-    }),
+    bench(
+      0,
+      'Gain -10: more margin',
+      setAnalysisLine(
+        note(setVal(se, 'R2', '10k'), ['With R2 = 10k the feedback factor drops to 1/11: T crosses 0 dB lower, far from the 1 MHz pole, and the margin rises to about 54°.']),
+        '.stb LP1 dec 50 10 100meg',
+      ),
+      STB,
+    ),
+    bench(
+      0,
+      'Step response',
+      setAnalysisLine(
+        note(step(se, 'V1', 'PULSE(0 0.1 0 10n 10n 5u 10u) AC 1'), [
+          'The ringing of the step response is the 25° phase margin. The probe does not change the circuit: this is the same as without it.',
+        ]),
+        '.tran 20u',
+      ),
+      {
+        panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }],
+        active: 0,
+        plot: 'tran1',
+      },
+    ),
     bench(0, 'Closed-loop Bode', setAnalysisLine(se, '.ac dec 50 10 100meg'), { panes: [{ traces: [{ expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'ac1', mode: 'bode' }),
     bench(
       1,
@@ -420,35 +502,81 @@ SYMATTR InstName B2
     bench(
       1,
       'DM without enough Miller (Cc = 22p)',
-      setAnalysisLine(dnote(lowCc, ['With Cc1 = Cc2 = 22p the Miller capacitors no longer split the poles of the two stages: T_DM crosses 0 dB near 2 MHz with about 15° of margin.']), '.stb LP1 dec 50 10 100meg'),
+      setAnalysisLine(
+        dnote(lowCc, ['With Cc1 = Cc2 = 22p the Miller capacitors no longer split the poles of the two stages: T_DM crosses 0 dB near 2 MHz with about 15° of margin.']),
+        '.stb LP1 dec 50 10 100meg',
+      ),
       DSTB,
     ),
     bench(
       1,
       'CMFB loop alone (LoopProbe at cm)',
-      setAnalysisLine(dnote(df, ['LP2 breaks only the CMFB; the positive CM loop through R2 stays closed inside it and is unstable on its own (a pole in the right half-plane).', 'T starts near -180° and the app flags a right half-plane pole: the margins of this Bode plot do not apply. Look at the closed-loop poles, or measure with LP1 in CM (nested loops).']), '.stb LP2 dec 50 10 100meg'),
+      setAnalysisLine(
+        dnote(df, [
+          'LP2 breaks only the CMFB; the positive CM loop through R2 stays closed inside it and is unstable on its own (a pole in the right half-plane).',
+          'T starts near -180° and the app flags a right half-plane pole: the margins of this Bode plot do not apply. Look at the closed-loop poles, or measure with LP1 in CM (nested loops).',
+        ]),
+        '.stb LP2 dec 50 10 100meg',
+      ),
       STB,
     ),
     bench(1, 'Differential step', setAnalysisLine(dnote(dmStep(df), ['A ±10 mV differential step: the outputs move ∓100 mV with the small overshoot of a 58° margin.']), '.tran 4u'), TRAN),
-    bench(1, 'Differential step, Cc = 22p', setAnalysisLine(dnote(dmStep(lowCc), ['The same step with Cc = 22p: it rings at about 2 MHz, the crossover of T, with the 15° margin.']), '.tran 4u'), TRAN),
-    bench(1, 'Common-mode step (Vcm)', setAnalysisLine(dnote(step(df, 'Vcm', 'PULSE(0 10m 0.5u 10n 10n 2u 4u)'), ['A 10 mV step in Vcm, the CMFB reference: both outputs follow it together. The probes are transparent here.']), '.tran 4u'), TRAN),
+    bench(
+      1,
+      'Differential step, Cc = 22p',
+      setAnalysisLine(dnote(dmStep(lowCc), ['The same step with Cc = 22p: it rings at about 2 MHz, the crossover of T, with the 15° margin.']), '.tran 4u'),
+      TRAN,
+    ),
+    bench(
+      1,
+      'Common-mode step (Vcm)',
+      setAnalysisLine(
+        dnote(step(df, 'Vcm', 'PULSE(0 10m 0.5u 10n 10n 2u 4u)'), ['A 10 mV step in Vcm, the CMFB reference: both outputs follow it together. The probes are transparent here.']),
+        '.tran 4u',
+      ),
+      TRAN,
+    ),
     bench(2, 'LoopProbe: Tian and GFT', setAnalysisLine(note(inside(se), TIAN), '.stb LP1 dec 50 10 100meg'), STB),
     bench(2, 'Balun: differential and common mode', setAnalysisLine(note(inside(bal), BALUN, 320), '.tran 3m'), {
-      panes: [{ traces: [{ expr: 'V(p)', color: '#1c7ed6' }, { expr: 'V(n)', color: '#e8590c' }] }, { traces: [{ expr: 'V(d)', color: '#2f9e44' }, { expr: 'V(c)', color: '#ae3ec9' }] }],
+      panes: [
+        {
+          traces: [
+            { expr: 'V(p)', color: '#1c7ed6' },
+            { expr: 'V(n)', color: '#e8590c' },
+          ],
+        },
+        {
+          traces: [
+            { expr: 'V(d)', color: '#2f9e44' },
+            { expr: 'V(c)', color: '#ae3ec9' },
+          ],
+        },
+      ],
       active: 0,
       plot: 'tran1',
     }),
     bench(
       2,
       'LoopProbe_Dif by hand: DM',
-      setAnalysisLine(dnote(inside(byHand), ['LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn). Double-click any of them to see its circuit.', 'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.']), '.stb LPd dec 50 10 100meg'),
+      setAnalysisLine(
+        dnote(inside(byHand), [
+          'LP1 replaced by what it has inside (bottom): B1 splits (op, on) into d and c, LPd and LPc are in series in each mode and B2 joins them back into (outp, outn). Double-click any of them to see its circuit.',
+          'The .stb at LPd gives the same T as LP1 in DM (about 58°); at LPc, the same as LP1 in CM.',
+        ]),
+        '.stb LPd dec 50 10 100meg',
+      ),
       STB,
     ),
     bench(2, 'LoopProbe_Dif by hand: CM', setAnalysisLine(dnote(inside(byHand), ['The .stb at LPc: the same T as LP1 in CM (about 110°).']), '.stb LPc dec 50 10 100meg'), STB),
   ];
   const ls: Project = {
-    name: 'Loop stability', created: t0, modified: t0, groups, files: SUBS,
-    activeVariant: BENCHES, variants: [{ id: BENCHES, name: 'Loop stability', base: sims[0].asc, activeSim: sims[0].id, sims }],
+    name: 'Loop stability',
+    created: t0,
+    modified: t0,
+    groups,
+    files: SUBS,
+    activeVariant: BENCHES,
+    variants: [{ id: BENCHES, name: 'Loop stability', base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
   const text = await serializeTurbo(ls);
   writeFileSync('public/examples/Loop stability.turbo', text);
@@ -478,11 +606,27 @@ for (const pdk of [
     bench(1, 'Transfer curve (tt)', inv, vtc),
     bench(1, 'Transfer curve (ff)', corner(inv, 'ff'), vtc),
     bench(1, 'Transfer curve (ss)', corner(inv, 'ss'), vtc),
-    bench(1, 'Step response (tt)', pulse, { panes: [{ traces: [{ expr: 'V(in)', color: '#2f9e44' }, { expr: 'V(out)', color: '#1c7ed6' }] }], active: 0, plot: 'tran1' }),
+    bench(1, 'Step response (tt)', pulse, {
+      panes: [
+        {
+          traces: [
+            { expr: 'V(in)', color: '#2f9e44' },
+            { expr: 'V(out)', color: '#1c7ed6' },
+          ],
+        },
+      ],
+      active: 0,
+      plot: 'tran1',
+    }),
   ];
   const project: Project = {
-    name: pdk.name, created: t0, modified: t0, groups, files: [],
-    activeVariant: BENCHES, variants: [{ id: BENCHES, name: pdk.name, base: sims[0].asc, activeSim: sims[0].id, sims }],
+    name: pdk.name,
+    created: t0,
+    modified: t0,
+    groups,
+    files: [],
+    activeVariant: BENCHES,
+    variants: [{ id: BENCHES, name: pdk.name, base: sims[0].asc, activeSim: sims[0].id, sims }],
   };
   const text = await serializeTurbo(project);
   writeFileSync(`public/examples/${pdk.name}.turbo`, text);

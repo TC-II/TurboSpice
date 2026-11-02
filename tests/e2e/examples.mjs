@@ -38,9 +38,7 @@ for (const scheme of ['light', 'dark']) {
   }
 
   // Abortar una simulación larga
-  await page.locator('textarea').fill(
-    `* larga\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 1u\n.tran 10n 2\n.end`,
-  );
+  await page.locator('textarea').fill(`* larga\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 1u\n.tran 10n 2\n.end`);
   await page.getByRole('button', { name: 'Simular' }).click();
   await page.getByRole('button', { name: 'Abortar' }).click({ timeout: 5000 });
   await page.getByText('Simulación abortada').waitFor({ timeout: 5000 });

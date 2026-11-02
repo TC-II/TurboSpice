@@ -161,7 +161,10 @@ export function emptyDoc(): AscDoc {
  * En el archivo las rutas usan "\\\\" y los espacios se escapan como "\\ ".
  */
 export function baseName(type: string): string {
-  return symbolPath(type).split('/').pop()!.replace(/\.asy$/i, '');
+  return symbolPath(type)
+    .split('/')
+    .pop()!
+    .replace(/\.asy$/i, '');
 }
 
 /** Ruta del símbolo normalizada con "/": "TCLib\\\\Special\\\\74HCU04\\ Not" → "TCLib/Special/74HCU04 Not" */

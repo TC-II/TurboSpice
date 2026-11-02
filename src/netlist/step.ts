@@ -9,11 +9,7 @@
 import { formatSi, formatSpiceNumber, LTSPICE_PREFIXES, parseSpiceNumber } from './spicenum.ts';
 import { t } from '../i18n/i18n.ts';
 
-export type StepTarget =
-  | { kind: 'param'; name: string }
-  | { kind: 'source'; name: string }
-  | { kind: 'temp' }
-  | { kind: 'model'; model: string; param: string };
+export type StepTarget = { kind: 'param'; name: string } | { kind: 'source'; name: string } | { kind: 'temp' } | { kind: 'model'; model: string; param: string };
 
 export interface Step {
   target: StepTarget;
@@ -124,7 +120,7 @@ export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefin
     else if (tt.kind === 'model') body.push(`altermod ${tt.model.toLowerCase()} ${tt.param.toLowerCase()} = ${v}`);
     else if (tt.kind === 'source') {
       const n = ngName(tt.name);
-      if (!n) return t('source {name} doesn\'t exist', { name: tt.name });
+      if (!n) return t("source {name} doesn't exist", { name: tt.name });
       body.push(`alter ${n.toLowerCase()} dc = ${v}`);
     }
   }

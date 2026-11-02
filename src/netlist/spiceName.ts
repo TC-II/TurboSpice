@@ -33,7 +33,10 @@ export function spiceValue(s: string): string {
   let v = unescape(s).replace(/\$([^$]+)\$/g, (_, tex: string) => {
     let x = tex;
     for (const [re, to] of VALUE_TEX) x = x.replace(re, to);
-    return x.replace(/[{}]/g, '').replace(/\\([A-Za-z]+)/g, '$1').replace(/\s+/g, '');
+    return x
+      .replace(/[{}]/g, '')
+      .replace(/\\([A-Za-z]+)/g, '$1')
+      .replace(/\s+/g, '');
   });
   v = v.replace(/Ω/g, '');
   return v;

@@ -7,7 +7,14 @@ import { Icon } from '../ui/icons.tsx';
 import type { Expanded } from '../ui/ResultsSplitter.tsx';
 import type { Theme } from './storage.ts';
 
-export function AppBarRight({ slot, theme, setTheme, switchLang, exporting, doShare }: {
+export function AppBarRight({
+  slot,
+  theme,
+  setTheme,
+  switchLang,
+  exporting,
+  doShare,
+}: {
   slot: HTMLElement;
   theme: Theme;
   setTheme(tt: Theme): void;
@@ -26,25 +33,30 @@ export function AppBarRight({ slot, theme, setTheme, switchLang, exporting, doSh
         <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
         {theme === 'auto' && <span className="auto">A</span>}
       </button>
-      <button
-        className="lang-btn"
-        aria-label={t('Change language')}
-        title={t('Language: English · Spanish (the page reloads; your work is kept)')}
-        onClick={switchLang}
-      >
+      <button className="lang-btn" aria-label={t('Change language')} title={t('Language: English · Spanish (the page reloads; your work is kept)')} onClick={switchLang}>
         <span className={getLang() === 'en' ? 'on' : ''}>EN</span>
         <span className={getLang() === 'es' ? 'on' : ''}>ES</span>
       </button>
-      {!exporting && <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
-        <Icon name="share" />
-        <span className="txt">{t('Share')}</span>
-      </button>}
+      {!exporting && (
+        <button className="share-btn" aria-label={t('Share')} title={t('Copy a link that opens this circuit')} onClick={doShare}>
+          <Icon name="share" />
+          <span className="txt">{t('Share')}</span>
+        </button>
+      )}
     </>,
     slot,
   );
 }
 
-export function ViewTabs({ slot, hasSim, schematicShown, resultsShown, setExpanded, resultsSide, setSide }: {
+export function ViewTabs({
+  slot,
+  hasSim,
+  schematicShown,
+  resultsShown,
+  setExpanded,
+  resultsSide,
+  setSide,
+}: {
   slot: HTMLElement;
   /** hay resultados */
   hasSim: boolean;
@@ -92,13 +104,22 @@ export function ViewTabs({ slot, hasSim, schematicShown, resultsShown, setExpand
   // el mismo ancho) para que el botón no cambie de tamaño al presionarlo
   const viewAct = (shown: boolean, enabled: boolean) => {
     const on = enabled && !(shown && !viewsBoth);
-    return <span className={on ? 'view-act' : 'view-act idle'} aria-hidden="true">{on && <Icon name={shown ? 'close' : 'caret'} size={12} />}</span>;
+    return (
+      <span className={on ? 'view-act' : 'view-act idle'} aria-hidden="true">
+        {on && <Icon name={shown ? 'close' : 'caret'} size={12} />}
+      </span>
+    );
   };
   return createPortal(
     <>
       {/* vistas: con las dos prendidas, pantalla partida */}
       <nav className="tabs view-tabs" aria-label={t('Views')} ref={viewTabs}>
-        <button className={viewCls(schematicShown)} aria-pressed={schematicShown} onClick={showSchematicView} title={!hasSim ? t('Schematic') : viewsBoth ? t('Close the schematic (the results stay full screen)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}>
+        <button
+          className={viewCls(schematicShown)}
+          aria-pressed={schematicShown}
+          onClick={showSchematicView}
+          title={!hasSim ? t('Schematic') : viewsBoth ? t('Close the schematic (the results stay full screen)') : schematicShown ? t('Schematic') : t('Add the schematic in split screen (Ctrl+0)')}
+        >
           {t('Schematic')}
           {viewAct(schematicShown, true)}
         </button>
@@ -107,7 +128,15 @@ export function ViewTabs({ slot, hasSim, schematicShown, resultsShown, setExpand
           aria-pressed={resultsShown}
           disabled={!hasSim}
           onClick={showResultsView}
-          title={!hasSim ? t('No results yet: simulate first') : viewsBoth ? t('Close the results (the schematic stays full screen)') : resultsShown ? t('Results') : t('Add the results in split screen (Ctrl+0)')}
+          title={
+            !hasSim
+              ? t('No results yet: simulate first')
+              : viewsBoth
+                ? t('Close the results (the schematic stays full screen)')
+                : resultsShown
+                  ? t('Results')
+                  : t('Add the results in split screen (Ctrl+0)')
+          }
         >
           {t('Results')}
           {viewAct(resultsShown, hasSim)}

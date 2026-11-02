@@ -31,7 +31,13 @@ describe('panel de DFT (#236)', async () => {
   const { paneCurves } = await import('../../src/waveform/curves.ts');
   const { asPlotView } = await import('../../src/waveform/view.ts');
   const { x, y } = sig((v) => Math.sin(2 * Math.PI * 1000 * v));
-  const plot = { name: 'tran1', vectors: [{ name: 'time', type: 1, real: x }, { name: 'v(out)', type: 3, real: y }] } as never;
+  const plot = {
+    name: 'tran1',
+    vectors: [
+      { name: 'time', type: 1, real: x },
+      { name: 'v(out)', type: 3, real: y },
+    ],
+  } as never;
   const resolver = () => (fn: string, args: string[]) => (fn.toLowerCase() === 'v' && args[0] === 'out' ? { re: y } : null);
   const ctx = { plot, runs: [plot], labels: new Map(), resolver, mode: 'bode' as const };
 
@@ -47,24 +53,53 @@ describe('panel de DFT (#236)', async () => {
   });
 
   it('vistas de #245: el espectro del panel pasa a sus trazas', () => {
-    const v = asPlotView({ tran: [{ traces: [{ expr: 'V(out)' }], fft: { window: 'hamming', from: 1e-3, to: 2e-3 } }, { traces: [], fft: { window: 'x' } }] });
+    const v = asPlotView({
+      tran: [
+        { traces: [{ expr: 'V(out)' }], fft: { window: 'hamming', from: 1e-3, to: 2e-3 } },
+        { traces: [], fft: { window: 'x' } },
+      ],
+    });
     expect(v?.tran[0].traces[0].dft).toEqual({ window: 'hamming', from: 1e-3, to: 2e-3 });
     expect(v?.tran[0].fft).toBeUndefined();
     expect(v?.tran[1]).toEqual({ traces: [] });
   });
 
   it('la ventana y el rango de cada traza se guardan con la vista (#260)', () => {
-    const tran = [{ traces: [{ expr: 'V(out)', dft: { window: 'hann' } }, { expr: 'V(out)', dft: { window: 'flattop', from: 1e-3, to: 2e-3 } }, { expr: 'V(in)', dft: { window: 'nope' } }] }];
+    const tran = [
+      {
+        traces: [
+          { expr: 'V(out)', dft: { window: 'hann' } },
+          { expr: 'V(out)', dft: { window: 'flattop', from: 1e-3, to: 2e-3 } },
+          { expr: 'V(in)', dft: { window: 'nope' } },
+        ],
+      },
+    ];
     const v = asPlotView(JSON.parse(JSON.stringify({ tran })));
     expect(v?.tran[0].traces.map((x) => x.dft)).toEqual([{ window: 'hann' }, { window: 'flattop', from: 1e-3, to: 2e-3 }, undefined]);
   });
 
   it('dos DFT de la misma señal con distinta ventana en un panel: dos curvas y dos nombres (#260)', () => {
-    const d = paneCurves({ traces: [{ expr: 'V(out)', dft: { window: 'hann' } }, { expr: 'V(out)', dft: { window: 'rect' } }] }, ctx);
+    const d = paneCurves(
+      {
+        traces: [
+          { expr: 'V(out)', dft: { window: 'hann' } },
+          { expr: 'V(out)', dft: { window: 'rect' } },
+        ],
+      },
+      ctx,
+    );
     expect(d.curves.map((c) => c.label)).toEqual(['V(out)-Hann', 'V(out)-Rec']);
     expect(d.curves[0].y).not.toEqual(d.curves[1].y);
     // con otro rango, la segunda se lleva a la grilla de frecuencias de la primera
-    const r = paneCurves({ traces: [{ expr: 'V(out)', dft: { window: 'hann' } }, { expr: 'V(out)', dft: { window: 'hann', from: 10e-3, to: 20e-3 } }] }, ctx);
+    const r = paneCurves(
+      {
+        traces: [
+          { expr: 'V(out)', dft: { window: 'hann' } },
+          { expr: 'V(out)', dft: { window: 'hann', from: 10e-3, to: 20e-3 } },
+        ],
+      },
+      ctx,
+    );
     expect(r.curves[1].y.length).toBe(r.x.length);
     expect(r.curves[1].label).toMatch(/^V\(out\)-Hann 10(\.0+)?ms…20(\.0+)?ms$/);
   });
@@ -73,7 +108,15 @@ describe('panel de DFT (#236)', async () => {
     const { spectrum } = await import('../../src/waveform/dft.ts');
     const a = spectrum(x, y, { window: 'hann' }).freq;
     const b = spectrum(x, y, { window: 'hann', from: 10e-3, to: 12e-3 }).freq;
-    const r = paneCurves({ traces: [{ expr: 'V(out)', dft: { window: 'hann', from: 10e-3, to: 12e-3 } }, { expr: 'V(out)', dft: { window: 'hann' } }] }, ctx);
+    const r = paneCurves(
+      {
+        traces: [
+          { expr: 'V(out)', dft: { window: 'hann', from: 10e-3, to: 12e-3 } },
+          { expr: 'V(out)', dft: { window: 'hann' } },
+        ],
+      },
+      ctx,
+    );
     const top = Math.max(a[a.length - 1], b[b.length - 1]);
     const low = Math.min(a[a.length - 1], b[b.length - 1]);
     expect(r.x[r.x.length - 1]).toBe(top);
@@ -259,7 +302,17 @@ describe('vista guardada de la DFT', async () => {
   const { asPlotView, sameDft } = await import('../../src/waveform/view.ts');
   const { traceLabel } = await import('../../src/waveform/curves.ts');
   it('las vistas de antes (fft) se leen como DFT, y la frecuencia de muestreo se guarda', () => {
-    const v = asPlotView({ tran: [{ traces: [{ expr: 'V(out)', fft: { window: 'hann', from: 1e-3 } }, { expr: 'V(out)', dft: { window: 'rect', fs: 1e6 } }, { expr: 'V(a)', dft: { window: 'rect', fs: -1 } }] }] });
+    const v = asPlotView({
+      tran: [
+        {
+          traces: [
+            { expr: 'V(out)', fft: { window: 'hann', from: 1e-3 } },
+            { expr: 'V(out)', dft: { window: 'rect', fs: 1e6 } },
+            { expr: 'V(a)', dft: { window: 'rect', fs: -1 } },
+          ],
+        },
+      ],
+    });
     expect(v?.tran[0].traces.map((x) => x.dft)).toEqual([{ window: 'hann', from: 1e-3 }, { window: 'rect', fs: 1e6 }, { window: 'rect' }]);
   });
   it('otra frecuencia de muestreo es otra DFT, y su nombre lo dice', () => {

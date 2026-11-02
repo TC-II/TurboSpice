@@ -61,7 +61,38 @@ const loadCollapsed = (): Set<string> => {
   }
 };
 
-export function ProjectTree({ benches, groups, activeBench, subs, current, peek, edgeOnly = false, onBench, onTestbench, onBenchItem, onNewBench, onNewGroup, onGroupAction, onRenameGroup, onMoveBench, onBenchAction, onRenameBench, onOpen, onNew, onNewModel, onNewVerilog, onRename, onDelete, onUpdateSymbol, onExport, onExportNetlist, onToUser, onImport, onLeave, onEnter }: {
+export function ProjectTree({
+  benches,
+  groups,
+  activeBench,
+  subs,
+  current,
+  peek,
+  edgeOnly = false,
+  onBench,
+  onTestbench,
+  onBenchItem,
+  onNewBench,
+  onNewGroup,
+  onGroupAction,
+  onRenameGroup,
+  onMoveBench,
+  onBenchAction,
+  onRenameBench,
+  onOpen,
+  onNew,
+  onNewModel,
+  onNewVerilog,
+  onRename,
+  onDelete,
+  onUpdateSymbol,
+  onExport,
+  onExportNetlist,
+  onToUser,
+  onImport,
+  onLeave,
+  onEnter,
+}: {
   project: string;
   benches: TreeBench[];
   groups: { id: string; name: string }[];
@@ -222,7 +253,12 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
           onDragEnd={() => (setDragging(''), setDropOn(null), setInsertAt(null))}
           title={t('Drag it to reorder it, or onto a workbench to move it')}
         >
-          <button className="tree-caret" onClick={() => toggleIn(setOpenBench, b.id)} aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })} aria-expanded={open}>
+          <button
+            className="tree-caret"
+            onClick={() => toggleIn(setOpenBench, b.id)}
+            aria-label={open ? t('Collapse {name}', { name: b.name }) : t('Expand {name}', { name: b.name })}
+            aria-expanded={open}
+          >
             {open ? '▾' : '▸'}
           </button>
           {renaming === `b:${b.id}` ? (
@@ -241,15 +277,28 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
             </button>
           )}
           <span className="tree-actions">
-            <button onClick={() => setRenaming(`b:${b.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>✎</button>
+            <button onClick={() => setRenaming(`b:${b.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>
+              ✎
+            </button>
             <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
               <Icon name="copy" size={13} />
             </button>
-            <button onClick={() => onBenchAction(b.id, 'delete')} disabled={benches.length === 1} title={benches.length > 1 ? t('Delete') : t('It\'s the only testbench')} aria-label={t('Delete {name}', { name: b.name })}>
+            <button
+              onClick={() => onBenchAction(b.id, 'delete')}
+              disabled={benches.length === 1}
+              title={benches.length > 1 ? t('Delete') : t("It's the only testbench")}
+              aria-label={t('Delete {name}', { name: b.name })}
+            >
               <Icon name="trash" size={13} />
             </button>
           </span>
-          <button className={`tree-runs${b.runs ? '' : ' none'}`} onClick={() => onBenchItem(b.id, 'history')} disabled={!b.runs} title={b.runs ? t('Run history') : t('No runs yet')} aria-label={t('Run history of {name}', { name: b.name })}>
+          <button
+            className={`tree-runs${b.runs ? '' : ' none'}`}
+            onClick={() => onBenchItem(b.id, 'history')}
+            disabled={!b.runs}
+            title={b.runs ? t('Run history') : t('No runs yet')}
+            aria-label={t('Run history of {name}', { name: b.name })}
+          >
             <Icon name="clock" size={13} />
             {b.runs > 0 && <span>{b.runs}</span>}
           </button>
@@ -266,7 +315,12 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
             <li>
               <div className="tree-row tree-sub">
                 {nVars > 0 ? (
-                  <button className="tree-caret" onClick={() => toggleIn(setOpenParams, b.id)} aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })} aria-expanded={pOpen}>
+                  <button
+                    className="tree-caret"
+                    onClick={() => toggleIn(setOpenParams, b.id)}
+                    aria-label={pOpen ? t('Collapse {name}', { name: t('Parameters and variables') }) : t('Expand {name}', { name: t('Parameters and variables') })}
+                    aria-expanded={pOpen}
+                  >
                     {pOpen ? '▾' : '▸'}
                   </button>
                 ) : (
@@ -336,24 +390,32 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
           {!s.uses.length ? t('not used') : s.uses.length === 1 ? t('used in 1') : t('used in {n}', { n: s.uses.length })}
         </button>
         <span className="tree-actions">
-          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>✎</button>
-          {(!s.type || s.type === 'model') && <>
-          <button
-            onClick={() => onExport(s.name)}
-            title={s.type === 'model' ? t('Export (.zip with its .lib and .asy, for LTspice or another project)') : t('Export (.zip with its .asc and .asy, for LTspice or another project)')}
-            aria-label={t('Export {name}', { name: s.name })}
-          >
-            ⤓
+          <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>
+            ✎
           </button>
-          {!s.type && (
-            <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
-              .sub
-            </button>
+          {(!s.type || s.type === 'model') && (
+            <>
+              <button
+                onClick={() => onExport(s.name)}
+                title={s.type === 'model' ? t('Export (.zip with its .lib and .asy, for LTspice or another project)') : t('Export (.zip with its .asc and .asy, for LTspice or another project)')}
+                aria-label={t('Export {name}', { name: s.name })}
+              >
+                ⤓
+              </button>
+              {!s.type && (
+                <button onClick={() => onExportNetlist(s.name)} title={t('Export as a .sub netlist (to share it as a text subcircuit)')} aria-label={t('Export {name} as .sub', { name: s.name })}>
+                  .sub
+                </button>
+              )}
+              <button
+                onClick={() => onToUser(s.name)}
+                title={t('Copy to My symbols and models (to use it in other projects)')}
+                aria-label={t('Copy {name} to My symbols and models', { name: s.name })}
+              >
+                ☆
+              </button>
+            </>
           )}
-          <button onClick={() => onToUser(s.name)} title={t('Copy to My symbols and models (to use it in other projects)')} aria-label={t('Copy {name} to My symbols and models', { name: s.name })}>
-            ☆
-          </button>
-          </>}
           <button onClick={() => onDelete(s.name)} title={t('Delete')} aria-label={t('Delete {name}', { name: s.name })}>
             <Icon name="trash" size={13} />
           </button>
@@ -370,7 +432,10 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
       ))}
       {s.outdated && (
         <div className="tree-warn" style={{ paddingLeft: 24 + depth * 14 }}>
-          {t('The ports changed.')} <button className="link" onClick={() => onUpdateSymbol(s.name)}>{t('Update symbol')}</button>
+          {t('The ports changed.')}{' '}
+          <button className="link" onClick={() => onUpdateSymbol(s.name)}>
+            {t('Update symbol')}
+          </button>
         </div>
       )}
       {usesOf === s.name && (
@@ -401,7 +466,15 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
     </li>
   );
   return (
-    <aside className={`project-tree${peek ? ' peek' : ''}${edgeOnly ? ' collapsed' : ''}`} aria-label={t('Project')} aria-hidden={edgeOnly || undefined} onMouseEnter={onEnter} onMouseLeave={onLeave} onKeyDown={onKey} ref={treeRef}>
+    <aside
+      className={`project-tree${peek ? ' peek' : ''}${edgeOnly ? ' collapsed' : ''}`}
+      aria-label={t('Project')}
+      aria-hidden={edgeOnly || undefined}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onKeyDown={onKey}
+      ref={treeRef}
+    >
       <ul className="tree-branch tree-groups">
         {groups.map((g, gi) => {
           const fold = collapsed.has(g.id);
@@ -409,7 +482,12 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
           return (
             <li key={g.id} className={pathClass(gi, activeGi)}>
               <div className={`tree-row tree-group${dropOn === g.id ? ' drop' : ''}`} {...drop(g.id)}>
-                <button className="tree-caret" onClick={() => toggleGroup(g.id)} aria-label={fold ? t('Expand {name}', { name: g.name }) : t('Collapse {name}', { name: g.name })} aria-expanded={!fold}>
+                <button
+                  className="tree-caret"
+                  onClick={() => toggleGroup(g.id)}
+                  aria-label={fold ? t('Expand {name}', { name: g.name }) : t('Collapse {name}', { name: g.name })}
+                  aria-expanded={!fold}
+                >
                   {fold ? '▸' : '▾'}
                 </button>
                 {renaming === `g:${g.id}` ? (
@@ -429,8 +507,15 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
                   </button>
                 )}
                 <span className="tree-actions">
-                  <button onClick={() => setRenaming(`g:${g.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>✎</button>
-                  <button onClick={() => onGroupAction(g.id)} disabled={groups.length < 2} title={groups.length > 1 ? t('Delete the workbench (its testbenches stay)') : t('A project always has at least one workbench')} aria-label={t('Delete {name}', { name: g.name })}>
+                  <button onClick={() => setRenaming(`g:${g.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>
+                    ✎
+                  </button>
+                  <button
+                    onClick={() => onGroupAction(g.id)}
+                    disabled={groups.length < 2}
+                    title={groups.length > 1 ? t('Delete the workbench (its testbenches stay)') : t('A project always has at least one workbench')}
+                    aria-label={t('Delete {name}', { name: g.name })}
+                  >
                     <Icon name="trash" size={13} />
                   </button>
                 </span>
@@ -462,18 +547,41 @@ export function ProjectTree({ benches, groups, activeBench, subs, current, peek,
               </button>
               {newMenu && (
                 <span className="tree-menu" role="menu">
-                  {([
-                    ['subckt', onNew],
-                    ['model', onNewModel],
-                    ['verilog', onNewVerilog],
-                  ] as const).map(([k, fn]) => fn && (
-                    <button key={k} role="menuitem" onClick={() => { setNewMenu(false); fn(); }} title={KIND[k].title()}>
-                      <span className="tree-glyph">{KIND[k].glyph}</span> {KIND[k].name()}
-                    </button>
-                  ))}
+                  {(
+                    [
+                      ['subckt', onNew],
+                      ['model', onNewModel],
+                      ['verilog', onNewVerilog],
+                    ] as const
+                  ).map(
+                    ([k, fn]) =>
+                      fn && (
+                        <button
+                          key={k}
+                          role="menuitem"
+                          onClick={() => {
+                            setNewMenu(false);
+                            fn();
+                          }}
+                          title={KIND[k].title()}
+                        >
+                          <span className="tree-glyph">{KIND[k].glyph}</span> {KIND[k].name()}
+                        </button>
+                      ),
+                  )}
                   <span className="tree-menu-sep" role="separator" />
                   {/* importar: qué acepta y adónde va cada cosa, a la vista (no sólo en el título) */}
-                  <button role="menuitem" className="tree-menu-import" onClick={() => { setNewMenu(false); onImport(); }} title={t('An .asc becomes a subcircuit here (with its .asy, or a generated symbol); .lib, .sub and other netlists go to the project files and their .subckt and .model are used from Component…; a .zip can bring all of them')}>
+                  <button
+                    role="menuitem"
+                    className="tree-menu-import"
+                    onClick={() => {
+                      setNewMenu(false);
+                      onImport();
+                    }}
+                    title={t(
+                      'An .asc becomes a subcircuit here (with its .asy, or a generated symbol); .lib, .sub and other netlists go to the project files and their .subckt and .model are used from Component…; a .zip can bring all of them',
+                    )}
+                  >
                     <span className="tree-glyph">⇪</span>
                     <span>
                       {t('Import files…')}
@@ -542,7 +650,14 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
 }
 
 /** Pide un nombre (reemplaza a prompt(), que no existe en todos los navegadores) */
-export function NameDialog({ title, label, initial, check, onOk, onClose }: {
+export function NameDialog({
+  title,
+  label,
+  initial,
+  check,
+  onOk,
+  onClose,
+}: {
   title: string;
   label: string;
   initial: string;
@@ -573,8 +688,12 @@ export function NameDialog({ title, label, initial, check, onOk, onClose }: {
         </label>
         {err && <p className="err-text">{err}</p>}
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary" disabled={!name.trim() || !!err}>{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary" disabled={!name.trim() || !!err}>
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>
@@ -582,7 +701,14 @@ export function NameDialog({ title, label, initial, check, onOk, onClose }: {
 }
 
 /** Parámetros (.param) y variables (.step) de un testbench (#180) */
-export function BenchParamsDialog({ bench, params, variables, onApply, onStudy, onClose }: {
+export function BenchParamsDialog({
+  bench,
+  params,
+  variables,
+  onApply,
+  onStudy,
+  onClose,
+}: {
   bench: string;
   params: [string, string][];
   variables: { name: string; line: string }[];
@@ -611,7 +737,13 @@ export function BenchParamsDialog({ bench, params, variables, onApply, onStudy, 
                 </td>
                 <td>=</td>
                 <td>
-                  <input value={v} placeholder={t('value')} aria-label={t('Value of {name}', { name: k })} spellCheck={false} onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))} />
+                  <input
+                    value={v}
+                    placeholder={t('value')}
+                    aria-label={t('Value of {name}', { name: k })}
+                    spellCheck={false}
+                    onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))}
+                  />
                 </td>
                 <td>
                   <button type="button" className="icon-x" aria-label={t('Remove {name}', { name: k })} onClick={() => setRows(rows.filter((_, j) => j !== i))}>
@@ -642,8 +774,12 @@ export function BenchParamsDialog({ bench, params, variables, onApply, onStudy, 
         </button>
         {bad && <p className="err-text">{t('Each parameter needs a valid name and a value')}</p>}
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary" disabled={bad}>{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary" disabled={bad}>
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>

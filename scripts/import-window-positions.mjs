@@ -21,9 +21,7 @@ const out = {};
 for (const [name, byOrient] of Object.entries(table).sort(([a], [b]) => a.localeCompare(b))) {
   const o = (out[name.toLowerCase()] = {});
   for (const [orient, wins] of Object.entries(byOrient)) {
-    o[orient] = Object.fromEntries(
-      Object.entries(wins).map(([i, w]) => [i, [w.ox, w.oy, w.align, typeof w.fontSize === 'number' ? w.fontSize : 2]]),
-    );
+    o[orient] = Object.fromEntries(Object.entries(wins).map(([i, w]) => [i, [w.ox, w.oy, w.align, typeof w.fontSize === 'number' ? w.fontSize : 2]]));
   }
 }
 writeFileSync(join(ROOT, 'library', 'window-positions.json'), `${JSON.stringify(out, null, 1)}\n`);

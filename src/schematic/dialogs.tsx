@@ -48,7 +48,14 @@ const MODAL_MARGIN = 16;
  * alto (otra pestaña, más o menos resultados) crecen o se achican hacia abajo, y sólo suben lo
  * necesario si dejarían de entrar (#67).
  */
-export function Modal({ title, children, onClose, wide, large, hidden }: {
+export function Modal({
+  title,
+  children,
+  onClose,
+  wide,
+  large,
+  hidden,
+}: {
   title: string;
   children: ReactNode;
   onClose(): void;
@@ -88,11 +95,7 @@ export function Modal({ title, children, onClose, wide, large, hidden }: {
     return () => window.removeEventListener('keydown', k);
   }, [onClose, hidden]);
   return (
-    <div
-      className={`modal-backdrop${hidden ? ' picking' : ''}`}
-      style={top !== null ? { paddingTop: top } : undefined}
-      onPointerDown={(e) => e.target === e.currentTarget && onClose()}
-    >
+    <div className={`modal-backdrop${hidden ? ' picking' : ''}`} style={top !== null ? { paddingTop: top } : undefined} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
         <h2>{title}</h2>
         {children}
@@ -169,7 +172,14 @@ export function pickerItems(paths: string[], dir: string, query: string, descOf:
       .sort((a, b) => a.rank - b.rank || a.i - b.i)
       .map((x) => sym(x.p));
   const inside = paths.filter((p) => p.startsWith(prefix));
-  const dirs = [...new Set(inside.map((p) => p.slice(prefix.length)).filter((r) => r.includes('/')).map((r) => prefix + r.split('/')[0]))];
+  const dirs = [
+    ...new Set(
+      inside
+        .map((p) => p.slice(prefix.length))
+        .filter((r) => r.includes('/'))
+        .map((r) => prefix + r.split('/')[0]),
+    ),
+  ];
   const loose = inside.filter((p) => !p.slice(prefix.length).includes('/'));
   const nested = visible.filter((p) => p.startsWith(prefix) && p.slice(prefix.length).includes('/'));
   // las carpetas ocultas van al fondo de la lista
@@ -179,7 +189,15 @@ export function pickerItems(paths: string[], dir: string, query: string, descOf:
 }
 
 /** Una fila del explorador; memo: al mover el mouse sólo se redibujan las dos que cambian */
-const PickerRow = memo(function PickerRow({ it, index, active, dir, lib, onEnter, onChoose }: {
+const PickerRow = memo(function PickerRow({
+  it,
+  index,
+  active,
+  dir,
+  lib,
+  onEnter,
+  onChoose,
+}: {
   it: PickerItem;
   index: number;
   active: boolean;
@@ -190,18 +208,30 @@ const PickerRow = memo(function PickerRow({ it, index, active, dir, lib, onEnter
 }) {
   const name = (p: string) => p.split('/').pop() ?? p;
   // carpeta relativa a la que se está viendo (para los que están más abajo)
-  const sub = it.kind === 'sym' ? it.path.slice(dir ? dir.length + 1 : 0).split('/').slice(0, -1).join('/') : '';
+  const sub =
+    it.kind === 'sym'
+      ? it.path
+          .slice(dir ? dir.length + 1 : 0)
+          .split('/')
+          .slice(0, -1)
+          .join('/')
+      : '';
   return (
     <li className={`${active ? 'active' : ''}${it.kind !== 'sym' ? ' folder' : ''}`} onPointerEnter={() => onEnter(index)} onClick={() => onChoose(it)}>
       {it.kind === 'sym' ? (
         <>
           <SymbolPreview path={it.path} lib={lib} className="thumb" />
           <span className="path">{name(it.path)}</span>
-          <span className="desc">{sub ? `${sub} · ` : ''}{it.desc}</span>
+          <span className="desc">
+            {sub ? `${sub} · ` : ''}
+            {it.desc}
+          </span>
         </>
       ) : (
         <>
-          <span className="thumb folder-icon"><Icon name="open" size={22} /></span>
+          <span className="thumb folder-icon">
+            <Icon name="open" size={22} />
+          </span>
           <span className="path">{it.kind === 'up' ? '..' : name(it.path)}</span>
           <span className="desc">{it.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
         </>
@@ -241,60 +271,68 @@ export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick
   return (
     // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
     <>
-    <Modal title={t('Component')} onClose={onClose} wide hidden={!!legacy}>
-      {(dir === LEGACY_OPAMPS || dir.startsWith(`${LEGACY_OPAMPS}/`)) && (
-        <p className="hint warn picker-legacy">
-          {t('These are the SPICE default OpAmps, kept for compatibility: they have no model. For new designs use the TCLib OpAmps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
-          <button type="button" className="link" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>
-        </p>
-      )}
-      <div className="picker">
-        <div className="picker-list">
-          <input
-            ref={input}
-            placeholder={t('Search (e.g. res, cap, OA_Ideal, npn)…')}
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setSel(0);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'ArrowDown') setSel((s) => Math.min(s + 1, items.length - 1));
-              if (e.key === 'ArrowUp') setSel((s) => Math.max(s - 1, 0));
-              if (e.key === 'Enter' && current) choose(current);
-              if (e.key === 'Backspace' && !q && dir) up();
-            }}
-          />
-          {dir && !q && <div className="picker-dir">{dir}</div>}
-          <ul ref={list}>
-            {items.map((it, i) => (
-              <PickerRow key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`} it={it} index={i} active={it === current} dir={dir} lib={lib} onEnter={setSel} onChoose={choose} />
-            ))}
-          </ul>
+      <Modal title={t('Component')} onClose={onClose} wide hidden={!!legacy}>
+        {(dir === LEGACY_OPAMPS || dir.startsWith(`${LEGACY_OPAMPS}/`)) && (
+          <p className="hint warn picker-legacy">
+            {t('These are the SPICE default OpAmps, kept for compatibility: they have no model. For new designs use the TCLib OpAmps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
+            <button type="button" className="link" onClick={() => onPick(LEGACY_ALT)}>
+              {t('Use OA_Ideal')}
+            </button>
+          </p>
+        )}
+        <div className="picker">
+          <div className="picker-list">
+            <input
+              ref={input}
+              placeholder={t('Search (e.g. res, cap, OA_Ideal, npn)…')}
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setSel(0);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') setSel((s) => Math.min(s + 1, items.length - 1));
+                if (e.key === 'ArrowUp') setSel((s) => Math.max(s - 1, 0));
+                if (e.key === 'Enter' && current) choose(current);
+                if (e.key === 'Backspace' && !q && dir) up();
+              }}
+            />
+            {dir && !q && <div className="picker-dir">{dir}</div>}
+            <ul ref={list}>
+              {items.map((it, i) => (
+                <PickerRow key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`} it={it} index={i} active={it === current} dir={dir} lib={lib} onEnter={setSel} onChoose={choose} />
+              ))}
+            </ul>
+          </div>
+          <div className="picker-preview">
+            {current?.kind !== 'sym' && <div className="big" />}
+            {current?.kind === 'sym' && (
+              <>
+                <SymbolPreview path={current.path} lib={lib} className="big" />
+                <strong>{current.path}</strong>
+                <p>{current.desc}</p>
+              </>
+            )}
+          </div>
         </div>
-        <div className="picker-preview">
-          {current?.kind !== 'sym' && <div className="big" />}
-          {current?.kind === 'sym' && (
-            <>
-              <SymbolPreview path={current.path} lib={lib} className="big" />
-              <strong>{current.path}</strong>
-              <p>{current.desc}</p>
-            </>
+      </Modal>
+      {legacy && (
+        <SlideConfirm
+          title={t('{name} has no model', { name: legacy.split('/').pop() ?? legacy })}
+          message={t(
+            'This OpAmp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib OpAmps.',
           )}
-        </div>
-      </div>
-    </Modal>
-    {legacy && (
-      <SlideConfirm
-        title={t('{name} has no model', { name: legacy.split('/').pop() ?? legacy })}
-        message={t('This OpAmp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib OpAmps.')}
-        action={t('Slide to use it anyway')}
-        releaseLabel={t('Release to use it')}
-        extra={<button className="primary" onClick={() => onPick(LEGACY_ALT)}>{t('Use OA_Ideal')}</button>}
-        onConfirm={() => onPick(legacy)}
-        onClose={() => setLegacy(null)}
-      />
-    )}
+          action={t('Slide to use it anyway')}
+          releaseLabel={t('Release to use it')}
+          extra={
+            <button className="primary" onClick={() => onPick(LEGACY_ALT)}>
+              {t('Use OA_Ideal')}
+            </button>
+          }
+          onConfirm={() => onPick(legacy)}
+          onClose={() => setLegacy(null)}
+        />
+      )}
     </>
   );
 }
@@ -311,8 +349,7 @@ interface LabelRow {
   moved: boolean;
 }
 
-const sameWin = (a: TextWindow | undefined, b: TextWindow | undefined) =>
-  !!a && !!b && a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;
+const sameWin = (a: TextWindow | undefined, b: TextWindow | undefined) => !!a && !!b && a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;
 
 /** Rótulos del componente que muestran un atributo (InstName, Value…), en orden de WINDOW */
 export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: WindowDefaults): LabelRow[] {
@@ -336,7 +373,16 @@ export function labelRows(inst: SymbolInst, def: SymbolDef | undefined, table: W
 const PASSIVE_KINDS = new Set(['res', 'cap', 'ind', 'bead']);
 
 /** Atributos de un componente y, a la derecha de cada uno, si su rótulo se ve en el esquemático */
-export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, onApply, onSweep, onClose }: {
+export function AttributeDialog({
+  inst,
+  def,
+  windowDefaults,
+  focusLabel,
+  parts,
+  onApply,
+  onSweep,
+  onClose,
+}: {
   /** barrer un parámetro de un subcircuito desde el Estudio (#180) */
   onSweep?(param: string, value: string, attrs: Record<string, string>): void;
   inst: SymbolInst;
@@ -350,9 +396,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
-  const keys = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2'].filter(
-    (k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine',
-  );
+  const keys = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2'].filter((k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine');
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
   const [rows, setRows] = useState(() => labelRows(inst, def, windowDefaults));
   const [patches, setPatches] = useState(new Map<number, LabelPatch>());
@@ -423,10 +467,15 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
     if (!passive) return true;
     if (picked) return true;
     const line = eff.get('SpiceLine') ?? '';
-    return !!line && !!parts?.some((g) => g.parts.some((p) => {
-      const a = cmpApply(p);
-      return a.SpiceLine === line && a.Value.toLowerCase() === (eff.get('Value') ?? '').toLowerCase();
-    }));
+    return (
+      !!line &&
+      !!parts?.some((g) =>
+        g.parts.some((p) => {
+          const a = cmpApply(p);
+          return a.SpiceLine === line && a.Value.toLowerCase() === (eff.get('Value') ?? '').toLowerCase();
+        }),
+      )
+    );
   });
   const table = !!parts?.length && <PartTable groups={parts} autoFocus={searchFirst} selected={picked} onPick={pick} onPickAndAccept={(p) => submit(pick(p))} />;
   const submit = (from = vals) => {
@@ -471,55 +520,57 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
             <small className="hint">{t('Default values come from the subcircuit; a value can be an expression like {G}.')}</small>
           </fieldset>
         )}
-        {keys.filter((k) => !(defaults.length && k === 'SpiceLine')).map((k) => {
-          const row = rows.find((r) => r.attr === k);
-          const field = (
-            <label key={k} className="attr-row">
-              <span>{k}</span>
-              <input
-                ref={k === focusAttr ? first : undefined}
-                value={vals[k]}
-                spellCheck={false}
-                onChange={(e) => (k === 'SpiceLine' ? setLine(e.target.value) : setVals({ ...vals, [k]: e.target.value }), k === 'Value' && setPicked(undefined))}
-              />
-              {k === 'SpiceLine' && !row && lineAt ? (
+        {keys
+          .filter((k) => !(defaults.length && k === 'SpiceLine'))
+          .map((k) => {
+            const row = rows.find((r) => r.attr === k);
+            const field = (
+              <label key={k} className="attr-row">
+                <span>{k}</span>
                 <input
-                  type="checkbox"
-                  className="attr-vis"
-                  checked={lineShown}
-                  title={t('Visible on the schematic')}
-                  aria-label={t('{k} visible on the schematic', { k })}
-                  onChange={(e) => ((lineTouched.current = true), showLine(e.target.checked))}
+                  ref={k === focusAttr ? first : undefined}
+                  value={vals[k]}
+                  spellCheck={false}
+                  onChange={(e) => (k === 'SpiceLine' ? setLine(e.target.value) : setVals({ ...vals, [k]: e.target.value }), k === 'Value' && setPicked(undefined))}
                 />
-              ) : row ? (
-                <input
-                  type="checkbox"
-                  className="attr-vis"
-                  checked={row.visible}
-                  title={t('Visible on the schematic')}
-                  aria-label={t('{k} visible on the schematic', { k })}
-                  onChange={(e) => setVisible(row.win, e.target.checked)}
-                />
-              ) : (
-                <span className="attr-vis" />
-              )}
-              {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
-            </label>
-          );
-          // capacitor e inductor: la condición inicial va justo después del valor
-          if (k !== 'Value' || !icUnit) return field;
-          return (
-            <Fragment key={k}>
-              {field}
-              <label className="attr-row">
-                <span title={t('Generates IC= on the SPICE line: the initial {what} of the transient', { what: icUnit === 'V' ? t('voltage') : t('current') })}>{t('Initial condition')}</span>
-                <input value={icVal} spellCheck={false} placeholder={t('none ({u})', { u: icUnit })} onChange={(e) => setIc(e.target.value)} />
-                <span className="attr-vis" />
-                <small className="hint">{t('Initial {what} for .tran (IC=), in {u}.', { what: icUnit === 'V' ? t('voltage') : t('current'), u: icUnit })}</small>
+                {k === 'SpiceLine' && !row && lineAt ? (
+                  <input
+                    type="checkbox"
+                    className="attr-vis"
+                    checked={lineShown}
+                    title={t('Visible on the schematic')}
+                    aria-label={t('{k} visible on the schematic', { k })}
+                    onChange={(e) => ((lineTouched.current = true), showLine(e.target.checked))}
+                  />
+                ) : row ? (
+                  <input
+                    type="checkbox"
+                    className="attr-vis"
+                    checked={row.visible}
+                    title={t('Visible on the schematic')}
+                    aria-label={t('{k} visible on the schematic', { k })}
+                    onChange={(e) => setVisible(row.win, e.target.checked)}
+                  />
+                ) : (
+                  <span className="attr-vis" />
+                )}
+                {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
               </label>
-            </Fragment>
-          );
-        })}
+            );
+            // capacitor e inductor: la condición inicial va justo después del valor
+            if (k !== 'Value' || !icUnit) return field;
+            return (
+              <Fragment key={k}>
+                {field}
+                <label className="attr-row">
+                  <span title={t('Generates IC= on the SPICE line: the initial {what} of the transient', { what: icUnit === 'V' ? t('voltage') : t('current') })}>{t('Initial condition')}</span>
+                  <input value={icVal} spellCheck={false} placeholder={t('none ({u})', { u: icUnit })} onChange={(e) => setIc(e.target.value)} />
+                  <span className="attr-vis" />
+                  <small className="hint">{t('Initial {what} for .tran (IC=), in {u}.', { what: icUnit === 'V' ? t('voltage') : t('current'), u: icUnit })}</small>
+                </label>
+              </Fragment>
+            );
+          })}
         {passive && (
           <details className="src-adv" open={partsOpen} onToggle={(e) => setPartsOpen(e.currentTarget.open)}>
             <summary>{t('Advanced: manufacturer model')}</summary>
@@ -527,8 +578,12 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
           </details>
         )}
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary">{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary">
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>
@@ -536,12 +591,7 @@ export function AttributeDialog({ inst, def, windowDefaults, focusLabel, parts, 
 }
 
 /** Texto libre: directiva SPICE (S) o comentario (T) */
-export function TextDialog({ initial, kind, onApply, onClose }: {
-  initial: string;
-  kind: 'directive' | 'comment';
-  onApply(text: string, kind: 'directive' | 'comment'): void;
-  onClose(): void;
-}) {
+export function TextDialog({ initial, kind, onApply, onClose }: { initial: string; kind: 'directive' | 'comment'; onApply(text: string, kind: 'directive' | 'comment'): void; onClose(): void }) {
   // En el archivo los saltos de línea se guardan como "\n" literal
   const [text, setText] = useState(initial.split('\\n').join('\n'));
   const [k, setK] = useState(kind);
@@ -572,8 +622,12 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
         />
         <p className="hint">{t('Ctrl+Enter to accept. One directive per line.')}</p>
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="button" className="primary" onClick={submit}>{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="button" className="primary" onClick={submit}>
+            {t('OK')}
+          </button>
         </div>
       </div>
     </Modal>
@@ -581,7 +635,13 @@ export function TextDialog({ initial, kind, onApply, onClose }: {
 }
 
 /** N: nombre de red (o tierra); adentro de un subcircuito, también si es un puerto */
-export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
+export function FlagDialog({
+  initial,
+  initialPort,
+  port,
+  onApply,
+  onClose,
+}: {
   initial: string;
   /** puerto actual de la etiqueta ('' = no es puerto) */
   initialPort?: string;
@@ -624,8 +684,12 @@ export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
           </label>
         )}
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary">{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary">
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>
@@ -633,7 +697,12 @@ export function FlagDialog({ initial, initialPort, port, onApply, onClose }: {
 }
 
 /** Estilo de línea de las figuras (Dibujar › Estilo de línea, doble click en una figura) */
-export function LineStyleDialog({ initial, count, onApply, onClose }: {
+export function LineStyleDialog({
+  initial,
+  count,
+  onApply,
+  onClose,
+}: {
   initial: string;
   /** figuras seleccionadas a las que se aplica (0: sólo las que se dibujen después) */
   count: number;
@@ -651,7 +720,9 @@ export function LineStyleDialog({ initial, count, onApply, onClose }: {
         }}
       >
         <p className="hint">
-          {count ? t('Applies to {p0} and to the ones drawn afterwards.', { p0: count === 1 ? t('the selected shape') : t('the {count} selected shapes', { count }) }) : t('Applies to the shapes that get drawn.')}
+          {count
+            ? t('Applies to {p0} and to the ones drawn afterwards.', { p0: count === 1 ? t('the selected shape') : t('the {count} selected shapes', { count }) })
+            : t('Applies to the shapes that get drawn.')}
         </p>
         {LINE_STYLES.map((ls) => (
           <label key={ls.value} className="line-style">
@@ -663,8 +734,12 @@ export function LineStyleDialog({ initial, count, onApply, onClose }: {
           </label>
         ))}
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary">{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary">
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>
@@ -694,16 +769,24 @@ export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) 
     <Modal title={t('Share circuit')} onClose={onClose}>
       <div className="textdlg">
         <input ref={input} readOnly value={url} aria-label={t('Link')} onFocus={(e) => e.target.select()} />
-        <p className="hint">{t('The link holds the whole circuit compressed in')}{' '}{t('{n} bytes.', { n: bytes.toLocaleString(locale()) })}</p>
+        <p className="hint">
+          {t('The link holds the whole circuit compressed in')} {t('{n} bytes.', { n: bytes.toLocaleString(locale()) })}
+        </p>
         {copied ? (
-          <p className="hint ok"><span aria-hidden="true">✓</span> {t('Link copied to the clipboard')}</p>
+          <p className="hint ok">
+            <span aria-hidden="true">✓</span> {t('Link copied to the clipboard')}
+          </p>
         ) : copied === false ? (
           <p className="hint">{t('Copy the link with Ctrl+C.')}</p>
         ) : null}
-        {url.length > LONG_LINK && <p className="hint warn">{t('It\'s a long link: some chats or e-mails may cut it.')}</p>}
+        {url.length > LONG_LINK && <p className="hint warn">{t("It's a long link: some chats or e-mails may cut it.")}</p>}
         <div className="buttons">
-          <button type="button" onClick={copy}>{t('Copy')}</button>
-          <button type="button" className="primary" onClick={onClose}>{t('Ready')}</button>
+          <button type="button" onClick={copy}>
+            {t('Copy')}
+          </button>
+          <button type="button" className="primary" onClick={onClose}>
+            {t('Ready')}
+          </button>
         </div>
       </div>
     </Modal>
@@ -723,7 +806,7 @@ const SHORTCUTS: [string, [string, string][]][] = [
       ['N', t('Net label')],
       ['. · T', t('SPICE directive · comment')],
       ['J · K · O · U', t('Line · rectangle · circle · arc (decorative)')],
-      ['M', t('Move: click an element (or a box); it follows the cursor until the next click; wires don\'t stretch')],
+      ['M', t("Move: click an element (or a box); it follows the cursor until the next click; wires don't stretch")],
       ['Del · Backspace', t('Delete the selection (no selection: delete mode, by click or box)')],
       ['Ctrl+C · Ctrl+X · Ctrl+V', t('Copy · cut · paste (also between tabs)')],
       ['Ctrl+A', t('Select all')],
@@ -808,19 +891,16 @@ export function HelpDialog({ onClose }: { onClose(): void }) {
       ))}
       <p className="hint">{t('On touch screens: pinch to zoom, two fingers to pan, long-press to edit.')}</p>
       <div className="buttons">
-        <button className="primary" onClick={onClose}>{t('Close')}</button>
+        <button className="primary" onClick={onClose}>
+          {t('Close')}
+        </button>
       </div>
     </Modal>
   );
 }
 
 /** Shift+S en el visor: qué corridas de un .step se muestran */
-export function RunsDialog({ runs, hidden, onApply, onClose }: {
-  runs: { name: string; label: string }[];
-  hidden: Set<string>;
-  onApply(hidden: Set<string>): void;
-  onClose(): void;
-}) {
+export function RunsDialog({ runs, hidden, onApply, onClose }: { runs: { name: string; label: string }[]; hidden: Set<string>; onApply(hidden: Set<string>): void; onClose(): void }) {
   const [off, setOff] = useState(() => new Set(hidden));
   const toggle = (name: string) => {
     const next = new Set(off);
@@ -853,23 +933,36 @@ export function AboutDialog({ repo, onClose }: { repo: string; onClose(): void }
   return (
     <Modal title={t('About TurboSpice')} onClose={onClose}>
       <div className="welcome about">
-        <h3><Logo size={28} /> <span><span className="logo">Turbo</span>Spice</span></h3>
+        <h3>
+          <Logo size={28} />{' '}
+          <span>
+            <span className="logo">Turbo</span>Spice
+          </span>
+        </h3>
         <p>
-          {t('Circuit simulator that runs the')}{' '}<strong>ngspice</strong>{' '}{t('engine, compiled in WebAssembly. Compatible with LTspice .ASC file format.')}
+          {t('Circuit simulator that runs the')} <strong>ngspice</strong> {t('engine, compiled in WebAssembly. Compatible with LTspice .ASC file format.')}
         </p>
         <p>{t('Designed and developed by Agustín Gullino and Javier Petrucci.')}</p>
         <p>
           {t('Free software under the')}{' '}
-          <a href={`${repo.replace(/\/$/, '')}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">{'GNU GPL v3.0'}</a>{' '}
+          <a href={`${repo.replace(/\/$/, '')}/blob/main/LICENSE`} target="_blank" rel="noopener noreferrer">
+            {'GNU GPL v3.0'}
+          </a>{' '}
           {t('or later.')}
         </p>
         <p className="about-links">
-          <a href={repo} target="_blank" rel="noopener noreferrer">{t('Source code and bug reports')}</a>
-          <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">{t('Privacy policy')}</a>
+          <a href={repo} target="_blank" rel="noopener noreferrer">
+            {t('Source code and bug reports')}
+          </a>
+          <a href={getLang() === 'es' ? 'privacidad.html' : 'privacy.html'} target="_blank" rel="noopener noreferrer">
+            {t('Privacy policy')}
+          </a>
         </p>
       </div>
       <div className="buttons">
-        <button className="primary" onClick={onClose}>{t('Close')}</button>
+        <button className="primary" onClick={onClose}>
+          {t('Close')}
+        </button>
       </div>
     </Modal>
   );
@@ -903,7 +996,9 @@ export function SettingsDialog({ sections, onClose }: { sections: SettingsSectio
                   {r.label}{' '}
                   <select value={r.value} onChange={(e) => r.onChange(e.target.value)}>
                     {r.options.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
                     ))}
                   </select>
                 </label>
@@ -913,7 +1008,9 @@ export function SettingsDialog({ sections, onClose }: { sections: SettingsSectio
         ))}
       </div>
       <div className="buttons">
-        <button className="primary" onClick={onClose} autoFocus>{t('Close')}</button>
+        <button className="primary" onClick={onClose} autoFocus>
+          {t('Close')}
+        </button>
       </div>
     </Modal>
   );
@@ -926,10 +1023,19 @@ export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onCl
       <div className="import-info">
         <p>{t('Everything you import is added to the open project; nothing is replaced.')}</p>
         <ul>
-          <li><strong>.turbo</strong> — {t('a TurboSpice project: it opens in place of the current one.')}</li>
-          <li><strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each')}{' '}<code>.asc</code>{' '}{t('in it becomes a testbench. The')}{' '}<code>.asy</code>, <code>.lib</code>, <code>.sub</code>{' '}{t('anywhere in the .zip go to the project files.')}</li>
-          <li><strong>.asc</strong> — {t('loose schematics: each one becomes a testbench.')}</li>
-          <li><strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its testbenches.')}</li>
+          <li>
+            <strong>.turbo</strong> — {t('a TurboSpice project: it opens in place of the current one.')}
+          </li>
+          <li>
+            <strong>.zip</strong> — {t('the best way to bring a whole LTspice project. Each')} <code>.asc</code> {t('in it becomes a testbench. The')} <code>.asy</code>, <code>.lib</code>,{' '}
+            <code>.sub</code> {t('anywhere in the .zip go to the project files.')}
+          </li>
+          <li>
+            <strong>.asc</strong> — {t('loose schematics: each one becomes a testbench.')}
+          </li>
+          <li>
+            <strong>{'.asy · .lib · .sub · .mod'}</strong> — {t('symbols and models: they go to the project files and apply to all its testbenches.')}
+          </li>
         </ul>
         <p className="hint">
           {t('To build the .zip: put one .asc per testbench, and add the symbols and models the circuits use that are not in the standard library. Then compress the whole folder.')}
@@ -937,7 +1043,9 @@ export function ImportInfoDialog({ onChoose, onClose }: { onChoose(): void; onCl
       </div>
       <div className="buttons">
         <button onClick={onClose}>{t('Cancel')}</button>
-        <button className="primary" onClick={onChoose} autoFocus>{t('Choose files…')}</button>
+        <button className="primary" onClick={onChoose} autoFocus>
+          {t('Choose files…')}
+        </button>
       </div>
     </Modal>
   );
@@ -951,7 +1059,16 @@ export interface UserFileInfo {
 }
 
 /** Símbolos, modelos y bloques propios del usuario (guardados en el navegador) */
-export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbol, onClose, project, onEditVerilog }: {
+export function UserFilesDialog({
+  files,
+  hasSymbol,
+  onAdd,
+  onRemove,
+  onMakeSymbol,
+  onClose,
+  project,
+  onEditVerilog,
+}: {
   files: UserFileInfo[];
   /** módulo Verilog del proyecto (#209): abrirlo (código y síntesis) */
   onEditVerilog?(name: string): void;
@@ -975,16 +1092,20 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
               <li key={f.name}>
                 <div className="uf-head">
                   <code>{f.name}</code>
-                  <button className="danger small" onClick={() => onRemove(f.name)} aria-label={t('Remove {name}', { name: f.name })}>{t('Remove')}</button>
+                  <button className="danger small" onClick={() => onRemove(f.name)} aria-label={t('Remove {name}', { name: f.name })}>
+                    {t('Remove')}
+                  </button>
                 </div>
                 {kind === 'model' && f.items.length > 0 && (
                   <div className="uf-items">
                     {f.items.map((sub) =>
                       hasSymbol(sub) ? (
-                        <span key={sub} className="uf-done" title={t('There\'s already a symbol with this name')}>✓ {sub}</span>
+                        <span key={sub} className="uf-done" title={t("There's already a symbol with this name")}>
+                          ✓ {sub}
+                        </span>
                       ) : (
                         <button key={sub} onClick={() => onMakeSymbol(f.name, sub)} title={t('Create a symbol for subcircuit {sub}', { sub })}>
-                          {t('Create symbol for')}{' '}{sub}
+                          {t('Create symbol for')} {sub}
                         </button>
                       ),
                     )}
@@ -998,7 +1119,9 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
                 )}
                 {kind === 'schematic' && (
                   <div className="uf-items">
-                    <span className="hint">{t('Ports:')}{' '}{f.items.join(', ') || t('(no labels)')}</span>
+                    <span className="hint">
+                      {t('Ports:')} {f.items.join(', ') || t('(no labels)')}
+                    </span>
                     {hasSymbol(f.name.replace(/\.asc$/i, '')) ? (
                       <span className="uf-done">{t('✓ block symbol')}</span>
                     ) : (
@@ -1019,17 +1142,26 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
     <Modal title={project ? t('Project files «{project}»', { project }) : t('My symbols and models')} onClose={onClose} wide>
       {project ? (
         <p className="hint">
-          {t('They\'re saved inside the project (.turbo) and apply to all its variants; they take precedence over «My symbols and models» and over the library. Symbols (')}<code>.asy</code>{t(') show up in the component browser (P) under «Project»; models (')}
-          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>.
+          {t("They're saved inside the project (.turbo) and apply to all its variants; they take precedence over «My symbols and models» and over the library. Symbols (")}
+          <code>.asy</code>
+          {t(') show up in the component browser (P) under «Project»; models (')}
+          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>
+          {t(') are used when simulating as if they were next to the')} <code>.asc</code>.
         </p>
       ) : (
-      <p className="hint">
-        {t('Shared by all your projects. Signed in with Google, they are saved in your Drive (TurboSpice › My symbols and models.json); otherwise, in this browser. Symbols (')}<code>.asy</code>{t(') show up in the component browser (P); models (')}<code>.lib</code>,{' '}
-        <code>.sub</code>, <code>.mod</code>{t(') are used when simulating as if they were next to the')}{' '}<code>.asc</code>{t('; an')}{' '}<code>.asc</code> {t('with its block symbol is used as a subcircuit (hierarchy, like in LTspice).')}
-      </p>
+        <p className="hint">
+          {t('Shared by all your projects. Signed in with Google, they are saved in your Drive (TurboSpice › My symbols and models.json); otherwise, in this browser. Symbols (')}
+          <code>.asy</code>
+          {t(') show up in the component browser (P); models (')}
+          <code>.lib</code>, <code>.sub</code>, <code>.mod</code>
+          {t(') are used when simulating as if they were next to the')} <code>.asc</code>
+          {t('; an')} <code>.asc</code> {t('with its block symbol is used as a subcircuit (hierarchy, like in LTspice).')}
+        </p>
       )}
       <div className="buttons left">
-        <button className="primary" onClick={() => input.current?.click()}>{t('Add files…')}</button>
+        <button className="primary" onClick={() => input.current?.click()}>
+          {t('Add files…')}
+        </button>
         <input
           ref={input}
           type="file"
@@ -1048,7 +1180,9 @@ export function UserFilesDialog({ files, hasSymbol, onAdd, onRemove, onMakeSymbo
       {project && section('verilog', t('Verilog modules'), t('None yet: create one with «+ New» in the project panel.'))}
       {!project && section('schematic', t('Hierarchical blocks (.asc)'), t('None yet.'))}
       <div className="buttons">
-        <button className="primary" onClick={onClose}>{t('Close')}</button>
+        <button className="primary" onClick={onClose}>
+          {t('Close')}
+        </button>
       </div>
     </Modal>
   );

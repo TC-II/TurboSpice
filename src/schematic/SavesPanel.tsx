@@ -11,7 +11,22 @@ import { t } from '../i18n/i18n.ts';
 
 const key = (r: string) => r.toLowerCase();
 
-export function SavesPanel({ selection, mode, onMode, signals, max, onChange, hover, onHoverRow, picking, onPicking, inactive, onActivate, blocked, onClose }: {
+export function SavesPanel({
+  selection,
+  mode,
+  onMode,
+  signals,
+  max,
+  onChange,
+  hover,
+  onHoverRow,
+  picking,
+  onPicking,
+  inactive,
+  onActivate,
+  blocked,
+  onClose,
+}: {
   /** lo elegido, tal como está en el esquemático (null: se guarda todo) */
   selection: string[] | null;
   /** «sólo lo elegido» sigue elegido aunque todavía no se haya marcado nada */
@@ -65,7 +80,17 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
   const n = selection?.length ?? 0;
   const over = max !== undefined && n > max;
   const shortcut = (label: string, refs: SavableSignal[], on: boolean) => (
-    <button type="button" className="link" disabled={!refs.length} onClick={() => set(refs.map((s) => s.ref), on)}>
+    <button
+      type="button"
+      className="link"
+      disabled={!refs.length}
+      onClick={() =>
+        set(
+          refs.map((s) => s.ref),
+          on,
+        )
+      }
+    >
       {label}
     </button>
   );
@@ -76,12 +101,7 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
   );
 
   return (
-    <aside
-      className={`saves-panel${inactive ? ' inactive' : ''}`}
-      aria-label={t('Saved signals')}
-      onMouseDownCapture={() => inactive && onActivate()}
-      onFocusCapture={() => inactive && onActivate()}
-    >
+    <aside className={`saves-panel${inactive ? ' inactive' : ''}`} aria-label={t('Saved signals')} onMouseDownCapture={() => inactive && onActivate()} onFocusCapture={() => inactive && onActivate()}>
       <header>
         <span className="saves-title">{t('Saved signals')}</span>
         <button className="close" onClick={onClose} aria-label={t('Close the saved signals')} title={t('Close the saved signals')}>
@@ -92,14 +112,14 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
       <div className="saves-body">
         {blocked && <p className="hint">{blocked}</p>}
         {!blocked && (
-        <div className="saves-mode" role="radiogroup" aria-label={t('Save')}>
-          <label className="check">
-            <input type="radio" checked={!some} onChange={() => (onMode('all'), onChange(null))} /> {t('Everything: every net voltage and every device current')}
-          </label>
-          <label className="check">
-            <input type="radio" checked={some} onChange={() => onMode('some')} /> {t('Only the selected signals')}
-          </label>
-        </div>
+          <div className="saves-mode" role="radiogroup" aria-label={t('Save')}>
+            <label className="check">
+              <input type="radio" checked={!some} onChange={() => (onMode('all'), onChange(null))} /> {t('Everything: every net voltage and every device current')}
+            </label>
+            <label className="check">
+              <input type="radio" checked={some} onChange={() => onMode('some')} /> {t('Only the selected signals')}
+            </label>
+          </div>
         )}
         {some && !blocked && (
           <>
@@ -107,24 +127,38 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
               <Icon name="probe" size={16} /> {picking ? t('Picking on the schematic') : t('Pick on the schematic')}
             </button>
             <p className="hint">
-              {picking
-                ? t('Click a wire for its voltage or a component for its current; click again to unselect.')
-                : t('With the probe, click a wire for its voltage or a component for its current.')}
+              {picking ? t('Click a wire for its voltage or a component for its current; click again to unselect.') : t('With the probe, click a wire for its voltage or a component for its current.')}
             </p>
             <p className="hint">{t('What the plots, the .meas and the Studio use is always saved too. The unnamed internal nodes of Verilog blocks are never saved.')}</p>
             {max !== undefined && (
               <p className="hint saves-max">
                 {max >= 1
-                  ? t('The last simulation didn\'t fit in memory: at its pace, up to {max} signals fit (the plotted ones count too).', { max })
-                  : t('The last simulation didn\'t fit in memory even with one signal: save only the end with «Save from».')}
+                  ? t("The last simulation didn't fit in memory: at its pace, up to {max} signals fit (the plotted ones count too).", { max })
+                  : t("The last simulation didn't fit in memory even with one signal: save only the end with «Save from».")}
               </p>
             )}
             <div className="saves-tools">
               <input type="search" placeholder={t('Search')} aria-label={t('Search')} value={q} onChange={(e) => setQ(e.target.value)} />
-              {shortcut(t('Top-level voltages'), all.filter((s) => !s.group && s.kind === 'voltage'), true)}
-              {shortcut(t('All currents'), all.filter((s) => s.kind === 'current'), true)}
-              {shortcut(t('Digital signals between blocks'), all.filter((s) => !s.group && s.kind === 'digital'), true)}
-              {shortcut(t('Nothing from subcircuits'), all.filter((s) => s.group), false)}
+              {shortcut(
+                t('Top-level voltages'),
+                all.filter((s) => !s.group && s.kind === 'voltage'),
+                true,
+              )}
+              {shortcut(
+                t('All currents'),
+                all.filter((s) => s.kind === 'current'),
+                true,
+              )}
+              {shortcut(
+                t('Digital signals between blocks'),
+                all.filter((s) => !s.group && s.kind === 'digital'),
+                true,
+              )}
+              {shortcut(
+                t('Nothing from subcircuits'),
+                all.filter((s) => s.group),
+                false,
+              )}
               <button type="button" className="link" disabled={!n} onClick={() => onChange([])}>
                 {t('None')}
               </button>
@@ -139,8 +173,7 @@ export function SavesPanel({ selection, mode, onMode, signals, max, onChange, ho
               {groups.map(([g, refs]) => (
                 <fieldset key={g} className="saves-group">
                   <legend>
-                    {g || t('Top level')}{' '}
-                    {shortcut(t('all'), refs, true)} · {shortcut(t('none'), refs, false)}
+                    {g || t('Top level')} {shortcut(t('all'), refs, true)} · {shortcut(t('none'), refs, false)}
                   </legend>
                   {refs.map((s) => row(s.ref))}
                 </fieldset>

@@ -44,7 +44,14 @@ export const ANALYSES: { kind: AnalysisKind; label: string; ngspiceOnly: boolean
   { kind: 'dc', label: t('DC sweep'), ngspiceOnly: false, help: t('Sweeps the value of one or two sources and solves the operating point at each step (.dc).') },
   // polos y ceros y estabilidad, debajo del barrido DC (#331)
   { kind: 'pz', label: t('Poles and zeros'), ngspiceOnly: true, help: t('Poles and zeros of a transfer function (.pz).') },
-  { kind: 'stb', label: t('Stability (loop gain)'), ngspiceOnly: true, help: t('Loop stability at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Middlebrook\'s GFT (asymptotic gain model: R, G∞ and G0) by default, or the Tian method (A-β model, T = −Aβ).') },
+  {
+    kind: 'stb',
+    label: t('Stability (loop gain)'),
+    ngspiceOnly: true,
+    help: t(
+      "Loop stability at a loop probe (Stability library), with phase and gain margins, poles and zeros and root locus (.stb). Middlebrook's GFT (asymptotic gain model: R, G∞ and G0) by default, or the Tian method (A-β model, T = −Aβ).",
+    ),
+  },
   { kind: 'noise', label: t('Noise'), ngspiceOnly: false, help: t('Noise spectral density at the output and referred to the input (.noise).') },
   { kind: 'tf', label: t('DC transfer function'), ngspiceOnly: false, help: t('DC gain, input and output resistance (.tf).') },
   { kind: 'sens', label: t('Sensitivity'), ngspiceOnly: true, help: t('Sensitivity of an output to each circuit parameter (.sens).') },
@@ -147,7 +154,10 @@ function unwrapV(s: string): [string, string] {
  * vacíos, para que la barra siga mostrando sus cajas y marque lo que falta.
  */
 export function parseAnalysis(line: string): Analysis | null {
-  const tt = line.trim().replace(/\(\s*([^)]*?)\s*\)/g, (_, x: string) => `(${x.replace(/\s+/g, '')})`).split(/\s+/);
+  const tt = line
+    .trim()
+    .replace(/\(\s*([^)]*?)\s*\)/g, (_, x: string) => `(${x.replace(/\s+/g, '')})`)
+    .split(/\s+/);
   return parseComplete(tt) ?? parseIncomplete(tt);
 }
 
@@ -345,7 +355,12 @@ export function validateAnalysis(a: Analysis): string[] {
       if (!!a.input.trim() !== !!a.output.trim()) errs.push(t('The closed-loop transfer needs both the input source and the output, or neither'));
       break;
     case 'pz':
-      for (const [v, w] of [[a.inP, t('input +')], [a.inN, t('input −')], [a.outP, t('output +')], [a.outN, t('output −')]]) {
+      for (const [v, w] of [
+        [a.inP, t('input +')],
+        [a.inN, t('input −')],
+        [a.outP, t('output +')],
+        [a.outN, t('output −')],
+      ]) {
         if (!v) errs.push(t('The {w} node is missing', { w }));
       }
       break;

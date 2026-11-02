@@ -37,7 +37,11 @@ await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el p
 // --- #38: barra de herramientas y menú colapsado ---
 check((await page.getByRole('menubar').count()) === 0, 'no queda barra de menús');
 await page.getByRole('button', { name: 'Menú', exact: true }).click();
-check((await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() === 'Tutorial interactivo,Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración…,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice', 'el botón junto al nombre despliega todos los menús');
+check(
+  (await page.getByRole('menu', { name: 'Menú' }).getByRole('menuitem').allTextContents()).join() ===
+    'Tutorial interactivo,Archivo▸,Editar▸,Dibujar▸,Simular▸,Ver▸,Configuración…,Ejemplos▸,Recientes▸,Archivos y bibliotecas▸,Ayuda▸,Acerca de TurboSpice',
+  'el botón junto al nombre despliega todos los menús',
+);
 // (el primero es el tutorial: se baja a Archivo)
 await page.keyboard.press('ArrowDown');
 await page.keyboard.press('ArrowRight');
@@ -49,35 +53,56 @@ await menu(page, 'Configuración…');
 const hoverBox = page.locator('.modal').getByRole('checkbox', { name: /panel del proyecto/ });
 const hoverWas = await hoverBox.isChecked();
 await hoverBox.click();
-check((await hoverBox.isChecked()) !== hoverWas && (await page.evaluate(() => localStorage.getItem('turbospice.treeHover'))) === (hoverWas ? '0' : '1'), 'Configuración abre una ventana con la opción como casilla, que se guarda');
+check(
+  (await hoverBox.isChecked()) !== hoverWas && (await page.evaluate(() => localStorage.getItem('turbospice.treeHover'))) === (hoverWas ? '0' : '1'),
+  'Configuración abre una ventana con la opción como casilla, que se guarda',
+);
 await hoverBox.click();
 // #329: el skin de los símbolos se elige ahí y se aplica en el momento
 const skinSel = page.locator('.modal').getByRole('combobox', { name: /Skin de los símbolos/ });
 await skinSel.selectOption('Boca Jrs');
-check((await page.locator('svg.editor .skin').evaluateAll((gs) => gs.some((g) => g.innerHTML.includes('#103f79')))) && (await page.evaluate(() => localStorage.getItem('turbospice.skin'))) === 'Boca Jrs', 'Configuración › Skin de los símbolos: Boca Jrs se aplica y se recuerda');
+check(
+  (await page.locator('svg.editor .skin').evaluateAll((gs) => gs.some((g) => g.innerHTML.includes('#103f79')))) && (await page.evaluate(() => localStorage.getItem('turbospice.skin'))) === 'Boca Jrs',
+  'Configuración › Skin de los símbolos: Boca Jrs se aplica y se recuerda',
+);
 await skinSel.selectOption('Default');
 await page.locator('.modal').getByRole('button', { name: 'Cerrar', exact: true }).click();
 check((await page.locator('.modal').count()) === 0, 'y se cierra con Cerrar');
-const toolbarNames = await page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+const toolbarNames = await page
+  .getByRole('toolbar', { name: 'Herramientas' })
+  .getByRole('button')
+  .evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  toolbarNames.slice(0, 19).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Resaltar,Mover' && toolbarNames.includes('Borrar'),
+  toolbarNames.slice(0, 19).join() === 'Menú,Nuevo,Guardar,Exportar a PDF,Abrir,Deshacer,Rehacer,Seleccionar,Cable,Componente,Tierra,Etiqueta,Texto,Figuras,Directiva,Ajustar,Grilla,Resaltar,Mover' &&
+    toolbarNames.includes('Borrar'),
   `orden de la barra (${toolbarNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Estudio…') && !toolbarNames.includes('.control…') && !toolbarNames.includes('Panel de resultados'), 'Estudio, .control y Resultados no tienen botón propio en la barra');
-const simNames = await page.getByRole('toolbar', { name: 'Simulación' }).getByRole('button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
+const simNames = await page
+  .getByRole('toolbar', { name: 'Simulación' })
+  .getByRole('button')
+  .evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')));
 check(
-  simNames.slice(0, 7).join() === 'Panel del proyecto,Nombre del proyecto,Nombre del testbench,Nueva simulación,Correr,Medir,Redes' || simNames.join().includes('Panel del proyecto,') && /Nueva simulación,Correr,Medir,Redes,Anotar OP/.test(simNames.join()),
+  simNames.slice(0, 7).join() === 'Panel del proyecto,Nombre del proyecto,Nombre del testbench,Nueva simulación,Correr,Medir,Redes' ||
+    (simNames.join().includes('Panel del proyecto,') && /Nueva simulación,Correr,Medir,Redes,Anotar OP/.test(simNames.join())),
   `segunda barra: árbol, cápsula, Nueva simulación, Correr, Medir, Redes, Anotar OP (${simNames.join(', ')})`,
 );
 check(!toolbarNames.includes('Medir') && !toolbarNames.includes('Redes'), 'Medir y Redes ya no están en la primera barra');
 check((await page.locator('.appbar h1 + nav, .appbar > h1:first-child').count()) > 0, 'la primera línea empieza con el logo');
 const views = page.getByRole('navigation', { name: 'Vistas' });
-check((await views.getByRole('button').allTextContents()).join() === 'Esquemático,Resultados' && (await views.getByRole('button', { name: 'Resultados' }).isDisabled()), 'arriba, Esquemático y Resultados (deshabilitado sin resultados)');
+check(
+  (await views.getByRole('button').allTextContents()).join() === 'Esquemático,Resultados' && (await views.getByRole('button', { name: 'Resultados' }).isDisabled()),
+  'arriba, Esquemático y Resultados (deshabilitado sin resultados)',
+);
 await page.getByRole('button', { name: 'Nueva simulación', exact: true }).click();
 const simMenu = await page.getByRole('menu').locator('[role^=menuitem]').allTextContents();
 await page.keyboard.press('Escape');
 check(
-  simMenu.includes('Barrido DC') && simMenu.includes('Comando de simulación…A') && simMenu.includes('Directiva SPICE….') && simMenu.includes('Estudio…Alt+E') && !simMenu.some((x) => /Nueva|Duplicar|Renombrar/.test(x)),
+  simMenu.includes('Barrido DC') &&
+    simMenu.includes('Comando de simulación…A') &&
+    simMenu.includes('Directiva SPICE….') &&
+    simMenu.includes('Estudio…Alt+E') &&
+    !simMenu.some((x) => /Nueva|Duplicar|Renombrar/.test(x)),
   `desplegable de Simular: tipos, comandos y análisis programados (${simMenu.join(' | ')})`,
 );
 await page.getByRole('button', { name: 'Texto', exact: true }).click();
@@ -89,8 +114,16 @@ await page.setViewportSize({ width: 375, height: 760 });
 await frames(page);
 const overflow = await page.evaluate(() => [document.documentElement.scrollWidth, document.querySelector('.appbar .iconbar').scrollWidth, document.querySelector('.appbar').scrollWidth]);
 // (si desborda, qué elementos de la barra pasan del borde)
-const past = await page.evaluate(() => [...document.querySelectorAll('.appbar *')].filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).map((e) => `${e.tagName.toLowerCase()}.${e.className}@${Math.round(e.getBoundingClientRect().left)}-${Math.round(e.getBoundingClientRect().right)}`).slice(0, 8));
-check(overflow.every((w) => w <= 375), `en 375 px no hay desborde (${overflow.join(', ')}${past.length ? `: ${past.join(' ')}` : ''})`);
+const past = await page.evaluate(() =>
+  [...document.querySelectorAll('.appbar *')]
+    .filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5)
+    .map((e) => `${e.tagName.toLowerCase()}.${e.className}@${Math.round(e.getBoundingClientRect().left)}-${Math.round(e.getBoundingClientRect().right)}`)
+    .slice(0, 8),
+);
+check(
+  overflow.every((w) => w <= 375),
+  `en 375 px no hay desborde (${overflow.join(', ')}${past.length ? `: ${past.join(' ')}` : ''})`,
+);
 await page.getByRole('button', { name: 'Más herramientas' }).click();
 await page.getByRole('menu').getByRole('menuitemcheckbox', { name: 'Cable', exact: true }).click();
 check(await page.locator('svg.editor.tool-wire').isVisible(), 'desde "Más herramientas" se elige el cable');
@@ -124,34 +157,64 @@ await page.getByRole('button', { name: 'Compartir' }).click();
 const link = await page.locator('.modal input[aria-label="Enlace"]').inputValue();
 check(/#c=[\w-]+(&z=1)?(&k=1)?&n=[^&]+$/.test(link), `genera el link (${link.length} caracteres)`);
 check((await page.locator('.modal').innerText()).match(/comprimido en [\d.,]+ bytes/) !== null, 'el diálogo dice cuántos bytes ocupa el circuito comprimido');
-check(await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count() === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'), 'confirma que se copió el link (o pide copiarlo)');
-check(await page.getByRole('button', { name: 'Descargar .asc' }).count() === 0, 'sin opción de descargar el .asc');
+check(
+  (await page.locator('.modal .hint.ok').filter({ hasText: 'Link copiado en portapapeles' }).count()) === 1 || (await page.locator('.modal').innerText()).includes('Ctrl+C'),
+  'confirma que se copió el link (o pide copiarlo)',
+);
+check((await page.getByRole('button', { name: 'Descargar .asc' }).count()) === 0, 'sin opción de descargar el .asc');
 await page.getByRole('button', { name: 'Listo', exact: true }).click();
 // Exportar a PDF (#326): la hoja a pantalla completa, con el PDF vectorial y el SVG de la hoja
 await page.getByRole('button', { name: 'Exportar a PDF' }).click();
 const exportView = page.getByRole('dialog', { name: 'Exportar' });
 await exportView.locator('button:enabled', { hasText: 'Descargar PDF' }).waitFor();
-check((await exportView.locator('svg.export-sheet .sym').count()) > 0 && /^\d+ × \d+ pt/.test(await exportView.locator('.hint').first().innerText()), 'Exportar a PDF abre la hoja a pantalla completa, con su tamaño en pt');
+check(
+  (await exportView.locator('svg.export-sheet .sym').count()) > 0 && /^\d+ × \d+ pt/.test(await exportView.locator('.hint').first().innerText()),
+  'Exportar a PDF abre la hoja a pantalla completa, con su tamaño en pt',
+);
 check((await exportView.getByLabel('Skin').inputValue()) === 'Default' && (await exportView.getByLabel('Letra').inputValue()) === 'lmodern', 'la primera vez: skin Default y la letra de LaTeX');
 // las capas opcionales, abajo en «Avanzado»
 await exportView.getByText('Avanzado', { exact: true }).click();
-check((await exportView.getByRole('checkbox', { name: 'Valores del punto de operación' }).isDisabled()) && !(await exportView.getByRole('checkbox', { name: 'Directivas SPICE' }).isChecked()), 'sin simular, el OP no se puede incluir; las directivas arrancan apagadas');
+check(
+  (await exportView.getByRole('checkbox', { name: 'Valores del punto de operación' }).isDisabled()) && !(await exportView.getByRole('checkbox', { name: 'Directivas SPICE' }).isChecked()),
+  'sin simular, el OP no se puede incluir; las directivas arrancan apagadas',
+);
 const [pdfDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar PDF' }).click()]);
 const pdfBytes = readFileSync(await pdfDl.path()).toString('latin1');
 const pdfHead = pdfBytes.slice(0, 8);
-check(pdfBytes.includes('/Creator (TurboSpice https://tc-ii.github.io/TurboSpice/)') && pdfBytes.includes('xmp:CreatorTool>TurboSpice'), 'el PDF lleva la marca de TurboSpice en sus metadatos (Info y XMP)');
+check(
+  pdfBytes.includes('/Creator (TurboSpice https://tc-ii.github.io/TurboSpice/)') && pdfBytes.includes('xmp:CreatorTool>TurboSpice'),
+  'el PDF lleva la marca de TurboSpice en sus metadatos (Info y XMP)',
+);
 check(pdfDl.suggestedFilename().endsWith('.pdf') && pdfHead.startsWith('%PDF-'), `Descargar PDF baja un .pdf (${pdfDl.suggestedFilename()})`);
 const [sheetDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar SVG' }).click()]);
 const sheet = readFileSync(await sheetDl.path(), 'utf8');
-check(sheetDl.suggestedFilename().endsWith('.svg') && /width="\d+pt"/.test(sheet) && sheet.includes('>R1<') && !sheet.includes('class=') && sheet.includes('<!-- Created with TurboSpice https://tc-ii.github.io/TurboSpice/ -->') && sheet.includes('<metadata'), `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`);
+check(
+  sheetDl.suggestedFilename().endsWith('.svg') &&
+    /width="\d+pt"/.test(sheet) &&
+    sheet.includes('>R1<') &&
+    !sheet.includes('class=') &&
+    sheet.includes('<!-- Created with TurboSpice https://tc-ii.github.io/TurboSpice/ -->') &&
+    sheet.includes('<metadata'),
+  `Descargar SVG: la hoja autónoma en pt (${sheet.length} bytes)`,
+);
 // #327: la misma hoja en TikZ, como .tex standalone
 const [texDl] = await Promise.all([page.waitForEvent('download'), exportView.getByRole('button', { name: 'Descargar .tex (TikZ)' }).click()]);
 const tex = readFileSync(await texDl.path(), 'utf8');
-check(texDl.suggestedFilename().endsWith('.tex') && tex.includes('\\documentclass[border=0pt]{standalone}') && tex.includes('\\begin{tikzpicture}') && /\\node\[[^\]]*\] at \([\d.-]+,[\d.-]+\) \{R1\}/.test(tex) && tex.includes('\\path['), `Descargar .tex (TikZ): standalone con caminos y rótulos (${tex.length} bytes)`);
+check(
+  texDl.suggestedFilename().endsWith('.tex') &&
+    tex.includes('\\documentclass[border=0pt]{standalone}') &&
+    tex.includes('\\begin{tikzpicture}') &&
+    /\\node\[[^\]]*\] at \([\d.-]+,[\d.-]+\) \{R1\}/.test(tex) &&
+    tex.includes('\\path['),
+  `Descargar .tex (TikZ): standalone con caminos y rótulos (${tex.length} bytes)`,
+);
 check(tex.includes('% Created with TurboSpice https://tc-ii.github.io/TurboSpice/'), 'el .tex dice que se hizo con TurboSpice');
 // #330: el skin Tremor redibuja cables y símbolos a mano alzada, sólo en la hoja, y sugiere su letra
 await exportView.getByLabel('Skin').selectOption('Tremor');
-check((await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0, 'Skin Tremor: los cables de la hoja salen a mano alzada; los del esquemático no');
+check(
+  (await exportView.locator('svg.export-sheet .wires polyline').count()) > 0 && (await page.locator('svg.editor .wires polyline').count()) === 0,
+  'Skin Tremor: los cables de la hoja salen a mano alzada; los del esquemático no',
+);
 check((await exportView.getByLabel('Letra').inputValue()) === 'comicrelief', 'el skin Tremor elige su letra (Comic Relief)');
 // la vista previa: zoom con la rueda y un área de la hoja
 const stage = exportView.locator('.export-stage');
@@ -168,18 +231,29 @@ await page.mouse.down();
 await page.mouse.move(shb.x + shb.width * 0.7, shb.y + shb.height * 0.7, { steps: 5 });
 await page.mouse.up();
 check((await exportView.locator('.export-panel .hint').nth(1).innerText()).includes('Sólo el área elegida'), 'arrastrar con «Elegir área» deja sólo esa parte de la hoja');
-const areaPt = await page.evaluate(() => Object.entries(localStorage).filter(([k]) => k.startsWith('turbospice.export.')).map(([, v]) => JSON.parse(v).area).find(Boolean));
+const areaPt = await page.evaluate(() =>
+  Object.entries(localStorage)
+    .filter(([k]) => k.startsWith('turbospice.export.'))
+    .map(([, v]) => JSON.parse(v).area)
+    .find(Boolean),
+);
 check(!!areaPt && Object.values(areaPt).every(Number.isInteger), `el recorte va en pt enteros (${JSON.stringify(areaPt)})`);
 await page.keyboard.press('Escape');
 check((await exportView.count()) === 0, 'Esc cierra la vista de export');
 // las opciones quedan para la próxima vez, en este dibujo
 await page.getByRole('button', { name: 'Exportar a PDF' }).click();
-check((await exportView.getByLabel('Skin').inputValue()) === 'Tremor' && (await exportView.locator('.export-panel .hint').nth(1).innerText()).includes('Sólo el área elegida'), 'al volver, el dibujo recuerda su skin y su área');
+check(
+  (await exportView.getByLabel('Skin').inputValue()) === 'Tremor' && (await exportView.locator('.export-panel .hint').nth(1).innerText()).includes('Sólo el área elegida'),
+  'al volver, el dibujo recuerda su skin y su área',
+);
 await page.getByRole('button', { name: 'Hoja entera' }).click();
 // como Esquemático/Resultados: la pestaña Exportar va pintada y Esquemático sale de Exportar
 check((await page.locator('.appbar .view-tabs button.active').innerText()).trim() === 'Exportar', 'la pestaña Exportar va pintada junto a Esquemático');
 await page.locator('.appbar .view-tabs button', { hasText: 'Esquemático' }).click();
-check((await exportView.count()) === 0 && (await page.locator('.appbar .view-tabs button', { hasText: 'Resultados' }).count()) === 1, 'la pestaña Esquemático sale de Exportar y vuelven las pestañas de siempre');
+check(
+  (await exportView.count()) === 0 && (await page.locator('.appbar .view-tabs button', { hasText: 'Resultados' }).count()) === 1,
+  'la pestaña Esquemático sale de Exportar y vuelven las pestañas de siempre',
+);
 const other = await context.newPage();
 watch(other);
 await other.goto(link);
@@ -232,7 +306,10 @@ await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 await steady(page);
 const q1 = await at(236, 208);
 await page.mouse.move(q1.x, q1.y);
-const tip = await page.locator('.bias-tip').textContent().catch(() => '');
+const tip = await page
+  .locator('.bias-tip')
+  .textContent()
+  .catch(() => '');
 check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.test(tip), `hover sobre Q1: ${tip}`);
 {
   // #53: en un transistor la punta de prueba mide la corriente de cada pin; el cuerpo no mide
@@ -241,7 +318,11 @@ check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.
   await page.mouse.click(q1.x, q1.y);
   await frames(page);
   check((await names()).length === n0, 'click en el cuerpo de Q1 no mide');
-  for (const [x, y] of [[256, 164], [196, 208], [256, 252]]) {
+  for (const [x, y] of [
+    [256, 164],
+    [196, 208],
+    [256, 252],
+  ]) {
     const pin = await at(x, y);
     await page.mouse.click(pin.x, pin.y);
     await frames(page);
@@ -253,7 +334,10 @@ check(/Q1/.test(tip) && /Ic = 1\.41\dmA/.test(tip) && /Región: activa directa/.
 }
 const outW = await at(320, 128);
 await page.mouse.move(outW.x, outW.y);
-const tipOut = await page.locator('.bias-tip').textContent().catch(() => '');
+const tipOut = await page
+  .locator('.bias-tip')
+  .textContent()
+  .catch(() => '');
 check(/V\(out\)5\.35\dV/.test(tipOut), `hover sobre la red out: ${tipOut}`);
 // DFT (#21): la salida del amplificador tiene la fundamental en 1 kHz
 await page.mouse.click(outW.x, outW.y);
@@ -275,29 +359,45 @@ await page.locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).clic
 await page.locator('.trace-chip', { hasText: 'Hann' }).first().hover();
 const fftInfo = await page.locator('.dft-info').first().textContent();
 check(/fundamental 1kHz/.test(fftInfo) && /THD [\d.]+ %/.test(fftInfo), `DFT y THD de V(out): ${fftInfo}`);
-check((await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)-Hann', 'la DFT queda como una traza en un panel debajo');
+check(
+  (await page.locator('.pane').count()) === 2 && (await page.locator('.trace-chip .name').allTextContents()).join() === 'V(out),V(out)/2,V(out)-Hann',
+  'la DFT queda como una traza en un panel debajo',
+);
 check((await page.locator('.pane-chart .uplot').last().getAttribute('data-range-x'))?.startsWith('0|'), 'el panel de la DFT tiene eje de frecuencias desde 0');
 await fftPick.click();
 await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: 'V(out)/2' }).click();
-const fftNames = (k) => page.locator('.pane').nth(k).locator('.trace-chip .name').allTextContents().then((v) => v.join());
+const fftNames = (k) =>
+  page
+    .locator('.pane')
+    .nth(k)
+    .locator('.trace-chip .name')
+    .allTextContents()
+    .then((v) => v.join());
 check((await page.locator('.pane').count()) === 2 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann', 'dos DFT a la vez en el panel de DFT');
 // #260: otra ventana, otro panel; el nombre dice la ventana; zoom propio de cada panel de DFT
 await page.getByLabel('Ventana', { exact: true }).selectOption('rect');
 await fftPick.click();
-await page.locator('.pane').first().locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ }).click();
-check((await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann' && (await fftNames(2)) === 'V(out)-Rec', 'DFT de la misma señal con otra ventana: otro panel y el nombre con la ventana');
+await page
+  .locator('.pane')
+  .first()
+  .locator('.trace-chip.pickable .name', { hasText: /^V\(out\)$/ })
+  .click();
+check(
+  (await page.locator('.pane').count()) === 3 && (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann' && (await fftNames(2)) === 'V(out)-Rec',
+  'DFT de la misma señal con otra ventana: otro panel y el nombre con la ventana',
+);
 {
-const rangeX = (k) => page.locator('.pane').nth(k).locator('.uplot').getAttribute('data-range-x');
-const r1 = await rangeX(1);
-const r2 = await rangeX(2);
-{
-  await page.locator('.pane').nth(2).locator('.pane-chart').scrollIntoViewIfNeeded();
-  const cb = await page.locator('.pane').nth(2).locator('.pane-chart').boundingBox();
-  await page.mouse.move(cb.x + cb.width / 3, cb.y + cb.height / 2);
-  await page.mouse.wheel(0, -300);
-  await frames(page);
-}
-check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de DFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
+  const rangeX = (k) => page.locator('.pane').nth(k).locator('.uplot').getAttribute('data-range-x');
+  const r1 = await rangeX(1);
+  const r2 = await rangeX(2);
+  {
+    await page.locator('.pane').nth(2).locator('.pane-chart').scrollIntoViewIfNeeded();
+    const cb = await page.locator('.pane').nth(2).locator('.pane-chart').boundingBox();
+    await page.mouse.move(cb.x + cb.width / 3, cb.y + cb.height / 2);
+    await page.mouse.wheel(0, -300);
+    await frames(page);
+  }
+  check((await rangeX(2)) !== r2 && (await rangeX(1)) === r1, `zoom en un panel de DFT no mueve el otro (${r1} → ${await rangeX(1)}; ${r2} → ${await rangeX(2)})`);
 }
 // (arrastre de HTML5 con eventos: el del mouse de Playwright no siempre llega a un panel vacío)
 const dnd = async (src, dst) => {
@@ -310,12 +410,24 @@ const dnd = async (src, dst) => {
 };
 // las dos DFT de V(out) en el mismo panel: dos curvas y dos nombres
 await dnd(page.locator('.pane').nth(2).locator('.trace-chip').first(), page.locator('.pane').nth(1).locator('.pane-chart'));
-check((await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann,V(out)-Rec' && (await page.locator('.pane').nth(1).locator('.uplot .u-legend .u-series').count().catch(() => 0)) !== 1, `dos DFT de la misma señal en un panel: ${await fftNames(1)}`);
+check(
+  (await fftNames(1)) === 'V(out)-Hann,V(out)/2-Hann,V(out)-Rec' &&
+    (await page
+      .locator('.pane')
+      .nth(1)
+      .locator('.uplot .u-legend .u-series')
+      .count()
+      .catch(() => 0)) !== 1,
+  `dos DFT de la misma señal en un panel: ${await fftNames(1)}`,
+);
 // el panel que quedó vacío acepta una traza de tiempo; uno de DFT, no
 await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(1).locator('.pane-chart'));
 check((await fftNames(0)) === 'V(out),V(out)/2', 'una traza de tiempo no va a un panel de DFT');
 await dnd(page.locator('.pane').first().locator('.trace-chip', { hasText: 'V(out)/2' }), page.locator('.pane').nth(2).locator('.pane-empty'));
-check((await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2', `el panel vacío (antes de DFT) acepta una traza de tiempo: ${await fftNames(0)} | ${await fftNames(1)} | ${await fftNames(2)} (${await page.locator('.pane').count()})`);
+check(
+  (await fftNames(0)) === 'V(out)' && (await fftNames(2)) === 'V(out)/2',
+  `el panel vacío (antes de DFT) acepta una traza de tiempo: ${await fftNames(0)} | ${await fftNames(1)} | ${await fftNames(2)} (${await page.locator('.pane').count()})`,
+);
 // y una DFT a un panel nuevo vacío
 await page.locator('.pane').nth(2).getByRole('button', { name: 'Quitar panel' }).click();
 await page.locator('.pane-add button').click();
@@ -333,10 +445,16 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   await field('Frecuencia de muestreo de la DFT').fill('2k');
   await frames(page);
   check(/^8 muestras · Δf = 250Hz$/.test(await sampling()), `muestreo elegido: ${await sampling()}`);
-  check((await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '8', `las 8 muestras se marcan sobre la traza (${await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')})`);
+  check(
+    (await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')) === '8',
+    `las 8 muestras se marcan sobre la traza (${await page.locator('.pane-chart .uplot').first().getAttribute('data-samples')})`,
+  );
   // un valor que no se entiende: en rojo, sin ⌖
   await field('Frecuencia de muestreo de la DFT').fill('abc');
-  check((await page.locator('.dft-field.bad').count()) === 1 && (await page.locator('.dft-tools .dft-pick').isDisabled()) && /^Escribí un número/.test(await sampling()), 'un valor que no se entiende se marca y no deja agregar');
+  check(
+    (await page.locator('.dft-field.bad').count()) === 1 && (await page.locator('.dft-tools .dft-pick').isDisabled()) && /^Escribí un número/.test(await sampling()),
+    'un valor que no se entiende se marca y no deja agregar',
+  );
   // 1000 muestras: no hace falta una potencia de 2
   await field('Frecuencia de muestreo de la DFT').fill('250k');
   await frames(page);
@@ -349,7 +467,10 @@ check((await page.locator('.trace-chip .name').allTextContents()).join() === 'V(
   // Editar la DFT: la barra toma su muestreo; Aplicar lo cambia
   await page.locator('.pane').nth(1).locator('.trace-chip').first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Editar la DFT (ventana y muestreo)' }).click();
-  check((await field('Frecuencia de muestreo de la DFT').inputValue()) === '250k' && /^Editando V\(out\)-Rec/.test(await sampling()), `al editar, la barra toma su muestreo (${await field('Frecuencia de muestreo de la DFT').inputValue()} · ${await sampling()})`);
+  check(
+    (await field('Frecuencia de muestreo de la DFT').inputValue()) === '250k' && /^Editando V\(out\)-Rec/.test(await sampling()),
+    `al editar, la barra toma su muestreo (${await field('Frecuencia de muestreo de la DFT').inputValue()} · ${await sampling()})`,
+  );
   await field('Frecuencia de muestreo de la DFT').fill('500k');
   await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
   await frames(page);
@@ -466,7 +587,10 @@ await page.keyboard.press('Control+z'); // sacar la tierra agregada
 await simCommand(page, 'Ruido');
 check(await page.locator('.analysis-list button.active', { hasText: 'Ruido' }).isVisible(), 'el comando de simulación se abre en el tipo elegido');
 await page.getByRole('button', { name: 'Elegir Nodo de salida en el esquemático' }).click();
-check(/elegir su red/.test(await page.locator('.hint-bar .hint-text').innerText()) && (await page.locator('.pick-banner').count()) === 0, 'el diálogo se oculta y la barra de estado pide elegir una red (sin cartel arriba, #331)');
+check(
+  /elegir su red/.test(await page.locator('.hint-bar .hint-text').innerText()) && (await page.locator('.pick-banner').count()) === 0,
+  'el diálogo se oculta y la barra de estado pide elegir una red (sin cartel arriba, #331)',
+);
 const outPick = await at(320, 128);
 await page.mouse.move(outPick.x, outPick.y);
 await page.mouse.click(outPick.x, outPick.y);
@@ -544,7 +668,10 @@ check(/@ 4\.9\d*k|@ 4\.89\d*k/.test(peak), `pico de resonancia cerca de 4.9 kHz 
 await page.getByRole('button', { name: 'Medidas' }).click();
 
 // #51: el "+" del borde inferior del último panel agrega uno debajo (y queda activo)
-await page.locator('.pane').last().hover({ position: { x: 200, y: 5 } });
+await page
+  .locator('.pane')
+  .last()
+  .hover({ position: { x: 200, y: 5 } });
 await page.getByRole('button', { name: 'Agregar panel' }).click();
 check((await page.locator('.pane').count()) === 2, 'el + del borde agrega un panel debajo');
 await page.getByLabel('Expresión').fill('V(out)/V(n001)');
@@ -561,7 +688,12 @@ await page.getByRole('button', { name: 'Quitar panel' }).nth(1).click();
 check((await page.locator('.pane').count()) === 1, 'se puede quitar un panel');
 {
   // #51: la punta de prueba no des-plotea; los colores no cambian al quitar una traza
-  const swatches = () => page.locator('.pane').first().locator('.trace-chip .swatch').evaluateAll((l) => l.map((e) => getComputedStyle(e).backgroundColor));
+  const swatches = () =>
+    page
+      .locator('.pane')
+      .first()
+      .locator('.trace-chip .swatch')
+      .evaluateAll((l) => l.map((e) => getComputedStyle(e).backgroundColor));
   const [cOut, cDiv] = await swatches();
   await page.mouse.click(outAc.x, outAc.y);
   await frames(page);
@@ -619,7 +751,10 @@ const canvas = page.locator('.pane-chart canvas').first();
 await canvas.evaluate((c) => (c.dataset.e2e = 'mismo'));
 await page.locator('.trace-chip').first().hover();
 await page.locator('.pane-chart').first().hover();
-await page.locator('.pane').first().click({ position: { x: 5, y: 5 } });
+await page
+  .locator('.pane')
+  .first()
+  .click({ position: { x: 5, y: 5 } });
 check((await canvas.evaluate((c) => c.dataset.e2e).catch(() => undefined)) === 'mismo', 'el gráfico no se recrea al pasar por una traza ni al activar el panel');
 // clicks seguidos y rápidos (sin esperar el doble click) cerca del A mueven siempre el A (el más cercano)
 // (el lugar del valor queda reservado: sin cursor dice "—")
@@ -652,7 +787,10 @@ const bMid = await headB();
 await page.mouse.move(rb.x + rb.width * 0.5, rb.y + rb.height / 2, { steps: 4 });
 await page.mouse.up();
 const b1 = await headB();
-check(b0 !== bMid && bMid !== b1 && lastA === (await headA()) && dx0 !== (await page.locator('.readout tr.dx').textContent()), `arrastrar el cursor B lo mueve en vivo (${b0} → ${bMid} → ${b1}), A queda`);
+check(
+  b0 !== bMid && bMid !== b1 && lastA === (await headA()) && dx0 !== (await page.locator('.readout tr.dx').textContent()),
+  `arrastrar el cursor B lo mueve en vivo (${b0} → ${bMid} → ${b1}), A queda`,
+);
 // flechas: punto a punto; borrar e intercambiar
 await page.keyboard.press('ArrowRight');
 check((await headB()) !== b1, `flecha → mueve el cursor B un punto (${await headB()})`);
@@ -667,7 +805,11 @@ await page.getByRole('button', { name: 'Cursores' }).click();
 
 {
   // markers como en ViVA: M sobre la traza bajo el mouse, V y H con sus cortes, A/D con sus diferencias
-  const names = () => page.locator('.pane-chart .uplot').first().evaluate((u) => u.dataset.markers ?? '');
+  const names = () =>
+    page
+      .locator('.pane-chart .uplot')
+      .first()
+      .evaluate((u) => u.dataset.markers ?? '');
   const readings = async () => ((await page.locator('.plot-panel').getAttribute('data-marker-readings')) ?? '').split('\n').filter(Boolean);
   const rowsOf = async (name) => (await readings()).filter((r) => r.startsWith(`${name}|`));
   check((await page.locator('section.readout-card[aria-label="Markers"]').count()) === 0, 'sin tabla de markers (las lecturas están en el gráfico)');
@@ -812,13 +954,29 @@ await page.screenshot({ path: `${OUT}/pz.png` });
 // #31: con .ac y ;.pz el mapa de polos y ceros se abre solo; con .step se superponen las corridas
 const rlcAsc = (extra, r = '10') =>
   [
-    'Version 4', 'SHEET 1 880 680', 'WIRE 0 16 0 -32', 'WIRE 0 -32 16 -32', 'WIRE 96 -32 112 -32', 'WIRE 192 -32 256 -32',
-    'FLAG 256 -32 out', 'FLAG 0 96 0', 'FLAG 192 32 0',
-    'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value AC 1',
-    'SYMBOL res 112 -48 R90', 'SYMATTR InstName R1', `SYMATTR Value ${r}`,
-    'SYMBOL ind 208 -48 R90', 'SYMATTR InstName L1', 'SYMATTR Value 1m',
-    'SYMBOL cap 176 -32 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1u',
-    'TEXT 0 160 Left 2 !.ac dec 100 100 100k', 'TEXT 0 192 Left 2 ;.pz N001 0 out 0 vol pz',
+    'Version 4',
+    'SHEET 1 880 680',
+    'WIRE 0 16 0 -32',
+    'WIRE 0 -32 16 -32',
+    'WIRE 96 -32 112 -32',
+    'WIRE 192 -32 256 -32',
+    'FLAG 256 -32 out',
+    'FLAG 0 96 0',
+    'FLAG 192 32 0',
+    'SYMBOL voltage 0 0 R0',
+    'SYMATTR InstName V1',
+    'SYMATTR Value AC 1',
+    'SYMBOL res 112 -48 R90',
+    'SYMATTR InstName R1',
+    `SYMATTR Value ${r}`,
+    'SYMBOL ind 208 -48 R90',
+    'SYMATTR InstName L1',
+    'SYMATTR Value 1m',
+    'SYMBOL cap 176 -32 R0',
+    'SYMATTR InstName C1',
+    'SYMATTR Value 1u',
+    'TEXT 0 160 Left 2 !.ac dec 100 100 100k',
+    'TEXT 0 192 Left 2 ;.pz N001 0 out 0 vol pz',
     ...extra.map((t, i) => `TEXT 0 ${224 + 32 * i} Left 2 ${t}`),
   ].join('\n') + '\n';
 const pzp = await context.newPage();
@@ -826,11 +984,14 @@ watch(pzp);
 await pzp.goto(URL);
 await pzp.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 const dropAsc = (name, text) =>
-  pzp.evaluate(([n, t]) => {
-    const dt = new DataTransfer();
-    dt.items.add(new File([t], n));
-    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
-  }, [name, text]);
+  pzp.evaluate(
+    ([n, t]) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([t], n));
+      window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    },
+    [name, text],
+  );
 await dropAsc('RLC pz.asc', rlcAsc([]));
 await pzp.waitForFunction(() => /workbench RLC pz/.test(document.body.innerText));
 await pzp.getByLabel('Correr', { exact: true }).click();
@@ -838,7 +999,10 @@ await pzp.locator('.pz-plane').waitFor({ timeout: 30000 });
 check((await pzp.getByRole('combobox', { name: 'Plot' }).inputValue()) === 'pz1', 'con .ac y .pz se abre el mapa de polos y ceros');
 const pole = await pzp.locator('.pz-plane path.pole').first().boundingBox();
 await pzp.mouse.move(pole.x + pole.width / 2, pole.y + pole.height / 2);
-const pzTip = await pzp.locator('.pz-tip').textContent().catch(() => '');
+const pzTip = await pzp
+  .locator('.pz-tip')
+  .textContent()
+  .catch(() => '');
 check(/5\.03\d*kHz/.test(pzTip) && /Q = 3\.16/.test(pzTip) && /ζ = 0\.158/.test(pzTip) && /τ = /.test(pzTip), `hover sobre un polo: f₀, Q, ζ, τ (${pzTip})`);
 check((await pzp.locator('.pz-table tr.hl').count()) === 1, 'el polo bajo el mouse se resalta en la tabla');
 const span0 = await pzp.locator('.pz-plane text').allTextContents();
@@ -913,7 +1077,10 @@ check(blue !== dark, `la vista que se muestra se distingue por color (${blue} / 
 await viewBtn('Esquemático').click();
 check((await page.locator('.workspace').getAttribute('class')) === 'workspace', 'con los dos prendidos, pantalla partida');
 await page.getByRole('button', { name: 'Resultados al costado' }).click();
-check((await page.locator('.workspace.side').count()) === 1 && (await page.getByRole('button', { name: 'Resultados al costado' }).getAttribute('aria-pressed')) === 'true', 'el botón de disposición pone los resultados al costado');
+check(
+  (await page.locator('.workspace.side').count()) === 1 && (await page.getByRole('button', { name: 'Resultados al costado' }).getAttribute('aria-pressed')) === 'true',
+  'el botón de disposición pone los resultados al costado',
+);
 await page.getByRole('button', { name: 'Resultados abajo' }).click();
 check((await page.locator('.workspace.side').count()) === 0, 'y el otro, abajo');
 await menu(page, 'Ver', 'Panel de resultados');
@@ -1006,7 +1173,10 @@ for (const where of ['al costado', 'abajo']) {
   await page.getByRole('button', { name: 'Mostrar esquemático' }).click();
   check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: restaurar vuelve al mismo tamaño (${before})`);
   await page.keyboard.press('Control+1');
-  check(!(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()), `${where}: Ctrl+1 deja sólo el esquemático, con pestaña para restaurar`);
+  check(
+    !(await page.locator('.results-panel').isVisible()) && (await page.getByRole('button', { name: 'Mostrar resultados' }).isVisible()),
+    `${where}: Ctrl+1 deja sólo el esquemático, con pestaña para restaurar`,
+  );
   await page.keyboard.press('Control+0');
   check(Math.abs((await rect('.results-panel'))[dim] - before) < 2, `${where}: Ctrl+0 restaura`);
   await page.keyboard.press('Control+2');
@@ -1028,7 +1198,8 @@ check(await page.locator('.results-panel').isVisible(), 'simular con el esquemá
 
 // --- #11: símbolos, modelos y bloques del usuario ---
 await menu(page, 'Archivos y bibliotecas', 'Mis símbolos y modelos…');
-const block = 'Version 4\nSHEET 1 880 680\nWIRE 16 96 16 112\nFLAG 16 16 in\nIOPIN 16 16 In\nFLAG 16 112 out\nIOPIN 16 112 Out\nFLAG 16 192 0\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k\nSYMBOL res 0 96 R0\nSYMATTR InstName R2\nSYMATTR Value {R}\nTEXT 0 240 Left 2 !.param R=2k\n';
+const block =
+  'Version 4\nSHEET 1 880 680\nWIRE 16 96 16 112\nFLAG 16 16 in\nIOPIN 16 16 In\nFLAG 16 112 out\nIOPIN 16 112 Out\nFLAG 16 192 0\nSYMBOL res 0 0 R0\nSYMATTR InstName R1\nSYMATTR Value 1k\nSYMBOL res 0 96 R0\nSYMATTR InstName R2\nSYMATTR Value {R}\nTEXT 0 240 Left 2 !.param R=2k\n';
 const libText = '* amplificador de ganancia 3\n.subckt amp3 in out\nE1 out 0 in 0 3\n.ends amp3\n';
 await page.getByLabel('Archivos de símbolos y modelos').setInputFiles([
   { name: 'div.asc', mimeType: 'text/plain', buffer: Buffer.from(block) },
@@ -1044,7 +1215,8 @@ await page.locator('.modal input').fill('amp3');
 check((await page.locator('.picker-list li', { hasText: 'Mis símbolos' }).filter({ hasText: 'amp3' }).count()) === 1, 'los símbolos propios aparecen en el buscador');
 await page.keyboard.press('Escape');
 // circuito que usa los dos: V1=3 → div (2 V) → amp3 (6 V)
-const top = 'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nWIRE 32 0 96 0\nWIRE 160 0 224 0\nFLAG -96 64 0\nFLAG 32 0 b\nFLAG 224 0 c\nSYMBOL voltage -96 -32 R0\nSYMATTR InstName V1\nSYMATTR Value 3\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMBOL amp3 128 0 R0\nSYMATTR InstName X2\nTEXT -96 128 Left 2 !.op\n';
+const top =
+  'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nWIRE 32 0 96 0\nWIRE 160 0 224 0\nFLAG -96 64 0\nFLAG 32 0 b\nFLAG 224 0 c\nSYMBOL voltage -96 -32 R0\nSYMATTR InstName V1\nSYMATTR Value 3\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMBOL amp3 128 0 R0\nSYMATTR InstName X2\nTEXT -96 128 Left 2 !.op\n';
 await page.getByRole('button', { name: 'Nuevo' }).click();
 await page.evaluate((t) => navigator.clipboard.writeText(t), top);
 await page.keyboard.press('Control+v');
@@ -1104,7 +1276,10 @@ await resultsMenu(page, /^Mediciones/);
 const mcRows = await page.locator('.meas-table tbody tr').allTextContents();
 const tvals = (await page.locator('.meas-table tbody tr td:nth-child(2)').allTextContents()).map((t) => parseFloat(t));
 const spread = Math.max(...tvals) - Math.min(...tvals);
-check(mcRows.length === 30 && spread > 0.05 && Math.min(...tvals) > 1.9 && Math.max(...tvals) < 2.5, `Monte Carlo: 30 corridas distintas dentro de ±10 % (${Math.min(...tvals)}m … ${Math.max(...tvals)}m)`);
+check(
+  mcRows.length === 30 && spread > 0.05 && Math.min(...tvals) > 1.9 && Math.max(...tvals) < 2.5,
+  `Monte Carlo: 30 corridas distintas dentro de ±10 % (${Math.min(...tvals)}m … ${Math.max(...tvals)}m)`,
+);
 check((await page.locator('.histogram').count()) === 1, 'histograma de la medición');
 await page.screenshot({ path: `${OUT}/montecarlo.png` });
 // "Ver código" editado a mano vuelve a ser tarjetas
@@ -1161,7 +1336,10 @@ const fcRows = await page.locator('.meas-table tbody tr').allTextContents();
 check(fcRows.length === 2, `la medición de f −3 dB, una por corrida (${fcRows.join(' | ')})`);
 // al reabrir se reconstruyen las tarjetas de simulación y de gráfico
 await page.keyboard.press('Alt+e');
-check((await page.locator('.study-card', { hasText: 'Simulación 2: AC (Bode)' }).count()) === 1 && (await page.locator('.study-card', { hasText: 'Gráfico' }).count()) === 1, 'al reabrir, vuelven las tarjetas de simulación y de gráfico');
+check(
+  (await page.locator('.study-card', { hasText: 'Simulación 2: AC (Bode)' }).count()) === 1 && (await page.locator('.study-card', { hasText: 'Gráfico' }).count()) === 1,
+  'al reabrir, vuelven las tarjetas de simulación y de gráfico',
+);
 await page.keyboard.press('Escape');
 
 // --- #23: Estudio con bloques ---
@@ -1186,23 +1364,46 @@ const prog = {
     languageVersion: 0,
     blocks: [
       {
-        type: 'ts_for_list', x: 20, y: 20,
+        type: 'ts_for_list',
+        x: 20,
+        y: 20,
         fields: { VAR: { id: 'vR' }, TARGET: 'component:R1', VALUES: '500 1k 2k' },
-        inputs: { DO: { block: { type: 'ts_simulate', next: { block: {
-          type: 'ts_measure', fields: { KIND: 'rise', SIGNAL: 'V(out)', A: '0.1', B: '0.9', VAR: { id: 'vT' } },
-          next: { block: {
-            type: 'controls_if',
-            inputs: {
-              IF0: { block: { type: 'logic_compare', fields: { OP: 'GT' }, inputs: { A: { block: { type: 'variables_get', fields: { VAR: { id: 'vT' } } } }, B: { block: { type: 'math_number', fields: { NUM: 0.003 } } } } } },
-              DO0: { block: { type: 'ts_message', fields: { TEXT: 'R1 demasiado grande' } } },
+        inputs: {
+          DO: {
+            block: {
+              type: 'ts_simulate',
+              next: {
+                block: {
+                  type: 'ts_measure',
+                  fields: { KIND: 'rise', SIGNAL: 'V(out)', A: '0.1', B: '0.9', VAR: { id: 'vT' } },
+                  next: {
+                    block: {
+                      type: 'controls_if',
+                      inputs: {
+                        IF0: {
+                          block: {
+                            type: 'logic_compare',
+                            fields: { OP: 'GT' },
+                            inputs: { A: { block: { type: 'variables_get', fields: { VAR: { id: 'vT' } } } }, B: { block: { type: 'math_number', fields: { NUM: 0.003 } } } },
+                          },
+                        },
+                        DO0: { block: { type: 'ts_message', fields: { TEXT: 'R1 demasiado grande' } } },
+                      },
+                      next: { block: { type: 'ts_plot_xy', fields: { Y: { id: 'vT' }, X: { id: 'vR' } } } },
+                    },
+                  },
+                },
+              },
             },
-            next: { block: { type: 'ts_plot_xy', fields: { Y: { id: 'vT' }, X: { id: 'vR' } } } },
-          } },
-        } } } } },
+          },
+        },
       },
     ],
   },
-  variables: [{ name: 'R', id: 'vR' }, { name: 'trise', id: 'vT' }],
+  variables: [
+    { name: 'R', id: 'vR' },
+    { name: 'trise', id: 'vT' },
+  ],
 };
 await page.locator('.study-blocks').evaluate((el, json) => el.loadProgram(json), prog);
 check(/\.control/.test(await page.locator('.modal .hint').last().textContent()), 'con lógica se guarda como .control');
@@ -1239,7 +1440,10 @@ check((logText.match(/R1 demasiado grande/g) ?? []).length === 1, 'la condición
 await page.keyboard.press('Alt+e');
 await page.locator('.study-blocks .blocklySvg').waitFor({ timeout: 20000 });
 const again = await blockText();
-check(again.some((t) => /R1 demasiado grande/.test(t)), 'al reabrir, el programa de bloques se recupera');
+check(
+  again.some((t) => /R1 demasiado grande/.test(t)),
+  'al reabrir, el programa de bloques se recupera',
+);
 await page.screenshot({ path: `${OUT}/blocks.png` });
 await page.keyboard.press('Escape');
 
@@ -1267,16 +1471,21 @@ await page.keyboard.press('Escape');
   const ac1 = () => ({ type: 'ts_source', fields: { WHAT: 'acmag', SOURCE: 'V1' }, inputs: { VALUE: { block: { type: 'math_number', fields: { NUM: 1 } } } } });
   // op + ac + tran en secuencia, una medida de cada uno y una tabla
   await runProgram({
-    blocks: { languageVersion: 0, blocks: [link(
-      ac1(),
-      { type: 'ts_op' },
-      { type: 'ts_vector', fields: { FN: 'first', SIGNAL: 'V(out)', ANALYSIS: 'op', VAR: v('vop') } },
-      { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '1', FSTOP: '1meg' } },
-      { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('fc') } },
-      { type: 'ts_tran', fields: { TSTOP: '10m', TSTEP: '', TSTART: '', UIC: false } },
-      { type: 'ts_vector', fields: { FN: 'max', SIGNAL: 'V(out)', ANALYSIS: 'tran', VAR: v('peak') } },
-      { type: 'ts_table_row', fields: { COLS: 'vop fc peak' } },
-    )] },
+    blocks: {
+      languageVersion: 0,
+      blocks: [
+        link(
+          ac1(),
+          { type: 'ts_op' },
+          { type: 'ts_vector', fields: { FN: 'first', SIGNAL: 'V(out)', ANALYSIS: 'op', VAR: v('vop') } },
+          { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '1', FSTOP: '1meg' } },
+          { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('fc') } },
+          { type: 'ts_tran', fields: { TSTOP: '10m', TSTEP: '', TSTART: '', UIC: false } },
+          { type: 'ts_vector', fields: { FN: 'max', SIGNAL: 'V(out)', ANALYSIS: 'tran', VAR: v('peak') } },
+          { type: 'ts_table_row', fields: { COLS: 'vop fc peak' } },
+        ),
+      ],
+    },
     variables: vars,
   });
   const head = await page.locator('.meas-panel thead th').allTextContents();
@@ -1285,20 +1494,33 @@ await page.keyboard.press('Escape');
   // Monte Carlo de 100 corridas: lista, histograma y rendimiento
   const rnd = (nom, tol) => ({ type: 'ts_random', fields: { DIST: 'uniform', TOL: tol }, inputs: { NOM: { block: { type: 'math_number', fields: { NUM: nom } } } } });
   await runProgram({
-    blocks: { languageVersion: 0, blocks: [link(
-      ac1(),
-      { type: 'ts_seed', fields: { SEED: 1 } },
-      { type: 'ts_repeat', fields: { TIMES: 100 }, inputs: { DO: { block: link(
-        { type: 'ts_set', fields: { TARGET: 'component:R1' }, inputs: { VALUE: { block: rnd(1000, 5) } } },
-        { type: 'ts_set', fields: { TARGET: 'component:C1' }, inputs: { VALUE: { block: rnd(1e-7, 10) } } },
-        { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '10', FSTOP: '1meg' } },
-        { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('m') } },
-        { type: 'ts_list_add', fields: { LIST: v('ms') }, inputs: { VALUE: { block: get('m') } } },
-      ) } } },
-      { type: 'ts_histogram', fields: { LIST: v('ms') } },
-      { type: 'ts_list_stat', fields: { STAT: 'yield', LIST: v('ms'), A: '1.5k', B: '1.7k', VAR: v('yield') } },
-      { type: 'ts_print', inputs: { VALUE: { block: get('yield') } } },
-    )] },
+    blocks: {
+      languageVersion: 0,
+      blocks: [
+        link(
+          ac1(),
+          { type: 'ts_seed', fields: { SEED: 1 } },
+          {
+            type: 'ts_repeat',
+            fields: { TIMES: 100 },
+            inputs: {
+              DO: {
+                block: link(
+                  { type: 'ts_set', fields: { TARGET: 'component:R1' }, inputs: { VALUE: { block: rnd(1000, 5) } } },
+                  { type: 'ts_set', fields: { TARGET: 'component:C1' }, inputs: { VALUE: { block: rnd(1e-7, 10) } } },
+                  { type: 'ts_ac', fields: { MODE: 'dec', POINTS: '50', FSTART: '10', FSTOP: '1meg' } },
+                  { type: 'ts_measure', fields: { KIND: 'f3db', SIGNAL: 'V(out)', A: '', B: '', VAR: v('m') } },
+                  { type: 'ts_list_add', fields: { LIST: v('ms') }, inputs: { VALUE: { block: get('m') } } },
+                ),
+              },
+            },
+          },
+          { type: 'ts_histogram', fields: { LIST: v('ms') } },
+          { type: 'ts_list_stat', fields: { STAT: 'yield', LIST: v('ms'), A: '1.5k', B: '1.7k', VAR: v('yield') } },
+          { type: 'ts_print', inputs: { VALUE: { block: get('yield') } } },
+        ),
+      ],
+    },
     variables: vars,
   });
   const mcRows = await page.locator('.meas-panel tbody tr').count();
@@ -1323,13 +1545,28 @@ await page.locator('svg.editor .sym').first().waitFor();
       await page.keyboard.press('Escape');
       const p = await at(0, 56);
       await page.mouse.dblclick(p.x, p.y);
-      if (await page.getByRole('dialog', { name: 'Fuente de tensión V1' }).waitFor({ timeout: 2000 }).then(() => true, () => false)) return;
+      if (
+        await page
+          .getByRole('dialog', { name: 'Fuente de tensión V1' })
+          .waitFor({ timeout: 2000 })
+          .then(
+            () => true,
+            () => false,
+          )
+      )
+        return;
       await frames(page);
     }
   };
   await openV1();
   const sd = page.getByRole('dialog', { name: 'Fuente de tensión V1' });
-  check(await sd.waitFor({ timeout: 5000 }).then(() => true, () => false), 'doble click en una fuente abre su ventana');
+  check(
+    await sd.waitFor({ timeout: 5000 }).then(
+      () => true,
+      () => false,
+    ),
+    'doble click en una fuente abre su ventana',
+  );
   const field = (n) => sd.getByLabel(n, { exact: true });
   check((await sd.getByRole('tab', { selected: true }).textContent()) === 'Pulso', 'reconoce el PULSE del ejemplo');
   const pulseVals = [await field('Ton').inputValue(), await field('Período').inputValue(), await field('Frecuencia').inputValue(), await field('DC').inputValue()];
@@ -1360,7 +1597,10 @@ await page.locator('svg.editor .sym').first().waitFor();
   await sd.getByLabel('Valor de la fuente').fill('wavefile="x.wav" chan=0');
   await sd.getByRole('button', { name: 'Aceptar' }).click();
   await openV1();
-  check((await sd.getByLabel('Valor de la fuente').inputValue()) === 'wavefile="x.wav" chan=0' && (await sd.getByText('el formulario no sabe editar').count()) === 1, 'lo que no reconoce abre como texto');
+  check(
+    (await sd.getByLabel('Valor de la fuente').inputValue()) === 'wavefile="x.wav" chan=0' && (await sd.getByText('el formulario no sabe editar').count()) === 1,
+    'lo que no reconoce abre como texto',
+  );
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
@@ -1378,7 +1618,13 @@ await page.locator('svg.editor .sym').first().waitFor();
   await open(236, 208); // Q1
   const dlg = page.getByRole('dialog');
   const table = dlg.locator('.parts-table');
-  check(await table.waitFor({ timeout: 5000 }).then(() => true, () => false), 'doble click en un transistor muestra la tabla de la librería');
+  check(
+    await table.waitFor({ timeout: 5000 }).then(
+      () => true,
+      () => false,
+    ),
+    'doble click en un transistor muestra la tabla de la librería',
+  );
   const heads = await table.locator('th').allTextContents();
   check(heads[0] === 'Nombre' && heads.some((h) => h.startsWith('Vceo')) && heads.some((h) => h.startsWith('Fabricante')), `con los parámetros relevantes en columnas (${heads.join(', ')})`);
   const rowNames = () => table.locator('tbody tr:not(.empty) td:first-child').allTextContents();
@@ -1388,7 +1634,14 @@ await page.locator('svg.editor .sym').first().waitFor();
   check((await table.locator('tr.empty').count()) === 1, 'la búsqueda filtra');
   await dlg.getByLabel('Buscar en la librería').fill('BC547C');
   await table.locator('tbody tr', { has: page.locator('td:first-child', { hasText: /^BC547C$/ }) }).click();
-  check((await dlg.locator('label', { hasText: /^Value/ }).locator('input').first().inputValue()) === 'BC547C', 'click en una fila pone el valor');
+  check(
+    (await dlg
+      .locator('label', { hasText: /^Value/ })
+      .locator('input')
+      .first()
+      .inputValue()) === 'BC547C',
+    'click en una fila pone el valor',
+  );
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
   // un resistor: doble click en la fila elige y acepta
   await open(256, 48); // RC
@@ -1407,10 +1660,22 @@ const fp = await fresh.newPage();
 await fp.goto(URL);
 await fp.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 check((await fp.getByRole('dialog').count()) === 0, 'la primera visita no abre ningún diálogo');
-check((await fp.locator('.capsule-project').textContent()) === 'Project' && (await fp.locator('svg.editor .sym').count()) === 0, `la primera visita abre un proyecto vacío (${await fp.locator('.capsule-project').textContent()})`);
+check(
+  (await fp.locator('.capsule-project').textContent()) === 'Project' && (await fp.locator('svg.editor .sym').count()) === 0,
+  `la primera visita abre un proyecto vacío (${await fp.locator('.capsule-project').textContent()})`,
+);
 check((await fp.locator('.project-tree').count()) === 1, 'la primera visita muestra el panel del proyecto abierto');
 await menu(fp, 'Acerca de TurboSpice');
-check(await fp.getByRole('dialog', { name: 'Acerca de TurboSpice' }).waitFor({ timeout: 5000 }).then(() => true, () => false), 'Menú › Acerca de abre el diálogo');
+check(
+  await fp
+    .getByRole('dialog', { name: 'Acerca de TurboSpice' })
+    .waitFor({ timeout: 5000 })
+    .then(
+      () => true,
+      () => false,
+    ),
+  'Menú › Acerca de abre el diálogo',
+);
 await fp.keyboard.press('Escape');
 await menu(fp, 'Ejemplos', 'Common Emitter');
 await fp.locator('svg.editor .sym').first().waitFor();

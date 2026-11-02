@@ -68,6 +68,10 @@ for (const [name, rots] of Object.entries(stats)) {
   }
 }
 
-const sorted = Object.fromEntries(Object.keys(result).sort().map((k) => [k, result[k]]));
+const sorted = Object.fromEntries(
+  Object.keys(result)
+    .sort()
+    .map((k) => [k, result[k]]),
+);
 writeFileSync(OUT, JSON.stringify(sorted, null, 1) + '\n');
 console.log(`${Object.keys(sorted).length} símbolos con posiciones por orientación → library/window-defaults.json`);

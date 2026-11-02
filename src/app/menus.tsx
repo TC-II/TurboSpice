@@ -91,8 +91,46 @@ export interface MenuActions {
 
 export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: MenuItem[]; simItems: MenuItem[] } {
   const { google, history, status, running, sim, bias, selection, docLine, editor, ltIndex, ltInput, recent, shapeStyle, theme, setTheme, setDialog, setTool, setTutorialOpen } = a;
-  const { shapeTool, openLineStyle, paste, newSim, complexSim, openSimulation, openSaves, openStudy, openControl, doImport, doRemoveLtspice, doNew, doOpen, doSave, doSaveLocal, exportZip, doShare, doExport, exportNetlist } = a;
-  const { copySelection, deleteSelection, selectAll, rotateOrMirror, startMove, run, abort, showLog, showOp, setShowOp, netHover, setNetHover, zoomBox, showGrid, setShowGrid, showLoose, setShowLoose } = a;
+  const {
+    shapeTool,
+    openLineStyle,
+    paste,
+    newSim,
+    complexSim,
+    openSimulation,
+    openSaves,
+    openStudy,
+    openControl,
+    doImport,
+    doRemoveLtspice,
+    doNew,
+    doOpen,
+    doSave,
+    doSaveLocal,
+    exportZip,
+    doShare,
+    doExport,
+    exportNetlist,
+  } = a;
+  const {
+    copySelection,
+    deleteSelection,
+    selectAll,
+    rotateOrMirror,
+    startMove,
+    run,
+    abort,
+    showLog,
+    showOp,
+    setShowOp,
+    netHover,
+    setNetHover,
+    zoomBox,
+    showGrid,
+    setShowGrid,
+    showLoose,
+    setShowLoose,
+  } = a;
   const { showSimCommand, toggleSimCommand, showNets, setShowNets, resultsSide, setSide, treeOpen, toggleTree, resultsShown, toggleResultsPanel, onNetlist, doExample, doRecent } = a;
   const placeTool = (type: string) => () => setTool({ kind: 'place', type, orient: 'R0' });
   // Figuras: en el menú Dibujar y en el botón de la barra (#64)
@@ -111,7 +149,13 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
   // análisis programados. Los testbenches
   // se eligen en el panel del proyecto (#180)
   const simItems: MenuItem[] = [
-    ...ANALYSES.map((x) => ({ label: x.label, lead: <AnalysisIcon kind={x.kind} />, title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }), current: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind, onClick: () => newSim(x.kind) })),
+    ...ANALYSES.map((x) => ({
+      label: x.label,
+      lead: <AnalysisIcon kind={x.kind} />,
+      title: docLine && !isComplexLine(docLine) ? t('New testbench with this simulation: {help}', { help: x.help }) : t('Simulation of this testbench: {help}', { help: x.help }),
+      current: ANALYSIS_LINE.exec(docLine)?.[1].toLowerCase() === x.kind,
+      onClick: () => newSim(x.kind),
+    })),
     {
       label: t('Complex simulation'),
       lead: <AnalysisIcon kind="complex" />,
@@ -142,7 +186,11 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
         { label: ltIndex ? t('Import again…') : t('Choose the lib folder…'), onClick: () => ltInput.current?.click() },
         ...(ltIndex
           ? [
-              { label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString(locale()) }), disabled: true, onClick: () => {} },
+              {
+                label: t('{symbols} symbols, {models} model files ({p2})', { symbols: ltIndex.count.symbols, models: ltIndex.count.models, p2: new Date(ltIndex.time).toLocaleDateString(locale()) }),
+                disabled: true,
+                onClick: () => {},
+              },
               { label: t('Remove'), onClick: doRemoveLtspice },
             ]
           : []),
@@ -237,7 +285,12 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
         { label: t('Previous zoom'), shortcut: 'Shift+Z', onClick: () => editor.current?.zoomPrev() },
         { label: t('Grid'), shortcut: 'Ctrl+G', onClick: () => setShowGrid((v) => !v), checked: showGrid },
         { label: t('Unconnected pin marks'), shortcut: 'Ctrl+U', onClick: () => setShowLoose((v) => !v), checked: showLoose },
-        { label: t('Show directives'), title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'), onClick: toggleSimCommand, checked: showSimCommand },
+        {
+          label: t('Show directives'),
+          title: t('Draw .tran, .ac…, .param, .step, .meas and .control on the schematic, like LTspice (they are edited from the simulation bar, the project panel and the Studio)'),
+          onClick: toggleSimCommand,
+          checked: showSimCommand,
+        },
         { label: t('Net names'), shortcut: 'Alt+N', onClick: () => setShowNets((v) => !v), checked: showNets },
         { label: t('Results on the side'), onClick: () => setSide(!resultsSide), checked: resultsSide },
         { label: t('Project panel (subcircuits)'), onClick: toggleTree, checked: treeOpen },
@@ -255,12 +308,28 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
       label: t('Examples'),
       items: [
         { label: 'Sample Project', onClick: () => doExample(SAMPLE) },
-        { label: 'Transfer functions', title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'), onClick: () => doExample(TRANSFER) },
-        { label: 'Transistor amplifiers', title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'), onClick: () => doExample(AMPS) },
-        { label: 'Loop stability', title: t('Loop gain (.stb) with the single-ended and the differential loop probe: Tian and GFT methods, phase and gain margins, root locus and the step response that confirms them'), onClick: () => doExample(STABILITY) },
+        {
+          label: 'Transfer functions',
+          title: t('RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map'),
+          onClick: () => doExample(TRANSFER),
+        },
+        {
+          label: 'Transistor amplifiers',
+          title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'),
+          onClick: () => doExample(AMPS),
+        },
+        {
+          label: 'Loop stability',
+          title: t('Loop gain (.stb) with the single-ended and the differential loop probe: Tian and GFT methods, phase and gain margins, root locus and the step response that confirms them'),
+          onClick: () => doExample(STABILITY),
+        },
         { label: 'sky130', title: t('SkyWater sky130 PDK: NMOS output curves and a CMOS inverter in the tt, ff and ss corners'), onClick: () => doExample(SKY130) },
         { label: 'gf180', title: t('GlobalFoundries GF180MCU PDK: NMOS output curves and a CMOS inverter in the tt, ff and ss corners'), onClick: () => doExample(GF180) },
-        { label: 'ADCs', title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'), onClick: () => doExample(ADC) },
+        {
+          label: 'ADCs',
+          title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'),
+          onClick: () => doExample(ADC),
+        },
         'sep',
         ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
       ],

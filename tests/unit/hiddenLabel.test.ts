@@ -8,11 +8,13 @@ import { patchLabels } from '../../src/schematic/edit.ts';
 import { labelRows } from '../../src/schematic/dialogs.tsx';
 
 const lib = new Library(buildBundle());
-const cap = (orient: string) =>
-  parseAsc(`Version 4\nSHEET 1 880 680\nSYMBOL cap 0 0 ${orient}\nSYMATTR InstName C1\nSYMATTR Value 1u\nSYMATTR SpiceLine IC=1\n`);
+const cap = (orient: string) => parseAsc(`Version 4\nSHEET 1 880 680\nSYMBOL cap 0 0 ${orient}\nSYMATTR InstName C1\nSYMATTR Value 1u\nSYMATTR SpiceLine IC=1\n`);
 
 describe('rótulo oculto que se vuelve a mostrar', () => {
-  for (const [orient, local] of [['R0', 'Left'], ['R90', 'VTop']] as const) {
+  for (const [orient, local] of [
+    ['R0', 'Left'],
+    ['R90', 'VTop'],
+  ] as const) {
     it(`${orient}: con la orientación del valor`, () => {
       let d = cap(orient);
       d = patchLabels(d, [0], new Map([[39, { visible: true, create: { x: 56, y: 32, align: local, size: 2 } }]]), lib);

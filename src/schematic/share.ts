@@ -75,7 +75,15 @@ export async function expandTurbo(text: string): Promise<string> {
   }
   raw.blobs = out;
   const fix = (x: unknown): unknown =>
-    typeof x === 'string' ? (/^@\d+$/.test(x) ? (real.get(x) ?? x) : x) : Array.isArray(x) ? x.map(fix) : isObj(x) ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === 'blobs' ? v : fix(v)])) : x;
+    typeof x === 'string'
+      ? /^@\d+$/.test(x)
+        ? (real.get(x) ?? x)
+        : x
+      : Array.isArray(x)
+        ? x.map(fix)
+        : isObj(x)
+          ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, k === 'blobs' ? v : fix(v)]))
+          : x;
   return JSON.stringify(fix(raw));
 }
 

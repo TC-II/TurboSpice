@@ -96,8 +96,20 @@ describe('.turbo', () => {
   it('un .turbo de la versión 1 (variantes) se abre como testbenches', async () => {
     const a = serializeAsc(docWith('.tran 10m'));
     const h = await hashText(a);
-    const v1 = { format: 'turbospice', version: 1, name: 'Viejo', created: '', modified: '', files: [], activeVariant: 'v2', blobs: { [h]: a },
-      variants: [{ id: 'v1', name: 'Uno', base: h, activeSim: '', sims: [] }, { id: 'v2', name: 'Dos', base: h, activeSim: 's1', sims: [{ id: 's1', current: h, runs: [] }] }] };
+    const v1 = {
+      format: 'turbospice',
+      version: 1,
+      name: 'Viejo',
+      created: '',
+      modified: '',
+      files: [],
+      activeVariant: 'v2',
+      blobs: { [h]: a },
+      variants: [
+        { id: 'v1', name: 'Uno', base: h, activeSim: '', sims: [] },
+        { id: 'v2', name: 'Dos', base: h, activeSim: 's1', sims: [{ id: 's1', current: h, runs: [] }] },
+      ],
+    };
     const { project, warnings } = await parseTurbo(JSON.stringify(v1));
     expect(warnings).toEqual([]);
     expect(project.variants[0].sims.map((s) => s.name)).toEqual(['Uno', 'Dos']);

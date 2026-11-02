@@ -11,7 +11,10 @@ describe('hoja de export (#326)', () => {
   });
 
   it('el tamaño es siempre múltiplo de la grilla', () => {
-    for (const b of [{ x: -7.5, y: 12.25, w: 33.3, h: 0.1 }, { x: 1000.4, y: -999.9, w: 1, h: 1 }]) {
+    for (const b of [
+      { x: -7.5, y: 12.25, w: 33.3, h: 0.1 },
+      { x: 1000.4, y: -999.9, w: 1, h: 1 },
+    ]) {
       const s = sheetBox(b);
       for (const v of [s.x, s.y, s.w, s.h]) expect(Math.abs(v % SHEET_GRID)).toBe(0);
       expect(s.x).toBeLessThanOrEqual(b.x - SHEET_GRID);

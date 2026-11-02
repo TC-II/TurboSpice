@@ -113,7 +113,10 @@ await page.keyboard.press('Control+u');
 const symPos = () => page.evaluate(() => document.querySelector('svg.editor .symbols').innerHTML.replace(/ sel/g, ''));
 // largo total de los cables: mover sin estirar lo conserva aunque un pin, al soltarse en medio de
 // un cable, lo parta en dos (unión en T); estirar lo cambia
-const wireLength = () => page.evaluate(() => [...document.querySelectorAll('svg.editor .wires line')].reduce((n, l) => n + Math.abs(+l.getAttribute('x2') - +l.getAttribute('x1')) + Math.abs(+l.getAttribute('y2') - +l.getAttribute('y1')), 0));
+const wireLength = () =>
+  page.evaluate(() =>
+    [...document.querySelectorAll('svg.editor .wires line')].reduce((n, l) => n + Math.abs(+l.getAttribute('x2') - +l.getAttribute('x1')) + Math.abs(+l.getAttribute('y2') - +l.getAttribute('y1')), 0),
+  );
 const before = await symPos();
 const lenBefore = await wireLength();
 await page.keyboard.press('m');

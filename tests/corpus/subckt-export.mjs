@@ -58,7 +58,10 @@ const conn = connectivity(doc, (tt) => lib.symbol(tt));
 const refs = [
   { kind: 'symbol', index: 1 },
   { kind: 'symbol', index: 2 },
-  ...doc.flags.map((f, i) => ({ kind: 'flag', index: i, f })).filter((x) => x.f.x === 128).map(({ kind, index }) => ({ kind, index })),
+  ...doc.flags
+    .map((f, i) => ({ kind: 'flag', index: i, f }))
+    .filter((x) => x.f.x === 128)
+    .map(({ kind, index }) => ({ kind, index })),
 ];
 const r = extractSubckt(doc, refs, conn, lib, 'DIV');
 if (typeof r === 'string') throw new Error(r);
@@ -70,7 +73,10 @@ for (const f of parent.flags.filter((f) => f.x >= inst.x - 64 && f.x <= inst.x +
 const p0 = newProject('Oráculo DIV');
 const p = {
   ...p0,
-  files: [{ name: 'DIV.asc', kind: 'schematic', text: serializeAsc(r.sub) }, { name: 'DIV.asy', kind: 'symbol', text: r.symbol }],
+  files: [
+    { name: 'DIV.asc', kind: 'schematic', text: serializeAsc(r.sub) },
+    { name: 'DIV.asy', kind: 'symbol', text: r.symbol },
+  ],
   variants: p0.variants.map((v) => ({ ...v, sims: v.sims.map((s) => ({ ...s, asc: serializeAsc(parent) })) })),
 };
 lib.setProjectFiles(p.files);
@@ -96,7 +102,10 @@ const files = await readZip(exportAllZip(p, lib).bytes);
 const ex = join(dir, 'zip');
 mkdirSync(ex);
 for (const f of files) writeFileSync(join(ex, f.path), f.data);
-check(['DIV.asc', 'DIV.asy'].every((n) => files.some((f) => f.path === n)), `el .zip trae DIV.asc y DIV.asy junto al testbench (${files.map((f) => f.path).join(', ')})`);
+check(
+  ['DIV.asc', 'DIV.asy'].every((n) => files.some((f) => f.path === n)),
+  `el .zip trae DIV.asc y DIV.asy junto al testbench (${files.map((f) => f.path).join(', ')})`,
+);
 
 if (!has('xvfb-run') || !existsSync(LTSPICE)) {
   console.log(`- LTspice: se saltea (${has('xvfb-run') ? 'no está LTspice en Wine' : 'falta xvfb-run'}); los archivos quedaron en ${ex}`);

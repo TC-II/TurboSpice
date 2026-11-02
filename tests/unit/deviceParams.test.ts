@@ -36,7 +36,10 @@ describe('nombres de vectores @dev[param]', () => {
   });
 
   it('referencias y unidad de una traza', () => {
-    expect(deviceRefs('@Q1[gm]/Ic(Q1)*@x_u1.q1[gpi]')).toEqual([{ device: 'Q1', param: 'gm' }, { device: 'x_u1.q1', param: 'gpi' }]);
+    expect(deviceRefs('@Q1[gm]/Ic(Q1)*@x_u1.q1[gpi]')).toEqual([
+      { device: 'Q1', param: 'gm' },
+      { device: 'x_u1.q1', param: 'gpi' },
+    ]);
     expect(deviceExprUnit('@Q1[gm]')).toBe('S');
     expect(deviceExprUnit('V(out)')).toBeNull();
   });
@@ -69,7 +72,13 @@ const sim = {
     ],
     blocks: [],
   },
-  ng: { names: new Map([['Q1', 'q1'], ['Q§X1', 'q_x1'], ['R1', 'r1']]) },
+  ng: {
+    names: new Map([
+      ['Q1', 'q1'],
+      ['Q§X1', 'q_x1'],
+      ['R1', 'r1'],
+    ]),
+  },
 } as unknown as BuiltSimulation;
 
 const vec = (name: string, v: number) => ({ name, type: 0, real: Float64Array.of(v, v) });

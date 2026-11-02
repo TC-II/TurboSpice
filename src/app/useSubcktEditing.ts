@@ -6,7 +6,18 @@ import { verilogFile, verilogPorts } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Library } from '../library/library.ts';
 import { exportSubcktNetlist } from '../project/exchange.ts';
-import { adoptModelSymbol, modelParams, modelSymbolText, setModelParams, setSymAttr as setModelAttr, storeModelSymbol, storeModelText, subcktParams, symAttr, syncModelAttrs } from '../project/modelModule.ts';
+import {
+  adoptModelSymbol,
+  modelParams,
+  modelSymbolText,
+  setModelParams,
+  setSymAttr as setModelAttr,
+  storeModelSymbol,
+  storeModelText,
+  subcktParams,
+  symAttr,
+  syncModelAttrs,
+} from '../project/modelModule.ts';
 import { staleInstances } from '../project/staleInstances.ts';
 import { moduleFile, storeSubckt, storeSymbol, subcktFile, subcktPorts, subcktSymbolText, symbolOutdated, updateSymbol } from '../project/subckt.ts';
 import { adoptSymbol, symParams } from '../project/symbolEdit.ts';
@@ -38,7 +49,10 @@ export interface SubcktEditingDeps {
 export function useSubcktEditing({ project, projectRef, setProjectState, editProject, snapshot, curSub, curModel, doc, liveDoc, docRef, commit, lib, warnShared, setMessage }: SubcktEditingDeps) {
   const curModule = curSub ? moduleFile(project, curSub) : undefined;
   const curVerilog = curModule?.kind === 'verilog' ? curModule : undefined;
-  const subPorts = useMemo(() => (curVerilog ? verilogPorts(curVerilog, subcktSymbolText(project, curSub)).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []), [curSub, curVerilog, liveDoc, project]);
+  const subPorts = useMemo(
+    () => (curVerilog ? verilogPorts(curVerilog, subcktSymbolText(project, curSub)).map((x) => x.name) : curSub ? subcktPorts(liveDoc) : []),
+    [curSub, curVerilog, liveDoc, project],
+  );
   const subPortsKey = subPorts.join(',');
   const syncPorts = useEvent(() => {
     if (!curSub || curVerilog) return;

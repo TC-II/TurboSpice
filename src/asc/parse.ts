@@ -1,16 +1,5 @@
 // Parser de .asc (esquemático) y .asy (símbolo) de LTspice.
-import {
-  emptyDoc,
-  ORIENTS,
-  type AscDoc,
-  type Orient,
-  type PinDef,
-  type Shape,
-  type ShapeKind,
-  type SymbolDef,
-  type SymbolInst,
-  type TextWindow,
-} from './model.ts';
+import { emptyDoc, ORIENTS, type AscDoc, type Orient, type PinDef, type Shape, type ShapeKind, type SymbolDef, type SymbolInst, type TextWindow } from './model.ts';
 import { t } from '../i18n/i18n.ts';
 
 const SHAPES = new Set<ShapeKind>(['LINE', 'RECTANGLE', 'CIRCLE', 'ARC', 'PATH', 'IMAGE']);

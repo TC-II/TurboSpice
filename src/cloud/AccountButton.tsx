@@ -11,11 +11,7 @@ const BASE = import.meta.env.BASE_URL;
 
 function Avatar({ account }: { account: Account }) {
   const [broken, setBroken] = useState(false);
-  return account.photoLink && !broken ? (
-    <img src={account.photoLink} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} />
-  ) : (
-    <span>{initial(account)}</span>
-  );
+  return account.photoLink && !broken ? <img src={account.photoLink} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} /> : <span>{initial(account)}</span>;
 }
 
 /** No se muestra si no hay Client ID configurado */
@@ -74,14 +70,24 @@ export function AccountButton() {
                 <strong>{a.displayName}</strong>
                 {a.emailAddress && <span>{a.emailAddress}</span>}
               </div>
-              <p className="hint">{t('Your simulations live in the «')}{FOLDER_NAME}{t('» folder of your Google Drive: Open (Ctrl+O) lists them and Save (Ctrl+S) saves them there.')}</p>
-              <button role="menuitem" onClick={() => (signOut(), setOpen(false))}>{t('Sign out')}</button>
+              <p className="hint">
+                {t('Your simulations live in the «')}
+                {FOLDER_NAME}
+                {t('» folder of your Google Drive: Open (Ctrl+O) lists them and Save (Ctrl+S) saves them there.')}
+              </p>
+              <button role="menuitem" onClick={() => (signOut(), setOpen(false))}>
+                {t('Sign out')}
+              </button>
             </>
           ) : (
             <>
               <ul className="account-ticks">
-                <li>{t('This creates the folder')}{' '}<strong>{FOLDER_NAME}</strong> {t('in your Google Drive.')}</li>
-                <li>TurboSpice <strong>{t('can only see the files it creates itself')}</strong>.</li>
+                <li>
+                  {t('This creates the folder')} <strong>{FOLDER_NAME}</strong> {t('in your Google Drive.')}
+                </li>
+                <li>
+                  TurboSpice <strong>{t('can only see the files it creates itself')}</strong>.
+                </li>
               </ul>
               <button role="menuitem" className="primary" onClick={login} disabled={g.busy}>
                 {g.busy ? 'Conectando…' : t('Sign in with Google')}
@@ -114,7 +120,13 @@ export async function importToDrive(picked: { name: string; bytes: Uint8Array }[
  * "Mis simulaciones": la carpeta TurboSpice del Drive como lugar de trabajo. Buscar, abrir,
  * renombrar, duplicar, mandar a la papelera e importar .asc del equipo (se suben a la carpeta).
  */
-export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }: {
+export function DriveDialog({
+  currentId,
+  onOpen,
+  onRenamed,
+  onTrashed,
+  onClose,
+}: {
   /** archivo abierto ahora (se marca en la lista) */
   currentId?: string;
   onOpen(f: DriveFile): void;
@@ -150,7 +162,7 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
     if (!n) return;
     const name = `${n.replace(/\.(asc|turbo)$/i, '')}${ext}`;
     if (name === f.name) return;
-    if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(t('There\'s already a «{name}» in the folder', { name }));
+    if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(t("There's already a «{name}» in the folder", { name }));
     run('Renombrando…', async () => onRenamed?.(await drive.rename(f.id, name)));
   };
   const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(f.name.replace(/(\.(asc|turbo))?$/i, t(' (copy)$1')), names)));
@@ -174,7 +186,11 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
   return (
     <Modal title={t('My simulations')} onClose={onClose} large>
       <div className="drive-browser">
-        <p className="hint">{t('Folder «')}{FOLDER_NAME}{t('» folder of your Google Drive.')}</p>
+        <p className="hint">
+          {t('Folder «')}
+          {FOLDER_NAME}
+          {t('» folder of your Google Drive.')}
+        </p>
         <input
           type="search"
           className="drive-search"
@@ -191,7 +207,10 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
         ) : !files.length ? (
           <p className="hint">{t('No projects yet. Save with Ctrl+S or import an .asc from your computer.')}</p>
         ) : !shown.length ? (
-          <p className="hint">{t('Nothing matches «')}{query}».</p>
+          <p className="hint">
+            {t('Nothing matches «')}
+            {query}».
+          </p>
         ) : (
           <ul className="drive-list">
             {shown.map((f) => (
@@ -200,9 +219,15 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
                   <span>{f.name}</span>
                   {f.modifiedTime && <span className="hint">{new Date(f.modifiedTime).toLocaleString(locale())}</span>}
                 </button>
-                <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>✎</button>
-                <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>⧉</button>
-                <button className="drive-act" title={t('Move to trash')} aria-label={t('Delete {name}', { name: f.name })} onClick={() => trash(f)} disabled={!!busy}>🗑</button>
+                <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>
+                  ✎
+                </button>
+                <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>
+                  ⧉
+                </button>
+                <button className="drive-act" title={t('Move to trash')} aria-label={t('Delete {name}', { name: f.name })} onClick={() => trash(f)} disabled={!!busy}>
+                  🗑
+                </button>
               </li>
             ))}
           </ul>
@@ -210,10 +235,12 @@ export function DriveDialog({ currentId, onOpen, onRenamed, onTrashed, onClose }
       </div>
       <div className="buttons">
         {busy && <span className="hint">{busy}</span>}
-        <button type="button" onClick={importLocal} disabled={!!busy} title={t('Uploads one or more .asc files from your computer to the folder and opens the file (if it\'s just one)')}>
+        <button type="button" onClick={importLocal} disabled={!!busy} title={t("Uploads one or more .asc files from your computer to the folder and opens the file (if it's just one)")}>
           {t('Import from computer…')}
         </button>
-        <button type="button" onClick={onClose}>{t('Close')}</button>
+        <button type="button" onClick={onClose}>
+          {t('Close')}
+        </button>
       </div>
     </Modal>
   );

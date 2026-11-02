@@ -23,12 +23,7 @@ interface TokenClient {
   requestAccessToken(o?: { prompt?: string; login_hint?: string }): void;
 }
 interface Oauth2 {
-  initTokenClient(o: {
-    client_id: string;
-    scope: string;
-    callback(r: TokenResponse): void;
-    error_callback?(e: { type?: string; message?: string }): void;
-  }): TokenClient;
+  initTokenClient(o: { client_id: string; scope: string; callback(r: TokenResponse): void; error_callback?(e: { type?: string; message?: string }): void }): TokenClient;
   hasGrantedAllScopes(r: TokenResponse, ...scopes: string[]): boolean;
   revoke(token: string, done?: () => void): void;
 }
@@ -98,7 +93,7 @@ function loadGis(): Promise<Oauth2> {
     const s = document.createElement('script');
     s.src = GIS_URL;
     s.async = true;
-    s.onload = () => (window.google?.accounts?.oauth2 ? resolve(window.google.accounts.oauth2) : reject(new Error(t('Google Identity Services didn\'t load'))));
+    s.onload = () => (window.google?.accounts?.oauth2 ? resolve(window.google.accounts.oauth2) : reject(new Error(t("Google Identity Services didn't load"))));
     s.onerror = () => reject(new Error(t('Could not load Google Identity Services (offline?)')));
     document.head.appendChild(s);
   });
@@ -117,14 +112,18 @@ function requestToken(prompt: string): Promise<string> {
             client_id: CLIENT_ID,
             scope: SCOPE,
             callback: (r) => {
-              if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || t('Google didn\'t return a token')));
+              if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || t("Google didn't return a token")));
               if (!oauth2.hasGrantedAllScopes(r, SCOPE)) return reject(new Error(t('You need to allow access to Google Drive to save there')));
               token = { value: r.access_token, expires: Date.now() + Number(r.expires_in ?? 3600) * 1000 };
               writeJson('session', TOKEN_KEY, token);
               resolve(r.access_token);
             },
             error_callback: (e) =>
-              reject(new Error(e.type === 'popup_closed' ? t('The Google window was closed') : e.type === 'popup_failed_to_open' ? t('The browser blocked the Google window') : e.message || t('Google error'))),
+              reject(
+                new Error(
+                  e.type === 'popup_closed' ? t('The Google window was closed') : e.type === 'popup_failed_to_open' ? t('The browser blocked the Google window') : e.message || t('Google error'),
+                ),
+              ),
           });
           client.requestAccessToken({ prompt, login_hint: state.account?.emailAddress });
         }),
@@ -135,7 +134,7 @@ function requestToken(prompt: string): Promise<string> {
 
 /** Token válido para Drive; si venció pide otro (sin volver a preguntar si ya hay permiso) */
 export async function getToken(force = false): Promise<string> {
-  if (!CLIENT_ID) throw new Error(t('Google sign-in isn\'t configured'));
+  if (!CLIENT_ID) throw new Error(t("Google sign-in isn't configured"));
   if (!force && tokenValid()) return token!.value;
   return requestToken('');
 }
@@ -195,5 +194,4 @@ export function signOut(): void {
 }
 
 /** Inicial para el circulito de la cuenta */
-export const initial = (a: Pick<Account, 'displayName' | 'emailAddress'>) =>
-  (a.displayName || a.emailAddress || '?').trim().charAt(0).toUpperCase() || '?';
+export const initial = (a: Pick<Account, 'displayName' | 'emailAddress'>) => (a.displayName || a.emailAddress || '?').trim().charAt(0).toUpperCase() || '?';

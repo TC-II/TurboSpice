@@ -75,7 +75,8 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   const ignored = [...p.keys()].filter((k) => !known.has(k));
   if (ignored.length) warnings.push(t('{name}: gate parameters not translated: {p1}', { name, p1: ignored.join(', ') }));
   const num = (k: string, d: string) => `{${p.get(k) ?? d}}`;
-  const vh = num('vhigh', '1'), vl = num('vlow', '0');
+  const vh = num('vhigh', '1'),
+    vl = num('vlow', '0');
   // PHASEDET: umbral 0,5 por omisión aunque cambien Vhigh/Vlow (medido)
   const ref = p.has('ref') ? num('ref', '') : model === 'phasedet' ? '0.5' : `(${vh}+${vl})/2`;
   const [i1, i2, i3, i4, i5, qb, q, com] = nodes;
@@ -87,8 +88,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   const not = (x: string) => `(1-${x})`;
   // en ngspice un nodo que sólo aparece en la expresión de una B no existe: cada entrada lleva
   // una resistencia de 1 TΩ a com (como gmin; ver floating.ts)
-  const anchor = (ins: string[]) =>
-    [...new Set(ins)].filter((x) => x !== '0' && x !== com).forEach((x, k) => lines.push(`R_${n}i${k + 1} ${x} ${com} 1e12`));
+  const anchor = (ins: string[]) => [...new Set(ins)].filter((x) => x !== '0' && x !== com).forEach((x, k) => lines.push(`R_${n}i${k + 1} ${x} ${com} 1e12`));
   const adc = () => lines.push(`.model ${n}adcm adc_bridge(in_low=0.5 in_high=0.5 rise_delay=1e-12 fall_delay=1e-12)`);
   const dac = () => lines.push(`.model ${n}dacm dac_bridge(out_low=0 out_high=1 t_rise=1e-10 t_fall=1e-10)`);
   if (model === 'phasedet') {
@@ -114,10 +114,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
     // recorte suave (1 mV) contra Vhigh/Vlow, sólo si se dan
     const up = p.has('vhigh') ? `*min(max((${vh}-${vq})*1e3,0),1)` : '';
     const dn = p.has('vlow') ? `*min(max((${vq}-${vl})*1e3,0),1)` : '';
-    lines.push(
-      `B_${n}q ${com} ${q} I=${num('iout', '100u')}*(V(${n}u)${up}-V(${n}d)${dn})`,
-      `R_${n}q ${q} ${com} ${num('rout', '1e10')}`,
-    );
+    lines.push(`B_${n}q ${com} ${q} I=${num('iout', '100u')}*(V(${n}u)${up}-V(${n}d)${dn})`, `R_${n}q ${q} ${com} ${num('rout', '1e10')}`);
     if (p.has('cout')) lines.push(`C_${n}q ${q} ${com} ${num('cout', '0')}`);
     return lines;
   }
@@ -126,14 +123,12 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       warnings.push(t('{name}: MODULATOR without mark is not translated', { name }));
       return undefined;
     }
-    const mark = num('mark', '0'), space = p.has('space') ? num('space', '0') : mark;
-    const fm = i1 === '0' ? '0' : `V(${i1})`, am = i2 === '0' ? '0' : `V(${i2})`;
+    const mark = num('mark', '0'),
+      space = p.has('space') ? num('space', '0') : mark;
+    const fm = i1 === '0' ? '0' : `V(${i1})`,
+      am = i2 === '0' ? '0' : `V(${i2})`;
     anchor([i1, i2]);
-    lines.push(
-      `B_${n}f ${n}f 0 V=${space}+(${mark}-${space})*${fm}`,
-      `A_${n}int ${n}f ${n}ph ${n}intm`,
-      `.model ${n}intm int(gain=1 out_ic=0 out_lower_limit=-1e30 out_upper_limit=1e30)`,
-    );
+    lines.push(`B_${n}f ${n}f 0 V=${space}+(${mark}-${space})*${fm}`, `A_${n}int ${n}f ${n}ph ${n}intm`, `.model ${n}intm int(gain=1 out_ic=0 out_lower_limit=-1e30 out_upper_limit=1e30)`);
     if (q !== '0') lines.push(`B_${n}q ${q} ${com} V=${am}*sin(2*pi*V(${n}ph))`);
     // modulate2: COS en _Q
     if (qb !== '0') lines.push(`B_${n}qb ${qb} ${com} V=${am}*cos(2*pi*V(${n}ph))`);
@@ -141,7 +136,9 @@ export function translateDigital(name: string, nodes: string[], value: string, w
   }
   if (model === 'varistor') {
     if (q === '0') return lines;
-    const vc = `abs(V(${i1},${i2}))`, v = `V(${q},${com})`, r = num('rclamp', '1');
+    const vc = `abs(V(${i1},${i2}))`,
+      v = `V(${q},${com})`,
+      r = num('rclamp', '1');
     anchor([i1, i2]);
     lines.push(`B_${n}q ${q} ${com} I=(${v}>${vc}) ? (${v}-${vc})/${r} : (${v}<-${vc}) ? (${v}+${vc})/${r} : 0`);
     return lines;
@@ -166,17 +163,14 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       dac();
       track = `V(${n}w)`;
     } else track = i4 === '0' ? '0' : bit(i4);
-    lines.push(
-      `C_${n}h ${n}h 0 1n`,
-      `R_${n}h ${n}h 0 1e12`,
-      `B_${n}h 0 ${n}h I=10*${track}*(${vin}-V(${n}h))`,
-    );
+    lines.push(`C_${n}h ${n}h 0 1n`, `R_${n}h ${n}h 0 1e12`, `B_${n}h 0 ${n}h I=10*${track}*(${vin}-V(${n}h))`);
     if (q !== '0') lines.push(`B_${n}q ${q} ${com} V=V(${n}h)`);
     return lines;
   }
   if (model === 'counter') {
     // d_fdiv toma enteros: si son números se calculan acá
-    const c = Number(p.get('cycles')), d = Number(p.get('duty') ?? '0.5');
+    const c = Number(p.get('cycles')),
+      d = Number(p.get('duty') ?? '0.5');
     const cyc = Number.isFinite(c) ? String(Math.round(c)) : num('cycles', '2');
     const hi = Number.isFinite(c) && Number.isFinite(d) ? String(Math.round(d * c)) : `{round(${p.get('duty') ?? '0.5'}*${p.get('cycles')})}`;
     lines.push(
@@ -191,7 +185,8 @@ export function translateDigital(name: string, nodes: string[], value: string, w
     dac();
   } else if (FLOPS.has(model)) {
     const dff = model === 'dflop';
-    const set = dff ? i4 : i1, rst = dff ? i5 : i2;
+    const set = dff ? i4 : i1,
+      rst = dff ? i5 : i2;
     const on = (x: string) => (x === '0' ? '0' : bit(x));
     let sig: [string, string][];
     if (model === 'schmitt') {
@@ -200,13 +195,21 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       const cmp = (e: string) => `min(max((${e})*1e4+0.5,0),1)`;
       // diferencial (diffschmitt…): in- = in2
       const vin = i2 === '0' ? `V(${i1})` : `V(${i1},${i2})`;
-      sig = [['fs', cmp(`${vin}-${vt}-${vhy}`)], ['fr', cmp(`${vt}-${vhy}-${vin}`)]];
+      sig = [
+        ['fs', cmp(`${vin}-${vt}-${vhy}`)],
+        ['fr', cmp(`${vt}-${vhy}-${vin}`)],
+      ];
     } else {
       // CLR/R tiene prioridad: el set efectivo es set·¬reset
       sig = [
         ['fs', `${on(set)}*${not(on(rst))}`],
         ['fr', on(rst)],
-        ...(dff ? ([['fd', on(i1)], ['fc', on(i3)]] as [string, string][]) : []),
+        ...(dff
+          ? ([
+              ['fd', on(i1)],
+              ['fc', on(i3)],
+            ] as [string, string][])
+          : []),
       ];
     }
     sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=${e}`));
@@ -216,9 +219,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       `A_${n}adc [${sig.map(([k]) => `${n}${k}`).join(' ')}] [${sig.map(([k]) => dig(k)).join(' ')}] ${n}adcm`,
       `.model ${n}adcm adc_bridge(in_low=0.5 in_high=0.5 rise_delay=1e-12 fall_delay=1e-12)`,
       // SR: d_dff sin flancos (clk a un pulldown); data da igual
-      dff
-        ? `A_${n}ff ${dig('fd')} ${dig('fc')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm`
-        : `A_${n}ff ${dig('fr')} ${dig('fz')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm`,
+      dff ? `A_${n}ff ${dig('fd')} ${dig('fc')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm` : `A_${n}ff ${dig('fr')} ${dig('fz')} ${dig('fs')} ${dig('fr')} ${dig('fq')} NULL ${n}ffm`,
       `.model ${n}ffm d_dff(clk_delay=1e-12 set_delay=1e-12 reset_delay=1e-12 rise_delay=1e-12 fall_delay=1e-12)`,
       `A_${n}dac [${dig('fq')}] [${n}x] ${n}dacm`,
       `.model ${n}dacm dac_bridge(out_low=0 out_high=1 t_rise=1e-10 t_fall=1e-10)`,
@@ -247,7 +248,8 @@ export function translateDigital(name: string, nodes: string[], value: string, w
     y = `${n}h`;
   }
   if (p.has('trise') || p.has('tfall')) {
-    const tr = p.get('trise') ?? p.get('tfall')!, tf = p.get('tfall') ?? tr;
+    const tr = p.get('trise') ?? p.get('tfall')!,
+      tf = p.get('tfall') ?? tr;
     lines.push(`A_${n}s ${y} ${n}s ${n}sm`, `.model ${n}sm slew(rise_slope={1/(${tr})} fall_slope={1/(${tf})})`);
     y = `${n}s`;
   }

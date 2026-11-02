@@ -64,8 +64,20 @@ describe('Estudio con bloques', () => {
 
   it('mediciones de AC con ayuda de let (f a −3 dB, margen de fase)', () => {
     const m = (kind: string, id: string): BlockJson => ({ type: 'ts_measure', fields: { KIND: kind, SIGNAL: 'V(out)', A: '', B: '', VAR: { id } } });
-    const prog: BlockJson = { type: 'ts_simulate', next: { block: { ...m('f3db', 'vA'), next: { block: { ...m('phaseMargin', 'vB'), next: { block: { type: 'ts_message', fields: { TEXT: 'x' } } } } } } } };
-    const r = compileBlocks({ blocks: { blocks: [prog] }, variables: [{ name: 'fc', id: 'vA' }, { name: 'pm', id: 'vB' }] }, 'ac');
+    const prog: BlockJson = {
+      type: 'ts_simulate',
+      next: { block: { ...m('f3db', 'vA'), next: { block: { ...m('phaseMargin', 'vB'), next: { block: { type: 'ts_message', fields: { TEXT: 'x' } } } } } } },
+    };
+    const r = compileBlocks(
+      {
+        blocks: { blocks: [prog] },
+        variables: [
+          { name: 'fc', id: 'vA' },
+          { name: 'pm', id: 'vB' },
+        ],
+      },
+      'ac',
+    );
     expect(r.study.custom!.body.split('\n')).toEqual([
       '* bloques',
       'run',

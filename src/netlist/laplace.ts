@@ -129,7 +129,11 @@ function parseRational(src: string): Rat {
     p++;
   };
   // texto de una subexpresión constante, tal cual (para funciones de constantes como sqrt(2*pi))
-  const textBetween = (a: number, b: number) => toks.slice(a, b).map((tt) => (tt.t === 'num' ? tt.s : tt.v)).join('');
+  const textBetween = (a: number, b: number) =>
+    toks
+      .slice(a, b)
+      .map((tt) => (tt.t === 'num' ? tt.s : tt.v))
+      .join('');
 
   function sum(): Rat {
     let r = term();
@@ -254,7 +258,11 @@ function scaled(n: Poly, d: Poly): string | null {
   const sc = (p: Poly) => p.map((c, k) => (c as number) * wd ** k);
   const ds = sc(d);
   const m = Math.max(...ds.map(Math.abs));
-  const fmt = (p: number[]) => p.map((c) => String(c / m)).reverse().join(' ');
+  const fmt = (p: number[]) =>
+    p
+      .map((c) => String(c / m))
+      .reverse()
+      .join(' ');
   return `num_coeff=[${fmt(sc(n))}] den_coeff=[${fmt(ds)}] denormalized_freq=${wd}`;
 }
 
@@ -333,12 +341,11 @@ export function translateLaplace(name: string, letter: string, nodes: string[], 
     rat = parseRational(lv.gain ? `(${lv.gain})*(${lv.expr})` : lv.expr);
   } catch (e) {
     if (!(e instanceof Unsupported)) throw e;
-    warnings.push(t('{name}: the transfer Laplace={expr} isn\'t a ratio of polynomials in s ({message}); ngspice can\'t simulate it', { name, expr: lv.expr, message: e.message }));
+    warnings.push(t("{name}: the transfer Laplace={expr} isn't a ratio of polynomials in s ({message}); ngspice can't simulate it", { name, expr: lv.expr, message: e.message }));
     return null;
   }
   const [op, on, ip, inn] = nodes;
-  const out = (y: string) =>
-    letter === 'B' ? `${name} ${op} ${on} ${lv.kind}=V(${y})` : `${name} ${op} ${on} ${y} 0 1`;
+  const out = (y: string) => (letter === 'B' ? `${name} ${op} ${on} ${lv.kind}=V(${y})` : `${name} ${op} ${on} ${y} 0 1`);
   const lines: string[] = [];
   const nin = `${name}__in`;
   // con numerador de grado ≤ al denominador s_xfer lo toma directo

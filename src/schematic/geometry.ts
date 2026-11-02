@@ -97,12 +97,7 @@ export function symbolBox(inst: SymbolInst, def: SymbolDef | undefined, lib: Lib
   const c = symbolBoxes.get(inst);
   if (c && c.def === def && c.vb === vb) return c.box;
   const b = localBox(def, vb);
-  const box = boxOf([
-    toWorld(inst, b.x1, b.y1),
-    toWorld(inst, b.x2, b.y1),
-    toWorld(inst, b.x1, b.y2),
-    toWorld(inst, b.x2, b.y2),
-  ]);
+  const box = boxOf([toWorld(inst, b.x1, b.y1), toWorld(inst, b.x2, b.y1), toWorld(inst, b.x1, b.y2), toWorld(inst, b.x2, b.y2)]);
   symbolBoxes.set(inst, { def, vb, box });
   return box;
 }
@@ -134,8 +129,7 @@ export function pivotNear(c: Point, ref: Point): Point {
     const bx = ref.x + k;
     const by = ref.y + k;
     for (const x of [Math.floor((c.x - bx) / GRID), Math.ceil((c.x - bx) / GRID)].map((i) => bx + i * GRID))
-      for (const y of [Math.floor((c.y - by) / GRID), Math.ceil((c.y - by) / GRID)].map((i) => by + i * GRID))
-        cands.push({ p: { x: x + 0, y: y + 0 }, d: (x - c.x) ** 2 + (y - c.y) ** 2, k });
+      for (const y of [Math.floor((c.y - by) / GRID), Math.ceil((c.y - by) / GRID)].map((i) => by + i * GRID)) cands.push({ p: { x: x + 0, y: y + 0 }, d: (x - c.x) ** 2 + (y - c.y) ** 2, k });
   }
   cands.sort((a, b) => a.d - b.d || a.k - b.k || a.p.y - b.p.y || a.p.x - b.p.x);
   return cands[0].p;
@@ -203,8 +197,12 @@ export function junctionPoints(doc: AscDoc, lib: Library): Point[] {
       const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
       const inside =
         cross === 0 &&
-        p.x >= Math.min(w.x1, w.x2) && p.x <= Math.max(w.x1, w.x2) && p.y >= Math.min(w.y1, w.y2) && p.y <= Math.max(w.y1, w.y2) &&
-        !(p.x === w.x1 && p.y === w.y1) && !(p.x === w.x2 && p.y === w.y2);
+        p.x >= Math.min(w.x1, w.x2) &&
+        p.x <= Math.max(w.x1, w.x2) &&
+        p.y >= Math.min(w.y1, w.y2) &&
+        p.y <= Math.max(w.y1, w.y2) &&
+        !(p.x === w.x1 && p.y === w.y1) &&
+        !(p.x === w.x2 && p.y === w.y2);
       if (inside) {
         n += 2;
         passes = true;
@@ -239,7 +237,10 @@ export function wireVertexAt(doc: AscDoc, p: Point, lib: Library, tol: number): 
   let best: Point | null = null;
   let bd = tol;
   for (const w of doc.wires) {
-    for (const e of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) {
+    for (const e of [
+      { x: w.x1, y: w.y1 },
+      { x: w.x2, y: w.y2 },
+    ]) {
       const d = Math.hypot(e.x - p.x, e.y - p.y);
       if (d <= bd && !fixed.has(`${e.x},${e.y}`)) [best, bd] = [e, d];
     }
@@ -247,8 +248,7 @@ export function wireVertexAt(doc: AscDoc, p: Point, lib: Library, tol: number): 
   return best;
 }
 
-export const inBox = (p: Point, b: Box, pad = 0) =>
-  p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad;
+export const inBox = (p: Point, b: Box, pad = 0) => p.x >= b.x1 - pad && p.x <= b.x2 + pad && p.y >= b.y1 - pad && p.y <= b.y2 + pad;
 
 export const boxesIntersect = (a: Box, b: Box) => a.x1 <= b.x2 && a.x2 >= b.x1 && a.y1 <= b.y2 && a.y2 >= b.y1;
 
@@ -338,7 +338,11 @@ export function textLines(t: TextLike): string[] {
   const fs = fontSize(t.size);
   const w = t.box.w;
   // (wrapText parte en `\n` literal: una barra y n que ya son texto no tienen que partir)
-  return lines.flatMap((l) => wrapText(l.replace(/\\n/g, '\0'), w, (s) => textWidth(s, fs)).split('\\n').map((x) => x.replace(/\0/g, '\\n')));
+  return lines.flatMap((l) =>
+    wrapText(l.replace(/\\n/g, '\0'), w, (s) => textWidth(s, fs))
+      .split('\\n')
+      .map((x) => x.replace(/\0/g, '\\n')),
+  );
 }
 
 /** Caja de un texto libre (TEXT): la fija si tiene, si no la que ocupa el texto */
@@ -362,7 +366,10 @@ export function wrapText(text: string, max: number, width: (s: string) => number
     let line = '';
     for (const word of para.split(' ')) {
       let w = word;
-      if (line && fits(line + ' ' + w)) { line += ' ' + w; continue; }
+      if (line && fits(line + ' ' + w)) {
+        line += ' ' + w;
+        continue;
+      }
       if (line) out.push(line);
       while (w.length > 1 && !fits(w)) {
         let n = 1;
@@ -423,7 +430,11 @@ export function hitTestAll(doc: AscDoc, p: Point, lib: Library, tol: number, sho
   // una imagen de fondo se elige también por adentro, después de todo lo demás
   for (let i = doc.shapes.length - 1; i >= 0; i--) {
     const [x1, y1, x2, y2] = doc.shapes[i].coords;
-    if (doc.shapes[i].kind === 'IMAGE' && !out.some((r) => r.kind === 'shape' && r.index === i) && inBox(p, { x1: Math.min(x1, x2), y1: Math.min(y1, y2), x2: Math.max(x1, x2), y2: Math.max(y1, y2) }, 0))
+    if (
+      doc.shapes[i].kind === 'IMAGE' &&
+      !out.some((r) => r.kind === 'shape' && r.index === i) &&
+      inBox(p, { x1: Math.min(x1, x2), y1: Math.min(y1, y2), x2: Math.max(x1, x2), y2: Math.max(y1, y2) }, 0)
+    )
       out.push({ kind: 'shape', index: i });
   }
   return out;
@@ -438,8 +449,14 @@ function wireEnds(wires: Wire[]): Map<string, Set<string>> {
   m = new Map();
   for (const w of wires) {
     for (const [a, b] of [
-      [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }],
-      [{ x: w.x2, y: w.y2 }, { x: w.x1, y: w.y1 }],
+      [
+        { x: w.x1, y: w.y1 },
+        { x: w.x2, y: w.y2 },
+      ],
+      [
+        { x: w.x2, y: w.y2 },
+        { x: w.x1, y: w.y1 },
+      ],
     ]) {
       const dir = b.y < a.y ? 'top' : b.y > a.y ? 'bottom' : b.x < a.x ? 'left' : b.x > a.x ? 'right' : '';
       if (!dir) continue;
@@ -476,8 +493,7 @@ export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }):
     const w = Math.max(16, f.name.length * fontSize(2) * 0.6);
     local = { x1: -w / 2, y1: -6, x2: w / 2, y2: 8 + fontSize(2) };
   }
-  const rot = (x: number, y: number) =>
-    dir === 'top' ? { x, y } : dir === 'bottom' ? { x: -x, y: -y } : dir === 'left' ? { x: y, y: -x } : { x: -y, y: x };
+  const rot = (x: number, y: number) => (dir === 'top' ? { x, y } : dir === 'bottom' ? { x: -x, y: -y } : dir === 'left' ? { x: y, y: -x } : { x: -y, y: x });
   const a = rot(local.x1, local.y1);
   const b = rot(local.x2, local.y2);
   // Las etiquetas con texto a izquierda/derecha se extienden horizontalmente

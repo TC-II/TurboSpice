@@ -18,7 +18,16 @@ const when = (tt: number) => {
   return sameDay ? t('Today {time}', { time }) : `${d.toLocaleDateString(locale(), { day: '2-digit', month: '2-digit', year: '2-digit' })} ${time}`;
 };
 
-export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRestore, onClone, onClose }: {
+export function HistoryPanel({
+  sim,
+  runs,
+  picked,
+  currentChanges,
+  onPick,
+  onRestore,
+  onClone,
+  onClose,
+}: {
   /** nombre de la simulación */
   sim: string;
   /** la más vieja primero, como en el proyecto */
@@ -32,7 +41,13 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
   onClose(): void;
 }) {
   const list = useRef<HTMLDivElement>(null);
-  const items: HistoryPick[] = ['', ...runs.filter((r) => !r.damaged).map((r) => r.id).reverse()];
+  const items: HistoryPick[] = [
+    '',
+    ...runs
+      .filter((r) => !r.damaged)
+      .map((r) => r.id)
+      .reverse(),
+  ];
   useEffect(() => list.current?.focus(), []);
   // la elegida, a la vista
   useEffect(() => {
@@ -54,7 +69,9 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
     <aside className="history-panel" aria-label={t('History of {sim}', { sim })}>
       <header>
         <Icon name="clock" size={16} />
-        <span className="history-title" title={sim}>{sim}</span>
+        <span className="history-title" title={sim}>
+          {sim}
+        </span>
         <button className="close" onClick={onClose} aria-label={t('Close the history')} title={t('Close the history (Esc)')}>
           <Icon name="close" size={14} />
         </button>
@@ -91,7 +108,7 @@ export function HistoryPanel({ sim, runs, picked, currentChanges, onPick, onRest
               aria-selected={picked === r.id}
               aria-disabled={r.damaged}
               className={`history-item${picked === r.id ? ' picked' : ''}${r.damaged ? ' damaged' : ''}`}
-              title={r.damaged ? t('This run is damaged in the file: it can\'t be shown') : new Date(r.time).toLocaleString(locale())}
+              title={r.damaged ? t("This run is damaged in the file: it can't be shown") : new Date(r.time).toLocaleString(locale())}
               onClick={() => !r.damaged && onPick(r.id)}
             >
               <span className="history-when">{when(r.time)}</span>

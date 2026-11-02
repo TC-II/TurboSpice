@@ -27,7 +27,19 @@ export const simProblems = (sim: SimRun | null) =>
 
 export type Problem = ReturnType<typeof simProblems>[number];
 
-export function ProblemsList({ problems, sim, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage }: {
+export function ProblemsList({
+  problems,
+  sim,
+  doc,
+  stopTime,
+  goTo,
+  openSaves,
+  plotStop,
+  commit,
+  setRunQueued,
+  run,
+  setMessage,
+}: {
   problems: Problem[];
   sim: SimRun;
   doc: AscDoc;
@@ -77,15 +89,22 @@ export function ProblemsList({ problems, sim, doc, stopTime, goTo, openSaves, pl
                 </button>
               )}
               {p.size.resume && (
-                <button onClick={() => run({ unlimited: true })} title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", { size: fmtBytes(simLimits(!!streamPlan(sim.built.netlist)).full) })}>
+                <button
+                  onClick={() => run({ unlimited: true })}
+                  title={t("Simulate again without stopping until the results fill {size} (ngspice can't resume where it stopped: it starts over)", {
+                    size: fmtBytes(simLimits(!!streamPlan(sim.built.netlist)).full),
+                  })}
+                >
                   {t('Continue anyway')}
                 </button>
               )}
             </span>
-          ) : p.big && (
-            <button className="link" onClick={() => openSaves(true)}>
-              {t('choose saved signals')}
-            </button>
+          ) : (
+            p.big && (
+              <button className="link" onClick={() => openSaves(true)}>
+                {t('choose saved signals')}
+              </button>
+            )
           )}
           {p.fix && p.size?.fit === undefined && (
             <button
@@ -95,7 +114,8 @@ export function ProblemsList({ problems, sim, doc, stopTime, goTo, openSaves, pl
                 setMessage(t('Changed to «{p0}»: simulate again with Alt+R', { p0: p.fix!.to }));
               }}
             >
-              {t('use «')}{p.fix.to}»
+              {t('use «')}
+              {p.fix.to}»
             </button>
           )}
         </li>

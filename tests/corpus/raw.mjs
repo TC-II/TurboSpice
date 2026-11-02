@@ -35,11 +35,15 @@ export function readRaw(path) {
     for (let p = 0; p < np; p++) {
       for (let v = 0; v < nv; v++) {
         if (complex) {
-          data[v].re[p] = buf.readDoubleLE(off); data[v].im[p] = buf.readDoubleLE(off + 8); off += 16;
+          data[v].re[p] = buf.readDoubleLE(off);
+          data[v].im[p] = buf.readDoubleLE(off + 8);
+          off += 16;
         } else if (v === 0 || dbl) {
-          data[v].re[p] = buf.readDoubleLE(off); off += 8;
+          data[v].re[p] = buf.readDoubleLE(off);
+          off += 8;
         } else {
-          data[v].re[p] = buf.readFloatLE(off); off += 4;
+          data[v].re[p] = buf.readFloatLE(off);
+          off += 4;
         }
       }
     }
@@ -50,7 +54,8 @@ export function readRaw(path) {
       t++; // índice
       for (let v = 0; v < nv; v++) {
         const [a, b] = toks[t++].split(',').map(Number);
-        data[v].re[p] = a; if (complex) data[v].im[p] = b;
+        data[v].re[p] = a;
+        if (complex) data[v].im[p] = b;
       }
     }
   }

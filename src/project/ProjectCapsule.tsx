@@ -6,7 +6,14 @@ import { useState } from 'react';
 import { t } from '../i18n/i18n.ts';
 import { NameInput } from '../ui/EditableName.tsx';
 
-export function ProjectCapsule({ project, bench, dirty, open, onToggle, onRename }: {
+export function ProjectCapsule({
+  project,
+  bench,
+  dirty,
+  open,
+  onToggle,
+  onRename,
+}: {
   project: string;
   /** testbench que se ve */
   bench: string;
@@ -35,10 +42,23 @@ export function ProjectCapsule({ project, bench, dirty, open, onToggle, onRename
     <button className={`proj-capsule${open ? ' on' : ''}`} onClick={onToggle} aria-pressed={open} aria-label={t('Project panel')} title={t('Project panel: testbenches and subcircuits')}>
       <Icon name="tree" />
       <span className="capsule-names">
-        <span className="capsule-project" title={t('{project} (double-click to rename)', { project })} onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); }}>{project}</span>
+        <span
+          className="capsule-project"
+          title={t('{project} (double-click to rename)', { project })}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            setRenaming(true);
+          }}
+        >
+          {project}
+        </span>
         <span className="capsule-dot">·</span>
         <span className="capsule-variant">{bench}</span>
-        {dirty && <span className="capsule-dirty" title={t('There are unsaved changes')}>•</span>}
+        {dirty && (
+          <span className="capsule-dirty" title={t('There are unsaved changes')}>
+            •
+          </span>
+        )}
       </span>
       {/* sólo indica que se abre (abajo) o se cierra (arriba) */}
       <svg className={`capsule-arrow${open ? ' up' : ''}`} viewBox="0 0 20 5" width="20" height="5" aria-hidden="true">

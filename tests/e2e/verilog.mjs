@@ -92,7 +92,10 @@ await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 // --- módulo nuevo: pregunta esquemático o Verilog ---
 await openTree();
 await page.locator('.tree-newmenu .tree-add').click();
-check((await page.getByRole('menuitem').count()) === 4 && (await page.getByRole('menuitem', { name: /Importar archivos/ }).count()) === 1, 'módulo nuevo: el menú ofrece subcircuito, modelo, Verilog e importar archivos');
+check(
+  (await page.getByRole('menuitem').count()) === 4 && (await page.getByRole('menuitem', { name: /Importar archivos/ }).count()) === 1,
+  'módulo nuevo: el menú ofrece subcircuito, modelo, Verilog e importar archivos',
+);
 await page.locator('.tree-newmenu .tree-add').click();
 await newModule('div4', 'Verilog');
 check((await page.locator('.verilog-module strong').textContent()) === 'div4.v', 'abre la vista del módulo Verilog (código en lugar del esquemático)');
@@ -123,23 +126,39 @@ await page.evaluate((asc) => {
 // (cada .asc soltado es un workbench nuevo y su testbench queda abierto, #316)
 await page.locator('.project-tree .tree-name', { hasText: 'div4 tb' }).waitFor();
 await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
-check((await page.locator('svg.editor .pinname', { hasText: 'q[1:0]' }).count()) === 1 && (await page.locator('svg.editor .buspin').count()) === 1, 'el símbolo muestra sus pines, con el bus q[1:0] marcado');
+check(
+  (await page.locator('svg.editor .pinname', { hasText: 'q[1:0]' }).count()) === 1 && (await page.locator('svg.editor .buspin').count()) === 1,
+  'el símbolo muestra sus pines, con el bus q[1:0] marcado',
+);
 check((await page.locator('svg.editor .wires line.bus').count()) === 1, 'el cable del bus se dibuja grueso');
 if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
 check((await page.locator('svg.editor .loose rect').count()) === 0, 'todos los pines quedan conectados');
 
 // --- doble clic: baja al código del módulo; Alt+↑ vuelve ---
-const inst = page.locator('svg.editor .sym').filter({ has: page.locator('text.win', { hasText: /^X1$/ }) }).locator('.body');
+const inst = page
+  .locator('svg.editor .sym')
+  .filter({ has: page.locator('text.win', { hasText: /^X1$/ }) })
+  .locator('.body');
 const ib = await inst.boundingBox();
 await page.mouse.dblclick(ib.x + ib.width / 2, ib.y + ib.height / 2);
-await page.locator('.verilog-module').waitFor({ timeout: 5000 }).catch(() => {});
+await page
+  .locator('.verilog-module')
+  .waitFor({ timeout: 5000 })
+  .catch(() => {});
 check((await page.locator('.verilog-module').count()) === 1 && (await code.inputValue()).includes('module div4'), 'doble clic en la instancia baja a su código');
 await page.keyboard.press('Alt+ArrowUp');
 await page.waitForFunction(() => !document.querySelector('.verilog-module'));
 
 // --- simular: la salida analógica, y los nodos digitales en un panel aparte ---
 await simulate();
-check((await page.locator('.status.ok').count()) === 1, `la simulación con el bloque Verilog anda (${await page.locator('.status').first().textContent()} ${await page.locator('.errors, .sim-errors, .log .err').first().textContent({ timeout: 500 }).catch(() => '')})`);
+check(
+  (await page.locator('.status.ok').count()) === 1,
+  `la simulación con el bloque Verilog anda (${await page.locator('.status').first().textContent()} ${await page
+    .locator('.errors, .sim-errors, .log .err')
+    .first()
+    .textContent({ timeout: 500 })
+    .catch(() => '')})`,
+);
 check(await addTrace('V(q[1])'), 'V(q[1]): un bit del bus de salida, analógico');
 check(await addTrace('Dig(x1.q[1:0])'), 'Dig(x1.q[1:0]): el bus de los nodos digitales');
 check(await addTrace('Dig(x1.q_0_d)'), 'Dig(x1.q_0_d): un bit');
@@ -165,13 +184,18 @@ endmodule
 `);
 await synthesize();
 // (mismo lugar de los pines que div4: dos entradas y un bus de dos bits)
-await page.evaluate((asc) => {
-  const dt = new DataTransfer();
-  dt.items.add(new File([asc], 'tri tb.asc'));
-  dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
-  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
-  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
-}, CIRCUIT.replace('SYMBOL div4', 'SYMBOL tri2').replace(/\brst\b/g, 'en').replace('PWL(0 5 20n 5 21n 0)', 'PWL(0 0 300n 0 301n 5 600n 5 601n 0)'));
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'tri tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMBOL div4', 'SYMBOL tri2')
+    .replace(/\brst\b/g, 'en')
+    .replace('PWL(0 5 20n 5 21n 0)', 'PWL(0 0 300n 0 301n 5 600n 5 601n 0)'),
+);
 // (cada .asc soltado es un workbench nuevo y su testbench queda abierto, #316)
 await page.locator('.project-tree .tree-name', { hasText: 'tri tb' }).waitFor();
 await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
@@ -185,7 +209,9 @@ check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await p
 
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
-await code.fill('`timescale 1ns/1ps\nmodule pulso(input clk, output reg y);\n  initial y = 0;\n  always @(posedge clk) begin\n    #20 y = 1;\n    #10 y = 0;\n    $display("pulso");\n  end\nendmodule\n');
+await code.fill(
+  '`timescale 1ns/1ps\nmodule pulso(input clk, output reg y);\n  initial y = 0;\n  always @(posedge clk) begin\n    #20 y = 1;\n    #10 y = 0;\n    $display("pulso");\n  end\nendmodule\n',
+);
 check(await until(async () => (await page.locator('.vm-suggest').count()) === 1), 'sugiere el modo comportamiento (tiene retardos # y $display)');
 await page.locator('.vm-suggest button').click();
 await synthesize();

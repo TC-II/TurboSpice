@@ -100,10 +100,34 @@ function ellipseSub(cx: number, cy: number, rx: number, ry: number): Sub {
     start: [cx + rx, cy],
     closed: true,
     segs: [
-      { p: [cx, cy + ry], c: [[cx + rx, cy + ky], [cx + kx, cy + ry]] },
-      { p: [cx - rx, cy], c: [[cx - kx, cy + ry], [cx - rx, cy + ky]] },
-      { p: [cx, cy - ry], c: [[cx - rx, cy - ky], [cx - kx, cy - ry]] },
-      { p: [cx + rx, cy], c: [[cx + kx, cy - ry], [cx + rx, cy - ky]] },
+      {
+        p: [cx, cy + ry],
+        c: [
+          [cx + rx, cy + ky],
+          [cx + kx, cy + ry],
+        ],
+      },
+      {
+        p: [cx - rx, cy],
+        c: [
+          [cx - kx, cy + ry],
+          [cx - rx, cy + ky],
+        ],
+      },
+      {
+        p: [cx, cy - ry],
+        c: [
+          [cx - rx, cy - ky],
+          [cx - kx, cy - ry],
+        ],
+      },
+      {
+        p: [cx + rx, cy],
+        c: [
+          [cx + kx, cy - ry],
+          [cx + rx, cy - ky],
+        ],
+      },
     ],
   };
 }
@@ -214,7 +238,13 @@ export function parsePath(d: string): Sub[] {
         const q: Pt = cmd.toUpperCase() === 'Q' ? at(num(), num()) : lastQ ? [2 * pos[0] - lastQ[0], 2 * pos[1] - lastQ[1]] : pos;
         const p = at(num(), num());
         const p0 = pos;
-        add({ p, c: [[p0[0] + (2 / 3) * (q[0] - p0[0]), p0[1] + (2 / 3) * (q[1] - p0[1])], [p[0] + (2 / 3) * (q[0] - p[0]), p[1] + (2 / 3) * (q[1] - p[1])]] });
+        add({
+          p,
+          c: [
+            [p0[0] + (2 / 3) * (q[0] - p0[0]), p0[1] + (2 / 3) * (q[1] - p0[1])],
+            [p[0] + (2 / 3) * (q[0] - p[0]), p[1] + (2 / 3) * (q[1] - p[1])],
+          ],
+        });
         lastQ = q;
         lastC = null;
         break;
@@ -260,7 +290,10 @@ function shapeOf(el: SVGElement): Sub[] {
       return [{ start: [n('x1'), n('y1')], segs: [{ p: [n('x2'), n('y2')] }], closed: false }];
     case 'polyline':
     case 'polygon': {
-      const v = (el.getAttribute('points') ?? '').trim().split(/[\s,]+/).map(Number);
+      const v = (el.getAttribute('points') ?? '')
+        .trim()
+        .split(/[\s,]+/)
+        .map(Number);
       const pts: Pt[] = [];
       for (let i = 0; i + 1 < v.length; i += 2) pts.push([v[i], v[i + 1]]);
       if (pts.length < 2) return [];
@@ -308,7 +341,11 @@ const GRAPHIC = 'line, polyline, polygon, rect, circle, ellipse, path, text';
  * El .tex de la hoja: `content` es el <g> con el dibujo, en unidades de la hoja (1 = 1 bp), ya
  * con el tema de impresión aplicado; `page`, la hoja
  */
-export function sheetTikz(content: SVGGraphicsElement, page: { x: number; y: number; w: number; h: number }, info: { name: string; skin: string; /** sólo un área de la hoja: lo de afuera se recorta */ clip?: boolean }): string {
+export function sheetTikz(
+  content: SVGGraphicsElement,
+  page: { x: number; y: number; w: number; h: number },
+  info: { name: string; skin: string; /** sólo un área de la hoja: lo de afuera se recorta */ clip?: boolean },
+): string {
   const base = content.getCTM();
   if (!base) throw new Error('TikZ: the sheet is not laid out');
   const inv = base.inverse();

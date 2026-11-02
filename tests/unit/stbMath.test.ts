@@ -30,8 +30,30 @@ const near = (got: C[], want: C[], rel = 1e-3) => {
 
 describe('álgebra', () => {
   it('autovalores reales y complejos', () => {
-    near(eigenvalues([[0, 1], [-2, -2]]), [{ re: -1, im: 1 }, { re: -1, im: -1 }], 1e-9);
-    near(eigenvalues([[2, 0, 0], [1, 3, 0], [4, 5, 6]]), [{ re: 2, im: 0 }, { re: 3, im: 0 }, { re: 6, im: 0 }], 1e-9);
+    near(
+      eigenvalues([
+        [0, 1],
+        [-2, -2],
+      ]),
+      [
+        { re: -1, im: 1 },
+        { re: -1, im: -1 },
+      ],
+      1e-9,
+    );
+    near(
+      eigenvalues([
+        [2, 0, 0],
+        [1, 3, 0],
+        [4, 5, 6],
+      ]),
+      [
+        { re: 2, im: 0 },
+        { re: 3, im: 0 },
+        { re: 6, im: 0 },
+      ],
+      1e-9,
+    );
   });
 });
 
@@ -40,7 +62,20 @@ describe('márgenes', () => {
     const w = 2 * Math.PI * 1e5;
     const k = 1e3;
     // T = k/(1+s/w)^3: cruce y fase −180° en √3·w
-    const t3 = sweep(tf(k, [], [{ re: -w, im: 0 }, { re: -w, im: 0 }, { re: -w, im: 0 }]), 1, 1e8, 400);
+    const t3 = sweep(
+      tf(
+        k,
+        [],
+        [
+          { re: -w, im: 0 },
+          { re: -w, im: 0 },
+          { re: -w, im: 0 },
+        ],
+      ),
+      1,
+      1e8,
+      400,
+    );
     const m = margins(t3.f, t3.re, t3.im);
     expect(m.gain[0].f).toBeCloseTo((Math.sqrt(3) * w) / (2 * Math.PI), -2);
     expect(m.gain[0].margin).toBeCloseTo(-20 * Math.log10(k / 8), 1);
@@ -49,7 +84,11 @@ describe('márgenes', () => {
 });
 
 describe('ajuste racional', () => {
-  const poles = [{ re: -2 * Math.PI * 10, im: 0 }, { re: -2 * Math.PI * 1e5, im: 2 * Math.PI * 3e5 }, { re: -2 * Math.PI * 1e5, im: -2 * Math.PI * 3e5 }];
+  const poles = [
+    { re: -2 * Math.PI * 10, im: 0 },
+    { re: -2 * Math.PI * 1e5, im: 2 * Math.PI * 3e5 },
+    { re: -2 * Math.PI * 1e5, im: -2 * Math.PI * 3e5 },
+  ];
   const zeros = [{ re: -2 * Math.PI * 1e6, im: 0 }];
   const fn = tf(1e4, zeros, poles);
   const d = sweep(fn);
@@ -72,6 +111,9 @@ describe('ajuste racional', () => {
   it('lugar de raíces: ramas desde los polos', () => {
     const br = rootLocus(m);
     expect(br.length).toBe(3);
-    near(br.map((b) => b[0]), poles);
+    near(
+      br.map((b) => b[0]),
+      poles,
+    );
   });
 });

@@ -88,8 +88,7 @@ function dcGroups(t: string[], models: Set<string>, subckts: Map<string, Subckt>
     case 'e':
     case 'g': {
       const kw = (p[2] ?? '').toLowerCase();
-      if (/^(poly|value|table|laplace|freq|cur|vol)/.test(kw) || t.slice(3).some((w) => /^(value|table|laplace)=/i.test(w)))
-        return { nodes: two, groups: letter === 'e' ? [two] : [] };
+      if (/^(poly|value|table|laplace|freq|cur|vol)/.test(kw) || t.slice(3).some((w) => /^(value|table|laplace)=/i.test(w))) return { nodes: two, groups: letter === 'e' ? [two] : [] };
       const four = p.slice(0, 4);
       return { nodes: four, groups: letter === 'e' ? [two] : [] };
     }
@@ -208,7 +207,9 @@ export function floatingNodes(main: string, files: Record<string, string>): stri
       }
       if (g.sub) {
         const inner = new Map<string, string>();
-        g.sub.ports.forEach((port, i) => { if (nodes[i] !== undefined) inner.set(port.toLowerCase(), nodes[i]); });
+        g.sub.ports.forEach((port, i) => {
+          if (nodes[i] !== undefined) inner.set(port.toLowerCase(), nodes[i]);
+        });
         expand(g.sub.body, `${prefix}${t[0].toLowerCase()}.`, inner, depth + 1);
       }
     }

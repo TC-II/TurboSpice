@@ -43,7 +43,9 @@ export class ErrorBoundary extends Component<Props, State> {
           <h2>{t('TurboSpice ran into an unexpected error')}</h2>
           <pre>{error.message}</pre>
           <p>{t('Your work is autosaved in this browser: reloading the page brings it back.')}</p>
-          <button className="primary" onClick={() => location.reload()}>{t('Reload')}</button>
+          <button className="primary" onClick={() => location.reload()}>
+            {t('Reload')}
+          </button>
         </div>
       );
     return (

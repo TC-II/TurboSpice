@@ -4,7 +4,15 @@ import { useRef, useState, type ReactNode } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import { t } from '../i18n/i18n.ts';
 
-export function SlideConfirm({ title, message, action = t('Slide to delete'), releaseLabel = t('Release to delete'), extra, onConfirm, onClose }: {
+export function SlideConfirm({
+  title,
+  message,
+  action = t('Slide to delete'),
+  releaseLabel = t('Release to delete'),
+  extra,
+  onConfirm,
+  onClose,
+}: {
   title: string;
   message: string;
   action?: string;
@@ -39,7 +47,11 @@ export function SlideConfirm({ title, message, action = t('Slide to delete'), re
         <span className="slide-label">{v >= 100 ? releaseLabel : action}</span>
         <div
           className="slide-knob"
-          onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); drag.current = { x0: e.clientX, v0: v }; setDragging(true); }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            drag.current = { x0: e.clientX, v0: v };
+            setDragging(true);
+          }}
           onPointerMove={move}
           onPointerUp={release}
           onPointerCancel={release}
@@ -57,7 +69,9 @@ export function SlideConfirm({ title, message, action = t('Slide to delete'), re
         />
       </div>
       <div className="buttons">
-        <button onClick={onClose} autoFocus>{t('Cancel')}</button>
+        <button onClick={onClose} autoFocus>
+          {t('Cancel')}
+        </button>
         {extra}
       </div>
     </Modal>

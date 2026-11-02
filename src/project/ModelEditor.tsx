@@ -11,7 +11,27 @@ import { GRID } from '../asc/model.ts';
 import { SymbolEditor } from './SymbolEditor.tsx';
 import { addFreePin, pinSide, removePin, setPinAlign, symPins, symWindows } from './symbolEdit.ts';
 import { subcktPins } from '../library/makeSymbol.ts';
-import { ATTR_WINDOW, attrSize, libForPins, setAttrSize, MODEL_ATTRS, attrVisible, modelFileName, modelInfo, modelParams, setModelParams, setAttrVisible, pinsMismatch, renameModelIn, renameSubcktIn, setPinAttr, setSymAttr, symAttr, syncModelAttrs, updateModelPins } from './modelModule.ts';
+import {
+  ATTR_WINDOW,
+  attrSize,
+  libForPins,
+  setAttrSize,
+  MODEL_ATTRS,
+  attrVisible,
+  modelFileName,
+  modelInfo,
+  modelParams,
+  setModelParams,
+  setAttrVisible,
+  pinsMismatch,
+  renameModelIn,
+  renameSubcktIn,
+  setPinAttr,
+  setSymAttr,
+  symAttr,
+  syncModelAttrs,
+  updateModelPins,
+} from './modelModule.ts';
 import { t } from '../i18n/i18n.ts';
 
 /** Qué hace cada atributo (según cómo los usan los símbolos de TCLib y el netlist) */
@@ -33,7 +53,16 @@ const READ_ONLY = new Set<string>(['Prefix', 'ModelFile']);
 /** tamaños de letra de LTspice (índice → pt, spec §7.1) */
 const SIZES = [8, 13, 20, 26, 32, 46, 65, 92];
 
-export function ModelEditor({ name, text, symText, onText, onSymbol: storeSymbol, onPickSymbol, onPickNetlist, onClose }: {
+export function ModelEditor({
+  name,
+  text,
+  symText,
+  onText,
+  onSymbol: storeSymbol,
+  onPickSymbol,
+  onPickNetlist,
+  onClose,
+}: {
   name: string;
   text: string;
   symText: string;
@@ -123,7 +152,11 @@ export function ModelEditor({ name, text, symText, onText, onSymbol: storeSymbol
             {t('Netlist ({file})', { file: `${name}.lib` })}
           </label>
           {onPickNetlist && (
-            <button className="tree-add" onClick={onPickNetlist} title={t('Import the netlist of an existing component (a subcircuit of the project, a TCLib model…): the .subckt, renamed to this model')}>
+            <button
+              className="tree-add"
+              onClick={onPickNetlist}
+              title={t('Import the netlist of an existing component (a subcircuit of the project, a TCLib model…): the .subckt, renamed to this model')}
+            >
               {t('Import from existing…')}
             </button>
           )}
@@ -170,7 +203,13 @@ export function ModelEditor({ name, text, symText, onText, onSymbol: storeSymbol
                     <label htmlFor={`model-attr-${k}`}>{k}</label>
                   </td>
                   <td>
-                    <AttrInput id={`model-attr-${k}`} value={symAttr(symText, k)} placeholder={k === 'InstName' ? `${symAttr(symText, 'Prefix') || 'X'}1` : undefined} readOnly={READ_ONLY.has(k)} onCommit={(v) => (k === 'SpiceModel' ? renameModel(v.replace(/\s/g, '')) : onSymbol(setSymAttr(symText, k, v)))} />
+                    <AttrInput
+                      id={`model-attr-${k}`}
+                      value={symAttr(symText, k)}
+                      placeholder={k === 'InstName' ? `${symAttr(symText, 'Prefix') || 'X'}1` : undefined}
+                      readOnly={READ_ONLY.has(k)}
+                      onCommit={(v) => (k === 'SpiceModel' ? renameModel(v.replace(/\s/g, '')) : onSymbol(setSymAttr(symText, k, v)))}
+                    />
                   </td>
                   <td>
                     {ATTR_WINDOW[k] !== undefined && (
@@ -219,10 +258,20 @@ export function ModelEditor({ name, text, symText, onText, onSymbol: storeSymbol
                   <tr key={i}>
                     <td className="tree-meta">{i + 1}</td>
                     <td>
-                      <AttrInput id={`model-pin-${i}`} label={t('Name of pin {n}', { n: i + 1 })} value={p.name} onCommit={(v) => v && onSymbol(setPinAttr(symText, i, 'PinName', v.replace(/\s/g, '')))} />
+                      <AttrInput
+                        id={`model-pin-${i}`}
+                        label={t('Name of pin {n}', { n: i + 1 })}
+                        value={p.name}
+                        onCommit={(v) => v && onSymbol(setPinAttr(symText, i, 'PinName', v.replace(/\s/g, '')))}
+                      />
                     </td>
                     <td>
-                      <AttrInput id={`model-ord-${i}`} label={t('SpiceOrder of pin {n}', { n: i + 1 })} value={String(p.order)} onCommit={(v) => /^\d+$/.test(v) && onSymbol(setPinAttr(symText, i, 'SpiceOrder', v))} />
+                      <AttrInput
+                        id={`model-ord-${i}`}
+                        label={t('SpiceOrder of pin {n}', { n: i + 1 })}
+                        value={String(p.order)}
+                        onCommit={(v) => /^\d+$/.test(v) && onSymbol(setPinAttr(symText, i, 'SpiceOrder', v))}
+                      />
                     </td>
                     <td>
                       <select

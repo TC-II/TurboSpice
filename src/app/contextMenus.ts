@@ -40,9 +40,10 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
       // las fuentes independientes (V, I) tienen su ventana de configuración
       const s = doc.symbols[ref.index];
       const prefix = effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '';
-      setDialog(/^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) || isNativeSwitch(prefix) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index });
-    }
-    else if (ref.kind === 'text') {
+      setDialog(
+        /^[VI]$/i.test(prefix) ? { kind: 'source', index: ref.index } : isTcSwitch(s.type) || isNativeSwitch(prefix) ? { kind: 'switch', index: ref.index } : { kind: 'attrs', index: ref.index },
+      );
+    } else if (ref.kind === 'text') {
       const tt = doc.texts[ref.index];
       const ls = tt.text.split('\\n');
       // Como en LTspice: un comando de análisis abre el menú de simulación
@@ -67,7 +68,7 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
     const saved = next.length < sel.length;
     const what = refs.join(' ');
     return {
-      label: saved ? t('Don\'t save {what}', { what }) : t('Save {what}', { what }),
+      label: saved ? t("Don't save {what}", { what }) : t('Save {what}', { what }),
       disabled: saved && !next.length,
       onClick: () => {
         commit(setSaveSelection(doc, next));
@@ -90,9 +91,7 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
     const value = s.attrs.get('Value') ?? eff.get('Value') ?? '';
     const prefix = (eff.get('Prefix') ?? '').toUpperCase();
     // R, L, C y fuentes V de continua: el valor se edita en el mismo menú
-    const quick =
-      /^[RLC]$/.test(prefix) ||
-      (prefix === 'V' && parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') })?.kind === 'dc');
+    const quick = /^[RLC]$/.test(prefix) || (prefix === 'V' && parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') })?.kind === 'dc');
     const p0 = snapshot();
     const inBench = !curSub && !!sims.active;
     const peers = inBench ? groupPeersWith(p0, sims.active, inst, s.type) : [];
@@ -116,9 +115,7 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
         {
           // con el valor que se está escribiendo (#229): se aplica primero y después se propaga
           label: (v = value) =>
-            !canPropagate
-              ? t('Propagate {inst} across the other testbenches of the workbench', { inst })
-              : t('Propagate {inst}={value} across «{group}»', { inst, value: v, group }),
+            !canPropagate ? t('Propagate {inst} across the other testbenches of the workbench', { inst }) : t('Propagate {inst}={value} across «{group}»', { inst, value: v, group }),
           short: t('Propagate'),
           disabled: !canPropagate,
           primary: true,

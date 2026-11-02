@@ -51,10 +51,10 @@ export function margins(f: ArrayLike<number>, re: ArrayLike<number>, im: ArrayLi
   const at = (i: number, u: number, y: number[]) => y[i] + u * (y[i + 1] - y[i]);
   const out: Margins = { phase: [], gain: [] };
   for (let i = 0; i + 1 < f.length; i++) {
-    if (Number.isFinite(db[i]) && Number.isFinite(db[i + 1]) && (db[i] >= 0) !== (db[i + 1] >= 0)) {
+    if (Number.isFinite(db[i]) && Number.isFinite(db[i + 1]) && db[i] >= 0 !== db[i + 1] >= 0) {
       const u = db[i] / (db[i] - db[i + 1]);
       // margen = 180° + fase, llevado a (−180°, 180°]
-      const m = (((180 + at(i, u, ph)) % 360) + 540) % 360 - 180;
+      const m = ((((180 + at(i, u, ph)) % 360) + 540) % 360) - 180;
       out.phase.push({ f: 10 ** at(i, u, lf), margin: m === -180 ? 180 : m });
     }
     // cruces de −180° + k·360°
@@ -378,7 +378,10 @@ function vectorFit(s: number[], H: Complex[], w: number[], n: number, flip: bool
       // Σ c·φ + d − H·Σ c̃·φ = H
       const rr = [...ph.map((p) => p.re), 1, ...ph.map((p) => -(h.re * p.re - h.im * p.im))];
       const ri = [...ph.map((p) => p.im), 0, ...ph.map((p) => -(h.re * p.im + h.im * p.re))];
-      rows.push(rr.map((v) => v * w[k]), ri.map((v) => v * w[k]));
+      rows.push(
+        rr.map((v) => v * w[k]),
+        ri.map((v) => v * w[k]),
+      );
       y.push(h.re * w[k], h.im * w[k]);
     });
     const x = leastSquares(rows, y);
@@ -415,7 +418,14 @@ export function fitRational(f: ArrayLike<number>, re: ArrayLike<number>, im: Arr
   }
   if (!best) return null;
   const { A, b } = realForm(best.poles);
-  const poles = best.poles.flatMap((p) => (p.im ? [{ re: p.re * wn, im: p.im * wn }, { re: p.re * wn, im: -p.im * wn }] : [{ re: p.re * wn, im: 0 }]));
+  const poles = best.poles.flatMap((p) =>
+    p.im
+      ? [
+          { re: p.re * wn, im: p.im * wn },
+          { re: p.re * wn, im: -p.im * wn },
+        ]
+      : [{ re: p.re * wn, im: 0 }],
+  );
   return { wn, A, b, c: best.c, d: best.d, poles, error: best.error };
 }
 

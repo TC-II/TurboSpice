@@ -81,12 +81,15 @@ export function applySynth(p: Project, name: string, text: string, block: HdlBlo
   const sym = p.files.find((f) => f.kind === 'symbol' && key(f.name) === key(asyName));
   // un símbolo que sigue siendo el generado se vuelve a generar (con los pines nuevos bien
   // repartidos); uno editado conserva su dibujo y la posición de los pines que siguen
-  const noParams = (text: string) => text.split('\n').filter((l) => !/^SYMATTR SpiceLine /.test(l)).join('\n');
+  const noParams = (text: string) =>
+    text
+      .split('\n')
+      .filter((l) => !/^SYMATTR SpiceLine /.test(l))
+      .join('\n');
   const generated = !!sym && !!file.synth && noParams(sym.text) === noParams(verilogSymbol(name, file.synth));
   const symPins = verilogSymbolPorts(block.pins, sym?.text);
-  const nextSym = sym && !generated
-    ? withParams(syncPins(sym.text, symPins), symbolParams(symParams(sym.text), block))
-    : withParams(verilogSymbol(name, block), symbolParams(sym ? symParams(sym.text) : [], block));
+  const nextSym =
+    sym && !generated ? withParams(syncPins(sym.text, symPins), symbolParams(symParams(sym.text), block)) : withParams(verilogSymbol(name, block), symbolParams(sym ? symParams(sym.text) : [], block));
   const files = p.files.map((f) => (f === file ? { ...f, text, synth } : f === sym ? { ...f, text: nextSym } : f));
   if (!sym) files.push({ name: asyName, kind: 'symbol', text: nextSym });
   return { ...p, modified: Date.now(), files };
@@ -117,7 +120,10 @@ export const vvpFileOf = (name: string) => `${name.toLowerCase()}.vvp`;
 export function looksBehavioral(text: string): boolean {
   const code = text.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""');
   // (#(…) después de "module x" o de un tipo de instancia son parámetros, no retardos)
-  return /(^|[^\w)\]])#\s*[\d(]/m.test(code.replace(/\b(module\s+\w+|\w+)\s*#\s*\(/g, '$1 (')) || /\$(display|write|monitor|strobe|finish|stop|time|realtime|random|urandom|fopen)\b|\b(forever|wait|fork)\b/.test(code);
+  return (
+    /(^|[^\w)\]])#\s*[\d(]/m.test(code.replace(/\b(module\s+\w+|\w+)\s*#\s*\(/g, '$1 (')) ||
+    /\$(display|write|monitor|strobe|finish|stop|time|realtime|random|urandom|fopen)\b|\b(forever|wait|fork)\b/.test(code)
+  );
 }
 
 /** Agrega un módulo Verilog nuevo (todavía sin símbolo: aparece al sintetizarlo) */

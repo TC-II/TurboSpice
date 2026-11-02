@@ -12,7 +12,17 @@ const FIX = join(__dirname, '..', 'fixtures', 'asc');
 
 describe('parseAsc tolerante', () => {
   it('una línea dañada no impide abrir el resto: queda tal cual y se informa', () => {
-    const text = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 0 x 16', 'SYMBOL res 32 32 R45', 'SYMATTR InstName R1', 'SYMBOL cap 64 64 R0', 'SYMATTR InstName C1', 'LINE Normal 0 0 nan 3', 'TEXT 0 0 Left 2 !.tran 1m'].join('\n');
+    const text = [
+      'Version 4',
+      'SHEET 1 880 680',
+      'WIRE 0 0 x 16',
+      'SYMBOL res 32 32 R45',
+      'SYMATTR InstName R1',
+      'SYMBOL cap 64 64 R0',
+      'SYMATTR InstName C1',
+      'LINE Normal 0 0 nan 3',
+      'TEXT 0 0 Left 2 !.tran 1m',
+    ].join('\n');
     const doc = parseAsc(text);
     expect(doc.symbols.map((s) => s.attrs.get('InstName'))).toEqual(['C1']);
     expect(doc.texts).toHaveLength(1);
@@ -34,7 +44,7 @@ describe('parseAsc tolerante', () => {
   it('no tira con archivos truncados o basura', () => {
     const text = decode(new Uint8Array(readFileSync(join(FIX, readdirSync(FIX).find((x) => x.endsWith('.asc'))!)))).text;
     let seed = 7;
-    const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31;
     for (let i = 0; i < 200; i++) {
       const cut = text.slice(0, Math.floor(rnd() * text.length));
       const noisy = cut.replace(/\d/g, (d) => (rnd() < 0.05 ? 'x' : d));

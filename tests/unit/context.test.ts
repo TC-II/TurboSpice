@@ -60,7 +60,15 @@ describe('valores en contexto adentro de una instancia (#199)', () => {
     const built = await build();
     const inst = blockInstances(built);
     expect(inst.map((i) => i.prefix)).toEqual(['x_u1.']);
-    const sc = instScope(built, 'BUF', inst[0].prefix, new Map([['in', 'a'], ['out', '0']]))!;
+    const sc = instScope(
+      built,
+      'BUF',
+      inst[0].prefix,
+      new Map([
+        ['in', 'a'],
+        ['out', '0'],
+      ]),
+    )!;
     expect(sc).toBeTruthy();
     const r1 = sc.block.lt.elements.find((e) => e.name === 'R1')!;
     expect(probeExpr(built, { symbol: r1.sym }, sc)).toBe('I(x_u1.r1)');
@@ -72,7 +80,13 @@ describe('valores en contexto adentro de una instancia (#199)', () => {
     expect(probeExpr(built, { net: 'out' }, sc)).toBeNull();
     expect(scopeNet(sc, r1.nodes[1]).toLowerCase()).toBe(`x_u1.${r1.nodes[1].toLowerCase()}`);
     // el resolver encuentra los vectores de savecurrents
-    const plot = { name: 'op1', vectors: [{ name: '@r.x_u1.r1[i]', type: 0, real: new Float64Array([2e-3]) }, { name: '@q.x_u1.q1[ib]', type: 0, real: new Float64Array([1e-6]) }] };
+    const plot = {
+      name: 'op1',
+      vectors: [
+        { name: '@r.x_u1.r1[i]', type: 0, real: new Float64Array([2e-3]) },
+        { name: '@q.x_u1.q1[ib]', type: 0, real: new Float64Array([1e-6]) },
+      ],
+    };
     const res = traceResolver(built, plot as never);
     expect(res('I', ['x_u1.r1'])?.re[0]).toBe(2e-3);
     expect(res('Ib', ['x_u1.q1'])?.re[0]).toBe(1e-6);

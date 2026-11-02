@@ -18,7 +18,11 @@ describe('export a TikZ (#327)', () => {
   it('lee caminos SVG relativos, H/V, cúbicas y arcos', () => {
     const [s] = parsePath('M10 10 h5 v5 l-5 0 z');
     expect(s.start).toEqual([10, 10]);
-    expect(s.segs.map((g) => g.p)).toEqual([[15, 10], [15, 15], [10, 15]]);
+    expect(s.segs.map((g) => g.p)).toEqual([
+      [15, 10],
+      [15, 15],
+      [10, 15],
+    ]);
     expect(s.closed).toBe(true);
     const [c] = parsePath('M0 0 C1 1 2 1 3 0 S5 -1 6 0');
     expect(c.segs[1].c?.[0]).toEqual([4, -1]);

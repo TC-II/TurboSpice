@@ -19,7 +19,8 @@ const run = (cmd, a, opts) =>
   new Promise((res) => {
     const t0 = Date.now();
     execFile(cmd, a, { ...opts, windowsHide: true, maxBuffer: 1 << 26 }, (err, stdout, stderr) =>
-      res({ err: err ? { code: err.code, killed: err.killed, signal: err.signal } : null, ms: Date.now() - t0, stderr: String(stderr).slice(-2000) }));
+      res({ err: err ? { code: err.code, killed: err.killed, signal: err.signal } : null, ms: Date.now() - t0, stderr: String(stderr).slice(-2000) }),
+    );
   });
 
 function summarizeRaw(p) {
@@ -27,9 +28,18 @@ function summarizeRaw(p) {
   const n = r.np;
   // por paso: sólo el primero completo (más el número de pasos)
   const end = r.steps.length > 1 ? r.steps[1] : n;
-  const sub = (arr) => { const o = []; const s = Math.max(1, Math.floor(end / 4000)); for (let i = 0; i < end; i += s) o.push(arr[i]); if ((end - 1) % s) o.push(arr[end - 1]); return o; };
+  const sub = (arr) => {
+    const o = [];
+    const s = Math.max(1, Math.floor(end / 4000));
+    for (let i = 0; i < end; i += s) o.push(arr[i]);
+    if ((end - 1) % s) o.push(arr[end - 1]);
+    return o;
+  };
   return {
-    plotname: r.plotname, flags: r.flags, np: n, nsteps: r.steps.length,
+    plotname: r.plotname,
+    flags: r.flags,
+    np: n,
+    nsteps: r.steps.length,
     vars: r.vars.map((v, i) => ({ name: v.name, type: v.type, re: sub(r.data[i].re), im: r.data[i].im ? sub(r.data[i].im) : undefined })),
   };
 }
@@ -47,18 +57,33 @@ async function one(j) {
     const o0 = {};
     const base = j.path.replace(/\.asc$/i, '');
     let hasSim = true;
-    try { const t = JSON.parse(readFileSync(tsOut, 'utf8')); hasSim = t.hasSim === true; } catch {}
+    try {
+      const t = JSON.parse(readFileSync(tsOut, 'utf8'));
+      hasSim = t.hasSim === true;
+    } catch {}
     // sin análisis, -b se queda en un diálogo: sólo la netlist
     const r = await run(LT, hasSim ? ['-Run', '-b', j.path] : ['-netlist', j.path], { timeout: hasSim ? 90000 : 30000, cwd: dirname(j.path) });
     o0.hasSim = hasSim;
     const o = { run: r, ...o0 };
-    try { o.log = readFileSync(base + '.log', 'utf8').slice(0, 20000); } catch {}
-    try { const b = readFileSync(base + '.net'); o.net = new TextDecoder(b[1] === 0 ? 'utf-16le' : 'utf-8').decode(b); } catch {}
+    try {
+      o.log = readFileSync(base + '.log', 'utf8').slice(0, 20000);
+    } catch {}
+    try {
+      const b = readFileSync(base + '.net');
+      o.net = new TextDecoder(b[1] === 0 ? 'utf-16le' : 'utf-8').decode(b);
+    } catch {}
     if (existsSync(base + '.raw')) {
-      try { o.raw = summarizeRaw(base + '.raw'); } catch (e) { o.rawError = String(e); }
+      try {
+        o.raw = summarizeRaw(base + '.raw');
+      } catch (e) {
+        o.rawError = String(e);
+      }
     }
     // los .op con .step o .meas también dejan .op.raw
-    if (existsSync(base + '.op.raw')) try { o.opraw = summarizeRaw(base + '.op.raw'); } catch {}
+    if (existsSync(base + '.op.raw'))
+      try {
+        o.opraw = summarizeRaw(base + '.op.raw');
+      } catch {}
     writeFileSync(ltOut, JSON.stringify(o));
   }
   done++;
@@ -66,5 +91,9 @@ async function one(j) {
 }
 
 const queue = [...jobs];
-await Promise.all(Array.from({ length: conc }, async () => { while (queue.length) await one(queue.shift()); }));
+await Promise.all(
+  Array.from({ length: conc }, async () => {
+    while (queue.length) await one(queue.shift());
+  }),
+);
 console.log('fin', done);

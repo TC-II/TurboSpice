@@ -280,7 +280,11 @@ export function ltNetlistText(n: LtNetlist): string {
     out.push('', '* block symbol definitions');
     for (const b of n.blocks) {
       out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
-      out.push(...ltNetlistText({ ...b.lt, blocks: [] }).split('\n').filter((l) => !/^\.(backanno|end)$/.test(l)));
+      out.push(
+        ...ltNetlistText({ ...b.lt, blocks: [] })
+          .split('\n')
+          .filter((l) => !/^\.(backanno|end)$/.test(l)),
+      );
       out.push(`.ends ${b.name}`, '');
     }
   }

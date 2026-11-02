@@ -29,17 +29,7 @@ import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { activeSim, type SimList, type SimView } from './sim/simList.ts';
 import { simLine } from './sim/complexSim.ts';
-import {
-  activeAsc,
-  addSim as addProjectSim,
-  lineOf,
-  simOf,
-  simsWithValue,
-  valueChanges,
-  withGroups,
-  variantOf,
-  type ValueChange,
-} from './project/project.ts';
+import { activeAsc, addSim as addProjectSim, lineOf, simOf, simsWithValue, valueChanges, withGroups, variantOf, type ValueChange } from './project/project.ts';
 import { runFilesOf, runSummary } from './project/exchange.ts';
 import { EXT, newProject, type Project } from './project/turbo.ts';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
@@ -120,7 +110,6 @@ import { useProjectFiles } from './app/useProjectFiles.ts';
 import { useEvent } from './app/useEvent.ts';
 import { SchematicContext } from './app/context.ts';
 
-
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
   const engine = useMemo(() => new EngineClient(false), []);
@@ -161,7 +150,12 @@ export function App() {
   return (
     <div className="app">
       <header className="appbar">
-        <h1><Logo /> <span><span className="logo">Turbo</span>Spice</span></h1>
+        <h1>
+          <Logo />{' '}
+          <span>
+            <span className="logo">Turbo</span>Spice
+          </span>
+        </h1>
         {mode === 'netlist' ? (
           <nav className="tabs">
             <button onClick={() => setMode('schematic')}>{t('Schematic')}</button>
@@ -197,7 +191,13 @@ export function App() {
   );
 }
 
-function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
+function SchematicMode({
+  engine,
+  lib,
+  slots,
+  onNetlist,
+  onSkin,
+}: {
   engine: EngineClient;
   lib: Library;
   slots: { menu: HTMLElement | null; tabs: HTMLElement | null; right: HTMLElement | null; tools: HTMLElement | null };
@@ -291,7 +291,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const viewingRef = useRef(false);
   viewingRef.current = !!viewedDoc;
   /** la corrida anterior a la que se ve (o la última, para el actual) */
-  const prevRun = useCallback((r?: (typeof curRuns)[number]) => curRuns.slice(0, r ? curRuns.indexOf(r) : curRuns.length).reverse().find((x) => !x.damaged), [curRuns]);
+  const prevRun = useCallback(
+    (r?: (typeof curRuns)[number]) =>
+      curRuns
+        .slice(0, r ? curRuns.indexOf(r) : curRuns.length)
+        .reverse()
+        .find((x) => !x.damaged),
+    [curRuns],
+  );
   // cambios contra la corrida anterior (#153): resaltados en el esquemático
   const historyDiff = useMemo(() => {
     const prev = historyOpen ? prevRun(viewed) : undefined;
@@ -490,7 +497,26 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const panesByKind = useRef(new Map<string, Pane[]>());
   const { showView, restoreCached, loadProject, loadDoc, loadPractice, recent, remember, openBytes, switchLang } = useProjectSession({
     ...{ lib, history, stacks, kept, quietDoc, docRef, projectRef, simsRef, pathRef, plotState, panesByKind, editor, doc, docKey, project, file, dirty, panes, activePane, plotName, mode },
-    ...{ setPanes, setActivePane, setPlotName, setMode, setSim, setProjectState, setDirty, setFile, setSelection, setOfferView, setValueOffer, setHistoryOpen, setViewRun, setTool, setDocKey, setPath, setCurModel, setMessage },
+    ...{
+      setPanes,
+      setActivePane,
+      setPlotName,
+      setMode,
+      setSim,
+      setProjectState,
+      setDirty,
+      setFile,
+      setSelection,
+      setOfferView,
+      setValueOffer,
+      setHistoryOpen,
+      setViewRun,
+      setTool,
+      setDocKey,
+      setPath,
+      setCurModel,
+      setMessage,
+    },
     // (declaradas más abajo)
     snapshot: () => snapshot(),
     confirmDiscard: () => confirmDiscard(),
@@ -511,8 +537,17 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
 
-
-  const { doImportLtspice, doRemoveLtspice, ascName, doShare, doExport, exportName, doRecent, doNew: newFile, doExample } = projectFileActions({
+  const {
+    doImportLtspice,
+    doRemoveLtspice,
+    ascName,
+    doShare,
+    doExport,
+    exportName,
+    doRecent,
+    doNew: newFile,
+    doExample,
+  } = projectFileActions({
     curSim: activeSim(sims),
     ...{ google, project, variant, sims, recent, setLtIndex, turboBytes, confirmDiscard, openBytes, remember, loadDoc, loadProject, markDirty, setDialog, setMessage },
     warnMissing: (d) => warnMissing(d), // (declarada más abajo)
@@ -530,7 +565,29 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // Deshacer / rehacer los cambios de la vista de resultados (trazas, paneles, colores)
   const paneUndo = useRef<{ past: Pane[][]; future: Pane[][] }>({ past: [], future: [] });
   const run = runActions({
-    ...{ engine, lib, ltIndex, liveDoc, pathRef, sims, simsRef, sim, kept, aborting, paneUndo, editor, savesPicking, setSaves, setStatus, setViewRun, setMessage, prevRun, snapshot, editProject, setAutoDrive },
+    ...{
+      engine,
+      lib,
+      ltIndex,
+      liveDoc,
+      pathRef,
+      sims,
+      simsRef,
+      sim,
+      kept,
+      aborting,
+      paneUndo,
+      editor,
+      savesPicking,
+      setSaves,
+      setStatus,
+      setViewRun,
+      setMessage,
+      prevRun,
+      snapshot,
+      editProject,
+      setAutoDrive,
+    },
     ...{ ascName, allTraces, synthStale, withVariants, setOpPoint, expanded, setExpanded, setSim, setHiddenRuns, setPlotName, plotView, panes, setPanes, setStopPlotted, setPanel, setTool },
   });
 
@@ -544,7 +601,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // hasta qué instante llegó (el último tiempo del transitorio frenado)
   const stopTime = useMemo(() => {
     if (!sim?.result.sizeStop) return undefined;
-    const time = sim.result.plots.filter((pl) => /^tran\d+$/i.test(pl.name)).at(-1)?.vectors.find((v) => v.name === 'time')?.real;
+    const time = sim.result.plots
+      .filter((pl) => /^tran\d+$/i.test(pl.name))
+      .at(-1)
+      ?.vectors.find((v) => v.name === 'time')?.real;
     return time?.length ? time[time.length - 1] : undefined;
   }, [sim]);
   const plotStop = () => {
@@ -735,8 +795,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const partGroups = (s: SymbolInst): PartGroup[] =>
     cmpChoicesFor(effectiveAttrs(s, lib.symbol(s.type)).get('Prefix') ?? '', s.type).map((c) => ({ kind: c.kind, label: c.label, parts: lib.parts(c.kind).filter(c.accept) }));
 
-
-
   const missingSymbols = (d: AscDoc) => [...new Set(d.symbols.filter((x) => !lib.symbol(x.type)).map((x) => `${baseName(x.type)}.asy`))];
   /** Avisa si el circuito usa símbolos que no están en la librería ni entre los del usuario */
   const warnMissing = (d: AscDoc) => {
@@ -750,7 +808,22 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     if (msgs.length) setMessage(msgs.join(' · '));
   };
 
-  const { copySelection, makesCycle, paste, deleteSelection } = clipboardActions({ doc, lib, selection, setSelection, setTool, commit, editor, pathRef, projectRef, opSel, setOpSel, setOpTags, showOp, setMessage });
+  const { copySelection, makesCycle, paste, deleteSelection } = clipboardActions({
+    doc,
+    lib,
+    selection,
+    setSelection,
+    setTool,
+    commit,
+    editor,
+    pathRef,
+    projectRef,
+    opSel,
+    setOpSel,
+    setOpTags,
+    showOp,
+    setMessage,
+  });
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = project.name;
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
@@ -762,17 +835,29 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     ...{ doc, docLine, curSub, lib, commit, setDialog, setMessage },
     circuitInfo: () => circuitInfo(), // (declarada más abajo)
   });
-  const { openSaves, closeSaves, pickSave, setHoverTarget, savesHover } = useSavesPanel({ saves, setSaves, savesOpen, curSub, doc, docRef, lib, sim, tool, setTool, setRowHover, commit, ascName, setMessage });
+  const { openSaves, closeSaves, pickSave, setHoverTarget, savesHover } = useSavesPanel({
+    saves,
+    setSaves,
+    savesOpen,
+    curSub,
+    doc,
+    docRef,
+    lib,
+    sim,
+    tool,
+    setTool,
+    setRowHover,
+    commit,
+    ascName,
+    setMessage,
+  });
 
   // Redes y fuentes del circuito, para los selectores del menú de simulación
   // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
-  const info = useMemo(
-    (): CircuitInfo => {
-      void libVersion;
-      return circuitInfoOf(conn, doc, lib);
-    },
-    [conn, doc, lib, libVersion],
-  );
+  const info = useMemo((): CircuitInfo => {
+    void libVersion;
+    return circuitInfoOf(conn, doc, lib);
+  }, [conn, doc, lib, libVersion]);
   const circuitInfo = () => info;
 
   // Atajos de teclado: los de la configuración de LTspice que usamos (LTspice.ini,
@@ -823,7 +908,27 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   };
   const { menus, shapeItems, simItems } = buildMenus({
     ...{ google, history, status, running, sim, bias, selection, docLine, editor, ltIndex, ltInput, recent, shapeStyle, theme, setTheme, setDialog, setTool, setTutorialOpen },
-    ...{ shapeTool, openLineStyle, paste, newSim, complexSim, openSimulation, openSaves, openStudy, openControl, doImport, doRemoveLtspice, doNew, doOpen, doSave, doSaveLocal, exportZip, doShare, doExport, exportNetlist },
+    ...{
+      shapeTool,
+      openLineStyle,
+      paste,
+      newSim,
+      complexSim,
+      openSimulation,
+      openSaves,
+      openStudy,
+      openControl,
+      doImport,
+      doRemoveLtspice,
+      doNew,
+      doOpen,
+      doSave,
+      doSaveLocal,
+      exportZip,
+      doShare,
+      doExport,
+      exportNetlist,
+    },
     ...{ copySelection, deleteSelection, selectAll, rotateOrMirror, startMove, run, abort, showLog, showOp, setShowOp, netHover, setNetHover, zoomBox, showGrid, setShowGrid, showLoose, setShowLoose },
     ...{ showSimCommand, toggleSimCommand, showNets, setShowNets, resultsSide, setSide, treeOpen, toggleTree, resultsShown, toggleResultsPanel, onNetlist, doExample, doRecent },
   });
@@ -851,8 +956,51 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   });
   // (los atajos se instalan en cada render, con lo de ese render)
   useShortcuts({
-    ...{ dialog, history, status, running, selection, allRuns, hasNets, area, editor, plotPanel, pltInput, viewerKeys, simulate, abort, showLog, doSave, doOpen, setQuickOpen, goUp, reapplyView, undoPanes },
-    ...{ setDialog, setMessage, rotateOrMirror, copySelection, paste, setTool, selectAll, setSelection, setShowGrid, setShowLoose, setShowNets, setNetHover, openControl, openStudy, openSimulation, zoomBox, descend, startMove, shapeTool, deleteSelection },
+    ...{
+      dialog,
+      history,
+      status,
+      running,
+      selection,
+      allRuns,
+      hasNets,
+      area,
+      editor,
+      plotPanel,
+      pltInput,
+      viewerKeys,
+      simulate,
+      abort,
+      showLog,
+      doSave,
+      doOpen,
+      setQuickOpen,
+      goUp,
+      reapplyView,
+      undoPanes,
+    },
+    ...{
+      setDialog,
+      setMessage,
+      rotateOrMirror,
+      copySelection,
+      paste,
+      setTool,
+      selectAll,
+      setSelection,
+      setShowGrid,
+      setShowLoose,
+      setShowNets,
+      setNetHover,
+      openControl,
+      openStudy,
+      openSimulation,
+      zoomBox,
+      descend,
+      startMove,
+      shapeTool,
+      deleteSelection,
+    },
   });
   const isComplex = plot?.vectors.some((v) => v.imag);
   const { onDftPicking, onProbe, onProbePair } = useProbe({
@@ -880,7 +1028,32 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // Tutorial (Academia): lo que mira para saber si se cumplió cada paso. Es una función que se
   // reemplaza en cada render: el tutorial la consulta seguido y siempre ve el estado actual
   tutorialProbe.current = () =>
-    tutorialState({ lib, doc, tbDoc, conn, plotState, project, dirty, variant, sims, curSub, docLine, tool, dialog, sim, plot, allRuns, panes, panel, treeOpen, historyOpen, showOp, bias, showNets, hasNets });
+    tutorialState({
+      lib,
+      doc,
+      tbDoc,
+      conn,
+      plotState,
+      project,
+      dirty,
+      variant,
+      sims,
+      curSub,
+      docLine,
+      tool,
+      dialog,
+      sim,
+      plot,
+      allRuns,
+      panes,
+      panel,
+      treeOpen,
+      historyOpen,
+      showOp,
+      bias,
+      showNets,
+      hasNets,
+    });
 
   return (
     <SchematicContext.Provider value={{ lib, doc, commit, projectRef, editProject, curSub, tool, setTool, selection, setSelection, sim, setDialog, setMessage }}>
@@ -902,73 +1075,180 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
         />
 
         <div className="work-row">
-        <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
-          <div
-            onMouseMove={(e) => {
-              // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
-              if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
-              if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
-            }}
-            style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
-            className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
-            // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
-            // de prueba escribe ahí el nodo o componente
-            onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
-          >
-            <ProjectPanel
-              {...{ project, snapshot, sims, path, curVerilog, curModel, setCurModel, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, go, goSim, openSub }}
-              {...{ benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts }}
-            />
-            <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }} />
-            {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
-            <EditorArea
-              traceFocus={traceFocus}
-              {...{ conn, editor, docKey, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle }}
-              {...{ symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved }}
-              {...{ historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun }}
-            />
-            <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
-            <StatusBar
-              picking={!!picking}
-              fileName={file.name}
-              {...{ hoverSink, savesPicking, conn, message, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, offerView, acceptOfferedView, setOfferView }}
-            />
-          </div>
+          <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
+            <div
+              onMouseMove={(e) => {
+                // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
+                if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
+                if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
+              }}
+              style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
+              className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+              // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
+              // de prueba escribe ahí el nodo o componente
+              onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
+            >
+              <ProjectPanel
+                {...{
+                  project,
+                  snapshot,
+                  sims,
+                  path,
+                  curVerilog,
+                  curModel,
+                  setCurModel,
+                  treeOpen,
+                  treePeek,
+                  setTreePeek,
+                  treeShown,
+                  treeBenches,
+                  treeSubs,
+                  quickOpen,
+                  setQuickOpen,
+                  go,
+                  goSim,
+                  openSub,
+                }}
+                {...{
+                  benchItem,
+                  newGroup,
+                  groupAction,
+                  renameGroupTo,
+                  moveBench,
+                  newEmptyBench,
+                  renameProject,
+                  benchAction,
+                  renameBench,
+                  newSubckt,
+                  newModel,
+                  renameModel,
+                  renameSub,
+                  deleteModel,
+                  deleteSub,
+                  exportSub,
+                  exportSubNetlist,
+                  subToUser,
+                  subImport,
+                  importSubckts,
+                }}
+              />
+              <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }} />
+              {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
+              <EditorArea
+                traceFocus={traceFocus}
+                {...{ conn, editor, docKey, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle }}
+                {...{
+                  symbolMenu,
+                  netMenu,
+                  textMenu,
+                  setTextMenu,
+                  closeTextMenu,
+                  descend,
+                  editItem,
+                  onProbe,
+                  onProbePair,
+                  rowNet,
+                  traceNetShown,
+                  rowSymbol,
+                  rowElement,
+                  onHoverSymbol,
+                  setHoverTarget,
+                  netColors,
+                  shownNets,
+                  describe,
+                  annotations,
+                  opSel,
+                  setOpSel,
+                  setOpTags,
+                  arrows,
+                  pickValue,
+                  endPick,
+                  onHover,
+                  historyDiff,
+                  unsaved,
+                }}
+                {...{ historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun }}
+              />
+              <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
+              <StatusBar
+                picking={!!picking}
+                fileName={file.name}
+                {...{ hoverSink, savesPicking, conn, message, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, offerView, acceptOfferedView, setOfferView }}
+              />
+            </div>
 
-          {sim && !curSub && (
-            <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
-          )}
-          {sim && !curSub && (
-            <ResultsPanel
-              projectName={project.name}
-              {...{ sim, resultsH, pltInput, importPlt, panel, setPanel, resultsItems, plot, scale, traceBox, traceNames, traceHints, addExpr, setTraceFocus, plotName, selectPlot, labels, isComplex, mode, setMode }}
-              {...{ viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver }}
-              {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
-              {...{ problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run }}
+            {sim && !curSub && <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />}
+            {sim && !curSub && (
+              <ResultsPanel
+                projectName={project.name}
+                {...{
+                  sim,
+                  resultsH,
+                  pltInput,
+                  importPlt,
+                  panel,
+                  setPanel,
+                  resultsItems,
+                  plot,
+                  scale,
+                  traceBox,
+                  traceNames,
+                  traceHints,
+                  addExpr,
+                  setTraceFocus,
+                  plotName,
+                  selectPlot,
+                  labels,
+                  isComplex,
+                  mode,
+                  setMode,
+                }}
+                {...{
+                  viewerTools,
+                  setViewerTools,
+                  withPz,
+                  pzSide,
+                  setPzSide,
+                  allRuns,
+                  visibleRuns,
+                  hiddenRuns,
+                  overlay,
+                  setOverlay,
+                  sims,
+                  plotState,
+                  onPlotState,
+                  plotPanel,
+                  runs,
+                  panes,
+                  editPanes,
+                  resolver,
+                }}
+                {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
+                {...{ problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run }}
+              />
+            )}
+          </div>
+          {saves && (
+            <SavesPanel
+              selection={curSub ? null : saveSelection(doc.texts)}
+              mode={saves.mode}
+              onMode={(mode) => setSaves((s) => s && { ...s, mode })}
+              signals={curSub ? [] : saves.signals}
+              max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected, simLimits(!!streamPlan(sim.built.netlist)).max) : undefined}
+              onChange={(refs) => commit(setSaveSelection(doc, refs))}
+              hover={savesHover}
+              onHoverRow={setRowHover}
+              picking={savesPicking}
+              inactive={!!saves.inactive}
+              onActivate={() => {
+                setSaves((s) => s && { ...s, inactive: false });
+                if (saves.picking) setTool({ kind: 'probe' });
+              }}
+              onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
+              blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
+              onClose={closeSaves}
             />
           )}
-        </div>
-        {saves && (
-          <SavesPanel
-            selection={curSub ? null : saveSelection(doc.texts)}
-            mode={saves.mode}
-            onMode={(mode) => setSaves((s) => s && { ...s, mode })}
-            signals={curSub ? [] : saves.signals}
-            max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected, simLimits(!!streamPlan(sim.built.netlist)).max) : undefined}
-            onChange={(refs) => commit(setSaveSelection(doc, refs))}
-            hover={savesHover}
-            onHoverRow={setRowHover}
-            picking={savesPicking}
-            inactive={!!saves.inactive}
-            onActivate={() => {
-              setSaves((s) => s && { ...s, inactive: false });
-              if (saves.picking) setTool({ kind: 'probe' });
-            }}
-            onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
-            blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
-            onClose={closeSaves}
-          />
-        )}
         </div>
 
         <AppDialogs
@@ -976,7 +1256,23 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
           {...{ dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam }}
           {...{ picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay }}
           {...{ userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule }}
-          {...{ driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile }}
+          {...{
+            driveConflict,
+            setDriveConflict,
+            resolveDriveConflict,
+            conflict,
+            setConflict,
+            schFont,
+            setSchFont,
+            onSkin,
+            hoverReveal,
+            setHoverReveal,
+            traceW,
+            importInput,
+            file,
+            setFile,
+            openDriveFile,
+          }}
           {...{ curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope }}
         />
       </div>

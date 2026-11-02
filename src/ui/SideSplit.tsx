@@ -43,7 +43,13 @@ export function useSideSize(key: string, dir: SplitDir): { size: number | null; 
   return { size: stored, set, style, storageKey };
 }
 
-export function SideSplit({ dir, onSize, min = 140, reserve = 160, label }: {
+export function SideSplit({
+  dir,
+  onSize,
+  min = 140,
+  reserve = 160,
+  label,
+}: {
   /** 'row': la parte de al lado va a la derecha; 'column': va debajo */
   dir: SplitDir;
   /** el tamaño nuevo de la parte que sigue al divisor (null: volver al del CSS) */

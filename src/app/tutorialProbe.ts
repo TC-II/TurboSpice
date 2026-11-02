@@ -43,7 +43,32 @@ export interface TutorialDeps {
   hasNets: boolean;
 }
 
-export function tutorialState({ lib, doc, tbDoc, conn, plotState, project, dirty, variant, sims, curSub, docLine, tool, dialog, sim, plot, allRuns, panes, panel, treeOpen, historyOpen, showOp, bias, showNets, hasNets }: TutorialDeps): TutorialProbe {
+export function tutorialState({
+  lib,
+  doc,
+  tbDoc,
+  conn,
+  plotState,
+  project,
+  dirty,
+  variant,
+  sims,
+  curSub,
+  docLine,
+  tool,
+  dialog,
+  sim,
+  plot,
+  allRuns,
+  panes,
+  panel,
+  treeOpen,
+  historyOpen,
+  showOp,
+  bias,
+  showNets,
+  hasNets,
+}: TutorialDeps): TutorialProbe {
   const effective = (s: SymbolInst) => effectiveAttrs(s, lib.symbol(s.type));
   const benchDoc = tbDoc ?? doc;
   let loose = 0;
@@ -56,7 +81,10 @@ export function tutorialState({ lib, doc, tbDoc, conn, plotState, project, dirty
     benches: variant.sims.map((x) => ({ id: x.id, custom: !!x.name, ...(x.group ? { group: x.group } : {}), line: sims.items.find((y) => y.id === x.id)?.line ?? '', runs: x.runs.length })),
     activeBench: sims.active,
     groups: project.groups.length,
-    modules: [...modules(project).map((f) => ({ name: subName(f.name), kind: f.kind === 'verilog' ? ('verilog' as const) : ('schematic' as const) })), ...modelModules(project).map((f) => ({ name: modelModuleName(f), kind: 'model' as const }))],
+    modules: [
+      ...modules(project).map((f) => ({ name: subName(f.name), kind: f.kind === 'verilog' ? ('verilog' as const) : ('schematic' as const) })),
+      ...modelModules(project).map((f) => ({ name: modelModuleName(f), kind: 'model' as const })),
+    ],
     inSub: curSub,
     symbols: doc.symbols.map((s) => {
       const e = effective(s);

@@ -40,7 +40,14 @@ const TC_FIELDS = [field('on', 'Rs', '1m'), field('off', 'Roff', '1G'), field('v
 /** .model SW de SPICE: los valores por defecto de ngspice (Roff = 1/GMIN) */
 const SW_FIELDS = [field('on', 'Ron', '1'), field('off', 'Roff', '1T'), field('vt', 'Vt', '0'), field('vh', 'Vh', '0')];
 
-export function SwitchDialog({ inst, def, doc, windowDefaults, onApply, onClose }: {
+export function SwitchDialog({
+  inst,
+  def,
+  doc,
+  windowDefaults,
+  onApply,
+  onClose,
+}: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   /** el esquemático: el switch nativo lee su .model de las directivas */
@@ -77,9 +84,7 @@ export function SwitchDialog({ inst, def, doc, windowDefaults, onApply, onClose 
   const [vals, setVals] = useState<Record<Id, string>>(() => ({ on: get(FIELDS[0]), off: get(FIELDS[1]), vt: get(FIELDS[2]), vh: get(FIELDS[3]) }));
   const [focus, setFocus] = useState<Id | ''>('');
   // otros switches nativos con el mismo .model: cambiarlo los cambia a todos
-  const sharing = native
-    ? doc.symbols.filter((s) => s !== inst && /(^|\/)sw$/i.test(s.type) && (s.attrs.get('Value') || 'SW').toLowerCase() === modelName.toLowerCase()).length
-    : 0;
+  const sharing = native ? doc.symbols.filter((s) => s !== inst && /(^|\/)sw$/i.test(s.type) && (s.attrs.get('Value') || 'SW').toLowerCase() === modelName.toLowerCase()).length : 0;
   const params = (): [string, string][] => {
     // los parámetros que no son de esta ventana se conservan
     const others = initial.filter(([n]) => !FIELDS.some((f) => f.param.toLowerCase() === n.toLowerCase()));
@@ -151,8 +156,12 @@ export function SwitchDialog({ inst, def, doc, windowDefaults, onApply, onClose 
         </details>
         <code className="src-line">{line}</code>
         <div className="buttons">
-          <button type="button" onClick={onClose}>{t('Cancel')}</button>
-          <button type="submit" className="primary">{t('OK')}</button>
+          <button type="button" onClick={onClose}>
+            {t('Cancel')}
+          </button>
+          <button type="submit" className="primary">
+            {t('OK')}
+          </button>
         </div>
       </form>
     </Modal>
@@ -176,27 +185,41 @@ function SwitchDrawing({ focus }: { focus: Id | '' }) {
         <line x1={x0} y1={yOn + 14} x2={W - 16} y2={yOn + 14} />
         <line x1={x0} y1={yOn + 14} x2={x0} y2={12} />
       </g>
-      <text x={W - 16} y={H - 4} textAnchor="end">V(Vc+, Vc−)</text>
-      <text x={x0 - 6} y={14} textAnchor="end">R</text>
+      <text x={W - 16} y={H - 4} textAnchor="end">
+        V(Vc+, Vc−)
+      </text>
+      <text x={x0 - 6} y={14} textAnchor="end">
+        R
+      </text>
       {/* abierto hasta Vt+Vh al subir; cerrado hasta Vt−Vh al bajar */}
       <path className="wave" d={`M${x0} ${yOff} H${hi} V${yOn} H${W - 24}`} />
       <path className="wave" d={`M${W - 24} ${yOn} H${lo} V${yOff}`} strokeDasharray="5 4" />
       <path className="wave" d={`M${hi - 8} ${(yOff + yOn) / 2 - 8} l8 8 l8 -8`} />
       <path className="wave" d={`M${lo - 8} ${(yOff + yOn) / 2 + 8} l8 -8 l8 8`} />
       <g className={`dim${on('off')}`}>
-        <text x={x0 + 6} y={yOff - 6}>Roff</text>
+        <text x={x0 + 6} y={yOff - 6}>
+          Roff
+        </text>
       </g>
       <g className={`dim${on('on')}`}>
-        <text x={W - 24} y={yOn - 6} textAnchor="end">Ron</text>
+        <text x={W - 24} y={yOn - 6} textAnchor="end">
+          Ron
+        </text>
       </g>
       <g className={`dim${on('vt')}`}>
         <line x1={vt} y1={yOff - 8} x2={vt} y2={yOn + 14} strokeDasharray="2 3" />
-        <text x={vt} y={yOn + 28} textAnchor="middle">Vt</text>
+        <text x={vt} y={yOn + 28} textAnchor="middle">
+          Vt
+        </text>
       </g>
       <g className={`dim${on('vh')}`}>
         <path d={`M${lo} ${yOff - 14} H${hi}`} />
-        <text x={lo - 4} y={yOff - 16} textAnchor="end">Vt−Vh</text>
-        <text x={hi + 4} y={yOff - 16}>Vt+Vh</text>
+        <text x={lo - 4} y={yOff - 16} textAnchor="end">
+          Vt−Vh
+        </text>
+        <text x={hi + 4} y={yOff - 16}>
+          Vt+Vh
+        </text>
       </g>
     </svg>
   );

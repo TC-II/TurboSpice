@@ -55,8 +55,7 @@ describe('rotar/espejar sin deriva', () => {
       const sp = symbolPivot(def);
       expect(toWorld(d.symbols[0], sp.x, sp.y)).toEqual(p0);
       // los pines son los de antes girados/espejados alrededor del punto fijo
-      const tp = (p: { x: number; y: number }) =>
-        op === 'rotate' ? { x: p0.x - (p.y - p0.y) + 0, y: p0.y + (p.x - p0.x) + 0 } : { x: 2 * p0.x - p.x + 0, y: p.y };
+      const tp = (p: { x: number; y: number }) => (op === 'rotate' ? { x: p0.x - (p.y - p0.y) + 0, y: p0.y + (p.x - p0.x) + 0 } : { x: 2 * p0.x - p.x + 0, y: p.y });
       const key = (p: { x: number; y: number }) => `${p.x},${p.y}`;
       expect(pins(d).map(key).sort()).toEqual(before.map(tp).map(key).sort());
       if (onGrid(type)) for (const p of pins(d)) expect(Math.abs(p.x % GRID) + Math.abs(p.y % GRID)).toBe(0);

@@ -33,10 +33,7 @@ function toPenSvg(skin: Skin, classes: Map<string, string>): string {
  */
 function fromPenSvg(svg: string, classes: Map<string, string>): string {
   const style = new Map([...classes].map(([decls, cls]) => [cls, decls]));
-  const colors = (s: string) =>
-    s
-      .replace(/(fill|stroke)(="|:\s*)#000(000)?\b/gi, '$1$2currentColor')
-      .replace(/(fill)(="|:\s*)#fff(fff)?\b/gi, '$1$2var(--sch-bg)');
+  const colors = (s: string) => s.replace(/(fill|stroke)(="|:\s*)#000(000)?\b/gi, '$1$2currentColor').replace(/(fill)(="|:\s*)#fff(fff)?\b/gi, '$1$2var(--sch-bg)');
   return colors(
     svg
       .replace(/<\?xml[^>]*>/, '')
@@ -76,7 +73,10 @@ export function tremorSkin(skin: Skin, pins: Pt[], seed: string): Skin {
 /** Un cable a mano alzada: los dos extremos quedan donde estaban (uniones, pines, etiquetas) */
 export function tremorWire(x1: number, y1: number, x2: number, y2: number): string {
   const opt = RoughPen.DEFAULTS;
-  const ends: Pt[] = [[x1, y1], [x2, y2]];
+  const ends: Pt[] = [
+    [x1, y1],
+    [x2, y2],
+  ];
   try {
     const rand = RoughPen.mulberry32(RoughPen.fnv1a(`wire|${x1},${y1}|${x2},${y2}`));
     const pts = RoughPen.penStroke(ends, rand, opt, RoughPen.makeWarp(rand, opt.warp, opt.warpPeriod), RoughPen.makeTaper(ends, opt.lock), false);

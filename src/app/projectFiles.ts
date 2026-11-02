@@ -34,7 +34,25 @@ export interface ProjectFileDeps {
   setMessage(m?: string): void;
 }
 
-export function projectFileActions({ google, project, variant, sims, curSim, recent, setLtIndex, turboBytes, confirmDiscard, openBytes, remember, loadDoc, loadProject, markDirty, warnMissing, setDialog, setMessage }: ProjectFileDeps) {
+export function projectFileActions({
+  google,
+  project,
+  variant,
+  sims,
+  curSim,
+  recent,
+  setLtIndex,
+  turboBytes,
+  confirmDiscard,
+  openBytes,
+  remember,
+  loadDoc,
+  loadProject,
+  markDirty,
+  warnMissing,
+  setDialog,
+  setMessage,
+}: ProjectFileDeps) {
   // carpeta lib de LTspice (lib/sym, lib/sub, lib/cmp): de Analog Devices, no se redistribuye; queda
   // en el IndexedDB de este navegador y no se sube a ningún lado
   const doImportLtspice = async (files: File[]) => {
@@ -50,7 +68,7 @@ export function projectFileActions({ google, project, variant, sims, curSim, rec
   const doRemoveLtspice = async () => {
     await removeLtspiceLibrary();
     setLtIndex(undefined);
-    setMessage(t('The LTspice library was removed from this browser (what\'s already loaded goes away when the page reloads)'));
+    setMessage(t("The LTspice library was removed from this browser (what's already loaded goes away when the page reloads)"));
   };
 
   // el link y el PDF llevan el circuito que se está viendo, como .asc
@@ -69,7 +87,13 @@ export function projectFileActions({ google, project, variant, sims, curSim, rec
     const me = variant.sims.find((x) => x.id === sims.active);
     const bench = project.groups.find((g) => g.id === me?.group)?.name;
     const tb = (curSim && simName(curSim)) || t('No analysis');
-    return [bench, tb].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, '_').trim() || project.name;
+    return (
+      [bench, tb]
+        .filter(Boolean)
+        .join(' - ')
+        .replace(/[\\/:*?"<>|]+/g, '_')
+        .trim() || project.name
+    );
   };
 
   const doRecent = async (i: number) => {
@@ -77,7 +101,13 @@ export function projectFileActions({ google, project, variant, sims, curSim, rec
     if (!r || !confirmDiscard()) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
     const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
-    const driveVersion = bytes && r.driveId && google.account ? await drive.meta(r.driveId).then((m) => m.version, () => undefined) : undefined;
+    const driveVersion =
+      bytes && r.driveId && google.account
+        ? await drive.meta(r.driveId).then(
+            (m) => m.version,
+            () => undefined,
+          )
+        : undefined;
     const at = { handle: r.handle as FileState['handle'], driveId: r.driveId, driveVersion };
     try {
       if (bytes) return await openBytes(bytes, r.name, at);

@@ -221,8 +221,10 @@ export function chapters(): Chapter[] {
         {
           id: 'welcome',
           title: t('Welcome to the Academy!'),
-          body: t('Each mission teaches you a part of TurboSpice. Do what this card says: TurboSpice **notices it on its own** and gives you XP. If you get stuck, ask for a **hint** (it costs a star) or **skip** the step. You can drag this card by its title.'),
-          next: t('Let\'s go!'),
+          body: t(
+            'Each mission teaches you a part of TurboSpice. Do what this card says: TurboSpice **notices it on its own** and gives you XP. If you get stuck, ask for a **hint** (it costs a star) or **skip** the step. You can drag this card by its title.',
+          ),
+          next: t("Let's go!"),
         },
         {
           id: 'menu',
@@ -305,7 +307,9 @@ export function chapters(): Chapter[] {
         {
           id: 'wires',
           title: t('Wires'),
-          body: t('Press [[W]] and click from pin to pin: each click makes a corner and clicking on a pin ends the wire. Join source → resistor → capacitor, and their bottoms to ground. The red marks are **unconnected pins**.'),
+          body: t(
+            'Press [[W]] and click from pin to pin: each click makes a corner and clicking on a pin ends the wire. Join source → resistor → capacitor, and their bottoms to ground. The red marks are **unconnected pins**.',
+          ),
           hint: t('A wire ends on a pin, on another wire or on a ground. Esc leaves the tool. If a component is far away, drag it: its wires stretch.'),
           check: (p) => p.loose === 0 && p.wires >= 2 && p.symbols.length >= 3,
           progress: looseText,
@@ -323,7 +327,16 @@ export function chapters(): Chapter[] {
           body: t('**Right-click** the resistor and write **1k**; then the capacitor: **1u**. (Double-click opens all its attributes.)'),
           hint: t('SI prefixes: k = kilo, m = milli, u = micro, n = nano, p = pico… and meg = mega (M is milli, as in SPICE).'),
           check: (p) => of(p, 'R').some((s) => near(num(s.value), 1e3)) && of(p, 'C').some((s) => near(num(s.value), 1e-6)),
-          progress: (p) => `R = ${of(p, 'R').map((s) => s.value || '?').join(', ') || '—'} · C = ${of(p, 'C').map((s) => s.value || '?').join(', ') || '—'}`,
+          progress: (p) =>
+            `R = ${
+              of(p, 'R')
+                .map((s) => s.value || '?')
+                .join(', ') || '—'
+            } · C = ${
+              of(p, 'C')
+                .map((s) => s.value || '?')
+                .join(', ') || '—'
+            }`,
         },
         {
           id: 'undo',
@@ -340,7 +353,7 @@ export function chapters(): Chapter[] {
     {
       id: 'simulate',
       icon: '⚡',
-      title: t('Let\'s simulate!'),
+      title: t("Let's simulate!"),
       blurb: t('Choose an analysis, set its parameters, configure the source and run.'),
       badge: t('Spark of life'),
       practice: 'rc',
@@ -409,7 +422,9 @@ export function chapters(): Chapter[] {
         {
           id: 'probe',
           title: t('The probe'),
-          body: t('The **probe** (the Measure button) plots what you click. It turns on by itself after simulating; if it is off, turn it on. Click a **wire** of the schematic: its voltage is plotted. Try the **out** net.'),
+          body: t(
+            'The **probe** (the Measure button) plots what you click. It turns on by itself after simulating; if it is off, turn it on. Click a **wire** of the schematic: its voltage is plotted. Try the **out** net.',
+          ),
           target: byLabel(t('Measure')),
           progress: (p) => (p.tool === 'probe' ? t('The probe is on: click the out wire.') : undefined),
           start: (p) => ({ n: traces(p).length }),
@@ -424,7 +439,9 @@ export function chapters(): Chapter[] {
         {
           id: 'expr',
           title: t('Expressions'),
-          body: t('With the mouse over the plot press [[T]] (or click the box of traces) and write **V(in)-V(out)**: in and out are the nets at both ends of the resistor, so it is the voltage across it. [[Enter]] adds it.'),
+          body: t(
+            'With the mouse over the plot press [[T]] (or click the box of traces) and write **V(in)-V(out)**: in and out are the nets at both ends of the resistor, so it is the voltage across it. [[Enter]] adds it.',
+          ),
           hint: t('Any expression works: V(out)*1000, I(R1)*V(in), abs(V(out))… and Ctrl+Space suggests the names.'),
           check: (p) => traces(p).some((x) => /\)\s*[-+*/]|[-+*/]\s*[VI]\(/i.test(x)),
         },
@@ -479,7 +496,9 @@ export function chapters(): Chapter[] {
         {
           id: 'concept',
           title: t('How a project is organized'),
-          body: t('A **project** (a .turbo file) has **workbenches**, and each workbench has **testbenches**. A testbench is a schematic **with its simulation**: a transient, an AC… The testbenches of a workbench are usually the same circuit seen in different ways. The **modules** (subcircuits, models, Verilog) belong to the whole project.'),
+          body: t(
+            'A **project** (a .turbo file) has **workbenches**, and each workbench has **testbenches**. A testbench is a schematic **with its simulation**: a transient, an AC… The testbenches of a workbench are usually the same circuit seen in different ways. The **modules** (subcircuits, models, Verilog) belong to the whole project.',
+          ),
         },
         {
           id: 'open',
@@ -491,7 +510,9 @@ export function chapters(): Chapter[] {
         {
           id: 'newbench',
           title: t('A second testbench'),
-          body: t('This testbench already simulates a transient. Choose **New simulation ▾ › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.'),
+          body: t(
+            'This testbench already simulates a transient. Choose **New simulation ▾ › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.',
+          ),
           target: byLabel(t('New simulation')),
           check: (p) => p.benches.length >= 2 && p.benches.some((b) => kind(b.line) === 'ac'),
         },
@@ -539,14 +560,18 @@ export function chapters(): Chapter[] {
         {
           id: 'history',
           title: t('The run history'),
-          body: t('Every time you simulate, the exact circuit is saved. The 🕑 button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.'),
+          body: t(
+            'Every time you simulate, the exact circuit is saved. The 🕑 button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.',
+          ),
           target: bySel('.project-tree .tree-runs:not(.none)'),
           ...turnOn((p) => p.historyOpen, t('It is already open: look at it and go on.')),
         },
         {
           id: 'propagate',
           title: t('Propagating values'),
-          body: t('When the testbenches of a workbench share components, **right-clicking** one (R1) offers to **propagate** its value to the others of the workbench. That way you change the design once.'),
+          body: t(
+            'When the testbenches of a workbench share components, **right-clicking** one (R1) offers to **propagate** its value to the others of the workbench. That way you change the design once.',
+          ),
         },
       ],
     },
@@ -574,7 +599,9 @@ export function chapters(): Chapter[] {
         {
           id: 'ports',
           title: t('Ports'),
-          body: t('The pins of the module are its **ports**: the **Port** button of the toolbar places a net label that is a port. Add **IN** and **OUT** (and a ground, which is the same everywhere).'),
+          body: t(
+            'The pins of the module are its **ports**: the **Port** button of the toolbar places a net label that is a port. Add **IN** and **OUT** (and a ground, which is the same everywhere).',
+          ),
           target: byLabel(t('Port')),
           check: (p) => !!p.inSub && p.ports >= 2,
         },

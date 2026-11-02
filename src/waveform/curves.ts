@@ -99,7 +99,15 @@ const V_TERM = String.raw`\s*V\([^)]*\)\s*`;
 const isCurrentExpr = (e: string) => new RegExp(`^${I_TERM}(-${I_TERM})?$`, 'i').test(e) || deviceExprUnit(e) === 'A';
 /** Unidad de una traza simple: V(…), I(…), V/I (Ω), I/V (S) o un parámetro de dispositivo (@Q1[gm] → S, #202) */
 export const exprUnit = (e: string) =>
-  new RegExp(`^${V_TERM}/${I_TERM}$`, 'i').test(e) ? 'Ω' : new RegExp(`^${I_TERM}/${V_TERM}$`, 'i').test(e) ? 'S' : new RegExp(`^${V_TERM}(-${V_TERM})?$`, 'i').test(e) ? 'V' : isCurrentExpr(e) ? 'A' : (deviceExprUnit(e) ?? '');
+  new RegExp(`^${V_TERM}/${I_TERM}$`, 'i').test(e)
+    ? 'Ω'
+    : new RegExp(`^${I_TERM}/${V_TERM}$`, 'i').test(e)
+      ? 'S'
+      : new RegExp(`^${V_TERM}(-${V_TERM})?$`, 'i').test(e)
+        ? 'V'
+        : isCurrentExpr(e)
+          ? 'A'
+          : (deviceExprUnit(e) ?? '');
 
 /**
  * Unidades de los dos ejes Y de un panel (#308): por orden de aparición, la corriente a la derecha
@@ -121,7 +129,6 @@ export function placeTrace(panes: Pane[], active: number, expr: string): { panes
   if (isDigitalExpr(expr) || units.length < 2 || units.includes(exprUnit(expr))) return { panes: addTraceTo(panes, i, expr), index: i };
   return { panes: addTraceTo([...panes, { traces: [] }], panes.length, expr), index: panes.length };
 }
-
 
 /** Tramos de un eje X que retrocede (barrido .dc anidado): [inicio, fin) de cada uno */
 export function sweepSegments(x: Float64Array): [number, number][] {
@@ -191,10 +198,33 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
         if (segs.length > 1) {
           segs.forEach(([a, b], si) => {
             const xs = scale.real.slice(a, b);
-            curves.push({ label: `${tt.expr}${p.suffix} #${si + 1}`, trace: ti, run: si, color: shade(base, si, segs.length), dash: p.dash, axis: p.axis, y: resample(xs, y.slice(a, b), x), hidden: !!tt.hidden, runLabel: `#${si + 1}`, ...digital });
+            curves.push({
+              label: `${tt.expr}${p.suffix} #${si + 1}`,
+              trace: ti,
+              run: si,
+              color: shade(base, si, segs.length),
+              dash: p.dash,
+              axis: p.axis,
+              y: resample(xs, y.slice(a, b), x),
+              hidden: !!tt.hidden,
+              runLabel: `#${si + 1}`,
+              ...digital,
+            });
           });
         } else {
-          curves.push({ label: `${tt.expr}${p.suffix}${runLabel}`, trace: ti, run: ri, color, dash: p.dash, axis: p.axis, y, ...(ex ? { x: ex } : {}), hidden: !!tt.hidden, ...(runLabel ? { runLabel: runLabel.slice(3) } : {}), ...digital });
+          curves.push({
+            label: `${tt.expr}${p.suffix}${runLabel}`,
+            trace: ti,
+            run: ri,
+            color,
+            dash: p.dash,
+            axis: p.axis,
+            y,
+            ...(ex ? { x: ex } : {}),
+            hidden: !!tt.hidden,
+            ...(runLabel ? { runLabel: runLabel.slice(3) } : {}),
+            ...digital,
+          });
         }
       }
     });
@@ -215,9 +245,7 @@ export function traceLabel(tt: Trace, others: Trace[] = []): string {
   const f = tt.dft;
   if (!f) return tt.expr;
   const twins = others.filter((o) => o !== tt && o.dft && sameExpr(o.expr, tt.expr) && !sameDft(o.dft, f));
-  const range = twins.some((o) => o.dft!.from !== f.from || o.dft!.to !== f.to)
-    ? ` ${f.from !== undefined && f.to !== undefined ? `${si(f.from)}s…${si(f.to)}s` : t('all points')}`
-    : '';
+  const range = twins.some((o) => o.dft!.from !== f.from || o.dft!.to !== f.to) ? ` ${f.from !== undefined && f.to !== undefined ? `${si(f.from)}s…${si(f.to)}s` : t('all points')}` : '';
   const rate = twins.some((o) => o.dft!.fs !== f.fs) ? ` ${f.fs !== undefined ? `${si(f.fs)}Hz` : t('automatic sample rate')}` : '';
   return `${tt.expr}-${f.window === 'rect' ? 'Rec' : t(WINDOW_LABEL[f.window])}${range}${rate}`;
 }

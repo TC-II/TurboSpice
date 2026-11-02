@@ -127,19 +127,18 @@ export function analysisDetail(line: string): string {
   const label = ANALYSES.find((x) => x.kind === a.kind)!.label;
   switch (a.kind) {
     case 'tran':
-      return [
-        `${label} ${range(a.tstart, a.tstop, 's')}`,
-        ...(a.tmax ? [t('max step {v}', { v: quantity(a.tmax, 's') })] : []),
-        ...(a.uic ? ['UIC'] : []),
-        ...(a.startup ? ['startup'] : []),
-      ].join(', ');
+      return [`${label} ${range(a.tstart, a.tstop, 's')}`, ...(a.tmax ? [t('max step {v}', { v: quantity(a.tmax, 's') })] : []), ...(a.uic ? ['UIC'] : []), ...(a.startup ? ['startup'] : [])].join(
+        ', ',
+      );
     case 'ac':
       return `${label} ${sweepDetail(a.sweep)}`;
     case 'dc': {
-      const sw = a.sweeps.filter((x) => x.src).map((x) => {
-        const u = /^i/i.test(x.src) ? 'A' : 'V';
-        return `${x.src} ${range(x.start, x.stop, u)}${x.step ? ` ${t('step {v}', { v: quantity(x.step, u) })}` : ''}`;
-      });
+      const sw = a.sweeps
+        .filter((x) => x.src)
+        .map((x) => {
+          const u = /^i/i.test(x.src) ? 'A' : 'V';
+          return `${x.src} ${range(x.start, x.stop, u)}${x.step ? ` ${t('step {v}', { v: quantity(x.step, u) })}` : ''}`;
+        });
       return sw.length ? `${label} ${sw.join(' · ')}` : `${label} (${t('no source chosen')})`;
     }
     case 'noise':
@@ -206,7 +205,7 @@ export function removeSim(l: SimList, id: string): SimList {
   const i = l.items.findIndex((s) => s.id === id);
   if (i < 0) return l;
   const items = l.items.filter((s) => s.id !== id);
-  const active = l.active !== id ? l.active : (items[i] ?? items[i - 1])?.id ?? '';
+  const active = l.active !== id ? l.active : ((items[i] ?? items[i - 1])?.id ?? '');
   return { items, active };
 }
 
@@ -214,8 +213,7 @@ export function removeSim(l: SimList, id: string): SimList {
  * Nombre propio (vacío: vuelve al automático)
  * @deprecated la interfaz usa la de project/project.ts
  */
-export const renameSim = (l: SimList, id: string, name: string): SimList =>
-  replace(l, id, ({ name: _, ...s }) => (name.trim() ? { ...s, name: name.trim() } : s));
+export const renameSim = (l: SimList, id: string, name: string): SimList => replace(l, id, ({ name: _, ...s }) => (name.trim() ? { ...s, name: name.trim() } : s));
 
 /** @deprecated la interfaz usa la de project/project.ts */
 export const selectSim = (l: SimList, id: string): SimList => (l.items.some((s) => s.id === id) ? { ...l, active: id } : l);
@@ -312,12 +310,7 @@ export const withSims = (doc: AscDoc, l: SimList): AscDoc => writeData(doc, 'sim
 
 const validList = (v: unknown): v is SimList => {
   const l = v as SimList;
-  return (
-    !!l &&
-    typeof l.active === 'string' &&
-    Array.isArray(l.items) &&
-    l.items.every((s) => s && typeof s.id === 'string' && typeof s.line === 'string' && (!s.view || Array.isArray(s.view.panes)))
-  );
+  return !!l && typeof l.active === 'string' && Array.isArray(l.items) && l.items.every((s) => s && typeof s.id === 'string' && typeof s.line === 'string' && (!s.view || Array.isArray(s.view.panes)));
 };
 
 /**
@@ -342,7 +335,9 @@ export function pzProblem(line: string): string | undefined {
   if (a?.kind !== 'pz' && !(!a && PZ_INCOMPLETE.test(line))) return undefined;
   // el nodo + en tierra es lo que queda en la barra al borrar el nodo: no elegido
   if (!a || a.kind !== 'pz' || !a.inP || !a.outP || a.inP === '0' || a.outP === '0')
-    return t('Poles and zeros: the input and output nodes are not chosen. Pick them in the simulation bar (the input is the node where the signal enters, the output the one you measure), or name the nets (e.g. "in" and "out").');
+    return t(
+      'Poles and zeros: the input and output nodes are not chosen. Pick them in the simulation bar (the input is the node where the signal enters, the output the one you measure), or name the nets (e.g. "in" and "out").',
+    );
   if (a.inP.toLowerCase() === (a.inN || '0').toLowerCase())
     return t('Poles and zeros: the input is between {p} and {n}, the same node. Choose as input the node where the signal enters.', { p: a.inP, n: a.inN || '0' });
   return undefined;
@@ -367,7 +362,11 @@ export function analysisProblem(line: string): string | undefined {
 export function pzLogErrors(log: string[]): string[] {
   const out: string[] = [];
   if (log.some((l) => /input is shorted/i.test(l)))
-    out.push(t('Poles and zeros: the input is shorted. Its two nodes are the same net, or a wire or a voltage source joins them directly. Choose as input the node where the signal enters, on the circuit side.'));
+    out.push(
+      t(
+        'Poles and zeros: the input is shorted. Its two nodes are the same net, or a wire or a voltage source joins them directly. Choose as input the node where the signal enters, on the circuit side.',
+      ),
+    );
   if (log.some((l) => /pz.*(no convergence|failed to converge)|pole-zero.*(failed|no convergence)/i.test(l)))
     out.push(t('Poles and zeros: the search did not converge. Check that the input and output are connected through the circuit.'));
   return out;

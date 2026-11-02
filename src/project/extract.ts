@@ -83,7 +83,14 @@ export function extractSubckt(doc: AscDoc, refs: ItemRef[], conn: Connectivity, 
   if (!ports.length) return t('Nothing connects the selection with the rest: there would be no ports');
 
   // el subcircuito, centrado en el origen
-  const pts = [...sub.symbols, ...sub.flags, ...sub.wires.flatMap((w) => [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }])];
+  const pts = [
+    ...sub.symbols,
+    ...sub.flags,
+    ...sub.wires.flatMap((w) => [
+      { x: w.x1, y: w.y1 },
+      { x: w.x2, y: w.y2 },
+    ]),
+  ];
   const cx = snap((Math.min(...pts.map((p) => p.x)) + Math.max(...pts.map((p) => p.x))) / 2);
   const cy = snap((Math.min(...pts.map((p) => p.y)) + Math.max(...pts.map((p) => p.y))) / 2);
   for (const s of sub.symbols) (s.x -= cx), (s.y -= cy);

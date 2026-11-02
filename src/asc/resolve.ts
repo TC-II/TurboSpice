@@ -24,17 +24,7 @@ export interface SymbolSource {
 }
 
 /** Atributos que afectan la netlist: siempre se escriben explícitos, en este orden */
-export const NETLIST_ATTRS = [
-  'InstName',
-  'Value',
-  'Value2',
-  'SpiceModel',
-  'SpiceLine',
-  'SpiceLine2',
-  'Prefix',
-  'ModelFile',
-  'Def_Sub',
-] as const;
+export const NETLIST_ATTRS = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2', 'Prefix', 'ModelFile', 'Def_Sub'] as const;
 
 const win = ([x, y, align, size]: [number, number, string, number]): TextWindow => ({ x, y, align, size });
 

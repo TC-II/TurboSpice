@@ -5,13 +5,23 @@ import { Modal } from '../schematic/dialogs.tsx';
 export type ModuleKind = 'schematic' | 'verilog';
 
 /** Palabras reservadas de Verilog que no pueden ser el nombre de un módulo */
-const RESERVED = new Set('module endmodule input output inout wire reg logic always assign begin end if else case endcase for while initial parameter localparam function task posedge negedge integer genvar generate'.split(' '));
+const RESERVED = new Set(
+  'module endmodule input output inout wire reg logic always assign begin end if else case endcase for while initial parameter localparam function task posedge negedge integer genvar generate'.split(
+    ' ',
+  ),
+);
 
 /**
  * Módulo nuevo del proyecto (#180, #209): un subcircuito esquemático (.asc) o un módulo Verilog
  * (.v); los dos con su símbolo y se colocan, se bajan y se editan igual.
  */
-export function NewModuleDialog({ kind, initial, check, onOk, onClose }: {
+export function NewModuleDialog({
+  kind,
+  initial,
+  check,
+  onOk,
+  onClose,
+}: {
   /** el tipo que se eligió en el menú «+ New» */
   kind: ModuleKind;
   initial: string;
@@ -33,8 +43,7 @@ export function NewModuleDialog({ kind, initial, check, onOk, onClose }: {
             : t('A digital block written in Verilog: it is synthesized with Yosys and simulated with XSPICE. Its pins are the ports of the module.')}
         </p>
         <label className="row">
-          {t('Name')}{' '}
-          <input value={name} autoFocus spellCheck={false} aria-label={t('Name')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ok()} />
+          {t('Name')} <input value={name} autoFocus spellCheck={false} aria-label={t('Name')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && ok()} />
         </label>
         {error && n && <p className="err">{error}</p>}
         <div className="buttons">

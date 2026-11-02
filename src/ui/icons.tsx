@@ -68,8 +68,12 @@ const P: Record<string, ReactNode> = {
   moon: <path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8" />,
   results: <path d="M3 16.5h14M3 3.5v13M5.5 13l3-4 3 2 4.5-6" />,
   // disposición de los resultados: al costado (dos columnas) o abajo (dos filas)
-  layoutSide: <path d="M4.5 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM12 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H12a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM3.5 6.5h5.5M11 6.5h5.5" />,
-  layoutStack: <path d="M4.5 3.5h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1zM4.5 11h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1zM6 3.5v5.5M6 11v5.5" />,
+  layoutSide: (
+    <path d="M4.5 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4.5a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM12 3.5h3.5a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H12a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1zM3.5 6.5h5.5M11 6.5h5.5" />
+  ),
+  layoutStack: (
+    <path d="M4.5 3.5h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1zM4.5 11h11a1 1 0 0 1 1 1v3.5a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1V12a1 1 0 0 1 1-1zM6 3.5v5.5M6 11v5.5" />
+  ),
   copy: <path d="M7 7h9v10H7zM4 13V3h9" />,
   tree: <path d="M3.5 4.5h5M6 4.5v11M6 9.5h4M6 15.5h4M12 7.5h4.5v4H12zM12 13.5h4.5v4H12z" />,
   trash: <path d="M3.5 5.5h13M8 5.5V3.5h4v2M5.5 5.5l1 11h7l1-11M8.5 8.5v5M11.5 8.5v5" />,
@@ -101,7 +105,18 @@ export type IconName = keyof typeof P;
 
 export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
   return (
-    <svg className="icon" width={WIDE.has(name) ? size * 1.5 : size} height={size} viewBox={WIDE.has(name) ? '0 0 30 20' : '0 0 20 20'} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      className="icon"
+      width={WIDE.has(name) ? size * 1.5 : size}
+      height={size}
+      viewBox={WIDE.has(name) ? '0 0 30 20' : '0 0 20 20'}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       {P[name]}
     </svg>
   );

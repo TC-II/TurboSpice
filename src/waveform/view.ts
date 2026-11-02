@@ -303,7 +303,7 @@ export function serializePlt(view: PlotView): string {
         .map((t, i) => {
           // (la paleta propia sigue el orden de la de LTspice)
           const c = t.color?.toLowerCase();
-          const color = c ? [LT_COLORS.indexOf(c), PALETTE.indexOf(c)].find((k) => k >= 0) ?? i : i;
+          const color = c ? ([LT_COLORS.indexOf(c), PALETTE.indexOf(c)].find((k) => k >= 0) ?? i) : i;
           const axis = kind === 'ac' ? 0 : isCurrent(t.expr) ? 0x2100000 : 0x80000;
           return `{${axis + 2 + color},0,"${t.expr}"}`;
         })

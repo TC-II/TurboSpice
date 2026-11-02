@@ -101,9 +101,7 @@ const CSV_HEAD = [t('run'), t('type'), 'n', 're [rad/s]', 'im [rad/s]', 'f0 [Hz]
 export function pzCsv(roots: Root[], label: (run: number) => string): string {
   const rows = roots.map((r) => {
     const i = rootInfo(r);
-    return [label(r.run), r.kind === 'pole' ? t('pole') : t('zero'), r.n, r.re, r.im, i.f0, i.q, i.zeta, i.tau].map((x) =>
-      typeof x === 'number' ? (Number.isFinite(x) ? String(x) : '') : `"${x}"`,
-    );
+    return [label(r.run), r.kind === 'pole' ? t('pole') : t('zero'), r.n, r.re, r.im, i.f0, i.q, i.zeta, i.tau].map((x) => (typeof x === 'number' ? (Number.isFinite(x) ? String(x) : '') : `"${x}"`));
   });
   return [CSV_HEAD.join(','), ...rows.map((r) => r.join(','))].join('\n') + '\n';
 }
@@ -127,7 +125,7 @@ export function pzBode(roots: Root[], perDecade = 50): { f: Float64Array; re: Fl
   const mags = roots.map((r) => Math.hypot(r.re, r.im)).filter((m) => m > 0);
   if (!roots.length || !mags.length) return null;
   const f0 = Math.min(...mags) / (2 * Math.PI) / 10;
-  const f1 = Math.max(...mags) / (2 * Math.PI) * 10;
+  const f1 = (Math.max(...mags) / (2 * Math.PI)) * 10;
   const d0 = Math.floor(Math.log10(f0));
   const d1 = Math.ceil(Math.log10(f1));
   const n = (d1 - d0) * perDecade + 1;
@@ -185,8 +183,8 @@ export function pzBodePlots(plots: SimPlot[]): SimPlot[] {
       {
         name: `${PZ_BODE}${i + 1}`,
         info: b.atOrigin
-          ? t('Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at its maximum) and the phase may be off by 180°')
-          : t('Bode normalized from the poles and zeros: .pz doesn\'t give the gain, so the level in dB is relative (0 dB at DC) and the phase may be off by 180°'),
+          ? t("Bode normalized from the poles and zeros: .pz doesn't give the gain, so the level in dB is relative (0 dB at its maximum) and the phase may be off by 180°")
+          : t("Bode normalized from the poles and zeros: .pz doesn't give the gain, so the level in dB is relative (0 dB at DC) and the phase may be off by 180°"),
         vectors: [
           { name: 'frequency', type: 2, real: b.f },
           { name: 'h', label: 'H', type: 0, real: b.re, imag: b.im },

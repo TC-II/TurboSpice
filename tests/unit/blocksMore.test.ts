@@ -44,19 +44,33 @@ describe('Bloques del Estudio (#179)', () => {
   });
 
   it('circuito: modelo, instancia, fuente, temperatura, semilla y aleatorios', () => {
-    expect(one({ type: 'ts_altermod', fields: { MODEL: 'DMOD', PARAM: 'IS' }, inputs: { VALUE: { block: num(1e-12) } } })).toEqual(['let ts_tmp = 1e-12', 'set ts_val = "$&ts_tmp"', 'altermod dmod is = $ts_val']);
+    expect(one({ type: 'ts_altermod', fields: { MODEL: 'DMOD', PARAM: 'IS' }, inputs: { VALUE: { block: num(1e-12) } } })).toEqual([
+      'let ts_tmp = 1e-12',
+      'set ts_val = "$&ts_tmp"',
+      'altermod dmod is = $ts_val',
+    ]);
     expect(one({ type: 'ts_alter_inst', fields: { INST: 'Q1', PARAM: 'area' }, inputs: { VALUE: { block: num(2) } } }).at(-1)).toBe('alter @q1[area] = $ts_val');
     expect(one({ type: 'ts_source', fields: { WHAT: 'acmag', SOURCE: 'V1' }, inputs: { VALUE: { block: num(2) } } }).at(-1)).toBe('alter v1 acmag = $ts_val');
     expect(one({ type: 'ts_temp', inputs: { VALUE: { block: num(85) } } })).toEqual(['let ts_tmp = 85', 'set ts_val = "$&ts_tmp"', 'option temp = $ts_val']);
     expect(one({ type: 'ts_seed', fields: { SEED: 7 } })).toEqual(['setseed 7']);
-    const rnd = (DIST: string): BlockJson => ({ type: 'variables_set', fields: { VAR: v('x') }, inputs: { VALUE: { block: { type: 'ts_random', fields: { DIST, TOL: 6 }, inputs: { NOM: { block: num(1000) } } } } } });
+    const rnd = (DIST: string): BlockJson => ({
+      type: 'variables_set',
+      fields: { VAR: v('x') },
+      inputs: { VALUE: { block: { type: 'ts_random', fields: { DIST, TOL: 6 }, inputs: { NOM: { block: num(1000) } } } } },
+    });
     expect(one(rnd('uniform'))[0]).toBe('let ts_tmp = (1000 * (1 + 0.06 * sunif(0)))');
     expect(one(rnd('gauss'))[0]).toBe('let ts_tmp = (1000 * (1 + 0.02 * sgauss(0)))');
   });
 
   it('medidas: sobrepico, establecimiento, slew rate, margen de ganancia y valores de un vector', () => {
     const more = (KIND: string, A = '') => one({ type: 'ts_measure_more', fields: { KIND, SIGNAL: 'V(out)', A, VAR: v('m') } });
-    expect(more('overshoot')).toEqual(['setplot $ts_plot_tran', 'let ts_y = v(out)', 'let ts_final = ts_y[length(ts_y)-1]', 'let ts_tmp = 100*(vecmax(ts_y)-ts_final)/ts_final', 'set v_m = "$&ts_tmp"']);
+    expect(more('overshoot')).toEqual([
+      'setplot $ts_plot_tran',
+      'let ts_y = v(out)',
+      'let ts_final = ts_y[length(ts_y)-1]',
+      'let ts_tmp = 100*(vecmax(ts_y)-ts_final)/ts_final',
+      'set v_m = "$&ts_tmp"',
+    ]);
     expect(more('settle', '5')).toContain('let ts_lim = 0.05*abs(ts_final)');
     expect(more('settle')).toContain('meas tran ts_settle when ts_err=$&ts_lim cross=last');
     expect(more('slew')).toContain('let ts_tmp = vecmax(abs(deriv(v(out))))');
@@ -92,13 +106,21 @@ describe('Bloques del Estudio (#179)', () => {
     expect(one({ type: 'ts_table_row', fields: { COLS: 'x m' } })).toEqual(['echo TS-ROW x= $v_x m= $v_m']);
     expect(one({ type: 'ts_histogram', fields: { LIST: v('ms') } }).at(-1)).toBe('echo TS-HIST ms $v_ms');
     expect(one({ type: 'ts_plot_lists', fields: { Y: v('ms'), X: v('x') } }).at(-1)).toBe('echo TS-XYL ms x @ $v_x @ $v_ms');
-    const join: BlockJson = { type: 'text_join', extraState: { itemCount: 3 }, inputs: { ADD0: { block: { type: 'text', fields: { TEXT: 'm =' } } }, ADD1: { block: get('m') }, ADD2: { block: num(2) } } };
+    const join: BlockJson = {
+      type: 'text_join',
+      extraState: { itemCount: 3 },
+      inputs: { ADD0: { block: { type: 'text', fields: { TEXT: 'm =' } } }, ADD1: { block: get('m') }, ADD2: { block: num(2) } },
+    };
     expect(one({ type: 'ts_print', inputs: { VALUE: { block: join } } })).toEqual(['let ts_j2 = 2', 'echo "m = $v_m $&ts_j2"']);
   });
 
   it('control: mientras / hasta, salir del bucle y funciones propias', () => {
     const cond: BlockJson = { type: 'logic_compare', fields: { OP: 'LT' }, inputs: { A: { block: get('k') }, B: { block: num(3) } } };
-    expect(one({ type: 'controls_whileUntil', fields: { MODE: 'WHILE' }, inputs: { BOOL: { block: cond }, DO: { block: { type: 'controls_flow_statements', fields: { FLOW: 'BREAK' } } } } })).toEqual(['while ($v_k lt 3)', '  break', 'end']);
+    expect(one({ type: 'controls_whileUntil', fields: { MODE: 'WHILE' }, inputs: { BOOL: { block: cond }, DO: { block: { type: 'controls_flow_statements', fields: { FLOW: 'BREAK' } } } } })).toEqual([
+      'while ($v_k lt 3)',
+      '  break',
+      'end',
+    ]);
     expect(one({ type: 'controls_whileUntil', fields: { MODE: 'UNTIL' }, inputs: { BOOL: { block: cond } } })[0]).toBe('while (not ($v_k lt 3))');
     const def: BlockJson = { type: 'procedures_defnoreturn', fields: { NAME: 'medir' }, extraState: { params: [{ name: 'x', id: 'v_x' }] }, inputs: { STACK: { block: { type: 'ts_op' } } } };
     const call: BlockJson = { type: 'procedures_callnoreturn', extraState: { name: 'medir', params: ['x'] }, inputs: { ARG0: { block: num(5) } } };
@@ -116,7 +138,9 @@ describe('Bloques del Estudio (#179)', () => {
 
   it('cada bloque de la caja de herramientas tiene definición (o es de Blockly)', () => {
     const defs = new Set(blockDefinitions().map((d) => (d as { type: string }).type));
-    const types = JSON.stringify(toolbox()).match(/"type":"(ts_\w+)"/g)!.map((s) => s.slice(8, -1));
+    const types = JSON.stringify(toolbox())
+      .match(/"type":"(ts_\w+)"/g)!
+      .map((s) => s.slice(8, -1));
     for (const tt of types) expect(defs.has(tt), tt).toBe(true);
   });
 

@@ -87,12 +87,7 @@ export function setAnalysisLine(doc: AscDoc, line: string): AscDoc {
   if (found) return replaceAnalysis(doc, found, line, ngspiceOnly);
   // en un lugar fijo: debajo de todo lo dibujado (circuito y textos), alineado a la izquierda
   const shown = doc.texts.filter((t) => !isDataText(t));
-  const bottoms = [
-    ...shown.map((t) => t.y + lines(t).length * 24),
-    ...doc.wires.flatMap((w) => [w.y1, w.y2]),
-    ...doc.flags.map((f) => f.y + 32),
-    ...doc.symbols.map((s) => s.y + 112),
-  ];
+  const bottoms = [...shown.map((t) => t.y + lines(t).length * 24), ...doc.wires.flatMap((w) => [w.y1, w.y2]), ...doc.flags.map((f) => f.y + 32), ...doc.symbols.map((s) => s.y + 112)];
   const lefts = [...shown.map((t) => t.x), ...doc.wires.flatMap((w) => [w.x1, w.x2]), ...doc.symbols.map((s) => s.x)];
   const y = bottoms.length ? Math.max(...bottoms) + 32 : 0;
   const x = shown[0]?.x ?? (lefts.length ? Math.min(...lefts) : 0);

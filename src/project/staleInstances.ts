@@ -27,15 +27,17 @@ export function instancePinIssues(doc: AscDoc, index: number, lib: Library): Pin
   const otherPins = doc.symbols.flatMap((o, i) => (i === index ? [] : pinPoints(o, lib.symbol(o.type))));
   // ¿algo (además de `skip`) toca el punto?
   const touches = (p: Point, skip?: { wire?: number; flag?: number }) =>
-    doc.wires.some((w, i) => i !== skip?.wire && distToSegment(p, w) === 0) ||
-    doc.flags.some((f, i) => i !== skip?.flag && same(f, p)) ||
-    otherPins.some((q) => same(q, p));
+    doc.wires.some((w, i) => i !== skip?.wire && distToSegment(p, w) === 0) || doc.flags.some((f, i) => i !== skip?.flag && same(f, p)) || otherPins.some((q) => same(q, p));
   const unconnected = def.pins.filter((_, k) => !touches(pins[k])).map((pin, k) => pin.attrs.get('PinName') ?? String(k + 1));
   const box = symbolBox(s, def, lib);
   const loose = (p: Point, skip: { wire?: number; flag?: number }) => inBox(p, box) && !pins.some((q) => same(q, p)) && !touches(p, skip);
   let dangling = 0;
   doc.wires.forEach((w, i) => {
-    for (const p of [{ x: w.x1, y: w.y1 }, { x: w.x2, y: w.y2 }]) if (loose(p, { wire: i })) dangling++;
+    for (const p of [
+      { x: w.x1, y: w.y1 },
+      { x: w.x2, y: w.y2 },
+    ])
+      if (loose(p, { wire: i })) dangling++;
   });
   doc.flags.forEach((f, i) => loose(f, { flag: i }) && dangling++);
   return unconnected.length || dangling ? { unconnected, dangling } : null;
@@ -50,7 +52,12 @@ export function staleInstances(p: Project, name: string, lib: Library, label: (a
     const k = w.kind === 'subckt' ? `s:${w.name}` : w.kind === 'sim' ? `b:${w.sim}` : `v:${w.variant}`;
     if (!texts.has(k)) {
       const v = w.kind === 'subckt' ? undefined : p.variants.find((x) => x.id === w.variant);
-      const asc = w.kind === 'subckt' ? p.files.find((f) => f.kind === 'schematic' && subName(f.name).toLowerCase() === w.name.toLowerCase())?.text : w.kind === 'sim' ? v?.sims.find((x) => x.id === w.sim)?.asc : v?.base;
+      const asc =
+        w.kind === 'subckt'
+          ? p.files.find((f) => f.kind === 'schematic' && subName(f.name).toLowerCase() === w.name.toLowerCase())?.text
+          : w.kind === 'sim'
+            ? v?.sims.find((x) => x.id === w.sim)?.asc
+            : v?.base;
       if (asc !== undefined) texts.set(k, parseAsc(asc));
     }
     return texts.get(k);

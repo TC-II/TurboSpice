@@ -18,7 +18,11 @@ import { makeZip, type ZipEntry } from './zip.ts';
 import { t } from '../i18n/i18n.ts';
 
 /** Nombre de archivo válido en Windows */
-export const safeName = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '_').replace(/[. ]+$/, '').trim() || t('unnamed');
+export const safeName = (s: string) =>
+  s
+    .replace(/[\\/:*?"<>|]+/g, '_')
+    .replace(/[. ]+$/, '')
+    .trim() || t('unnamed');
 
 /** Archivos del proyecto que usan estos circuitos: símbolos por nombre, modelos nombrados en el texto */
 export function usedFiles(files: ProjectFile[], ascTexts: string[]): ProjectFile[] {
@@ -90,7 +94,10 @@ export function variantEntries(p: Project, v: Variant, lib: SymbolSource, dir = 
   return [
     // todo explícito, como al guardar un .asc (así LTspice lo abre igual)
     ...ascs.map((a) => ({ path: `${dir}${a.name}`, data: ascBytes(parseAsc(a.asc), lib).bytes })),
-    ...usedFiles(p.files, ascs.map((a) => a.asc)).map((f) => ({ path: `${dir}${f.name}`, data: enc.encode(f.text) })),
+    ...usedFiles(
+      p.files,
+      ascs.map((a) => a.asc),
+    ).map((f) => ({ path: `${dir}${f.name}`, data: enc.encode(f.text) })),
   ];
 }
 

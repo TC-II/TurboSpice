@@ -18,9 +18,17 @@ import { hasLatex, labelPlain, mathSvg, useMathJax } from './latex.ts';
 // Transistores: el Value por defecto del .asy ("NPN") no se muestra (spec §10)
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;
 
-
 /** <text> con la semántica de alineación de LTspice (Left…VBottom, spec §7) */
-export function AlignedText({ x, y, align, size, children, className, label, latex = true }: {
+export function AlignedText({
+  x,
+  y,
+  align,
+  size,
+  children,
+  className,
+  label,
+  latex = true,
+}: {
   /** un $…$ se compone con LaTeX (MathJax, #328); las directivas no (en SPICE, $ es comentario) */
   latex?: boolean;
   x: number;
@@ -66,14 +74,7 @@ export function AlignedText({ x, y, align, size, children, className, label, lat
     );
   }
   return (
-    <text
-      x={x}
-      y={by}
-      fontSize={fs}
-      textAnchor={anchor}
-      transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
-      className={`fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
-    >
+    <text x={x} y={by} fontSize={fs} textAnchor={anchor} transform={vertical ? `rotate(-90 ${x} ${y})` : undefined} className={`fs${fontIndex(size)}${className ? ` ${className}` : ''}`}>
       {latex && typeof children === 'string' ? labelPlain(children) : children}
     </text>
   );
@@ -117,7 +118,18 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
 
 const matrix = (o: Orient, x: number, y: number) => `matrix(${orientMatrix(o).join(' ')} ${x} ${y})`;
 
-export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, hover, grabWin, hideLabels, mark, unsaved, tremor }: {
+export const SymbolView = memo(function SymbolView({
+  inst,
+  def,
+  lib,
+  selected,
+  hover,
+  grabWin,
+  hideLabels,
+  mark,
+  unsaved,
+  tremor,
+}: {
   /** a mano alzada (trazo Tremor de la hoja de export, #330) */
   tremor?: boolean;
   /** no se guardó en la simulación (#314): atenuado */
@@ -142,7 +154,9 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
     return (
       <g className={cls}>
         <rect x={inst.x - 16} y={inst.y - 16} width={32} height={32} />
-        <text x={inst.x} y={inst.y} fontSize={10} textAnchor="middle" dominantBaseline="central">?</text>
+        <text x={inst.x} y={inst.y} fontSize={10} textAnchor="middle" dominantBaseline="central">
+          ?
+        </text>
       </g>
     );
   }
@@ -172,7 +186,11 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
         {skin ? (
           <>
             <g className="skin" dangerouslySetInnerHTML={{ __html: skin.body }} />
-            {waveIcon && <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">{waveIcon}</g>}
+            {waveIcon && (
+              <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">
+                {waveIcon}
+              </g>
+            )}
           </>
         ) : waveIcon ? (
           <>
@@ -180,13 +198,19 @@ export const SymbolView = memo(function SymbolView({ inst, def, lib, selected, h
             <line x1={0} y1={80} x2={0} y2={96} />
             <circle cx={0} cy={56} r={24} fill="none" />
             <path d="M-4 41H4M0 37V45M-4 71H4" fill="none" />
-            <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">{waveIcon}</g>
+            <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">
+              {waveIcon}
+            </g>
           </>
         ) : (
           <>
-            {def.shapes.map((s, i) => <ShapeView key={i} s={s} />)}
+            {def.shapes.map((s, i) => (
+              <ShapeView key={i} s={s} />
+            ))}
             {def.texts.map((t, i) => (
-              <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size} label>{t.text}</AlignedText>
+              <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size} label>
+                {t.text}
+              </AlignedText>
             ))}
             {!hideLabels && def.pins.map((p, i) => <PinName key={`p${i}`} pin={p} />)}
           </>
@@ -280,13 +304,20 @@ function netIslands(net: Net, doc: AscDoc, conn: Connectivity, from: Point): Poi
   const flags = doc.flags.filter((f) => conn.netAt(f) === net);
   const points = [...flags, ...net.pins.map((p) => p.at)];
   const items = [...points.map(dot), ...net.wires.map((i) => doc.wires[i])];
-  const touch = (a: typeof items[number], b: typeof items[number]) =>
-    [{ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }].some((p) => onSegment(p, b)) || [{ x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 }].some((p) => onSegment(p, a));
+  const touch = (a: (typeof items)[number], b: (typeof items)[number]) =>
+    [
+      { x: a.x1, y: a.y1 },
+      { x: a.x2, y: a.y2 },
+    ].some((p) => onSegment(p, b)) ||
+    [
+      { x: b.x1, y: b.y1 },
+      { x: b.x2, y: b.y2 },
+    ].some((p) => onSegment(p, a));
   const island = items.map((_, i) => i);
   const root = (i: number): number => (island[i] === i ? i : (island[i] = root(island[i])));
   items.forEach((a, i) => items.forEach((b, j) => j > i && touch(a, b) && (island[root(j)] = root(i))));
   // el cursor se ajusta a la grilla y puede no caer justo sobre la red: vale lo más cercano
-  const d = (it: typeof items[number]) => Math.min(Math.hypot(it.x1 - from.x, it.y1 - from.y), Math.hypot(it.x2 - from.x, it.y2 - from.y));
+  const d = (it: (typeof items)[number]) => Math.min(Math.hypot(it.x1 - from.x, it.y1 - from.y), Math.hypot(it.x2 - from.x, it.y2 - from.y));
   const on = items.findIndex((it) => touch(dot(from), it));
   const here = on >= 0 ? on : items.reduce((m, it, i) => (d(it) < d(items[m]) ? i : m), 0);
   const seen = new Set([root(here)]);
@@ -324,7 +355,24 @@ export interface CanvasProps {
   tremor?: boolean;
 }
 
-export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, selection, highlightNet, flightFrom, hoverSymbol, grabLabel, hoverFlag, hoverWire, netColors, unsaved, showLoose = true, showSimCommand = true, diff, tremor }: CanvasProps) {
+export const SchematicCanvas = memo(function SchematicCanvas({
+  doc,
+  lib,
+  conn,
+  selection,
+  highlightNet,
+  flightFrom,
+  hoverSymbol,
+  grabLabel,
+  hoverFlag,
+  hoverWire,
+  netColors,
+  unsaved,
+  showLoose = true,
+  showSimCommand = true,
+  diff,
+  tremor,
+}: CanvasProps) {
   const clipId = useId().replace(/:/g, '');
   // (con un Set: con todo seleccionado, buscar en la lista por elemento era O(n²), #184)
   const selected = new Set(selection.map((r) => `${r.kind}:${r.index}`));
@@ -344,10 +392,11 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
   });
 
   const wireColor = new Map<number, string>();
-  if (netColors?.size) for (const n of conn.nets) {
-    const c = netColors.get(n.name.toLowerCase());
-    if (c) n.wires.forEach((wi) => wireColor.set(wi, c));
-  }
+  if (netColors?.size)
+    for (const n of conn.nets) {
+      const c = netColors.get(n.name.toLowerCase());
+      if (c) n.wires.forEach((wi) => wireColor.set(wi, c));
+    }
 
   const dimWires = new Set(unsaved ? conn.nets.filter((n) => unsaved.nets.has(n.name.toLowerCase())).flatMap((n) => n.wires) : []);
   const hl = highlightNet ? conn.nets.find((n) => n.name === highlightNet) : undefined;
@@ -361,7 +410,10 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       <g className="shapes">{doc.shapes.map((s, i) => s.kind !== 'IMAGE' && <ShapeView key={i} s={s} className={isSel({ kind: 'shape', index: i }) ? 'sel' : undefined} />)}</g>
       <g className="wires">
         {doc.wires.map((w, i) => {
-          const className = [busWires.has(i) && 'bus', dimWires.has(i) && 'unsaved', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`].filter(Boolean).join(' ') || undefined;
+          const className =
+            [busWires.has(i) && 'bus', dimWires.has(i) && 'unsaved', isSel({ kind: 'wire', index: i }) ? 'sel' : hoverWire === i ? 'hover' : diff?.wires.has(i) && `diff-${diff.wires.get(i)}`]
+              .filter(Boolean)
+              .join(' ') || undefined;
           const style = wireColor.has(i) && !isSel({ kind: 'wire', index: i }) ? { stroke: wireColor.get(i) } : undefined;
           return tremor ? (
             <polyline key={i} points={tremorWire(w.x1, w.y1, w.x2, w.y2)} className={className} style={style} />
@@ -384,7 +436,9 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
             const w = doc.wires[wi];
             return <line key={wi} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />;
           })}
-          {hl.pins.map((p, i) => <circle key={i} cx={p.at.x} cy={p.at.y} r={4} />)}
+          {hl.pins.map((p, i) => (
+            <circle key={i} cx={p.at.x} cy={p.at.y} r={4} />
+          ))}
           {flightFrom && netIslands(hl, doc, conn, flightFrom).map((q, i) => <path key={i} d={flightArc(flightFrom, q)} />)}
         </g>
       )}
@@ -401,13 +455,28 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
       </g>
       <g className="symbols">
         {doc.symbols.map((s, i) => (
-          <SymbolView key={i} tremor={tremor} unsaved={unsaved?.symbols.has(i)} inst={s} def={lib.symbol(s.type)} lib={lib} selected={isSel({ kind: 'symbol', index: i })} hover={hoverSymbol === i} grabWin={grabLabel?.sym === i ? grabLabel.win : undefined} mark={diff?.symbols.get(i)} />
+          <SymbolView
+            key={i}
+            tremor={tremor}
+            unsaved={unsaved?.symbols.has(i)}
+            inst={s}
+            def={lib.symbol(s.type)}
+            lib={lib}
+            selected={isSel({ kind: 'symbol', index: i })}
+            hover={hoverSymbol === i}
+            grabWin={grabLabel?.sym === i ? grabLabel.win : undefined}
+            mark={diff?.symbols.get(i)}
+          />
         ))}
       </g>
       {diff && (diff.removed.symbols.length > 0 || diff.removed.wires.length > 0) && (
         <g className="diff-ghost">
-          {diff.removed.wires.map((w, i) => <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />)}
-          {diff.removed.symbols.map((s, i) => <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} mark="removed" />)}
+          {diff.removed.wires.map((w, i) => (
+            <line key={i} x1={w.x1} y1={w.y1} x2={w.x2} y2={w.y2} />
+          ))}
+          {diff.removed.symbols.map((s, i) => (
+            <SymbolView key={i} inst={s} def={lib.symbol(s.type)} lib={lib} mark="removed" />
+          ))}
         </g>
       )}
       <g className="loose">{showLoose && loose.map((p, i) => <rect key={i} x={p.x - 3} y={p.y - 3} width={6} height={6} />)}</g>
@@ -415,31 +484,33 @@ export const SchematicCanvas = memo(function SchematicCanvas({ doc, lib, conn, s
         {doc.texts.map((full, i) => {
           const t = visibleText(full, showSimCommand);
           return !t ? null : (
-          <g
-            key={i}
-            className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}${diff?.texts.has(i) ? ' diff-changed' : ''}`}
-          >
-            {t.box && (
-              <clipPath id={`${clipId}t${i}`}>
-                {(() => {
-                  const b = textBox(t);
-                  return <rect x={b.x1} y={b.y1} width={b.x2 - b.x1} height={b.y2 - b.y1} />;
-                })()}
-              </clipPath>
-            )}
-            <g clipPath={t.box ? `url(#${clipId}t${i})` : undefined}>
-              {textLines(t).map((line, j) => (
-                <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size} latex={t.kind === 'comment' && !isNgspiceComment(full.text)}>
-                  {line}
-                </AlignedText>
-              ))}
+            <g
+              key={i}
+              className={`${t.kind === 'comment' && isNgspiceComment(full.text) ? 'directive ngspice' : t.kind}${isSel({ kind: 'text', index: i }) ? ' sel' : ''}${diff?.texts.has(i) ? ' diff-changed' : ''}`}
+            >
+              {t.box && (
+                <clipPath id={`${clipId}t${i}`}>
+                  {(() => {
+                    const b = textBox(t);
+                    return <rect x={b.x1} y={b.y1} width={b.x2 - b.x1} height={b.y2 - b.y1} />;
+                  })()}
+                </clipPath>
+              )}
+              <g clipPath={t.box ? `url(#${clipId}t${i})` : undefined}>
+                {textLines(t).map((line, j) => (
+                  <AlignedText key={j} x={t.x} y={t.y + j * fontSize(t.size) * 1.2} align={t.align} size={t.size} latex={t.kind === 'comment' && !isNgspiceComment(full.text)}>
+                    {line}
+                  </AlignedText>
+                ))}
+              </g>
             </g>
-          </g>
           );
         })}
       </g>
       <g className="flags">
-        {doc.flags.map((f, i) => <FlagView key={i} tremor={tremor} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} hover={hoverFlag === i} mark={diff?.flags.get(i)} />)}
+        {doc.flags.map((f, i) => (
+          <FlagView key={i} tremor={tremor} flag={f} doc={doc} lib={lib} selected={isSel({ kind: 'flag', index: i })} hover={hoverFlag === i} mark={diff?.flags.get(i)} />
+        ))}
       </g>
     </g>
   );

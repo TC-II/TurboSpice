@@ -9,7 +9,19 @@ import type { SynthResult } from './yosys.ts';
  * el código, «Sintetizar» (Yosys) con sus errores y avisos, y la interfaz eléctrica y los
  * parameter por omisión de las instancias (los del símbolo; cada instancia los puede cambiar).
  */
-export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMode, pins, params, onText, onSynthesize, onParams }: {
+export function VerilogModule({
+  name,
+  text,
+  stale,
+  mode,
+  suggestBehavioral,
+  onMode,
+  pins,
+  params,
+  onText,
+  onSynthesize,
+  onParams,
+}: {
   name: string;
   text: string;
   /** el código cambió desde la última síntesis (o nunca se sintetizó) */
@@ -148,7 +160,11 @@ export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMo
           )}
           {failure && <p className="err">{t('Yosys could not run: {msg}', { msg: failure })}</p>}
           {result?.error && <p className="err">{result.error}</p>}
-          {result?.block?.warnings.map((w) => <p key={w} className="hint">{w}</p>)}
+          {result?.block?.warnings.map((w) => (
+            <p key={w} className="hint">
+              {w}
+            </p>
+          ))}
           <section>
             <h4>{t('Pins')}</h4>
             {pins.length ? (
@@ -203,7 +219,10 @@ export function VerilogModule({ name, text, stale, mode, suggestBehavioral, onMo
                 label={beh && p.name === 'tpd' ? t('Extra output delay (tpd)') : p.label}
                 help={beh && p.name === 'tpd' ? t('Added to every output, on top of the # delays of the code. Usually 0 or small.') : undefined}
                 unit={p.unit}
-                name={p.name} value={values.get(p.name) ?? p.value} onChange={(v) => setParam(p.name, v)} />
+                name={p.name}
+                value={values.get(p.name) ?? p.value}
+                onChange={(v) => setParam(p.name, v)}
+              />
             ))}
             <p className="hint">{t('VIL above VIH gives hysteresis (Schmitt trigger). Values may depend on vcc: {vcc/2}.')}</p>
           </section>

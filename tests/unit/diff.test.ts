@@ -3,7 +3,17 @@ import { emptyDoc, type AscDoc, type SymbolInst } from '../../src/asc/model.ts';
 import { diffCircuits } from '../../src/project/diff.ts';
 import { getLang, setLang } from '../../src/i18n/i18n.ts';
 
-const sym = (inst: string, value: string, x = 0, type = 'res'): SymbolInst => ({ type, x, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', inst], ['Value', value]]) });
+const sym = (inst: string, value: string, x = 0, type = 'res'): SymbolInst => ({
+  type,
+  x,
+  y: 0,
+  orient: 'R0',
+  windows: new Map(),
+  attrs: new Map([
+    ['InstName', inst],
+    ['Value', value],
+  ]),
+});
 const doc = (symbols: SymbolInst[], wires = [{ x1: 0, y1: 0, x2: 64, y2: 0 }], text = '.tran 10m'): AscDoc => ({
   ...emptyDoc(),
   symbols,
@@ -17,7 +27,10 @@ describe('cambios entre corridas', () => {
     const b = doc([sym('R1', '2k2'), sym('C3', '1u', 0, 'cap')]);
     const d = diffCircuits(a, b);
     expect(d.summary).toBe('+C3, −R2, R1 1k→2k2');
-    expect([...d.symbols]).toEqual([[0, 'changed'], [1, 'added']]);
+    expect([...d.symbols]).toEqual([
+      [0, 'changed'],
+      [1, 'added'],
+    ]);
     expect(d.removed.symbols.map((s) => s.attrs.get('InstName'))).toEqual(['R2']);
     expect(d.same).toBe(false);
   });
@@ -40,7 +53,16 @@ describe('cambios entre corridas', () => {
   it('cables por segmento, sin importar el sentido', () => {
     const a = doc([], [{ x1: 0, y1: 0, x2: 64, y2: 0 }]);
     expect(diffCircuits(a, doc([], [{ x1: 64, y1: 0, x2: 0, y2: 0 }])).same).toBe(true);
-    const d = diffCircuits(a, doc([], [{ x1: 0, y1: 0, x2: 64, y2: 0 }, { x1: 0, y1: 0, x2: 0, y2: 64 }]));
+    const d = diffCircuits(
+      a,
+      doc(
+        [],
+        [
+          { x1: 0, y1: 0, x2: 64, y2: 0 },
+          { x1: 0, y1: 0, x2: 0, y2: 64 },
+        ],
+      ),
+    );
     expect(d.summary).toBe('+1 cable');
     expect([...d.wires.keys()]).toEqual([1]);
     expect(diffCircuits(doc([], []), a).summary).toBe('+1 cable');

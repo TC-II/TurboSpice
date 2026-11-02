@@ -41,7 +41,11 @@ await page.getByRole('button', { name: 'Nuevo' }).click();
 
 const svg = page.locator('svg.editor');
 // la vista se reajusta al documento vacío un cuadro después: esperar a que quede quieta
-await svg.locator('.symbols > g').first().waitFor({ state: 'detached' }).catch(() => {});
+await svg
+  .locator('.symbols > g')
+  .first()
+  .waitFor({ state: 'detached' })
+  .catch(() => {});
 for (let last = '', i = 0; i < 20; i++) {
   const vb = await svg.getAttribute('viewBox');
   if (vb === last) break;
@@ -134,7 +138,13 @@ check(/^SINE\(/.test(await sourceValue()), 'Enter deja la fuente en SINE(…)');
 // …y al pasarla a Pulso el DC no queda como DC para .op
 await page.mouse.dblclick(p.x, p.y);
 await src.getByRole('tab', { name: 'Pulso' }).click();
-for (const [k, v] of [['Ton', '2m'], ['Período', '4m'], ['Trise', '1u'], ['Tfall', '1u']]) await src.getByLabel(k, { exact: true }).fill(v);
+for (const [k, v] of [
+  ['Ton', '2m'],
+  ['Período', '4m'],
+  ['Trise', '1u'],
+  ['Tfall', '1u'],
+])
+  await src.getByLabel(k, { exact: true }).fill(v);
 await page.keyboard.press('Enter');
 await page.screenshot({ path: `${OUT}/editor-1.png` });
 
@@ -147,7 +157,10 @@ await steady(page);
 await click(96, -32);
 const chips = await page.locator('.trace-chip .name').allTextContents();
 // los pines se tocan sin cable: como en LTspice, la red se llama P001 (#109)
-check(chips.some((c) => /^V\([np]\d+\)/i.test(c)), `punta de prueba en el nodo de salida: ${chips.join(', ')}`);
+check(
+  chips.some((c) => /^V\([np]\d+\)/i.test(c)),
+  `punta de prueba en el nodo de salida: ${chips.join(', ')}`,
+);
 await page.screenshot({ path: `${OUT}/editor-2.png` });
 await page.keyboard.press('Escape');
 
@@ -172,7 +185,10 @@ const doc = parseAsc(decode(ascEntry?.data ?? new Uint8Array()).text);
 const lib = new Library(buildBundle());
 const net = ltNetlistText(ltNetlist(doc, lib));
 check(doc.symbols.length === 3 && doc.flags.length === 2 && doc.texts.length === 1, `.asc exportado con 3 símbolos, 2 tierras y 1 directiva (${ascEntry?.path})`);
-check(doc.symbols.every((s) => s.windows.has(0) && s.windows.has(3) && s.attrs.has('Value') && s.attrs.has('Prefix')), 'todo explícito (WINDOW 0/3, Value, Prefix)');
+check(
+  doc.symbols.every((s) => s.windows.has(0) && s.windows.has(3) && s.attrs.has('Value') && s.attrs.has('Prefix')),
+  'todo explícito (WINDOW 0/3, Value, Prefix)',
+);
 check(/^R1 [NP]\d+ [NP]\d+ 1k$/m.test(net) && /^C1 [NP]\d+ 0 1u$/m.test(net) && /^V1 [NP]\d+ 0 PULSE/m.test(net), `netlist del archivo guardado:\n${net.replace(/^/gm, '    ')}`);
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);

@@ -24,10 +24,7 @@ describe('markers', () => {
   });
   it('cortes de líneas', () => {
     expect(verticalCuts(1.5, xs, [up, tri]).map((c) => c.y)).toEqual([1.5, 1]);
-    expect(horizontalCuts(1, 'y', xs, [up, tri, { ...up, label: 'I', axis: 'i' }])).toEqual([
-      { label: 'V(a)', x: 1 },
-      ...[0.5, 1.5, 2.5, 3.5].map((x) => ({ label: 'V(b)', x })),
-    ]);
+    expect(horizontalCuts(1, 'y', xs, [up, tri, { ...up, label: 'I', axis: 'i' }])).toEqual([{ label: 'V(a)', x: 1 }, ...[0.5, 1.5, 2.5, 3.5].map((x) => ({ label: 'V(b)', x }))]);
   });
   it('valor y delta', () => {
     expect(markerValue({ kind: 'm', id: 1, pane: 0, x: 2.5, trace: 'V(a)' }, xs, [up])).toBe(2.5);
@@ -46,7 +43,10 @@ describe('markers', () => {
       { kind: 'v', id: 2, pane: 1, x: 1 },
       { kind: 'v', id: 3, pane: 2, x: 1 },
     ];
-    expect(remapPanes(l, { remove: 1 }).map((m) => [m.id, m.pane])).toEqual([[1, 0], [3, 1]]);
+    expect(remapPanes(l, { remove: 1 }).map((m) => [m.id, m.pane])).toEqual([
+      [1, 0],
+      [3, 1],
+    ]);
     expect(remapPanes(l, { swap: [0, 1] }).map((m) => m.pane)).toEqual([1, 0, 2]);
   });
   it('lee lo guardado y descarta lo inválido', () => {

@@ -17,7 +17,22 @@ import { freeSubcktName } from '../project/subckt.ts';
 import { projectName, type Project } from '../project/turbo.ts';
 import { benchParams, benchVariables, setBenchParams } from '../schematic/benchParams.ts';
 import { currentArrows } from '../schematic/currentArrows.tsx';
-import { AboutDialog, AttributeDialog, ComponentPicker, FlagDialog, HelpDialog, ImportInfoDialog, LineStyleDialog, Modal, RunsDialog, SettingsDialog, ShareDialog, TextDialog, UserFilesDialog, type UserFileInfo } from '../schematic/dialogs.tsx';
+import {
+  AboutDialog,
+  AttributeDialog,
+  ComponentPicker,
+  FlagDialog,
+  HelpDialog,
+  ImportInfoDialog,
+  LineStyleDialog,
+  Modal,
+  RunsDialog,
+  SettingsDialog,
+  ShareDialog,
+  TextDialog,
+  UserFilesDialog,
+  type UserFileInfo,
+} from '../schematic/dialogs.tsx';
 import { replaceAnalysis } from '../schematic/directivesEdit.ts';
 import { addFlag, deleteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, setWindows } from '../schematic/edit.ts';
 import { ExportView } from '../schematic/ExportView.tsx';
@@ -108,7 +123,8 @@ export function AppDialogs(props: AppDialogsProps) {
   const { dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam } = props;
   const { picking, picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay } = props;
   const { userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule } = props;
-  const { driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile } = props;
+  const { driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile } =
+    props;
   const { curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope } = props;
   return (
     <>
@@ -140,7 +156,11 @@ export function AppDialogs(props: AppDialogsProps) {
             const changed = Object.fromEntries(Object.entries(attrs).filter(([k, v]) => v !== (s.attrs.get(k) ?? null)));
             let d = Object.keys(changed).length ? setSymbolAttrs(doc, dialog.index, changed) : doc;
             // con otro símbolo (DC ↔ forma de onda) los rótulos van a la posición por defecto del nuevo
-            if (type && type !== s.type) d = setWindows(setSymbolType(d, dialog.index, type, lib), [...s.windows.keys()].map((win) => ({ sym: dialog.index, win, w: null })));
+            if (type && type !== s.type)
+              d = setWindows(
+                setSymbolType(d, dialog.index, type, lib),
+                [...s.windows.keys()].map((win) => ({ sym: dialog.index, win, w: null })),
+              );
             if (labels.size) d = patchLabels(d, [dialog.index], labels, lib);
             if (d !== doc) commit(d);
           }}
@@ -282,14 +302,7 @@ export function AppDialogs(props: AppDialogsProps) {
         />
       )}
       {dialog?.kind === 'userfiles' && (
-        <UserFilesDialog
-          files={userFileInfo()}
-          hasSymbol={(n) => !!lib.symbol(n)}
-          onAdd={addUserFiles}
-          onRemove={removeUserFile}
-          onMakeSymbol={makeUserSymbol}
-          onClose={() => setDialog(null)}
-        />
+        <UserFilesDialog files={userFileInfo()} hasSymbol={(n) => !!lib.symbol(n)} onAdd={addUserFiles} onRemove={removeUserFile} onMakeSymbol={makeUserSymbol} onClose={() => setDialog(null)} />
       )}
       {dialog?.kind === 'projectfiles' && (
         <UserFilesDialog
@@ -307,17 +320,28 @@ export function AppDialogs(props: AppDialogsProps) {
         />
       )}
       {dialog?.kind === 'newModule' && (
-        <NewModuleDialog kind={dialog.module} initial={freeSubcktName(projectRef.current, dialog.module === 'verilog' ? 'VERILOG' : 'SUB')} check={checkSubName()} onOk={createModule} onClose={() => setDialog(null)} />
+        <NewModuleDialog
+          kind={dialog.module}
+          initial={freeSubcktName(projectRef.current, dialog.module === 'verilog' ? 'VERILOG' : 'SUB')}
+          check={checkSubName()}
+          onOk={createModule}
+          onClose={() => setDialog(null)}
+        />
       )}
       {driveConflict && (
         <Modal title={t('The file changed in Google Drive')} onClose={() => setDriveConflict(null)}>
           <p>
-            «{driveConflict.name}{t('» was modified in Google Drive (in another tab or computer) after you opened it. Nothing was saved, so those changes aren\'t overwritten.')}
+            «{driveConflict.name}
+            {t("» was modified in Google Drive (in another tab or computer) after you opened it. Nothing was saved, so those changes aren't overwritten.")}
           </p>
           <div className="buttons">
-            <button onClick={() => resolveDriveConflict('reload')} title={t('Opens the Drive version; what you have here stays in Recent')}>{t('Reload the Drive version')}</button>
+            <button onClick={() => resolveDriveConflict('reload')} title={t('Opens the Drive version; what you have here stays in Recent')}>
+              {t('Reload the Drive version')}
+            </button>
             <button onClick={() => resolveDriveConflict('copy')}>{t('Save mine as a copy')}</button>
-            <button className="danger" onClick={() => resolveDriveConflict('overwrite')}>{t('Overwrite')}</button>
+            <button className="danger" onClick={() => resolveDriveConflict('overwrite')}>
+              {t('Overwrite')}
+            </button>
           </div>
         </Modal>
       )}
@@ -416,7 +440,9 @@ export function AppDialogs(props: AppDialogsProps) {
       {dialog?.kind === 'deleteSim' && (
         <SlideConfirm
           title={t('Delete the testbench')}
-          message={t('«{p0}» will be deleted with its schematic, its simulation and its run history.', { p0: simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || t('No analysis') })}
+          message={t('«{p0}» will be deleted with its schematic, its simulation and its run history.', {
+            p0: simName(sims.items.find((x) => x.id === dialog.id) ?? { id: '', line: '' }) || t('No analysis'),
+          })}
           onClose={() => setDialog(null)}
           onConfirm={() => {
             setDialog(null);
@@ -450,12 +476,7 @@ export function AppDialogs(props: AppDialogsProps) {
           onMessage={setMessage}
         />
       )}
-      {dialog?.kind === 'share' && (
-        <ShareDialog
-          url={dialog.url}
-          onClose={() => setDialog(null)}
-        />
-      )}
+      {dialog?.kind === 'share' && <ShareDialog url={dialog.url} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'lineStyle' && (
         <LineStyleDialog
           initial={dialog.shapes.length ? (doc.shapes[dialog.shapes[0]]?.style ?? '') : shapeStyle}

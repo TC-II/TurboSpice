@@ -66,10 +66,7 @@ const LAYOUT: Record<Exclude<SourceKind, 'pwl'>, FieldDef[][]> = {
     [f(0, 'V1', 'V', 'v1'), f(1, 'V2', 'V', 'v2'), f(3, t('rise τ'), 's', 'tau1'), f(5, t('fall τ'), 's', 'tau2')],
     [f(2, t('Rise start'), 's', 'td1', true), f(4, t('Fall start'), 's', 'td2')],
   ],
-  sffm: [
-    [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, t('Carrier'), 'Hz', 'fc'), f(4, t('Modulating'), 'Hz', 'fs')],
-    [f(3, t('Modulation index'), '', 'mdi')],
-  ],
+  sffm: [[f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, t('Carrier'), 'Hz', 'fc'), f(4, t('Modulating'), 'Hz', 'fs')], [f(3, t('Modulation index'), '', 'mdi')]],
 };
 
 const fullLine = (s: SourceSpec) => {
@@ -78,7 +75,16 @@ const fullLine = (s: SourceSpec) => {
 };
 
 /** Campo de texto que no pisa lo que se está escribiendo cuando cambia el valor calculado */
-function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, label, autoFocus }: {
+function LiveInput({
+  value,
+  onChange,
+  onFocus,
+  onBlur,
+  className,
+  placeholder,
+  label,
+  autoFocus,
+}: {
   value: string;
   /** al abrir la ventana (o cambiar de pestaña) el foco va acá, con el texto seleccionado */
   autoFocus?: boolean;
@@ -104,7 +110,14 @@ function LiveInput({ value, onChange, onFocus, onBlur, className, placeholder, l
   );
 }
 
-export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAttributes }: {
+export function SourceDialog({
+  inst,
+  def,
+  windowDefaults,
+  onApply,
+  onClose,
+  onAttributes,
+}: {
   inst: SymbolInst;
   def: SymbolDef | undefined;
   windowDefaults: WindowDefaults;
@@ -231,7 +244,14 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
       if (!spec.dc && !dcStash.current) autoFilled.current.dc = '1';
     }
     // PWL nuevo: un período de 1 kHz que se repite
-    if (k === 'pwl' && !next.points.length) (next.points = [['0', '0'], ['250u', '1'], ['750u', '1'], ['1m', '0']]), (next.repeat = true);
+    if (k === 'pwl' && !next.points.length)
+      (next.points = [
+        ['0', '0'],
+        ['250u', '1'],
+        ['750u', '1'],
+        ['1m', '0'],
+      ]),
+        (next.repeat = true);
     setSpec(next);
   };
 
@@ -239,7 +259,10 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   const fieldsText = [...args, spec.dc, spec.acMag, ...spec.points.flat()];
   const mega = fieldsText.find((s) => looksLikeMegaTypo(s ?? ''));
   const notFit = pulse && (n(args[3]) || 0) + (n(args[5]) || 0) + (n(args[4]) || 0) > n(args[6]) * 1.0001;
-  const warn = [notFit ? t('Trise + Ton + Tfall doesn\'t fit in the period.') : '', mega ? t('"{p0}" is {p1} milli, like in LTspice; for mega write {p2}Meg.', { p0: mega.trim(), p1: mega.trim().slice(0, -1), p2: mega.trim().slice(0, -1) }) : '']
+  const warn = [
+    notFit ? t("Trise + Ton + Tfall doesn't fit in the period.") : '',
+    mega ? t('"{p0}" is {p1} milli, like in LTspice; for mega write {p2}Meg.', { p0: mega.trim(), p1: mega.trim().slice(0, -1), p2: mega.trim().slice(0, -1) }) : '',
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -263,17 +286,20 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
   }, [kind]);
   // con otro símbolo los rótulos vuelven a la posición por defecto del símbolo nuevo, así que
   // se manda lo que se ve de todos (no sólo lo que cambió respecto del símbolo de antes)
-  const labels = (newType?: string) =>
-    new Map(shown.filter((r) => (newType && newType !== inst.type) || visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
+  const labels = (newType?: string) => new Map(shown.filter((r) => (newType && newType !== inst.type) || visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));
   const showToggles = shown.length > 0 && (
     <span className="src-show" role="group" aria-label={t('Show on the schematic')}>
       {t('Show:')}
       {shown.map((r) => (
         <label key={r.win} title={t('{p0} is shown on the schematic', { p0: r.attr === 'InstName' ? t('The name') : t('The value') })}>
-          <input type="checkbox" checked={!!visible.get(r.win)} onChange={(e) => {
+          <input
+            type="checkbox"
+            checked={!!visible.get(r.win)}
+            onChange={(e) => {
               if (r.attr === 'Value') valueTouched.current = true;
               setVisible(new Map(visible).set(r.win, e.target.checked));
-            }} />
+            }}
+          />
           {r.attr === 'InstName' ? t('Name') : t('Value')}
         </label>
       ))}
@@ -304,7 +330,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
       <Modal title={title} onClose={onClose} wide>
         <form className="srcdlg-text" onSubmit={(e) => (e.preventDefault(), submit())}>
           {!parsed && text === [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ') && (
-            <p className="hint">{t('This source has something the form can\'t edit: it\'s edited as text.')}</p>
+            <p className="hint">{t("This source has something the form can't edit: it's edited as text.")}</p>
           )}
           <input aria-label={t('Source value')} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
           <p className="hint">{t('LTspice syntax, for example: SINE(0 1 1k) AC 1 Rser=1')}</p>
@@ -313,7 +339,7 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
             <button
               type="button"
               disabled={!parseSource({ Value: text })}
-              title={parseSource({ Value: text }) ? '' : t('The form can\'t edit this value')}
+              title={parseSource({ Value: text }) ? '' : t("The form can't edit this value")}
               onClick={() => {
                 const p = parseSource({ Value: text });
                 if (!p) return;
@@ -324,10 +350,16 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
             >
               {t('Form')}
             </button>
-            <button type="button" onClick={onAttributes}>{t('Attributes…')}</button>
+            <button type="button" onClick={onAttributes}>
+              {t('Attributes…')}
+            </button>
             <span className="spacer" />
-            <button type="button" onClick={onClose}>{t('Cancel')}</button>
-            <button type="submit" className="primary">{t('OK')}</button>
+            <button type="button" onClick={onClose}>
+              {t('Cancel')}
+            </button>
+            <button type="submit" className="primary">
+              {t('OK')}
+            </button>
           </div>
         </form>
       </Modal>
@@ -349,7 +381,9 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
               onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), submit())}
             >
               <svg viewBox="0 0 46 20" aria-hidden="true">
-                <g fill="none" stroke="currentColor" strokeWidth="1.5">{k.icon}</g>
+                <g fill="none" stroke="currentColor" strokeWidth="1.5">
+                  {k.icon}
+                </g>
               </svg>
               {k.label}
             </button>
@@ -381,7 +415,11 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
                   ))}
                 </div>
               ))}
-              {kind === 'ac' && <p className="hint">{t('Only for .ac and .noise: in transient and at the operating point it\'s 0')}{' '}{current ? 'A' : 'V'}.</p>}
+              {kind === 'ac' && (
+                <p className="hint">
+                  {t("Only for .ac and .noise: in transient and at the operating point it's 0")} {current ? 'A' : 'V'}.
+                </p>
+              )}
             </>
           )}
           <details className="src-adv">
@@ -412,8 +450,9 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
                 </>
               )}
               {kind !== 'dc' && kind !== 'ac' && (
-                <label title={t('The one .op and .dc use (otherwise, the waveform\'s value at t = 0)')}>
-                  {t('DC for .op [')}{current ? 'A' : 'V'}]
+                <label title={t("The one .op and .dc use (otherwise, the waveform's value at t = 0)")}>
+                  {t('DC for .op [')}
+                  {current ? 'A' : 'V'}]
                   <input aria-label={t('DC for .op')} value={spec.dc} placeholder="—" onChange={(e) => setSpec({ ...spec, dc: e.target.value })} />
                 </label>
               )}
@@ -421,16 +460,24 @@ export function SourceDialog({ inst, def, windowDefaults, onApply, onClose, onAt
             <p className="hint">{t('Value saved in the .asc')}</p>
             <code className="src-line">{fullLine(full)}</code>
             <div className="buttons left">
-              <button type="button" onClick={() => setText(fullLine(full))}>{t('Edit as text')}</button>
-              <button type="button" onClick={onAttributes}>{t('Attributes…')}</button>
+              <button type="button" onClick={() => setText(fullLine(full))}>
+                {t('Edit as text')}
+              </button>
+              <button type="button" onClick={onAttributes}>
+                {t('Attributes…')}
+              </button>
             </div>
           </details>
           {warn && <p className="hint warn">{warn}</p>}
           <div className="buttons">
             {showToggles}
             <span className="spacer" />
-            <button type="button" onClick={onClose}>{t('Cancel')}</button>
-            <button type="submit" className="primary">{t('OK')}</button>
+            <button type="button" onClick={onClose}>
+              {t('Cancel')}
+            </button>
+            <button type="submit" className="primary">
+              {t('OK')}
+            </button>
           </div>
         </div>
       </form>
@@ -572,8 +619,12 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
           <line x1={cx} y1={10} x2={cx} y2={142} />
           <path d={`M332 ${cy - 3}L337 ${cy}L332 ${cy + 3}`} />
           <path d={`M${cx - 3} 14L${cx} 9L${cx + 3} 14`} />
-          <text x={342} y={cy + 4}>Re</text>
-          <text x={cx + 6} y={18}>Im</text>
+          <text x={342} y={cy + 4}>
+            Re
+          </text>
+          <text x={cx + 6} y={18}>
+            Im
+          </text>
         </g>
         <g className={`phasor${on('amp') ? ' on' : ''}`}>
           <line x1={cx} y1={cy} x2={ex} y2={ey} />
@@ -629,7 +680,9 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
         <Level y={64} label={t('Value')} to={0} on={on('dc')} />
         <g className="axis">
           <line x1={70} y1={112} x2={500} y2={112} />
-          <text x={500} y={128} textAnchor="end">t</text>
+          <text x={500} y={128} textAnchor="end">
+            t
+          </text>
         </g>
       </>
     );
@@ -676,7 +729,9 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
     const lo = Math.min(0, ...nums.map(([, v]) => v));
     const hi = Math.max(1, ...nums.map(([, v]) => v)) * 1.1;
     return {
-      T, lo, hi,
+      T,
+      lo,
+      hi,
       X: (tt: number) => 66 + (tt / T) * 430,
       Y: (v: number) => 124 - ((v - lo) / (hi - lo)) * 104,
       iX: (x: number) => ((x - 66) / 430) * T,
@@ -708,13 +763,16 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
   const order = [...valid].sort((a, b) => a.t - b.t);
   const path = order.length ? `M${geo.X(0)} ${geo.Y(order[0].v)}` + order.map((q) => `L${geo.X(q.t).toFixed(1)} ${geo.Y(q.v).toFixed(1)}`).join('') + 'H505' : '';
   const selPt = valid.find((q) => q.i === sel);
-  const box = selPt && svg.current ? (() => {
-    const b = svg.current.getBoundingClientRect();
-    const k = b.width / W;
-    let x = geo.X(selPt.t) * k + 10;
-    if (x > b.width - 150) x -= 164;
-    return { left: x, top: Math.max(2, geo.Y(selPt.v) * k - 14) };
-  })() : null;
+  const box =
+    selPt && svg.current
+      ? (() => {
+          const b = svg.current.getBoundingClientRect();
+          const k = b.width / W;
+          let x = geo.X(selPt.t) * k + 10;
+          if (x > b.width - 150) x -= 164;
+          return { left: x, top: Math.max(2, geo.Y(selPt.v) * k - 14) };
+        })()
+      : null;
   const set = (i: number, c: 0 | 1, v: string) => setPts(pts.map((p, j) => (j === i ? (c ? [p[0], v] : [v, p[1]]) : p)) as [string, string][]);
   const remove = (i: number) => (setPts(pts.filter((_, j) => j !== i)), setSel(-1));
   const unit = current ? 'A' : 'V';
@@ -811,7 +869,10 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
             <tr>
               <th>#</th>
               <th>{t('Time [s]')}</th>
-              <th>{t('Amplitude [')}{unit}]</th>
+              <th>
+                {t('Amplitude [')}
+                {unit}]
+              </th>
               <th />
             </tr>
           </thead>
@@ -836,7 +897,9 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
         </table>
       </div>
       <div className="buttons left">
-        <button type="button" onClick={() => (setPts([...pts, ['', '']]), setSel(pts.length))}>{t('+ Point')}</button>
+        <button type="button" onClick={() => (setPts([...pts, ['', '']]), setSel(pts.length))}>
+          {t('+ Point')}
+        </button>
         <CsvImport onPoints={(p) => (setPts(p), setSel(-1))} />
         <label className="src-check">
           <input type="checkbox" checked={spec.repeat} onChange={(e) => setSpec({ ...spec, repeat: e.target.checked })} /> {t('Repeat')}
@@ -857,12 +920,22 @@ function PwlGrid({ geo }: { geo: { T: number; lo: number; hi: number; X(t: numbe
   const vLine = (tt: number, major: boolean, key: string) => {
     const x = geo.X(tt);
     lines.push(<line key={`t${key}`} className={major ? 'major' : 'minor'} x1={x} y1={20} x2={x} y2={124} />);
-    if (major) lines.push(<text key={`tl${key}`} x={x} y={138} textAnchor="middle">{engNumber(tt)}</text>);
+    if (major)
+      lines.push(
+        <text key={`tl${key}`} x={x} y={138} textAnchor="middle">
+          {engNumber(tt)}
+        </text>,
+      );
   };
   const hLine = (v: number, major: boolean, key: string) => {
     const y = geo.Y(v);
     lines.push(<line key={`v${key}`} className={major ? 'major' : 'minor'} x1={66} y1={y} x2={496} y2={y} />);
-    if (major) lines.push(<text key={`vl${key}`} x={60} y={y + 4} textAnchor="end">{engNumber(v)}</text>);
+    if (major)
+      lines.push(
+        <text key={`vl${key}`} x={60} y={y + 4} textAnchor="end">
+          {engNumber(v)}
+        </text>,
+      );
   };
   axis(0, geo.T, ts / 5, false, vLine);
   axis(geo.lo, geo.hi, vs / 5, false, hLine);
@@ -876,7 +949,9 @@ function CsvImport({ onPoints }: { onPoints(p: [string, string][]): void }) {
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
-      <button type="button" onClick={() => input.current?.click()}>{t('Import CSV')}</button>
+      <button type="button" onClick={() => input.current?.click()}>
+        {t('Import CSV')}
+      </button>
       <input
         ref={input}
         type="file"
@@ -896,7 +971,10 @@ function CsvImport({ onPoints }: { onPoints(p: [string, string][]): void }) {
 export function csvPoints(text: string): [string, string][] {
   const out: [string, string][] = [];
   for (const line of text.split(/\r?\n/)) {
-    const cells = line.split(/[;,\t]|\s+/).map((c) => c.trim()).filter(Boolean);
+    const cells = line
+      .split(/[;,\t]|\s+/)
+      .map((c) => c.trim())
+      .filter(Boolean);
     if (cells.length < 2) continue;
     if (!isFinite(spiceNumber(cells[0])) || !isFinite(spiceNumber(cells[1]))) continue;
     out.push([cells[0], cells[1]]);

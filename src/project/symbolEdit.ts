@@ -105,7 +105,7 @@ export function syncPins(text: string, ports: { name: string; dir?: string }[]):
   const body = symBody(text) ?? { x1: -48, y1: -16, x2: 48, y2: 16 };
   const taken = new Set(pins.filter((p) => keep.has(p.name.toLowerCase())).map((p) => `${p.x},${p.y}`));
   const free = (x: number) => {
-    for (let y = body.y1 + 16; ; y += 32) if (!taken.has(`${x},${y}`)) return (taken.add(`${x},${y}`), y);
+    for (let y = body.y1 + 16; ; y += 32) if (!taken.has(`${x},${y}`)) return taken.add(`${x},${y}`), y;
   };
   let maxY = body.y2;
   for (const p of ports) {
@@ -163,7 +163,11 @@ function renamePins(text: string, names: Map<number, string>): string {
  */
 export function adoptSymbol(asy: string, ports: { name: string; dir?: string }[], params: [string, string][] = []): string {
   const drop = /^SYMATTR (Prefix|Value|Value2|SpiceModel|ModelFile|SpiceLine|SpiceLine2|Def_Sub|InstName)\b/;
-  let text = join(lines(asy).map((l) => (/^SymbolType /.test(l) ? 'SymbolType BLOCK' : l)).filter((l) => !drop.test(l)));
+  let text = join(
+    lines(asy)
+      .map((l) => (/^SymbolType /.test(l) ? 'SymbolType BLOCK' : l))
+      .filter((l) => !drop.test(l)),
+  );
   const pins = symPins(text).map((p, i) => ({ ...p, i }));
   const free = new Set(ports.map((p) => p.name));
   const names = new Map<number, string>();
@@ -246,7 +250,13 @@ export interface SymWindow {
 
 /** Rótulos (WINDOW) del símbolo */
 export function symWindows(text: string): SymWindow[] {
-  return [...text.matchAll(/^WINDOW (\d+) (-?\d+) (-?\d+) (\S+)(?: (\d+))?/gm)].map((m) => ({ n: Number(m[1]), x: Number(m[2]), y: Number(m[3]), align: m[4], size: m[5] === undefined ? 2 : Number(m[5]) }));
+  return [...text.matchAll(/^WINDOW (\d+) (-?\d+) (-?\d+) (\S+)(?: (\d+))?/gm)].map((m) => ({
+    n: Number(m[1]),
+    x: Number(m[2]),
+    y: Number(m[3]),
+    align: m[4],
+    size: m[5] === undefined ? 2 : Number(m[5]),
+  }));
 }
 
 /** ¿Se ve el rótulo? Sólo «Invisible» lo oculta: el tamaño 0 es la letra más chica (spec §7.1) */
@@ -383,10 +393,12 @@ export function removePin(text: string, index: number): string {
   let end = pin.line + 1;
   while (end < ls.length && ls[end].startsWith('PINATTR')) end++;
   ls.splice(pin.line, end - pin.line);
-  return join(ls.map((l) => {
-    const m = /^PINATTR SpiceOrder (\d+)$/.exec(l);
-    return m && Number(m[1]) > pin.order ? `PINATTR SpiceOrder ${Number(m[1]) - 1}` : l;
-  }));
+  return join(
+    ls.map((l) => {
+      const m = /^PINATTR SpiceOrder (\d+)$/.exec(l);
+      return m && Number(m[1]) > pin.order ? `PINATTR SpiceOrder ${Number(m[1]) - 1}` : l;
+    }),
+  );
 }
 
 /** Pin nuevo `name` en un lugar libre de la grilla, a la izquierda del cuerpo */
@@ -428,7 +440,10 @@ export function copySym(text: string, shapeLines: number[], pinIdx: number[]): S
 export function pasteSym(text: string, clip: SymClip, dx: number, dy: number): { text: string; shapes: number[]; pins: number[] } {
   const shift = (l: string) =>
     l
-      .replace(/^(LINE|RECTANGLE|CIRCLE)(\s+\S+\s+)(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/, (_, k: string, st: string, a: string, b: string, c: string, d: string) => `${k}${st}${+a + dx} ${+b + dy} ${+c + dx} ${+d + dy}`)
+      .replace(
+        /^(LINE|RECTANGLE|CIRCLE)(\s+\S+\s+)(-?\d+)\s+(-?\d+)\s+(-?\d+)\s+(-?\d+)/,
+        (_, k: string, st: string, a: string, b: string, c: string, d: string) => `${k}${st}${+a + dx} ${+b + dy} ${+c + dx} ${+d + dy}`,
+      )
       .replace(/^TEXT\s+(-?\d+)\s+(-?\d+)/, (_, a: string, b: string) => `TEXT ${+a + dx} ${+b + dy}`);
   let ls = lines(text);
   const last = Math.max(symShapes(text).at(-1)?.line ?? -1, symTexts(text).at(-1)?.line ?? -1);

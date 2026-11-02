@@ -76,7 +76,19 @@ const ZOOM_MAX = 16;
 /** Margen alrededor de la hoja al ajustarla a la vista (px) */
 const FIT_PAD = 32;
 
-export function ExportView({ doc, lib, conn, name, storeKey, annotations, arrows, toolsSlot, tabsSlot, onClose, onMessage }: {
+export function ExportView({
+  doc,
+  lib,
+  conn,
+  name,
+  storeKey,
+  annotations,
+  arrows,
+  toolsSlot,
+  tabsSlot,
+  onClose,
+  onMessage,
+}: {
   doc: AscDoc;
   /** la librería de la pantalla: la hoja usa el skin que se elige acá */
   lib: Library;
@@ -399,11 +411,7 @@ export function ExportView({ doc, lib, conn, name, storeKey, annotations, arrows
           </svg>
         )}
         {!sheet && <div className="export-empty">{t('The schematic is empty')}</div>}
-        {sheet && (
-          <div className="export-hint">
-            {picking ? t('Drag over the sheet to choose the area to export · Esc: cancel') : `${Math.round(zoom * 100)}% · ${t('Wheel: zoom · drag: move')}`}
-          </div>
-        )}
+        {sheet && <div className="export-hint">{picking ? t('Drag over the sheet to choose the area to export · Esc: cancel') : `${Math.round(zoom * 100)}% · ${t('Wheel: zoom · drag: move')}`}</div>}
       </div>
       <aside className="export-panel">
         <section>
@@ -412,7 +420,9 @@ export function ExportView({ doc, lib, conn, name, storeKey, annotations, arrows
             <span>{t('Skin')}</span>
             <select value={skin} onChange={(e) => pickSkin(e.target.value)}>
               {skins.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>
+                  {s}
+                </option>
               ))}
             </select>
           </label>
@@ -420,25 +430,35 @@ export function ExportView({ doc, lib, conn, name, storeKey, annotations, arrows
             <span>{t('Font')}</span>
             <select value={choice.id} onChange={(e) => set({ font: e.target.value })}>
               {SHEET_FONTS.map((f) => (
-                <option key={f.id} value={f.id}>{f.label}</option>
+                <option key={f.id} value={f.id}>
+                  {f.label}
+                </option>
               ))}
             </select>
           </label>
         </section>
         <section>
           <h3>{t('Sheet')}</h3>
-          <p className="hint">
-            {page ? `${page.w} × ${page.h} pt (${(page.w * PT_MM).toFixed(0)} × ${(page.h * PT_MM).toFixed(0)} mm)` : '—'}
-          </p>
+          <p className="hint">{page ? `${page.w} × ${page.h} pt (${(page.w * PT_MM).toFixed(0)} × ${(page.h * PT_MM).toFixed(0)} mm)` : '—'}</p>
           {area && <p className="hint">{t('Only the selected area')}</p>}
         </section>
         <section className="export-actions">
           <h3>{t('Download')}</h3>
-          <button className="primary" disabled={!page || busy || font !== choice.id} onClick={() => run('pdf')}>{t('Download PDF')}</button>
-          <button disabled={!page || busy} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>{t('Download .tex (TikZ)')}</button>
-          <button disabled={!page || busy} onClick={() => run('png')}>{t('Download PNG')}</button>
-          <button disabled={!page || busy || !('ClipboardItem' in window)} onClick={() => run('copy')}>{t('Copy image')}</button>
-          <button disabled={!page || busy} onClick={() => run('svg')}>{t('Download SVG')}</button>
+          <button className="primary" disabled={!page || busy || font !== choice.id} onClick={() => run('pdf')}>
+            {t('Download PDF')}
+          </button>
+          <button disabled={!page || busy} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>
+            {t('Download .tex (TikZ)')}
+          </button>
+          <button disabled={!page || busy} onClick={() => run('png')}>
+            {t('Download PNG')}
+          </button>
+          <button disabled={!page || busy || !('ClipboardItem' in window)} onClick={() => run('copy')}>
+            {t('Copy image')}
+          </button>
+          <button disabled={!page || busy} onClick={() => run('svg')}>
+            {t('Download SVG')}
+          </button>
         </section>
         <details className="export-advanced">
           <summary>{t('Advanced')}</summary>

@@ -132,35 +132,35 @@ const addTrace = async (expr) => {
 
 let t0 = Date.now();
 await profiled('sim', async () => {
-await page.locator('[aria-label="Correr"]:enabled').click();
-await page.locator('.results-panel').waitFor({ timeout: 120000 });
-if (!TURBO) await addTrace('V(out)');
-await page.locator('.results-panel .pane-chart canvas').first().waitFor({ timeout: 120000 });
-await settle();
+  await page.locator('[aria-label="Correr"]:enabled').click();
+  await page.locator('.results-panel').waitFor({ timeout: 120000 });
+  if (!TURBO) await addTrace('V(out)');
+  await page.locator('.results-panel .pane-chart canvas').first().waitFor({ timeout: 120000 });
+  await settle();
 });
 report('simular hasta ver el gráfico', Date.now() - t0);
 const points = await page.evaluate(() => document.querySelector('.results-panel .pane-chart .uplot')?.dataset.rangeX);
 report('rango X del gráfico', points ?? '?');
 
 if (!TURBO) {
-t0 = Date.now();
-await addTrace('V(in)');
-await settle();
-report('agregar una traza (mismo panel)', Date.now() - t0);
-t0 = Date.now();
-await addTrace('I(R1)');
-await settle();
-report('agregar una corriente (eje derecho)', Date.now() - t0);
+  t0 = Date.now();
+  await addTrace('V(in)');
+  await settle();
+  report('agregar una traza (mismo panel)', Date.now() - t0);
+  t0 = Date.now();
+  await addTrace('I(R1)');
+  await settle();
+  report('agregar una corriente (eje derecho)', Date.now() - t0);
 
-// segundo panel con dos trazas
-t0 = Date.now();
-await page.locator('.pane-add button').click();
-await addTrace('V(in)-V(out)');
-await page.locator('.results-panel .pane-chart').nth(1).locator('canvas').waitFor();
-await settle();
-report('panel nuevo con una expresión', Date.now() - t0);
-await addTrace('V(out)*2');
-await settle();
+  // segundo panel con dos trazas
+  t0 = Date.now();
+  await page.locator('.pane-add button').click();
+  await addTrace('V(in)-V(out)');
+  await page.locator('.results-panel .pane-chart').nth(1).locator('canvas').waitFor();
+  await settle();
+  report('panel nuevo con una expresión', Date.now() - t0);
+  await addTrace('V(out)*2');
+  await settle();
 }
 report('paneles', await page.evaluate(() => document.querySelectorAll('.results-panel .pane').length));
 
@@ -182,7 +182,7 @@ const onChart = (kind, n, pane = 0) =>
         const t = performance.now();
         if (kind === 'wheel') root.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: i < n / 2 ? -120 : 120, ...at(n / 2) }));
         else if (kind === 'pan') pe(root, 'pointermove', i, { buttons: 4 });
-        else (pe(root, 'pointermove', i), me('mousemove', i));
+        else pe(root, 'pointermove', i), me('mousemove', i);
         await frame();
         out.push(performance.now() - t);
       }
@@ -240,7 +240,10 @@ async function fineWheel(selector, name) {
       last = now;
     }
     on = false;
-    const gaps = frames.filter((t) => t <= tEnd).map((t, k, a) => (k ? t - a[k - 1] : 0)).slice(1);
+    const gaps = frames
+      .filter((t) => t <= tEnd)
+      .map((t, k, a) => (k ? t - a[k - 1] : 0))
+      .slice(1);
     return { sent: events, frames: gaps.length, maxGap: Math.max(...gaps), settle: performance.now() - tEnd };
   }, selector);
   report(name, r.maxGap, `peor salto entre cuadros · ${r.frames} cuadros en 500 ms (${r.sent} eventos) · quieto ${r.settle.toFixed(0)} ms después`);
@@ -273,7 +276,13 @@ if (await page.locator('.results-panel .digital-lanes').count()) {
   await settle();
   await fineWheel('.results-panel .digital-lanes', 'digital: rueda fina (500 eventos/s)');
   // 8 eventos de 15 px acercan lo mismo que uno de 120 px (una muesca)
-  const width = () => page.evaluate(() => document.querySelector('.results-panel .pane-chart .uplot')?.dataset.rangeX.split('|').reduce((a, b) => b - a));
+  const width = () =>
+    page.evaluate(() =>
+      document
+        .querySelector('.results-panel .pane-chart .uplot')
+        ?.dataset.rangeX.split('|')
+        .reduce((a, b) => b - a),
+    );
   await page.locator('.fit-btn').click();
   await settle();
   const w0 = await width();

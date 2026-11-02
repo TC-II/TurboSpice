@@ -10,4 +10,10 @@ const text = await serializeTurbo(p);
 writeFileSync('public/examples/ADC.turbo', text);
 const sims = p.variants[0].sims;
 console.log(`ADC.turbo (${(text.length / 1024).toFixed(1)} kB):`);
-for (const g of p.groups) console.log(`  ${g.name}: ${sims.filter((s) => s.group === g.id).map((s) => s.name).join(', ')}`);
+for (const g of p.groups)
+  console.log(
+    `  ${g.name}: ${sims
+      .filter((s) => s.group === g.id)
+      .map((s) => s.name)
+      .join(', ')}`,
+  );

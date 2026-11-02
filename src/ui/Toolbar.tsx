@@ -76,7 +76,12 @@ export function Toolbar({ label, groups, lead, fixed, after }: { label: string; 
       // lo de la derecha se achica (sus campos pasan a más filas) hasta su mínimo
       const afterW = el.querySelector(':scope > .bar-after') ? AFTER_MIN : 0;
       const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - fixedW - afterW;
-      setShown(groupsThatFit(groups.map((g) => widths.current.get(g.id) ?? 0), avail));
+      setShown(
+        groupsThatFit(
+          groups.map((g) => widths.current.get(g.id) ?? 0),
+          avail,
+        ),
+      );
     };
     fit();
     const ro = new ResizeObserver(fit);
@@ -87,10 +92,11 @@ export function Toolbar({ label, groups, lead, fixed, after }: { label: string; 
   const hidden = groups.slice(shown);
   const moreItems: MenuItem[] = hidden.flatMap((g, i) => [
     ...(i ? ['sep' as const] : []),
-    ...g.tools.map((tt): MenuItem =>
-      tt.items
-        ? { label: tt.label, items: tt.items, disabled: tt.disabled }
-        : { label: tt.label, shortcut: tt.shortcut, title: tt.title, onClick: tt.onClick ?? (() => {}), disabled: tt.disabled, checked: tt.active },
+    ...g.tools.map(
+      (tt): MenuItem =>
+        tt.items
+          ? { label: tt.label, items: tt.items, disabled: tt.disabled }
+          : { label: tt.label, shortcut: tt.shortcut, title: tt.title, onClick: tt.onClick ?? (() => {}), disabled: tt.disabled, checked: tt.active },
     ),
   ]);
 

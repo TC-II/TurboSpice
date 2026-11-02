@@ -69,7 +69,10 @@ await page.keyboard.press('Escape');
 const ref = await saved();
 check(ref.length === 2, `componentes colocados: ${ref.join(' | ')}`);
 
-for (const [i, [x, y]] of [[0, 0], [160, 0]].entries()) {
+for (const [i, [x, y]] of [
+  [0, 0],
+  [160, 0],
+].entries()) {
   await click(x, y);
   await keys('Control+r', 1);
   const r1 = (await saved())[i];

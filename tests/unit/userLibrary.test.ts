@@ -15,7 +15,11 @@ describe('My symbols and models en Drive', () => {
 
   it('une por nombre sin distinguir mayúsculas; gana el más nuevo', () => {
     const m = mergeUserFiles([f('A.lib', 5, 'drive'), f('x.lib', 1)], [f('a.lib', 9, 'local'), f('y.lib', 2)]);
-    expect(m.map((x) => [x.name, x.text])).toEqual([['a.lib', 'local'], ['x.lib', 'x.lib'], ['y.lib', 'y.lib']]);
+    expect(m.map((x) => [x.name, x.text])).toEqual([
+      ['a.lib', 'local'],
+      ['x.lib', 'x.lib'],
+      ['y.lib', 'y.lib'],
+    ]);
   });
 
   it('busca el archivo de nombre fijo y lo crea o lo reemplaza', async () => {

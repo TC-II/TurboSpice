@@ -28,7 +28,12 @@ const resolve = (p: SimPlot) => (fn: string, args: string[]) => {
   const v = p.vectors.find((x) => x.name === args[0].toLowerCase());
   return fn.toUpperCase() === 'V' && v ? { re: v.real, ...(v.imag ? { im: v.imag } : {}) } : null;
 };
-const run = (lines: string[], p: SimPlot) => evalMeasures(lines.map((l) => parseMeas(l) as MeasDef), p, resolve(p));
+const run = (lines: string[], p: SimPlot) =>
+  evalMeasures(
+    lines.map((l) => parseMeas(l) as MeasDef),
+    p,
+    resolve(p),
+  );
 const val = (m: Map<string, unknown>, k: string) => (m.get(k) as MeasValue).value;
 
 describe('.meas', () => {

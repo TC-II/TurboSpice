@@ -159,8 +159,12 @@ export function sheetSvg(svg: SVGSVGElement, page: Rect, title = 'TurboSpice sch
   // la marca: un comentario y los metadatos RDF (no se dibujan)
   const meta = new DOMParser().parseFromString(`<metadata xmlns="http://www.w3.org/2000/svg">${rdf(title)}</metadata>`, 'image/svg+xml').documentElement;
   clone.insertBefore(document.importNode(meta, true), clone.firstChild);
-  return XML_HEAD + `<!-- ${CREATED_WITH} -->
-` + new XMLSerializer().serializeToString(clone);
+  return (
+    XML_HEAD +
+    `<!-- ${CREATED_WITH} -->
+` +
+    new XMLSerializer().serializeToString(clone)
+  );
 }
 
 // --- texto en el PNG (chunks tEXt, antes de IEND) ---
@@ -191,12 +195,7 @@ export async function pngWithText(png: Blob, title: string): Promise<Blob> {
   const bytes = new Uint8Array(await png.arrayBuffer());
   // IEND son los últimos 12 bytes
   const end = bytes.length - 12;
-  const chunks = [
-    textChunk('Title', title),
-    textChunk('Software', 'TurboSpice'),
-    textChunk('Source', TURBOSPICE_URL),
-    textChunk('Comment', CREATED_WITH),
-  ];
+  const chunks = [textChunk('Title', title), textChunk('Software', 'TurboSpice'), textChunk('Source', TURBOSPICE_URL), textChunk('Comment', CREATED_WITH)];
   return new Blob([bytes.subarray(0, end), ...chunks, bytes.subarray(end)], { type: 'image/png' });
 }
 

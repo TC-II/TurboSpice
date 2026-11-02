@@ -59,7 +59,13 @@ describe('comando de simulación oculto en el esquemático (#48)', () => {
   });
 
   it('el comando nuevo va debajo del circuito, no encima', () => {
-    const d: AscDoc = { ...emptyDoc(), wires: [{ x1: -64, y1: 0, x2: 160, y2: 0 }, { x1: 160, y1: 0, x2: 160, y2: 240 }] };
+    const d: AscDoc = {
+      ...emptyDoc(),
+      wires: [
+        { x1: -64, y1: 0, x2: 160, y2: 0 },
+        { x1: 160, y1: 0, x2: 160, y2: 240 },
+      ],
+    };
     const t = setAnalysisLine(d, '.tran 1m').texts[0];
     expect(t.y).toBeGreaterThan(240);
     expect(t.x).toBe(-64);

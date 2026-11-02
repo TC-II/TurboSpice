@@ -41,8 +41,7 @@ function words(line: string): string[] {
 /** Agrega las fuentes de 0 V en los pines de las instancias X de la netlist (ver arriba) */
 export function addPinCurrentSources(netlist: string, files: Record<string, string>): string {
   const generated = new Set<string>();
-  for (const text of Object.values(files))
-    if (GENERATED.test(text)) for (const m of text.matchAll(/^\.subckt\s+(\S+)/gim)) generated.add(m[1].toLowerCase());
+  for (const text of Object.values(files)) if (GENERATED.test(text)) for (const m of text.matchAll(/^\.subckt\s+(\S+)/gim)) generated.add(m[1].toLowerCase());
   const lines = netlist.split('\n');
   const out: string[] = [];
   let control = false;

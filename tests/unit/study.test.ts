@@ -35,7 +35,10 @@ const cards = (doc: typeof DOC) => {
   return rest;
 };
 const value = (doc: typeof DOC, name: string) =>
-  doc.symbols.map((s) => effectiveAttrs(s, lib.symbol(s.type))).find((a) => a.get('InstName') === name)?.get('Value');
+  doc.symbols
+    .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
+    .find((a) => a.get('InstName') === name)
+    ?.get('Value');
 
 describe('Estudio: tarjetas ↔ directivas', () => {
   it('barridos: componente, parámetro, fuente, temperatura, modelo; activos y desactivados', () => {
@@ -106,14 +109,22 @@ describe('Estudio: tarjetas ↔ directivas', () => {
   });
 
   it('archivo de LTspice con .step y .meas escritos a mano', () => {
-    const doc = parseAsc(DOC_TEXT_WITH(`TEXT 0 300 Left 2 !.param R=1k\\n.step param R list 500 1k 2k\\n.meas tran tsub TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1\\n.meas tran raro AVG V(out)*I(R1) FROM 1m TO 2m`));
+    const doc = parseAsc(
+      DOC_TEXT_WITH(
+        `TEXT 0 300 Left 2 !.param R=1k\\n.step param R list 500 1k 2k\\n.meas tran tsub TRIG V(out) VAL=0.1 RISE=1 TARG V(out) VAL=0.9 RISE=1\\n.meas tran raro AVG V(out)*I(R1) FROM 1m TO 2m`,
+      ),
+    );
     const st = studyFromDoc(doc, lib);
     expect(st.sweeps).toEqual([{ target: { kind: 'param', name: 'R' }, mode: 'list', list: '500 1k 2k', start: '', stop: '', step: '', enabled: true, original: undefined }]);
     expect(st.measures.map((m) => m.kind)).toEqual(['rise', 'avg']);
     expect(st.measures[1]).toMatchObject({ signal: 'V(out)*I(R1)', from: '1m', to: '2m' });
     // reaplicar sin cambios no altera lo que simula
     const again = applyStudy(doc, lib, st);
-    const ng = (d: typeof doc) => toNgspice(ltNetlist(d, lib), 't', { resolve: () => undefined }).text.split('\n').filter((l) => !l.startsWith('*')).sort();
+    const ng = (d: typeof doc) =>
+      toNgspice(ltNetlist(d, lib), 't', { resolve: () => undefined })
+        .text.split('\n')
+        .filter((l) => !l.startsWith('*'))
+        .sort();
     expect(ng(again)).toEqual(ng(doc));
   });
 

@@ -55,7 +55,10 @@ await page.mouse.down();
 await page.mouse.move(to.x, to.y, { steps: 5 });
 await page.mouse.up();
 const wires = await page.locator('.wires line').evaluateAll((ls) => ls.map((l) => [l.getAttribute('x1'), l.getAttribute('y1'), l.getAttribute('x2'), l.getAttribute('y2')].join(',')));
-check(wires.some((w) => /^240,(80|112),240,144$|^240,144,240,(80|112)$/.test(w)), `al arrastrarla queda conectada con un cable (${wires.join(' ')})`);
+check(
+  wires.some((w) => /^240,(80|112),240,144$|^240,144,240,(80|112)$/.test(w)),
+  `al arrastrarla queda conectada con un cable (${wires.join(' ')})`,
+);
 await page.keyboard.press('Control+z');
 
 // --- Comando de simulación ---
@@ -169,8 +172,7 @@ const copyName = await benchName();
 check(copyName === 'DC (copia)', `la copia es otro testbench, «‹nombre› (copia)» (${await benchName()})`);
 // aplicar un campo y escribir enseguida en el siguiente: la línea aplicada vuelve a la barra un
 // render después y no debe pisar lo que se está escribiendo (fallaba en CI)
-const directiveIs = (t) =>
-  page.waitForFunction((t) => document.querySelector('.texts .directive')?.textContent === t, t, { timeout: 5000 }).catch(() => {});
+const directiveIs = (t) => page.waitForFunction((t) => document.querySelector('.texts .directive')?.textContent === t, t, { timeout: 5000 }).catch(() => {});
 await page.getByLabel('Fin 1').fill('2');
 await page.getByLabel('Fin 1').press('Enter');
 await directiveIs('.dc V1 0 2 0.1');
@@ -217,12 +219,16 @@ await frames(page);
 check((await benchName()) === 'DC', `↑ vuelve al anterior (${await benchName()})`);
 await page.keyboard.press('ArrowDown');
 await frames(page);
-check(!(await page.getByRole('button', { name: 'Nueva simulación', exact: true }).count()) || !(await (async () => {
-  await page.getByRole('button', { name: 'Nueva simulación', exact: true }).click();
-  const has = (await page.getByRole('menu').locator('[role^=menuitem]').allTextContents()).some((x) => x === 'DC');
-  await page.keyboard.press('Escape');
-  return has;
-})()), 'el desplegable de Simular ya no lista testbenches');
+check(
+  !(await page.getByRole('button', { name: 'Nueva simulación', exact: true }).count()) ||
+    !(await (async () => {
+      await page.getByRole('button', { name: 'Nueva simulación', exact: true }).click();
+      const has = (await page.getByRole('menu').locator('[role^=menuitem]').allTextContents()).some((x) => x === 'DC');
+      await page.keyboard.press('Escape');
+      return has;
+    })()),
+  'el desplegable de Simular ya no lista testbenches',
+);
 // alternar: cada uno conserva sus trazas y sus resultados (sin volver a simular)
 await goBench('DC');
 check((await directive()) === '.dc V1 0 5 0.1', 'al elegir el primero, su comando vuelve al esquemático');
@@ -274,7 +280,10 @@ await page.keyboard.press('Escape');
 // un testbench nuevo está vacío y sin simulación: Simular despliega el menú para elegir el tipo
 await openPanel();
 await page.locator('.project-tree .tree-group .tree-add').first().click();
-check((await page.locator('svg.editor .symbols > g').count()) === 0 && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0, 'el testbench nuevo arranca vacío y sin simulación');
+check(
+  (await page.locator('svg.editor .symbols > g').count()) === 0 && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0,
+  'el testbench nuevo arranca vacío y sin simulación',
+);
 await page.getByRole('button', { name: 'Correr', exact: true }).click();
 check(await page.getByRole('menu', { name: 'Nueva simulación' }).isVisible(), 'sin simulación, Simular despliega el menú');
 await page.keyboard.press('Escape');
@@ -282,11 +291,27 @@ await page.screenshot({ path: `${OUT}/simulaciones.png` });
 
 // --- #361, #363 y #365: un transitorio que al ritmo medido no entra en memoria se frena enseguida, con lo
 // simulado hasta ahí y lo que se puede hacer como botones; mientras corre, el % va en el botón ---
-const longAsc = ['Version 4', 'SHEET 1 880 680', 'WIRE 0 16 80 16', 'WIRE 80 16 160 16', 'WIRE 0 96 80 96', 'WIRE 80 96 160 96', 'WIRE 160 80 160 96', 'FLAG 0 96 0',
-  'SYMBOL voltage 0 0 R0', 'SYMATTR InstName V1', 'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
-  'SYMBOL res 64 0 R0', 'SYMATTR InstName R1', 'SYMATTR Value 1k',
-  'SYMBOL cap 144 16 R0', 'SYMATTR InstName C1', 'SYMATTR Value 1n',
-  'TEXT 0 160 Left 2 !.tran 0 5'].join('\n') + '\n';
+const longAsc =
+  [
+    'Version 4',
+    'SHEET 1 880 680',
+    'WIRE 0 16 80 16',
+    'WIRE 80 16 160 16',
+    'WIRE 0 96 80 96',
+    'WIRE 80 96 160 96',
+    'WIRE 160 80 160 96',
+    'FLAG 0 96 0',
+    'SYMBOL voltage 0 0 R0',
+    'SYMATTR InstName V1',
+    'SYMATTR Value PULSE(0 1 0 10n 10n 0.5u 1u)',
+    'SYMBOL res 64 0 R0',
+    'SYMATTR InstName R1',
+    'SYMATTR Value 1k',
+    'SYMBOL cap 144 16 R0',
+    'SYMATTR InstName C1',
+    'SYMATTR Value 1n',
+    'TEXT 0 160 Left 2 !.tran 0 5',
+  ].join('\n') + '\n';
 await page.evaluate((t) => {
   const dt = new DataTransfer();
   dt.items.add(new File([t], 'Largo.asc'));

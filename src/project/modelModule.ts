@@ -7,7 +7,10 @@ import { baseName, WINDOW_ATTR } from '../asc/model.ts';
 import type { Project, ProjectFile } from './turbo.ts';
 import { addFreePin, formatParamList, parseParamList, symPins, symShapes, symWindows, windowShown } from './symbolEdit.ts';
 
-const key = (n: string) => baseName(n).replace(/\.(lib|sub|mod|asy)$/i, '').toLowerCase();
+const key = (n: string) =>
+  baseName(n)
+    .replace(/\.(lib|sub|mod|asy)$/i, '')
+    .toLowerCase();
 export const modelFileName = (name: string) => `${name}.lib`;
 
 export const isModelModule = (f: ProjectFile) => f.kind === 'model' && f.module === 'model';
@@ -129,7 +132,11 @@ export function setSubcktPins(text: string, pins: string[], name?: string): stri
   const re = new RegExp(`^([ \\t]*\\.subckt[ \\t]+${id})([^\\r\\n]*(?:\\r?\\n[ \\t]*\\+[^\\r\\n]*)*)`, 'im');
   const m = re.exec(text);
   if (!m) return text;
-  const toks = m[2].replace(/\r?\n[ \t]*\+/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const toks = m[2]
+    .replace(/\r?\n[ \t]*\+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   const at = toks.findIndex((x) => /^params:/i.test(x) || x.includes('='));
   const params = at < 0 ? [] : toks.slice(at);
   return text.replace(re, () => [m[1], ...pins, ...params].join(' '));
@@ -157,9 +164,7 @@ export function renameModelIn(text: string, from: string, to: string): string {
 /** Renombra el .subckt `from` (su línea y su .ends) a `to`; los de adentro quedan como están */
 export function renameSubcktIn(text: string, from: string, to: string): string {
   const esc = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return text
-    .replace(new RegExp(`^(\\s*\\.subckt\\s+)${esc}(?=\\s)`, 'im'), (_, a: string) => a + to)
-    .replace(new RegExp(`^(\\s*\\.ends\\s+)${esc}\\s*$`, 'im'), (_, a: string) => a + to);
+  return text.replace(new RegExp(`^(\\s*\\.subckt\\s+)${esc}(?=\\s)`, 'im'), (_, a: string) => a + to).replace(new RegExp(`^(\\s*\\.ends\\s+)${esc}\\s*$`, 'im'), (_, a: string) => a + to);
 }
 
 /** Netlist inicial */
@@ -309,7 +314,10 @@ export function setAttrVisible(sym: string, k: string, on: boolean, align = 'Lef
   const wins = ls.filter((l) => l.startsWith('WINDOW ')).length;
   const x = (xs.length ? Math.max(...xs) : 0) + 8;
   const y = (ys.length ? Math.min(...ys) : 0) + 16 * wins;
-  const last = ls.reduce((a, l, j) => (l.startsWith('WINDOW ') ? j : a), ls.findIndex((l) => l.startsWith('SymbolType ')));
+  const last = ls.reduce(
+    (a, l, j) => (l.startsWith('WINDOW ') ? j : a),
+    ls.findIndex((l) => l.startsWith('SymbolType ')),
+  );
   ls.splice(last + 1, 0, `WINDOW ${n} ${x} ${y} Left 2`);
   return ls.join('\n');
 }
@@ -422,7 +430,11 @@ export function subcktAfterPins(text: string, name: string, before: string, afte
   if (b.length < a.length) {
     const gone = a.find((p) => !b.some((q) => q.name === p.name && q.x === p.x && q.y === p.y));
     if (!gone || gone.order < 1 || gone.order > nodes.length) return text;
-    return setSubcktPins(text, nodes.filter((_, i) => i !== gone.order - 1), name);
+    return setSubcktPins(
+      text,
+      nodes.filter((_, i) => i !== gone.order - 1),
+      name,
+    );
   }
   let out = text;
   const now = [...nodes];

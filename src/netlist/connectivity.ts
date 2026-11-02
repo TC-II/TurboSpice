@@ -73,9 +73,7 @@ class UnionFind {
 export function onSegment(p: Point, w: { x1: number; y1: number; x2: number; y2: number }): boolean {
   const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
   if (cross !== 0) return false;
-  return (
-    p.x >= Math.min(w.x1, w.x2) && p.x <= Math.max(w.x1, w.x2) && p.y >= Math.min(w.y1, w.y2) && p.y <= Math.max(w.y1, w.y2)
-  );
+  return p.x >= Math.min(w.x1, w.x2) && p.x <= Math.max(w.x1, w.x2) && p.y >= Math.min(w.y1, w.y2) && p.y <= Math.max(w.y1, w.y2);
 }
 
 export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef | undefined): Connectivity {
@@ -118,8 +116,7 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
     else if (w.x1 === w.x2) (vert.get(w.x1) ?? vert.set(w.x1, []).get(w.x1)!).push(i);
     else diag.push(i);
   });
-  const wiresThrough = (p: Point): number[] =>
-    [...(horiz.get(p.y) ?? []), ...(vert.get(p.x) ?? []), ...diag].filter((i) => onSegment(p, doc.wires[i]));
+  const wiresThrough = (p: Point): number[] => [...(horiz.get(p.y) ?? []), ...(vert.get(p.x) ?? []), ...diag].filter((i) => onSegment(p, doc.wires[i]));
   for (const [k, p] of points) {
     for (const i of wiresThrough(p)) uf.union(k, key(doc.wires[i].x1, doc.wires[i].y1));
   }
@@ -164,7 +161,8 @@ export function connectivity(doc: AscDoc, symbolOf: (type: string) => SymbolDef 
     if (n.labels.includes('0')) n.name = '0';
     // (una etiqueta con $…$ se dibuja como fórmula; a la netlist va su nombre simple, spiceName)
     else if (n.labels.length) n.name = spiceName(chosen.get(n)!.name);
-    else if (n.pins.length === 1 && !n.wires.length) n.name = ''; // pin suelto → NC_xx
+    else if (n.pins.length === 1 && !n.wires.length)
+      n.name = ''; // pin suelto → NC_xx
     else unnamed.push(n);
   }
   // LTspice numera según el primer cable de cada red en el orden del archivo (N001, N002…;

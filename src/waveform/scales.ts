@@ -53,7 +53,6 @@ export function panBy(min: number, max: number, f: number, log = false, bounds?:
   return log ? [10 ** a, 10 ** b] : [a, b];
 }
 
-
 /**
  * Factor de zoom de un evento de la rueda (<1 acerca): proporcional a cuánto giró, así una rueda
  * fina (muchos eventos chicos) y una con muescas (pocos grandes) acercan lo mismo por vuelta.

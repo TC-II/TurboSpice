@@ -32,7 +32,24 @@ export interface RunHistoryDeps {
   setMessage(m?: string): void;
 }
 
-export function runHistoryActions({ curRuns, curSim, history, stacks, viewingRef, projectRef, editProject, leave, enter, goSim, markDirty, setViewRun, setHistoryOpen, valueOffer, setValueOffer, setMessage }: RunHistoryDeps) {
+export function runHistoryActions({
+  curRuns,
+  curSim,
+  history,
+  stacks,
+  viewingRef,
+  projectRef,
+  editProject,
+  leave,
+  enter,
+  goSim,
+  markDirty,
+  setViewRun,
+  setHistoryOpen,
+  valueOffer,
+  setValueOffer,
+  setMessage,
+}: RunHistoryDeps) {
   /** Restore: la corrida pasa a ser el circuito actual (un paso más de deshacer) */
   const restoreRun = (id: string) => {
     const r = curRuns.find((x) => x.id === id);

@@ -415,13 +415,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
                     </text>
                   ))}
                   {drag?.mode === 'box' && (
-                    <rect
-                      className="zoom-box"
-                      x={Math.min(drag.x0, drag.x1)}
-                      y={Math.min(drag.y0, drag.y1)}
-                      width={Math.abs(drag.x1 - drag.x0)}
-                      height={Math.abs(drag.y1 - drag.y0)}
-                    />
+                    <rect className="zoom-box" x={Math.min(drag.x0, drag.x1)} y={Math.min(drag.y0, drag.y1)} width={Math.abs(drag.x1 - drag.x0)} height={Math.abs(drag.y1 - drag.y0)} />
                   )}
                 </g>
                 <rect className="frame" x={0.5} y={0.5} width={W - 1} height={H - 1} />

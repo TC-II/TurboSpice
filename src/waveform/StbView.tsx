@@ -92,7 +92,10 @@ function Summary({ info, L, tag }: { info: StbInfo; L: string; tag?: string }) {
   return (
     <p
       className={`stb-summary${tag ? ' mode' : ''}`}
-      title={t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', { L, e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—' })}
+      title={t('Poles and zeros from a rational fit of {L}(jω) (error {e}); line: root locus of 1 + k·{L}, k from 0 to ∞. The margin assumes what stays closed is stable.', {
+        L,
+        e: Number.isFinite(info.error) ? info.error.toExponential(1) : '—',
+      })}
     >
       {tag && <span className="stb-mode">{tag}</span>}
       <span title={t('Phase margin') + (pm.length > 1 ? ` · ${t('0 dB crossings')}: ${pm.map((c) => `${si(c.f)}Hz (${deg(c.margin)})`).join(' · ')}` : '')}>
@@ -139,7 +142,11 @@ export function StbView({ plot, name, style }: { plot: SimPlot; name: string; st
           const labels = new Map(runs.map((r) => [r.name, r.name]));
           return (
             <div key={m} className="stb-map">
-              {multi && <span className="stb-mode" title={m === 'dm' ? t('Differential (DM)') : t('Common mode (CM)')}>{m.toUpperCase()}</span>}
+              {multi && (
+                <span className="stb-mode" title={m === 'dm' ? t('Differential (DM)') : t('Common mode (CM)')}>
+                  {m.toUpperCase()}
+                </span>
+              )}
               {info.open ? (
                 <PzPlane runs={runs} labels={labels} name={`${name} stb${m ? `_${m}` : ''}`} compact locus={info.locus} stableRun={1} />
               ) : (

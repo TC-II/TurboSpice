@@ -35,69 +35,69 @@ export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symT
   const { projectRef, editProject, curSub, setDialog } = useSchematic();
   return (
     <>
-    {curSub && symText && (
-      <Suspense fallback={null}>
-      <SymbolEditor
-        name={curSub}
-        text={symText}
-        ports={subPorts}
-        onChange={editSymbol}
-        onParams={(ps) => editSymbol(curVerilog ? withParams(symText, ps) : setSymParams(symText, ps))}
-        onReset={() =>
-          editSymbol(curVerilog?.synth ? setSymParams(verilogSymbol(curSub, curVerilog.synth), symParams(symText)) : setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))
-        }
-        onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
-        onWidth={setSymW}
-        onAddPort={addPort}
-      />
-      </Suspense>
-    )}
-    {curModel && modelModuleFile(project, curModel) && (
-      <Suspense fallback={null}>
-      <ModelEditor
-        name={curModel}
-        text={modelModuleFile(project, curModel)!.text}
-        symText={modelSymbolText(project, curModel) ?? ''}
-        onText={(text) => {
-          const p = storeModelText(projectRef.current, curModel, text);
-          projectRef.current = p;
-          editProject(p);
-        }}
-        onSymbol={(text) => {
-          const p = storeModelSymbol(projectRef.current, curModel, text);
-          projectRef.current = p;
-          editProject(p);
-        }}
-        onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
-        onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
-        onClose={() => setCurModel('')}
-      />
-      </Suspense>
-    )}
-    {curVerilog && (
-      <VerilogModule
-        name={curSub}
-        text={curVerilog.text}
-        stale={isStale(curVerilog)}
-        mode={curVerilog.hdl === 'behavioral' ? 'behavioral' : 'synth'}
-        suggestBehavioral={curVerilog.hdl !== 'behavioral' && looksBehavioral(curVerilog.text)}
-        onMode={(m) => {
-          const p = setHdlMode(projectRef.current, curSub, m);
-          projectRef.current = p;
-          editProject(p);
-        }}
-        pins={curVerilog.synth?.pins ?? []}
-        params={symText ? symParams(symText) : []}
-        onText={(text) => {
-          const p = storeVerilog(projectRef.current, curSub, text);
-          projectRef.current = p;
-          editProject(p);
-          warnShared();
-        }}
-        onSynthesize={(text) => synthModule(curSub, text)}
-        onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
-      />
-    )}
+      {curSub && symText && (
+        <Suspense fallback={null}>
+          <SymbolEditor
+            name={curSub}
+            text={symText}
+            ports={subPorts}
+            onChange={editSymbol}
+            onParams={(ps) => editSymbol(curVerilog ? withParams(symText, ps) : setSymParams(symText, ps))}
+            onReset={() =>
+              editSymbol(curVerilog?.synth ? setSymParams(verilogSymbol(curSub, curVerilog.synth), symParams(symText)) : setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))
+            }
+            onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
+            onWidth={setSymW}
+            onAddPort={addPort}
+          />
+        </Suspense>
+      )}
+      {curModel && modelModuleFile(project, curModel) && (
+        <Suspense fallback={null}>
+          <ModelEditor
+            name={curModel}
+            text={modelModuleFile(project, curModel)!.text}
+            symText={modelSymbolText(project, curModel) ?? ''}
+            onText={(text) => {
+              const p = storeModelText(projectRef.current, curModel, text);
+              projectRef.current = p;
+              editProject(p);
+            }}
+            onSymbol={(text) => {
+              const p = storeModelSymbol(projectRef.current, curModel, text);
+              projectRef.current = p;
+              editProject(p);
+            }}
+            onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
+            onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
+            onClose={() => setCurModel('')}
+          />
+        </Suspense>
+      )}
+      {curVerilog && (
+        <VerilogModule
+          name={curSub}
+          text={curVerilog.text}
+          stale={isStale(curVerilog)}
+          mode={curVerilog.hdl === 'behavioral' ? 'behavioral' : 'synth'}
+          suggestBehavioral={curVerilog.hdl !== 'behavioral' && looksBehavioral(curVerilog.text)}
+          onMode={(m) => {
+            const p = setHdlMode(projectRef.current, curSub, m);
+            projectRef.current = p;
+            editProject(p);
+          }}
+          pins={curVerilog.synth?.pins ?? []}
+          params={symText ? symParams(symText) : []}
+          onText={(text) => {
+            const p = storeVerilog(projectRef.current, curSub, text);
+            projectRef.current = p;
+            editProject(p);
+            warnShared();
+          }}
+          onSynthesize={(text) => synthModule(curSub, text)}
+          onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
+        />
+      )}
     </>
   );
 }

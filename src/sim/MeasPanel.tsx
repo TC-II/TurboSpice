@@ -28,8 +28,12 @@ function Histogram({ values, label }: { values: number[]; label: string }) {
             <title>{`${si(b.from, 4)} … ${si(b.to, 4)}: ${b.count}`}</title>
           </rect>
         ))}
-        <text x={0} y={H + 12}>{si(bins[0]?.from ?? 0, 4)}</text>
-        <text x={W} y={H + 12} textAnchor="end">{si(bins[bins.length - 1]?.to ?? 0, 4)}</text>
+        <text x={0} y={H + 12}>
+          {si(bins[0]?.from ?? 0, 4)}
+        </text>
+        <text x={W} y={H + 12} textAnchor="end">
+          {si(bins[bins.length - 1]?.to ?? 0, 4)}
+        </text>
       </svg>
       <figcaption>{label}</figcaption>
     </figure>
@@ -52,7 +56,9 @@ export function MeasPanel({ table }: { table: MeasTable }) {
   return (
     <div className="meas-panel">
       {table.errors.map((e) => (
-        <p key={e} className="hint warn">{e}</p>
+        <p key={e} className="hint warn">
+          {e}
+        </p>
       ))}
       <p>
         <button type="button" onClick={() => downloadCsv(table)}>

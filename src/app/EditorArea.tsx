@@ -74,11 +74,41 @@ export interface EditorAreaProps {
 export function EditorArea(props: EditorAreaProps) {
   const { doc, lib, commit, tool, setTool, selection, setSelection, sim, curSub, projectRef, setDialog } = useSchematic();
   const { conn, editor, docKey, traceFocus, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle } = props;
-  const { symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved } = props;
+  const {
+    symbolMenu,
+    netMenu,
+    textMenu,
+    setTextMenu,
+    closeTextMenu,
+    descend,
+    editItem,
+    onProbe,
+    onProbePair,
+    rowNet,
+    traceNetShown,
+    rowSymbol,
+    rowElement,
+    onHoverSymbol,
+    setHoverTarget,
+    netColors,
+    shownNets,
+    describe,
+    annotations,
+    opSel,
+    setOpSel,
+    setOpTags,
+    arrows,
+    pickValue,
+    endPick,
+    onHover,
+    historyDiff,
+    unsaved,
+  } = props;
   const { historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun } = props;
   return (
     <>
-      {textMenu && doc.texts[textMenu.index] &&
+      {textMenu &&
+        doc.texts[textMenu.index] &&
         createPortal(
           <TextMenu
             at={textMenu.at}

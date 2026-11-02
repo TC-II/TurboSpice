@@ -59,7 +59,20 @@ function niceTicks(a: number, b: number, n = 6): number[] {
  * bajo, y X o Z como una raya al medio (X roja y cortada, Z gris y punteada); un bus, como tramos
  * con su valor en el radix de la traza. Comparte con los paneles analógicos el rango en X, el zoom y los cursores.
  */
-export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, onCursor, onZoom, onWheelZoom, pendingX, onHover, fill }: {
+export function DigitalLanes({
+  x,
+  curves,
+  radix,
+  xRange,
+  cursors,
+  cursorMode,
+  onCursor,
+  onZoom,
+  onWheelZoom,
+  pendingX,
+  onHover,
+  fill,
+}: {
   x: Float64Array;
   curves: Curve[];
   /** radix de cada traza (por índice de traza del panel) */
@@ -121,7 +134,7 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
       style={fill ? { flex: '1 1 0', minHeight: shown.length * LANE + AXIS } : { height: H, flex: 'none' }}
       onPointerMove={(e) => {
         const p = local(e);
-        if (p < LABEL) return (setMouse(null), onHover(null));
+        if (p < LABEL) return setMouse(null), onHover(null);
         setMouse(p);
         onHover(nearest(val(p)));
         if (drag) setDrag({ ...drag, b: p });
@@ -187,48 +200,46 @@ export function DigitalLanes({ x, curves, radix, xRange, cursors, cursorMode, on
                 {c.label.replace(/^Dig\((.*)\)$/i, '$1')}
               </text>
               <g clipPath={`url(#${clip})`} stroke={c.color} fill="none" strokeWidth={1.5}>
-                {bits === 1 ? (
-                  (() => {
-                    // la señal (con las transiciones hasta la raya del medio) y aparte los tramos X y Z
-                    let d = '';
-                    const odd = { x: '', z: '' };
-                    segs.forEach(([a, b, v], k) => {
+                {bits === 1
+                  ? (() => {
+                      // la señal (con las transiciones hasta la raya del medio) y aparte los tramos X y Z
+                      let d = '';
+                      const odd = { x: '', z: '' };
+                      segs.forEach(([a, b, v], k) => {
+                        const st = logicState(v);
+                        const y = st !== 'v' ? mid : v === 1 ? top : bot;
+                        d += `${k ? 'L' : 'M'}${px(a)},${y}`;
+                        if (st === 'v') d += `H${px(b)}`;
+                        else {
+                          odd[st] += `M${px(a)},${mid}H${px(b)}`;
+                          d += `M${px(b)},${mid}`;
+                        }
+                      });
+                      return (
+                        <>
+                          <path d={d} />
+                          {odd.x && <path className="dl-x" d={odd.x} />}
+                          {odd.z && <path className="dl-z" d={odd.z} />}
+                        </>
+                      );
+                    })()
+                  : segs.map(([a, b, v], k) => {
+                      const xa = px(a);
+                      const xb = px(b);
+                      const s = Math.min(3, (xb - xa) / 2);
+                      const label = formatRadix(v, bits, c.trace >= 0 ? (radix(c.trace) ?? 'hex') : 'hex');
                       const st = logicState(v);
-                      const y = st !== 'v' ? mid : v === 1 ? top : bot;
-                      d += `${k ? 'L' : 'M'}${px(a)},${y}`;
-                      if (st === 'v') d += `H${px(b)}`;
-                      else {
-                        odd[st] += `M${px(a)},${mid}H${px(b)}`;
-                        d += `M${px(b)},${mid}`;
-                      }
-                    });
-                    return (
-                      <>
-                        <path d={d} />
-                        {odd.x && <path className="dl-x" d={odd.x} />}
-                        {odd.z && <path className="dl-z" d={odd.z} />}
-                      </>
-                    );
-                  })()
-                ) : (
-                  segs.map(([a, b, v], k) => {
-                    const xa = px(a);
-                    const xb = px(b);
-                    const s = Math.min(3, (xb - xa) / 2);
-                    const label = formatRadix(v, bits, c.trace >= 0 ? (radix(c.trace) ?? 'hex') : 'hex');
-                    const st = logicState(v);
-                    return (
-                      <g key={k} className={st === 'v' ? undefined : `dl-${st}`}>
-                        <path d={`M${xa},${mid}L${xa + s},${top}H${xb - s}L${xb},${mid}L${xb - s},${bot}H${xa + s}Z`} />
-                        {xb - xa > label.length * 7 + 6 && (
-                          <text className="dl-value" x={(xa + xb) / 2} y={mid + 4} textAnchor="middle">
-                            {label}
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })
-                )}
+                      return (
+                        <g key={k} className={st === 'v' ? undefined : `dl-${st}`}>
+                          <path d={`M${xa},${mid}L${xa + s},${top}H${xb - s}L${xb},${mid}L${xb - s},${bot}H${xa + s}Z`} />
+                          {xb - xa > label.length * 7 + 6 && (
+                            <text className="dl-value" x={(xa + xb) / 2} y={mid + 4} textAnchor="middle">
+                              {label}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    })}
               </g>
             </g>
           );

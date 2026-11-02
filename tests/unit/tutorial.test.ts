@@ -43,7 +43,10 @@ const probe = (p: Partial<Probe> = {}): Probe => ({
   showNets: false,
   ...p,
 });
-const step = (ch: string, id: string) => chapters().find((c) => c.id === ch)!.steps.find((s) => s.id === id)!;
+const step = (ch: string, id: string) =>
+  chapters()
+    .find((c) => c.id === ch)!
+    .steps.find((s) => s.id === id)!;
 
 describe('tutorial', () => {
   it('capítulos y pasos con ids únicos', () => {
@@ -63,11 +66,18 @@ describe('tutorial', () => {
       const { conn } = ltNetlist(doc, lib);
       const loose = [...conn.pinNet.values()].filter((n) => n.pins.length === 1 && !n.labels.length);
       expect(loose, k).toEqual([]);
-      expect(doc.symbols.every((s, si) => lib.symbol(s.type)!.pins.every((_, pi) => conn.pinNet.has(`${si}:${pi}`))), k).toBe(true);
+      expect(
+        doc.symbols.every((s, si) => lib.symbol(s.type)!.pins.every((_, pi) => conn.pinNet.has(`${si}:${pi}`))),
+        k,
+      ).toBe(true);
     }
     const rc = parseAsc(practiceCircuit('rcTran').asc!);
     expect(rc.texts.map((x) => x.text)).toContain('.tran 20m');
-    expect(ltNetlist(rc, lib).conn.nets.map((n) => n.name).sort()).toEqual(['0', 'in', 'out']);
+    expect(
+      ltNetlist(rc, lib)
+        .conn.nets.map((n) => n.name)
+        .sort(),
+    ).toEqual(['0', 'in', 'out']);
     expect(practiceCircuit('empty').asc).toBeNull();
   });
 
@@ -119,7 +129,13 @@ describe('tutorial', () => {
 
 describe('pasos que piden abrir o prender algo', () => {
   it('si ya estaba abierto al empezar, no se cumple solo: queda como explicación, con «Siguiente»', () => {
-    for (const [ch, id] of [['tour', 'panel'], ['project', 'open'], ['project', 'history'], ['op', 'annotate'], ['op', 'nets']]) {
+    for (const [ch, id] of [
+      ['tour', 'panel'],
+      ['project', 'open'],
+      ['project', 'history'],
+      ['op', 'annotate'],
+      ['op', 'nets'],
+    ]) {
       const s = step(ch, id);
       const key = ({ panel: 'treeOpen', open: 'treeOpen', history: 'historyOpen', annotate: 'showOp', nets: 'showNets' } as const)[id as 'panel'];
       const on = probe({ [key]: true });

@@ -61,7 +61,7 @@ export function studyCode(st: Study): string {
 }
 
 const SWEEP_KINDS: [SweepTarget['kind'], string][] = [
-  ['component', t('A component\'s value')],
+  ['component', t("A component's value")],
   ['param', t('A parameter (.param)')],
   ['source', t('A source (DC value)')],
   ['temp', t('The temperature')],
@@ -73,14 +73,7 @@ const plain = (v: string) => v.trim().replace(/[µμ]/g, 'u');
 
 const isNumeric = (v: string) => /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?(meg|[tgkmunpfµ])?[a-zΩ]*$/i.test(v.trim());
 
-function Card({ title, enabled, onToggle, onRemove, children, extra }: {
-  title: string;
-  enabled: boolean;
-  onToggle(v: boolean): void;
-  onRemove(): void;
-  children: ReactNode;
-  extra?: ReactNode;
-}) {
+function Card({ title, enabled, onToggle, onRemove, children, extra }: { title: string; enabled: boolean; onToggle(v: boolean): void; onRemove(): void; children: ReactNode; extra?: ReactNode }) {
   return (
     <section className={`study-card${enabled ? '' : ' off'}`}>
       <header>
@@ -89,7 +82,9 @@ function Card({ title, enabled, onToggle, onRemove, children, extra }: {
           <strong>{title}</strong>
         </label>
         {extra}
-        <button className="x" onClick={onRemove} aria-label={t('Remove {title}', { title })} title={t('Remove')}>✕</button>
+        <button className="x" onClick={onRemove} aria-label={t('Remove {title}', { title })} title={t('Remove')}>
+          ✕
+        </button>
       </header>
       <div className="study-body">{children}</div>
     </section>
@@ -106,7 +101,15 @@ function Row({ label, children, hint }: { label: string; children: ReactNode; hi
   );
 }
 
-function PickInput({ value, onChange, picker, what, list, placeholder, label }: {
+function PickInput({
+  value,
+  onChange,
+  picker,
+  what,
+  list,
+  placeholder,
+  label,
+}: {
   value: string;
   onChange(v: string): void;
   picker?: Picker;
@@ -156,7 +159,9 @@ function SweepCard({ s, set, remove, info, picker }: { s: StudySweep; set(s: Stu
       <Row label={t('What to vary')}>
         <select value={tt.kind} onChange={(e) => setTarget(e.target.value as SweepTarget['kind'])} aria-label={t('What to vary')}>
           {SWEEP_KINDS.map(([k, l]) => (
-            <option key={k} value={k}>{l}</option>
+            <option key={k} value={k}>
+              {l}
+            </option>
           ))}
         </select>
       </Row>
@@ -281,7 +286,9 @@ function ToleranceCard({ st, set, info, picker }: { st: Study; set(st: Study): v
                 </td>
               )}
               <td>
-                <button className="x" aria-label={t('Remove {component}', { component: it.component })} onClick={() => upd({ items: tt.items.filter((_, k) => k !== i) })}>✕</button>
+                <button className="x" aria-label={t('Remove {component}', { component: it.component })} onClick={() => upd({ items: tt.items.filter((_, k) => k !== i) })}>
+                  ✕
+                </button>
               </td>
             </tr>
           ))}
@@ -291,7 +298,9 @@ function ToleranceCard({ st, set, info, picker }: { st: Study; set(st: Study): v
         <select value="" aria-label={t('Add component')} onChange={(e) => e.target.value && addComponent(e.target.value)}>
           <option value="">{t('Add component…')}</option>
           {candidates.map((c) => (
-            <option key={c.name} value={c.name}>{c.name} ({c.value})</option>
+            <option key={c.name} value={c.name}>
+              {c.name} ({c.value})
+            </option>
           ))}
         </select>
         {picker && (
@@ -349,7 +358,9 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
         <Row label={t('What to measure')}>
           <select value={m.kind} aria-label={t('What to measure')} onChange={(e) => set({ ...m, kind: e.target.value as MeasureKind, line: m.line ?? lines[0] })}>
             {kinds.map((k) => (
-              <option key={k.kind} value={k.kind}>{k.label}</option>
+              <option key={k.kind} value={k.kind}>
+                {k.label}
+              </option>
             ))}
           </select>
         </Row>
@@ -375,7 +386,7 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
               {field(t('Level on the delayed one'), 'level2', t('empty = the same'))}
             </div>
           )}
-          {(m.kind === 'period' || m.kind === 'freq') && field(t('Crossing level'), 'level', t('e.g. the signal\'s mean value'))}
+          {(m.kind === 'period' || m.kind === 'freq') && field(t('Crossing level'), 'level', t("e.g. the signal's mean value"))}
           {['max', 'min', 'pp', 'avg', 'rms', 'noise'].includes(m.kind) && (
             <div className="study-triple">
               {field(t('From'), 'from', t('empty = all'))}
@@ -390,7 +401,14 @@ function MeasureCard({ m, set, remove, picker }: { m: StudyMeasure; set(m: Study
   );
 }
 
-function AnalysisCard({ a, index, primary, set, remove, picker }: {
+function AnalysisCard({
+  a,
+  index,
+  primary,
+  set,
+  remove,
+  picker,
+}: {
   a: StudyAnalysis;
   index: number;
   /** es el análisis principal (el que corre LTspice) */
@@ -409,18 +427,10 @@ function AnalysisCard({ a, index, primary, set, remove, picker }: {
       enabled={a.enabled}
       onToggle={(enabled) => set({ ...a, enabled })}
       onRemove={remove}
-      extra={
-        a.enabled && (
-          <span className="hint">{primary && !meta?.ngspiceOnly ? t('main (the one LTspice runs)') : t('TurboSpice only')}</span>
-        )
-      }
+      extra={a.enabled && <span className="hint">{primary && !meta?.ngspiceOnly ? t('main (the one LTspice runs)') : t('TurboSpice only')}</span>}
     >
       <Row label={t('Analysis')}>
-        <select
-          value={kind ?? ''}
-          aria-label={t('Analysis type')}
-          onChange={(e) => set({ ...a, line: formatAnalysis(defaultAnalysis(e.target.value as AnalysisKind)) })}
-        >
+        <select value={kind ?? ''} aria-label={t('Analysis type')} onChange={(e) => set({ ...a, line: formatAnalysis(defaultAnalysis(e.target.value as AnalysisKind)) })}>
           {!meta && <option value="">{t('(other)')}</option>}
           {ANALYSES.map((x) => (
             <option key={x.kind} value={x.kind}>
@@ -435,7 +445,7 @@ function AnalysisCard({ a, index, primary, set, remove, picker }: {
           <AnalysisForm a={parsed} set={(x) => set({ ...a, line: formatAnalysis(x) })} picker={picker} />
         </div>
       ) : (
-        <Row label={t('Directive')} hint={t('Options the form doesn\'t handle: it\'s edited as text')}>
+        <Row label={t('Directive')} hint={t("Options the form doesn't handle: it's edited as text")}>
           <input value={a.line} spellCheck={false} aria-label={t('Analysis directive')} onChange={(e) => set({ ...a, line: e.target.value })} />
         </Row>
       )}
@@ -465,7 +475,13 @@ const PLOT_KINDS: [string, string][] = [
   ['noise', t('Noise')],
 ];
 
-function PlotCard({ view, set, remove, picker, preferred }: {
+function PlotCard({
+  view,
+  set,
+  remove,
+  picker,
+  preferred,
+}: {
   view: PlotView;
   set(v: PlotView): void;
   remove(): void;
@@ -499,7 +515,7 @@ function PlotCard({ view, set, remove, picker, preferred }: {
       {panes.map((p, pi) => (
         <fieldset key={pi} className="study-pane">
           <legend>
-            {t('Pane')}{' '}{pi + 1}
+            {t('Pane')} {pi + 1}
             <button className="x" aria-label={t('Remove pane {p0}', { p0: pi + 1 })} title={t('Remove the pane')} onClick={() => setPanes(panes.filter((_, k) => k !== pi))}>
               ✕
             </button>
@@ -513,7 +529,15 @@ function PlotCard({ view, set, remove, picker, preferred }: {
                 value={traceColor(tt, ti)}
                 onChange={(e) => setTrace(pi, ti, { ...tt, color: e.target.value })}
               />
-              <PickInput value={tt.expr} onChange={(expr) => setTrace(pi, ti, { ...tt, expr })} picker={picker} what="net" list="sim-nets-v" label={t('Signal {p0} of pane {p1}', { p0: ti + 1, p1: pi + 1 })} placeholder={t('V(out) or V(out)/V(in)')} />
+              <PickInput
+                value={tt.expr}
+                onChange={(expr) => setTrace(pi, ti, { ...tt, expr })}
+                picker={picker}
+                what="net"
+                list="sim-nets-v"
+                label={t('Signal {p0} of pane {p1}', { p0: ti + 1, p1: pi + 1 })}
+                placeholder={t('V(out) or V(out)/V(in)')}
+              />
               <button className="x" aria-label={t('Remove {p0}', { p0: tt.expr || t('the signal') })} title={t('Remove')} onClick={() => setTrace(pi, ti, null)}>
                 ✕
               </button>
@@ -530,7 +554,9 @@ function PlotCard({ view, set, remove, picker, preferred }: {
         </fieldset>
       ))}
       <div className="tol-quick">
-        <button onClick={() => setPanes([...panes, { traces: [] }])}>{t('+ Pane for')}{' '}{label(kind)}</button>
+        <button onClick={() => setPanes([...panes, { traces: [] }])}>
+          {t('+ Pane for')} {label(kind)}
+        </button>
       </div>
       <p className="hint">
         {t('It\'s the same view as "Remember view" in the results: it\'s applied on every simulation and saved inside the .asc.')}
@@ -611,7 +637,15 @@ function TemplatePicker({ info, blocks, onInsert }: { info: StudyInfo; blocks: b
   );
 }
 
-export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode, onClose }: {
+export function StudyPanel({
+  initial,
+  info,
+  picker,
+  hidden,
+  onApply,
+  onApplyCode,
+  onClose,
+}: {
   initial: Study;
   info: StudyInfo;
   picker?: Picker;
@@ -665,10 +699,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
     measure: () =>
       set({
         ...st,
-        measures: [
-          ...st.measures,
-          { enabled: true, name: nextName('m'), analysis: info.analysis, kind: info.analysis === 'ac' ? 'f3db' : info.analysis === 'noise' ? 'noise' : 'max', signal: '' },
-        ],
+        measures: [...st.measures, { enabled: true, name: nextName('m'), analysis: info.analysis, kind: info.analysis === 'ac' ? 'f3db' : info.analysis === 'noise' ? 'noise' : 'max', signal: '' }],
       }),
     custom: () => set({ ...st, custom: { mode: 'hooks', body: 'run\n', before: '', after: '', final: '' } }),
     analysis: () => {
@@ -711,20 +742,48 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       const p = parseAnalysis(a.line);
       return a.enabled && p && validateAnalysis(p).length ? [t('Check the data of simulation {p0}', { p0: i + 1 })] : [];
     }),
-    ...st.sweeps.filter((s) => s.enabled && sweepRuns(s) === null).map(() => t('There\'s a sweep with invalid values')),
+    ...st.sweeps.filter((s) => s.enabled && sweepRuns(s) === null).map(() => t("There's a sweep with invalid values")),
     ...st.sweeps.filter((s) => s.target.kind === 'component' && (!s.target.name || s.original === undefined)).map(() => t('Pick the component to sweep')),
     ...st.measures.filter((m) => m.kind !== 'raw' && !m.signal).map((m) => t('The signal of {name} is missing', { name: m.name })),
   ];
   return (
     <Modal title={t('Studio')} onClose={onClose} wide hidden={hidden}>
-      <datalist id="study-components">{info.components.map((c) => <option key={c.name} value={c.name}>{c.value}</option>)}</datalist>
-      <datalist id="study-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="study-params">{info.params.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="sim-nets">{info.nets.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="sim-sources">{info.sources.map((n) => <option key={n} value={n} />)}</datalist>
-      <datalist id="sim-nets-v">{info.nets.map((n) => <option key={n} value={`V(${n})`} />)}</datalist>
+      <datalist id="study-components">
+        {info.components.map((c) => (
+          <option key={c.name} value={c.name}>
+            {c.value}
+          </option>
+        ))}
+      </datalist>
+      <datalist id="study-sources">
+        {info.sources.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="study-params">
+        {info.params.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="sim-nets">
+        {info.nets.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="sim-sources">
+        {info.sources.map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <datalist id="sim-nets-v">
+        {info.nets.map((n) => (
+          <option key={n} value={`V(${n})`} />
+        ))}
+      </datalist>
       <nav className="tabs study-tabs">
-        <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>{t('Cards')}</button>
+        <button className={tab === 'cards' ? 'active' : ''} onClick={() => setTab('cards')}>
+          {t('Cards')}
+        </button>
         <button
           className={tab === 'blocks' ? 'active' : ''}
           onClick={() => {
@@ -747,7 +806,8 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
         </button>
         {tab !== 'blocks' && (
           <span className="hint study-runs">
-            {runs} {t('run')}{runs === 1 ? '' : 's'} {t('in total')}
+            {runs} {t('run')}
+            {runs === 1 ? '' : 's'} {t('in total')}
             {active.length > 0 && t(' · each one runs {p0}', { p0: active.map((a) => `.${kindOf(a.line)}`).join(', ') })}
           </span>
         )}
@@ -767,7 +827,9 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           ))}
           {active.length > 1 && (
             <p className="hint warn">
-              {t('LTspice runs a single analysis per simulation: in the .asc the first active simulation stays as a directive and the others as a comment that LTspice ignores and only TurboSpice runs.')}
+              {t(
+                'LTspice runs a single analysis per simulation: in the .asc the first active simulation stays as a directive and the others as a comment that LTspice ignores and only TurboSpice runs.',
+              )}
             </p>
           )}
           {st.sweeps.map((s, i) => (
@@ -792,12 +854,8 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           ))}
           {st.custom && (
             <Card title={t('Custom step (.control)')} enabled onToggle={(v) => !v && set({ ...st, custom: null })} onRemove={() => set({ ...st, custom: null })}>
-              <Row label={t('How it\'s combined')}>
-                <select
-                  value={st.custom.mode}
-                  aria-label={t('Custom step mode')}
-                  onChange={(e) => set({ ...st, custom: { ...st.custom!, mode: e.target.value as 'full' | 'hooks' } })}
-                >
+              <Row label={t("How it's combined")}>
+                <select value={st.custom.mode} aria-label={t('Custom step mode')} onChange={(e) => set({ ...st, custom: { ...st.custom!, mode: e.target.value as 'full' | 'hooks' } })}>
                   <option value="hooks">{t('With the sweeps: before / after each run and at the end')}</option>
                   <option value="full">{t('Full block: the .control decides what to simulate')}</option>
                 </select>
@@ -835,7 +893,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
                 </div>
               )}
               <p className="hint warn">
-                {t('LTspice has no .control: it\'s saved as a comment that LTspice ignores, so this step only runs in TurboSpice.')}
+                {t("LTspice has no .control: it's saved as a comment that LTspice ignores, so this step only runs in TurboSpice.")}
                 {st.custom.mode === 'full' && (st.sweeps.length || st.tolerance) ? t(' In "full block" mode sweeps and tolerances are ignored.') : ''}
               </p>
             </Card>
@@ -855,15 +913,23 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
           <div className="study-add">
             <button onClick={add.analysis}>{t('+ Simulation')}</button>
             <button onClick={add.sweep}>{t('+ Sweep')}</button>
-            <button onClick={add.tolerance} disabled={!!st.tolerance}>{t('+ Tolerances')}</button>
+            <button onClick={add.tolerance} disabled={!!st.tolerance}>
+              {t('+ Tolerances')}
+            </button>
             <button onClick={add.measure}>{t('+ Measurement')}</button>
-            <button onClick={add.custom} disabled={!!st.custom}>{t('+ Custom step')}</button>
-            <button onClick={add.plot} disabled={plotOpen}>{t('+ Plot')}</button>
+            <button onClick={add.custom} disabled={!!st.custom}>
+              {t('+ Custom step')}
+            </button>
+            <button onClick={add.plot} disabled={plotOpen}>
+              {t('+ Plot')}
+            </button>
           </div>
           <TemplatePicker info={info} blocks={false} onInsert={insertTemplate} />
           {!analyses.length && !st.sweeps.length && !st.tolerance && !st.measures.length && !st.custom && !plotOpen && (
             <p className="empty pad">
-              {t('Add simulations (.tran, .ac…), what to plot, a sweep (vary a component, a source, the temperature…), tolerances (Monte Carlo or worst case) or measurements (rise time, f at −3 dB…). They\'re saved as .step and .meas, so the .asc still simulates the same in LTspice.')}
+              {t(
+                "Add simulations (.tran, .ac…), what to plot, a sweep (vary a component, a source, the temperature…), tolerances (Monte Carlo or worst case) or measurements (rise time, f at −3 dB…). They're saved as .step and .meas, so the .asc still simulates the same in LTspice.",
+              )}
             </p>
           )}
         </div>
@@ -888,7 +954,7 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
                 ? compiled.errors.join(' · ')
                 : compiled.ltspice
                   ? t('Saved as .step and .meas: the .asc still simulates the same in LTspice.')
-                  : t('It uses logic LTspice doesn\'t have: it\'s saved as a .control block (TurboSpice only). The blocks are saved in the .asc.')}
+                  : t("It uses logic LTspice doesn't have: it's saved as a .control block (TurboSpice only). The blocks are saved in the .asc.")}
             </p>
           )}
         </>
@@ -896,23 +962,21 @@ export function StudyPanel({ initial, info, picker, hidden, onApply, onApplyCode
       {tab === 'code' && (
         <div className="study-code">
           <textarea spellCheck={false} rows={14} aria-label={t('Studio code')} value={shownCode} onChange={(e) => setCode(e.target.value)} />
-          <p className="hint">
-            {t('Lines starting with ";" are disabled. You can edit by hand: when applying, what\'s recognized becomes cards again and the rest stays as a directive.')}
-          </p>
+          <p className="hint">{t('Lines starting with ";" are disabled. You can edit by hand: when applying, what\'s recognized becomes cards again and the rest stays as a directive.')}</p>
         </div>
       )}
       {tab === 'cards' && problems.length > 0 && <p className="hint warn">{[...new Set(problems)].join(' · ')}</p>}
       <div className="buttons">
         <button onClick={onClose}>{t('Cancel')}</button>
         {tab === 'code' && code !== null ? (
-          <button className="primary" onClick={() => onApplyCode(code)}>{t('Apply code')}</button>
+          <button className="primary" onClick={() => onApplyCode(code)}>
+            {t('Apply code')}
+          </button>
         ) : tab === 'blocks' ? (
           <button
             className="primary"
             disabled={!compiled || compiled.errors.length > 0}
-            onClick={() =>
-              compiled && onApply(withOriginals({ ...compiled.study, analyses: st.analyses, plot: cleanPlot(compiled.study.plot ?? st.plot), blocks: blocks ?? undefined }))
-            }
+            onClick={() => compiled && onApply(withOriginals({ ...compiled.study, analyses: st.analyses, plot: cleanPlot(compiled.study.plot ?? st.plot), blocks: blocks ?? undefined }))}
           >
             {t('Apply')}
           </button>

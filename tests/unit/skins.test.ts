@@ -11,7 +11,10 @@ describe('skins de transistores (#57)', () => {
     for (const t of TRANSISTORS) {
       expect(skins[t], t).toBeDefined();
       const radii = [...skins[t].body.matchAll(/<circle\b[^>]*\br="([\d.]+)"/g)].map((m) => Number(m[1]));
-      expect(radii.filter((r) => r > 10), t).toEqual([]);
+      expect(
+        radii.filter((r) => r > 10),
+        t,
+      ).toEqual([]);
     }
   });
 

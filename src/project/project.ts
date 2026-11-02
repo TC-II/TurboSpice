@@ -48,8 +48,7 @@ export const nameTaken = (names: string[], name: string) => names.some((n) => n.
 
 const touch = (p: Project): Project => ({ ...p, modified: Date.now() });
 
-export const mapVariant = (p: Project, id: string, f: (v: Variant) => Variant): Project =>
-  touch({ ...p, variants: p.variants.map((v) => (v.id === id ? f(v) : v)) });
+export const mapVariant = (p: Project, id: string, f: (v: Variant) => Variant): Project => touch({ ...p, variants: p.variants.map((v) => (v.id === id ? f(v) : v)) });
 
 const mapSim = (v: Variant, id: string, f: (s: Sim) => Sim): Variant => ({ ...v, sims: v.sims.map((s) => (s.id === id ? f(s) : s)) });
 
@@ -111,14 +110,16 @@ export function cornerSims(p: Project, simId: string, name: string, corner: stri
   const taken = new Set(v.sims.map((x) => x.name));
   const copies = corners
     .filter((c) => c !== corner && !taken.has(named(c)))
-    .map((c): Sim => ({
-      id: newId('s'),
-      name: named(c),
-      asc: serializeAsc(writeData(parseAsc(src.asc), 'pdk', c === 'tt' ? undefined : { corner: c })),
-      ...(src.view ? { view: structuredClone(src.view) } : {}),
-      ...(src.group ? { group: src.group } : {}),
-      runs: [],
-    }));
+    .map(
+      (c): Sim => ({
+        id: newId('s'),
+        name: named(c),
+        asc: serializeAsc(writeData(parseAsc(src.asc), 'pdk', c === 'tt' ? undefined : { corner: c })),
+        ...(src.view ? { view: structuredClone(src.view) } : {}),
+        ...(src.group ? { group: src.group } : {}),
+        runs: [],
+      }),
+    );
   const i = v.sims.indexOf(src);
   const sims = [...v.sims.slice(0, i), { ...src, name: named(corner) }, ...copies, ...v.sims.slice(i + 1)];
   return mapVariant(p, v.id, (x) => ({ ...x, sims }));
@@ -138,18 +139,31 @@ export function removeSim(p: Project, simId: string): Project {
 }
 
 /** Nombre propio (vacío: vuelve al automático) */
-export const renameSim = (p: Project, simId: string, name: string): Project =>
-  name.trim() ? mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, (s) => ({ ...s, name: name.trim() }))) : p;
+export const renameSim = (p: Project, simId: string, name: string): Project => (name.trim() ? mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, (s) => ({ ...s, name: name.trim() }))) : p);
 
 // --- grupos de testbenches (#180) ----------------------------------------------------------------
 
 export function addGroup(p: Project, name: string): { project: Project; id: string } {
   const id = newId('g');
-  return { project: touch({ ...p, groups: [...p.groups, { id, name: uniqueLabel(name, p.groups.map((g) => g.name)) }] }), id };
+  return {
+    project: touch({
+      ...p,
+      groups: [
+        ...p.groups,
+        {
+          id,
+          name: uniqueLabel(
+            name,
+            p.groups.map((g) => g.name),
+          ),
+        },
+      ],
+    }),
+    id,
+  };
 }
 
-export const renameGroup = (p: Project, id: string, name: string): Project =>
-  name.trim() ? touch({ ...p, groups: p.groups.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)) }) : p;
+export const renameGroup = (p: Project, id: string, name: string): Project => (name.trim() ? touch({ ...p, groups: p.groups.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)) }) : p);
 
 /** Saca el grupo: sus testbenches pasan al primero de los que quedan (el último no se saca) */
 export function removeGroup(p: Project, id: string): Project {
@@ -175,8 +189,7 @@ export function withGroups(p: Project): Project {
 }
 
 /** Mueve un testbench a un grupo */
-export const setBenchGroup = (p: Project, simId: string, group?: string): Project =>
-  mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
+export const setBenchGroup = (p: Project, simId: string, group?: string): Project => mapVariant(p, variantOf(p).id, (v) => mapSim(v, simId, ({ group: _, ...s }) => (group ? { ...s, group } : s)));
 
 /**
  * Reordena (#218): pone el testbench en `group`, justo antes de `before` (otro testbench), o al
@@ -216,7 +229,7 @@ export function freeBenchName(p: Project): string {
 export function recordRun(p: Project, simId: string, asc: string, time = Date.now(), summary?: string, files?: Record<string, string>): { project: Project; run: Run } {
   const v = variantOf(p);
   const s = simOf(v, simId);
-  if (!s) throw new Error(t('Simulation {simId} doesn\'t exist', { simId }));
+  if (!s) throw new Error(t("Simulation {simId} doesn't exist", { simId }));
   const last = s.runs[s.runs.length - 1];
   // misma corrida si no cambió el circuito ni los subcircuitos/modelos que usa (#199)
   // (una corrida de antes de guardar archivos no se repite: se le agregan)
@@ -241,7 +254,12 @@ export function cloneVariant(p: Project, id: string, name?: string): { project: 
   const v: Variant = {
     ...structuredClone(src),
     id: newId('v'),
-    name: name ?? uniqueLabel(t('{name} (copy)', { name: src.name }), p.variants.map((x) => x.name)),
+    name:
+      name ??
+      uniqueLabel(
+        t('{name} (copy)', { name: src.name }),
+        p.variants.map((x) => x.name),
+      ),
   };
   // ids nuevos para las simulaciones (los resultados en memoria van por id)
   const ids = new Map(v.sims.map((s) => [s.id, newId('s')]));
@@ -253,7 +271,18 @@ export function cloneVariant(p: Project, id: string, name?: string): { project: 
 
 /** Variante vacía (sin circuito ni simulaciones), al final y activa */
 export function blankVariant(p: Project, name?: string): { project: Project; id: string } {
-  const v: Variant = { id: newId('v'), name: name ?? uniqueLabel(t('Variant 1'), p.variants.map((x) => x.name)), base: EMPTY_ASC, activeSim: '', sims: [] };
+  const v: Variant = {
+    id: newId('v'),
+    name:
+      name ??
+      uniqueLabel(
+        t('Variant 1'),
+        p.variants.map((x) => x.name),
+      ),
+    base: EMPTY_ASC,
+    activeSim: '',
+    sims: [],
+  };
   return { project: touch({ ...p, variants: [...p.variants, v], activeVariant: v.id }), id: v.id };
 }
 
@@ -359,7 +388,10 @@ export async function mergeFiles(files: ProjectFile[], incoming: ProjectFile[], 
       out[i] = f;
       added.push(f.name);
     } else if (choice === 'rename') {
-      const name = uniqueFileName(f.name, out.map((x) => x.name));
+      const name = uniqueFileName(
+        f.name,
+        out.map((x) => x.name),
+      );
       out.push({ ...f, name });
       added.push(name);
     }

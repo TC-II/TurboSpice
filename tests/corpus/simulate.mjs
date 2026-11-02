@@ -77,5 +77,8 @@ for (const root of args) {
 process.stderr.write('\n');
 examples.forEach((e) => console.log('✗', e));
 console.log('\nMotivos más frecuentes:');
-[...reasons].sort((a, b) => b[1] - a[1]).slice(0, 12).forEach(([r, c]) => console.log(`  ${String(c).padStart(4)}  ${r}`));
+[...reasons]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 12)
+  .forEach(([r, c]) => console.log(`  ${String(c).padStart(4)}  ${r}`));
 console.log(`\n${ok}/${n} esquemáticos simulan sin errores en ngspice`);

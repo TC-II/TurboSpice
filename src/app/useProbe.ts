@@ -138,7 +138,7 @@ export function useProbe(d: ProbeDeps) {
       // que usan las trazas se guarda siempre, aparece al volver a simular
       if (saveSelection(sim.built.lt.texts)) {
         addProbed(i, expr);
-        return setMessage(t('{expr} wasn\'t saved (only the selected signals are): it will be when you run again', { expr }));
+        return setMessage(t("{expr} wasn't saved (only the selected signals are): it will be when you run again", { expr }));
       }
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }

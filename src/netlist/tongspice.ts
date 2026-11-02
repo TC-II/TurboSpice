@@ -177,7 +177,7 @@ function expandElement(name: string, letter: string, nodes: string[], value: str
   if (rpar) lines.push(`R__${name}_par ${a} ${b} ${rpar}`);
   if (cpar) lines.push(`C__${name}_par ${a} ${b} ${cpar}`);
   for (const k of order) {
-    if (k.toLowerCase() === 'ipk' || k.toLowerCase() === 'rlshunt') warnings.push(t('{name}: {k} isn\'t supported by ngspice and is ignored', { name, k }));
+    if (k.toLowerCase() === 'ipk' || k.toLowerCase() === 'rlshunt') warnings.push(t("{name}: {k} isn't supported by ngspice and is ignored", { name, k }));
   }
   return lines;
 }
@@ -349,11 +349,7 @@ export function expandStateFunctions(name: string, expr: string, lines: string[]
         // al final de la simulación (si fuera mayor, la fracción dejaría de ser t/delmax), así que
         // delmax = min(tmax, tstop); prepareSimulation define dly_tstop con el tstop del .tran
         const dmax = `min(${tmax ? tmax.replace(/[{}]/g, '') : '1e30'},dly_tstop)`;
-        lines.push(
-          `B__${n}_t ${n}_t 0 V=(${tt})/(${dmax})`,
-          `A__${n} ${n}_in ${n} ${n}_t ${n}_m`,
-          `.model ${n}_m delay(delmin=0 delmax={${dmax}} has_delay_cnt=true)`,
-        );
+        lines.push(`B__${n}_t ${n}_t 0 V=(${tt})/(${dmax})`, `A__${n} ${n}_in ${n} ${n}_t ${n}_m`, `.model ${n}_m delay(delmin=0 delmax={${dmax}} has_delay_cnt=true)`);
         warnings.push(t('{name}: delay() with a variable delay is resolved at the .tran step', { name }));
       }
       rep = `V(${n})`;
@@ -470,7 +466,10 @@ function sinePeriods(lt: LtNetlist): { period: number; delay: number }[] {
     if (!/^[VI]$/i.test(e.prefix)) continue;
     const m = /\bSIN(?:E)?\s*\(([^)]*)\)/i.exec(e.value);
     if (!m) continue;
-    const a = m[1].trim().split(/[\s,]+/).map(parseSpiceNumber);
+    const a = m[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map(parseSpiceNumber);
     const f = a[2];
     if (f > 0 && Number.isFinite(f)) out.push({ period: 1 / f, delay: Number.isFinite(a[3]) ? a[3] : 0 });
   }
@@ -594,7 +593,10 @@ function tranHoldsIc(lt: LtNetlist): boolean {
 function splitIc(line: string, currents: Map<string, string>): string | null {
   if (!/^\.ic\b/i.test(line)) return line;
   const rest: string[] = [];
-  for (const tt of line.slice(3).trim().match(/(?:[^\s=]+\s*=\s*)?\S+/g) ?? []) {
+  for (const tt of line
+    .slice(3)
+    .trim()
+    .match(/(?:[^\s=]+\s*=\s*)?\S+/g) ?? []) {
     const m = /^I\(([^)]+)\)\s*=\s*(\S+)$/i.exec(tt);
     if (m) currents.set(m[1].toLowerCase(), m[2]);
     else rest.push(tt);
@@ -653,7 +655,15 @@ function convertElements(
     const letter = name[0].toUpperCase();
     // compuertas digitales de LTspice (ver digital.ts)
     // una entrada unida a tierra por un bypass (TCLib) está en el nodo 0 en LTspice, que une las redes
-    const gate = letter === 'A' ? translateDigital(name, e.nodes.map((n) => (grounded.has(n) ? '0' : n)), e.value, warnings) : undefined;
+    const gate =
+      letter === 'A'
+        ? translateDigital(
+            name,
+            e.nodes.map((n) => (grounded.has(n) ? '0' : n)),
+            e.value,
+            warnings,
+          )
+        : undefined;
     if (gate) {
       out.push(...gate);
       continue;
@@ -709,7 +719,6 @@ function convertElements(
  * ("no such function 'v'" o malloc enorme). LTspice lo acepta; en ngspice el nodo se llama temp_.
  */
 export const ngNodeName = (net: string): string => (/^(temp|temper)$/i.test(net) ? `${net}_` : busBitNode(net));
-
 
 function renameReservedNodes(lt: LtNetlist): LtNetlist {
   // los bloques jerárquicos también (sus puertos y elementos)
@@ -770,7 +779,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     if (tt.kind === 'directive') for (const l of tt.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
   }
   const holdIc = tranHoldsIc(lt);
-  for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t('.ic I({l})={v}: ngspice uses the inductor\'s initial current only with .tran uic', { l, v }));
+  for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t(".ic I({l})={v}: ngspice uses the inductor's initial current only with .tran uic", { l, v }));
   out.push(...convertElements(lt, used, names, warnings, subcktParams, inductorIcs, hasStartup(lt), holdIc, coupledInductors(lt), missingValues));
   out.push(...capacitorIcs(lt, names, holdIc));
   const implicit = [...lt.implicitModels];
@@ -904,11 +913,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   if (stbLines.length) out.push(...stbBlock(stbLines, lt, names, { ctl: !!ctl, steps: steps.length > 0, run: testbenchAnalysis }, warnings));
 
   // Modelos referenciados que no aparecen definidos en ningún lado
-  const local = new Set(
-    lt.texts
-      .filter((tt) => tt.kind === 'directive')
-      .flatMap((tt) => [...tt.text.matchAll(/(?:^|\\n)\s*\.(?:model|subckt)\s+(\S+)/gi)].map((m) => m[1].toLowerCase())),
-  );
+  const local = new Set(lt.texts.filter((tt) => tt.kind === 'directive').flatMap((tt) => [...tt.text.matchAll(/(?:^|\\n)\s*\.(?:model|subckt)\s+(\S+)/gi)].map((m) => m[1].toLowerCase())));
   // Los de library/cmp (la lista de la que se eligen) se incluyen solos, salvo que el
   // esquemático los defina: como LTspice con su standard.bjt, .dio, .jft y .mos
   if (models.cmpFile) {
@@ -920,7 +925,10 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     }
     // ".model Dz ako: 1N750 (bv=4.3)": el modelo base también puede estar en library/cmp
     for (const tt of lt.texts) {
-      for (const m of tt.text.split('\\n').join('\n').matchAll(/^\s*\.model\s+\S+\s+ako:\s*([^\s(]+)/gim)) {
+      for (const m of tt.text
+        .split('\\n')
+        .join('\n')
+        .matchAll(/^\s*\.model\s+\S+\s+ako:\s*([^\s(]+)/gim)) {
         const rel = !local.has(m[1].toLowerCase()) ? models.cmpFile(m[1]) : undefined;
         if (rel && !includes.includes(rel)) out.push(include(rel)!);
       }
@@ -969,7 +977,20 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   }
 
   out.push('.end');
-  return { text: out.join('\n'), includes, names, blockNames, warnings, missingValues, subcktParams, steps: stepRuns, measures, xyPlots, ...(blocksCtl ? { blocks: true } : {}), ...(pdk ? { pdk } : {}) };
+  return {
+    text: out.join('\n'),
+    includes,
+    names,
+    blockNames,
+    warnings,
+    missingValues,
+    subcktParams,
+    steps: stepRuns,
+    measures,
+    xyPlots,
+    ...(blocksCtl ? { blocks: true } : {}),
+    ...(pdk ? { pdk } : {}),
+  };
 }
 
 /**
@@ -978,7 +999,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
  */
 function stbBlock(lines: string[], lt: LtNetlist, names: Map<string, string>, o: { ctl: boolean; steps: boolean; run: boolean }, warnings: string[]): string[] {
   if (o.ctl || o.steps) {
-    warnings.push(o.ctl ? t('.stb is ignored because the schematic has a .control block') : t('.stb can\'t be combined with .step yet: it is ignored'));
+    warnings.push(o.ctl ? t('.stb is ignored because the schematic has a .control block') : t(".stb can't be combined with .step yet: it is ignored"));
     return [];
   }
   const byName = new Map([...names].map(([k, v]) => [k.toLowerCase().replace(/§/g, ''), v.toLowerCase()]));
@@ -1121,9 +1142,7 @@ function patchSubckts(text: string, subcktParams: Map<string, Map<string, string
   return text.replace(/^([ \t]*\.subckt[ \t]+(\S+)[^\r\n]*)/gim, (header: string, _h: string, name: string) => {
     const wanted = subcktParams.get(name.toLowerCase());
     if (!wanted) return header;
-    const declared = new Set(
-      [...header.matchAll(/(\w+)\s*=/g)].map((m) => m[1].toLowerCase()),
-    );
+    const declared = new Set([...header.matchAll(/(\w+)\s*=/g)].map((m) => m[1].toLowerCase()));
     const missing = [...wanted].filter(([k]) => !declared.has(k));
     if (!missing.length) return header;
     const list = missing.map(([k, v]) => `${k}=${v}`).join(' ');
@@ -1189,7 +1208,7 @@ function bypassGrounded(elements: { name: string; nodes: string[]; value: string
   }
   const seen = new Set<string>(['0']);
   const todo = ['0'];
-  while (todo.length) for (const n of adj.get(todo.pop()!) ?? []) if (!seen.has(n)) (seen.add(n), todo.push(n));
+  while (todo.length) for (const n of adj.get(todo.pop()!) ?? []) if (!seen.has(n)) seen.add(n), todo.push(n);
   seen.delete('0');
   return seen;
 }

@@ -37,17 +37,7 @@ function instance(dev, k) {
 function op(dir, includes, devs) {
   const parts = devs.map((d) => instance(d.dev, d.k));
   const sources = parts.flatMap((p) => p.sources);
-  const net = [
-    'unidades sky130',
-    ...includes,
-    ...parts.flatMap((p) => p.lines),
-    '.control',
-    'op',
-    ...sources.map((s) => `echo "I ${s}" $&i(${s})`),
-    '.endc',
-    '.end',
-    '',
-  ].join('\n');
+  const net = ['unidades sky130', ...includes, ...parts.flatMap((p) => p.lines), '.control', 'op', ...sources.map((s) => `echo "I ${s}" $&i(${s})`), '.endc', '.end', ''].join('\n');
   writeFileSync(join(dir, 'u.cir'), net);
   let log;
   try {
@@ -92,12 +82,20 @@ for (const corner of corners) {
     const t0 = performance.now();
     const got = op(dir, pdkIncludes(index, corner, [d.dev.name], PDK), [d]);
     worstMs = Math.max(worstMs, performance.now() - t0);
-    const bad = got.error
-      ? 'error de ngspice'
-      : Object.keys(got.out).find((s) => Math.abs(got.out[s] - ref.out[s]) > ABS + TOL * Math.abs(ref.out[s]));
+    const bad = got.error ? 'error de ngspice' : Object.keys(got.out).find((s) => Math.abs(got.out[s] - ref.out[s]) > ABS + TOL * Math.abs(ref.out[s]));
     if (bad) {
       failed++;
-      console.log(`MAL ${corner} ${d.dev.name}: ${bad === 'error de ngspice' ? got.log.split('\n').filter((l) => /error/i.test(l)).slice(0, 3).join(' | ') : `${bad} ${got.out[bad]} ≠ ${ref.out[bad]}`}`);
+      console.log(
+        `MAL ${corner} ${d.dev.name}: ${
+          bad === 'error de ngspice'
+            ? got.log
+                .split('\n')
+                .filter((l) => /error/i.test(l))
+                .slice(0, 3)
+                .join(' | ')
+            : `${bad} ${got.out[bad]} ≠ ${ref.out[bad]}`
+        }`,
+      );
     } else ok++;
   }
   console.log(`${corner}: ${ok}/${pool.length} dispositivos iguales a la esquina entera (el más lento, ${worstMs.toFixed(0)} ms)`);

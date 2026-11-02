@@ -75,7 +75,29 @@ export interface RunDeps {
 }
 
 export function runActions(d: RunDeps) {
-  const { engine, lib, ltIndex, liveDoc, pathRef, sims, simsRef, sim, kept, aborting, paneUndo, editor, savesPicking, setSaves, setStatus, setViewRun, setMessage, prevRun, snapshot, editProject, setAutoDrive } = d;
+  const {
+    engine,
+    lib,
+    ltIndex,
+    liveDoc,
+    pathRef,
+    sims,
+    simsRef,
+    sim,
+    kept,
+    aborting,
+    paneUndo,
+    editor,
+    savesPicking,
+    setSaves,
+    setStatus,
+    setViewRun,
+    setMessage,
+    prevRun,
+    snapshot,
+    editProject,
+    setAutoDrive,
+  } = d;
   const { ascName, allTraces, synthStale, withVariants, setOpPoint, expanded, setExpanded, setSim, setHiddenRuns, setPlotName, plotView, panes, setPanes, setStopPlotted, setPanel, setTool } = d;
   /** `unlimited`: «seguir igual» con un transitorio que no entraba, hasta llenar la memoria */
   const run = async ({ unlimited = false }: { unlimited?: boolean } = {}) => {
@@ -141,7 +163,8 @@ export function runActions(d: RunDeps) {
       // .stb: la ganancia de lazo, R (GFT) o T (Tian); con la sonda diferencial, un pane por modo (#333)
       const stbMain = isStbPlot(shown) ? stbMainTraces(shown) : [];
       // vistas guardadas antes de que existieran T y R: la vieja "loopgain" pasa a la de ahora
-      const keptView = remembered && stbMain.length ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: stbMain[0] } : tr)) })) : remembered;
+      const keptView =
+        remembered && stbMain.length ? remembered.map((pn) => ({ ...pn, traces: pn.traces.map((tr) => (/^\s*loopgain\s*$/i.test(tr.expr) ? { ...tr, expr: stbMain[0] } : tr)) })) : remembered;
       // (la vista que se usa tiene que traer alguna traza de este .stb: la de la sonda simple no sirve con la diferencial)
       const fits = (pns: typeof panes) => pns.some((pn) => pn.traces.some((tr) => shown!.vectors.some((v) => v.name === tr.expr.trim().toLowerCase())));
       if (xy.length && shown === xy[xy.length - 1]) setPanes([{ traces: [{ expr: shown.vectors[1].name }] }]);
@@ -159,12 +182,12 @@ export function runActions(d: RunDeps) {
         errs.length && (!result.plots.length || result.sizeStop)
           ? t('{p0} — see the Errors tab', { p0: errs[0] })
           : missing.length
-          ? missing.length === 1
-            ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
-            : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
-          : built.warnings.length
-            ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
-            : undefined,
+            ? missing.length === 1
+              ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })
+              : t("Incomplete simulation: symbols {names} weren't found and were left out of the circuit. The results don't match the schematic.", { names: missing.join(', ') })
+            : built.warnings.length
+              ? t('{p0} — see the Errors tab', { p0: built.warnings.length === 1 ? built.warnings[0] : t('{n} warnings', { n: built.warnings.length }) })
+              : undefined,
       );
       setStopPlotted(false);
       // frenado por memoria: la punta de prueba recién con «Plot up to here» (que lleva al gráfico)

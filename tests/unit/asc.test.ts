@@ -65,9 +65,7 @@ describe('ida y vuelta .asc', () => {
       const def = lib.symbol(s.type)!;
       const t = again.symbols[i];
       expect(Object.fromEntries(effectiveAttrs(t, def))).toEqual(Object.fromEntries(effectiveAttrs(s, def)));
-      expect(Object.fromEntries(effectiveWindows(t, def, lib.windowDefaults))).toEqual(
-        Object.fromEntries(effectiveWindows(s, def, lib.windowDefaults)),
-      );
+      expect(Object.fromEntries(effectiveWindows(t, def, lib.windowDefaults))).toEqual(Object.fromEntries(effectiveWindows(s, def, lib.windowDefaults)));
       // todo explícito: cada instancia lleva sus WINDOW y su Value
       expect(t.attrs.has('Value')).toBe(def.attrs.has('Value') || s.attrs.has('Value'));
       for (const idx of def.windows.keys()) expect(t.windows.has(idx)).toBe(true);

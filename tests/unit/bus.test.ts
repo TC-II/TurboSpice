@@ -104,12 +104,19 @@ SYMATTR InstName U1
     expect(l).toContain('R[0] d[0] 0 1k');
     // en ngspice los bits van como d__1__ (los corchetes son de XSPICE), adentro y afuera
     lib.setProjectFiles(p.files);
-    const ng = toNgspice(ltNetlist(parseAsc(`Version 4
+    const ng = toNgspice(
+      ltNetlist(
+        parseAsc(`Version 4
 SHEET 1 880 680
 FLAG ${x} ${y} x[1:0]
 SYMBOL DUO 0 0 R0
 SYMATTR InstName U1
-`), lib), 't', { resolve: () => undefined }).text;
+`),
+        lib,
+      ),
+      't',
+      { resolve: () => undefined },
+    ).text;
     lib.setProjectFiles([]);
     expect(ng).toMatch(/^\.subckt DUO d__1__ d__0__$/m);
     expect(ng).toMatch(/ x__1__ x__0__ DUO/);
@@ -117,7 +124,9 @@ SYMATTR InstName U1
   });
 
   it('un subcircuito en arreglo va como X_S__1__: con corchetes, sus elementos XSPICE no encuentran el modelo', () => {
-    const ng = toNgspice(ltNetlist(parseAsc(`Version 4
+    const ng = toNgspice(
+      ltNetlist(
+        parseAsc(`Version 4
 SHEET 1 880 680
 FLAG 0 16 a
 FLAG 0 96 b[1:0]
@@ -125,7 +134,12 @@ FLAG -48 32 c
 FLAG -48 80 0
 SYMBOL TCLib\\\\switch 0 0 R0
 SYMATTR InstName S[1:0]
-`), lib), 't', { resolve: () => undefined }).text;
+`),
+        lib,
+      ),
+      't',
+      { resolve: () => undefined },
+    ).text;
     expect(ng).toMatch(/^X_S__1__ a b__1__ c 0 switch/m);
     expect(ng).toMatch(/^X_S__0__ a b__0__ c 0 switch/m);
     expect(ng).not.toMatch(/X_S\[/);

@@ -163,5 +163,9 @@ const subscribe = (l: () => void) => {
 };
 /** Vuelve a dibujar cuando termina de cargar MathJax */
 export function useMathJax(): number {
-  return useSyncExternalStore(subscribe, () => version, () => version);
+  return useSyncExternalStore(
+    subscribe,
+    () => version,
+    () => version,
+  );
 }

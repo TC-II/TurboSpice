@@ -38,7 +38,11 @@ describe('redes entre bloques Verilog, digitales', () => {
     expect(dig).toContain('ab_clk [clk] [clk_d] null hdl_in');
     expect(r.files['project/b.sub']).toContain('ag1 d y_d hdl_inv');
     // los nodos de adentro que desaparecen, para las trazas Dig() de antes
-    expect([...r.aliases]).toEqual([['x1.q_d', 'q'], ['x2.d_d', 'q'], ['x3.d_d', 'q']]);
+    expect([...r.aliases]).toEqual([
+      ['x1.q_d', 'q'],
+      ['x2.d_d', 'q'],
+      ['x3.d_d', 'q'],
+    ]);
   });
 
   it('si la red toca algo más (un elemento, una fuente B, .meas) queda analógica', () => {

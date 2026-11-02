@@ -151,8 +151,14 @@ if (process.env.SHOT) await page.screenshot({ path: process.env.SHOT });
 check((await editing()) === 'DIV', `doble clic en la instancia: se edita DIV adentro (${await editing()})`);
 await showOp();
 const inside = (await annotations()).sort();
-check(['1mA', '2V', '3V'].every((v) => inside.includes(v)), `adentro: el punto de operación de la instancia (${inside.join(', ')})`);
-check(JSON.stringify([...new Set(before)].sort()) === JSON.stringify([...new Set([...top, ...inside].filter((v) => !/^I = /.test(v)))].sort()), 'como subcircuito da la misma simulación (los mismos valores, arriba y adentro)');
+check(
+  ['1mA', '2V', '3V'].every((v) => inside.includes(v)),
+  `adentro: el punto de operación de la instancia (${inside.join(', ')})`,
+);
+check(
+  JSON.stringify([...new Set(before)].sort()) === JSON.stringify([...new Set([...top, ...inside].filter((v) => !/^I = /.test(v)))].sort()),
+  'como subcircuito da la misma simulación (los mismos valores, arriba y adentro)',
+);
 check((await page.locator('.current-arrow').count()) > 0, 'adentro: flechas de corriente en los pines');
 // la punta de prueba mide la corriente de un componente de adentro
 await page.locator('button[aria-label="Medir"]').click();
@@ -175,13 +181,19 @@ await page.keyboard.press('Alt+ArrowUp');
 await frames(page);
 check((await editing()) === '', 'Alt+↑ vuelve al testbench');
 const chips = await page.locator('.trace-chip .name').allTextContents();
-check(chips.some((c) => /^I\(x\w*\.r1\)$/i.test(c)), `la punta de prueba adentro midió la corriente de R1 (${chips.join(', ')})`);
+check(
+  chips.some((c) => /^I\(x\w*\.r1\)$/i.test(c)),
+  `la punta de prueba adentro midió la corriente de R1 (${chips.join(', ')})`,
+);
 check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom');
 
 // --- instancias desactualizadas o sin cablear (#199): X9 quedó con su pin suelto ---
 {
   const w = await page.locator('.project-tree .tree-warn', { hasText: 'X9' }).allTextContents();
-  check(w.length === 1 && /el pin in no está conectado/.test(w[0]) && !(await page.locator('.project-tree .tree-warn', { hasText: 'U1' }).count()), `el panel marca la instancia sin cablear (${w.join(' | ')})`);
+  check(
+    w.length === 1 && /el pin in no está conectado/.test(w[0]) && !(await page.locator('.project-tree .tree-warn', { hasText: 'U1' }).count()),
+    `el panel marca la instancia sin cablear (${w.join(' | ')})`,
+  );
 }
 
 // --- arrastrar el subcircuito desde el panel al esquemático (#199) ---
@@ -204,7 +216,13 @@ check((await svg.getAttribute('viewBox')) === viewTop, 'y al mismo lugar y zoom'
 await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();
 const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }), page.getByRole('button', { name: 'Exportar DIV como .sub' }).click()]);
 const subText = readFileSync(await dl.path(), 'utf8');
-check(dl.suggestedFilename() === 'DIV.sub' && /^\.subckt DIV in\b/m.test(subText) && /^\.ends DIV$/m.test(subText) && /^R1 /m.test(subText), `exportar DIV como .sub (${subText.split('\n').filter((l) => l.startsWith('.subckt')).join(' | ')})`);
+check(
+  dl.suggestedFilename() === 'DIV.sub' && /^\.subckt DIV in\b/m.test(subText) && /^\.ends DIV$/m.test(subText) && /^R1 /m.test(subText),
+  `exportar DIV como .sub (${subText
+    .split('\n')
+    .filter((l) => l.startsWith('.subckt'))
+    .join(' | ')})`,
+);
 
 // --- copiar a Mis símbolos y modelos (#199, #171) ---
 await page.locator('.project-tree .tree-row', { hasText: 'DIV' }).first().hover();

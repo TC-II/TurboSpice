@@ -24,7 +24,11 @@ function* walk(p) {
 }
 
 // Normalización mínima: LTspice no siempre termina con salto de línea y usa \r\n o \n
-const norm = (t) => t.split(/\r\n|\r|\n/).filter((l) => l.trim() !== '').join('\n');
+const norm = (t) =>
+  t
+    .split(/\r\n|\r|\n/)
+    .filter((l) => l.trim() !== '')
+    .join('\n');
 
 let total = 0;
 let exact = 0;

@@ -7,7 +7,31 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GRID, WINDOW_ATTR } from '../asc/model.ts';
 import { Icon, type IconName } from '../ui/icons.tsx';
 import { AlignedText } from '../schematic/SchematicCanvas.tsx';
-import { addPin, addShape, addText, setText, symTexts, type SymText, assignPin, copySym, pasteSym, type SymClip, formatParamList, moveWindow, movePin, removePin, removeShape, resizeBody, setShape, symParams, symPins, symShapes, symWindows, windowShown, type ShapeKind } from './symbolEdit.ts';
+import {
+  addPin,
+  addShape,
+  addText,
+  setText,
+  symTexts,
+  type SymText,
+  assignPin,
+  copySym,
+  pasteSym,
+  type SymClip,
+  formatParamList,
+  moveWindow,
+  movePin,
+  removePin,
+  removeShape,
+  resizeBody,
+  setShape,
+  symParams,
+  symPins,
+  symShapes,
+  symWindows,
+  windowShown,
+  type ShapeKind,
+} from './symbolEdit.ts';
 import { t } from '../i18n/i18n.ts';
 
 type Tool = 'edit' | 'pin' | 'text' | ShapeKind;
@@ -51,7 +75,20 @@ const capture = (e: React.PointerEvent) => {
   }
 };
 
-export function SymbolEditor({ name, text, ports, assign = true, keepAlign = false, params, onChange, onParams, onReset, onPickSymbol, onWidth, onAddPort }: {
+export function SymbolEditor({
+  name,
+  text,
+  ports,
+  assign = true,
+  keepAlign = false,
+  params,
+  onChange,
+  onParams,
+  onReset,
+  onPickSymbol,
+  onWidth,
+  onAddPort,
+}: {
   name: string;
   text: string;
   /** puertos del esquemático (para avisar los que no tienen pin) */
@@ -89,7 +126,7 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
   const [askPin, setAskPin] = useState<(Pt & { name: string }) | null>(null);
   const askInput = useRef<HTMLInputElement>(null);
   /** texto nuevo (sin `line`) o el que se cambia (doble clic), esperando su contenido */
-  const [askText, setAskText] = useState<Omit<SymText, 'line'> & { line?: number } | null>(null);
+  const [askText, setAskText] = useState<(Omit<SymText, 'line'> & { line?: number }) | null>(null);
   const askTextInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!askText) return;
@@ -520,7 +557,11 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
         <button aria-label={t('Undo (Ctrl+Z)')} title={t('Undo (Ctrl+Z)')} disabled={!undo.current.length} onClick={() => back(undo, redo)}>
           <Icon name="undo" size={16} />
         </button>
-        <button aria-label={t('Fit the symbol to the view (wheel: zoom, middle or right button: pan)')} title={t('Fit the symbol to the view (wheel: zoom, middle or right button: pan)')} onClick={fit}>
+        <button
+          aria-label={t('Fit the symbol to the view (wheel: zoom, middle or right button: pan)')}
+          title={t('Fit the symbol to the view (wheel: zoom, middle or right button: pan)')}
+          onClick={fit}
+        >
           <Icon name="fit" size={16} />
         </button>
         <span className="tree-meta">{hint}</span>
@@ -533,9 +574,20 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
             confirmPin();
           }}
         >
-          <input ref={askInput} aria-label={t('Name of the new port')} placeholder={t('Name of the new port')} value={askPin.name} spellCheck={false} onChange={(e) => setAskPin({ ...askPin, name: e.target.value.replace(/\s/g, '') })} />
-          <button type="submit" className="tree-add">{t('Add')}</button>
-          <button type="button" className="tree-add" onClick={() => setAskPin(null)}>{t('Cancel')}</button>
+          <input
+            ref={askInput}
+            aria-label={t('Name of the new port')}
+            placeholder={t('Name of the new port')}
+            value={askPin.name}
+            spellCheck={false}
+            onChange={(e) => setAskPin({ ...askPin, name: e.target.value.replace(/\s/g, '') })}
+          />
+          <button type="submit" className="tree-add">
+            {t('Add')}
+          </button>
+          <button type="button" className="tree-add" onClick={() => setAskPin(null)}>
+            {t('Cancel')}
+          </button>
         </form>
       )}
       {askText && (
@@ -562,11 +614,24 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
               </option>
             ))}
           </select>
-          <button type="submit" className="tree-add">{askText.line === undefined ? t('Add') : t('OK')}</button>
-          <button type="button" className="tree-add" onClick={() => setAskText(null)}>{t('Cancel')}</button>
+          <button type="submit" className="tree-add">
+            {askText.line === undefined ? t('Add') : t('OK')}
+          </button>
+          <button type="button" className="tree-add" onClick={() => setAskText(null)}>
+            {t('Cancel')}
+          </button>
         </form>
       )}
-      <svg ref={svg} className={`sym-canvas${tool === 'edit' ? '' : ' drawing'}`} viewBox={box.join(' ')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onContextMenu={(e) => e.preventDefault()}>
+      <svg
+        ref={svg}
+        className={`sym-canvas${tool === 'edit' ? '' : ' drawing'}`}
+        viewBox={box.join(' ')}
+        onPointerDown={down}
+        onPointerMove={move}
+        onPointerUp={up}
+        onPointerCancel={up}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <defs>
           {/* grilla fina de 1×1 (tenue) y la de 16×16 encima */}
           <pattern id="sym-grid-fine" width={1} height={1} patternUnits="userSpaceOnUse" x={0} y={0}>
@@ -610,7 +675,15 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
                   const x = cx ? Math.max(x1, x2) : Math.min(x1, x2);
                   const y = cy ? Math.max(y1, y2) : Math.min(y1, y2);
                   return (
-                    <rect key={`${cx}${cy}`} className="sym-corner" x={x - 5 * upx} y={y - 5 * upx} width={10 * upx} height={10 * upx} onPointerDown={start({ kind: 'corner', line: selShape.line, cx, cy })}>
+                    <rect
+                      key={`${cx}${cy}`}
+                      className="sym-corner"
+                      x={x - 5 * upx}
+                      y={y - 5 * upx}
+                      width={10 * upx}
+                      height={10 * upx}
+                      onPointerDown={start({ kind: 'corner', line: selShape.line, cx, cy })}
+                    >
                       <title>{t('Resize')}</title>
                     </rect>
                   );
@@ -690,7 +763,20 @@ export function SymbolEditor({ name, text, ports, assign = true, keepAlign = fal
                   <tr key={i}>
                     <td className="tree-meta">{t('Pin {n}', { n: i + 1 })}</td>
                     <td>
-                      <select aria-label={t('Port of pin {n}', { n: i + 1 })} value={p.name} onChange={(e) => onChange(assignPin(text, i, e.target.value, ports.map((n) => ({ name: n }))))}>
+                      <select
+                        aria-label={t('Port of pin {n}', { n: i + 1 })}
+                        value={p.name}
+                        onChange={(e) =>
+                          onChange(
+                            assignPin(
+                              text,
+                              i,
+                              e.target.value,
+                              ports.map((n) => ({ name: n })),
+                            ),
+                          )
+                        }
+                      >
                         {ports.map((n) => (
                           <option key={n} value={n}>
                             {n}
@@ -728,42 +814,61 @@ function ParamsEditor({ params, onChange }: { params: [string, string][]; onChan
       </h4>
       {rows.length ? (
         <>
-        <p className="tree-meta sym-params-help">{t('Name: just the identifier, without braces (e.g. R3). Inside the subcircuit use it between braces in values and expressions: {R3}, {2*R3}. Each instance can override the default value (R3=10k).')}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>{t('Name')}</th>
-              <th>{t('Default value')}</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(([k, v], i) => (
-              <tr key={i}>
-                <td>
-                  <input value={k} aria-label={t('Parameter name')} spellCheck={false} onChange={(e) => setRows(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))} onBlur={() => commit()} />
-                </td>
-                <td>
-                  <input value={v} className={k.trim() && !v.trim() ? 'bad' : undefined} aria-invalid={!!k.trim() && !v.trim()} aria-label={t('Default value of {name}', { name: k })} spellCheck={false} onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))} onBlur={() => commit()} onKeyDown={(e) => e.key === 'Enter' && commit()} />
-                </td>
-                <td>
-                  <button
-                    className="icon-x"
-                    aria-label={t('Remove {name}', { name: k })}
-                    onClick={() => {
-                      const next = rows.filter((_, j) => j !== i);
-                      setRows(next);
-                      commit(next);
-                    }}
-                  >
-                    ×
-                  </button>
-                </td>
+          <p className="tree-meta sym-params-help">
+            {t(
+              'Name: just the identifier, without braces (e.g. R3). Inside the subcircuit use it between braces in values and expressions: {R3}, {2*R3}. Each instance can override the default value (R3=10k).',
+            )}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('Name')}</th>
+                <th>{t('Default value')}</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.some(([k, v]) => k.trim() && !v.trim()) && <p className="tree-warn">{t('A parameter is saved once it has a default value (e.g. 1k)')}</p>}
+            </thead>
+            <tbody>
+              {rows.map(([k, v], i) => (
+                <tr key={i}>
+                  <td>
+                    <input
+                      value={k}
+                      aria-label={t('Parameter name')}
+                      spellCheck={false}
+                      onChange={(e) => setRows(rows.map((r, j) => (j === i ? [e.target.value, r[1]] : r)))}
+                      onBlur={() => commit()}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      value={v}
+                      className={k.trim() && !v.trim() ? 'bad' : undefined}
+                      aria-invalid={!!k.trim() && !v.trim()}
+                      aria-label={t('Default value of {name}', { name: k })}
+                      spellCheck={false}
+                      onChange={(e) => setRows(rows.map((r, j) => (j === i ? [r[0], e.target.value] : r)))}
+                      onBlur={() => commit()}
+                      onKeyDown={(e) => e.key === 'Enter' && commit()}
+                    />
+                  </td>
+                  <td>
+                    <button
+                      className="icon-x"
+                      aria-label={t('Remove {name}', { name: k })}
+                      onClick={() => {
+                        const next = rows.filter((_, j) => j !== i);
+                        setRows(next);
+                        commit(next);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.some(([k, v]) => k.trim() && !v.trim()) && <p className="tree-warn">{t('A parameter is saved once it has a default value (e.g. 1k)')}</p>}
         </>
       ) : (
         <p className="tree-meta">{t('None. Inside the subcircuit they are used as {name} (e.g. a resistor of value {R}); each instance can change them.')}</p>

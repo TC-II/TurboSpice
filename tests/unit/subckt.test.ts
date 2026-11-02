@@ -12,7 +12,20 @@ import { recordRun } from '../../src/project/project.ts';
 import { t } from '../../src/i18n/i18n.ts';
 import { extractSubckt } from '../../src/project/extract.ts';
 import { adoptSymbol, assignPin, symPins } from '../../src/project/symbolEdit.ts';
-import { addSubckt, storeSymbol, benchesUsing, childSubckts, placingCycle, removeSubckt, renameSubckt, storeSubckt, subcktFile, symbolOutdated, updateSymbol, usages } from '../../src/project/subckt.ts';
+import {
+  addSubckt,
+  storeSymbol,
+  benchesUsing,
+  childSubckts,
+  placingCycle,
+  removeSubckt,
+  renameSubckt,
+  storeSubckt,
+  subcktFile,
+  symbolOutdated,
+  updateSymbol,
+  usages,
+} from '../../src/project/subckt.ts';
 import { newProject, parseTurbo, serializeTurbo } from '../../src/project/turbo.ts';
 
 const lib = new Library(buildBundle());
@@ -96,7 +109,9 @@ describe('subcircuitos del proyecto (#180)', () => {
     let p = withSub();
     p = addSubckt(p, 'TOP', tb('BUF'));
     expect(childSubckts(p, subcktFile(p, 'TOP')!.text)).toEqual(['BUF']);
-    const names = usedFiles(p.files, [tb('TOP')]).map((f) => f.name).sort();
+    const names = usedFiles(p.files, [tb('TOP')])
+      .map((f) => f.name)
+      .sort();
     expect(names).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
   });
 });
@@ -216,10 +231,18 @@ describe('exportar e importar subcircuitos (#180)', () => {
     const entries = await readZip(z.bytes);
     expect(entries.map((e) => e.path).sort()).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
     const files = subcktFilesFrom(entries, [], (n, asc) => subcktSymbol(n, parseAsc(asc)));
-    expect(files.filter((f) => f.kind === 'schematic').map((f) => f.name).sort()).toEqual(['BUF.asc', 'TOP.asc']);
+    expect(
+      files
+        .filter((f) => f.kind === 'schematic')
+        .map((f) => f.name)
+        .sort(),
+    ).toEqual(['BUF.asc', 'TOP.asc']);
     // un .asc suelto recibe un símbolo generado
     const loose = subcktFilesFrom([{ path: 'x/AMP.asc', data: new TextEncoder().encode(BUF) }], [], (n, asc) => subcktSymbol(n, parseAsc(asc)));
-    expect(loose.map((f) => [f.name, f.kind])).toEqual([['AMP.asc', 'schematic'], ['AMP.asy', 'symbol']]);
+    expect(loose.map((f) => [f.name, f.kind])).toEqual([
+      ['AMP.asc', 'schematic'],
+      ['AMP.asy', 'symbol'],
+    ]);
   });
 });
 
@@ -234,11 +257,23 @@ describe('edición del símbolo (#180)', () => {
     sym = e.resizeBody(sym, { x1: -64, y1: -32, x2: 64, y2: 48 });
     expect(e.symBody(sym)).toEqual({ x1: -64, y1: -32, x2: 64, y2: 48 });
     // un puerto nuevo (vdd) y uno que se va (out): «in» queda donde estaba
-    sym = e.syncPins(sym, [{ name: 'in', dir: 'In' }, { name: 'vdd', dir: 'In' }]);
-    expect(e.symPins(sym).map((x) => [x.name, x.order])).toEqual([['in', 1], ['vdd', 2]]);
+    sym = e.syncPins(sym, [
+      { name: 'in', dir: 'In' },
+      { name: 'vdd', dir: 'In' },
+    ]);
+    expect(e.symPins(sym).map((x) => [x.name, x.order])).toEqual([
+      ['in', 1],
+      ['vdd', 2],
+    ]);
     expect(e.symPins(sym)[0]).toMatchObject({ x: -48, y: 32 });
-    sym = e.setSymParams(sym, [['G', '2'], ['R', '{1k*G}']]);
-    expect(e.symParams(sym)).toEqual([['G', '2'], ['R', '{1k*G}']]);
+    sym = e.setSymParams(sym, [
+      ['G', '2'],
+      ['R', '{1k*G}'],
+    ]);
+    expect(e.symParams(sym)).toEqual([
+      ['G', '2'],
+      ['R', '{1k*G}'],
+    ]);
     expect(e.setSymParams(sym, [])).not.toMatch(/SpiceLine|WINDOW 39/);
   });
 
@@ -300,7 +335,11 @@ describe('copiar a Mis símbolos y modelos (#199)', () => {
   it('el subcircuito con su símbolo y los que usa adentro', () => {
     let p = withSub();
     p = addSubckt(p, 'TOP', tb('BUF'));
-    expect(subcktFilesFor(p, 'top').map((f) => f.name).sort()).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
+    expect(
+      subcktFilesFor(p, 'top')
+        .map((f) => f.name)
+        .sort(),
+    ).toEqual(['BUF.asc', 'BUF.asy', 'TOP.asc', 'TOP.asy']);
     expect(subcktFilesFor(p, 'nope')).toEqual([]);
   });
 });

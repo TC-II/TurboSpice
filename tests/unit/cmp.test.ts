@@ -19,7 +19,10 @@ describe('archivos de library/cmp', () => {
       const text = decode(new Uint8Array(readFileSync(join(CMP, file)))).text;
       const parts = parseCmp(file, text);
       expect(parts.length, file).toBeGreaterThanOrEqual(2);
-      expect(parts.every((p) => p.kind === kind), file).toBe(true);
+      expect(
+        parts.every((p) => p.kind === kind),
+        file,
+      ).toBe(true);
       expect(lib.parts(kind).map((p) => p.name)).toEqual(parts.map((p) => p.name));
     }
   });
@@ -39,7 +42,12 @@ describe('archivos de library/cmp', () => {
 
 describe('qué lista ve cada símbolo', () => {
   const names = (prefix: string, sym: string) =>
-    cmpChoicesFor(prefix, sym).flatMap((c) => lib.parts(c.kind).filter(c.accept).map((p) => p.name));
+    cmpChoicesFor(prefix, sym).flatMap((c) =>
+      lib
+        .parts(c.kind)
+        .filter(c.accept)
+        .map((p) => p.name),
+    );
   it('por polaridad, canal y tipo de diodo', () => {
     const npn = names('QN', 'npn');
     expect(npn).toContain('BC547C');
@@ -87,7 +95,11 @@ describe('al simular', () => {
     const read = (rel: string) => decode(new Uint8Array(readFileSync(join(CMP, rel.replace(/^cmp\//, ''))))).text;
     const prep = prepareSimulation(ng, read);
     expect(prep.files['cmp/standard.dio']).toMatch(/\.model 1N4148 D\(/);
-    const models = (rel: string) => prep.files[rel].split(/\r?\n/).filter((l) => /^\.model/i.test(l)).join('\n');
+    const models = (rel: string) =>
+      prep.files[rel]
+        .split(/\r?\n/)
+        .filter((l) => /^\.model/i.test(l))
+        .join('\n');
     expect(models('cmp/standard.dio')).not.toMatch(/iave|vpk|mfg|type=/i);
     expect(models('cmp/standard.bjt')).not.toMatch(/vceo|icrating|mfg/i);
   });

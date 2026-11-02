@@ -114,9 +114,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
     ltspiceFile: (m) => (lib.definesModel(m, false) || isPdkDevice(m) || inPdk.has(m.toLowerCase()) ? undefined : lib.ltspiceFileDefining(m)),
     pdkLib,
   });
-  const texts = Object.fromEntries(
-    await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)),
-  );
+  const texts = Object.fromEntries(await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)));
   const prepared = prepareSimulation(ng, (rel) => texts[rel]);
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);

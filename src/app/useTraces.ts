@@ -56,7 +56,7 @@ export function useTraces({ sim, plot, labels, resolver, mode, panes, activePane
       };
       const again = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver: missingOk, mode });
       if (again.errors.size) return again.errors.get(0);
-      setMessage(t('{expr} wasn\'t saved in this simulation: it will be saved when you simulate again', { expr }));
+      setMessage(t("{expr} wasn't saved in this simulation: it will be saved when you simulate again", { expr }));
     }
     const next = addTraceTo(panes, activePane, expr);
     if (next !== panes) editPanes(next);
@@ -66,7 +66,7 @@ export function useTraces({ sim, plot, labels, resolver, mode, panes, activePane
   const reapplyView = () => {
     const v = plot && plotView[plotKind(plot.name)];
     if (v) editPanes(v);
-    else setMessage(t('There\'s no saved view for this analysis (import one with a .plt)'));
+    else setMessage(t("There's no saved view for this analysis (import one with a .plt)"));
   };
   const acceptOfferedView = () => {
     if (offerView) setPlotView({ ...offerView, ...plotView });
@@ -77,7 +77,13 @@ export function useTraces({ sim, plot, labels, resolver, mode, panes, activePane
     if (!Object.keys(v).length) return setMessage(t('The .plt has no views TurboSpice understands'));
     setPlotView({ ...plotView, ...v });
     if (plot && v[plotKind(plot.name)]) setPanes(v[plotKind(plot.name)]);
-    setMessage(t('View imported from the .plt ({p0})', { p0: Object.keys(v).map((k) => `.${k}`).join(', ') }));
+    setMessage(
+      t('View imported from the .plt ({p0})', {
+        p0: Object.keys(v)
+          .map((k) => `.${k}`)
+          .join(', '),
+      }),
+    );
   };
   const exportPlt = () => {
     const v = plot ? { ...plotView, [plotKind(plot.name)]: panes } : plotView;

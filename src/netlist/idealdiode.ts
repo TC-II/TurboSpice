@@ -77,7 +77,7 @@ export function replaceIdealDiodes(text: string, external = new Map<string, Idea
     if (![...p.keys()].some((k) => IDEAL_PARAMS.includes(k))) continue;
     const other = [...p.keys()].filter((k) => !IDEAL_PARAMS.includes(k));
     if (other.length) warnings.push(t('Ideal diode {p0}: parameters ignored ({p1})', { p0: m[1], p1: other.join(', ') }));
-    if (p.has('epsilon') || p.has('revepsilon')) warnings.push(t('Ideal diode {p0}: Epsilon (smooth transition) isn\'t modeled', { p0: m[1] }));
+    if (p.has('epsilon') || p.has('revepsilon')) warnings.push(t("Ideal diode {p0}: Epsilon (smooth transition) isn't modeled", { p0: m[1] }));
     found.set(m[1].toLowerCase(), {
       ron: minR(p.get('ron') ?? '1'),
       // LTspice: sin Roff el diodo apagado conduce sólo Gmin

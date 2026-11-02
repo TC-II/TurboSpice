@@ -13,8 +13,7 @@ const unique = JSON.parse(readFileSync(uniqueFile, 'utf8'));
 // tablas por índice de unique.json ({"12": "..."}) o por texto ({"texto en español": "..."})
 const tables = trFiles.map((f) => JSON.parse(readFileSync(f, 'utf8')));
 const toEn = new Map();
-for (const tab of tables)
-  for (const [k, v] of Object.entries(tab)) toEn.set(/^\d+$/.test(k) ? unique[Number(k)] : k, v);
+for (const tab of tables) for (const [k, v] of Object.entries(tab)) toEn.set(/^\d+$/.test(k) ? unique[Number(k)] : k, v);
 
 const quote = (s) => `'${s.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r')}'`;
 const es = new Map();
@@ -50,10 +49,16 @@ for (const rel of files) {
     const en = at.has(`${rel}:${node.getStart()}`) && toEn.has(text) ? toEn.get(text) : undefined;
     return en === text ? undefined : en;
   };
-  const compared = (n) => ts.isBinaryExpression(n.parent) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken].includes(n.parent.operatorToken.kind);
+  const compared = (n) =>
+    ts.isBinaryExpression(n.parent) && [ts.SyntaxKind.EqualsEqualsEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken, ts.SyntaxKind.EqualsEqualsToken].includes(n.parent.operatorToken.kind);
   const visit = (n) => {
     node = n;
-    if ((ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) && !ts.isImportDeclaration(n.parent) && !ts.isLiteralTypeNode(n.parent) && !(ts.isPropertyAssignment(n.parent) && n.parent.name === n)) {
+    if (
+      (ts.isStringLiteral(n) || ts.isNoSubstitutionTemplateLiteral(n)) &&
+      !ts.isImportDeclaration(n.parent) &&
+      !ts.isLiteralTypeNode(n.parent) &&
+      !(ts.isPropertyAssignment(n.parent) && n.parent.name === n)
+    ) {
       const en = look(n.text);
       if (typeof en === 'string' && en && en !== '!') {
         if (compared(n)) skipped.push(`${rel}: comparación con «${n.text}»`);

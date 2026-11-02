@@ -130,9 +130,7 @@ function nameLetter(def: { attrs: Map<string, string> } | undefined): string {
 }
 
 export function nextInstName(doc: AscDoc, letter: string, lib: Library): string {
-  const used = new Set(
-    doc.symbols.map((s) => (s.attrs.get('InstName') ?? lib.symbol(s.type)?.attrs.get('InstName') ?? '').toUpperCase()),
-  );
+  const used = new Set(doc.symbols.map((s) => (s.attrs.get('InstName') ?? lib.symbol(s.type)?.attrs.get('InstName') ?? '').toUpperCase()));
   for (let i = 1; ; i++) if (!used.has(`${letter}${i}`.toUpperCase())) return `${letter}${i}`;
 }
 
@@ -206,15 +204,22 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   // un pin movido que cae en el medio de un cable lo parte ahí (unión en T)
   const movedPins = [...s].flatMap((i) => pinPoints(base.symbols[i], lib.symbol(base.symbols[i].type)));
   const finish = (wires: Wire[]) =>
-    mergeCollinear({ ...base, wires: movedPins.reduce((ws, p) => splitAt(ws, p), cutThroughBodies(base, wires, lib, (sym, wr) => s.has(sym) || moved.has(wr))) }, lib);
+    mergeCollinear(
+      {
+        ...base,
+        wires: movedPins.reduce(
+          (ws, p) => splitAt(ws, p),
+          cutThroughBodies(base, wires, lib, (sym, wr) => s.has(sym) || moved.has(wr)),
+        ),
+      },
+      lib,
+    );
   if (!drag) return finish(doc.wires.map((wr, i) => (w.has(i) ? moveWire(wr) : wr)));
 
   // Puntos que se mueven: pines y etiquetas seleccionados, extremos de cables seleccionados
   const moving = new Map<string, Point>();
   const stayPins = new Set<string>();
-  doc.symbols.forEach((sym, i) =>
-    pinPoints(sym, lib.symbol(sym.type)).forEach((p) => (s.has(i) ? moving.set(key(p), p) : stayPins.add(key(p)))),
-  );
+  doc.symbols.forEach((sym, i) => pinPoints(sym, lib.symbol(sym.type)).forEach((p) => (s.has(i) ? moving.set(key(p), p) : stayPins.add(key(p)))));
   const stayFlags = new Set<string>();
   doc.flags.forEach((fl, i) => (f.has(i) ? moving.set(key(fl), fl) : stayFlags.add(key(fl))));
   // Un cable seleccionado que se mueve a lo largo de sí mismo, con un extremo en un codo con un
@@ -225,8 +230,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   // por los cables que llegan ahí; en diagonal, el codo se desliza con la parte de costado del
   // movimiento y el cable se estira con la otra.
   const otherSelEnds = (i: number, p: Point) => doc.wires.some((o, j) => j !== i && w.has(j) && ends(o).some((e) => samePt(e, p)));
-  const unselEnd = (p: Point) =>
-    stayPins.has(key(p)) || stayFlags.has(key(p)) || doc.wires.some((o, j) => !w.has(j) && onSegment(p, o));
+  const unselEnd = (p: Point) => stayPins.has(key(p)) || stayFlags.has(key(p)) || doc.wires.some((o, j) => !w.has(j) && onSegment(p, o));
   const pinned = (i: number, p: Point) => unselEnd(p) && !moving.has(key(p)) && !otherSelEnds(i, p);
   const stretchedSel = new Set<number>();
   const slide = new Map<string, Point>();
@@ -254,8 +258,7 @@ export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, 
   for (const p of stayPoints) if (!moving.has(key(p)) && inSelInterior(p)) moving.set(key(p), p);
 
   // Puntos movidos donde queda algo fijo: se unen con un cable nuevo en vez de estirar
-  const passes = (p: Point) =>
-    doc.wires.some((wr, i) => !w.has(i) && onSegment(p, wr) && !ends(wr).some((e) => samePt(e, p)));
+  const passes = (p: Point) => doc.wires.some((wr, i) => !w.has(i) && onSegment(p, wr) && !ends(wr).some((e) => samePt(e, p)));
   const anchored = [...moving.values()].filter((p) => stayPins.has(key(p)) || stayFlags.has(key(p)) || passes(p));
   const anchoredKeys = new Set(anchored.map(key));
   const stretches = (p: Point) => moving.has(key(p)) && !anchoredKeys.has(key(p));
@@ -601,7 +604,11 @@ function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolI
 
 /** Último punto fijo usado por documento resultante: rotar/espejar otra vez lo reutiliza */
 const lastPivot = new WeakMap<AscDoc, { key: string; c: Point }>();
-const refsKey = (refs: ItemRef[]) => refs.map((r) => `${r.kind}${r.index}`).sort().join(' ');
+const refsKey = (refs: ItemRef[]) =>
+  refs
+    .map((r) => `${r.kind}${r.index}`)
+    .sort()
+    .join(' ');
 
 /**
  * Punto fijo para rotar/espejar la selección. Un símbolo solo gira alrededor de su
@@ -626,7 +633,13 @@ export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Poin
       if (!def) pts.push(sym);
       else {
         const b = localBox(def);
-        pts.push(...pinPoints(sym, def), ...[[b.x1, b.y1], [b.x2, b.y2]].map(([x, y]) => toWorld(sym, x, y)));
+        pts.push(
+          ...pinPoints(sym, def),
+          ...[
+            [b.x1, b.y1],
+            [b.x2, b.y2],
+          ].map(([x, y]) => toWorld(sym, x, y)),
+        );
       }
     }
     if (r.kind === 'wire') pts.push(...ends(doc.wires[r.index]));
@@ -645,8 +658,7 @@ export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Poin
 export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
   if (!refs.length) return doc;
   const c = transformPivot(doc, refs, lib);
-  const tp = (p: Point): Point =>
-    op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y };
+  const tp = (p: Point): Point => (op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y });
 
   const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
   const [s, w, f, t, sh] = [sel('symbol'), sel('wire'), sel('flag'), sel('text'), sel('shape')];
@@ -755,7 +767,6 @@ export function setShapeStyle(doc: AscDoc, indices: number[], style: string): As
     }),
   };
 }
-
 
 /** Copia de los elementos seleccionados desplazada (duplicar / pegar) */
 export function duplicateItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, lib: Library): { doc: AscDoc; refs: ItemRef[] } {

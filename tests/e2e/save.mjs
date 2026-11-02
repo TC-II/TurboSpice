@@ -78,7 +78,7 @@ function matches(f, q) {
   for (let i = 0; i < q.length; i++) {
     if (q[i] === '\\' && quoted) cur += q[i] + q[++i];
     else if (q[i] === "'") (quoted = !quoted), (cur += q[i]);
-    else if (!quoted && q.startsWith(' and ', i)) (clauses.push(cur), (cur = ''), (i += 4));
+    else if (!quoted && q.startsWith(' and ', i)) clauses.push(cur), (cur = ''), (i += 4);
     else cur += q[i];
   }
   clauses.push(cur);
@@ -98,10 +98,13 @@ function matches(f, q) {
 function parseMultipart(buf, contentType) {
   const boundary = contentType.match(/boundary=(.+)$/)[1];
   const s = buf.toString('latin1');
-  const parts = s.split(`--${boundary}`).slice(1, -1).map((p) => {
-    const body = p.slice(p.indexOf('\r\n\r\n') + 4, -2);
-    return Buffer.from(body, 'latin1');
-  });
+  const parts = s
+    .split(`--${boundary}`)
+    .slice(1, -1)
+    .map((p) => {
+      const body = p.slice(p.indexOf('\r\n\r\n') + 4, -2);
+      return Buffer.from(body, 'latin1');
+    });
   return { meta: JSON.parse(parts[0].toString('utf8')), data: parts[1] };
 }
 
@@ -171,7 +174,11 @@ async function attachDrive(context, fake) {
       if ((m = path.match(/^\/upload\/drive\/v3\/files(?:\/([^/]+))?$/)) && url.searchParams.get('uploadType') === 'resumable') {
         const key = `up${fake.sessions.size + 1}x${Date.now()}`;
         fake.sessions.set(key, { meta: JSON.parse(req.postData() ?? '{}'), id: m[1] && decodeURIComponent(m[1]) });
-        return route.fulfill({ status: 200, headers: { 'Access-Control-Expose-Headers': 'Location', Location: `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=${key}` }, body: '' });
+        return route.fulfill({
+          status: 200,
+          headers: { 'Access-Control-Expose-Headers': 'Location', Location: `https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&upload_id=${key}` },
+          body: '',
+        });
       }
       if ((m = path.match(/^\/upload\/drive\/v3\/files(?:\/([^/]+))?$/))) {
         const { meta: mm, data } = parseMultipart(req.postDataBuffer(), req.headers()['content-type']);
@@ -234,8 +241,14 @@ async function newPage(context) {
 }
 
 const dirty = async (page) => (await page.locator('.capsule-dirty').count()) > 0;
-const toast = async (page) => ((await page.locator('.status-msg').count()) ? (await page.locator('.status-msg').textContent()) : '');
-const waitToast = (page, re) => page.waitForFunction((src) => new RegExp(src).test(document.querySelector('.status-msg')?.textContent ?? ''), re.source, { timeout: 10000 }).then(() => true, () => false);
+const toast = async (page) => ((await page.locator('.status-msg').count()) ? await page.locator('.status-msg').textContent() : '');
+const waitToast = (page, re) =>
+  page
+    .waitForFunction((src) => new RegExp(src).test(document.querySelector('.status-msg')?.textContent ?? ''), re.source, { timeout: 10000 })
+    .then(
+      () => true,
+      () => false,
+    );
 /** espera a que la app termine lo que estaba haciendo: nada subiendo a Drive (data-drive) y el autoguardado en el navegador terminado */
 const settle = async (page) => {
   await page.waitForFunction(() => document.documentElement.dataset.drive !== 'busy', null, { timeout: 15000 });
@@ -272,7 +285,7 @@ const project = (buf) => {
     return null;
   }
 };
-const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.length ?? 0 : -1);
+const flags = (p) => (p ? (JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.length ?? 0) : -1);
 
 // =============================================================================================
 // 1. Google Drive
@@ -299,7 +312,10 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   check(!!p1 && p1.name === 'Sample Project' && p1.testbenches?.length >= 1, 'Drive: el contenido es un .turbo válido con el proyecto');
   check(f.mimeType === 'application/json' && f.appProperties?.turbospice === '1', 'Drive: subido como JSON marcado de TurboSpice');
   check(!(await dirty(page)), 'Drive: al guardar se quita la marca de cambios');
-  check(fake.tokens.every((t) => /^Bearer tok\d+$/.test(t)), 'Drive: todas las llamadas llevan el token');
+  check(
+    fake.tokens.every((t) => /^Bearer tok\d+$/.test(t)),
+    'Drive: todas las llamadas llevan el token',
+  );
 
   // -- guardar de nuevo: el mismo archivo (PATCH), con el cambio adentro
   const before = flags(p1);
@@ -312,7 +328,13 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   await waitToast(page, /Google Drive/);
   await settle(page);
   const ups = fake.uploads().slice(up0);
-  check((await page.getByRole('dialog').filter({ hasText: /cambió en Google Drive|changed in Google Drive/ }).count()) === 0, 'Drive: el segundo guardado no ve un conflicto que no existe (#176)');
+  check(
+    (await page
+      .getByRole('dialog')
+      .filter({ hasText: /cambió en Google Drive|changed in Google Drive/ })
+      .count()) === 0,
+    'Drive: el segundo guardado no ve un conflicto que no existe (#176)',
+  );
   check(ups.length === 1 && ups[0].method === 'PATCH' && ups[0].path.endsWith(`/${f.id}`), `Drive: el segundo guardado reemplaza el mismo archivo (${ups.map((u) => `${u.method} ${u.path}`)})`);
   check(fake.projects().length === 1, 'Drive: no se duplica el archivo');
   check(flags(project(f.data)) === before + 1, `Drive: el contenido tiene el cambio (tierras ${before} → ${flags(project(f.data))})`);
@@ -367,7 +389,13 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   const up3 = fake.uploads().length;
   await save(page);
   const conflict = page.getByRole('dialog').filter({ hasText: /cambió en Google Drive|changed in Google Drive/ });
-  check(await conflict.waitFor({ timeout: 5000 }).then(() => true, () => false), 'Drive: si el archivo cambió en Drive, pregunta');
+  check(
+    await conflict.waitFor({ timeout: 5000 }).then(
+      () => true,
+      () => false,
+    ),
+    'Drive: si el archivo cambió en Drive, pregunta',
+  );
   check(fake.uploads().length === up3 && f.data === theirs, 'Drive: y no lo pisa');
   await conflict.getByRole('button', { name: /copia|copy/i }).click();
   await waitToast(page, /Google Drive/);
@@ -393,7 +421,10 @@ const flags = (p) => (p ? JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.leng
   page.answers.push('Sample Project', false);
   await saveAs(page);
   await settle(page);
-  check(page.dialogs.some((d) => /^confirm: .*Sample Project\.turbo/.test(d)), `Drive: Guardar como con un nombre existente pregunta si reemplazar (${page.dialogs.slice(-2).join(' / ')})`);
+  check(
+    page.dialogs.some((d) => /^confirm: .*Sample Project\.turbo/.test(d)),
+    `Drive: Guardar como con un nombre existente pregunta si reemplazar (${page.dialogs.slice(-2).join(' / ')})`,
+  );
   check(fake.uploads().length === up4 && fake.projects().length === count, 'Drive: al cancelar, no se sube nada');
   page.answers.push('Sample Project', true);
   await saveAs(page);
@@ -452,7 +483,10 @@ const listed = (d) => d.locator('.drive-open > span:first-child').allTextContent
 /** espera a que termine la acción del diálogo (el «Renombrando…», «Duplicando…») */
 const idle = async (d) => {
   await frames(d.page());
-  await d.page().waitForFunction(() => !document.querySelector('.drive-browser')?.closest('.modal, [role=dialog]')?.querySelector('.buttons .hint'), null, { timeout: 10000 }).catch(() => {});
+  await d
+    .page()
+    .waitForFunction(() => !document.querySelector('.drive-browser')?.closest('.modal, [role=dialog]')?.querySelector('.buttons .hint'), null, { timeout: 10000 })
+    .catch(() => {});
   await frames(d.page());
 };
 const simulate = async (p) => {
@@ -491,7 +525,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await d.getByRole('button', { name: 'Renombrar Sample Project.turbo' }).click();
   await idle(d);
   check(f.name === 'Filtro final.turbo', `Mis simulaciones: renombrar cambia el nombre en Drive (${f.name})`);
-  check((await page.locator('.capsule-project').textContent()) === 'Filtro final', `Mis simulaciones: renombrar el abierto cambia el nombre del proyecto (${await page.locator('.capsule-project').textContent()})`);
+  check(
+    (await page.locator('.capsule-project').textContent()) === 'Filtro final',
+    `Mis simulaciones: renombrar el abierto cambia el nombre del proyecto (${await page.locator('.capsule-project').textContent()})`,
+  );
   page.answers.push('Filtro final');
   await d.getByRole('button', { name: 'Renombrar Sample Project (copia).turbo' }).click();
   await idle(d);
@@ -503,13 +540,19 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await save(page);
   await waitToast(page, /Google Drive/);
   await settle(page);
-  check(fake.uploads().length === ups + 1 && f.name === 'Filtro final.turbo' && project(f.data)?.name === 'Filtro final' && !fake.byName('Sample Project.turbo'), `Mis simulaciones: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`);
+  check(
+    fake.uploads().length === ups + 1 && f.name === 'Filtro final.turbo' && project(f.data)?.name === 'Filtro final' && !fake.byName('Sample Project.turbo'),
+    `Mis simulaciones: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`,
+  );
 
   // -- abrir otro desde la lista
   d = await openMySims(page);
   await d.getByRole('button', { name: /^Sample Project \(copia\) \(2\)\.turbo/ }).click();
   await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Sample Project (copia) (2)', null, { timeout: 10000 }).catch(() => {});
-  check((await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)', `Mis simulaciones: abrir carga ese proyecto (${await page.locator('.capsule-project').textContent()}; ${await toast(page)}; ${page.dialogs.slice(-2)})`);
+  check(
+    (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)',
+    `Mis simulaciones: abrir carga ese proyecto (${await page.locator('.capsule-project').textContent()}; ${await toast(page)}; ${page.dialogs.slice(-2)})`,
+  );
   const opened = fake.byName('Sample Project (copia) (2).turbo');
   const openedRev = opened.rev;
   await edit(page);
@@ -525,7 +568,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await d.getByRole('button', { name: /^Filtro final\.turbo/ }).click();
   await until(() => page.dialogs.at(-1)?.startsWith('confirm:'));
   await frames(page);
-  check((await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'), 'Mis simulaciones: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)');
+  check(
+    (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'),
+    'Mis simulaciones: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)',
+  );
 
   // -- papelera, sobre el abierto: cancelar no borra; aceptar sí
   page.answers.push(false);
@@ -544,7 +590,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await waitToast(page, /Google Drive/);
   await settle(page);
   const again = fake.byName('Sample Project (copia) (2).turbo');
-  check(fake.uploads().length === ups2 + 1 && fake.uploads().at(-1).method === 'POST' && !!again && again.id !== opened.id, 'Mis simulaciones: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)');
+  check(
+    fake.uploads().length === ups2 + 1 && fake.uploads().at(-1).method === 'POST' && !!again && again.id !== opened.id,
+    'Mis simulaciones: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)',
+  );
   check(!page.errors.length, `Mis simulaciones: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
   await context.close();
 }
@@ -580,7 +629,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await waitToast(page, /Google Drive/);
   await settle(page);
   const res2 = fake.log.filter((l) => l.resumable).slice(2);
-  check(res2.length === 2 && res2[0].method === 'PATCH' && res2[0].path.endsWith(`/${f?.id}`) && fake.projects().length === 1, `≥ 5 MB: el segundo guardado reemplaza el mismo archivo por partes (${res2.map((l) => `${l.method} ${l.path}`)})`);
+  check(
+    res2.length === 2 && res2[0].method === 'PATCH' && res2[0].path.endsWith(`/${f?.id}`) && fake.projects().length === 1,
+    `≥ 5 MB: el segundo guardado reemplaza el mismo archivo por partes (${res2.map((l) => `${l.method} ${l.path}`)})`,
+  );
   // abrirlo de nuevo desde Drive, en otra pestaña
   const other = await newPage(context);
   const d = await openMySims(other);
@@ -659,13 +711,15 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await page.locator('svg.editor .sym').first().waitFor();
   // (que termine de restaurar la sesión antes de seguir)
   await settle(page);
-  check(await until(async () => (await page.locator('svg.editor .sym').count()) === syms && (await dirty(page))), `Sin conexión: al recargar se recupera el trabajo sin guardar (${syms} símbolos; ${await toast(page)})`);
+  check(
+    await until(async () => (await page.locator('svg.editor .sym').count()) === syms && (await dirty(page))),
+    `Sin conexión: al recargar se recupera el trabajo sin guardar (${syms} símbolos; ${await toast(page)})`,
+  );
   await save(page);
   check(await waitToast(page, /Google Drive/), `Sin conexión: al volver la conexión, Ctrl+S guarda (${await toast(page)})`);
   check(await until(async () => !(await dirty(page)) && !f.data.equals(before)), 'Sin conexión: y queda guardado');
   await context.close();
 }
-
 
 // -- la sesión se renueva en un gesto, antes de que venza (#192)
 {
@@ -785,7 +839,10 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   d = await disk();
   check((await pickers()).length === 2 && !!d['Otro nombre.turbo'], 'Equipo: Guardar como pregunta de nuevo y escribe el archivo nuevo');
   const shown = await page.locator('.capsule-project').textContent();
-  check(project(Buffer.from(d['Otro nombre.turbo'] ?? ''))?.name === 'Otro nombre' && shown === 'Otro nombre', `Equipo: el proyecto toma el nombre del archivo (archivo: ${project(Buffer.from(d['Otro nombre.turbo'] ?? ''))?.name}, cápsula: ${shown})`);
+  check(
+    project(Buffer.from(d['Otro nombre.turbo'] ?? ''))?.name === 'Otro nombre' && shown === 'Otro nombre',
+    `Equipo: el proyecto toma el nombre del archivo (archivo: ${project(Buffer.from(d['Otro nombre.turbo'] ?? ''))?.name}, cápsula: ${shown})`,
+  );
 
   // cancelar el diálogo: nada cambia y sigue sin guardar
   await page.evaluate(() => {

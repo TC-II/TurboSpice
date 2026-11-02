@@ -82,7 +82,7 @@ export function crossings(xs: ArrayLike<number>, ys: ArrayLike<number | null>, l
     // (un punto justo en el nivel cuenta una vez: como final de un tramo, no como comienzo del siguiente)
     if (a === 0 && k > 1) continue;
     if (a === 0) out.push(xs[k - 1]);
-    else if (b === 0 || (a < 0) !== (b < 0)) out.push(b === 0 ? xs[k] : xs[k - 1] + ((xs[k] - xs[k - 1]) * a) / (a - b));
+    else if (b === 0 || a < 0 !== b < 0) out.push(b === 0 ? xs[k] : xs[k - 1] + ((xs[k] - xs[k - 1]) * a) / (a - b));
   }
   return out;
 }
@@ -94,8 +94,7 @@ export function markerValue(m: Marker, xs: ArrayLike<number>, curves: MarkCurve[
 }
 
 /** Cortes de una línea vertical: el valor de cada curva visible en x */
-export const verticalCuts = (x: number, xs: ArrayLike<number>, curves: MarkCurve[]) =>
-  curves.filter((c) => !c.hidden).map((c) => ({ label: c.label, axis: c.axis, y: valueAt(xs, c.y, x) }));
+export const verticalCuts = (x: number, xs: ArrayLike<number>, curves: MarkCurve[]) => curves.filter((c) => !c.hidden).map((c) => ({ label: c.label, axis: c.axis, y: valueAt(xs, c.y, x) }));
 
 /** Cortes de una línea horizontal: dónde la cruza cada curva visible de su misma escala */
 export const horizontalCuts = (level: number, axis: MarkerAxis, xs: ArrayLike<number>, curves: MarkCurve[], limit = 64) =>

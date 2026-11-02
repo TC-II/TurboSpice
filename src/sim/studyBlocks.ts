@@ -109,7 +109,7 @@ export const PLOT_COLORS: [string, string][] = [
 export function blockDefinitions(): object[] {
   const stmt = { previousStatement: null, nextStatement: null };
   return [
-    { type: 'ts_simulate', message0: t('Simulate the schematic\'s analysis'), colour: COLORS.sim, tooltip: t('Runs the schematic\'s analyses (.tran, .ac…)'), ...stmt },
+    { type: 'ts_simulate', message0: t("Simulate the schematic's analysis"), colour: COLORS.sim, tooltip: t("Runs the schematic's analyses (.tran, .ac…)"), ...stmt },
     {
       type: 'ts_for_list',
       message0: t('For each value %1 of %2 in %3 %4 %5'),
@@ -130,7 +130,15 @@ export function blockDefinitions(): object[] {
       args0: [
         { type: 'field_variable', name: 'VAR', variable: t('value') },
         { type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] },
-        { type: 'field_dropdown', name: 'MODE', options: [[t('linear'), 'lin'], [t('per decade'), 'dec'], [t('per octave'), 'oct']] },
+        {
+          type: 'field_dropdown',
+          name: 'MODE',
+          options: [
+            [t('linear'), 'lin'],
+            [t('per decade'), 'dec'],
+            [t('per octave'), 'oct'],
+          ],
+        },
         { type: 'field_input', name: 'START', text: '1k' },
         { type: 'field_input', name: 'STOP', text: '10k' },
         { type: 'field_input', name: 'STEP', text: '1k' },
@@ -151,7 +159,10 @@ export function blockDefinitions(): object[] {
     {
       type: 'ts_set',
       message0: t('Set %1 to %2'),
-      args0: [{ type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] }, { type: 'input_value', name: 'VALUE' }],
+      args0: [
+        { type: 'field_dropdown', name: 'TARGET', options: [[t('(choose)'), '']] },
+        { type: 'input_value', name: 'VALUE' },
+      ],
       colour: COLORS.circuit,
       tooltip: t('Changes the value of a component, a parameter, a source or the temperature'),
       ...stmt,
@@ -228,7 +239,11 @@ function moreBlockDefinitions(): object[] {
   const inp = (name: string, text = '') => ({ type: 'field_input', name, text });
   const v = (name: string, variable: string) => ({ type: 'field_variable', name, variable });
   const dd = (name: string, options: [string, string][]) => ({ type: 'field_dropdown', name, options });
-  const sweepModes: [string, string][] = [[t('per decade'), 'dec'], [t('per octave'), 'oct'], [t('linear'), 'lin']];
+  const sweepModes: [string, string][] = [
+    [t('per decade'), 'dec'],
+    [t('per octave'), 'oct'],
+    [t('linear'), 'lin'],
+  ];
   return [
     // --- simular
     { type: 'ts_op', message0: t('Run operating point (.op)'), colour: COLORS.sim, tooltip: t('Runs a DC operating point analysis'), ...stmt },
@@ -276,7 +291,13 @@ function moreBlockDefinitions(): object[] {
     {
       type: 'ts_option',
       message0: t('Simulator option %1 = %2'),
-      args0: [dd('NAME', SIM_OPTIONS.map((o): [string, string] => [o, o])), inp('VALUE', '1e-4')],
+      args0: [
+        dd(
+          'NAME',
+          SIM_OPTIONS.map((o): [string, string] => [o, o]),
+        ),
+        inp('VALUE', '1e-4'),
+      ],
       colour: COLORS.sim,
       tooltip: t('Changes a simulator option (reltol, abstol, method…) for the next analyses'),
       ...stmt,
@@ -316,7 +337,15 @@ function moreBlockDefinitions(): object[] {
     {
       type: 'ts_source',
       message0: t('Set %1 of source %2 to %3'),
-      args0: [dd('WHAT', [[t('the DC value'), 'dc'], [t('the AC amplitude'), 'acmag'], [t('the AC phase'), 'acphase']]), dd('SOURCE', [[t('(choose)'), '']]), { type: 'input_value', name: 'VALUE' }],
+      args0: [
+        dd('WHAT', [
+          [t('the DC value'), 'dc'],
+          [t('the AC amplitude'), 'acmag'],
+          [t('the AC phase'), 'acphase'],
+        ]),
+        dd('SOURCE', [[t('(choose)'), '']]),
+        { type: 'input_value', name: 'VALUE' },
+      ],
       colour: COLORS.circuit,
       ...stmt,
     },
@@ -331,7 +360,14 @@ function moreBlockDefinitions(): object[] {
     {
       type: 'ts_random',
       message0: t('random %1 around %2 ± %3 %%'),
-      args0: [dd('DIST', [[t('uniform'), 'uniform'], [t('gaussian'), 'gauss']]), { type: 'input_value', name: 'NOM' }, { type: 'field_number', name: 'TOL', value: 5, min: 0 }],
+      args0: [
+        dd('DIST', [
+          [t('uniform'), 'uniform'],
+          [t('gaussian'), 'gauss'],
+        ]),
+        { type: 'input_value', name: 'NOM' },
+        { type: 'field_number', name: 'TOL', value: 5, min: 0 },
+      ],
       inputsInline: true,
       colour: COLORS.circuit,
       tooltip: t('A different random value every time: uniform within the tolerance, or gaussian with 3σ = the tolerance'),
@@ -495,7 +531,11 @@ export const HIST_PREFIX = 'TS-HIST';
 export const XYL_PREFIX = 'TS-XYL';
 
 /** Señal escrita como en el visor (V(out), I(V1)) → vector de ngspice (v(out), i(v1)) */
-const ngSignal = (s: string) => s.trim().replace(/\bV\(/g, 'v(').replace(/\bI\(([^()]+)\)/g, (_, n: string) => `i(${n.toLowerCase()})`);
+const ngSignal = (s: string) =>
+  s
+    .trim()
+    .replace(/\bV\(/g, 'v(')
+    .replace(/\bI\(([^()]+)\)/g, (_, n: string) => `i(${n.toLowerCase()})`);
 
 const chain = (b: BlockJson | undefined): BlockJson[] => {
   const out: BlockJson[] = [];
@@ -699,7 +739,14 @@ class Compiler {
         return out(['setplot $ts_plot_tran', `let ts_tmp = vecmax(abs(deriv(${sig})))`]);
       case 'gainMargin':
         // donde la fase (continua) cruza −180°, cuánto le falta a la ganancia para 0 dB
-        return out(['setplot $ts_plot_ac', `let ts_ph = cph(${sig})`, 'meas ac ts_f180 when ts_ph=-3.14159265 cross=1', `let ts_gdb = db(${sig})`, 'meas ac ts_g180 find ts_gdb at=$&ts_f180', 'let ts_tmp = -ts_g180']);
+        return out([
+          'setplot $ts_plot_ac',
+          `let ts_ph = cph(${sig})`,
+          'meas ac ts_f180 when ts_ph=-3.14159265 cross=1',
+          `let ts_gdb = db(${sig})`,
+          'meas ac ts_g180 find ts_gdb at=$&ts_f180',
+          'let ts_tmp = -ts_g180',
+        ]);
       default:
         this.errors.push(t('Unsupported block: {type}', { type: field(b, 'KIND') }));
         return [];
@@ -890,7 +937,10 @@ class Compiler {
       }
       // --- mostrar
       case 'ts_table_row': {
-        const cols = field(b, 'COLS').split(/[\s,;]+/).filter(Boolean).map((c) => c.replace(/[^\w]/g, '_'));
+        const cols = field(b, 'COLS')
+          .split(/[\s,;]+/)
+          .filter(Boolean)
+          .map((c) => c.replace(/[^\w]/g, '_'));
         if (!cols.length) {
           this.errors.push(t('Write the variables of "Add a row to the table"'));
           return [];
@@ -921,7 +971,7 @@ class Compiler {
           return [];
         }
         if (this.calling.includes(name)) {
-          this.errors.push(t('A function can\'t call itself: {name}', { name }));
+          this.errors.push(t("A function can't call itself: {name}", { name }));
           return [];
         }
         // ngspice no tiene funciones: se copia el cuerpo; los argumentos son variables

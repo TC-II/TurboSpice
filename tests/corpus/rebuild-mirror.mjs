@@ -13,29 +13,46 @@ const SIB = new Set(['.asy', '.lib', '.sub', '.inc', '.mod', '.cir', '.txt', '.b
 const ANA = /^\.(tran|ac|dc|op|noise|tf)\b/i;
 const jobs = JSON.parse(readFileSync(jobsFile, 'utf8'));
 // raíz del espejo viejo: lo que tienen en común todas las rutas
-const old = jobs.map((j) => j.path).reduce((a, b) => { let i = 0; while (i < a.length && a[i] === b[i]) i++; return a.slice(0, i); });
+const old = jobs
+  .map((j) => j.path)
+  .reduce((a, b) => {
+    let i = 0;
+    while (i < a.length && a[i] === b[i]) i++;
+    return a.slice(0, i);
+  });
 const oldBase = old.slice(0, old.lastIndexOf('mirror') + 'mirror'.length);
 const remap = (p) => join(out, p.slice(oldBase.length));
 
 const copiedDirs = new Set();
-let ok = 0, missing = 0;
+let ok = 0,
+  missing = 0;
 for (const j of jobs.filter((x) => !x.variant)) {
   j.path = remap(j.path);
-  const srcDir = dirname(j.src), dstDir = dirname(j.path);
+  const srcDir = dirname(j.src),
+    dstDir = dirname(j.path);
   mkdirSync(dstDir, { recursive: true });
   if (!copiedDirs.has(srcDir + '>' + dstDir)) {
     copiedDirs.add(srcDir + '>' + dstDir);
     try {
       for (const e of readdirSync(srcDir)) {
         const p = join(srcDir, e);
-        try { if (SIB.has(extname(e).toLowerCase()) && statSync(p).isFile() && statSync(p).size < 2e6) copyFileSync(p, join(dstDir, e)); } catch {}
+        try {
+          if (SIB.has(extname(e).toLowerCase()) && statSync(p).isFile() && statSync(p).size < 2e6) copyFileSync(p, join(dstDir, e));
+        } catch {}
       }
     } catch {}
   }
   // el .asc ya pudo copiarse como hermano (y quedar de sólo lectura, como el original)
   const dst = join(dstDir, basename(j.path));
   if (!existsSync(j.src)) missing++;
-  else { try { copyFileSync(j.src, dst); } catch (e) { if (!existsSync(dst)) throw e; } ok++; }
+  else {
+    try {
+      copyFileSync(j.src, dst);
+    } catch (e) {
+      if (!existsSync(dst)) throw e;
+    }
+    ok++;
+  }
 }
 
 // variantes: la k-ésima activa el k-ésimo análisis comentado y comenta los activos
@@ -44,12 +61,17 @@ for (const v of jobs.filter((x) => x.variant)) {
   const j = base.get(v.src);
   v.path = j.path.replace(/\.asc$/i, `__v${v.variant}.asc`);
   if (!existsSync(j.path)) continue;
-  const buf = readFileSync(j.path), utf16 = buf[1] === 0;
+  const buf = readFileSync(j.path),
+    utf16 = buf[1] === 0;
   const lines = (utf16 ? buf.toString('utf16le') : buf.toString('latin1')).split(/\r?\n/);
-  const textIdx = (pfx) => lines.map((l, i) => [l, i]).filter(([l]) => {
-    const m = /^TEXT\s+\S+\s+\S+\s+\S+\s+\S+\s+([!;])(.*)$/.exec(l);
-    return m && m[1] === pfx && m[2].split('\\n').every((x) => ANA.test(x.trim()) || x.trim() === '') && ANA.test(m[2].trim());
-  }).map(([, i]) => i);
+  const textIdx = (pfx) =>
+    lines
+      .map((l, i) => [l, i])
+      .filter(([l]) => {
+        const m = /^TEXT\s+\S+\s+\S+\s+\S+\s+\S+\s+([!;])(.*)$/.exec(l);
+        return m && m[1] === pfx && m[2].split('\\n').every((x) => ANA.test(x.trim()) || x.trim() === '') && ANA.test(m[2].trim());
+      })
+      .map(([, i]) => i);
   const ci = textIdx(';')[v.variant - 1];
   if (ci === undefined) continue;
   const o = [...lines];

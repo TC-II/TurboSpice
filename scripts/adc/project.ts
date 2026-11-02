@@ -55,10 +55,16 @@ export async function build(): Promise<Project> {
   // los símbolos dibujados a mano (la síntesis los conserva)
   p = { ...p, files: ['FLASHENC', 'MODULATOR', 'DOWNSAMPLER'].map((m) => ({ name: `${m}.asy`, kind: 'symbol' as const, text: read(`${m}.asy`) })) };
   for (const m of ['FLASHENC', 'SARLOGIC', 'MODULATOR', 'DOWNSAMPLER']) p = await withVerilog(p, m);
-  p = { ...p, files: [...p.files, { name: 'COMP.asc', kind: 'schematic', text: read('COMP.asc') }, { name: 'COMP.asy', kind: 'symbol', text: read('COMP.asy') },
-    { name: 'ASW.lib', kind: 'model', module: 'model', text: read('ASW.lib') },
-    { name: 'ASW.asy', kind: 'symbol', text: read('ASW.asy') },
-  ] };
+  p = {
+    ...p,
+    files: [
+      ...p.files,
+      { name: 'COMP.asc', kind: 'schematic', text: read('COMP.asc') },
+      { name: 'COMP.asy', kind: 'symbol', text: read('COMP.asy') },
+      { name: 'ASW.lib', kind: 'model', module: 'model', text: read('ASW.lib') },
+      { name: 'ASW.asy', kind: 'symbol', text: read('ASW.asy') },
+    ],
+  };
   lib.setProjectFiles(p.files);
 
   const groups = ['Flash 3-bit', 'SAR 8-bit', 'Sigma-delta'].map((name) => ({ id: newId('g'), name }));
@@ -68,10 +74,12 @@ export async function build(): Promise<Project> {
     bench(0, 'Ramp: every code', read('flash-ramp.asc'), flashView),
     bench(0, 'Sine 20 kHz', read('flash-sine.asc'), flashView),
     bench(1, 'Comparator', read('sar-comparator.asc'), view([{ traces: ['V(out)'] }], 'dc1')),
-    bench(1, 'Two conversions', read('sar-conversions.asc'), view([
-      { traces: ['V(top)', 'V(vcm)'] },
-      { traces: ['Dig(x2.smp_d)', 'Dig(x2.cmp_d)', { expr: 'Dig(x2.up[7:0])', radix: 'bin' }, 'Dig(x2.data[7:0])', 'Dig(x2.eoc_d)'], digital: true },
-    ])),
+    bench(
+      1,
+      'Two conversions',
+      read('sar-conversions.asc'),
+      view([{ traces: ['V(top)', 'V(vcm)'] }, { traces: ['Dig(x2.smp_d)', 'Dig(x2.cmp_d)', { expr: 'Dig(x2.up[7:0])', radix: 'bin' }, 'Dig(x2.data[7:0])', 'Dig(x2.eoc_d)'], digital: true }]),
+    ),
     bench(1, 'Sine 1 kHz', read('sar-sine.asc'), view([{ traces: ['V(vin)', 'V(dac)'] }, { traces: ['Dig(x2.data[7:0])'], digital: true }])),
     bench(2, 'Sine 250 Hz', read('sigma-delta.asc'), view([{ traces: ['V(vin)', 'V(out)', 'V(int)'] }, { traces: ['Dig(x2.value[6:0])'], digital: true }])),
   ];

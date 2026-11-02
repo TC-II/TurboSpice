@@ -5,7 +5,20 @@ import type { AscDoc } from '../asc/model.ts';
 import { t } from '../i18n/i18n.ts';
 import { PDK_CORNERS } from '../library/pdk.ts';
 import type { BenchItem } from '../project/Hierarchy.tsx';
-import { addGroup, addSim as addProjectSim, cornerSims, duplicateSim as duplicateProjectSim, placeBench, removeGroup, removeSim as removeProjectSim, removeVariant, renameGroup, renameSim as renameProjectSim, setBenchGroup, variantOf } from '../project/project.ts';
+import {
+  addGroup,
+  addSim as addProjectSim,
+  cornerSims,
+  duplicateSim as duplicateProjectSim,
+  placeBench,
+  removeGroup,
+  removeSim as removeProjectSim,
+  removeVariant,
+  renameGroup,
+  renameSim as renameProjectSim,
+  setBenchGroup,
+  variantOf,
+} from '../project/project.ts';
 import { EMPTY_ASC, type Project } from '../project/turbo.ts';
 import { dropResult } from '../schematic/autosave.ts';
 import { setAnalysisLine } from '../schematic/directivesEdit.ts';
@@ -116,8 +129,7 @@ export function benchActions(d: BenchDeps) {
     if (item === 'study') return setTimeout(openStudy, 0);
     if (item !== 'schematic') setTimeout(() => (item === 'sim' ? openSimulation() : setDialog({ kind: 'benchParams' })), 0);
   };
-  const benchAction = (id: string, action: 'duplicate' | 'delete') =>
-    action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id });
+  const benchAction = (id: string, action: 'duplicate' | 'delete') => (action === 'duplicate' ? duplicateSim(id) : sims.items.length > 1 && setDialog({ kind: 'deleteSim', id }));
   const deleteSim = (id: string) => {
     const p0 = leave();
     stacks.current.delete(`${variantOf(p0).id}/${id}`);

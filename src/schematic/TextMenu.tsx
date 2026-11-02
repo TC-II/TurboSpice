@@ -18,7 +18,15 @@ const alignLabel = (a: string) =>
     VBottom: t('Vertical bottom'),
   })[a] ?? a;
 
-export function TextMenu({ at, text, onChange, onEdit, onDialog, onDelete, onClose }: {
+export function TextMenu({
+  at,
+  text,
+  onChange,
+  onEdit,
+  onDialog,
+  onDelete,
+  onClose,
+}: {
   at: { x: number; y: number };
   text: SchText;
   onChange(patch: Partial<SchText>): void;
@@ -65,13 +73,21 @@ export function TextMenu({ at, text, onChange, onEdit, onDialog, onDelete, onClo
         <span>{t('Alignment')}</span>
         <select value={text.align} onChange={(e) => onChange({ align: e.target.value })}>
           {aligns.map((a) => (
-            <option key={a} value={a}>{alignLabel(a)}</option>
+            <option key={a} value={a}>
+              {alignLabel(a)}
+            </option>
           ))}
         </select>
       </label>
-      <button type="button" role="menuitem" onClick={act(onEdit)}>{t('Edit text')}</button>
-      <button type="button" role="menuitem" onClick={act(onDialog)}>{t('Text properties…')}</button>
-      <button type="button" role="menuitem" onClick={act(onDelete)}>{t('Delete')}</button>
+      <button type="button" role="menuitem" onClick={act(onEdit)}>
+        {t('Edit text')}
+      </button>
+      <button type="button" role="menuitem" onClick={act(onDialog)}>
+        {t('Text properties…')}
+      </button>
+      <button type="button" role="menuitem" onClick={act(onDelete)}>
+        {t('Delete')}
+      </button>
     </div>
   );
 }

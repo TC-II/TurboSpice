@@ -55,7 +55,10 @@ export function clipboardActions({ doc, lib, selection, setSelection, setTool, c
   const makesCycle = (types: string[]): boolean => {
     const host = pathRef.current[pathRef.current.length - 1]?.sub;
     const c = host ? placingCycle(projectRef.current, host, types) : null;
-    if (c) setMessage(c.toLowerCase() === host!.toLowerCase() ? t("{name} can't contain itself", { name: c }) : t("{name} can't go inside {host}: {name} already contains {host}", { name: c, host: host! }));
+    if (c)
+      setMessage(
+        c.toLowerCase() === host!.toLowerCase() ? t("{name} can't contain itself", { name: c }) : t("{name} can't go inside {host}: {name} already contains {host}", { name: c, host: host! }),
+      );
     return !!c;
   };
   const paste = async () => {

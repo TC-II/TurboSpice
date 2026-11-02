@@ -137,7 +137,8 @@ export function newProject(name: string, benchName?: string): Project {
  */
 export function asBenches(p: Project): Project {
   const v0 = p.variants[0];
-  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => !s.name || !isDefaultBenchName(s.name)) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups) return p;
+  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => !s.name || !isDefaultBenchName(s.name)) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups)
+    return p;
   const groups = [...(p.groups ?? [])];
   const several = p.variants.length > 1;
   const sims: Sim[] = [];
@@ -368,15 +369,20 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
   const get = (h: unknown): string | null => (typeof h === 'string' ? (ok.get(h) ?? null) : null);
   // archivos de una corrida (#199): los que no verifican se omiten (sólo se pierde el «cambió X»)
   const runFiles = (o: Record<string, unknown>): Record<string, string> =>
-    Object.fromEntries(Object.entries(o).flatMap(([k, h]) => {
-      const text = get(h);
-      return text === null ? [] : [[k, text]];
-    }));
+    Object.fromEntries(
+      Object.entries(o).flatMap(([k, h]) => {
+        const text = get(h);
+        return text === null ? [] : [[k, text]];
+      }),
+    );
 
   const files: ProjectFile[] = migrateVerilog(
     Array.isArray(raw.files)
       ? raw.files
-          .filter((f): f is ProjectFile => isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog'))
+          .filter(
+            (f): f is ProjectFile =>
+              isObj(f) && typeof f.name === 'string' && typeof f.text === 'string' && (f.kind === 'symbol' || f.kind === 'model' || f.kind === 'schematic' || f.kind === 'verilog'),
+          )
           .map((f) => {
             const { module, ...rest } = f;
             const g: ProjectFile = module === 'model' && f.kind === 'model' ? { ...rest, module } : rest;
@@ -413,7 +419,14 @@ export async function parseTurbo(text: string): Promise<ParsedTurbo> {
         asc = [...runs].reverse().find((r) => !r.damaged)?.asc ?? EMPTY_ASC;
         warnings.push(t('{label}: the current circuit is damaged; recovered {p1}', { label, p1: asc === EMPTY_ASC ? t('empty') : t('the one from the last run') }));
       }
-      return { id, ...(name ? { name } : {}), ...(typeof sr.group === 'string' && sr.group ? { group: sr.group } : {}), asc, ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}), runs };
+      return {
+        id,
+        ...(name ? { name } : {}),
+        ...(typeof sr.group === 'string' && sr.group ? { group: sr.group } : {}),
+        asc,
+        ...(isObj(sr.view) && Array.isArray(sr.view.panes) ? { view: sr.view as unknown as SimView } : {}),
+        runs,
+      };
     });
     let base = v2 ? EMPTY_ASC : get(vr.base);
     if (base === null) {

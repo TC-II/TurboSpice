@@ -159,7 +159,10 @@ export function writeSource(spec: SourceSpec): { Value: string; Value2: string |
       wave = `AC ${spec.acMag.trim() || '1'}${spec.acPhase.trim() ? ` ${spec.acPhase.trim()}` : ''}`;
       break;
     case 'pwl': {
-      const pts = spec.points.filter(([a, b]) => a.trim() && b.trim()).map(([a, b]) => `${a.trim()} ${b.trim()}`).join(' ');
+      const pts = spec.points
+        .filter(([a, b]) => a.trim() && b.trim())
+        .map(([a, b]) => `${a.trim()} ${b.trim()}`)
+        .join(' ');
       wave = spec.repeat ? `PWL REPEAT FOREVER (${pts}) ENDREPEAT` : `PWL(${pts})`;
       break;
     }
@@ -211,10 +214,7 @@ export function pulseDuty(ton: number, per: number, tr: number, tf: number): num
 }
 
 /** Recalcula el que no está entre los dos fijos; devuelve los tres (período en segundos) */
-export function solvePulse(
-  fixed: [PulseLinked, PulseLinked],
-  v: { ton: number; per: number; duty: number; tr: number; tf: number },
-): { ton: number; per: number; duty: number } {
+export function solvePulse(fixed: [PulseLinked, PulseLinked], v: { ton: number; per: number; duty: number; tr: number; tf: number }): { ton: number; per: number; duty: number } {
   const ramps = (v.tr + v.tf) / 2;
   const has = (k: PulseLinked) => fixed.includes(k);
   if (has('per') && has('duty')) return { ton: v.duty * v.per - ramps, per: v.per, duty: v.duty };

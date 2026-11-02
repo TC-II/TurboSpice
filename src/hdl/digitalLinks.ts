@@ -60,7 +60,10 @@ function generatedSubckts(files: Record<string, string>): Map<string, GenSubckt>
     const re = /^(\.subckt\s+(\S+)\s+[^\n]*)\n([\s\S]*?)^\.ends\b[^\n]*/gim;
     for (const m of text.matchAll(re)) {
       const header = m[1];
-      const pins = header.split(/\s+/).slice(2).filter((p) => p && !p.includes('='));
+      const pins = header
+        .split(/\s+/)
+        .slice(2)
+        .filter((p) => p && !p.includes('='));
       const body = m[3].split('\n').filter((l) => l.trim());
       const info = new Map<string, PinInfo>();
       for (const pin of pins) {
@@ -95,9 +98,7 @@ function digitalVariant(sub: GenSubckt, pins: Set<string>, name: string): string
     for (const p of list) if (p !== port) buffers.push(`alnk_${p} ${port} ${p} hdl_lnk`);
   }
   const drop = new Set([...pins].map((p) => `ab_${p}`.toLowerCase()));
-  const body = sub.body
-    .filter((l) => !drop.has(l.trim().split(/\s+/)[0].toLowerCase()))
-    .map((l) => l.replace(/[^\s[\]]+/g, (w) => rename.get(w) ?? w));
+  const body = sub.body.filter((l) => !drop.has(l.trim().split(/\s+/)[0].toLowerCase())).map((l) => l.replace(/[^\s[\]]+/g, (w) => rename.get(w) ?? w));
   const header = sub.header.replace(/^(\.subckt\s+)\S+/i, `$1${name}`);
   const model = buffers.length ? ['.model hdl_lnk d_buffer(rise_delay=1e-12 fall_delay=1e-12)'] : [];
   return [`* ${sub.name} with digital pins ${[...pins].join(' ')} (TurboSpice: nets between Verilog blocks)`, header, ...body, ...buffers, ...model, `.ends ${name}`, ''].join('\n');
@@ -110,10 +111,7 @@ const isGround = (n: string) => n === '0' || n.toLowerCase() === 'gnd';
  * y los archivos cambiados, las redes que quedaron digitales (nombres de ngspice, en minúsculas) y
  * los nodos de adentro que desaparecieron ("x1.q_0_d") → su red.
  */
-export function linkDigitalNets(
-  netlist: string,
-  files: Record<string, string>,
-): { netlist: string; files: Record<string, string>; nets: string[]; aliases: Map<string, string> } {
+export function linkDigitalNets(netlist: string, files: Record<string, string>): { netlist: string; files: Record<string, string>; nets: string[]; aliases: Map<string, string> } {
   const aliases = new Map<string, string>();
   const subs = generatedSubckts(files);
   if (!subs.size) return { netlist, files, nets: [], aliases };

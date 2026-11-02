@@ -20,12 +20,7 @@ import { ANALYSIS_LINE } from './analyses.ts';
 import { parseMeas, type MeasAnalysis, type MeasDef } from './meas.ts';
 import { t } from '../i18n/i18n.ts';
 
-export type SweepTarget =
-  | { kind: 'component'; name: string }
-  | { kind: 'param'; name: string }
-  | { kind: 'source'; name: string }
-  | { kind: 'temp' }
-  | { kind: 'model'; model: string; param: string };
+export type SweepTarget = { kind: 'component'; name: string } | { kind: 'param'; name: string } | { kind: 'source'; name: string } | { kind: 'temp' } | { kind: 'model'; model: string; param: string };
 
 export type SweepMode = 'list' | 'lin' | 'dec' | 'oct';
 
@@ -59,24 +54,7 @@ export interface StudyTolerance {
   items: ToleranceItem[];
 }
 
-export type MeasureKind =
-  | 'max'
-  | 'min'
-  | 'pp'
-  | 'avg'
-  | 'rms'
-  | 'at'
-  | 'rise'
-  | 'fall'
-  | 'delay'
-  | 'period'
-  | 'freq'
-  | 'gainAt'
-  | 'f3db'
-  | 'f0db'
-  | 'phaseMargin'
-  | 'noise'
-  | 'raw';
+export type MeasureKind = 'max' | 'min' | 'pp' | 'avg' | 'rms' | 'at' | 'rise' | 'fall' | 'delay' | 'period' | 'freq' | 'gainAt' | 'f3db' | 'f0db' | 'phaseMargin' | 'noise' | 'raw';
 
 export interface StudyMeasure {
   enabled: boolean;
@@ -166,8 +144,7 @@ export const MEASURE_KINDS: { kind: MeasureKind; label: string; analysis: MeasAn
 
 export function stepLine(s: StudySweep): string {
   const tt = s.target;
-  const what =
-    tt.kind === 'component' || tt.kind === 'param' ? `param ${tt.name}` : tt.kind === 'source' ? tt.name : tt.kind === 'temp' ? 'temp' : `${tt.model}(${tt.param})`;
+  const what = tt.kind === 'component' || tt.kind === 'param' ? `param ${tt.name}` : tt.kind === 'source' ? tt.name : tt.kind === 'temp' ? 'temp' : `${tt.model}(${tt.param})`;
   if (s.mode === 'list') return `.step ${what} list ${s.list.trim()}`;
   const mode = s.mode === 'lin' ? '' : `${s.mode} `;
   return `.step ${mode}${what} ${s.start} ${s.stop} ${s.step}`;
@@ -440,7 +417,7 @@ export function studyFromDoc(doc: AscDoc, lib: SymbolSource): Study {
     const list = listMode ? l.value.replace(/^.*\blist\s+/i, '') : '';
     // ".step param run …" de las tolerancias
     if (step.target.kind === 'param' && step.target.name.toLowerCase() === 'run' && items.length) {
-      st.tolerance = { enabled: l.enabled, mode: worst ? 'worst' : 'montecarlo', runs: worst ? String(2 ** items.length) : nums[1] ?? '100', items };
+      st.tolerance = { enabled: l.enabled, mode: worst ? 'worst' : 'montecarlo', runs: worst ? String(2 ** items.length) : (nums[1] ?? '100'), items };
       continue;
     }
     let target: SweepTarget;

@@ -58,16 +58,35 @@ export interface ProjectPanelProps {
 export function ProjectPanel(props: ProjectPanelProps) {
   const { projectRef, editProject, curSub, tool, setDialog } = useSchematic();
   const { project, snapshot, sims, path, curVerilog, curModel, setCurModel, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, go, goSim, openSub } = props;
-  const { benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts } = props;
+  const {
+    benchItem,
+    newGroup,
+    groupAction,
+    renameGroupTo,
+    moveBench,
+    newEmptyBench,
+    renameProject,
+    benchAction,
+    renameBench,
+    newSubckt,
+    newModel,
+    renameModel,
+    renameSub,
+    deleteModel,
+    deleteSub,
+    exportSub,
+    exportSubNetlist,
+    subToUser,
+    subImport,
+    importSubckts,
+  } = props;
   return (
     <>
       {curSub && (
         <div className={`sub-hint${curVerilog ? ' verilog' : ''}`} role="status">
           <strong>{curVerilog ? t('Verilog Editor') : t('Subcircuit Editor')}</strong>
           <span className="sub-hint-name">{curSub}</span>
-          <span className="sub-hint-text">
-            {curVerilog ? t('write the module; its ports are the pins of the symbol') : t('draw the circuit between the ports (net labels with a port, N)')}
-          </span>
+          <span className="sub-hint-text">{curVerilog ? t('write the module; its ports are the pins of the symbol') : t('draw the circuit between the ports (net labels with a port, N)')}</span>
           <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
             {t('Return')}
           </button>
@@ -118,21 +137,21 @@ export function ProjectPanel(props: ProjectPanelProps) {
       )}
       {quickOpen &&
         createPortal(
-        <QuickOpen
-          items={[
-            ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
-            ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
-            ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
-          ]}
-          onPick={(k) => {
-            const id = k.slice(2);
-            if (k.startsWith('m:')) return setCurModel(id);
-            if (k.startsWith('s:')) return openSub(id);
-            if (id !== sims.active) return goSim(id);
-            if (path.length) go([]);
-          }}
-          onClose={() => setQuickOpen(false)}
-        />,
+          <QuickOpen
+            items={[
+              ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
+              ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
+              ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
+            ]}
+            onPick={(k) => {
+              const id = k.slice(2);
+              if (k.startsWith('m:')) return setCurModel(id);
+              if (k.startsWith('s:')) return openSub(id);
+              if (id !== sims.active) return goSim(id);
+              if (path.length) go([]);
+            }}
+            onClose={() => setQuickOpen(false)}
+          />,
           document.body,
         )}
       <input

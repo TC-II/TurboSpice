@@ -35,10 +35,7 @@ const lsSet = (k: string, v: string) => {
 };
 
 const isTyping = (e: KeyboardEvent) =>
-  e.target instanceof HTMLInputElement ||
-  e.target instanceof HTMLTextAreaElement ||
-  e.target instanceof HTMLSelectElement ||
-  (e.target instanceof HTMLElement && e.target.isContentEditable);
+  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement || (e.target instanceof HTMLElement && e.target.isContentEditable);
 
 /**
  * Estado expandido/dividido, recordado entre visitas, con los atajos Ctrl+1 (sólo esquemático),
@@ -116,9 +113,7 @@ export function ResultsSplitter({
     // pestaña en el borde para restaurar la división (mismo tamaño que antes)
     return (
       <div className={`splitter expanded ${expanded}`} role="separator" aria-orientation={side ? 'vertical' : 'horizontal'}>
-        <div className="split-actions">
-          {btn('', expanded === 'schematic' ? t('Show results') : t('Show schematic'), expanded === 'schematic' ? (side ? '◀' : '▲') : side ? '▶' : '▼', '0')}
-        </div>
+        <div className="split-actions">{btn('', expanded === 'schematic' ? t('Show results') : t('Show schematic'), expanded === 'schematic' ? (side ? '◀' : '▲') : side ? '▶' : '▼', '0')}</div>
       </div>
     );
   }
@@ -144,11 +139,7 @@ export function ResultsSplitter({
         el.setPointerCapture(e.pointerId);
         setDragging(true);
         const move = (ev: PointerEvent) =>
-          setSize(() =>
-            side
-              ? Math.min(wrap.width - 240, Math.max(280, wrap.right - (ev.clientX + off)))
-              : Math.min(wrap.height - 120, Math.max(140, wrap.bottom - (ev.clientY + off))),
-          );
+          setSize(() => (side ? Math.min(wrap.width - 240, Math.max(280, wrap.right - (ev.clientX + off))) : Math.min(wrap.height - 120, Math.max(140, wrap.bottom - (ev.clientY + off)))));
         const up = () => {
           window.removeEventListener('pointermove', move);
           window.removeEventListener('pointerup', up);

@@ -23,7 +23,15 @@ export function treeBenchesOf(variant: ReturnType<typeof variantOf>, sims: SimLi
     const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
     const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
     // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
-    return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisDetail(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
+    return {
+      id: x.id,
+      name: x.name || (line ? analysisLabel(line) : t('No analysis')),
+      detail: line ? analysisDetail(line) : t('No analysis'),
+      ...(x.group ? { group: x.group } : {}),
+      runs: x.runs.length,
+      params: benchParams(d),
+      steps: benchVariables(d),
+    };
   });
 }
 
@@ -31,50 +39,54 @@ export function treeBenchesOf(variant: ReturnType<typeof variantOf>, sims: SimLi
 export function treeSubsOf(project: Project, curSub: string, liveDoc: AscDoc, lib: Library, goUsage: (u: Usage, name: string) => void): TreeSub[] {
   const p = curSub ? storeSubckt(project, curSub, ascText(liveDoc)) : storeActive(project, ascText(liveDoc));
   const label = (asc: string, nm?: string) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'));
-  return modules(p).map((f) => {
-    const name = subName(f.name);
-    // un módulo Verilog (#209): sus pines son los de la última síntesis
-    if (f.kind === 'verilog')
+  return modules(p)
+    .map((f) => {
+      const name = subName(f.name);
+      // un módulo Verilog (#209): sus pines son los de la última síntesis
+      if (f.kind === 'verilog')
+        return {
+          name,
+          ports: verilogPorts(f, subcktSymbolText(p, name)).length,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+          type: 'verilog' as const,
+          ...(isStale(f) ? { unsynthesized: true } : {}),
+        };
+      const stale = staleInstances(p, name, lib, label).map((u) => ({
+        label: u.where.label,
+        inst: u.inst,
+        go: () => goUsage(u, name),
+        detail: [
+          ...(u.unconnected.length
+            ? [u.unconnected.length === 1 ? t('pin {pins} not connected', { pins: u.unconnected[0] }) : t('pins {pins} not connected', { pins: u.unconnected.join(', ') })]
+            : []),
+          ...(u.dangling ? [t('a wire ends on the symbol without a pin (was a port removed?)')] : []),
+        ].join('; '),
+      }));
       return {
+        ...(stale.length ? { stale } : {}),
         name,
-        ports: verilogPorts(f, subcktSymbolText(p, name)).length,
-        uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-        children: [],
-        outdated: false,
-        text: false,
-        type: 'verilog' as const,
-        ...(isStale(f) ? { unsynthesized: true } : {}),
-      };
-    const stale = staleInstances(p, name, lib, label).map((u) => ({
-      label: u.where.label,
-      inst: u.inst,
-      go: () => goUsage(u, name),
-      detail: [
-        ...(u.unconnected.length ? [u.unconnected.length === 1 ? t('pin {pins} not connected', { pins: u.unconnected[0] }) : t('pins {pins} not connected', { pins: u.unconnected.join(', ') })] : []),
-        ...(u.dangling ? [t('a wire ends on the symbol without a pin (was a port removed?)')] : []),
-      ].join('; '),
-    }));
-    return {
-      ...(stale.length ? { stale } : {}),
-      name,
-      ports: subcktPorts(parseAsc(f.text)).length,
-      uses: usages(p, name, (asc, nm) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'))).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-      children: childSubckts(p, f.text),
-      outdated: symbolOutdated(p, name),
-      text: false,
-    };
-  }).concat(
-    modelModules(p).map((f): TreeSub => {
-      const name = modelModuleName(f);
-      return {
-        name,
-        type: 'model',
-        ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
-        uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-        children: [],
-        outdated: false,
+        ports: subcktPorts(parseAsc(f.text)).length,
+        uses: usages(p, name, (asc, nm) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'))).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+        children: childSubckts(p, f.text),
+        outdated: symbolOutdated(p, name),
         text: false,
       };
-    }),
-  );
+    })
+    .concat(
+      modelModules(p).map((f): TreeSub => {
+        const name = modelModuleName(f);
+        return {
+          name,
+          type: 'model',
+          ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
+          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
+          children: [],
+          outdated: false,
+          text: false,
+        };
+      }),
+    );
 }

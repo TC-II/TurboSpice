@@ -7,12 +7,17 @@ import { t } from '../i18n/i18n.ts';
 /** Error del nombre propuesto, o null si sirve */
 export function nameError(name: string, taken: string[] = []): string | null {
   const n = name.trim();
-  if (!n) return t('The name can\'t be empty');
-  if (taken.some((tt) => tt.trim().toLowerCase() === n.toLowerCase())) return t('There\'s already one called «{n}»', { n });
+  if (!n) return t("The name can't be empty");
+  if (taken.some((tt) => tt.trim().toLowerCase() === n.toLowerCase())) return t("There's already one called «{n}»", { n });
   return null;
 }
 
-export function NameInput({ value, taken, onDone, label }: {
+export function NameInput({
+  value,
+  taken,
+  onDone,
+  label,
+}: {
   value: string;
   /** nombres de los demás (no se pueden repetir) */
   taken?: string[];
@@ -60,7 +65,14 @@ export function NameInput({ value, taken, onDone, label }: {
 }
 
 /** Texto que con doble clic se vuelve un NameInput */
-export function EditableName({ value, taken, onRename, label, className, title }: {
+export function EditableName({
+  value,
+  taken,
+  onRename,
+  label,
+  className,
+  title,
+}: {
   value: string;
   taken?: string[];
   onRename(name: string): void;

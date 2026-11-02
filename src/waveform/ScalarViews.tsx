@@ -39,17 +39,27 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow, highlightDevice }: 
   }, [plot, sort, filter]);
   const per = Math.ceil(rows.length / cols) || 1;
   // la flechita de orden ocupa siempre su lugar: al ordenar no cambia el ancho de las columnas
-  const arrow = (on: boolean) => <span className="sort-mark" aria-hidden={!on}>{on ? '▾' : ''}</span>;
+  const arrow = (on: boolean) => (
+    <span className="sort-mark" aria-hidden={!on}>
+      {on ? '▾' : ''}
+    </span>
+  );
   const table = (part: typeof rows) => (
     <div className="pz-table">
       <table>
         <thead>
           <tr>
             <th>
-              <button className="sort" onClick={() => setSort('name')}>{t('Name')}{arrow(sort === 'name')}</button>
+              <button className="sort" onClick={() => setSort('name')}>
+                {t('Name')}
+                {arrow(sort === 'name')}
+              </button>
             </th>
             <th className="num">
-              <button className="sort" title={t('Sort by |x|')} onClick={() => setSort('abs')}>{t('Value')}{arrow(sort === 'abs')}</button>
+              <button className="sort" title={t('Sort by |x|')} onClick={() => setSort('abs')}>
+                {t('Value')}
+                {arrow(sort === 'abs')}
+              </button>
             </th>
           </tr>
         </thead>
@@ -68,7 +78,9 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow, highlightDevice }: 
     <div className="result-table" ref={box}>
       <div className="plot-tools">
         <input className="filter" placeholder={t('Filter…')} aria-label={t('Filter')} value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <span className="hint">{rows.length} {t('of')}{' '}{plot.vectors.length}</span>
+        <span className="hint">
+          {rows.length} {t('of')} {plot.vectors.length}
+        </span>
       </div>
       <div className="result-cols">
         {Array.from({ length: Math.min(cols, Math.ceil(rows.length / per) || 1) }, (_, k) => (

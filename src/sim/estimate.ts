@@ -168,10 +168,8 @@ export function countVectors(netlist: string, files: Record<string, string> = {}
   return count(top, new Set(), 0) + 1;
 }
 
-export const fmtBytes = (b: number) =>
-  b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace('.', ',')} GB` : `${Math.round(b / 1024 ** 2)} MB`;
-const fmtCount = (n: number) =>
-  n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',')} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : String(n);
+export const fmtBytes = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1).replace('.', ',')} GB` : `${Math.round(b / 1024 ** 2)} MB`);
+const fmtCount = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1).replace('.', ',')} M` : n >= 1e4 ? `${Math.round(n / 1e3)} k` : String(n));
 
 export interface SizeProblem {
   text: string;
@@ -203,7 +201,11 @@ function fewerPoints(line: string, a: Analysis, factor: number): string | undefi
     // (en dec/oct, más de 1000 puntos no aportan: tampoco se proponen)
     const want = Math.max(1, Math.min(Math.floor(n * factor), a.sweep.type === 'lin' ? Infinity : 1000));
     // un número redondo: 10, 20, 50, 100, 200, 500…
-    const round = [1, 2, 5].flatMap((m) => [0, 1, 2, 3, 4, 5, 6].map((e) => m * 10 ** e)).filter((x) => x <= want).sort((x, y) => y - x)[0] ?? 1;
+    const round =
+      [1, 2, 5]
+        .flatMap((m) => [0, 1, 2, 3, 4, 5, 6].map((e) => m * 10 ** e))
+        .filter((x) => x <= want)
+        .sort((x, y) => y - x)[0] ?? 1;
     tt[i + 1] = String(round);
     return tt.join(' ');
   }
@@ -246,15 +248,22 @@ export function measuredSizeProblem(line: string, m: MeasuredSize, maxBytes = MA
   const fit = signalsThatFit(m.projected, maxBytes);
   const pct = m.percent < 10 ? m.percent.toFixed(1).replace(/\.0$/, '').replace('.', ',') : Math.round(m.percent);
   const text = m.full
-    ? t('Stopped at {pct}% of the time: the results of «{line}» filled the memory ({size}). The plots show what was simulated up to there.', { pct, line, size: fmtBytes((m.points ?? m.projected) * m.vectors * 8) })
-    : t('Stopped at {pct}% of the time: at this rate «{line}» would save ≈ {points} points × {vectors} signals ≈ {size}, more than the browser can hold ({max}). The plots show what was simulated up to there.', {
+    ? t('Stopped at {pct}% of the time: the results of «{line}» filled the memory ({size}). The plots show what was simulated up to there.', {
         pct,
         line,
-        points: fmtCount(m.projected),
-        vectors: m.vectors,
-        size: fmtBytes(bytes),
-        max: fmtBytes(maxBytes),
-      });
+        size: fmtBytes((m.points ?? m.projected) * m.vectors * 8),
+      })
+    : t(
+        'Stopped at {pct}% of the time: at this rate «{line}» would save ≈ {points} points × {vectors} signals ≈ {size}, more than the browser can hold ({max}). The plots show what was simulated up to there.',
+        {
+          pct,
+          line,
+          points: fmtCount(m.projected),
+          vectors: m.vectors,
+          size: fmtBytes(bytes),
+          max: fmtBytes(maxBytes),
+        },
+      );
   // guardar sólo el final: la parte que entra con estas mismas señales (con margen)
   const a = parseAnalysis(line);
   let fix: SizeProblem['fix'];
@@ -288,7 +297,11 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     if (!Number.isFinite(points)) continue;
     if ('sweep' in a && a.sweep.type !== 'lin' && parseSpiceNumber(a.sweep.points) > MAX_PER_DECADE * (a.sweep.type === 'oct' ? 0.3 : 1)) {
       out.warnings.push({
-        text: t('{line}: {p1} points per {p2} hardly ever add resolution (100 to 1000 is enough)', { line, p1: fmtCount(parseSpiceNumber(a.sweep.points)), p2: a.sweep.type === 'dec' ? t('decade') : t('octave') }),
+        text: t('{line}: {p1} points per {p2} hardly ever add resolution (100 to 1000 is enough)', {
+          line,
+          p1: fmtCount(parseSpiceNumber(a.sweep.points)),
+          p2: a.sweep.type === 'dec' ? t('decade') : t('octave'),
+        }),
       });
     }
     vectors ??= countVectors(netlist, files);
@@ -303,7 +316,7 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
         : t('≈ {p0}: too many points to simulate and plot in a reasonable time', { p0: fmtBytes(bytes) });
     out.errors.push({
       text:
-        t('{line} produces {p1} points × {vectors} vectors{per} {why}, so it isn\'t simulated.', { line, p1: fmtCount(points), vectors, per, why }) +
+        t("{line} produces {p1} points × {vectors} vectors{per} {why}, so it isn't simulated.", { line, p1: fmtCount(points), vectors, per, why }) +
         (to ? t(' Try «{to}».', { to }) : t(' Lower the number of points.')) +
         (savedVectors === undefined ? t(' Or save only some signals (Simulate › Saved signals…).') : ''),
       fix: to ? { from: line, to } : undefined,

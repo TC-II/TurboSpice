@@ -39,13 +39,32 @@ describe('leer el valor de una fuente', () => {
   });
 
   it('PWL entre paréntesis, sin paréntesis y repetido', () => {
-    expect(read('PWL(0 0 1m 1 2m 0)')?.points).toEqual([['0', '0'], ['1m', '1'], ['2m', '0']]);
-    expect(read('PWL 0 0 1n 1m 10n 1m 11n 0')?.points).toEqual([['0', '0'], ['1n', '1m'], ['10n', '1m'], ['11n', '0']]);
-    expect(read('PWL REPEAT FOREVER (0 0 1m 1) ENDREPEAT')).toMatchObject({ kind: 'pwl', repeat: true, points: [['0', '0'], ['1m', '1']] });
+    expect(read('PWL(0 0 1m 1 2m 0)')?.points).toEqual([
+      ['0', '0'],
+      ['1m', '1'],
+      ['2m', '0'],
+    ]);
+    expect(read('PWL 0 0 1n 1m 10n 1m 11n 0')?.points).toEqual([
+      ['0', '0'],
+      ['1n', '1m'],
+      ['10n', '1m'],
+      ['11n', '0'],
+    ]);
+    expect(read('PWL REPEAT FOREVER (0 0 1m 1) ENDREPEAT')).toMatchObject({
+      kind: 'pwl',
+      repeat: true,
+      points: [
+        ['0', '0'],
+        ['1m', '1'],
+      ],
+    });
   });
 
   it('parásitos de SpiceLine y la bandera load', () => {
-    expect(read('SINE(0 1 1k)', undefined, 'Rser=1 Cpar=1n')?.params).toEqual([['Rser', '1'], ['Cpar', '1n']]);
+    expect(read('SINE(0 1 1k)', undefined, 'Rser=1 Cpar=1n')?.params).toEqual([
+      ['Rser', '1'],
+      ['Cpar', '1n'],
+    ]);
     expect(read('1m', undefined, 'load')?.params).toEqual([['load', null]]);
   });
 
@@ -75,7 +94,14 @@ describe('escribir con la sintaxis de LTspice', () => {
   it('DC para .op junto con una forma de onda, y PWL repetido', () => {
     expect(writeSource({ ...emptySource('sine'), args: ['0', '1', '1k'], dc: '2' }).Value).toBe('DC 2 SINE(0 1 1k)');
     expect(read('DC 2 SINE(0 1 1k)')).toMatchObject({ kind: 'sine', dc: '2' });
-    const p = writeSource({ ...emptySource('pwl'), points: [['0', '0'], ['1m', '1']], repeat: true }).Value;
+    const p = writeSource({
+      ...emptySource('pwl'),
+      points: [
+        ['0', '0'],
+        ['1m', '1'],
+      ],
+      repeat: true,
+    }).Value;
     expect(p).toBe('PWL REPEAT FOREVER (0 0 1m 1) ENDREPEAT');
     expect(read(p)).toMatchObject({ repeat: true });
   });
@@ -156,7 +182,11 @@ describe('traducción a ngspice e importación de puntos', () => {
   });
 
   it('CSV: tiempo y valor por línea; se saltan encabezados y líneas vacías', () => {
-    expect(csvPoints('t,v\n0,0\n1m;1\n\n2e-3\t0.5\nfin')).toEqual([['0', '0'], ['1m', '1'], ['2e-3', '0.5']]);
+    expect(csvPoints('t,v\n0,0\n1m;1\n\n2e-3\t0.5\nfin')).toEqual([
+      ['0', '0'],
+      ['1m', '1'],
+      ['2e-3', '0.5'],
+    ]);
   });
 });
 

@@ -159,7 +159,15 @@ export function navigation(d: NavigationDeps) {
     const up = (node: string) => (node === '0' ? '0' : (parent?.ports.get(node.toLowerCase()) ?? `${parent?.prefix ?? ''}${node}`));
     const ports = new Map<string, string>();
     el?.pinNames.forEach((pn, i) => pn && ports.set(pn.toLowerCase(), up(el.nodes[i])));
-    go([...pathRef.current, { sub: subName(f.name), inst: s.attrs.get('InstName') ?? el?.name ?? '?', prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`, ports: parent && !parent.inst ? new Map() : ports }]);
+    go([
+      ...pathRef.current,
+      {
+        sub: subName(f.name),
+        inst: s.attrs.get('InstName') ?? el?.name ?? '?',
+        prefix: parent && !parent.inst ? '' : `${parent?.prefix ?? ''}${ng}.`,
+        ports: parent && !parent.inst ? new Map() : ports,
+      },
+    ]);
     return true;
   };
   /** Ir a una instancia de un subcircuito (desde «usado en») */

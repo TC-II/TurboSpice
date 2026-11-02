@@ -13,7 +13,13 @@ const sim = {
       { name: 'R1', prefix: 'R', sym: 2 },
     ],
   },
-  ng: { names: new Map([['M1', 'm1'], ['Q1', 'q1'], ['R1', 'r1']]) },
+  ng: {
+    names: new Map([
+      ['M1', 'm1'],
+      ['Q1', 'q1'],
+      ['R1', 'r1'],
+    ]),
+  },
 } as unknown as BuiltSimulation;
 
 const vec = (name: string, v: number) => ({ name, type: 0, real: Float64Array.of(v, v) });

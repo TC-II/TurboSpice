@@ -38,7 +38,27 @@ export interface ToolActions {
   deleteSelection(): void;
 }
 
-export function buildToolGroups({ google, history, tool, setTool, curSub, shapeItems, editor, showGrid, setShowGrid, netHover, setNetHover, setDialog, doNew, doSave, doExport, doOpen, startMove, rotateOrMirror, deleteSelection }: ToolActions): ToolGroup[] {
+export function buildToolGroups({
+  google,
+  history,
+  tool,
+  setTool,
+  curSub,
+  shapeItems,
+  editor,
+  showGrid,
+  setShowGrid,
+  netHover,
+  setNetHover,
+  setDialog,
+  doNew,
+  doSave,
+  doExport,
+  doOpen,
+  startMove,
+  rotateOrMirror,
+  deleteSelection,
+}: ToolActions): ToolGroup[] {
   const toolGroups: ToolGroup[] = [
     {
       id: 'file',
@@ -136,9 +156,21 @@ export function buildResultsItems({ sim, project, panel, setPanel, plot, plotPan
             { label: t('Import .plt view…'), shortcut: 'O', onClick: () => pltInput.current?.click() },
             'sep',
             { label: 'Netlist .cir (ngspice)', onClick: () => download(`${exportBase()}.cir`, new Blob([sim.built.netlist], { type: 'text/plain' })) },
-            { label: 'Netlist .net (LTspice)', onClick: () => download(`${exportBase()}.net`, new Blob([`* ${ascName()}
+            {
+              label: 'Netlist .net (LTspice)',
+              onClick: () =>
+                download(
+                  `${exportBase()}.net`,
+                  new Blob(
+                    [
+                      `* ${ascName()}
 ${ltNetlistText(sim.built.lt)}
-`], { type: 'text/plain' })) },
+`,
+                    ],
+                    { type: 'text/plain' },
+                  ),
+                ),
+            },
           ],
         },
         'sep',

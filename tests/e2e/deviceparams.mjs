@@ -37,12 +37,18 @@ await page.locator('svg.editor .sym').first().waitFor();
 await simulate();
 
 const options = await page.locator('#trace-names option').evaluateAll((os) => os.map((o) => o.value));
-check(['@Q1[gm]', '@Q1[gpi]', '@Q1[cpi]', '@Q1[vbe]'].every((o) => options.includes(o)), 'la caja de trazas ofrece los parámetros de Q1');
+check(
+  ['@Q1[gm]', '@Q1[gpi]', '@Q1[cpi]', '@Q1[vbe]'].every((o) => options.includes(o)),
+  'la caja de trazas ofrece los parámetros de Q1',
+);
 
 await add('@Q1[gm]');
 check((await names()).includes('@Q1[gm]'), `@Q1[gm] se agrega aunque no esté guardado (${await names()})`);
 const msg = await page.locator('.message, .status-msg, [role=status]').allTextContents();
-check(msg.some((m) => /no se guardó en esta simulación/.test(m)), `avisa que se guarda al simular de nuevo (${msg.join(' | ')})`);
+check(
+  msg.some((m) => /no se guardó en esta simulación/.test(m)),
+  `avisa que se guarda al simular de nuevo (${msg.join(' | ')})`,
+);
 await add('Ic(Q1)');
 await simulate();
 check((await names()).join() === '@Q1[gm],Ic(Q1)', `trazas: ${await names()}`);

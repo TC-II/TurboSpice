@@ -77,7 +77,7 @@ X1 d g q t lat
       if (at('t', 50e-9) < 2.5) return 't no arranca en 1';
       if (at('t', 150e-9) > 2.5) return 't no cambia en el primer flanco de g';
       // con g alto q sigue a d; con g bajo retiene
-      if ((at('q', 115e-9) > 2.5) !== (at('d', 113e-9) > 2.5)) return 'q no sigue a d con g alto';
+      if (at('q', 115e-9) > 2.5 !== at('d', 113e-9) > 2.5) return 'q no sigue a d con g alto';
     },
   },
   {
@@ -126,7 +126,7 @@ X1 a y one zero top
     check: (at, block) => {
       if (block.name !== 'top') return `módulo ${block.name}`;
       if (at('one', 50e-9) < 4.9 || at('zero', 50e-9) > 0.1) return 'constantes mal';
-      if ((at('y', 30e-9) > 2.5) === (at('a', 28e-9) > 2.5)) return 'y no es ~a';
+      if (at('y', 30e-9) > 2.5 === at('a', 28e-9) > 2.5) return 'y no es ~a';
     },
   },
   {

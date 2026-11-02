@@ -197,8 +197,14 @@ SYMATTR Value V=delay(V(in),V(td))
     // delmax = min(tmax, tstop): ngspice lo recorta al final de la simulación (#131)
     expect(v.text).toMatch(/^\.model B1__delay0_m delay\(delmin=0 delmax=\{min\(1e30,dly_tstop\)\} has_delay_cnt=true\)$/m);
     expect(v.text).toContain('V=(V(td))/(min(1e30,dly_tstop))');
-    const prep = prepareSimulation({ ...v, text: `${v.text.replace(/\.end\s*$/, '')}.tran 1u 20m
-.end` }, () => '');
+    const prep = prepareSimulation(
+      {
+        ...v,
+        text: `${v.text.replace(/\.end\s*$/, '')}.tran 1u 20m
+.end`,
+      },
+      () => '',
+    );
     expect(prep.netlist).toMatch(/^\.param dly_tstop=20m$/m);
     expect(v.warnings.some((w) => /delay\(\) con retardo variable/.test(w))).toBe(true);
   });
@@ -257,7 +263,8 @@ TEXT 0 240 Left 2 !.ic I(L9)=3
   });
 
   it('.tran con una SINE: paso máximo T/8.7 como LTspice (#101)', () => {
-    const sch = (tran: string, sine = 'SINE(0 1 1k)') => ng(`Version 4
+    const sch = (tran: string, sine = 'SINE(0 1 1k)') =>
+      ng(`Version 4
 SHEET 1 880 680
 SYMBOL voltage 0 0 R0
 SYMATTR InstName V1
@@ -697,11 +704,7 @@ describe('modelos ako:', () => {
     const lib = '.model TIP32C PNP(IS=1e-13 BF=50 VAF=100\n+ RB=1)\n.model D1N D(IS=1e-14)';
     const net = '.model TIP32Cm AKO: TIP32C (Bf=20)\n.MODEL QP AKO:TIP32Cm PNP(VAF=50)\n.model X ako:D1N N=2\n.model Y ako:NADA (BF=1)';
     const r = replaceAko(net, collectModels(lib));
-    expect(r.text.split('\n').filter((l) => !l.startsWith('*'))).toEqual([
-      '.model TIP32Cm PNP(IS=1e-13 VAF=100 RB=1 Bf=20)',
-      '.model QP PNP(IS=1e-13 RB=1 Bf=20 VAF=50)',
-      '.model X D(IS=1e-14 N=2)',
-    ]);
+    expect(r.text.split('\n').filter((l) => !l.startsWith('*'))).toEqual(['.model TIP32Cm PNP(IS=1e-13 VAF=100 RB=1 Bf=20)', '.model QP PNP(IS=1e-13 RB=1 Bf=20 VAF=50)', '.model X D(IS=1e-14 N=2)']);
     expect(r.warnings).toEqual(['Y: no se encontró el modelo base NADA (ako:)']);
   });
 });
@@ -834,9 +837,7 @@ SYMATTR Value ${value}
   });
 
   it('llaves en parte de la expresión, cache= y ganancia antes de Laplace', () => {
-    expect(ng('e', 'E1', 'Laplace={w0/Q}*s /(s*s  + {w0/Q}*s + {w0*w0}) cache=2').text).toContain(
-      's_xfer(num_coeff=[{(w0)*(1/(Q))} 0] den_coeff=[1 {(w0)*(1/(Q))} {(w0)*(w0)}])',
-    );
+    expect(ng('e', 'E1', 'Laplace={w0/Q}*s /(s*s  + {w0/Q}*s + {w0*w0}) cache=2').text).toContain('s_xfer(num_coeff=[{(w0)*(1/(Q))} 0] den_coeff=[1 {(w0)*(1/(Q))} {(w0)*(w0)}])');
     expect(ng('e', 'E1', '2 Laplace=1/(1+s)').text).toContain('s_xfer(num_coeff=[2] den_coeff=[1 1])');
   });
 
@@ -865,12 +866,23 @@ SYMATTR Value ${value}
 describe('nodos flotantes (como LTspice: gmin en el último nodo creado de cada grupo)', () => {
   it('entrada de E abierta, capacitores en serie y fuente entre capacitores', () => {
     const net = [
-      'V1 1 0 1', 'E1 out 0 in 0 10', 'R1 out 0 1k',
-      'C1 1 2 1u', 'C2 2 0 3u',
-      'C3 1 3 1u', 'R3 3 4 1k', 'C4 4 0 1u',
-      'C5 1 a 1u', 'V3 a b 5', 'C6 b 0 1u',
-      'L1 1 5 1m', 'I1 0 5 1m', 'D1 5 0 dmod', '.model dmod D',
-      '.op', '.end',
+      'V1 1 0 1',
+      'E1 out 0 in 0 10',
+      'R1 out 0 1k',
+      'C1 1 2 1u',
+      'C2 2 0 3u',
+      'C3 1 3 1u',
+      'R3 3 4 1k',
+      'C4 4 0 1u',
+      'C5 1 a 1u',
+      'V3 a b 5',
+      'C6 b 0 1u',
+      'L1 1 5 1m',
+      'I1 0 5 1m',
+      'D1 5 0 dmod',
+      '.model dmod D',
+      '.op',
+      '.end',
     ].join('\n');
     // los mismos nodos que nombra LTspice en "WARNING: Node … is floating"
     expect(floatingNodes(net, {})).toEqual(['in', '2', '4', 'b']);
@@ -880,16 +892,50 @@ describe('nodos flotantes (como LTspice: gmin en el último nodo creado de cada 
   });
 
   it('nodos internos de subcircuitos (de la netlist o de un archivo incluido), con nombre aplanado', () => {
-    const lib = ['.subckt Gyr V1+ V1- V2+ V2- PARAMS: R=1', 'Rin V1+ I1in 1m', 'VI1 I1in I1out 0', 'HV1 I1out V1- VI2 {-R}',
-      'Rout V2+ I2in 1m', 'VI2 I2in I2out 0', 'HV2 I2out V2- VI1 {R}', '.ends Gyr'].join('\n');
-    const net = ['X_U1 N014 N016 N010 N005 gyr R=1', 'X_U2 N010 N005 N011 N006 gyr R=1', 'V1 N016 0 1', 'R1 N011 0 1',
-      '.subckt div a', 'C1 a m 1u', 'C2 m 0 1u', '.ends', 'XD N016 div', '.include gyr.lib', '.op', '.end'].join('\n');
+    const lib = [
+      '.subckt Gyr V1+ V1- V2+ V2- PARAMS: R=1',
+      'Rin V1+ I1in 1m',
+      'VI1 I1in I1out 0',
+      'HV1 I1out V1- VI2 {-R}',
+      'Rout V2+ I2in 1m',
+      'VI2 I2in I2out 0',
+      'HV2 I2out V2- VI1 {R}',
+      '.ends Gyr',
+    ].join('\n');
+    const net = [
+      'X_U1 N014 N016 N010 N005 gyr R=1',
+      'X_U2 N010 N005 N011 N006 gyr R=1',
+      'V1 N016 0 1',
+      'R1 N011 0 1',
+      '.subckt div a',
+      'C1 a m 1u',
+      'C2 m 0 1u',
+      '.ends',
+      'XD N016 div',
+      '.include gyr.lib',
+      '.op',
+      '.end',
+    ].join('\n');
     expect(floatingNodes(net, { 'gyr.lib': lib })).toEqual(['x_u2.i1out', 'xd.m']);
   });
 
   it('no toca circuitos con camino a tierra (transistores, MOSFET de 3 y 4 terminales, subcircuitos desconocidos)', () => {
-    const net = ['V1 1 0 5', 'Q1 1 2 3 npn', 'R1 3 0 1k', 'C1 2 0 1n', 'M1 1 4 5 5 nm', 'M2 1 4 6 nm', 'R2 6 0 1', 'R4 4 0 1',
-      'C5 5 0 1n', 'X1 7 8 nada', 'C7 1 7 1n', '.model npn NPN', '.model nm VDMOS', '.end'].join('\n');
+    const net = [
+      'V1 1 0 5',
+      'Q1 1 2 3 npn',
+      'R1 3 0 1k',
+      'C1 2 0 1n',
+      'M1 1 4 5 5 nm',
+      'M2 1 4 6 nm',
+      'R2 6 0 1',
+      'R4 4 0 1',
+      'C5 5 0 1n',
+      'X1 7 8 nada',
+      'C7 1 7 1n',
+      '.model npn NPN',
+      '.model nm VDMOS',
+      '.end',
+    ].join('\n');
     expect(floatingNodes(net, {})).toEqual([]);
     expect(fixFloatingNodes(net, {}).text).toBe(net);
   });
@@ -929,7 +975,9 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
 
   it('OR, XOR (exactamente una alta) y AND sin entradas (= 1)', () => {
     expect(ng(gate('or'))).toMatch(/V=1-\(1-min\(.*\)\)\*\(1-min\(.*\)\)$/m);
-    const x = ng(gate('xor')).split('\n').find((l) => l.startsWith('B_A1__x'))!;
+    const x = ng(gate('xor'))
+      .split('\n')
+      .find((l) => l.startsWith('B_A1__x'))!;
     expect(x.match(/\*\(1-min\(/g)?.length).toBe(2);
     expect(ng(netFromAsc('Version 4\nSHEET 1 880 680\nFLAG 32 48 q\nSYMBOL Digital\\and 0 0 R0\nSYMATTR InstName A1\n'))).toMatch(/^B_A1__x A1__x 0 V=1$/m);
   });
@@ -979,7 +1027,8 @@ describe('flip-flops y Schmitt de LTspice (A: DFLOP, SRFLOP, SCHMITT; #133)', ()
   });
 
   it('una entrada unida a tierra por un bypass de TCLib no participa, como en LTspice que une las redes', () => {
-    const t = toNgspice(netFromAsc(`Version 4
+    const t = toNgspice(
+      netFromAsc(`Version 4
 SHEET 1 880 680
 FLAG -32 32 a
 FLAG -32 48 b
@@ -989,7 +1038,10 @@ SYMBOL Digital\\\\and 0 0 R0
 SYMATTR InstName A1
 SYMBOL TCLib\\\\Special\\\\bypass -64 48 R0
 SYMATTR InstName J1
-`), 't', resolver).text;
+`),
+      't',
+      resolver,
+    ).text;
     expect(t).toMatch(/^X\S*J1 0 b bypass$/m);
     const x = t.split('\n').find((l) => l.startsWith('B_A1__x'))!;
     expect(x).toMatch(/V\(a,0\)/);

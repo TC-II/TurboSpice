@@ -7,7 +7,14 @@ const coords = (body: string) => [...body.matchAll(/d="([^"]+)"/g)].flatMap((m) 
 
 describe('trazo Tremor (#330)', () => {
   it('redibuja la resistencia entera a mano alzada y llega justo a los pines', () => {
-    const out = tremorSkin(skins.res, [[16, 16], [16, 96]], 'res|0|0');
+    const out = tremorSkin(
+      skins.res,
+      [
+        [16, 16],
+        [16, 96],
+      ],
+      'res|0|0',
+    );
     expect(out.body).not.toContain('<style');
     expect(out.body).not.toContain('class=');
     expect(out.body).toContain('stroke="currentColor"');
@@ -16,13 +23,42 @@ describe('trazo Tremor (#330)', () => {
     // el cuerpo sigue midiendo 22 de ancho (de x = 5 a 27), con el temblor
     expect(Math.min(...xs)).toBeLessThan(6.5);
     expect(Math.max(...xs)).toBeGreaterThan(25.5);
-    for (const pin of [[16, 16], [16, 96]]) expect(pts.some((p) => p[0] === pin[0] && p[1] === pin[1])).toBe(true);
+    for (const pin of [
+      [16, 16],
+      [16, 96],
+    ])
+      expect(pts.some((p) => p[0] === pin[0] && p[1] === pin[1])).toBe(true);
   });
 
   it('la misma semilla da el mismo dibujo; otra, uno distinto', () => {
-    const a = tremorSkin(skins.cap, [[16, 0], [16, 64]], 'cap|1|2');
-    expect(tremorSkin(skins.cap, [[16, 0], [16, 64]], 'cap|1|2')).toBe(a);
-    expect(tremorSkin(skins.cap, [[16, 0], [16, 64]], 'cap|9|9').body).not.toBe(a.body);
+    const a = tremorSkin(
+      skins.cap,
+      [
+        [16, 0],
+        [16, 64],
+      ],
+      'cap|1|2',
+    );
+    expect(
+      tremorSkin(
+        skins.cap,
+        [
+          [16, 0],
+          [16, 64],
+        ],
+        'cap|1|2',
+      ),
+    ).toBe(a);
+    expect(
+      tremorSkin(
+        skins.cap,
+        [
+          [16, 0],
+          [16, 64],
+        ],
+        'cap|9|9',
+      ).body,
+    ).not.toBe(a.body);
   });
 
   it('un cable conserva sus extremos', () => {
@@ -46,7 +82,15 @@ describe('el blanco de los skins a color (Boca Jrs)', () => {
   });
 
   it('a mano alzada, un trazo blanco sigue blanco (roughPen traza todo en negro)', () => {
-    const out = tremorSkin(boca.npn, [[64, 0], [0, 48], [64, 96]], 'npn|0|0');
+    const out = tremorSkin(
+      boca.npn,
+      [
+        [64, 0],
+        [0, 48],
+        [64, 96],
+      ],
+      'npn|0|0',
+    );
     expect(out.body).toMatch(/stroke="#fff"/);
   });
 });

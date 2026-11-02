@@ -12,7 +12,13 @@ export interface PartGroup {
   parts: CmpPart[];
 }
 
-export function PartTable({ groups, selected, onPick, onPickAndAccept, autoFocus }: {
+export function PartTable({
+  groups,
+  selected,
+  onPick,
+  onPickAndAccept,
+  autoFocus,
+}: {
   groups: PartGroup[];
   /** el cursor arranca en el buscador */
   autoFocus?: boolean;
@@ -21,7 +27,12 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept, autoFocus
   onPick(p: CmpPart): void;
   onPickAndAccept(p: CmpPart): void;
 }) {
-  const [g, setG] = useState(() => Math.max(0, groups.findIndex((x) => x.parts.some((p) => p.name === selected))));
+  const [g, setG] = useState(() =>
+    Math.max(
+      0,
+      groups.findIndex((x) => x.parts.some((p) => p.name === selected)),
+    ),
+  );
   const [q, setQ] = useState('');
   // columna por la que se ordena ('' = el nombre) y sentido; sin orden, el de la librería
   const [sort, setSort] = useState<{ key: string; dir: 1 | -1 } | null>(null);
@@ -71,7 +82,9 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept, autoFocus
         <table>
           <thead>
             <tr>
-              <th className="sortable" aria-sort={ariaSort('')} onClick={() => sortBy('')}>{t('Name')}</th>
+              <th className="sortable" aria-sort={ariaSort('')} onClick={() => sortBy('')}>
+                {t('Name')}
+              </th>
               {cols.map((c) => (
                 <th key={c.key} className="sortable" aria-sort={ariaSort(c.key)} onClick={() => sortBy(c.key)}>
                   {c.label}
@@ -82,13 +95,7 @@ export function PartTable({ groups, selected, onPick, onPickAndAccept, autoFocus
           </thead>
           <tbody>
             {rows.map((p) => (
-              <tr
-                key={p.name}
-                className={p.name === selected ? 'on' : ''}
-                aria-selected={p.name === selected}
-                onClick={() => onPick(p)}
-                onDoubleClick={() => onPickAndAccept(p)}
-              >
+              <tr key={p.name} className={p.name === selected ? 'on' : ''} aria-selected={p.name === selected} onClick={() => onPick(p)} onDoubleClick={() => onPickAndAccept(p)}>
                 <td>{p.name}</td>
                 {cols.map((c) => (
                   <td key={c.key}>{cmpCell(p, c.key)}</td>

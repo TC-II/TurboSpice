@@ -44,7 +44,6 @@ export type Dialog =
   /** estilo de línea para las figuras indicadas y las que se dibujen después */
   | { kind: 'lineStyle'; shapes: number[] };
 
-
 /** Nivel de la jerarquía abierto (#180): prefijo de sus vectores en ngspice y red de arriba de cada puerto */
 export interface HierLevel extends Level {
   prefix: string;

@@ -282,8 +282,8 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
     case 'trigtarg': {
       const a = cross(def.trig!, ctx);
       const b = cross(def.targ!, ctx);
-      if (!Number.isFinite(a)) throw new ExprError(t('TRIG doesn\'t occur'));
-      if (!Number.isFinite(b)) throw new ExprError(t('TARG doesn\'t occur'));
+      if (!Number.isFinite(a)) throw new ExprError(t("TRIG doesn't occur"));
+      if (!Number.isFinite(b)) throw new ExprError(t("TARG doesn't occur"));
       return { value: b - a };
     }
     default: {
@@ -291,11 +291,17 @@ function evalOne(def: MeasDef, ctx: Ctx): MeasValue {
       let to = def.to !== undefined ? num(def.to, ctx) : x[x.length - 1];
       if (def.trig) from = cross(def.trig, ctx);
       if (def.targ) to = cross(def.targ, ctx);
-      if (!Number.isFinite(from) || !Number.isFinite(to)) throw new ExprError(t('the TRIG/TARG range doesn\'t occur'));
+      if (!Number.isFinite(from) || !Number.isFinite(to)) throw new ExprError(t("the TRIG/TARG range doesn't occur"));
       const y = realPart(wave(def.expr!, ctx));
       // ruido: INTEG de una densidad (V/√Hz) es el valor eficaz en la banda, √∫v²df (como LTspice)
       if (def.kind === 'integ' && /^noise/i.test(ctx.plot.name)) {
-        const r = aggregate('integ', x, y.map((v) => v * v), Math.min(from, to), Math.max(from, to));
+        const r = aggregate(
+          'integ',
+          x,
+          y.map((v) => v * v),
+          Math.min(from, to),
+          Math.max(from, to),
+        );
         return { value: Math.sqrt(r.value) };
       }
       return aggregate(def.kind, x, y, Math.min(from, to), Math.max(from, to));

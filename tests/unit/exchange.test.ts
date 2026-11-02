@@ -13,7 +13,19 @@ const lib = new Library(buildBundle());
 const asc = (line: string, type = 'res'): string => {
   const d: AscDoc = {
     ...emptyDoc(),
-    symbols: [{ type, x: 0, y: 0, orient: 'R0', windows: new Map(), attrs: new Map([['InstName', 'X1'], ['Value', '1k']]) }],
+    symbols: [
+      {
+        type,
+        x: 0,
+        y: 0,
+        orient: 'R0',
+        windows: new Map(),
+        attrs: new Map([
+          ['InstName', 'X1'],
+          ['Value', '1k'],
+        ]),
+      },
+    ],
     texts: [{ x: 0, y: 200, align: 'Left', size: 2, kind: 'directive', text: line }],
   };
   return serializeAsc(d);
@@ -36,9 +48,15 @@ function sample(): Project {
 describe('zip', () => {
   it('ida y vuelta sin comprimir, con nombres UTF-8', async () => {
     const enc = new TextEncoder();
-    const z = makeZip([{ path: 'Variante ñ/a.asc', data: enc.encode('hola') }, { path: 'b.txt', data: new Uint8Array() }]);
+    const z = makeZip([
+      { path: 'Variante ñ/a.asc', data: enc.encode('hola') },
+      { path: 'b.txt', data: new Uint8Array() },
+    ]);
     const back = await readZip(z);
-    expect(back.map((e) => [e.path, new TextDecoder().decode(e.data)])).toEqual([['Variante ñ/a.asc', 'hola'], ['b.txt', '']]);
+    expect(back.map((e) => [e.path, new TextDecoder().decode(e.data)])).toEqual([
+      ['Variante ñ/a.asc', 'hola'],
+      ['b.txt', ''],
+    ]);
     expect(crc32(enc.encode('123456789'))).toBe(0xcbf43926);
   });
 

@@ -3,7 +3,36 @@ import { buildBundle } from '../../scripts/build-library.mjs';
 import { Library } from '../../src/library/library.ts';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
-import { addModelModule, libForPins, subcktForPins, setAttrSize, subcktAfterPins, adoptModelSymbol, pinsMismatch, updateModelPins, attrVisible, modelParams, setAttrVisible, setModelParams, subcktParams, extractModel, extractSubckt, modelInfo, renameModelIn, renameSubcktIn, setSubcktPins, syncModelAttrs, modelModuleFile, modelModules, modelSymbolText, removeModelModule, renameModelModule, setPinAttr, setSymAttr, symAttr } from '../../src/project/modelModule.ts';
+import {
+  addModelModule,
+  libForPins,
+  subcktForPins,
+  setAttrSize,
+  subcktAfterPins,
+  adoptModelSymbol,
+  pinsMismatch,
+  updateModelPins,
+  attrVisible,
+  modelParams,
+  setAttrVisible,
+  setModelParams,
+  subcktParams,
+  extractModel,
+  extractSubckt,
+  modelInfo,
+  renameModelIn,
+  renameSubcktIn,
+  setSubcktPins,
+  syncModelAttrs,
+  modelModuleFile,
+  modelModules,
+  modelSymbolText,
+  removeModelModule,
+  renameModelModule,
+  setPinAttr,
+  setSymAttr,
+  symAttr,
+} from '../../src/project/modelModule.ts';
 import { symPins } from '../../src/project/symbolEdit.ts';
 import { newProject, serializeTurbo, parseTurbo } from '../../src/project/turbo.ts';
 import { subcktFilesFor } from '../../src/project/exchange.ts';
@@ -92,23 +121,37 @@ describe('rótulos y parámetros del símbolo de un modelo', () => {
   });
 
   it('reparte los parámetros en Value, Value2, SpiceLine y SpiceLine2', () => {
-    const s = setModelParams('Version 4\nSymbolType CELL\nSYMATTR Prefix X\n', [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4'], ['e', '5']]);
+    const s = setModelParams('Version 4\nSymbolType CELL\nSYMATTR Prefix X\n', [
+      ['a', '1'],
+      ['b', '2'],
+      ['c', '3'],
+      ['d', '4'],
+      ['e', '5'],
+    ]);
     expect(symAttr(s, 'Value')).toBe('a=1');
     expect(symAttr(s, 'Value2')).toBe('b=2');
     expect(symAttr(s, 'SpiceLine')).toBe('c=3');
     expect(symAttr(s, 'SpiceLine2')).toBe('d=4 e=5');
-    expect(modelParams(s).map(([k]) => k).join('')).toBe('abcde');
+    expect(
+      modelParams(s)
+        .map(([k]) => k)
+        .join(''),
+    ).toBe('abcde');
     expect(attrVisible(s, 'Value2')).toBe(true);
   });
 
   it('lee los params: de la línea .subckt', () => {
-    expect(subcktParams('.subckt A in out\n+ params: G=1 R={2*k}\nR1 in out {R}\n.ends A\n', 'A')).toEqual([['G', '1'], ['R', '{2*k}']]);
+    expect(subcktParams('.subckt A in out\n+ params: G=1 R={2*k}\nR1 in out {R}\n.ends A\n', 'A')).toEqual([
+      ['G', '1'],
+      ['R', '{2*k}'],
+    ]);
   });
 });
 
 describe('símbolo y netlist de un modelo', () => {
   it('los pines van a los nodos por SpiceOrder, no por nombre (como OA_Ideal: 1 2 5)', () => {
-    const sym = 'SymbolType CELL\nPIN 0 0 NONE 0\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN 0 16 NONE 0\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN 0 32 NONE 0\nPINATTR PinName OUT\nPINATTR SpiceOrder 5\n';
+    const sym =
+      'SymbolType CELL\nPIN 0 0 NONE 0\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN 0 16 NONE 0\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN 0 32 NONE 0\nPINATTR PinName OUT\nPINATTR SpiceOrder 5\n';
     expect(pinsMismatch(sym, ['1', '2', '3', '4', '5'])).toBe(false);
     expect(pinsMismatch(sym, ['1', '2', '3', '4'])).toBe(true);
     const up = updateModelPins(sym, ['a', 'b', 'c'], 16);
@@ -137,19 +180,67 @@ describe('pines del símbolo y nodos del .subckt', () => {
   const net = '.subckt M a b\nR1 a b 1k\nC1 b 0 {a}\n.ends M\n';
 
   it('agregar, sacar y renombrar un pin cambia el .subckt', () => {
-    const two = sym([['a', 1, 0], ['b', 2, 16]]);
-    expect(subcktAfterPins(net, 'M', two, sym([['a', 1, 0], ['b', 2, 16], ['c', 3, 32]]))).toMatch(/^\.subckt M a b c$/m);
+    const two = sym([
+      ['a', 1, 0],
+      ['b', 2, 16],
+    ]);
+    expect(
+      subcktAfterPins(
+        net,
+        'M',
+        two,
+        sym([
+          ['a', 1, 0],
+          ['b', 2, 16],
+          ['c', 3, 32],
+        ]),
+      ),
+    ).toMatch(/^\.subckt M a b c$/m);
     expect(subcktAfterPins(net, 'M', two, sym([['b', 1, 16]]))).toMatch(/^\.subckt M b$/m);
-    const ren = subcktAfterPins(net, 'M', two, sym([['in', 1, 0], ['b', 2, 16]]));
+    const ren = subcktAfterPins(
+      net,
+      'M',
+      two,
+      sym([
+        ['in', 1, 0],
+        ['b', 2, 16],
+      ]),
+    );
     expect(ren).toBe('.subckt M in b\nR1 in b 1k\nC1 b 0 {a}\n.ends M\n');
   });
 
   it('renombrar un pin renombra el nodo de su posición aunque se llamara distinto (sin tocar valores)', () => {
     const t = '.subckt OA 1 2\nE1 1 2 0 0 1\n.ends OA\n';
-    expect(subcktAfterPins(t, 'OA', sym([['In+', 1, 0], ['In-', 2, 16]]), sym([['Vp', 1, 0], ['In-', 2, 16]]))).toBe('.subckt OA Vp 2\nE1 Vp 2 0 0 1\n.ends OA\n');
+    expect(
+      subcktAfterPins(
+        t,
+        'OA',
+        sym([
+          ['In+', 1, 0],
+          ['In-', 2, 16],
+        ]),
+        sym([
+          ['Vp', 1, 0],
+          ['In-', 2, 16],
+        ]),
+      ),
+    ).toBe('.subckt OA Vp 2\nE1 Vp 2 0 0 1\n.ends OA\n');
     // como en la foto: in+ out in- → A B C
     const d = '.subckt Dif in+ out in-\nE1 out 0 in+ in- 1\n.ends Dif\n';
-    expect(subcktAfterPins(d, 'Dif', sym([['in+', 1, 0], ['out', 2, 16]]), sym([['A', 1, 0], ['out', 2, 16]]))).toBe('.subckt Dif A out in-\nE1 out 0 A in- 1\n.ends Dif\n');
+    expect(
+      subcktAfterPins(
+        d,
+        'Dif',
+        sym([
+          ['in+', 1, 0],
+          ['out', 2, 16],
+        ]),
+        sym([
+          ['A', 1, 0],
+          ['out', 2, 16],
+        ]),
+      ),
+    ).toBe('.subckt Dif A out in-\nE1 out 0 A in- 1\n.ends Dif\n');
   });
 
   it('Prefix sale de lo que define el netlist', () => {
@@ -192,6 +283,10 @@ describe('Update pins in .lib y exportar un modelo', () => {
 
   it('el .zip de un modelo lleva su .lib y su .asy', () => {
     const p = addModelModule(newProject('x'), 'M1');
-    expect(subcktFilesFor(p, 'M1').map((f) => f.name).sort()).toEqual(['M1.asy', 'M1.lib']);
+    expect(
+      subcktFilesFor(p, 'M1')
+        .map((f) => f.name)
+        .sort(),
+    ).toEqual(['M1.asy', 'M1.lib']);
   });
 });

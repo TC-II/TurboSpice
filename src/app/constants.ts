@@ -19,8 +19,6 @@ export const SCH_FONT_KEY = 'turbospice.schFont';
 export const SAMPLE = 'Sample Project.turbo';
 /** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
 export const ADC = 'ADC.turbo';
-export const EXAMPLES_TURBO = 'Examples.turbo';
-export const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier', 'Loop Gain (.stb)'];
 /** las transferencias de 1er y 2do orden con RC y RLC: un workbench cada una (scripts/make-examples.ts) */
 export const TRANSFER = 'Transfer functions.turbo';
 /** emisor común, degenerado, colector común y base común, BJT contra MOSFET (scripts/make-examples.ts) */

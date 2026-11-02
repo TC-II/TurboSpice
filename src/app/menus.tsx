@@ -12,7 +12,7 @@ import type { Bias } from '../sim/bias.ts';
 import { isComplexLine } from '../sim/complexSim.ts';
 import { AnalysisIcon } from '../ui/analysisIcons.tsx';
 import type { MenuDef, MenuItem } from '../ui/Menu.tsx';
-import { ADC, AMPS, EXAMPLES, EXAMPLES_TURBO, GF180, REPO, SAMPLE, SKY130, STABILITY, TRANSFER } from './constants.ts';
+import { ADC, AMPS, GF180, REPO, SAMPLE, SKY130, STABILITY, TRANSFER } from './constants.ts';
 import type { Theme } from './storage.ts';
 import type { Dialog, SimRun } from './types.ts';
 
@@ -330,8 +330,6 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
           title: t('Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each'),
           onClick: () => doExample(ADC),
         },
-        'sep',
-        ...EXAMPLES.map((x) => ({ label: x, title: t('Testbench of the «Examples» project'), onClick: () => doExample(EXAMPLES_TURBO, x) })),
       ],
     },
     {

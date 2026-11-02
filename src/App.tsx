@@ -3,7 +3,7 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
-import { DIGITAL_TYPE, type SimPlot } from './engine/ngspice.ts';
+import { type SimPlot } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames } from './schematic/NetNames.tsx';
@@ -74,16 +74,13 @@ import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
-import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
-import { paneCurves, type ComplexMode } from './waveform/curves.ts';
+import { sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
+import { type ComplexMode } from './waveform/curves.ts';
 import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
-import { type Resolver } from './waveform/expr.ts';
-import { addTraceTo, colorize, emptyPanes, parsePlt, plotKind, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { colorize, emptyPanes, plotKind, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
-import { deviceParamTraces, traceResolver } from './sim/traces.ts';
-import { deviceRefs } from './sim/deviceParams.ts';
+import { traceResolver } from './sim/traces.ts';
 import { moveOpTag } from './sim/opPins.ts';
-import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { useSideSize } from './ui/SideSplit.tsx';
@@ -93,7 +90,6 @@ import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
 import { locale, t } from './i18n/i18n.ts';
 import { moduleOf } from './hdl/project.ts';
-import { busNames } from './waveform/digital.ts';
 import { BASE, DEFAULT_PROJECT, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
@@ -131,6 +127,7 @@ import { useSavesPanel } from './app/useSavesPanel.ts';
 import { useSubcktEditing } from './app/useSubcktEditing.ts';
 import { useProjectSession } from './app/useProjectSession.ts';
 import { useHighlights } from './app/useHighlights.ts';
+import { useTraces } from './app/useTraces.ts';
 
 
 export function App() {
@@ -870,55 +867,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // escribe en la caja, aunque la herramienta elegida sea la de selección
   const [traceFocus, setTraceFocus] = useState(false);
   const [viewerTools, setViewerTools] = useState<HTMLElement | null>(null);
-  const traceNames = useMemo(() => {
-    const sc = plot && scaleOf(plot);
-    if (!plot) return [];
-    // y los buses que forman los nodos digitales de los bloques Verilog (#209): Dig(x1.q[3:0])
-    return [...new Set([...plot.vectors.filter((v) => v !== sc).map(displayName), ...busNames(plot.vectors.filter((v) => v.type === DIGITAL_TYPE).map((v) => v.name))])];
-  }, [plot]);
-  // parámetros de los dispositivos para elegir en la caja de trazas (#202)
-  const traceHints = useMemo(() => (sim ? deviceParamTraces(sim.built) : undefined), [sim]);
-  /** agrega la expresión al panel activo; devuelve el error si no se puede graficar */
-  const addExpr = (expr: string): string | undefined => {
-    if (!plot) return;
-    const test = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver, mode });
-    if (test.errors.size) {
-      // un parámetro de dispositivo que no se guardó (#202): queda la traza y se guarda al simular de nuevo
-      if (!deviceRefs(expr).length) return test.errors.get(0);
-      const len = scaleOf(plot)?.real.length ?? 0;
-      const missingOk = (p: SimPlot): Resolver => {
-        const r = resolver(p);
-        return (fn, args, run) => r(fn, args, run) ?? (fn === '@' ? { re: new Float64Array(len) } : null);
-      };
-      const again = paneCurves({ traces: [{ expr }] }, { plot, runs: [plot], labels, resolver: missingOk, mode });
-      if (again.errors.size) return again.errors.get(0);
-      setMessage(t('{expr} wasn\'t saved in this simulation: it will be saved when you simulate again', { expr }));
-    }
-    const next = addTraceTo(panes, activePane, expr);
-    if (next !== panes) editPanes(next);
-  };
-
-  /** Ctrl+Espacio: volver a aplicar la vista guardada para el análisis (";.plot" o un .plt importado) */
-  const reapplyView = () => {
-    const v = plot && plotView[plotKind(plot.name)];
-    if (v) editPanes(v);
-    else setMessage(t('There\'s no saved view for this analysis (import one with a .plt)'));
-  };
-  const acceptOfferedView = () => {
-    if (offerView) setPlotView({ ...offerView, ...plotView });
-    setOfferView(null);
-  };
-  const importPlt = (bytes: Uint8Array) => {
-    const v = parsePlt(decode(bytes).text);
-    if (!Object.keys(v).length) return setMessage(t('The .plt has no views TurboSpice understands'));
-    setPlotView({ ...plotView, ...v });
-    if (plot && v[plotKind(plot.name)]) setPanes(v[plotKind(plot.name)]);
-    setMessage(t('View imported from the .plt ({p0})', { p0: Object.keys(v).map((k) => `.${k}`).join(', ') }));
-  };
-  const exportPlt = () => {
-    const v = plot ? { ...plotView, [plotKind(plot.name)]: panes } : plotView;
-    download(`${project.name}.plt`, new Blob([serializePlt(v)], { type: 'text/plain' }));
-  };
 
   const rotateOrMirror = (op: 'rotate' | 'mirror') => {
     if (op === 'rotate' && editor.current?.rotateLabel()) return;
@@ -1105,15 +1053,19 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const scale = plot ? scaleOf(plot) : null;
   // memoizadas: un arreglo nuevo en cada render recrearía los gráficos (y perdería clicks, #30)
   const allRuns = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
-  // (después de allRuns: los atajos se instalan en cada render, con lo de ese render)
-  useShortcuts({
-    ...{ dialog, history, status, running, selection, allRuns, hasNets, area, editor, plotPanel, pltInput, viewerKeys, simulate, abort, showLog, doSave, doOpen, setQuickOpen, goUp, reapplyView, undoPanes },
-    ...{ setDialog, setMessage, rotateOrMirror, copySelection, paste, setTool, selectAll, setSelection, setShowGrid, setShowLoose, setShowNets, setNetHover, openControl, openStudy, openSimulation, zoomBox, descend, startMove, shapeTool, deleteSelection },
-  });
   // corridas que se muestran: todas (salvo las ocultas, Shift+S) al superponer, o sólo la elegida
   const visibleRuns = useMemo(() => allRuns.filter((r) => !hiddenRuns.has(r.name)), [allRuns, hiddenRuns]);
   const runs = useMemo(() => (plot ? (overlay && visibleRuns.length ? visibleRuns : [plot]) : []), [overlay, visibleRuns, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
+  const { traceNames, traceHints, addExpr, reapplyView, acceptOfferedView, importPlt, exportPlt } = useTraces({
+    ...{ sim, plot, labels, resolver, mode, panes, activePane, editPanes, setPanes, plotView, setPlotView, offerView, setOfferView, setMessage },
+    projectName: project.name,
+  });
+  // (los atajos se instalan en cada render, con lo de ese render)
+  useShortcuts({
+    ...{ dialog, history, status, running, selection, allRuns, hasNets, area, editor, plotPanel, pltInput, viewerKeys, simulate, abort, showLog, doSave, doOpen, setQuickOpen, goUp, reapplyView, undoPanes },
+    ...{ setDialog, setMessage, rotateOrMirror, copySelection, paste, setTool, selectAll, setSelection, setShowGrid, setShowLoose, setShowNets, setNetHover, openControl, openStudy, openSimulation, zoomBox, descend, startMove, shapeTool, deleteSelection },
+  });
   const isComplex = plot?.vectors.some((v) => v.imag);
   const { onDftPicking, onProbe, onProbePair } = useProbe({
     ...{ tool, setTool, setToolState, sim, plot, op, setOpTags, simScope, resolver, isComplex, panes, activePane, editPanes, setActivePane },

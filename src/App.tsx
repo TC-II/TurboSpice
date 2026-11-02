@@ -506,11 +506,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
 
 
-  const { doImportLtspice, doRemoveLtspice, ascName, doShare, doExport, exportName, doRecent, doNew, doExample } = projectFileActions({
+  const { doImportLtspice, doRemoveLtspice, ascName, doShare, doExport, exportName, doRecent, doNew: newFile, doExample } = projectFileActions({
     curSim: activeSim(sims),
     ...{ google, project, variant, sims, recent, setLtIndex, turboBytes, confirmDiscard, openBytes, remember, loadDoc, loadProject, markDirty, setDialog, setMessage },
     warnMissing: (d) => warnMissing(d), // (declarada más abajo)
   });
+  // un proyecto nuevo se ve con su panel abierto (para agregarle testbenches y módulos)
+  const doNew = () => newFile() && setTreeOpen(true);
   const exporting = dialog?.kind === 'export';
 
   /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
@@ -700,10 +702,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     return treeSubsOf(project, curSub, liveDoc, lib, goUsage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
-  const toggleTree = () => {
-    lsSet('turbospice.tree', treeOpen ? '0' : '1');
-    setTreePref(!treeOpen);
+  const setTreeOpen = (open: boolean) => {
+    lsSet('turbospice.tree', open ? '1' : '0');
+    setTreePref(open);
   };
+  const toggleTree = () => setTreeOpen(!treeOpen);
 
   // ⌖ de la DFT: mientras se elige, el esquemático está en la punta de prueba y lo que se pinche
   // (esté graficado o no) va a la DFT; al terminar vuelve a la herramienta de antes

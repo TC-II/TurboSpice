@@ -3,7 +3,7 @@
 // simulaciones (#39).
 // Uso: node tests/e2e/simulation.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { autosaved, frames, steady, menu, openExample, resultsMenu, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser } from './lib.mjs';
+import { autosaved, frames, steady, menu, openExample, resultsMenu, showSimCommand, simCommand, simType, skipWelcome, slideToDelete, launchBrowser, sampleUrl } from './lib.mjs';
 import { lineOf, simOf, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
 
@@ -27,7 +27,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
 

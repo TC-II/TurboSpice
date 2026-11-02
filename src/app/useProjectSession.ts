@@ -21,9 +21,12 @@ import { buildSimulation } from '../sim/schematicSim.ts';
 import type { SimList, SimView } from '../sim/simList.ts';
 import type { ComplexMode } from '../waveform/curves.ts';
 import { asPlotView, emptyPanes, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from '../waveform/view.ts';
-import { BASE, SAMPLE } from './constants.ts';
+import { BASE, DEFAULT_PROJECT } from './constants.ts';
 import { ascText } from './helpers.ts';
 import type { FileState, HierLevel, SimRun } from './types.ts';
+
+/** Un ejemplo de public/examples pedido en la URL (?example=Sample%20Project.turbo) */
+const EXAMPLE_NAME = /^[\w .()-]+\.turbo$/;
 
 export interface ProjectSessionDeps {
   lib: Library;
@@ -198,8 +201,9 @@ export function useProjectSession(d: ProjectSessionDeps) {
     return true;
   }, [loadDoc]);
 
-  // Primer documento: el del link, el último en el que se estaba trabajando (autoguardado)
-  // o un ejemplo. Nada de esto pisa lo que el usuario ya haya empezado a hacer.
+  // Primer documento: el del link, el ejemplo pedido en la URL (?example=…), el último en el que se
+  // estaba trabajando (autoguardado) o, la primera vez, un proyecto vacío como el de «Nuevo proyecto».
+  // Nada de esto pisa lo que el usuario ya haya empezado a hacer.
   const touched = useRef(false);
   touched.current ||= docKey > 0 || history.version > 0;
   const [restored, setRestored] = useState(false);
@@ -207,10 +211,22 @@ export function useProjectSession(d: ProjectSessionDeps) {
     (async () => {
       setRecent(await loadRecent());
       const session = await loadProjectSession();
-      if (await openShared()) {
-        // el trabajo sin guardar anterior queda en recientes
+      // el trabajo sin guardar anterior queda en recientes
+      const keepSession = () => {
         if (session?.dirty) addRecent({ name: session.name, asc: session.turbo, turbo: true, time: session.time, unsaved: true }).then(setRecent);
-        return;
+      };
+      if (await openShared()) return keepSession();
+      const example = new URLSearchParams(location.search).get('example');
+      if (example && EXAMPLE_NAME.test(example)) {
+        window.history.replaceState(null, '', location.pathname + location.hash);
+        const r = await fetch(`${BASE}examples/${encodeURIComponent(example)}`);
+        if (r.ok) {
+          // sin pasar por recientes: es lo que se ve al entrar, no algo que abrió el usuario
+          const { project: p } = await parseTurbo(new TextDecoder().decode(await r.arrayBuffer()));
+          if (touched.current) return;
+          loadProject(p, { name: example });
+          return keepSession();
+        }
       }
       if (touched.current) return;
       if (session) {
@@ -223,15 +239,10 @@ export function useProjectSession(d: ProjectSessionDeps) {
           if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {
-          // sesión ilegible: seguir con el ejemplo
+          // sesión ilegible: seguir con un proyecto vacío
         }
       }
-      const b = await (await fetch(`${BASE}examples/${encodeURIComponent(SAMPLE)}`)).arrayBuffer();
-      if (touched.current) return;
-      // sin pasar por recientes: es lo que se ve al entrar, no algo que abrió el usuario
-      const { project: sample } = await parseTurbo(new TextDecoder().decode(b));
-      if (touched.current) return;
-      loadProject(sample, { name: SAMPLE });
+      loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
     })()
       .catch(() => {})
       .finally(() => setRestored(true));

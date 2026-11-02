@@ -1421,6 +1421,8 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .tree-menu { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 140px; padding: 4px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); box-shadow: 0 6px 20px rgb(0 0 0 / .25); }
 .tree-menu button { display: flex; gap: 6px; align-items: center; border: 0; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; text-align: left; padding: 4px 8px; white-space: nowrap; }
 .tree-menu button:hover, .tree-menu button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.tree-menu-sep { height: 1px; margin: 4px 2px; background: var(--border); }
+.tree-menu-import small { display: block; color: var(--fg-muted); font-size: 11px; }
 @media (max-width: 700px) { .canvas-wrap.with-tree > .model-editor { left: 0; } .model-left { right: 0; } }
 
 /* Cápsula del proyecto: ocupa el ancho del panel de proyecto, todo el alto de la barra, y con el

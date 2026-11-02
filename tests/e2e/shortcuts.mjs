@@ -2,7 +2,7 @@
 // resultados (con el mouse sobre los gráficos) y modo Netlist.
 // Uso: node tests/e2e/shortcuts.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { frames, menu, openExample, resultsView, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, menu, openExample, resultsView, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -21,7 +21,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor(); // Sample Project: el pasabajos RC
 // el pasabajos RC sin historial de corridas (Sample Project, el que abre, tiene corridas)

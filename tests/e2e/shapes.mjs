@@ -2,7 +2,7 @@
 // mueven, rotan, borran, se les cambia el estilo de línea, y se dibujan círculos y arcos.
 // Uso: node tests/e2e/shapes.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { frames, menu, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, menu, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -33,7 +33,7 @@ const ASC = [
   '',
 ].join('\r\n');
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.evaluate((asc) => {
   const dt = new DataTransfer();

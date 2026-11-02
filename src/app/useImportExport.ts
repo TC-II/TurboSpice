@@ -162,13 +162,26 @@ export function useImportExport({ lib, projectRef, editProject, snapshot, markDi
       }
       const p0 = snapshot();
       const incoming = subcktFilesFrom(entries, p0.files, (n, asc) => subcktSymbol(n, parseAsc(asc)));
-      const subs = incoming.filter((f) => f.kind === 'schematic').map((f) => f.name.replace(/\.asc$/i, ''));
-      if (!incoming.length) return setMessage(t('There was nothing to import (.zip, .asc, .asy, .lib or .sub)'));
+      if (!incoming.length) return setMessage(t('There was nothing to import: choose .asc subcircuits (with their .asy), .lib/.sub netlists or a .zip with them'));
       const merged = await mergeFiles(p0.files, incoming, askConflict);
       const p = { ...p0, modified: Date.now(), files: merged.files };
       projectRef.current = p;
       editProject(p);
-      setMessage(subs.length ? t('Imported subcircuits: {list}', { list: subs.join(', ') }) : t('Imported: {list}', { list: merged.added.join(', ') }));
+      // qué entró y adónde fue: los .asc son subcircuitos del panel; los netlists y símbolos, archivos
+      // del proyecto (no se ven en el panel); lo idéntico a lo que ya estaba no cambia
+      // (sin los símbolos generados para los .asc que no traían el suyo)
+      const chosen = new Set(entries.map((e) => e.path.replace(/^.*[\\/]/, '').toLowerCase()));
+      const added = merged.files.filter((f) => merged.added.includes(f.name) && (f.kind !== 'symbol' || chosen.has(f.name.toLowerCase())));
+      const names = (kind: string) => added.filter((f) => f.kind === kind).map((f) => f.name);
+      const subs = names('schematic').map((n) => n.replace(/\.asc$/i, ''));
+      const same = incoming.filter((f) => chosen.has(f.name.toLowerCase()) && p0.files.some((x) => x.name.toLowerCase() === f.name.toLowerCase() && x.text === f.text)).map((f) => f.name);
+      const parts = [
+        ...(subs.length ? [t('Subcircuits added to Modules: {list}', { list: subs.join(', ') })] : []),
+        ...(names('model').length ? [t('Netlists added to the project files (their .subckt and .model are in Component…): {list}', { list: names('model').join(', ') })] : []),
+        ...(names('symbol').length ? [t('Symbols: {list}', { list: names('symbol').join(', ') })] : []),
+        ...(same.length ? [t('Already in the project, unchanged: {list}', { list: same.join(', ') })] : []),
+      ];
+      setMessage(parts.length ? parts.join(' · ') : t('Nothing was imported'));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }

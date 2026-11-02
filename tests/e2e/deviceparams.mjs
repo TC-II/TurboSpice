@@ -1,7 +1,7 @@
 // E2E de los parámetros de dispositivo (#202): @Q1[gm] e Ic(Q1) en el visor, guardados con .save
 // al simular de nuevo, con su unidad y ofrecidos en la caja de trazas.
 // Uso: node tests/e2e/deviceparams.mjs [url]   (con `npm run preview` corriendo)
-import { frames, steady, openExample, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, steady, openExample, skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const browser = await launchBrowser();
@@ -30,7 +30,7 @@ const add = async (expr) => {
   await frames(page);
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();

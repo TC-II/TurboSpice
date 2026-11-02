@@ -2,7 +2,7 @@
 // "viajar" y, mientras se lo arrastra, el fantasma gira en el acto sin mover el mouse.
 // Uso: node tests/e2e/rotate.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync, readFileSync } from 'node:fs';
-import { frames, skipWelcome, launchBrowser } from './lib.mjs';
+import { frames, skipWelcome, launchBrowser, sampleUrl, steady } from './lib.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { activeAsc, variantOf } from '../../src/project/project.ts';
 import { parseTurbo } from '../../src/project/turbo.ts';
@@ -28,8 +28,11 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.getByRole('button', { name: 'Nuevo' }).click();
+// (un proyecto nuevo abre el panel del proyecto: el esquemático se reacomoda)
+await page.locator('.project-tree').waitFor();
+await steady(page);
 const svg = page.locator('svg.editor');
 const at = async (x, y) => {
   const box = await svg.boundingBox();

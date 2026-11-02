@@ -3,7 +3,7 @@
 // figuras de la barra y los atajos O, U, I.
 // Uso: node tests/e2e/placing.mjs [url]   (con `npm run preview` corriendo)
 
-import { skipWelcome, launchBrowser } from './lib.mjs';
+import { skipWelcome, launchBrowser, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -20,7 +20,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 const svg = page.locator('svg.editor');
 const box = await svg.boundingBox();

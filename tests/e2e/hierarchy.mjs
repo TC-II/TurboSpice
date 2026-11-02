@@ -3,7 +3,7 @@
 // lugar y medir adentro (tensiones, corrientes, punto de operación y flechas de corriente).
 // Uso: node tests/e2e/hierarchy.mjs [url]   (con `npm run preview` corriendo)
 import { readFileSync } from 'node:fs';
-import { frames, steady, menu, skipWelcome, launchBrowser, FIREFOX } from './lib.mjs';
+import { frames, steady, menu, skipWelcome, launchBrowser, FIREFOX, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -22,7 +22,7 @@ const check = (ok, msg) => {
   if (!ok) failed++;
 };
 
-await page.goto(URL);
+await page.goto(sampleUrl(URL));
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
 

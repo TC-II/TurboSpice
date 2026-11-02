@@ -34,7 +34,7 @@ import { findAnalysis, findControl, removeAnalysis } from './schematic/directive
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisDetail, analysisLabel, keepResult, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, keepResult, simName, type SimList, type SimView } from './sim/simList.ts';
 import { hasParkedControl, isComplexLine, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -75,13 +75,12 @@ import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
-import { benchParams, benchVariables } from './schematic/benchParams.ts';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, symParams } from './project/symbolEdit.ts';
 import { adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, storeModelSymbol, storeModelText } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
-import { benchesUsing, childSubckts, moduleFile, modules, placingCycle, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
+import { benchesUsing, moduleFile, modules, placingCycle, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -138,6 +137,7 @@ import { useProbe } from './app/useProbe.ts';
 import { useOpPoint } from './app/useOpPoint.ts';
 import { ResultsPanel } from './app/ResultsPanel.tsx';
 import { ModuleEditors } from './app/ModuleEditors.tsx';
+import { treeBenchesOf, treeSubsOf } from './app/projectTree.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1587,66 +1587,14 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // testbenches del panel, con sus .param y .step (el activo, con lo que se está editando)
   const treeBenches = useMemo(() => {
     if (!treeOpen && !treePeek) return [];
-    return variant.sims.map((x) => {
-      const line = sims.items.find((y) => y.id === x.id)?.line ?? '';
-      const d = x.id === sims.active && !curSub ? liveDoc : parseAsc(x.asc);
-      // sin nombre propio, el automático con el análisis en vivo (el que se está editando)
-      return { id: x.id, name: x.name || (line ? analysisLabel(line) : t('No analysis')), detail: line ? analysisDetail(line) : t('No analysis'), ...(x.group ? { group: x.group } : {}), runs: x.runs.length, params: benchParams(d), steps: benchVariables(d) };
-    });
+    return treeBenchesOf(variant, sims, curSub, liveDoc);
   }, [treeOpen, treePeek, variant, sims, curSub, liveDoc]);
 
   // Panel de proyecto (#180): subcircuitos con sus usos y los que tienen adentro (el que se está
   // editando, con su texto actual)
   const treeSubs = useMemo((): TreeSub[] => {
     if (!treeOpen) return [];
-    const p = curSub ? storeSubckt(project, curSub, ascText(liveDoc)) : storeActive(project, ascText(liveDoc));
-    const label = (asc: string, nm?: string) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'));
-    return modules(p).map((f) => {
-      const name = subName(f.name);
-      // un módulo Verilog (#209): sus pines son los de la última síntesis
-      if (f.kind === 'verilog')
-        return {
-          name,
-          ports: verilogPorts(f, subcktSymbolText(p, name)).length,
-          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-          children: [],
-          outdated: false,
-          text: false,
-          type: 'verilog' as const,
-          ...(isStale(f) ? { unsynthesized: true } : {}),
-        };
-      const stale = staleInstances(p, name, lib, label).map((u) => ({
-        label: u.where.label,
-        inst: u.inst,
-        go: () => goUsage(u, name),
-        detail: [
-          ...(u.unconnected.length ? [u.unconnected.length === 1 ? t('pin {pins} not connected', { pins: u.unconnected[0] }) : t('pins {pins} not connected', { pins: u.unconnected.join(', ') })] : []),
-          ...(u.dangling ? [t('a wire ends on the symbol without a pin (was a port removed?)')] : []),
-        ].join('; '),
-      }));
-      return {
-        ...(stale.length ? { stale } : {}),
-        name,
-        ports: subcktPorts(parseAsc(f.text)).length,
-        uses: usages(p, name, (asc, nm) => nm || (lineOf(asc) ? analysisLabel(lineOf(asc)) : t('No analysis'))).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-        children: childSubckts(p, f.text),
-        outdated: symbolOutdated(p, name),
-        text: false,
-      };
-    }).concat(
-      modelModules(p).map((f): TreeSub => {
-        const name = modelModuleName(f);
-        return {
-          name,
-          type: 'model',
-          ports: (modelSymbolText(p, name)?.match(/^PIN\s/gm) ?? []).length,
-          uses: usages(p, name, label).map((u) => ({ label: u.where.label, inst: u.inst, go: () => goUsage(u, name) })),
-          children: [],
-          outdated: false,
-          text: false,
-        };
-      }),
-    );
+    return treeSubsOf(project, curSub, liveDoc, lib, goUsage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treeOpen, project, curSub, liveDoc, libVersion]);
   const toggleTree = () => {

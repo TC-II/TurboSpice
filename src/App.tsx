@@ -1,5 +1,5 @@
 // TurboSpice: editor de esquemáticos .asc (compatible con LTspice) + simulación con ngspice.
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
@@ -10,7 +10,7 @@ import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
 import { biasCommand, biasParams, elementBias, netBias, pinBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
 import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
-import type { DrawnShapeKind, Point } from './asc/model.ts';
+import type { DrawnShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
 import { isStbPlot, StbView, stbMainTraces } from './waveform/StbView.tsx';
@@ -36,7 +36,7 @@ import { serializeAsc } from './asc/serialize.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { elementRefs, savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { ControlDialog, SimulationDialog, type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine, type FoundLine } from './schematic/directivesEdit.ts';
+import { findAnalysis, findControl, removeAnalysis, replaceAnalysis, replaceLine, setAnalysisLine } from './schematic/directivesEdit.ts';
 import { controlBlock, controlBody } from './sim/controlSnippets.ts';
 import { fmtBytes, measuredSizeProblem, signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
@@ -99,7 +99,7 @@ import { DISPLAY_PREFIXES, formatSi } from './netlist/spicenum.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type Level, type TreeSub } from './project/Hierarchy.tsx';
+import { BenchParamsDialog, NameDialog, ProjectTree, QuickOpen, type BenchItem, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables, setBenchParams } from './schematic/benchParams.ts';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
@@ -150,177 +150,15 @@ import { busNames } from './waveform/digital.ts';
 import { busBits, isBusName } from './netlist/bus.ts';
 import { NewModuleDialog } from './project/NewModuleDialog.tsx';
 import type { SynthResult } from './hdl/yosys.ts';
+import { AMPS, ADC, BASE, DEFAULT_NAME, DEFAULT_PROJECT, EXAMPLES, EXAMPLES_TURBO, GF180, MAX_CACHED_BYTES, PANEL_NAMES, REPO, SAMPLE, SCH_FONT_KEY, SKIN_KEY, SKY130, STABILITY, TRANSFER } from './app/constants.ts';
+import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
+import { lsGet, lsSet, useTheme } from './app/storage.ts';
+import { ascText, clipboardImage, isTyping, registerUserFile, userFileKind } from './app/helpers.ts';
+import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
 
-/** Resultados más grandes que esto no se guardan en el navegador al simular */
-const MAX_CACHED_BYTES = 256 * 1024 ** 2;
-
-/** Nombre de un proyecto nuevo; con sesión de Google pasa a «Project 2», «Project 3»… si ya está en el Drive */
-const DEFAULT_PROJECT = 'Project';
-const DEFAULT_NAME = /^project( \d+)?$/i;
-
-const BASE = import.meta.env.BASE_URL;
-const REPO = 'https://github.com/TC-II/TurboSpice';
-/** El skin de los símbolos elegido en Configuración (#329) */
-const SKIN_KEY = 'turbospice.skin';
-/** La letra del esquemático elegida en Configuración (#328) */
-const SCH_FONT_KEY = 'turbospice.schFont';
-// public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
-// y los ejemplos sueltos, una variante cada uno de Examples.turbo
-const SAMPLE = 'Sample Project.turbo';
-/** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
-const ADC = 'ADC.turbo';
-const EXAMPLES_TURBO = 'Examples.turbo';
-const EXAMPLES = ['Half-wave Rectifier', 'Common Emitter', 'Inverting Amplifier', 'Loop Gain (.stb)'];
-/** las transferencias de 1er y 2do orden con RC y RLC: un workbench cada una (scripts/make-examples.ts) */
-const TRANSFER = 'Transfer functions.turbo';
-/** emisor común, degenerado, colector común y base común, BJT contra MOSFET (scripts/make-examples.ts) */
-const AMPS = 'Transistor amplifiers.turbo';
-/** ganancia de lazo (.stb) con la sonda simple y la diferencial (scripts/make-examples.ts) */
-const STABILITY = 'Loop stability.turbo';
-/** transistores del PDK sky130 en varias esquinas (scripts/make-examples.ts, docs/pdk.md) */
-const SKY130 = 'sky130.turbo';
-const GF180 = 'gf180.turbo';
-
-type Dialog =
-  | { kind: 'picker'; forSymbol?: boolean; forNetlist?: boolean }
-  | { kind: 'attrs'; index: number; label?: number; generic?: boolean }
-  | { kind: 'switch'; index: number }
-  | { kind: 'source'; index: number }
-  | { kind: 'text'; index?: number; textKind: 'directive' | 'comment' }
-  | { kind: 'flag'; index?: number; at?: Point; ioPin?: string }
-  | { kind: 'sim'; found: FoundLine | null; analysis?: AnalysisKind }
-  | { kind: 'control'; index: number }
-  /** qué señales se guardan (#314); `signals` llega después de armar la netlist */
-  | { kind: 'share'; url: string }
-  | { kind: 'export' }
-  | { kind: 'help' }
-  | { kind: 'userfiles' }
-  | { kind: 'importinfo' }
-  | { kind: 'study' }
-  | { kind: 'runs' }
-  | { kind: 'about' }
-  | { kind: 'settings' }
-  | { kind: 'drive' }
-  /** borrar una simulación (con el control deslizante) */
-  | { kind: 'deleteSim'; id: string }
-  | { kind: 'deleteVariant'; id: string }
-  | { kind: 'projectfiles' }
-  /** módulo nuevo (#209): esquemático o Verilog, el que se eligió en «+ New» */
-  | { kind: 'newModule'; module: 'schematic' | 'verilog' }
-  /** pedir un nombre (testbench o subcircuito, #180) */
-  | { kind: 'name'; title: string; label: string; initial: string; check(name: string): string | null; onOk(name: string): void }
-  /** parámetros y variables del testbench (#180) */
-  | { kind: 'benchParams' }
-  /** confirmar con el control deslizante */
-  | { kind: 'slide'; title: string; message: string; onConfirm(): void }
-  /** estilo de línea para las figuras indicadas y las que se dibujen después */
-  | { kind: 'lineStyle'; shapes: number[] };
-
-/** Resultados de una simulación */
-/** Nivel de la jerarquía abierto (#180): prefijo de sus vectores en ngspice y red de arriba de cada puerto */
-interface HierLevel extends Level {
-  prefix: string;
-  ports: Map<string, string>;
-}
-
-interface SimRun {
-  built: BuiltSimulation;
-  result: SimResult;
-  doc: AscDoc;
-  meas: MeasTable | null;
-}
-
-interface FileState {
-  name: string;
-  handle?: Parameters<typeof saveFile>[2];
-  /** id del archivo en Google Drive (si se abrió o guardó ahí) */
-  driveId?: string;
-  /** versión del archivo en Drive cuando se abrió o guardó: si cambió, otro lo modificó (#156) */
-  driveVersion?: string;
-}
-
-// Serialización cacheada por documento (el autoguardado y el cambio de simulación la usan seguido)
-const ascCache = new WeakMap<AscDoc, string>();
-const ascText = (d: AscDoc) => {
-  let tt = ascCache.get(d);
-  if (tt === undefined) ascCache.set(d, (tt = serializeAsc(d)));
-  return tt;
-};
-
-const isTyping = (e: KeyboardEvent) =>
-  e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
-
-type Theme = 'auto' | 'light' | 'dark';
-
-/** Tema claro/oscuro elegido en la app (por defecto, el del sistema) */
-function useTheme(): [Theme, (tt: Theme) => void] {
-  const [theme, setTheme] = useState<Theme>(() => {
-    try {
-      return (localStorage.getItem('turbospice.theme') as Theme) || 'auto';
-    } catch {
-      return 'auto';
-    }
-  });
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'auto') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
-    try {
-      localStorage.setItem('turbospice.theme', theme);
-    } catch {
-      // sin almacenamiento: el tema vale sólo para esta sesión
-    }
-  }, [theme]);
-  return [theme, setTheme];
-}
-
-const lsGet = (k: string) => {
-  try {
-    return localStorage.getItem(k);
-  } catch {
-    return null;
-  }
-};
-const lsSet = (k: string, v: string) => {
-  try {
-    localStorage.setItem(k, v);
-  } catch {
-    // sin almacenamiento
-  }
-};
-
-/** Registra un archivo del usuario en la librería (símbolo, modelos o bloque) */
-function registerUserFile(lib: Library, f: UserFile) {
-  if (f.kind === 'symbol') lib.addSymbol(f.name.replace(/\.asy$/i, ''), f.text);
-  else if (f.kind === 'model') lib.addModelFile(f.name, f.text);
-  else lib.addSchematic(f.name, f.text);
-}
-
-const userFileKind = (name: string): UserFile['kind'] | null =>
-  /\.asy$/i.test(name) ? 'symbol' : /\.(lib|sub|mod|inc|cir|txt|lb)$/i.test(name) ? 'model' : /\.asc$/i.test(name) ? 'schematic' : null;
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
 let clipboardFallback = '';
-
-/**
- * Imagen pegada → data URL y tamaño en unidades del esquemático (1 px = 1 unidad, el lado mayor
- * a lo sumo 800). Las grandes se achican y pasan a JPEG para no inflar el archivo.
- */
-async function clipboardImage(blob: Blob): Promise<{ data: string; w: number; h: number }> {
-  const bmp = await createImageBitmap(blob);
-  const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bmp.width * k);
-  canvas.height = Math.round(bmp.height * k);
-  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-  const png = canvas.toDataURL('image/png');
-  const data = png.length > 600_000 ? canvas.toDataURL('image/jpeg', 0.85) : png;
-  const s = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
-  return { data, w: Math.round(bmp.width * s), h: Math.round(bmp.height * s) };
-}
-
-/** Nombre de cada vista del panel de resultados (en el botón Resultados) */
-const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Errors'), meas: t('Measurements') };
 
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
@@ -4827,82 +4665,4 @@ ${ltNetlistText(sim.built.lt)}
       )}
     </div>
   );
-}
-
-type Hover = { ref: ItemRef | null; at: Point } | null;
-
-/** Barra de estado de abajo: lo que hay bajo el mouse (con su propio estado, #187) */
-/** Barra de estado bajo el esquemático: la ayuda a la izquierda y los avisos a la derecha (#229: sin ventanas emergentes) */
-function HintBar({ sink, text, message, onDismiss, offers }: { sink: MutableRefObject<((h: Hover) => void) | undefined>; text(hover: Hover): string; message?: string; onDismiss(): void; offers?: ReactNode }) {
-  const [hover, setHover] = useState<Hover>(null);
-  useEffect(() => {
-    sink.current = setHover;
-    return () => {
-      sink.current = undefined;
-    };
-  }, [sink]);
-  const error = !!message && /could not|couldn't|failed|error|no se pudo|falló/i.test(message);
-  // los avisos se van solos; los largos y los errores duran más para poder leerlos
-  const ms = message ? Math.min(45000, Math.max(error ? 30000 : 18000, message.length * 210)) : 0;
-  useEffect(() => {
-    if (!message) return;
-    const id = setTimeout(onDismiss, ms);
-    return () => clearTimeout(id);
-  }, [message]); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <div className="hint-bar">
-      <span className="hint-text">{text(hover)}</span>
-      {offers}
-      {message && (
-        <span className={error ? 'status-msg error' : 'status-msg'} role="status" title={message} onClick={onDismiss}>
-          {message}
-        </span>
-      )}
-      {message && (
-        // cuánto le queda al aviso: el aro se vacía desde las 12 en sentido antihorario (key: reinicia con cada aviso)
-        <svg key={message} className={error ? 'status-timer error' : 'status-timer'} viewBox="0 0 12 12" aria-hidden="true">
-          <circle className="track" cx="6" cy="6" r="4.5" />
-          <circle className="left" cx="6" cy="6" r="4.5" pathLength={100} style={{ animationDuration: `${ms}ms` }} />
-        </svg>
-      )}
-    </div>
-  );
-}
-
-function toolHint(tt: Tool): string {
-  switch (tt.kind) {
-    case 'select':
-      return '';
-    case 'wire':
-      return tt.start ? t('Click to fix the segment (Ctrl: straight line) · right-click or Esc to finish') : t('Click to start the wire');
-    case 'place':
-      return t('Placing {type} · Ctrl+R rotate · Ctrl+E mirror · Esc to finish', { type: tt.type });
-    case 'flag':
-      return tt.name === '0' ? t('Click to place ground · Esc to finish') : t('Click to place the label "{name}"', { name: tt.name });
-    case 'text':
-      return t('Click to place the text');
-    case 'comment':
-      return t('Click where the comment goes and type · Enter or click outside to finish · Shift+Enter for a new line · Esc to cancel');
-    case 'delete':
-      return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
-    case 'probe':
-      return t('Click a wire to see its voltage or a component for its current · Esc to edit');
-    case 'move':
-      return tt.refs
-        ? t('Click to drop{p0} · right-click or Esc cancels', { p0: tt.stretch ? t(' (wires stretch)') : '' })
-        : t('{p0}: click an element or drag a box to choose · Esc to finish', { p0: t('Move (without stretching wires)') });
-    case 'shape': {
-      const n = tt.pts.length;
-      if (tt.shape === 'ARC' && n >= 2) return t('{p0} · right-click cancels', { p0: n === 2 ? t("Click the arc's start point") : t('Click the end point (counterclockwise)') });
-      if (n) return t('Click to finish{p0} · right-click cancels', { p0: tt.shape === 'ARC' ? t(' the arc\'s box') : '' });
-      const what = { LINE: t('the line'), RECTANGLE: t('the rectangle'), CIRCLE: t('the circle (its box)'), ARC: t('the arc (its ellipse\'s box)') }[tt.shape];
-      return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
-    }
-    case 'pencil':
-      return t('Drag to draw freehand · Esc to finish');
-    case 'zoom':
-      return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
-    case 'pick':
-      return tt.what === 'net' ? t('Click a wire or pin to choose its net · Esc cancels') : tt.what === 'source' ? t('Click a V or I source to choose it · Esc cancels') : tt.what === 'probe' ? t('Click a loop probe (LoopProbe or LoopProbe_Dif) to choose it · Esc cancels') : t('Click a component to choose it · Esc cancels');
-  }
 }

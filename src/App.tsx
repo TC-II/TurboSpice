@@ -78,10 +78,10 @@ import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
 import { benchParams, benchVariables } from './schematic/benchParams.ts';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
-import { adoptSymbol, formatParamList, parseParamList, setSymParams, symParams } from './project/symbolEdit.ts';
+import { adoptSymbol, formatParamList, parseParamList, symParams } from './project/symbolEdit.ts';
 import { adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, storeModelSymbol, storeModelText } from './project/modelModule.ts';
-import { ModelEditor, SymbolEditor, Tutorial } from './lazyViews.ts';
-import { benchesUsing, childSubckts, moduleFile, modules, placingCycle, storeSymbol, subcktSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
+import { Tutorial } from './lazyViews.ts';
+import { benchesUsing, childSubckts, moduleFile, modules, placingCycle, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -112,9 +112,8 @@ import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
 import { compileBehavioral, synthesizeVerilog } from './hdl/client.ts';
-import { looksBehavioral, setHdlMode, vvpFileOf, withParams, applySynth, isStale, moduleOf, storeVerilog, verilogFile, verilogModules, verilogPorts, verilogSources, verilogSymbol } from './hdl/project.ts';
+import { vvpFileOf, applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogPorts, verilogSources } from './hdl/project.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
-import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
 import type { SynthResult } from './hdl/yosys.ts';
 import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
@@ -138,6 +137,7 @@ import { useImportExport } from './app/useImportExport.ts';
 import { useProbe } from './app/useProbe.ts';
 import { useOpPoint } from './app/useOpPoint.ts';
 import { ResultsPanel } from './app/ResultsPanel.tsx';
+import { ModuleEditors } from './app/ModuleEditors.tsx';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -2344,70 +2344,8 @@ ${ltNetlistText(sim.built.lt)}
               if (files.length) importSubckts(files);
             }}
           />
-          {curSub && symText && (
-            <Suspense fallback={null}>
-            <SymbolEditor
-              name={curSub}
-              text={symText}
-              ports={subPorts}
-              onChange={editSymbol}
-              onParams={(ps) => editSymbol(curVerilog ? withParams(symText, ps) : setSymParams(symText, ps))}
-              onReset={() =>
-                editSymbol(curVerilog?.synth ? setSymParams(verilogSymbol(curSub, curVerilog.synth), symParams(symText)) : setSymParams(subcktSymbol(curSub, liveDoc).text, symParams(symText)))
-              }
-              onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
-              onWidth={setSymW}
-              onAddPort={addPort}
-            />
-            </Suspense>
-          )}
-          {curModel && modelModuleFile(project, curModel) && (
-            <Suspense fallback={null}>
-            <ModelEditor
-              name={curModel}
-              text={modelModuleFile(project, curModel)!.text}
-              symText={modelSymbolText(project, curModel) ?? ''}
-              onText={(text) => {
-                const p = storeModelText(projectRef.current, curModel, text);
-                projectRef.current = p;
-                editProject(p);
-              }}
-              onSymbol={(text) => {
-                const p = storeModelSymbol(projectRef.current, curModel, text);
-                projectRef.current = p;
-                editProject(p);
-              }}
-              onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
-              onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
-              onClose={() => setCurModel('')}
-            />
-            </Suspense>
-          )}
+          <ModuleEditors {...{ project, projectRef, editProject, curSub, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, setDialog, synthModule, warnShared }} />
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
-          {curVerilog && (
-            <VerilogModule
-              name={curSub}
-              text={curVerilog.text}
-              stale={isStale(curVerilog)}
-              mode={curVerilog.hdl === 'behavioral' ? 'behavioral' : 'synth'}
-              suggestBehavioral={curVerilog.hdl !== 'behavioral' && looksBehavioral(curVerilog.text)}
-              onMode={(m) => {
-                const p = setHdlMode(projectRef.current, curSub, m);
-                projectRef.current = p;
-                editProject(p);
-              }}
-              pins={curVerilog.synth?.pins ?? []}
-              params={symText ? symParams(symText) : []}
-              onText={(text) => {
-                const p = storeVerilog(projectRef.current, curSub, text);
-                projectRef.current = p;
-                editProject(p);
-                warnShared();
-              }}
-              onSynthesize={(text) => synthModule(curSub, text)}
-              onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
-            />
-          )}
           {textMenu && doc.texts[textMenu.index] &&
             createPortal(
               <TextMenu

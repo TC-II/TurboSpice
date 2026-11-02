@@ -30,16 +30,14 @@ import { findControl, removeAnalysis } from './schematic/directivesEdit.ts';
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSIS_LINE } from './sim/analyses.ts';
-import { activeSim, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, type SimList, type SimView } from './sim/simList.ts';
 import { simLine } from './sim/complexSim.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
-  applyValues,
   mergeFiles,
   projectFileKind,
   lineOf,
-  setSimAsc,
   simOf,
   simsWithValue,
   valueChanges,
@@ -82,7 +80,7 @@ import { AccountButton } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
-import { locale, t } from './i18n/i18n.ts';
+import { t } from './i18n/i18n.ts';
 import { moduleOf } from './hdl/project.ts';
 import { BASE, DEFAULT_PROJECT, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
@@ -126,6 +124,7 @@ import { usePicker } from './app/usePicker.ts';
 import { useLayoutPrefs } from './app/useLayoutPrefs.ts';
 import { EditorArea } from './app/EditorArea.tsx';
 import { ProjectPanel } from './app/ProjectPanel.tsx';
+import { runHistoryActions } from './app/runHistory.ts';
 
 
 export function App() {
@@ -717,53 +716,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     if (file.handle) setMessage(t('Saving (Ctrl+S) will create «{newName}»', { newName }));
   };
 
-  /** Restore: la corrida pasa a ser el circuito actual (un paso más de deshacer) */
-  const restoreRun = (id: string) => {
-    const r = curRuns.find((x) => x.id === id);
-    if (!r) return;
-    setViewRun('');
-    viewingRef.current = false;
-    setValueOffer(null);
-    history.commit(parseAsc(r.asc));
-    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: new Date(r.time).toLocaleString(locale()) }));
-  };
-  /** Clonar: una simulación nueva con el circuito de esa corrida */
-  const cloneRun = (id: string) => {
-    const r = curRuns.find((x) => x.id === id);
-    if (!r || !curSim) return;
-    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString(locale())})`);
-    enter(res.project);
-    markDirty();
-  };
-  const openHistory = (id: string) => {
-    goSim(id);
-    setViewRun('');
-    setHistoryOpen(true);
-  };
+  const { restoreRun, cloneRun, openHistory, applyValueOffer } = runHistoryActions({
+    ...{ curRuns, curSim: activeSim(sims), history, stacks, viewingRef, projectRef, editProject, leave, enter, goSim, markDirty, setViewRun, setHistoryOpen, valueOffer, setValueOffer, setMessage },
+  });
   useEffect(() => setSelection([]), [viewRun]);
 
-  /** «Aplicar»: el valor nuevo va a las otras simulaciones, cada una con su paso de deshacer */
-  const applyValueOffer = () => {
-    if (!valueOffer) return;
-    let p = projectRef.current;
-    const v = variantOf(p);
-    let n = 0;
-    for (const id of valueOffer.sims) {
-      const s = simOf(v, id);
-      if (!s) continue;
-      const key = `${v.id}/${id}`;
-      const h = stacks.current.get(key);
-      const cur = h?.present ?? parseAsc(s.asc);
-      const next = applyValues(cur, valueOffer.changes);
-      if (next === cur) continue;
-      stacks.current.set(key, { past: [...(h?.past ?? []), cur], present: next, future: [] });
-      p = setSimAsc(p, id, ascText(next));
-      n++;
-    }
-    editProject(p);
-    setValueOffer(null);
-    setMessage(t('Applied to {p0}', { p0: n === 1 ? t('1 simulation') : t('{n} simulations', { n }) }));
-  };
   const curSim = activeSim(sims);
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
   const simMenu = useRef<(() => void) | null>(null);

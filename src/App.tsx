@@ -8,13 +8,13 @@ import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from '
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
-import { biasCommand, biasParams, elementBias, netBias, pinBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
+import { elementBias, netBias, pinBias, sameCircuit, scopedNetBias, type Bias } from './sim/bias.ts';
 import { pinPoints, symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
 import { isStbPlot, StbView, stbMainTraces } from './waveform/StbView.tsx';
-import { isPzBodePlot, pzBodePlots, pzMarks, pzRoots } from './waveform/pz.ts';
+import { isPzBodePlot, pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
@@ -34,10 +34,10 @@ import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { elementRefs, savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis, setAnalysisLine } from './schematic/directivesEdit.ts';
-import { measuredSizeProblem, signalsThatFit, simLimits } from './sim/estimate.ts';
+import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
 import { ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
-import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, analysisProblem, pzLogErrors, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
+import { activeSim, analysisDetail, analysisLabel, defaultLine, keepResult, reuseLine, simName, type SimList, type SimView } from './sim/simList.ts';
 import { hasParkedControl, isComplexLine, parkControl, simLine, unparkControl } from './sim/complexSim.ts';
 import {
   activeAsc,
@@ -102,7 +102,7 @@ import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSi
 import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
-import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
+import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
 import { paneCurves, placeTrace, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { evalTrace, type Resolver } from './waveform/expr.ts';
@@ -112,7 +112,7 @@ import { deviceParamTraces, digitalProbeExpr, multiPinPrefix, probeExpr, traceRe
 import { deviceRefs } from './sim/deviceParams.ts';
 import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
-import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog, type MeasTable } from './sim/measResults.ts';
+import { type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
 import { type StudyInfo } from './schematic/StudyPanel.tsx';
 import { parseAnalysis } from './sim/analyses.ts';
@@ -148,6 +148,7 @@ import { useDrive } from './app/useDrive.ts';
 import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 import { SimRow } from './app/SimRow.tsx';
 import { ProblemsList, simProblems } from './app/Problems.tsx';
+import { runTestbench } from './app/simulate.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1062,67 +1063,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
       setAutoDrive((n) => n + 1);
     }
     try {
-      if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
-      // los módulos Verilog que cambiaron se sintetizan antes (#209)
-      await synthStale();
-      const prepare = async (pinCurrents: boolean) => {
-        const b = await buildSimulation(doc, lib, ascName(), allTraces(), { pinCurrents });
-        // y las instancias con otro parameter usan su propia síntesis
-        const vv = await withVariants(b.netlist);
-        b.netlist = vv.netlist;
-        b.files = { ...b.files, ...vv.files };
-        b.warnings.push(...vv.warnings);
-        return b;
-      };
-      let built = await prepare(true);
-      // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)
-      // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
-      // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
-      const incomplete = analysisProblem(lineOf(simAsc) ?? '');
-      const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
-      // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
-      // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
-      const run = (b: BuiltSimulation) => {
-        const lim = simLimits(!!streamPlan(b.netlist));
-        return engine.simulate(b.netlist, b.files, { bias: biasParams(b), biasCommand: biasCommand(b.netlist).cmd, digital: b.digitalSaves, maxBytes: unlimited ? lim.full : lim.max, project: !unlimited });
-      };
-      let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
-      // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
-      // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
-      if (!blocking.length && !result.aborted && [...result.errors, ...result.log].some((l) => /singular/i.test(l))) {
-        const plain = await prepare(false);
-        if (plain.netlist !== built.netlist) {
-          const again = await run(plain);
-          if (!again.result.errors.some((l) => /singular/i.test(l))) {
-            built = plain;
-            ({ result, ms } = again);
-            built.warnings.push(t('Simulated without the subcircuit pin currents (Ix): with them the matrix was singular'));
-          }
-        }
-      }
-      // cortado porque no iba a entrar: cuánto iba a guardar y qué hacer; los plots traen lo simulado
-      if (result.sizeStop) {
-        // (cuántas señales o cuánto del final entran: con el límite de una corrida normal, no el de «seguir igual»)
-        const big = measuredSizeProblem(lineOf(simAsc) ?? '.tran', result.sizeStop, simLimits(!!streamPlan(built.netlist)).max);
-        built.tooBig = [...built.tooBig, big];
-        result.errors = [big.text];
-      }
-      // los errores de un .pz que ngspice deja sólo en el log ("Input is shorted"), explicados
-      const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
-      if (pzErrs.length) result.errors.unshift(...pzErrs);
-      if (result.bias) setOpPoint({ doc, built, bias: result.bias });
-      result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
-      // .pz sin otro análisis en frecuencia: su Bode normalizado, con el mapa al lado (#343)
-      result.plots.push(...pzBodePlots(result.plots));
-      // .meas: se evalúan sobre los resultados de cada corrida
-      const cardMeas = measureResults(built, result.plots, stepLabels(result.plots, built.ng.steps));
-      const mp = cardMeas && measSweepPlot(cardMeas, built);
-      if (mp) result.plots.push(mp);
-      // gráficos x-y de un programa de bloques, y sus listas y tabla (#179)
-      const blk = built.ng.blocks ? blockResultsFromLog(result.log) : { table: null, plots: [] };
-      const xy = [...xyPlotsFromLog(result.log, built.ng.xyPlots), ...blk.plots];
-      result.plots.push(...xy);
-      const meas = cardMeas ?? blk.table;
+      const { built, result, ms, meas, blk, xy } = await runTestbench({
+        ...{ doc, simAsc, lib, ltIndex, engine, unlimited, ascName, allTraces, synthStale, withVariants },
+        onBias: (built, bias) => setOpPoint({ doc, built, bias }),
+      });
       // los resultados de la última corrida quedan en el navegador (no van en el .turbo); los muy
       // grandes no: guardarlos los copia entera otra vez (y la base del navegador puede no admitirlos)
       if (id) {

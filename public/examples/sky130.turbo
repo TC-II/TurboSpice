@@ -5,23 +5,23 @@
  "created": "2026-10-22T17:00:00.000Z",
  "modified": "2026-10-22T17:00:00.000Z",
  "files": [],
- "activeTestbench": "smvuknjca39",
+ "activeTestbench": "smvzpkfet38",
  "groups": [
   {
-   "id": "gmvuknjca37",
+   "id": "gmvzpkfet36",
    "name": "NMOS curves"
   },
   {
-   "id": "gmvuknjca38",
+   "id": "gmvzpkfet37",
    "name": "CMOS inverter"
   }
  ],
  "testbenches": [
   {
-   "id": "smvuknjca39",
+   "id": "smvzpkfet38",
    "name": "ID against VDS (tt)",
-   "group": "gmvuknjca37",
-   "current": "sha256:56d507d2abeca683fe9e48c0016b8300106056370bae5d59a2e1031b2f55b379",
+   "group": "gmvzpkfet36",
+   "current": "sha256:ef1eca8fc0bb6616672324cb0fd7694db883e2381ef76d360f9d72568d3b344f",
    "view": {
     "panes": [
      {
@@ -39,10 +39,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3a",
+   "id": "smvzpkfet39",
    "name": "ID against VDS (ff)",
-   "group": "gmvuknjca37",
-   "current": "sha256:89d08c332eea313a73e79532510c059439f0e7c2e4ca6d311a5e05aac4c241dd",
+   "group": "gmvzpkfet36",
+   "current": "sha256:955a1868e5b99372ecf76437b7a17e3d070f69c2703ac972df934d38cf56ca9a",
    "view": {
     "panes": [
      {
@@ -60,10 +60,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3b",
+   "id": "smvzpkfet3a",
    "name": "ID against VDS (ss)",
-   "group": "gmvuknjca37",
-   "current": "sha256:6c2d2fb75f62d6ffd06451aabb699caa5e962f7edd3a9ab274fbf463bd82f4e6",
+   "group": "gmvzpkfet36",
+   "current": "sha256:21c21dc87cdc804ba8c4e4084e7d73292b68dd5ff5fbe657bef86104eb835a35",
    "view": {
     "panes": [
      {
@@ -81,10 +81,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3c",
+   "id": "smvzpkfet3b",
    "name": "Transfer curve (tt)",
-   "group": "gmvuknjca38",
-   "current": "sha256:ea917ac367d8bf348f15a27020e4f46340e9518c15b3c2701dc889ee3f1003b8",
+   "group": "gmvzpkfet37",
+   "current": "sha256:667eb8d386579eb0988814be7377e4b5d125dafa0e8aac20049593373bdc1028",
    "view": {
     "panes": [
      {
@@ -102,10 +102,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3d",
+   "id": "smvzpkfeu3c",
    "name": "Transfer curve (ff)",
-   "group": "gmvuknjca38",
-   "current": "sha256:6ec12a71ff11e66298d547c1a7d9a0f8965d46851ebf97c6bf125fb48b68a847",
+   "group": "gmvzpkfet37",
+   "current": "sha256:20a129b5284aefae7eaf14003b141956865997c744da90dd2f756b0785bf0532",
    "view": {
     "panes": [
      {
@@ -123,10 +123,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3e",
+   "id": "smvzpkfeu3d",
    "name": "Transfer curve (ss)",
-   "group": "gmvuknjca38",
-   "current": "sha256:537d52851b95f776f104767d243dca1111060957aa842a0bf9e1bcca8463fd3b",
+   "group": "gmvzpkfet37",
+   "current": "sha256:55f42245017871a694616bd1993e63c6a4c1cec456df2c62547246ec927700f0",
    "view": {
     "panes": [
      {
@@ -144,10 +144,10 @@
    "runs": []
   },
   {
-   "id": "smvuknjca3f",
+   "id": "smvzpkfeu3e",
    "name": "Step response (tt)",
-   "group": "gmvuknjca38",
-   "current": "sha256:4e72de32837cf836c88e7db2356817bc090b872a9f562f495a13659c8bde3964",
+   "group": "gmvzpkfet37",
+   "current": "sha256:c5bd277609dfd86e73ada452c8940508f8ddecbee04eb3e1efbaba6f5e7b602a",
    "view": {
     "panes": [
      {
@@ -170,12 +170,12 @@
   }
  ],
  "blobs": {
-  "sha256:56d507d2abeca683fe9e48c0016b8300106056370bae5d59a2e1031b2f55b379": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 d\r\nFLAG 0 80 g\r\nFLAG 48 96 0\r\nFLAG 48 48 0\r\nFLAG 240 16 d\r\nFLAG 240 96 0\r\nFLAG 368 16 g\r\nFLAG 368 96 0\r\nSYMBOL sky130\\nfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 240 0 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 368 0 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 0 216 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\n",
-  "sha256:89d08c332eea313a73e79532510c059439f0e7c2e4ca6d311a5e05aac4c241dd": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 d\r\nFLAG 0 80 g\r\nFLAG 48 96 0\r\nFLAG 48 48 0\r\nFLAG 240 16 d\r\nFLAG 240 96 0\r\nFLAG 368 16 g\r\nFLAG 368 96 0\r\nSYMBOL sky130\\nfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 240 0 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 368 0 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 0 216 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\nTEXT -64 400 Left 0 ;.pdk eyJjb3JuZXIiOiJmZiJ9\r\n",
-  "sha256:6c2d2fb75f62d6ffd06451aabb699caa5e962f7edd3a9ab274fbf463bd82f4e6": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 d\r\nFLAG 0 80 g\r\nFLAG 48 96 0\r\nFLAG 48 48 0\r\nFLAG 240 16 d\r\nFLAG 240 96 0\r\nFLAG 368 16 g\r\nFLAG 368 96 0\r\nSYMBOL sky130\\nfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 240 0 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 368 0 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 0 216 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\nTEXT -64 400 Left 0 ;.pdk eyJjb3JuZXIiOiJzcyJ9\r\n",
-  "sha256:ea917ac367d8bf348f15a27020e4f46340e9518c15b3c2701dc889ee3f1003b8": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 out\r\nFLAG 0 80 in\r\nFLAG 48 96 vdd\r\nFLAG 48 48 vdd\r\nFLAG 248 0 out\r\nFLAG 200 80 in\r\nFLAG 248 96 0\r\nFLAG 248 48 0\r\nFLAG 400 16 vdd\r\nFLAG 400 96 0\r\nFLAG 528 16 in\r\nFLAG 528 96 0\r\nSYMBOL sky130\\pfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 200 0 R0\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 400 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 528 0 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc V2 0 1.8 0.01\r\n",
-  "sha256:6ec12a71ff11e66298d547c1a7d9a0f8965d46851ebf97c6bf125fb48b68a847": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 out\r\nFLAG 0 80 in\r\nFLAG 48 96 vdd\r\nFLAG 48 48 vdd\r\nFLAG 248 0 out\r\nFLAG 200 80 in\r\nFLAG 248 96 0\r\nFLAG 248 48 0\r\nFLAG 400 16 vdd\r\nFLAG 400 96 0\r\nFLAG 528 16 in\r\nFLAG 528 96 0\r\nSYMBOL sky130\\pfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 200 0 R0\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 400 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 528 0 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc V2 0 1.8 0.01\r\nTEXT -64 368 Left 0 ;.pdk eyJjb3JuZXIiOiJmZiJ9\r\n",
-  "sha256:537d52851b95f776f104767d243dca1111060957aa842a0bf9e1bcca8463fd3b": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 out\r\nFLAG 0 80 in\r\nFLAG 48 96 vdd\r\nFLAG 48 48 vdd\r\nFLAG 248 0 out\r\nFLAG 200 80 in\r\nFLAG 248 96 0\r\nFLAG 248 48 0\r\nFLAG 400 16 vdd\r\nFLAG 400 96 0\r\nFLAG 528 16 in\r\nFLAG 528 96 0\r\nSYMBOL sky130\\pfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 200 0 R0\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 400 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 528 0 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 0 184 Left 2 !.dc V2 0 1.8 0.01\r\nTEXT -64 368 Left 0 ;.pdk eyJjb3JuZXIiOiJzcyJ9\r\n",
-  "sha256:4e72de32837cf836c88e7db2356817bc090b872a9f562f495a13659c8bde3964": "Version 4\r\nSHEET 1 880 680\r\nFLAG 48 0 out\r\nFLAG 0 80 in\r\nFLAG 48 96 vdd\r\nFLAG 48 48 vdd\r\nFLAG 248 0 out\r\nFLAG 200 80 in\r\nFLAG 248 96 0\r\nFLAG 248 48 0\r\nFLAG 400 16 vdd\r\nFLAG 400 96 0\r\nFLAG 528 16 in\r\nFLAG 528 96 0\r\nSYMBOL sky130\\pfet_01v8 0 0 R0\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 200 0 R0\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 400 0 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 528 0 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V2\r\nSYMATTR Value PULSE(0 1.8 0.5n 50p 50p 1n 2n)\r\nTEXT 0 184 Left 2 !.tran 4n\r\n"
+  "sha256:ef1eca8fc0bb6616672324cb0fd7694db883e2381ef76d360f9d72568d3b344f": "Version 4\r\nSHEET 1 880 680\r\nWIRE 352 112 352 160\r\nWIRE 640 112 352 112\r\nWIRE 640 176 640 112\r\nWIRE 128 240 304 240\r\nWIRE 128 288 128 240\r\nWIRE 352 272 352 256\r\nWIRE 384 272 352 272\r\nWIRE 384 208 384 272\r\nWIRE 352 208 384 208\r\nFLAG 352 112 d\r\nFLAG 224 240 g\r\nFLAG 352 272 0\r\nFLAG 128 368 0\r\nFLAG 640 256 0\r\nSYMBOL sky130\\nfet_01v8 304 160 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 640 160 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 272 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 16 432 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 16 464 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\n",
+  "sha256:955a1868e5b99372ecf76437b7a17e3d070f69c2703ac972df934d38cf56ca9a": "Version 4\r\nSHEET 1 880 680\r\nWIRE 352 112 352 160\r\nWIRE 640 112 352 112\r\nWIRE 640 176 640 112\r\nWIRE 128 240 304 240\r\nWIRE 128 288 128 240\r\nWIRE 352 272 352 256\r\nWIRE 384 272 352 272\r\nWIRE 384 208 384 272\r\nWIRE 352 208 384 208\r\nFLAG 352 112 d\r\nFLAG 224 240 g\r\nFLAG 352 272 0\r\nFLAG 128 368 0\r\nFLAG 640 256 0\r\nSYMBOL sky130\\nfet_01v8 304 160 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 640 160 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 272 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 16 432 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 16 464 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\nTEXT 16 648 Left 0 ;.pdk eyJjb3JuZXIiOiJmZiJ9\r\n",
+  "sha256:21c21dc87cdc804ba8c4e4084e7d73292b68dd5ff5fbe657bef86104eb835a35": "Version 4\r\nSHEET 1 880 680\r\nWIRE 352 112 352 160\r\nWIRE 640 112 352 112\r\nWIRE 640 176 640 112\r\nWIRE 128 240 304 240\r\nWIRE 128 288 128 240\r\nWIRE 352 272 352 256\r\nWIRE 384 272 352 272\r\nWIRE 384 208 384 272\r\nWIRE 352 208 384 208\r\nFLAG 352 112 d\r\nFLAG 224 240 g\r\nFLAG 352 272 0\r\nFLAG 128 368 0\r\nFLAG 640 256 0\r\nSYMBOL sky130\\nfet_01v8 304 160 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=1 L=0.15 nf=1\r\nSYMBOL voltage 640 160 R0\r\nSYMATTR InstName VD\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 272 R0\r\nSYMATTR InstName VG\r\nSYMATTR Value 0.9\r\nTEXT 16 432 Left 2 !.dc VD 0 1.8 0.01 VG 0.4 1.8 0.2\r\nTEXT 16 464 Left 2 ;sky130 nfet_01v8, W = 1 µm, L = 0.15 µm: drain current against VDS for VGS from 0.4 to 1.8 V\r\nTEXT 16 648 Left 0 ;.pdk eyJjb3JuZXIiOiJzcyJ9\r\n",
+  "sha256:667eb8d386579eb0988814be7377e4b5d125dafa0e8aac20049593373bdc1028": "Version 4\r\nSHEET 1 880 680\r\nWIRE 448 128 448 144\r\nWIRE 480 128 448 128\r\nWIRE 480 192 480 128\r\nWIRE 448 192 480 192\r\nWIRE 352 160 400 160\r\nWIRE 352 256 352 160\r\nWIRE 352 368 352 256\r\nWIRE 400 368 352 368\r\nWIRE 304 256 352 256\r\nWIRE 448 256 448 240\r\nWIRE 448 288 448 256\r\nWIRE 544 256 448 256\r\nWIRE 448 400 448 384\r\nWIRE 480 400 448 400\r\nWIRE 480 336 480 400\r\nWIRE 448 336 480 336\r\nWIRE 16 112 16 160\r\nWIRE 128 112 128 160\r\nFLAG 448 128 vdd\r\nFLAG 304 256 in\r\nFLAG 544 256 out\r\nFLAG 448 400 0\r\nFLAG 16 112 vdd\r\nFLAG 16 240 0\r\nFLAG 128 112 in\r\nFLAG 128 240 0\r\nSYMBOL sky130\\pfet_01v8 400 240 M180\r\nWINDOW 0 88 80 Left 2\r\nWINDOW 3 88 40 Left 2\r\nWINDOW 39 88 16 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 400 288 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 16 144 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 144 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 16 456 Left 2 !.dc V2 0 1.8 0.01\r\n",
+  "sha256:20a129b5284aefae7eaf14003b141956865997c744da90dd2f756b0785bf0532": "Version 4\r\nSHEET 1 880 680\r\nWIRE 448 128 448 144\r\nWIRE 480 128 448 128\r\nWIRE 480 192 480 128\r\nWIRE 448 192 480 192\r\nWIRE 352 160 400 160\r\nWIRE 352 256 352 160\r\nWIRE 352 368 352 256\r\nWIRE 400 368 352 368\r\nWIRE 304 256 352 256\r\nWIRE 448 256 448 240\r\nWIRE 448 288 448 256\r\nWIRE 544 256 448 256\r\nWIRE 448 400 448 384\r\nWIRE 480 400 448 400\r\nWIRE 480 336 480 400\r\nWIRE 448 336 480 336\r\nWIRE 16 112 16 160\r\nWIRE 128 112 128 160\r\nFLAG 448 128 vdd\r\nFLAG 304 256 in\r\nFLAG 544 256 out\r\nFLAG 448 400 0\r\nFLAG 16 112 vdd\r\nFLAG 16 240 0\r\nFLAG 128 112 in\r\nFLAG 128 240 0\r\nSYMBOL sky130\\pfet_01v8 400 240 M180\r\nWINDOW 0 88 80 Left 2\r\nWINDOW 3 88 40 Left 2\r\nWINDOW 39 88 16 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 400 288 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 16 144 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 144 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 16 456 Left 2 !.dc V2 0 1.8 0.01\r\nTEXT -48 640 Left 0 ;.pdk eyJjb3JuZXIiOiJmZiJ9\r\n",
+  "sha256:55f42245017871a694616bd1993e63c6a4c1cec456df2c62547246ec927700f0": "Version 4\r\nSHEET 1 880 680\r\nWIRE 448 128 448 144\r\nWIRE 480 128 448 128\r\nWIRE 480 192 480 128\r\nWIRE 448 192 480 192\r\nWIRE 352 160 400 160\r\nWIRE 352 256 352 160\r\nWIRE 352 368 352 256\r\nWIRE 400 368 352 368\r\nWIRE 304 256 352 256\r\nWIRE 448 256 448 240\r\nWIRE 448 288 448 256\r\nWIRE 544 256 448 256\r\nWIRE 448 400 448 384\r\nWIRE 480 400 448 400\r\nWIRE 480 336 480 400\r\nWIRE 448 336 480 336\r\nWIRE 16 112 16 160\r\nWIRE 128 112 128 160\r\nFLAG 448 128 vdd\r\nFLAG 304 256 in\r\nFLAG 544 256 out\r\nFLAG 448 400 0\r\nFLAG 16 112 vdd\r\nFLAG 16 240 0\r\nFLAG 128 112 in\r\nFLAG 128 240 0\r\nSYMBOL sky130\\pfet_01v8 400 240 M180\r\nWINDOW 0 88 80 Left 2\r\nWINDOW 3 88 40 Left 2\r\nWINDOW 39 88 16 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 400 288 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 16 144 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 144 R0\r\nSYMATTR InstName V2\r\nSYMATTR Value 0.9\r\nTEXT 16 456 Left 2 !.dc V2 0 1.8 0.01\r\nTEXT -48 640 Left 0 ;.pdk eyJjb3JuZXIiOiJzcyJ9\r\n",
+  "sha256:c5bd277609dfd86e73ada452c8940508f8ddecbee04eb3e1efbaba6f5e7b602a": "Version 4\r\nSHEET 1 880 680\r\nWIRE 448 128 448 144\r\nWIRE 480 128 448 128\r\nWIRE 480 192 480 128\r\nWIRE 448 192 480 192\r\nWIRE 352 160 400 160\r\nWIRE 352 256 352 160\r\nWIRE 352 368 352 256\r\nWIRE 400 368 352 368\r\nWIRE 304 256 352 256\r\nWIRE 448 256 448 240\r\nWIRE 448 288 448 256\r\nWIRE 544 256 448 256\r\nWIRE 448 400 448 384\r\nWIRE 480 400 448 400\r\nWIRE 480 336 480 400\r\nWIRE 448 336 480 336\r\nWIRE 16 112 16 160\r\nWIRE 128 112 128 160\r\nFLAG 448 128 vdd\r\nFLAG 304 256 in\r\nFLAG 544 256 out\r\nFLAG 448 400 0\r\nFLAG 16 112 vdd\r\nFLAG 16 240 0\r\nFLAG 128 112 in\r\nFLAG 128 240 0\r\nSYMBOL sky130\\pfet_01v8 400 240 M180\r\nWINDOW 0 88 80 Left 2\r\nWINDOW 3 88 40 Left 2\r\nWINDOW 39 88 16 Left 2\r\nSYMATTR InstName XM1\r\nSYMATTR SpiceLine W=2 L=0.15 nf=1\r\nSYMBOL sky130\\nfet_01v8 400 288 R0\r\nWINDOW 0 88 32 Left 2\r\nWINDOW 3 88 72 Left 2\r\nWINDOW 39 88 96 Left 2\r\nSYMATTR InstName XM2\r\nSYMBOL voltage 16 144 R0\r\nSYMATTR InstName V1\r\nSYMATTR Value 1.8\r\nSYMBOL voltage 128 144 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName V2\r\nSYMATTR Value PULSE(0 1.8 0.5n 50p 50p 1n 2n)\r\nTEXT 16 456 Left 2 !.tran 4n\r\n"
  }
 }

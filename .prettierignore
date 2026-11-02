@@ -1,0 +1,22 @@
+# Prettier formatea sólo el código (TS, TSX, JS, MJS); lo mismo que mira ESLint
+dist/
+node_modules/
+engine/
+public/
+graphify-out/
+docs/
+library/
+examples/
+test-results/
+coverage/
+.cache/
+.claude/
+# port tal cual de ASC-Parser (engine/rough_pen.js): se mantiene igual al original
+src/schematic/roughPen.js
+# fuera del alcance de Prettier: estilos con una regla por línea, datos y textos
+**/*.css
+**/*.json
+**/*.md
+**/*.html
+**/*.yml
+**/*.yaml

@@ -51,21 +51,19 @@ import {
 import { runFilesOf, runSummary } from './project/exchange.ts';
 import { EXT, newProject, type Project } from './project/turbo.ts';
 import { isNativeSwitch, isTcSwitch } from './schematic/SwitchDialog.tsx';
-import { HistoryPanel } from './project/HistoryPanel.tsx';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { allItems, deleteItems, setText, transformItems } from './schematic/edit.ts';
+import { allItems, transformItems } from './schematic/edit.ts';
 import { spiceName } from './netlist/spiceName.ts';
 import type { ItemRef } from './schematic/geometry.ts';
-import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
+import { type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
-import { TextMenu } from './schematic/TextMenu.tsx';
 import { isModelModule, modelModuleFile, modelModuleName, modelModules } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
-import { benchesUsing, moduleFile, modules, subcktFile, subName, updateSymbol, usages } from './project/subckt.ts';
+import { benchesUsing, modules, subcktFile, subName, updateSymbol, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -77,7 +75,6 @@ import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { colorize, emptyPanes, plotKind, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
 import { traceResolver } from './sim/traces.ts';
-import { moveOpTag } from './sim/opPins.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { useSideSize } from './ui/SideSplit.tsx';
@@ -127,6 +124,7 @@ import { useHighlights } from './app/useHighlights.ts';
 import { useTraces } from './app/useTraces.ts';
 import { usePicker } from './app/usePicker.ts';
 import { useLayoutPrefs } from './app/useLayoutPrefs.ts';
+import { EditorArea } from './app/EditorArea.tsx';
 
 
 export function App() {
@@ -1134,88 +1132,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
           />
           <ModuleEditors {...{ project, projectRef, editProject, curSub, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, setDialog, synthModule, warnShared }} />
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
-          {textMenu && doc.texts[textMenu.index] &&
-            createPortal(
-              <TextMenu
-                at={textMenu.at}
-                text={doc.texts[textMenu.index]}
-                onClose={closeTextMenu}
-                onChange={(patch) => commit(setText(doc, textMenu.index, patch))}
-                onEdit={() => editor.current?.editText(textMenu.index)}
-                onDialog={() => setDialog({ kind: 'text', index: textMenu.index, textKind: doc.texts[textMenu.index].kind })}
-                onDelete={() => {
-                  commit(deleteItems(doc, [{ kind: 'text', index: textMenu.index }]));
-                  setSelection([]);
-                }}
-              />,
-              document.body,
-            )}
-          <SchematicEditor
-            handle={editor}
-            onSymbolMenu={symbolMenu}
-            onNetMenu={netMenu}
-            unsaved={unsaved}
-            onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
-            onDescend={descend}
-            docKey={docKey}
-            netHover={netHover}
-            doc={doc}
-            lib={lib}
-            conn={conn}
-            commit={commit}
-            tool={traceFocus && tool.kind === 'select' && sim ? { kind: 'probe' } : tool}
-            setTool={setTool}
-            selection={selection}
-            setSelection={setSelection}
-            onEdit={editItem}
-            onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
-            onProbe={onProbe}
-            onProbePair={onProbePair}
-            onDropSubckt={(name) => {
-              const m = modelModuleFile(projectRef.current, name);
-              if (m) return viewRun ? null : modelModuleName(m);
-              const f = moduleFile(projectRef.current, name);
-              return f && !viewRun && !makesCycle([subName(f.name)]) ? subName(f.name) : null;
-            }}
-            highlightNet={rowNet ?? traceNetShown}
-            highlightSymbol={rowSymbol >= 0 ? rowSymbol : rowElement?.sym}
-            onHoverSymbol={onHoverSymbol}
-            onHoverTarget={savesOpen ? setHoverTarget : undefined}
-            netColors={netColors}
-            netNames={shownNets}
-            onNameNet={(at) => setDialog({ kind: 'flag', at })}
-            describe={describe}
-            annotations={annotations}
-            selectedAnnotation={opSel}
-            onSelectAnnotation={(key) => {
-              setOpSel(key);
-              if (key) setSelection([]);
-            }}
-            onMoveAnnotation={(key, dx, dy) => setOpTags((p) => moveOpTag(p, key, dx, dy))}
-            currentArrows={arrows}
-            pickValue={pickValue}
-            onPicked={endPick}
-            showGrid={showGrid}
-            showLoose={showLoose}
-            showSimCommand={showSimCommand}
-            onHover={onHover}
-            diff={historyDiff}
+          <EditorArea
+            traceFocus={traceFocus}
+            {...{ doc, lib, conn, commit, tool, setTool, selection, setSelection, editor, docKey, sim, curSub, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, projectRef, makesCycle, setDialog }}
+            {...{ symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved }}
+            {...{ historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun }}
           />
-          {historyOpen && curSim && !curSub && (
-            <HistoryPanel
-              sim={simName(curSim) || t('No analysis')}
-              runs={curRuns}
-              picked={viewed?.id ?? ''}
-              currentChanges={currentChanges}
-              onPick={setViewRun}
-              onRestore={restoreRun}
-              onClone={cloneRun}
-              onClose={() => {
-                setHistoryOpen(false);
-                setViewRun('');
-              }}
-            />
-          )}
           <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
           <StatusBar
             picking={!!picking}

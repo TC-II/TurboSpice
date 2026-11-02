@@ -57,9 +57,7 @@ import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { allItems, deleteItems, setText, transformItems } from './schematic/edit.ts';
-import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
-import { setMeasureFont } from './schematic/geometry.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
@@ -73,7 +71,6 @@ import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { preloadPlots } from './waveform/lazy.ts';
-import { useTraceWidth } from './waveform/lineWidth.ts';
 import { sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
 import { type ComplexMode } from './waveform/curves.ts';
 import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
@@ -90,7 +87,7 @@ import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
 import { locale, t } from './i18n/i18n.ts';
 import { moduleOf } from './hdl/project.ts';
-import { BASE, DEFAULT_PROJECT, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
+import { BASE, DEFAULT_PROJECT, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, registerUserFile } from './app/helpers.ts';
@@ -129,6 +126,7 @@ import { useProjectSession } from './app/useProjectSession.ts';
 import { useHighlights } from './app/useHighlights.ts';
 import { useTraces } from './app/useTraces.ts';
 import { usePicker } from './app/usePicker.ts';
+import { useLayoutPrefs } from './app/useLayoutPrefs.ts';
 
 
 export function App() {
@@ -249,53 +247,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   pathRef.current = path;
   const curSub = path.length ? path[path.length - 1].sub : '';
   const [, setSubTabs] = useState<string[]>([]);
-  // el panel se muestra al acercar el mouse al borde izquierdo (si se tildó, en modo selección)
-  const [hoverReveal, setHoverRevealState] = useState(() => lsGet('turbospice.treeHover') === '1');
-  // letra del esquemático (#328): una variable de CSS y la que mide los textos
-  const [schFont, setSchFontState] = useState(() => fontChoice(lsGet(SCH_FONT_KEY)).id);
-  useEffect(() => {
-    const c = fontChoice(schFont);
-    const apply = () => {
-      document.documentElement.style.setProperty('--sch-font', c.css);
-      setMeasureFont(c.css);
-    };
-    loadFont(c).then(apply, () => setMessage(t('Could not load the font «{name}»', { name: c.label })));
-  }, [schFont]);
-  const setSchFont = (id: string) => (lsSet(SCH_FONT_KEY, id), setSchFontState(id));
-  const traceW = useTraceWidth();
-  const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
-  const [treePeek, setTreePeek] = useState(false);
-  // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto para quien entra por
-  // primera vez (así ve los testbenches del proyecto de ejemplo) y, si no, abierto si hay subcircuitos
-  const [treePref, setTreePref] = useState<boolean | null>(() => {
-    const v = lsGet('turbospice.tree');
-    return v === '1' ? true : v === '0' ? false : lsGet('turbospice.welcomed') ? null : true;
-  });
-  // (desde la segunda visita ya no cuenta como primera)
-  useEffect(() => lsSet('turbospice.welcomed', '1'), []);
   const hasSubs = project.files.some((f) => f.kind === 'schematic' || isModelModule(f));
   // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
   const [curModel, setCurModel] = useState('');
-  const treeOpen = treePref ?? hasSubs;
-  // la barra de jerarquía sólo con subcircuitos (o el panel abierto): sin ellos no ocupa lugar
-  // ancho del panel del símbolo (se arrastra su borde izquierdo)
-  const [symW, setSymWState] = useState(() => {
-    try {
-      return Number(localStorage.getItem('turbospice.symW')) || 420;
-    } catch {
-      return 420;
-    }
-  });
-  const setSymW = (w: number) => {
-    setSymWState(w);
-    try {
-      localStorage.setItem('turbospice.symW', String(Math.round(w)));
-    } catch {
-      /* sin almacenamiento */
-    }
-  };
-  // con «mostrar al acercar el mouse» el panel oculto queda como un borde visible (#251)
-  const treeShown = treeOpen || treePeek || hoverReveal;
+  const [message, setMessage] = useState<string>();
+  const { hoverReveal, setHoverReveal, schFont, setSchFont, traceW, treePeek, setTreePeek, setTreePref, treeOpen, symW, setSymW, treeShown } = useLayoutPrefs(hasSubs, setMessage);
   const [quickOpen, setQuickOpen] = useState(false);
   const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
@@ -326,7 +282,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const savesOpen = !!saves && !curSub;
   const google = useGoogle();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
-  const [message, setMessage] = useState<string>();
   // resultados de la simulación que se está viendo
   const [sim, setSim] = useState<SimRun | null>(null);
   // lista de simulaciones de la variante (#39, #151) y resultados en memoria de las que no se

@@ -59,7 +59,121 @@ const clocked = (label: string, input?: string, extra: Partial<Drawing['pins']> 
   name: [0, -40, 'Bottom'],
 });
 
+/**
+ * Caja genérica: entradas a la izquierda, salidas a la derecha y los de control (clk, rst, en, sel…)
+ * abajo, cada pin con su nombre adentro (salvo que sea sólo x → y). `label`: el rótulo del medio;
+ * `bubble`: un círculo de negación en la salida (NOT).
+ */
+function blk(label: string, ins: string[], outs: string[], bottom: string[] = [], opts: { bubble?: boolean; top?: string[] } = {}): Drawing {
+  const rows = Math.max(ins.length, outs.length, 1);
+  const h = 32 * rows + 32;
+  const ys = (n: number) => Array.from({ length: n }, (_, k) => (k - (n - 1) / 2) * 32);
+  const xs = (n: number) => Array.from({ length: n }, (_, k) => (k - (n - 1) / 2) * 32);
+  const named = !(ins.length <= 1 && outs.length === 1 && ins[0] !== 'trig' && bottom.length === 0) || (ins.length === 1 && bottom.length > 0);
+  // (con los nombres de los pines adentro, más ancha: que no se toquen con el rótulo ni con el borde)
+  const w = named || bottom.length > 2 ? 64 : 48;
+  const pins: Record<string, Pt> = {};
+  const shapes = [box(-w, -h / 2, w, h / 2)];
+  ins.forEach((p, k) => {
+    pins[p] = [-w - 16, ys(ins.length)[k]];
+    shapes.push(...line([-w - 16, ys(ins.length)[k]], [-w, ys(ins.length)[k]]));
+    if (named) shapes.push(`TEXT ${-w + 6} ${ys(ins.length)[k]} Left 1 ${p}`);
+  });
+  outs.forEach((p, k) => {
+    const y = ys(outs.length)[k];
+    const edge = opts.bubble ? w + 12 : w;
+    pins[p] = [w + 16, y];
+    if (opts.bubble) shapes.push(`CIRCLE Normal ${w} ${y - 6} ${w + 12} ${y + 6}`);
+    shapes.push(...line([edge, y], [w + 16, y]));
+    if (named) shapes.push(`TEXT ${w - 6} ${y} Right 1 ${p === 'prbs' ? 'bit' : p}`);
+  });
+  bottom.forEach((p, k) => {
+    const x = xs(bottom.length)[k];
+    pins[p] = [x, h / 2 + 32];
+    shapes.push(...line([x, h / 2], [x, h / 2 + 32]));
+    if (p === 'clk') shapes.push(...line([x - 8, h / 2], [x, h / 2 - 10], [x + 8, h / 2]));
+    else shapes.push(`TEXT ${x} ${h / 2 - 10} Center 1 ${p}`);
+  });
+  (opts.top ?? []).forEach((p) => {
+    pins[p] = [0, -h / 2 - 32];
+    shapes.push(...line([0, -h / 2], [0, -h / 2 - 32]), `TEXT 0 ${-h / 2 + 10} Center 1 ${p}`);
+  });
+  // el rótulo: al medio si los pines no tienen nombre; si no, arriba
+  shapes.push(text(0, named && rows > 1 ? -h / 2 + 14 : named ? -h / 2 + 12 : 0, label, named ? 2 : 3));
+  return { pins, shapes, name: opts.top?.length ? [w + 8, -h / 2 - 8, 'Left'] : [0, -h / 2 - 8, 'Bottom'] };
+}
+
+/** Multiplexor: trapecio (más alto del lado de las entradas) con sel abajo */
+function mux(ins: string[], outs: string[], sel: string, label: string): Drawing {
+  const n = Math.max(ins.length, outs.length);
+  const h = 32 * n + 32;
+  const ys = (m: number) => Array.from({ length: m }, (_, k) => (k - (m - 1) / 2) * 32);
+  const wide = ins.length >= outs.length;
+  const [l, r] = wide ? [h / 2, h / 2 - 16] : [h / 2 - 16, h / 2];
+  const pins: Record<string, Pt> = { [sel]: [0, h / 2 + 24] };
+  const shapes = [...line([-32, -l], [32, -r], [32, r], [-32, l], [-32, -l]), ...line([0, h / 2 - 8], [0, h / 2 + 24]), `TEXT 8 ${h / 2 + 12} Left 1 ${sel}`, text(0, 0, label, 1)];
+  ins.forEach((p, k) => {
+    pins[p] = [-64, ys(ins.length)[k]];
+    shapes.push(...line([-64, ys(ins.length)[k]], [-32, ys(ins.length)[k]]));
+    if (ins.length > 1) shapes.push(`TEXT -26 ${ys(ins.length)[k]} Left 0 ${k}`);
+  });
+  outs.forEach((p, k) => {
+    pins[p] = [64, ys(outs.length)[k]];
+    shapes.push(...line([32, ys(outs.length)[k]], [64, ys(outs.length)[k]]));
+    if (outs.length > 1) shapes.push(`TEXT 26 ${ys(outs.length)[k]} Right 0 ${k}`);
+  });
+  return { pins, shapes, name: [0, -h / 2 - 8, 'Bottom'] };
+}
+
+/** Pin por pin de las cajas: [rótulo, entradas, salidas, abajo] */
+const BOXES: Record<string, [string, string[], string[], string[]?]> = {
+  dsp_abs: ['|x|', ['x'], ['y']],
+  dsp_requant: ['Q', ['x'], ['y']],
+  dsp_sum4: ['Σ', ['a', 'b', 'c', 'd'], ['y']],
+  dsp_minmax: ['min max', ['a', 'b'], ['mn', 'mx']],
+  dsp_cmp: ['a : b', ['a', 'b'], ['lt', 'eq', 'gt']],
+  dsp_mac: ['MAC', ['a', 'b'], ['acc'], ['clk', 'clr']],
+  dsp_integrator: ['∫', ['x'], ['y'], ['clk', 'clr']],
+  dsp_diff: ['1−z⁻¹', ['x'], ['y'], ['clk']],
+  dsp_popcount: ['#1', ['x'], ['n']],
+  dsp_clz: ['CLZ', ['x'], ['n']],
+  dsp_and: ['&', ['a', 'b'], ['y']],
+  dsp_or: ['≥1', ['a', 'b'], ['y']],
+  dsp_xor: ['=1', ['a', 'b'], ['y']],
+  dsp_mask: ['& M', ['x'], ['y']],
+  dsp_rotate: ['↻K', ['x'], ['y']],
+  dsp_bitrev: ['rev', ['x'], ['y']],
+  dsp_bin2gray: ['B→G', ['x'], ['y']],
+  dsp_gray2bin: ['G→B', ['x'], ['y']],
+  dsp_parity: ['P', ['x'], ['p']],
+  dsp_decoder: ['DEC', ['sel'], ['y'], ['en']],
+  dsp_prienc: ['PRI', ['x'], ['idx', 'valid']],
+  dsp_split: ['split', ['x'], ['hi', 'lo']],
+  dsp_join: ['join', ['hi', 'lo'], ['y']],
+  dsp_counter: ['CTR', [], ['q', 'tc'], ['clk', 'rst', 'en', 'down']],
+  dsp_lfsr: ['LFSR', [], ['q', 'prbs'], ['clk']],
+  dsp_shiftreg: ['SIPO', ['d'], ['q'], ['clk']],
+  dsp_piso: ['PISO', ['x'], ['q'], ['clk', 'load']],
+  dsp_edge: ['EDGE', ['d'], ['rise', 'fall'], ['clk']],
+  dsp_sync: ['SYNC', ['d'], ['q'], ['clk']],
+  dsp_pwm: ['PWM', ['duty'], ['q'], ['clk']],
+  dsp_debounce: ['DEB', ['d'], ['q'], ['clk']],
+  dsp_oneshot: ['1-shot', ['trig'], ['q'], ['clk']],
+  dsp_ram: ['RAM', ['addr', 'd'], ['q'], ['clk', 'we']],
+  dsp_movavg: ['AVG', ['x'], ['y'], ['clk']],
+  dsp_envelope: ['ENV', ['x'], ['y'], ['clk']],
+};
+
 const DRAW: Record<string, Drawing> = {
+  ...Object.fromEntries(Object.entries(BOXES).map(([k, [label, ins, outs, bottom]]) => [k, blk(label, ins, outs, bottom)])),
+  dsp_not: blk('1', ['x'], ['y'], [], { bubble: true }),
+  dsp_mux2: mux(['a', 'b'], ['y'], 'sel', ''),
+  dsp_mux4: mux(['a', 'b', 'c', 'd'], ['y'], 'sel', ''),
+  dsp_demux2: mux(['x'], ['a', 'b'], 'sel', ''),
+  dsp_upsample: (() => {
+    const d = clocked('↑L', 'x', { y: [64, 0], clko: [0, -64] });
+    return { ...d, shapes: [...d.shapes, ...line([32, 0], [64, 0]), ...line([0, -32], [0, -64])], name: [40, -40, 'Left'] };
+  })(),
   dsp_add: node('Σ', ['+', '+']),
   dsp_sub: node('Σ', ['+', '−']),
   dsp_mul: node('×'),

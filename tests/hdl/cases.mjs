@@ -14,6 +14,8 @@ const word = (at, name, w, tt) => {
   const u = Array.from({ length: w }, (_, k) => w - 1 - k).reduce((acc, b) => acc * 2 + (at(`${name}_${b}`, tt) > 2.5 ? 1 : 0), 0);
   return u >= 2 ** (w - 1) ? u - 2 ** w : u;
 };
+/** Valor sin signo de un bus de `w` bits */
+const uword = (at, name, w, tt) => Array.from({ length: w }, (_, k) => w - 1 - k).reduce((acc, b) => acc * 2 + (at(w > 1 ? `${name}_${b}` : name, tt) > 2.5 ? 1 : 0), 0);
 const nodes = (name, w) => Array.from({ length: w }, (_, k) => `${name}_${w - 1 - k}`).join(' ');
 /** dsp_tap/dsp_mul en Q1.7 con redondeo y saturación */
 const q7 = (a, b) => Math.max(-128, Math.min(127, Math.floor((a * b + 64) / 128)));
@@ -400,6 +402,176 @@ X1 clk ${nodes('y', 8)} slow cic tpd=1n
         const got = word(at, 'y', 8, tt);
         if (got !== 20) return `y en ${tt * 1e6} µs: ${got} (esperaba 4·5 = 20)`;
       }
+    },
+  },
+  {
+    name: 'DSP (#366): aritmética, lógica de bits y ruteo (abs, requant, Σ4, min/max, comparador, #1, CLZ, AND/OR/XOR/NOT, máscara, rotación, rev, Gray, paridad, MUX, decodificador, prioridad, split/join)',
+    file: 'comb.v',
+    top: 'comb',
+    verilog: `${DSP}
+module comb(
+  output signed [7:0] abs_b, output signed [7:0] rq_a, output signed [7:0] rq_up, output signed [7:0] s4,
+  output signed [7:0] mn, output signed [7:0] mx, output lt, output eq, output gt,
+  output [4:0] pop, output [4:0] clz, output [7:0] and_, output [7:0] or_, output [7:0] xor_, output [7:0] not_,
+  output [7:0] msk, output [7:0] rot, output [7:0] rev, output [7:0] gray, output [7:0] bin, output par,
+  output [7:0] m2, output [7:0] m4, output [7:0] dec, output [2:0] idx, output valid, output [7:0] hi, output [7:0] lo
+);
+  wire signed [7:0] a, b, c;
+  wire [15:0] j;
+  dsp_const #(.W(8), .VALUE(100)) ca(.y(a));
+  dsp_const #(.W(8), .VALUE(-60)) cb(.y(b));
+  dsp_const #(.W(8), .VALUE(7)) cc(.y(c));
+  dsp_abs #(.W(8)) u1(.x(b), .y(abs_b));
+  dsp_requant #(.W(8), .SHIFT(2)) u2(.x(a), .y(rq_a));
+  dsp_requant #(.W(8), .SHIFT(-1)) u3(.x(a), .y(rq_up));
+  dsp_sum4 #(.W(8)) u4(.a(a), .b(a), .c(b), .d(b), .y(s4));
+  dsp_minmax #(.W(8)) u5(.a(a), .b(b), .mn(mn), .mx(mx));
+  dsp_cmp #(.W(8)) u6(.a(a), .b(b), .lt(lt), .eq(eq), .gt(gt));
+  dsp_popcount #(.W(8)) u7(.x(a), .n(pop));
+  dsp_clz #(.W(8)) u8(.x(c), .n(clz));
+  dsp_and #(.W(8)) u9(.a(a), .b(b), .y(and_));
+  dsp_or #(.W(8)) u10(.a(a), .b(b), .y(or_));
+  dsp_xor #(.W(8)) u11(.a(a), .b(b), .y(xor_));
+  dsp_not #(.W(8)) u12(.x(a), .y(not_));
+  dsp_mask #(.W(8), .MASK(15)) u13(.x(a), .y(msk));
+  dsp_rotate #(.W(8), .K(3)) u14(.x(a), .y(rot));
+  dsp_bitrev #(.W(8)) u15(.x(a), .y(rev));
+  dsp_bin2gray #(.W(8)) u16(.x(a), .y(gray));
+  dsp_gray2bin #(.W(8)) u17(.x(gray), .y(bin));
+  dsp_parity #(.W(8)) u18(.x(a), .p(par));
+  dsp_mux2 #(.W(8)) u19(.a(a), .b(b), .sel(1'b1), .y(m2));
+  dsp_mux4 #(.W(8)) u20(.a(a), .b(b), .c(c), .d(a), .sel(2'd2), .y(m4));
+  dsp_decoder u21(.sel(3'd5), .en(1'b1), .y(dec));
+  dsp_prienc u22(.x(a), .idx(idx), .valid(valid));
+  dsp_join u23(.hi(a), .lo(b), .y(j));
+  dsp_split u24(.x(j), .hi(hi), .lo(lo));
+endmodule`,
+    // (nombre, bits, valor esperado sin signo)
+    outs: [
+      ['abs_b', 8, 60],
+      ['rq_a', 8, 25],
+      ['rq_up', 8, 127],
+      ['s4', 8, 80],
+      ['mn', 8, 196],
+      ['mx', 8, 100],
+      ['lt', 1, 0],
+      ['eq', 1, 0],
+      ['gt', 1, 1],
+      ['pop', 5, 3],
+      ['clz', 5, 5],
+      ['and_', 8, 0x44],
+      ['or_', 8, 0xe4],
+      ['xor_', 8, 0xa0],
+      ['not_', 8, 0x9b],
+      ['msk', 8, 4],
+      ['rot', 8, 0x23],
+      ['rev', 8, 0x26],
+      ['gray', 8, 0x56],
+      ['bin', 8, 0x64],
+      ['par', 1, 1],
+      ['m2', 8, 0xc4],
+      ['m4', 8, 7],
+      ['dec', 8, 0x20],
+      ['idx', 3, 6],
+      ['valid', 1, 1],
+      ['hi', 8, 0x64],
+      ['lo', 8, 0xc4],
+    ],
+    get circuit() {
+      return `X1 ${this.outs.map(([n, w]) => (w > 1 ? nodes(n, w) : n)).join(' ')} comb\n.tran 1n 20n`;
+    },
+    check(at) {
+      for (const [n, w, v] of this.outs) {
+        const got = uword(at, n, w, 10e-9);
+        if (got !== v) return `${n} = ${got} (esperaba ${v})`;
+      }
+    },
+  },
+  {
+    name: 'DSP (#366): secuenciales (contador, LFSR, SIPO, MAC, integrador, diferenciador, promedio móvil, PWM)',
+    file: 'seq.v',
+    top: 'seq',
+    verilog: `${DSP}
+module seq(input clk, output [7:0] cnt, output tc, output [15:0] lf, output [7:0] sr, output signed [7:0] mac,
+  output signed [7:0] integ, output signed [7:0] dif, output signed [7:0] avg, output pwm);
+  wire signed [7:0] half, three, forty;
+  dsp_const #(.W(8), .VALUE(64)) c1(.y(half));
+  dsp_const #(.W(8), .VALUE(3)) c2(.y(three));
+  dsp_const #(.W(8), .VALUE(40)) c3(.y(forty));
+  dsp_counter #(.W(8), .MOD(10)) u1(.clk(clk), .rst(1'b0), .en(1'b1), .down(1'b0), .q(cnt), .tc(tc));
+  dsp_lfsr u2(.clk(clk), .q(lf), .prbs());
+  dsp_shiftreg #(.W(8)) u3(.clk(clk), .d(1'b1), .q(sr));
+  dsp_mac #(.W(8), .F(7)) u4(.clk(clk), .clr(1'b0), .a(half), .b(half), .acc(mac));
+  dsp_integrator #(.W(8)) u5(.clk(clk), .clr(1'b0), .x(three), .y(integ));
+  dsp_diff #(.W(8)) u6(.clk(clk), .x(forty), .y(dif));
+  dsp_movavg #(.W(8), .K(2)) u7(.clk(clk), .x(forty), .y(avg));
+  dsp_pwm #(.N(3)) u8(.clk(clk), .duty(3'd3), .q(pwm));
+endmodule`,
+    circuit: `${CLK}
+X1 clk ${nodes('cnt', 8)} tc ${nodes('lf', 16)} ${nodes('sr', 8)} ${nodes('mac', 8)} ${nodes('integ', 8)} ${nodes('dif', 8)} ${nodes('avg', 8)} pwm seq tpd=1n
+.tran 1n 1.6u`,
+    check: (at) => {
+      // (el reloj sube en 0, 100n…: en el ciclo k ya hubo k + 1 flancos; x es constante desde 0, así que
+      // el diferenciador ya da 0 en el ciclo 0)
+      let lf = 44257;
+      for (let k = 0; k < 14; k++) {
+        const tt = k * 100e-9 + 50e-9;
+        const e = k + 1;
+        const fb = ((lf >> 15) ^ (lf >> 13) ^ (lf >> 12) ^ (lf >> 10)) & 1;
+        lf = ((lf << 1) | fb) & 0xffff;
+        const want = { cnt: e % 10, lf, sr: Math.min(255, 2 ** e - 1), mac: Math.min(127, 32 * e), integ: ((3 * e + 128) % 256) - 128, dif: 0, avg: Math.min(4, e) * 10 };
+        for (const [n, v] of Object.entries(want)) {
+          const got = n === 'cnt' || n === 'sr' || n === 'lf' ? uword(at, n, n === 'lf' ? 16 : 8, tt) : word(at, n, 8, tt);
+          if (got !== v) return `${n} en el ciclo ${k}: ${got} (esperaba ${v})`;
+        }
+        if (at('tc', tt) > 2.5 !== (e % 10 === 9)) return `tc en el ciclo ${k}`;
+        // PWM de período 8: los 3 primeros ciclos de cada período en 1 (n = e mod 8 después del flanco)
+        if (at('pwm', tt) > 2.5 !== e % 8 < 3) return `pwm en el ciclo ${k}`;
+      }
+    },
+  },
+  {
+    name: 'DSP (#366): control y memoria (flancos, sincronizador, 1-shot, antirrebote, DEMUX, RAM, ↑L, envolvente, PISO)',
+    file: 'ctl.v',
+    top: 'ctl',
+    verilog: `${DSP}
+module ctl(input clk, input d, output rise, output fall, output sq, output os, output db, output [7:0] da, output [7:0] dbb,
+  output [7:0] ram, output signed [7:0] up, output signed [7:0] env, output ser);
+  wire signed [7:0] k;
+  dsp_const #(.W(8), .VALUE(100)) c1(.y(k));
+  dsp_edge u1(.clk(clk), .d(d), .rise(rise), .fall(fall));
+  dsp_sync u2(.clk(clk), .d(d), .q(sq));
+  dsp_oneshot #(.N(3)) u3(.clk(clk), .trig(d), .q(os));
+  dsp_debounce #(.N(2)) u4(.clk(clk), .d(d), .q(db));
+  dsp_demux2 #(.W(8)) u5(.x(k), .sel(1'b1), .a(da), .b(dbb));
+  dsp_ram #(.W(8)) u6(.clk(clk), .we(1'b1), .addr(4'd3), .d(k), .q(ram));
+  dsp_upsample #(.W(8), .L(4)) u7(.clk(clk), .x(k), .y(up), .clko());
+  dsp_envelope #(.W(8), .K(1)) u8(.clk(clk), .x(k), .y(env));
+  dsp_piso #(.W(8)) u9(.clk(clk), .load(1'b0), .x(k), .q(ser));
+endmodule`,
+    // d sube en 420n y baja en 1020n (entre flancos)
+    circuit: `${CLK}
+Vd d 0 PWL(0 0 420n 0 421n 5 1020n 5 1021n 0)
+X1 clk d rise fall sq os db ${nodes('da', 8)} ${nodes('dbb', 8)} ${nodes('ram', 8)} ${nodes('up', 8)} ${nodes('env', 8)} ser ctl tpd=1n
+.tran 1n 2u`,
+    check: (at) => {
+      const hi = (n, tt) => at(n, tt) > 2.5;
+      // d se muestrea en el flanco de 500n: rise en el ciclo que sigue (500n–600n), sync dos flancos después
+      if (!hi('rise', 550e-9) || hi('rise', 650e-9) || hi('rise', 450e-9)) return 'rise';
+      if (!hi('fall', 1150e-9) || hi('fall', 1250e-9)) return 'fall';
+      if (hi('sq', 550e-9) || !hi('sq', 650e-9) || !hi('sq', 1050e-9) || hi('sq', 1250e-9)) return 'sync';
+      // 1-shot de 3 ciclos desde el flanco que ve el disparo (500n)
+      if (!hi('os', 550e-9) || !hi('os', 750e-9) || hi('os', 850e-9)) return 'one-shot';
+      // antirrebote de 2 ciclos: q sube después de ver d estable dos flancos
+      if (hi('db', 650e-9) || !hi('db', 850e-9)) return 'antirrebote';
+      if (uword(at, 'da', 8, 100e-9) !== 0 || uword(at, 'dbb', 8, 100e-9) !== 100) return 'demux';
+      if (uword(at, 'ram', 8, 150e-9) !== 100) return `ram = ${uword(at, 'ram', 8, 150e-9)}`;
+      // ↑4: x en el primero de cada 4 ciclos, 0 en los otros
+      const ups = [0, 1, 2, 3, 4].map((k) => word(at, 'up', 8, k * 100e-9 + 50e-9)).join();
+      if (ups !== '100,0,0,0,100') return `up ${ups}`;
+      const e = word(at, 'env', 8, 1.95e-6);
+      if (e < 98 || e > 100) return `envolvente ${e}`;
+      if (hi('ser', 1.5e-6)) return 'piso';
     },
   },
   {

@@ -89,13 +89,24 @@ Detalles:
   en cada una evita la matriz singular en el punto de operación.
 
 ### Biblioteca DSP (#366)
-Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `library/verilog/DSP`:
-`dsp_const`, `dsp_delay` (z⁻¹), `dsp_add`, `dsp_sub`, `dsp_mul`, `dsp_tap` (coeficiente COEF),
-`dsp_shift` (×2^K), `dsp_neg`, `dsp_impulse` (impulso o escalón), `dsp_nco` (seno con acumulador de
-fase), `dsp_clkdiv` y `dsp_downsample` (↓M con su reloj `clko`, que cambia en los flancos de bajada de
-`clk`: los bloques que siguen con `clko` son sincrónicos con su salida). SAT/RND eligen saturar y redondear.
+Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `library/verilog/DSP`
+(`dsp_<nombre>`):
+- Aritmética: `const`, `add`, `sub`, `sum4`, `mul`, `tap` (coeficiente COEF), `shift` (×2^K), `neg`,
+  `abs`, `requant` (cambio de formato: corre SHIFT bits, redondea y satura), `minmax`, `cmp`, `mac`,
+  `popcount`, `clz`.
+- DSP: `delay` (z⁻¹), `integrator`, `diff` (1 − z⁻¹), `movavg`, `envelope`, `nco`, `impulse`
+  (impulso o escalón), `downsample` (↓M) y `upsample` (↑L), con su reloj `clko`, que cambia en los
+  flancos de bajada de `clk`: los bloques que siguen con `clko` son sincrónicos con la muestra.
+- Lógica y bits: `and`, `or`, `xor`, `not`, `mask`, `rotate`, `bitrev`, `bin2gray`, `gray2bin`, `parity`.
+- Ruteo y memoria: `mux2`, `mux4`, `demux2`, `decoder` (3 → 8), `prienc` (8 → 3), `split` y `join`
+  (16 ↔ 2 × 8), `ram` (16 palabras).
+- Secuencial y control: `counter`, `clkdiv`, `lfsr` (PRBS de 16 bits), `shiftreg` (SIPO), `piso`,
+  `edge`, `sync`, `pwm`, `debounce`, `oneshot`.
+
+SAT/RND eligen saturar y redondear.
 - **Símbolos dibujados** (`library/sym/DSP`, carpeta DSP del buscador): Σ en un círculo, el tap como
-  triángulo, z⁻¹ con el reloj abajo… Los genera `node scripts/gen-dsp-symbols.ts` (el orden de los pines
+  triángulo, z⁻¹ con el reloj abajo, el MUX como trapecio, las compuertas con el rótulo IEC (&, ≥1,
+  =1); los demás, una caja con los nombres de los pines adentro y los de control (clk, rst, en…) abajo. Los genera `node scripts/gen-dsp-symbols.ts` (el orden de los pines
   y los parameter salen de la síntesis). Al elegir uno, el `.v` y su símbolo se copian al proyecto y se
   sintetiza ahí (`bundle.verilog`); la síntesis conserva el dibujo.
 - Los parameter que no cambian pines (COEF, VALUE, K, SAT…) van por instancia, negativos incluidos
@@ -108,7 +119,7 @@ fase), `dsp_clkdiv` y `dsp_downsample` (↓M con su reloj `clko`, que cambia en 
   (impulso, banda de paso y de rechazo), IIR de primer orden y biquad Butterworth (Q2.14), CIC N = 2,
   R = 8, y un mezclador con dos NCO. Los esquemáticos se dibujan en el script como diagrama de bloques.
 - Pruebas: los casos DSP de `tests/hdl/cases.mjs` (aritmética con saturación, FIR de 4 taps, parameter
-  negativo, CIC).
+  negativo, CIC, y uno por familia: combinacionales, secuenciales y de control con memoria).
 
 Plan completo (módulo único para Icarus, modos por instancia): issue #366.
 

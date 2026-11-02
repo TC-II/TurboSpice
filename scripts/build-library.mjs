@@ -4,7 +4,7 @@
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decode } from '../src/asc/encoding.ts';
+import { decodeText } from '../src/asc/encoding.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const LIB = join(ROOT, 'library');
@@ -18,7 +18,8 @@ function* walk(dir) {
   }
 }
 
-const readText = (p) => decode(new Uint8Array(readFileSync(p))).text;
+// (UTF-8 si lo es, como los símbolos de la biblioteca DSP; si no, como LTspice)
+const readText = (p) => decodeText(new Uint8Array(readFileSync(p)));
 const rel = (base, p) => relative(base, p).split('\\').join('/');
 
 /**

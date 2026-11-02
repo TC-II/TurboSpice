@@ -92,12 +92,15 @@ export interface BuiltSimulation {
   digitalSaves?: string[];
 }
 
+/** Las instancias de un módulo Verilog con otro parameter (useVerilog.withVariants): su síntesis va al archivo del módulo */
+export type Variants = (netlist: string, files: Record<string, string>) => Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }>;
+
 /**
  * `traces`: expresiones de las trazas que se van a mirar; los parámetros de dispositivo que usen
  * (@Q1[gm], #202) se piden con ".save" porque ngspice no los guarda solo. `pinCurrents: false`,
  * sin las fuentes de 0 V en los pines de los subcircuitos (ver pinCurrents.ts)
  */
-export async function buildSimulation(doc: AscDoc, lib: Library, title: string, traces: string[] = [], opts: { pinCurrents?: boolean } = {}): Promise<BuiltSimulation> {
+export async function buildSimulation(doc: AscDoc, lib: Library, title: string, traces: string[] = [], opts: { pinCurrents?: boolean; variants?: Variants } = {}): Promise<BuiltSimulation> {
   const lt = ltNetlist(doc, lib);
   // los nombres de los PDK que piden las directivas (los de GF180, como nmos_3p3, no se reconocen
   // por el nombre como los sky130_fd_pr__…): definidos, sin aviso de modelo que falta
@@ -115,7 +118,10 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
     pdkLib,
   });
   const texts = Object.fromEntries(await Promise.all(ng.includes.map(async (rel) => [rel, lib.userFile(rel) ?? (await fetchModelFile(rel))] as const)));
-  const prepared = prepareSimulation(ng, (rel) => texts[rel]);
+  const base = prepareSimulation(ng, (rel) => texts[rel]);
+  // las instancias de Verilog con otro parameter, antes de las redes digitales: también tienen su copia sin puentes
+  const v = opts.variants && (await opts.variants(base.netlist, base.files));
+  const prepared = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
   // la corriente de cada pin de los subcircuitos (Ix(U1:OUT))

@@ -143,7 +143,9 @@ export function AppDialogs(props: AppDialogsProps) {
             const mod = baseName(name);
             const code = lib.bundle.verilog?.[mod];
             // (por nombre, como los del proyecto: así se usa su símbolo una vez sintetizado)
-            if (code !== undefined && !verilogFile(projectRef.current, mod)) void addProjectFiles([{ name: `${mod}.v`, text: code }]);
+            // (con su símbolo dibujado, antes del .v: la síntesis conserva un dibujo que no es el generado)
+            const sym = lib.bundle.symbols[name];
+            if (code !== undefined && !verilogFile(projectRef.current, mod)) void addProjectFiles([...(sym ? [{ name: `${mod}.asy`, text: sym }] : []), { name: `${mod}.v`, text: code }]);
             const placed = code !== undefined ? mod : name;
             if (!makesCycle([placed])) setTool({ kind: 'place', type: placed, orient: 'R0' });
           }}

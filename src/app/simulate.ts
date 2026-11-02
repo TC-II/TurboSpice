@@ -11,7 +11,7 @@ import { lineOf } from '../project/project.ts';
 import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog } from '../sim/measResults.ts';
-import { buildSimulation, type BuiltSimulation } from '../sim/schematicSim.ts';
+import { buildSimulation, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
 import { analysisProblem, pzLogErrors } from '../sim/simList.ts';
 import { pzBodePlots } from '../waveform/pz.ts';
 import { stepLabels, stepSweepPlots } from '../waveform/series.ts';
@@ -30,7 +30,7 @@ export interface RunOptions {
   allTraces(): string[];
   /** sintetiza los módulos Verilog que cambiaron (#209) */
   synthStale(): Promise<void>;
-  withVariants(netlist: string): Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }>;
+  withVariants: Variants;
   /** llegó el punto de operación de la corrida */
   onBias(built: BuiltSimulation, bias: Bias): void;
 }
@@ -40,13 +40,8 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   // los módulos Verilog que cambiaron se sintetizan antes (#209)
   await synthStale();
   const prepare = async (pinCurrents: boolean) => {
-    const b = await buildSimulation(doc, lib, ascName(), allTraces(), { pinCurrents });
-    // y las instancias con otro parameter usan su propia síntesis
-    const vv = await withVariants(b.netlist);
-    b.netlist = vv.netlist;
-    b.files = { ...b.files, ...vv.files };
-    b.warnings.push(...vv.warnings);
-    return b;
+    // (las instancias con otro parameter usan su propia síntesis)
+    return buildSimulation(doc, lib, ascName(), allTraces(), { pinCurrents, variants: withVariants });
   };
   let built = await prepare(true);
   // lo que no entra en memoria no llega a ngspice: sólo el error, en Problemas (#58)

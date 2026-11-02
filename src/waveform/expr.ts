@@ -34,7 +34,33 @@ type Node =
 // Dig(q): nodo digital de XSPICE (#209); D() es la derivada, como en LTspice
 const isRefFn = (fn: string) => /^(v|i[bcdegsx]?|dig)$/i.test(fn);
 
-export const FUNCTIONS = ['db', 'mag', 'abs', 'ph', 'phase', 're', 'real', 'im', 'imag', 'sqrt', 'exp', 'ln', 'log', 'log10', 'sin', 'cos', 'tan', 'atan', 'sgn', 'd', 'integ', 'min', 'max', 'pow'];
+export const FUNCTIONS = [
+  'db',
+  'mag',
+  'abs',
+  'ph',
+  'phase',
+  're',
+  'real',
+  'im',
+  'imag',
+  'sqrt',
+  'exp',
+  'ln',
+  'log',
+  'log10',
+  'sin',
+  'cos',
+  'tan',
+  'atan',
+  'sgn',
+  'd',
+  'integ',
+  'min',
+  'max',
+  'pow',
+  'signed',
+];
 
 export class ExprError extends Error {}
 
@@ -345,6 +371,11 @@ function ev(n: Node, ctx: EvalContext): C {
           if (!args[1]) throw new ExprError(t('{fn}(a, b) needs two arguments', { fn: n.fn }));
           const f = n.fn === 'min' ? Math.min : Math.max;
           return map2(a, args[1], (ar, _ai, br) => [f(ar, br), 0]);
+        }
+        case 'signed': {
+          // un bus de N bits en complemento a dos (signed(Dig(y[15:0]), 16)): la mitad de arriba es negativa
+          if (!args[1]) throw new ExprError(t('signed(x, bits) needs two arguments'));
+          return map2(a, args[1], (ar, _ai, br) => [ar >= 2 ** (br - 1) ? ar - 2 ** br : ar, 0]);
         }
         case 'd':
           return derivative(a, ctx.scale, len);

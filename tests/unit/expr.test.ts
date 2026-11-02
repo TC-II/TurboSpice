@@ -28,6 +28,8 @@ describe('expresiones de trazas', () => {
     expect(ev('V(out,in)')).toEqual([-1, 1, 3, 5]);
     expect(ev('I(R1)*1k')).toEqual([1, 2, 3, 4]);
     expect(ev('-V(out)+2^3')).toEqual([8, 6, 4, 2]);
+    // un bus en complemento a dos (#366): con 3 bits, 4 y 6 son −4 y −2
+    expect(ev('signed(V(out), 3)')).toEqual([0, 2, -4, -2]);
     expect(ev('out*2')).toEqual([0, 4, 8, 12]);
     expect(ev('Ic(Q1)')).toEqual([5, 5, 5, 5]);
     expect(ev('time*2')).toEqual([0, 2, 4, 6]);

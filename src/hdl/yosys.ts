@@ -32,6 +32,15 @@ export async function synthesize(run: RunYosys, files: Record<string, string>, s
   const sink = (b: Uint8Array | null) => {
     if (b) log += dec.decode(b, { stream: true });
   };
+  // Yosys no lee números negativos en -chparam ("Can't decode value '-4'"): esos van como valor
+  // por omisión del parameter, en el código del archivo principal
+  const neg = Object.entries(params).filter(([, v]) => v.trim().startsWith('-'));
+  if (neg.length && files[source] !== undefined) {
+    let text = files[source];
+    for (const [k, v] of neg) text = text.replace(new RegExp(`(\\bparameter\\b[^=;]*?\\b${k}\\s*=\\s*)[^,;)\\n]+`), `$1${v.trim()}`);
+    files = { ...files, [source]: text };
+    params = Object.fromEntries(Object.entries(params).filter(([, v]) => !v.trim().startsWith('-')));
+  }
   // los nombres de archivo van entre comillas en el script de Yosys
   const names = Object.keys(files).map((n) => n.replace(/["\\]/g, '_'));
   const tree: Tree = Object.fromEntries(Object.values(files).map((text, i) => [names[i], text]));

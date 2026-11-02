@@ -831,6 +831,7 @@ export const es: Record<string, string> = {
   'Poles and zeros of a transfer function (.pz).': 'Polos y ceros de una función de transferencia (.pz).',
   'Poles only': 'Sólo polos',
   'Ports:': 'Puertos:',
+  'signed(x, bits) needs two arguments': 'signed(x, bits) necesita dos argumentos',
   'pow(x, y) needs two arguments': 'pow(x, y) necesita dos argumentos',
   'Power': 'Potencia',
   'Previous zoom': 'Zoom anterior',
@@ -1951,6 +1952,8 @@ export const es: Record<string, string> = {
   'Drag to change the height of the panes · double-click: equal heights': 'Arrastrar para cambiar el alto de los paneles · doble clic: todos iguales',
   'Bring to front': 'Traer al frente',
   'Send to back': 'Enviar atrás',
+  'Digital signal processing with the DSP library (fixed point, Q1.15): FIR, IIR and CIC filters, an NCO and a mixer, one workbench each':
+    'Procesamiento digital de señales con la biblioteca DSP (punto fijo, Q1.15): filtros FIR, IIR y CIC, un NCO y un mezclador, un workbench cada uno',
   'Mixed-signal: the «ADC» project has a flash, a SAR and a sigma-delta ADC (Verilog, a CMOS comparator and component arrays), one workbench each':
     'Simulación mixta: el proyecto «ADC» tiene un ADC flash, uno SAR y uno sigma-delta (Verilog, un comparador CMOS y arreglos de componentes), un workbench cada uno',
   '{inst}: pin {pin} ({w} bits) does not fit the bus {bus} ({n} bits)': '{inst}: el pin {pin} ({w} bits) no encaja con el bus {bus} ({n} bits)',

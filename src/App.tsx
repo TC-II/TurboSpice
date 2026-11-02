@@ -827,8 +827,9 @@ function SchematicMode({
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = project.name;
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));
-    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName(), allTraces());
-    download(`${base}.cir`, new Blob([(await withVariants(built.netlist)).netlist], { type: 'text/plain' }));
+    // (la de la última simulación ya tiene las variantes)
+    const built = sim && sameExceptData(sim.doc, doc) ? sim.built : await buildSimulation(doc, lib, ascName(), allTraces(), { variants: withVariants });
+    download(`${base}.cir`, new Blob([built.netlist], { type: 'text/plain' }));
   };
 
   const { openStudy, complexSim, sweepSubParam, studyInfo, openSimulation, openControl } = studyActions({

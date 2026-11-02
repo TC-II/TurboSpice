@@ -16,7 +16,7 @@ import type { Project } from '../project/turbo.ts';
 import { dropResult, saveResult } from '../schematic/autosave.ts';
 import type { EditorHandle, Tool } from '../schematic/SchematicEditor.tsx';
 import type { Bias } from '../sim/bias.ts';
-import type { BuiltSimulation } from '../sim/schematicSim.ts';
+import type { BuiltSimulation, Variants } from '../sim/schematicSim.ts';
 import { keepResult, type SimList } from '../sim/simList.ts';
 import type { Expanded } from '../ui/ResultsSplitter.tsx';
 import { isPzBodePlot } from '../waveform/pz.ts';
@@ -59,7 +59,7 @@ export interface RunDeps {
   ascName(): string;
   allTraces(): string[];
   synthStale(): Promise<void>;
-  withVariants(netlist: string): Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }>;
+  withVariants: Variants;
   setOpPoint(o: { doc: AscDoc; built: BuiltSimulation; bias: Bias }): void;
   expanded: Expanded;
   setExpanded(e: Expanded): void;

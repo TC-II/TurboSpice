@@ -91,16 +91,32 @@ Detalles:
 ### Biblioteca DSP (#366)
 Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `library/verilog/DSP`:
 `dsp_const`, `dsp_delay` (z⁻¹), `dsp_add`, `dsp_sub`, `dsp_mul`, `dsp_tap` (coeficiente COEF),
-`dsp_shift` (×2^K), `dsp_neg` y `dsp_impulse` (impulso o escalón). SAT/RND eligen saturar y redondear.
-Sus símbolos (`library/sym/DSP`, carpeta DSP del buscador) se generan con `node scripts/gen-dsp-symbols.ts`;
-al elegir uno, el `.v` se copia al proyecto y se sintetiza ahí (`bundle.verilog`). Los parameter que no
-cambian pines (COEF, VALUE, K, SAT…) van por instancia; W cambia los buses, así que se cambia en el `.v`
-del proyecto. Pruebas: los casos DSP de `tests/hdl/cases.mjs` (aritmética con saturación y un FIR de 4 taps).
+`dsp_shift` (×2^K), `dsp_neg`, `dsp_impulse` (impulso o escalón), `dsp_nco` (seno con acumulador de
+fase), `dsp_clkdiv` y `dsp_downsample` (↓M con su reloj `clko`, que cambia en los flancos de bajada de
+`clk`: los bloques que siguen con `clko` son sincrónicos con su salida). SAT/RND eligen saturar y redondear.
+- **Símbolos dibujados** (`library/sym/DSP`, carpeta DSP del buscador): Σ en un círculo, el tap como
+  triángulo, z⁻¹ con el reloj abajo… Los genera `node scripts/gen-dsp-symbols.ts` (el orden de los pines
+  y los parameter salen de la síntesis). Al elegir uno, el `.v` y su símbolo se copian al proyecto y se
+  sintetiza ahí (`bundle.verilog`); la síntesis conserva el dibujo.
+- Los parameter que no cambian pines (COEF, VALUE, K, SAT…) van por instancia, negativos incluidos
+  (Yosys no los lee en `-chparam`: `synthesize` los escribe como valor por omisión del parameter). W
+  cambia los buses, así que se cambia en el `.v` del proyecto.
+- **Graficar el valor real**: `signed(Dig(y[15:0]), 16)/32768` (la función `signed(x, bits)` de las
+  trazas lee un bus en complemento a dos). Conviene graficar la salida de un registro (un z⁻¹): la de un
+  sumador tiene las carreras de sus compuertas.
+- **Ejemplo** «DSP» (Archivo › Ejemplos, `scripts/make-dsp.ts` + `scripts/dsp/project.ts`): FIR de 8 taps
+  (impulso, banda de paso y de rechazo), IIR de primer orden y biquad Butterworth (Q2.14), CIC N = 2,
+  R = 8, y un mezclador con dos NCO. Los esquemáticos se dibujan en el script como diagrama de bloques.
+- Pruebas: los casos DSP de `tests/hdl/cases.mjs` (aritmética con saturación, FIR de 4 taps, parameter
+  negativo, CIC).
+
 Plan completo (módulo único para Icarus, modos por instancia): issue #366.
 
 ### parameter por instancia (`variants.ts`)
 Un parameter cambia el circuito (ancho de un bus…): una instancia con otro valor (entero) usa otra
-síntesis (`chparam` en Yosys, `defparam` en Icarus) con su propio nombre, que se agrega a la netlist.
+síntesis (`chparam` en Yosys, `defparam` en Icarus) con su propio nombre, que se agrega al archivo del
+módulo. Se aplica antes de las redes digitales (`buildSimulation`, opción `variants`): así una variante
+también tiene su copia sin puentes (antes, una instancia en una red digital perdía su parameter).
 
 ### Icarus en WebAssembly (`engine/icarus/`)
 - `build.sh` (lo llama `engine/build.sh`): Icarus (commit fijo) con `libvvp-step.patch`, que parte

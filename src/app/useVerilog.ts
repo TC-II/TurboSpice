@@ -8,6 +8,7 @@ import type { SynthResult } from '../hdl/yosys.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR, type Library } from '../library/library.ts';
 import type { Status } from '../NetlistMode.tsx';
+import type { Variants } from '../sim/schematicSim.ts';
 import type { Project } from '../project/turbo.ts';
 
 export interface VerilogDeps {
@@ -61,16 +62,18 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
    * (en memoria mientras no cambie el código), y los bloques de comportamiento necesitan su .vvp
    */
   const variantCache = useRef(new Map<string, { subckt: string; vvp?: string }>());
-  const withVariants = async (netlist: string): Promise<{ netlist: string; files: Record<string, string>; warnings: string[] }> => {
+  const withVariants: Variants = async (netlist, inFiles) => {
     const p = projectRef.current;
     const mods = verilogModules(p).filter((f) => f.synth);
     const v = applyVariants(
       netlist,
       mods.map((f) => ({ name: moduleOf(f), params: f.synth!.params })),
     );
-    const files: Record<string, string> = {};
+    const files: Record<string, string> = { ...inFiles };
     for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
     const subs: string[] = [];
+    /** .subckt de variantes que van al final de la netlist (su módulo no está en ningún archivo) */
+    const inline: string[] = [];
     for (const n of v.needs) {
       const f = verilogFile(p, n.module)!;
       const k = `${n.name}\u0000${f.hdl ?? ''}\u0000${f.text}`;
@@ -89,12 +92,17 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
         variantCache.current.set(k, hit);
       }
       subs.push(hit.subckt);
+      // al archivo del módulo (así digitalLinks la encuentra y le hace su copia sin puentes)
+      const re = new RegExp(`^\\s*\\.subckt\\s+${moduleOf(f)}\\s`, 'im');
+      const file = Object.keys(files).find((k) => re.test(files[k]));
+      if (file) files[file] = `${files[file].replace(/\n*$/, '\n')}${hit.subckt}`;
+      else inline.push(hit.subckt);
       if (hit.vvp) files[vvpFileOf(n.name)] = hit.vvp;
     }
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
     const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
-    return { netlist: withSubckts(v.netlist, subs), files, warnings: v.warnings };
+    return { netlist: withSubckts(v.netlist, inline), files, warnings: v.warnings };
   };
   return { synthModule, synthAndReport, synthStale, withVariants };
 }

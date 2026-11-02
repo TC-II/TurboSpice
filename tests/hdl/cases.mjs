@@ -363,6 +363,46 @@ X1 clk ${nodes('y', 8)} fir4 tpd=1n
     },
   },
   {
+    name: 'DSP (#366): parameter negativo por instancia (dsp_shift con K=-2; Yosys no lo acepta en -chparam)',
+    file: 'dsp_shift.v',
+    top: 'dsp_shift',
+    params: { K: '-2', W: '8' },
+    verilog: readFileSync(new URL('dsp_shift.v', DSP_DIR), 'utf8'),
+    // x = −100 (0x9C), un bit por fuente
+    circuit: `${Array.from({ length: 8 }, (_, b) => `Vx${b} x_${b} 0 ${(0x9c >> b) & 1 ? 5 : 0}`).join('\n')}
+X1 ${nodes('x', 8)} ${nodes('y', 8)} dsp_shift
+.tran 1n 20n`,
+    check: (at) => {
+      const got = word(at, 'y', 8, 10e-9);
+      if (got !== -25) return `y = ${got} (esperaba −100 >> 2 = −25)`;
+    },
+  },
+  {
+    name: 'DSP (#366): CIC de 1 etapa por 4 (integrador, ↓4 y peine con su reloj clko): un escalón de 5 da 20',
+    file: 'cic.v',
+    top: 'cic',
+    verilog: `${DSP}
+module cic(input clk, output signed [7:0] y, output slow);
+  wire signed [7:0] x, i, id, d, dd;
+  dsp_impulse #(.W(8), .VALUE(5), .STEP(1)) u0(.clk(clk), .y(x));
+  dsp_add #(.W(8), .SAT(0)) a1(.a(x), .b(id), .y(i));
+  dsp_delay #(.W(8)) z1(.clk(clk), .d(i), .q(id));
+  dsp_downsample #(.W(8), .M(4)) ds(.clk(clk), .x(i), .y(d), .clko(slow));
+  dsp_delay #(.W(8)) z2(.clk(slow), .d(d), .q(dd));
+  dsp_sub #(.W(8), .SAT(0)) c1(.a(d), .b(dd), .y(y));
+endmodule`,
+    circuit: `${CLK}
+X1 clk ${nodes('y', 8)} slow cic tpd=1n
+.tran 1n 4u`,
+    check: (at) => {
+      // (el integrador envuelve: 5·t pasa de 127 enseguida; el peine lo deshace)
+      for (const tt of [2.05e-6, 2.65e-6, 3.45e-6, 3.95e-6]) {
+        const got = word(at, 'y', 8, tt);
+        if (got !== 20) return `y en ${tt * 1e6} µs: ${got} (esperaba 4·5 = 20)`;
+      }
+    },
+  },
+  {
     name: 'error de sintaxis',
     file: 'bad.v',
     verilog: `module bad(input a, output y); assign y = ; endmodule`,

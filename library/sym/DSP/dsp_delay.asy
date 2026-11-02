@@ -1,19 +1,25 @@
 Version 4
 SymbolType CELL
-RECTANGLE Normal -48 -32 48 32
+RECTANGLE Normal -32 -32 32 32
+LINE Normal -8 32 0 22
+LINE Normal 0 22 8 32
+LINE Normal 0 32 0 64
+LINE Normal -64 0 -32 0
+TEXT 0 -4 Center 3 z⁻¹
+LINE Normal 32 0 64 0
 WINDOW 0 0 -40 Bottom 2
-WINDOW 3 0 40 Top 2
+WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16
 SYMATTR Prefix X
 SYMATTR Value dsp_delay
 SYMATTR ModelFile dsp_delay.sub
 SYMATTR Description Verilog module dsp_delay
-PIN -48 -16 LEFT 8
+PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1
-PIN -48 16 LEFT 8
+PIN -64 0 NONE 0
 PINATTR PinName d[15:0]
 PINATTR SpiceOrder 2
-PIN 48 -16 RIGHT 8
+PIN 64 0 NONE 0
 PINATTR PinName q[15:0]
 PINATTR SpiceOrder 3

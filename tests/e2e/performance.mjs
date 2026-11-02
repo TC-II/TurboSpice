@@ -4,7 +4,7 @@
 // y la segunda carga no lo vuelve a bajar.
 // Uso: node tests/e2e/performance.mjs [url] [carpeta-capturas]   (con `npm run preview` corriendo)
 import { mkdirSync } from 'node:fs';
-import { frames, launchBrowser, skipWelcome, until, sampleUrl } from './lib.mjs';
+import { autosaved, frames, launchBrowser, skipWelcome, until, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 const OUT = process.argv[3] ?? 'test-results';
@@ -42,6 +42,8 @@ const cached = await page.evaluate(async () => {
 check(cached.some((u) => /^ngspice\.wasm\?v=\w+$/.test(u)) && cached.some((u) => /^analog\.cm\?v=/.test(u)), `motor guardado con su hash (${cached.length} archivos)`);
 const engineRequests = [];
 page.on('request', (r) => /engine\/(ngspice\.wasm|\w+\.cm)$/.test(r.url()) && engineRequests.push(r.url()));
+// (?example= sale de la URL al abrirse: la recarga trae el proyecto del autoguardado)
+await autosaved(page);
 await page.reload();
 await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 60000 });
 check(engineRequests.length === 0, `la segunda carga no vuelve a bajar el motor (${engineRequests.length} pedidos)`);

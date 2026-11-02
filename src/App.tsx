@@ -59,11 +59,11 @@ import { allItems, transformItems } from './schematic/edit.ts';
 import { spiceName } from './netlist/spiceName.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
-import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
+import { type TreeSub } from './project/Hierarchy.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
-import { isModelModule, modelModuleFile, modelModuleName, modelModules } from './project/modelModule.ts';
+import { isModelModule } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
-import { benchesUsing, modules, subcktFile, subName, updateSymbol, usages } from './project/subckt.ts';
+import { benchesUsing, subcktFile, subName, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -125,6 +125,7 @@ import { useTraces } from './app/useTraces.ts';
 import { usePicker } from './app/usePicker.ts';
 import { useLayoutPrefs } from './app/useLayoutPrefs.ts';
 import { EditorArea } from './app/EditorArea.tsx';
+import { ProjectPanel } from './app/ProjectPanel.tsx';
 
 
 export function App() {
@@ -1043,92 +1044,9 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
           // de prueba escribe ahí el nodo o componente
           onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
         >
-          {curSub && (
-            <div className={`sub-hint${curVerilog ? ' verilog' : ''}`} role="status">
-              <strong>{curVerilog ? t('Verilog Editor') : t('Subcircuit Editor')}</strong>
-              <span className="sub-hint-name">{curSub}</span>
-              <span className="sub-hint-text">
-                {curVerilog ? t('write the module; its ports are the pins of the symbol') : t('draw the circuit between the ports (net labels with a port, N)')}
-              </span>
-              <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
-                {t('Return')}
-              </button>
-            </div>
-          )}
-          {treeShown && (
-            <ProjectTree
-              project={project.name}
-              benches={treeBenches}
-              groups={project.groups}
-              peek={!treeOpen && treePeek}
-              edgeOnly={!treeOpen && !treePeek}
-              onEnter={() => !treeOpen && !treePeek && tool.kind === 'select' && setTreePeek(true)}
-              onBenchItem={benchItem}
-              onNewGroup={newGroup}
-              onGroupAction={groupAction}
-              onRenameGroup={renameGroupTo}
-              onMoveBench={moveBench}
-              onLeave={() => setTreePeek(false)}
-              activeBench={sims.active}
-              subs={treeSubs}
-              current={curModel || curSub}
-              onBench={goSim}
-              onTestbench={() => path.length && go([])}
-              onNewBench={newEmptyBench}
-              onRenameProject={renameProject}
-              onBenchAction={benchAction}
-              onRenameBench={renameBench}
-              onOpen={(n) => {
-                if (modelModuleFile(projectRef.current, n)) setCurModel(n);
-                else openSub(n);
-              }}
-              onNew={newSubckt}
-              onNewModel={newModel}
-              onNewVerilog={() => setDialog({ kind: 'newModule', module: 'verilog' })}
-              onRename={(n) => (modelModuleFile(projectRef.current, n) ? renameModel(n) : renameSub(n))}
-              onDelete={(n) => (modelModuleFile(projectRef.current, n) ? deleteModel(n) : deleteSub(n))}
-              onExport={exportSub}
-              onExportNetlist={exportSubNetlist}
-              onToUser={subToUser}
-              onImport={() => subImport.current?.click()}
-              onUpdateSymbol={(n) => {
-                const p = updateSymbol(snapshot(), n);
-                projectRef.current = p;
-                editProject(p);
-              }}
-            />
-          )}
-          {quickOpen &&
-            createPortal(
-            <QuickOpen
-              items={[
-                ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
-                ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
-                ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
-              ]}
-              onPick={(k) => {
-                const id = k.slice(2);
-                if (k.startsWith('m:')) return setCurModel(id);
-                if (k.startsWith('s:')) return openSub(id);
-                if (id !== sims.active) return goSim(id);
-                if (path.length) go([]);
-              }}
-              onClose={() => setQuickOpen(false)}
-            />,
-              document.body,
-            )}
-          <input
-            ref={subImport}
-            data-subckt-import
-            type="file"
-            hidden
-            multiple
-            accept=".zip,.asc,.asy,.lib,.sub,.mod,.inc,.cir,.txt"
-            onChange={(e) => {
-              const files = [...(e.target.files ?? [])];
-              e.target.value = '';
-              if (files.length) importSubckts(files);
-            }}
+          <ProjectPanel
+            {...{ project, projectRef, editProject, snapshot, sims, path, curSub, curVerilog, curModel, setCurModel, tool, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, setDialog, go, goSim, openSub }}
+            {...{ benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts }}
           />
           <ModuleEditors {...{ project, projectRef, editProject, curSub, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, setDialog, synthModule, warnShared }} />
           {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}

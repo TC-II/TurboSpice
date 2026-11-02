@@ -1,0 +1,16 @@
+Version 4
+SymbolType CELL
+RECTANGLE Normal -48 -16 48 16
+WINDOW 0 0 -24 Bottom 2
+WINDOW 3 0 24 Top 2
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=16384 F=15 RND=1 SAT=1 W=16
+SYMATTR Prefix X
+SYMATTR Value dsp_tap
+SYMATTR ModelFile dsp_tap.sub
+SYMATTR Description Verilog module dsp_tap
+PIN -48 0 LEFT 8
+PINATTR PinName x[15:0]
+PINATTR SpiceOrder 1
+PIN 48 0 RIGHT 8
+PINATTR PinName y[15:0]
+PINATTR SpiceOrder 2

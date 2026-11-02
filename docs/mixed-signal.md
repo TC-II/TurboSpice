@@ -88,6 +88,16 @@ Detalles:
   nodo), salvo las que sólo maneja un buffer tri-state, que van directo (para ver la Z); 1 GΩ a masa
   en cada una evita la matriz singular en el punto de operación.
 
+### Biblioteca DSP (#366)
+Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `library/verilog/DSP`:
+`dsp_const`, `dsp_delay` (z⁻¹), `dsp_add`, `dsp_sub`, `dsp_mul`, `dsp_tap` (coeficiente COEF),
+`dsp_shift` (×2^K), `dsp_neg` y `dsp_impulse` (impulso o escalón). SAT/RND eligen saturar y redondear.
+Sus símbolos (`library/sym/DSP`, carpeta DSP del buscador) se generan con `node scripts/gen-dsp-symbols.ts`;
+al elegir uno, el `.v` se copia al proyecto y se sintetiza ahí (`bundle.verilog`). Los parameter que no
+cambian pines (COEF, VALUE, K, SAT…) van por instancia; W cambia los buses, así que se cambia en el `.v`
+del proyecto. Pruebas: los casos DSP de `tests/hdl/cases.mjs` (aritmética con saturación y un FIR de 4 taps).
+Plan completo (módulo único para Icarus, modos por instancia): issue #366.
+
 ### parameter por instancia (`variants.ts`)
 Un parameter cambia el circuito (ancho de un bus…): una instancia con otro valor (entero) usa otra
 síntesis (`chparam` en Yosys, `defparam` en Icarus) con su propio nombre, que se agrega a la netlist.

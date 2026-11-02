@@ -2,7 +2,7 @@
 // rótulos por orientación) que la app descarga de una vez.
 // Uso: node scripts/build-library.mjs [salida]   (por defecto public/library/bundle.json)
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decode } from '../src/asc/encoding.ts';
 
@@ -109,7 +109,10 @@ export function buildBundle() {
     ltspice: JSON.parse(readFileSync(join(LIB, 'window-defaults.json'), 'utf8')),
     preferred: JSON.parse(readFileSync(join(LIB, 'window-positions.json'), 'utf8')),
   };
-  return { symbols, skins, skinSets, windowDefaults, subs, cmp };
+  // library/verilog: módulos que se copian al proyecto al elegir su símbolo (DSP, #366)
+  const verilog = {};
+  for (const p of walk(join(LIB, 'verilog'))) if (p.endsWith('.v')) verilog[basename(p).replace(/\.v$/, '')] = readText(p);
+  return { symbols, skins, skinSets, windowDefaults, subs, cmp, verilog };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

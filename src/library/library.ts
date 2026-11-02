@@ -18,6 +18,8 @@ export interface LibraryBundle {
   subs: Record<string, { subckts: string[]; models: string[] }>;
   /** library/cmp: archivo (standard.bjt…) → texto; las listas de las que se elige un valor */
   cmp?: Record<string, string>;
+  /** library/verilog: módulo → código; al elegir su símbolo el .v se copia al proyecto (#366) */
+  verilog?: Record<string, string>;
 }
 
 /** El skin de library/skins/default */

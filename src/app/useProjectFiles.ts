@@ -28,7 +28,11 @@ export function useProjectFiles({ projectRef, editProject, synthAndReport, setMe
     });
     if (!incoming.length) return;
     const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
-    if (r.added.length) editProject({ ...projectRef.current, files: r.files });
+    if (r.added.length) {
+      // (antes de sintetizar: synthAndReport busca el módulo en projectRef)
+      projectRef.current = { ...projectRef.current, files: r.files };
+      editProject(projectRef.current);
+    }
     setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
     // un .v agregado es un módulo: se sintetiza enseguida (así aparece su símbolo)
     for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthAndReport(moduleOf({ name }));

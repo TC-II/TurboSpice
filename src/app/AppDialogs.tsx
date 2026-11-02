@@ -1,10 +1,10 @@
 // Los diálogos del modo esquemático: componentes, textos y simulaciones, archivos, Drive y configuración
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import type { SymbolInst } from '../asc/model.ts';
+import { baseName, type SymbolInst } from '../asc/model.ts';
 import { decodeText } from '../asc/encoding.ts';
 import type { DriveFile } from '../cloud/drive.ts';
 import { DriveDialog } from '../cloud/AccountButton.tsx';
-import { moduleOf, verilogPorts } from '../hdl/project.ts';
+import { moduleOf, verilogFile, verilogPorts } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR, USER_DIR, scanModels } from '../library/library.ts';
 import { pdkOfSymbol } from '../library/pdk.ts';
@@ -139,7 +139,13 @@ export function AppDialogs(props: AppDialogsProps) {
             const name = dir ? type.slice(dir.length + 1) : type;
             if (dialog.forNetlist) return void adoptNetlistFor(name);
             if (dialog.forSymbol) return adoptSymbolFor(name);
-            if (!makesCycle([name])) setTool({ kind: 'place', type: name, orient: 'R0' });
+            // un módulo de library/verilog (DSP, #366): su .v se copia al proyecto y se sintetiza ahí
+            const mod = baseName(name);
+            const code = lib.bundle.verilog?.[mod];
+            // (por nombre, como los del proyecto: así se usa su símbolo una vez sintetizado)
+            if (code !== undefined && !verilogFile(projectRef.current, mod)) void addProjectFiles([{ name: `${mod}.v`, text: code }]);
+            const placed = code !== undefined ? mod : name;
+            if (!makesCycle([placed])) setTool({ kind: 'place', type: placed, orient: 'R0' });
           }}
         />
       )}

@@ -1,6 +1,23 @@
 // Casos de tests/hdl/run.mjs: Verilog, el circuito que lo usa y qué se espera.
 // `check(at, block)`: at(nodo, t) es el valor del vector en t (V o digital); devuelve un string si algo está mal.
 // `compare`: [nodo, tiempos] a comparar contra ngspice nativo.
+import { readFileSync, readdirSync } from 'node:fs';
+
+// la biblioteca DSP (#366), toda junta: un caso la usa desde un módulo de más arriba
+const DSP_DIR = new URL('../../library/verilog/DSP/', import.meta.url);
+const DSP = readdirSync(DSP_DIR)
+  .filter((f) => f.endsWith('.v'))
+  .map((f) => readFileSync(new URL(f, DSP_DIR), 'utf8'))
+  .join('\n');
+/** Valor con signo de un bus de `w` bits leído como tensiones (nombre_7 … nombre_0) */
+const word = (at, name, w, tt) => {
+  const u = Array.from({ length: w }, (_, k) => w - 1 - k).reduce((acc, b) => acc * 2 + (at(`${name}_${b}`, tt) > 2.5 ? 1 : 0), 0);
+  return u >= 2 ** (w - 1) ? u - 2 ** w : u;
+};
+const nodes = (name, w) => Array.from({ length: w }, (_, k) => `${name}_${w - 1 - k}`).join(' ');
+/** dsp_tap/dsp_mul en Q1.7 con redondeo y saturación */
+const q7 = (a, b) => Math.max(-128, Math.min(127, Math.floor((a * b + 64) / 128)));
+const FIR = [32, -64, 96, 16];
 
 const CLK = 'V1 clk 0 PULSE(0 5 0 1n 1n 49n 100n)';
 
@@ -288,6 +305,61 @@ X1 clk q_5 q_4 q_3 q_2 q_1 q_0 cntp
       if (block.pins.length !== 7) return `pines ${block.pins.map((p) => p.name)}`;
       const q = [5, 4, 3, 2, 1, 0].reduce((a, b) => a * 2 + (at(`q_${b}`, 3.05e-6) > 2.5 ? 1 : 0), 0);
       if (q !== 31) return `q = ${q} (esperaba 31)`;
+    },
+  },
+  {
+    name: 'DSP (#366): constantes, sumador y restador con saturación, multiplicador, negador, ×2^K',
+    file: 'arith.v',
+    top: 'arith',
+    verilog: `${DSP}
+module arith(output signed [7:0] add, output signed [7:0] sub, output signed [7:0] mul, output signed [7:0] neg, output signed [7:0] sh, output signed [7:0] wrap);
+  wire signed [7:0] a, b, m;
+  dsp_const #(.W(8), .VALUE(100)) ca(.y(a));
+  dsp_const #(.W(8), .VALUE(-60)) cb(.y(b));
+  dsp_const #(.W(8), .VALUE(-128)) cm(.y(m));
+  dsp_add #(.W(8)) u1(.a(a), .b(a), .y(add));
+  dsp_sub #(.W(8)) u2(.a(a), .b(b), .y(sub));
+  dsp_mul #(.W(8), .F(7)) u3(.a(a), .b(b), .y(mul));
+  dsp_neg #(.W(8)) u4(.x(m), .y(neg));
+  dsp_shift #(.W(8), .K(-2)) u5(.x(b), .y(sh));
+  dsp_add #(.W(8), .SAT(0)) u6(.a(a), .b(a), .y(wrap));
+endmodule`,
+    circuit: `X1 ${['add', 'sub', 'mul', 'neg', 'sh', 'wrap'].map((n) => nodes(n, 8)).join(' ')} arith
+.tran 1n 20n`,
+    check: (at) => {
+      const want = { add: 127, sub: 127, mul: q7(100, -60), neg: 127, sh: -15, wrap: 200 - 256 };
+      for (const [n, v] of Object.entries(want)) {
+        const got = word(at, n, 8, 10e-9);
+        if (got !== v) return `${n} = ${got} (esperaba ${v})`;
+      }
+    },
+  },
+  {
+    name: 'DSP (#366): FIR de 4 taps (impulso → retardos z⁻¹ → taps → sumadores)',
+    file: 'fir4.v',
+    top: 'fir4',
+    verilog: `${DSP}
+module fir4(input clk, output signed [7:0] y);
+  wire signed [7:0] x, d1, d2, d3, p0, p1, p2, p3, s1, s2;
+  dsp_impulse #(.W(8), .VALUE(127)) u0(.clk(clk), .y(x));
+  dsp_delay #(.W(8)) z1(.clk(clk), .d(x), .q(d1));
+  dsp_delay #(.W(8)) z2(.clk(clk), .d(d1), .q(d2));
+  dsp_delay #(.W(8)) z3(.clk(clk), .d(d2), .q(d3));
+${FIR.map((c, k) => `  dsp_tap #(.W(8), .F(7), .COEF(${c})) t${k}(.x(${k ? `d${k}` : 'x'}), .y(p${k}));`).join('\n')}
+  dsp_add #(.W(8)) a1(.a(p0), .b(p1), .y(s1));
+  dsp_add #(.W(8)) a2(.a(p2), .b(p3), .y(s2));
+  dsp_add #(.W(8)) a3(.a(s1), .b(s2), .y(y));
+endmodule`,
+    circuit: `${CLK}
+X1 clk ${nodes('y', 8)} fir4 tpd=1n
+.tran 1n 800n`,
+    check: (at) => {
+      // (el reloj sube en 0, 100n…): en el ciclo k sale el coeficiente k por el impulso
+      const want = [...FIR.map((c) => q7(c, 127)), 0, 0];
+      for (let k = 0; k < want.length; k++) {
+        const got = word(at, 'y', 8, k * 100e-9 + 50e-9);
+        if (got !== want[k]) return `y en el ciclo ${k}: ${got} (esperaba ${want[k]})`;
+      }
     },
   },
   {

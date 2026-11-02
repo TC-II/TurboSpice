@@ -102,7 +102,7 @@ import { addSubckt, benchesUsing, childSubckts, freeSubcktName, moduleFile, modu
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
-import type { PlotAction, PlotPanelHandle } from './waveform/PlotPanel.tsx';
+import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
 import { displayName, sameRuns, scaleOf, stepLabels, stepSweepPlots } from './waveform/series.ts';
@@ -143,10 +143,11 @@ import type { SynthResult } from './hdl/yosys.ts';
 import { BASE, DEFAULT_NAME, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
-import { ascText, clipboardImage, isTyping, registerUserFile, userFileKind } from './app/helpers.ts';
+import { ascText, clipboardImage, registerUserFile, userFileKind } from './app/helpers.ts';
 import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
+import { useShortcuts } from './app/shortcuts.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -2842,168 +2843,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
   // (con los resultados colapsados el visor no se ve: el teclado vuelve al esquemático)
   const viewerKeys = () => area.current === 'viewer' && !!sim && expanded !== 'schematic' && panel === 'plot' && !!plotPanel.current;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (dialog || isTyping(e)) return;
-      const ctrl = e.ctrlKey || e.metaKey;
-      const k = e.key;
-      // letra sin importar Shift/Bloq Mayús (Shift se mira aparte)
-      const lk = k.length === 1 ? k.toLowerCase() : k;
-      const handled = () => e.preventDefault();
-      // en los dos contextos
-      if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && simulate();
-      if (e.altKey && lk === 's') return handled(), running && abort();
-      if (ctrl && lk === 'l') return handled(), showLog();
-      if (ctrl && k === 'Enter') return handled(), simulate();
-      if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
-      if (ctrl && lk === 'o') return handled(), doOpen();
-      if (ctrl && lk === 'p') return handled(), setQuickOpen(true);
-      if (e.altKey && k === 'ArrowUp') return handled(), goUp();
-      if (k === ' ' && !e.altKey) {
-        // Espacio tocado = ajustar (al soltarlo); mantenido + arrastrar desplaza
-        handled();
-        if (ctrl && viewerKeys()) reapplyView();
-        return;
-      }
-      if (viewerKeys()) {
-        const act = (a: PlotAction) => (handled(), plotPanel.current?.action(a));
-        if (ctrl && lk === 'z') return handled(), undoPanes(e.shiftKey);
-        if (ctrl && lk === 'y') return act('autoY');
-        if (ctrl && lk === 'g') return act('grid');
-        if (!ctrl && !e.altKey) {
-          switch (lk) {
-            case 'z':
-              return act(e.shiftKey ? 'zoomPrev' : 'zoomBox');
-            // A y D ponen los markers A y D, con sus diferencias (como en ViVA); T va a la caja de trazas
-            case 'a':
-              return act('markA');
-            case 't':
-              return act('addTrace');
-            case 'p':
-              return act('addPane');
-            case 'b':
-              return act('addPaneBelow');
-            case 'u':
-              return act(e.shiftKey ? 'paneDown' : 'paneUp');
-            case 'd':
-              return act('markD');
-            case 'm':
-              return act(e.shiftKey ? 'clearMarkers' : 'markPoint');
-            case 'v':
-              return act('markV');
-            case 'h':
-              return act('markH');
-            case 'Delete':
-              if (plotPanel.current?.markerSelected()) return act('deleteMarker');
-              break;
-            case 'Backspace':
-              return act('removeTraces');
-            case 'c':
-              return act(e.shiftKey ? 'clearCursors' : 'cursor');
-            case 's':
-              if (!e.shiftKey) return;
-              handled();
-              if (allRuns.length > 1) setDialog({ kind: 'runs' });
-              else setMessage(t('This analysis doesn\'t have several runs (.step)'));
-              return;
-            case 'o':
-              return handled(), pltInput.current?.click();
-            case 'Escape':
-              plotPanel.current?.action('cancel');
-              return;
-          }
-          // el resto de las letras no van al esquemático
-          if (k.length === 1) return;
-        }
-      }
-      if (ctrl && lk === 'z') return handled(), e.shiftKey ? history.redo() : history.undo();
-      if (ctrl && lk === 'y') return handled(), history.redo();
-      if (ctrl && lk === 'r') return handled(), rotateOrMirror('rotate');
-      if (ctrl && lk === 'e') return handled(), rotateOrMirror('mirror');
-      if (ctrl && lk === 'c') return handled(), copySelection();
-      if (ctrl && lk === 'x') return handled(), copySelection(true);
-      if (ctrl && lk === 'v') return handled(), paste();
-      if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), selectAll();
-      if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
-      if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
-      if (e.altKey && lk === 'c') return handled(), openControl();
-      if (e.altKey && lk === 'n') return handled(), hasNets && setShowNets((v) => !v);
-      if (e.altKey && lk === 'e') return handled(), openStudy();
-      if (e.altKey) return;
-      if (ctrl) return;
-      if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
-      if (lk === 'h') return handled(), setNetHover((v) => !v);
-      switch (k) {
-        case 'Escape':
-          plotPanel.current?.action('cancel');
-          setTool({ kind: 'select' });
-          setSelection([]);
-          return;
-        case 'e':
-        case 'Enter': {
-          const sel = selection.length === 1 && selection[0].kind === 'symbol' ? selection[0].index : -1;
-          if (sel >= 0 && descend(sel)) return handled();
-          if (k === 'Enter') return;
-          return handled(), setMessage(t('Select an instance of a project subcircuit to enter it (E or double-click)'));
-        }
-        case 'a':
-          return handled(), openSimulation();
-        case 'p':
-          return handled(), setDialog({ kind: 'picker' });
-        case 'm':
-          return handled(), startMove(false);
-        case 'j':
-          return handled(), shapeTool('LINE')();
-        case 'k':
-          return handled(), shapeTool('RECTANGLE')();
-        case 'o':
-          return handled(), shapeTool('CIRCLE')();
-        case 'u':
-          return handled(), shapeTool('ARC')();
-        case 'w':
-          return handled(), setTool({ kind: 'wire', start: null });
-        case 'n':
-          return handled(), setDialog({ kind: 'flag' });
-        case 'Delete':
-        case 'Backspace':
-          return handled(), deleteSelection();
-        case '?':
-          return handled(), setDialog({ kind: 'help' });
-        case 'r':
-          return setTool({ kind: 'place', type: 'res', orient: 'R0' });
-        case 'c':
-          return setTool({ kind: 'place', type: 'cap', orient: 'R0' });
-        case 'l':
-          return setTool({ kind: 'place', type: 'ind', orient: 'R0' });
-        case 'd':
-          return setTool({ kind: 'place', type: 'diode', orient: 'R0' });
-        case 'v':
-          return setTool({ kind: 'place', type: 'voltage', orient: 'R0' });
-        case 'i':
-          return setTool({ kind: 'place', type: 'current', orient: 'R0' });
-        case 'g':
-          return setTool({ kind: 'flag', name: '0' });
-        case '.':
-          return handled(), setDialog({ kind: 'text', textKind: 'directive' });
-        case 't':
-          return handled(), setTool({ kind: 'comment' });
-        case 'Home':
-          return handled(), editor.current?.fit();
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key !== ' ' || e.ctrlKey || e.metaKey || e.altKey || dialog || isTyping(e)) return;
-      e.preventDefault();
-      if (viewerKeys()) plotPanel.current?.action('fit');
-      else if (area.current === 'schematic' && !editor.current?.spacePanned()) editor.current?.fit();
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('keyup', onKeyUp);
-    };
-  });
 
   // Importar a este proyecto (#157): un .zip (cada carpeta, y la raíz, es una variante) o archivos
   // sueltos (cada .asc, una variante); los símbolos y modelos van a los archivos del proyecto
@@ -3234,6 +3073,11 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const scale = plot ? scaleOf(plot) : null;
   // memoizadas: un arreglo nuevo en cada render recrearía los gráficos (y perdería clicks, #30)
   const allRuns = useMemo(() => (sim && plot ? sameRuns(sim.result.plots, plot) : []), [sim, plot]);
+  // (después de allRuns: los atajos se instalan en cada render, con lo de ese render)
+  useShortcuts({
+    ...{ dialog, history, status, running, selection, allRuns, hasNets, area, editor, plotPanel, pltInput, viewerKeys, simulate, abort, showLog, doSave, doOpen, setQuickOpen, goUp, reapplyView, undoPanes },
+    ...{ setDialog, setMessage, rotateOrMirror, copySelection, paste, setTool, selectAll, setSelection, setShowGrid, setShowLoose, setShowNets, setNetHover, openControl, openStudy, openSimulation, zoomBox, descend, startMove, shapeTool, deleteSelection },
+  });
   // corridas que se muestran: todas (salvo las ocultas, Shift+S) al superponer, o sólo la elegida
   const visibleRuns = useMemo(() => allRuns.filter((r) => !hiddenRuns.has(r.name)), [allRuns, hiddenRuns]);
   const runs = useMemo(() => (plot ? (overlay && visibleRuns.length ? visibleRuns : [plot]) : []), [overlay, visibleRuns, plot]);

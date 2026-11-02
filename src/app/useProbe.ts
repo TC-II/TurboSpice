@@ -8,7 +8,7 @@ import { busBits, isBusName } from '../netlist/bus.ts';
 import type { Tool } from '../schematic/SchematicEditor.tsx';
 import type { InstScope } from '../sim/context.ts';
 import { toggleOpTag, type OpTags } from '../sim/opPins.ts';
-import { saveSelection } from '../sim/saves.ts';
+import { deviceSignals, saveSelection } from '../sim/saves.ts';
 import { digitalProbeExpr, probeExpr } from '../sim/traces.ts';
 import type { Expanded } from '../ui/ResultsSplitter.tsx';
 import { placeTrace } from '../waveform/curves.ts';
@@ -124,6 +124,11 @@ export function useProbe(d: ProbeDeps) {
       const dig = digitalProbeExpr(sim.built, [target.net]);
       if (dig && hasData(dig)) return addDigitalProbe(dig);
     }
+    plotExpr(expr);
+  };
+  /** grafica una expresión en el panel activo (o avisa si no hay datos) */
+  const plotExpr = (expr: string) => {
+    if (!sim || !plot) return;
     setPanel('plot');
     // con los resultados colapsados, mostrarlos para ver la traza
     if (expanded === 'schematic') setExpanded('');
@@ -143,6 +148,18 @@ export function useProbe(d: ProbeDeps) {
       return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
     }
     addProbed(i, expr);
+  };
+  /**
+   * Click en el cuerpo de un transistor o diodo con la punta: en vez de graficar, qué se puede
+   * graficar de él (corrientes y parámetros de punto de operación), con lo que no se guardó en
+   * esta simulación aparte. null: la punta sigue como siempre.
+   */
+  const deviceMenu = (target: Target): { items: { expr: string; label?: string; saved: boolean }[] } | null => {
+    if (savesPicking || !sim || !plot || !scaleOf(plot) || target.symbol === undefined || target.pin !== undefined) return null;
+    if (pathRef.current.length || dftPick.current || traceBox.current?.focused()) return null;
+    const el = sim.built.lt.elements.find((e) => e.sym === target.symbol);
+    const refs = el && deviceSignals(sim.built, el);
+    return refs ? { items: refs.map((r) => ({ expr: r.ref, label: r.label, saved: hasData(r.ref) })) } : null;
   };
   /** ¿La expresión tiene datos en el plot que se ve? (Dig() sólo después de un transitorio) */
   const hasData = (expr: string) => {
@@ -195,5 +212,5 @@ export function useProbe(d: ProbeDeps) {
     const i = Math.min(activePane, panes.length - 1);
     addProbed(i, expr);
   };
-  return { onDftPicking, onProbe, onProbePair };
+  return { onDftPicking, onProbe, onProbePair, deviceMenu, plotExpr };
 }

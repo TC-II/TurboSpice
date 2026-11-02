@@ -1003,7 +1003,7 @@ function SchematicMode({
     },
   });
   const isComplex = plot?.vectors.some((v) => v.imag);
-  const { onDftPicking, onProbe, onProbePair } = useProbe({
+  const { onDftPicking, onProbe, onProbePair, deviceMenu, plotExpr } = useProbe({
     ...{ tool, setTool, setToolState, sim, plot, op, setOpTags, simScope, resolver, isComplex, panes, activePane, editPanes, setActivePane },
     ...{ expanded, setExpanded, setPanel, pathRef, plotPanel, traceBox, savesPicking, pickSave, setMessage },
   });
@@ -1147,6 +1147,8 @@ function SchematicMode({
                   editItem,
                   onProbe,
                   onProbePair,
+                  deviceMenu,
+                  plotExpr,
                   rowNet,
                   traceNetShown,
                   rowSymbol,

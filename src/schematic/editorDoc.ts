@@ -132,6 +132,12 @@ export function positionedAncestor(el: Element | null): HTMLElement | null {
   return null;
 }
 
+/** El cuadro fijo de un transistor: como el tooltip, y tan alto como el lugar que queda de ese lado */
+export function pinnedStyle(tip: { x: number; y: number; w: number; h: number }) {
+  const st = tipStyle(tip);
+  return { ...st, maxHeight: (st.top !== undefined ? tip.h - st.top : tip.h - st.bottom!) - 8 };
+}
+
 export function tipStyle(tip: { x: number; y: number; w: number; h: number }): { left?: number; right?: number; top?: number; bottom?: number } {
   const OFF = 16;
   const right = tip.x < tip.w - 220;

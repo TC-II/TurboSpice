@@ -41,6 +41,8 @@ export interface EditorAreaProps {
   editItem: EP['onEdit'];
   onProbe: EP['onProbe'];
   onProbePair: EP['onProbePair'];
+  deviceMenu: EP['deviceMenu'];
+  plotExpr: EP['onPlotExpr'];
   rowNet: string | undefined;
   traceNetShown: string | undefined;
   rowSymbol: number;
@@ -84,6 +86,8 @@ export function EditorArea(props: EditorAreaProps) {
     editItem,
     onProbe,
     onProbePair,
+    deviceMenu,
+    plotExpr,
     rowNet,
     traceNetShown,
     rowSymbol,
@@ -145,6 +149,8 @@ export function EditorArea(props: EditorAreaProps) {
         onEditLabel={(index, label) => setDialog({ kind: 'attrs', index, label })}
         onProbe={onProbe}
         onProbePair={onProbePair}
+        deviceMenu={deviceMenu}
+        onPlotExpr={plotExpr}
         onDropSubckt={(name) => {
           const m = modelModuleFile(projectRef.current, name);
           if (m) return viewRun ? null : modelModuleName(m);

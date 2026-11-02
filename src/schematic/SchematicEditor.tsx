@@ -53,8 +53,25 @@ import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
 import { resizeShape, shapeHandles } from './shapes.ts';
 import { SUBCKT_DRAG, type Tool, type EditorHandle, type View, type Drag, type InlineText } from './editorTypes.ts';
-import { pinCurrents, orthoEnd, resizableBox, docBox, itemsIn, connectsAt, gridPointOnWire, freeEnd, looseWire, shapeFromClicks, dropMove, positionedAncestor, tipStyle } from './editorDoc.ts';
+import {
+  pinCurrents,
+  orthoEnd,
+  resizableBox,
+  docBox,
+  itemsIn,
+  connectsAt,
+  gridPointOnWire,
+  freeEnd,
+  looseWire,
+  shapeFromClicks,
+  dropMove,
+  positionedAncestor,
+  tipStyle,
+  pinnedStyle,
+} from './editorDoc.ts';
 import { InlineEditor } from './InlineEditor.tsx';
+import { Icon } from '../ui/icons.tsx';
+import { t } from '../i18n/i18n.ts';
 import { useEvent } from '../ui/useEvent.ts';
 import { useEditorView } from './useEditorView.ts';
 
@@ -86,6 +103,13 @@ interface Props {
   onProbe?(ref: { net?: string; symbol?: number; pin?: number }): void;
   /** punta de prueba arrastrada de un punto a otro (#308): la resta o el cociente de los dos */
   onProbePair?(from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }): void;
+  /**
+   * click con la punta en el cuerpo de un transistor o diodo: qué se puede graficar de él (lo que
+   * no se guardó, en gris). Con una lista, el cuadro del punto de operación queda fijo para elegir.
+   */
+  deviceMenu?(target: { symbol: number }): { items: { expr: string; label?: string; saved: boolean }[] } | null;
+  /** grafica una expresión elegida en ese cuadro */
+  onPlotExpr?(expr: string): void;
   highlightNet?: string;
   /** color de los cables de cada red (nombre en minúsculas) con una traza en el gráfico */
   netColors?: Map<string, string>;
@@ -240,6 +264,17 @@ export function SchematicEditor(props: Props) {
     setPickHover(null);
   }, [tool.kind, props.netHover]);
   const [tip, setTip] = useState<{ x: number; y: number; w: number; h: number; info: BiasInfo } | null>(null);
+  // el cuadro fijo de un transistor, para elegir qué graficar de él
+  const [pinned, setPinned] = useState<{ x: number; y: number; w: number; h: number; symbol: number; info: BiasInfo | null; items: { expr: string; label?: string; saved: boolean }[] } | null>(null);
+  useEffect(() => {
+    if (tool.kind !== 'probe') setPinned(null);
+  }, [tool.kind]);
+  useEffect(() => {
+    if (!pinned) return;
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setPinned(null);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [pinned]);
   const spaceDown = useRef(false);
   const spaceUsed = useRef(false);
   const lastClick = useRef<{ p: Point; i: number; t: number } | null>(null);
@@ -363,7 +398,7 @@ export function SchematicEditor(props: Props) {
    * los de varios pines (MOS, BJT, JFET) la corriente es la de un pin (`pins`: sólo con la punta
    * de prueba): se mide sobre el pin, no sobre el cuerpo.
    */
-  const probeTarget = (p: Point, pins = false): { net?: string; symbol?: number; pin?: number } | null => {
+  const probeTarget = (p: Point, pins = false): { net?: string; symbol?: number; pin?: number; body?: boolean } | null => {
     if (pins) {
       let best: { symbol: number; pin: number; d: number } | null = null;
       doc.symbols.forEach((s, i) => {
@@ -385,10 +420,10 @@ export function SchematicEditor(props: Props) {
       if (net) return { net };
     }
     if (hit?.kind === 'symbol') {
-      // el cuerpo de un transistor no mide: la corriente va por pin
+      // el cuerpo de un transistor no mide (la corriente va por pin): abre qué graficar de él
       const s = doc.symbols[hit.index];
       const def = lib.symbol(s.type);
-      if (pins && def && pinCurrents(def.pins.length, s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return null;
+      if (pins && def && pinCurrents(def.pins.length, s.attrs.get('Prefix') ?? def.attrs.get('Prefix') ?? '')) return props.deviceMenu ? { symbol: hit.index, body: true } : null;
       return { symbol: hit.index };
     }
     if (hit?.kind === 'flag') return { net: conn.netAt(doc.flags[hit.index])?.name };
@@ -457,6 +492,7 @@ export function SchematicEditor(props: Props) {
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
+    setPinned(null);
     // click afuera del comentario que se escribe: lo deja (y ese click no hace otra cosa)
     if (inlineRef.current) {
       e.preventDefault();
@@ -822,7 +858,7 @@ export function SchematicEditor(props: Props) {
       setPickHover(v ? { value: v, symbol: t?.symbol } : null);
       setHoverNet(v && t?.net ? t.net : undefined);
     }
-    const info = target && describe ? describe(target) : null;
+    const info = target && describe && !pinned ? describe(target) : null;
     if (info) {
       // en píxeles de pantalla respecto del contenedor (que puede tener padding por los paneles)
       const box = positionedAncestor(svgRef.current)?.getBoundingClientRect() ?? svgRect();
@@ -975,8 +1011,16 @@ export function SchematicEditor(props: Props) {
     if (drag.mode === 'probe') {
       const to = boxEnd && probeTarget(boxEnd, true);
       const same = (a: typeof to, b: typeof to) => !!a && !!b && a.net === b.net && a.symbol === b.symbol && a.pin === b.pin;
-      if (to && !same(to, drag.from) && onProbePair) onProbePair(drag.from, to);
-      else onProbe?.(drag.from);
+      const { body, ...f } = drag.from;
+      const menu = f.symbol !== undefined && f.pin === undefined && (!to || same(to, drag.from)) ? props.deviceMenu?.({ symbol: f.symbol }) : null;
+      if (menu) {
+        const box = positionedAncestor(svgRef.current)?.getBoundingClientRect() ?? svgRect();
+        setTip(null);
+        setPinned({ x: e.clientX - box.left, y: e.clientY - box.top, w: box.width, h: box.height, symbol: f.symbol!, info: describe?.(f) ?? null, items: menu.items });
+      } else if (body) {
+        // (un transistor sin nada que graficar: la punta no mide su cuerpo)
+      } else if (to && !same(to, drag.from) && onProbePair) onProbePair(f, to);
+      else onProbe?.(f);
     }
     if (drag.mode === 'zoom' && boxEnd) {
       const b = { x1: Math.min(drag.start.x, boxEnd.x), y1: Math.min(drag.start.y, boxEnd.y), x2: Math.max(drag.start.x, boxEnd.x), y2: Math.max(drag.start.y, boxEnd.y) };
@@ -1314,6 +1358,30 @@ export function SchematicEditor(props: Props) {
           tool.kind !== 'move' &&
           tool.kind !== 'pencil' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
       </svg>
+      {pinned && (
+        <div className="bias-tip pinned" role="dialog" aria-label={pinned.info?.title} style={pinnedStyle(pinned)} onPointerDown={(e) => e.stopPropagation()}>
+          <button className="close" onClick={() => setPinned(null)} aria-label={t('Close')} title={t('Close')}>
+            <Icon name="close" size={12} />
+          </button>
+          <strong>{pinned.info?.title}</strong>
+          {pinned.info?.lines.map((l, i) => <div key={i}>{l}</div>)}
+          <div className="bias-plot-head">{t('Plot:')}</div>
+          <div className="bias-plot-list">
+            {pinned.items.map((it) => (
+              <button
+                key={it.expr}
+                type="button"
+                className={it.saved ? undefined : 'unsaved'}
+                title={it.saved ? it.label : `${it.label ? `${it.label} — ` : ''}${t('not saved in this simulation: it will be when you run again')}`}
+                onClick={() => props.onPlotExpr?.(it.expr)}
+              >
+                {it.expr}
+                {it.label && <span>{it.label}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {tip && (
         <div
           className="bias-tip"

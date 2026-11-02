@@ -80,7 +80,7 @@ export type Drag =
   /** recuadro de la herramienta zoom */
   | { mode: 'zoom'; start: Point }
   /** punta de prueba apretada sobre `from`: al soltar en otro lugar, la resta o el cociente (#308) */
-  | { mode: 'probe'; start: Point; from: { net?: string; symbol?: number; pin?: number } }
+  | { mode: 'probe'; start: Point; from: { net?: string; symbol?: number; pin?: number; body?: boolean } }
   /** trazo del lápiz en curso */
   | { mode: 'pencil'; pts: Point[] }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */

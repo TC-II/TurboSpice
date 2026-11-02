@@ -458,6 +458,14 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 /* ---------- Punto de operación ---------- */
 .canvas-wrap > .bias-tip { position: absolute; z-index: 2; pointer-events: none; padding: 6px 10px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 4px 16px rgb(0 0 0 / 18%); font: 12px/1.45 var(--mono); color: var(--fg); white-space: nowrap; }
 .bias-tip strong { display: block; font-family: system-ui, sans-serif; margin-bottom: 2px; }
+.canvas-wrap > .bias-tip.pinned { pointer-events: auto; overflow: auto; padding-right: 26px; }
+.bias-tip.pinned .close { position: absolute; top: 4px; right: 4px; }
+.bias-plot-head { margin-top: 6px; padding-top: 4px; border-top: 1px solid var(--border); font-family: system-ui, sans-serif; color: var(--fg-muted); }
+.bias-plot-list { display: flex; flex-direction: column; }
+.bias-plot-list button { display: flex; gap: 8px; justify-content: space-between; text-align: left; font: inherit; color: var(--fg); background: none; border: 0; border-radius: 4px; padding: 1px 4px; cursor: pointer; }
+.bias-plot-list button:hover { background: var(--hover, color-mix(in srgb, var(--fg) 10%, transparent)); }
+.bias-plot-list button span { color: var(--fg-muted); font-family: system-ui, sans-serif; }
+.bias-plot-list button.unsaved { color: var(--fg-muted); opacity: 0.55; }
 .op-annotation text { stroke: none; font-family: var(--mono); font-weight: 600; }
 .op-annotation rect { stroke-width: 1; vector-effect: non-scaling-stroke; }
 .op-annotation.v rect { fill: color-mix(in srgb, var(--sch-bg) 85%, transparent); stroke: var(--sch-wire); }

@@ -1747,6 +1747,8 @@ export const es: Record<string, string> = {
   'B-E charge': 'Carga B-E',
   'B-C charge': 'Carga B-C',
   'Diode charge': 'Carga del diodo',
+  'Plot:': 'Graficar:',
+  'not saved in this simulation: it will be when you run again': 'no se guardó en esta simulación: se va a guardar cuando simules de nuevo',
   'Turn-on voltage': 'Tensión de encendido',
   'Bulk-drain junction conductance': 'Conductancia de la juntura sustrato-drenador',
   'Bulk-source junction conductance': 'Conductancia de la juntura sustrato-fuente',

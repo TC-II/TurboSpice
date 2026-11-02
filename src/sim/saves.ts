@@ -236,6 +236,19 @@ function elementSignals(elements: Element[], name: (e: Element) => string | unde
   return out;
 }
 
+/**
+ * Lo que se puede graficar de un transistor o diodo del nivel superior: sus corrientes por terminal
+ * y sus parámetros de punto de operación según el modelo; null si no es uno
+ */
+export function deviceSignals(sim: Pick<BuiltSimulation, 'ng' | 'files'>, el: Element): { ref: string; label?: string }[] | null {
+  const p = el.prefix.toUpperCase();
+  if (!/^[QMJD]/.test(p)) return null;
+  const name = el.name.replace(/§/g, '');
+  const models = collectModels(sim.ng.text);
+  for (const f of Object.values(sim.files ?? {})) collectModels(f, models);
+  return [...elementRefs(name, p).map((ref) => ({ ref })), ...operatingParams(p, p[0] === 'M' ? modelLevel(el, models) : undefined).map((d) => ({ ref: `@${name}[${d.name}]`, label: d.label }))];
+}
+
 /** Todas las señales que se pueden guardar, por jerarquía (las de las instancias de subcircuitos del proyecto) */
 export function savableSignals(sim: Pick<BuiltSimulation, 'lt' | 'ng' | 'files' | 'digitalNets'>): SavableSignal[] {
   // (los bloques Verilog no tienen corriente por pin: ver pinCurrents.ts)

@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
 import { DIGITAL_TYPE, type SimPlot, type SimResult } from './engine/ngspice.ts';
-import { Library, PROJECT_DIR, USER_DIR, scanModels, type LibraryBundle } from './library/library.ts';
+import { Library, PROJECT_DIR, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames, type Annotation } from './schematic/NetNames.tsx';
 import { currentArrows } from './schematic/currentArrows.tsx';
@@ -18,16 +18,15 @@ import { isPzBodePlot, pzMarks, pzRoots } from './waveform/pz.ts';
 import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
-import { type UserFileInfo } from './schematic/dialogs.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
-import { makeSymbol, schematicPorts, subcktPins } from './library/makeSymbol.ts';
+import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu, MenuButton, type MenuItem } from './ui/Menu.tsx';
 import { Icon } from './ui/icons.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
-import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, saveUserFiles, type RecentFile, type UserFile } from './schematic/autosave.ts';
+import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, type RecentFile, type UserFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
@@ -117,7 +116,7 @@ import { MeasPanel } from './sim/MeasPanel.tsx';
 import { type StudyInfo } from './schematic/StudyPanel.tsx';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
-import { decode, decodeText } from './asc/encoding.ts';
+import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { SideSplit, useSideSize } from './ui/SideSplit.tsx';
@@ -125,7 +124,6 @@ import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import { AccountButton, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
-import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from './cloud/userLibrary.ts';
 import { Logo } from './ui/Logo.tsx';
 import { hoverCoords, hoverInfo } from './schematic/hoverInfo.ts';
 import { getLang, locale, setLang, t } from './i18n/i18n.ts';
@@ -139,7 +137,7 @@ import type { SynthResult } from './hdl/yosys.ts';
 import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
-import { ascText, clipboardImage, registerUserFile, userFileKind } from './app/helpers.ts';
+import { ascText, clipboardImage, registerUserFile } from './app/helpers.ts';
 import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
@@ -149,6 +147,7 @@ import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 import { SimRow } from './app/SimRow.tsx';
 import { ProblemsList, simProblems } from './app/Problems.tsx';
 import { runTestbench } from './app/simulate.ts';
+import { useUserFiles } from './app/useUserFiles.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -437,33 +436,8 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const [netHover, setNetHover] = useState(false);
 
   // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
-  const [userFiles, setUserFiles] = useState<UserFile[]>([]);
-  const [libVersion, setLibVersion] = useState(0);
-  useEffect(() => {
-    loadUserFiles().then(setUserFiles);
-  }, []);
-  // con sesión de Google, «My symbols and models» vive en Drive (USER_LIBRARY_NAME), el mismo para
-  // todos los proyectos; al entrar se une con lo que haya en este navegador
-  const userLibId = useRef<string>();
   const account = google.account?.emailAddress ?? google.account?.displayName;
-  useEffect(() => {
-    userLibId.current = undefined;
-    if (!account) return;
-    let off = false;
-    (async () => {
-      const remote = await pullUserLibrary(drive);
-      const merged = mergeUserFiles(remote.files ?? [], await loadUserFiles());
-      if (off) return;
-      for (const f of merged) registerUserFile(lib, f);
-      setUserFiles(merged);
-      saveUserFiles(merged);
-      setLibVersion((v) => v + 1);
-      userLibId.current = remote.files && userLibraryText(merged) === userLibraryText(remote.files) ? remote.id : await pushUserLibrary(drive, merged, remote.id);
-    })().catch((e: Error) => !off && setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
-    return () => {
-      off = true;
-    };
-  }, [account]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { userFiles, libVersion, setLibVersion, storeUserFiles, addUserFiles, removeUserFile, makeUserSymbol, userFileInfo } = useUserFiles(lib, account, setMessage);
   // el progreso del tutorial también (PROGRESS_NAME): así no se repite en otra máquina
   useEffect(() => {
     if (!account) return;
@@ -474,7 +448,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   useEffect(() => {
     lib.setProjectFiles(project.files);
     setLibVersion((v) => v + 1);
-  }, [lib, project.files]);
+  }, [lib, project.files, setLibVersion]);
   // archivo repetido con otro contenido: se pregunta qué hacer
   const [conflict, setConflict] = useState<{ name: string; resolve(c: FileConflict): void } | null>(null);
   const askConflict = (name: string) => new Promise<FileConflict>((resolve) => setConflict({ name, resolve }));
@@ -591,7 +565,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     return () => {
       alive = false;
     };
-  }, [doc, lib, ltIndex]);
+  }, [doc, lib, ltIndex, setLibVersion]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const lt = useMemo(() => ltNetlist(doc, lib), [doc, lib, libVersion]);
   const conn = lt.conn;
@@ -2379,56 +2353,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     ];
     if (msgs.length) setMessage(msgs.join(' · '));
   };
-  const storeUserFiles = (next: UserFile[]) => {
-    setUserFiles(next);
-    saveUserFiles(next);
-    setLibVersion((v) => v + 1);
-    if (account)
-      pushUserLibrary(drive, next, userLibId.current)
-        .then((id) => (userLibId.current = id))
-        .catch((e: Error) => setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
-  };
-  const addUserFiles = async (files: File[]) => {
-    const next = [...userFiles];
-    const added: string[] = [];
-    for (const f of files) {
-      const kind = userFileKind(f.name);
-      if (!kind) continue;
-      const uf: UserFile = { name: f.name, kind, text: decodeText(new Uint8Array(await f.arrayBuffer())), time: Date.now() };
-      const i = next.findIndex((x) => x.name.toLowerCase() === f.name.toLowerCase());
-      if (i >= 0) next[i] = uf;
-      else next.push(uf);
-      registerUserFile(lib, uf);
-      added.push(f.name);
-    }
-    storeUserFiles(next);
-    if (added.length) setMessage(t('Added: {p0}', { p0: added.join(', ') }));
-  };
-  const removeUserFile = (name: string) => {
-    const f = userFiles.find((x) => x.name === name);
-    if (!f) return;
-    if (f.kind === 'symbol') lib.removeSymbol(name.replace(/\.asy$/i, ''));
-    else if (f.kind === 'model') lib.removeModelFile(name);
-    else lib.removeSchematic(name);
-    storeUserFiles(userFiles.filter((x) => x !== f));
-  };
-  /** Símbolo para un .subckt de un archivo de modelos, o de bloque para un .asc */
-  const makeUserSymbol = (file: string, name: string) => {
-    const f = userFiles.find((x) => x.name === file);
-    if (!f) return;
-    const pins = f.kind === 'schematic' ? schematicPorts(parseAsc(f.text).flags) : subcktPins(f.text, name);
-    if (!pins) return setMessage(t('No .subckt {name} found in {file}', { name, file }));
-    const uf: UserFile = { name: `${name}.asy`, kind: 'symbol', text: makeSymbol({ name, pins, block: f.kind === 'schematic', modelFile: f.kind === 'model' ? file : undefined }), time: Date.now() };
-    registerUserFile(lib, uf);
-    storeUserFiles([...userFiles.filter((x) => x.name.toLowerCase() !== uf.name.toLowerCase()), uf]);
-    setMessage(t('Symbol {name} created: it\'s in the component browser (P) under "{USER_DIR}"', { name, USER_DIR }));
-  };
-  const userFileInfo = (): UserFileInfo[] =>
-    userFiles.map((f) => ({
-      name: f.name,
-      kind: f.kind,
-      items: f.kind === 'model' ? scanModels(f.text).subckts : f.kind === 'schematic' ? schematicPorts(parseAsc(f.text).flags) : [],
-    }));
 
   // Portapapeles: la selección como texto .asc (se puede pegar en otra pestaña o en un editor)
   const copySelection = async (cut = false) => {

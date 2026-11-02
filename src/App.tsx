@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { baseName, emptyDoc, type AscDoc, type SymbolInst } from './asc/model.ts';
 import { EngineClient } from './engine/client.ts';
 import { type SimPlot } from './engine/ngspice.ts';
-import { Library, PROJECT_DIR, type LibraryBundle } from './library/library.ts';
+import { Library, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames } from './schematic/NetNames.tsx';
 import { type Bias } from './sim/bias.ts';
@@ -16,7 +16,6 @@ import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { NetlistMode } from './NetlistMode.tsx';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
-import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
 import { AppMenu } from './ui/Menu.tsx';
 import { Toolbar } from './ui/Toolbar.tsx';
 import { loadLtspiceIndex, prefetchLtspice, type LtspiceIndex } from './library/ltspiceLib.ts';
@@ -34,15 +33,12 @@ import { simLine } from './sim/complexSim.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
-  mergeFiles,
-  projectFileKind,
   lineOf,
   simOf,
   simsWithValue,
   valueChanges,
   withGroups,
   variantOf,
-  type FileConflict,
   type ValueChange,
 } from './project/project.ts';
 import { runFilesOf, runSummary } from './project/exchange.ts';
@@ -79,7 +75,6 @@ import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
 import { t } from './i18n/i18n.ts';
-import { moduleOf } from './hdl/project.ts';
 import { BASE, DEFAULT_PROJECT, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SavesState, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
@@ -124,6 +119,7 @@ import { EditorArea } from './app/EditorArea.tsx';
 import { ProjectPanel } from './app/ProjectPanel.tsx';
 import { runHistoryActions } from './app/runHistory.ts';
 import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
+import { useProjectFiles } from './app/useProjectFiles.ts';
 
 
 export function App() {
@@ -379,35 +375,13 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     lib.setProjectFiles(project.files);
     setLibVersion((v) => v + 1);
   }, [lib, project.files, setLibVersion]);
-  // archivo repetido con otro contenido: se pregunta qué hacer
-  const [conflict, setConflict] = useState<{ name: string; resolve(c: FileConflict): void } | null>(null);
-  const askConflict = (name: string) => new Promise<FileConflict>((resolve) => setConflict({ name, resolve }));
-  /** Agrega símbolos y modelos al proyecto (los demás tipos se ignoran) */
-  const addProjectFiles = async (list: { name: string; text: string }[]) => {
-    const incoming = list.flatMap((f) => {
-      const kind = projectFileKind(f.name);
-      return kind ? [{ name: f.name, kind, text: f.text }] : [];
-    });
-    if (!incoming.length) return;
-    const r = await mergeFiles(projectRef.current.files, incoming, askConflict);
-    if (r.added.length) editProject({ ...projectRef.current, files: r.files });
-    setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
-    // un .v agregado es un módulo: se sintetiza enseguida (así aparece su símbolo)
-    for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthAndReport(moduleOf({ name }));
-  };
+  const { conflict, setConflict, askConflict, addProjectFiles, removeProjectFile, makeProjectSymbol } = useProjectFiles({
+    ...{ projectRef, editProject, setMessage },
+    synthAndReport: (name) => synthAndReport(name), // (declarada más abajo)
+  });
 
   // Módulos Verilog (#209): síntesis, comportamiento y variantes
   const { synthModule, synthAndReport, synthStale, withVariants } = useVerilog({ lib, projectRef, editProject, setLibVersion, setStatus, setMessage });
-  const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
-  /** Símbolo para un .subckt de un archivo de modelos del proyecto */
-  const makeProjectSymbol = (file: string, name: string) => {
-    const f = projectRef.current.files.find((x) => x.name === file);
-    const pins = f && subcktPins(f.text, name);
-    if (!pins) return setMessage(t('No .subckt {name} found in {file}', { name, file }));
-    const sym = { name: `${name}.asy`, kind: 'symbol' as const, text: makeSymbol({ name, pins, block: false, modelFile: file }) };
-    editProject({ ...projectRef.current, files: [...projectRef.current.files.filter((x) => x.name.toLowerCase() !== sym.name.toLowerCase()), sym] });
-    setMessage(t('Symbol {name} created: it\'s in the component browser (P) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
-  };
 
   // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
   // cada esquemático trae de ahí sólo los símbolos y modelos que le faltan

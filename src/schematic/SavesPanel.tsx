@@ -1,9 +1,11 @@
 // Qué señales se guardan en la simulación del testbench (#314), en un panel a la derecha (#364):
 // todo, o sólo las elegidas, con búsqueda y atajos por jerarquía. Se eligen acá o con la punta de
 // prueba en el esquemático (un cable, su tensión; un componente, su corriente), y cada fila bajo el
-// mouse resalta su red o su componente (y al revés). Lo elegido se escribe al momento como
+// mouse resalta su red o su componente (y al revés). Cada jerarquía se pliega, y adentro los
+// transistores y diodos tienen sus parámetros de punto de operación (gm, capacidades, cargas…,
+// según el nivel del modelo), plegados hasta abrirlos. Lo elegido se escribe al momento como
 // ".save V(out) I(R1)…" en el .asc.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { SavableSignal } from '../sim/saves.ts';
 import { rowDevice } from '../waveform/ScalarViews.tsx';
 import { Icon } from '../ui/icons.tsx';
@@ -60,7 +62,7 @@ export function SavesPanel({
     const m = new Map<string, SavableSignal[]>();
     const qq = q.trim().toLowerCase();
     for (const s of all) {
-      if (qq && !s.ref.toLowerCase().includes(qq)) continue;
+      if (qq && !s.ref.toLowerCase().includes(qq) && !s.label?.toLowerCase().includes(qq)) continue;
       m.set(s.group, [...(m.get(s.group) ?? []), s]);
     }
     return [...m];
@@ -70,6 +72,29 @@ export function SavesPanel({
     const next = on ? [...cur, ...refs.filter((r) => !sel.has(key(r)))] : cur.filter((r) => !refs.some((x) => key(x) === key(r)));
     onChange(next);
   };
+  // las secciones plegadas o abiertas al revés de como empiezan (las jerarquías abiertas, los
+  // parámetros de cada dispositivo plegados); buscando, se abre todo
+  const [flipped, setFlipped] = useState<Set<string>>(() => new Set());
+  const section = (id: string, openByDefault: boolean, summary: ReactNode, body: ReactNode, className = 'saves-group') => (
+    <details
+      key={id}
+      className={className}
+      open={!!q.trim() || openByDefault !== flipped.has(id)}
+      onToggle={(e) => {
+        const open = e.currentTarget.open;
+        if (q.trim() || open === (openByDefault !== flipped.has(id))) return;
+        setFlipped((f) => {
+          const n = new Set(f);
+          if (n.has(id)) n.delete(id);
+          else n.add(id);
+          return n;
+        });
+      }}
+    >
+      <summary>{summary}</summary>
+      {body}
+    </details>
+  );
   const hot = useMemo(() => new Set(hover.refs.map(key)), [hover.refs]);
   const isHot = (ref: string) => hot.has(key(ref)) || (!!hover.device && rowDevice(ref) === hover.device.toUpperCase());
   // la fila de lo que está bajo el mouse en el esquemático, a la vista
@@ -84,21 +109,51 @@ export function SavesPanel({
       type="button"
       className="link"
       disabled={!refs.length}
-      onClick={() =>
-        set(
-          refs.map((s) => s.ref),
-          on,
+      onClick={(e) =>
+        (
+          // (en el título de una sección: que no la pliegue)
+          e.preventDefault(),
+          set(
+            refs.map((s) => s.ref),
+            on,
+          )
         )
       }
     >
       {label}
     </button>
   );
-  const row = (ref: string) => (
-    <label key={ref} className={`check saves-row${isHot(ref) ? ' hl' : ''}`} data-ref={ref} onMouseEnter={() => onHoverRow(ref)} onMouseLeave={() => onHoverRow(null)}>
+  const row = (ref: string, label?: string) => (
+    <label key={ref} className={`check saves-row${isHot(ref) ? ' hl' : ''}`} data-ref={ref} title={label} onMouseEnter={() => onHoverRow(ref)} onMouseLeave={() => onHoverRow(null)}>
       <input type="checkbox" checked={sel.has(key(ref))} onChange={(e) => set([ref], e.target.checked)} /> <code>{ref}</code>
+      {label && <span className="saves-label">{label}</span>}
     </label>
   );
+  /** las filas de una jerarquía: tensiones y corrientes, y los parámetros de cada dispositivo aparte */
+  const groupBody = (g: string, refs: SavableSignal[]) => {
+    const devices = new Map<string, SavableSignal[]>();
+    for (const s of refs) if (s.kind === 'param' && s.device) devices.set(s.device, [...(devices.get(s.device) ?? []), s]);
+    return (
+      <>
+        {refs.filter((s) => s.kind !== 'param').map((s) => row(s.ref))}
+        {[...devices].map(([d, ps]) =>
+          section(
+            `${g}\u0000${d}`,
+            false,
+            <>
+              <code>{d}</code> {t('Operating point')}{' '}
+              <span className="saves-n">
+                ({ps.filter((s) => sel.has(key(s.ref))).length}/{ps.length})
+              </span>{' '}
+              {shortcut(t('all'), ps, true)} · {shortcut(t('none'), ps, false)}
+            </>,
+            ps.map((s) => row(s.ref, s.label)),
+            'saves-device',
+          ),
+        )}
+      </>
+    );
+  };
 
   return (
     <aside className={`saves-panel${inactive ? ' inactive' : ''}`} aria-label={t('Saved signals')} onMouseDownCapture={() => inactive && onActivate()} onFocusCapture={() => inactive && onActivate()}>
@@ -170,20 +225,23 @@ export function SavesPanel({
             {!n && <p className="hint">{t('Nothing selected yet: until you choose, everything is saved.')}</p>}
             <div className="saves-list" ref={list}>
               {!signals && <p className="hint">{t('Reading the circuit…')}</p>}
-              {groups.map(([g, refs]) => (
-                <fieldset key={g} className="saves-group">
-                  <legend>
-                    {g || t('Top level')} {shortcut(t('all'), refs, true)} · {shortcut(t('none'), refs, false)}
-                  </legend>
-                  {refs.map((s) => row(s.ref))}
-                </fieldset>
-              ))}
-              {extra.length > 0 && (
-                <fieldset className="saves-group">
-                  <legend>{t('Written in the .save')}</legend>
-                  {extra.map(row)}
-                </fieldset>
+              {groups.map(([g, refs]) =>
+                section(
+                  g,
+                  true,
+                  <>
+                    <span className="saves-group-name">{g || t('Top level')}</span> {shortcut(t('all'), refs, true)} · {shortcut(t('none'), refs, false)}
+                  </>,
+                  groupBody(g, refs),
+                ),
               )}
+              {extra.length > 0 &&
+                section(
+                  '\u0000extra',
+                  true,
+                  <span className="saves-group-name">{t('Written in the .save')}</span>,
+                  extra.map((r) => row(r)),
+                )}
             </div>
           </>
         )}

@@ -13,6 +13,8 @@
 import type { AscDoc } from '../asc/model.ts';
 import type { Element, LtNetlist } from '../netlist/ltnetlist.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
+import { collectModels } from '../netlist/ako.ts';
+import { operatingParams } from './deviceParams.ts';
 import { ngNodeName, type NgspiceNetlist } from '../netlist/tongspice.ts';
 import { blockInstances, hierDevice } from './context.ts';
 import { pinVector, probeExpr, verilogNodes } from './traces.ts';
@@ -163,9 +165,12 @@ export function refVectors(ref: string, lt: LtNetlist, ng: NgspiceNetlist): stri
 export interface SavableSignal {
   /** como se escribe en el .save (nombres de LTspice / de las trazas) */
   ref: string;
-  kind: 'voltage' | 'current' | 'digital';
+  kind: 'voltage' | 'current' | 'digital' | 'param';
   /** "" en el nivel superior, "X_U1", "X_U1.X_U2"… */
   group: string;
+  /** de un parámetro de punto de operación (@M1[gm]): su dispositivo y qué es */
+  device?: string;
+  label?: string;
 }
 
 /** Terminales con corriente propia de cada tipo de transistor */
@@ -205,7 +210,14 @@ export function targetRefs(sim: Pick<BuiltSimulation, 'lt'>, target: { net?: str
   return el ? elementRefs(el.name.replace(/§/g, ''), el.prefix) : [];
 }
 
-function elementSignals(elements: Element[], name: (e: Element) => string | undefined, net: (n: string) => string, group: string): SavableSignal[] {
+/** Nivel del modelo de un MOSFET (el ".model … level=8"), si se encuentra */
+function modelLevel(e: Element, models: ReturnType<typeof collectModels>): number | undefined {
+  const m = models.get(e.value.trim().split(/\s+/)[0]?.toLowerCase() ?? '');
+  const lv = m?.params.find(([k]) => k.toLowerCase() === 'level')?.[1];
+  return lv ? Number(lv) || undefined : undefined;
+}
+
+function elementSignals(elements: Element[], name: (e: Element) => string | undefined, net: (n: string) => string, group: string, models: ReturnType<typeof collectModels>): SavableSignal[] {
   const out: SavableSignal[] = [];
   const nets = new Set<string>();
   for (const e of elements) for (const n of e.nodes) if (n && n !== '0') nets.add(n);
@@ -217,6 +229,9 @@ function elementSignals(elements: Element[], name: (e: Element) => string | unde
     for (const ref of elementRefs(nm ?? '', p)) out.push({ ref, kind: 'current', group });
     // los subcircuitos, la de cada pin (adentro de una instancia, por número)
     if (p === 'X' && nm) e.nodes.forEach((_, k) => out.push({ ref: `Ix(${nm}:${(!nm.includes('.') && e.pinNames[k]) || k + 1})`, kind: 'current', group }));
+    // los transistores y diodos, sus parámetros de punto de operación (gm, capacidades, cargas…)
+    if (nm && /^[QMJD]/.test(p))
+      for (const d of operatingParams(p, p[0] === 'M' ? modelLevel(e, models) : undefined)) out.push({ ref: `@${nm}[${d.name}]`, kind: 'param', group, device: nm, label: d.label });
   }
   return out;
 }
@@ -227,11 +242,14 @@ export function savableSignals(sim: Pick<BuiltSimulation, 'lt' | 'ng' | 'files' 
   const verilog = new Set(
     sim.lt.elements.filter((e) => e.prefix.toUpperCase() === 'X' && verilogNodes(sim as BuiltSimulation, e.value.trim().split(/\s+/)[0])).map((e) => e.name.replace(/§/g, '').toLowerCase()),
   );
+  const models = collectModels(sim.ng.text);
+  for (const f of Object.values(sim.files ?? {})) collectModels(f, models);
   const out = elementSignals(
     sim.lt.elements,
     (e) => e.name.replace(/§/g, ''),
     (n) => n,
     '',
+    models,
   ).filter((s) => !(s.ref.startsWith('Ix(') && verilog.has(s.ref.slice(3, s.ref.lastIndexOf(':')).toLowerCase())));
   // nodos digitales: las redes entre bloques Verilog y, de cada bloque, sus pines y cables con
   // nombre (los internos sin nombre de Yosys, nunca)
@@ -254,6 +272,7 @@ export function savableSignals(sim: Pick<BuiltSimulation, 'lt' | 'ng' | 'files' 
         },
         (n) => `${b.prefix}${ngNodeName(n)}`,
         group,
+        models,
       ).filter((s) => !(s.kind === 'voltage' && b.block.ports.some((p) => s.ref.toLowerCase() === `v(${b.prefix}${ngNodeName(p)})`.toLowerCase()))),
     );
   }

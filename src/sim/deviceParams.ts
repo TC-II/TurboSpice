@@ -50,6 +50,21 @@ const LABELS: Record<string, () => string> = {
   qbe: () => t('B-E charge'),
   qbc: () => t('B-C charge'),
   charge: () => t('Diode charge'),
+  von: () => t('Turn-on voltage'),
+  gbd: () => t('Bulk-drain junction conductance'),
+  gbs: () => t('Bulk-source junction conductance'),
+  cgb: () => t('Gate-bulk capacitance'),
+  cgg: () => t('Total gate capacitance'),
+  cbd: () => t('Bulk-drain capacitance'),
+  cbs: () => t('Bulk-source capacitance'),
+  cdd: () => t('Drain capacitance'),
+  css: () => t('Source capacitance'),
+  qgs: () => t('Gate-source charge'),
+  qgd: () => t('Gate-drain charge'),
+  qgb: () => t('Gate-bulk charge'),
+  qg: () => t('Gate charge'),
+  qd: () => t('Drain charge'),
+  qb: () => t('Bulk charge'),
 };
 
 /** Parámetros de salida que se ofrecen por letra del dispositivo (la de ngspice) */
@@ -69,6 +84,27 @@ const BY_LETTER: Record<string, string[]> = {
   m: ['id', 'ig', 'is', 'ib', 'vgs', 'vds', 'vbs', 'gm', 'gds', 'gmbs', 'vdsat', 'vth', 'cgs', 'cgd', 'p'],
   j: ['id', 'ig', 'is', 'vgs', 'gm', 'gds', 'p'],
 };
+
+/**
+ * Parámetros de punto de operación de los MOSFET según el modelo (27.6 del manual): los de
+ * Meyer (niveles 1, 2, 3, 6 y 9), BSIM3 (8, 49) y BSIM4 (14, 54)
+ */
+const MOS_BY_LEVEL: { levels: number[]; params: string[] }[] = [
+  { levels: [1, 2, 3, 6, 9], params: ['vgs', 'vds', 'vbs', 'von', 'vdsat', 'gm', 'gds', 'gmbs', 'gbd', 'gbs', 'cgs', 'cgd', 'cgb', 'cbd', 'cbs', 'qgs', 'qgd', 'qgb', 'p'] },
+  { levels: [8, 49], params: ['vgs', 'vds', 'vbs', 'vth', 'vdsat', 'gm', 'gds', 'gmbs', 'gbd', 'gbs', 'cgg', 'cgs', 'cgd', 'cdd', 'cbd', 'cbs', 'qg', 'qd', 'qb'] },
+  { levels: [14, 54], params: ['vgs', 'vds', 'vbs', 'vth', 'vdsat', 'gm', 'gds', 'gmbs', 'gbd', 'gbs', 'cgg', 'cgs', 'cgd', 'cgb', 'cdd', 'css', 'cbd', 'cbs'] },
+];
+
+/**
+ * Parámetros de punto de operación (sin las corrientes, que ya tienen su I()) de un dispositivo
+ * por su letra y, en los MOSFET, el nivel del modelo (sin nivel: el 1, como LTspice y ngspice)
+ */
+export function operatingParams(letter: string, level?: number): DeviceParam[] {
+  const l = letter[0]?.toLowerCase() ?? '';
+  const mos = l === 'm' ? MOS_BY_LEVEL.find((m) => m.levels.includes(level ?? 1)) : undefined;
+  const names = mos?.params ?? (BY_LETTER[l] ?? []).filter((n) => !/^(i|current|i[bcdegs])$/.test(n));
+  return names.map((name) => ({ name, unit: paramUnit(name), label: LABELS[name]?.() ?? name }));
+}
 
 /** Unidad de un parámetro por su nombre: g… conductancias, c… capacidades, v… tensiones… */
 export function paramUnit(param: string): string {

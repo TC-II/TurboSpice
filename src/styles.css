@@ -1627,9 +1627,16 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-panel button.link:hover { text-decoration: underline; }
 .saves-panel button.link:disabled { color: var(--fg-muted); cursor: default; text-decoration: none; }
 .saves-list { flex: 1; min-height: 60px; overflow: auto; display: flex; flex-direction: column; gap: 8px; }
-.saves-group { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; display: flex; flex-direction: column; gap: 1px; margin: 0; }
-.saves-group legend { font-weight: 600; padding: 0 4px; }
-.saves-group legend button.link { font-weight: 400; }
+.saves-group { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin: 0; }
+.saves-group[open] { display: flex; flex-direction: column; gap: 1px; }
+.saves-group > summary, .saves-device > summary { cursor: pointer; padding: 0 2px; user-select: none; }
+.saves-group > summary { margin-bottom: 2px; }
+.saves-group-name { font-weight: 600; }
+.saves-device { margin: 2px 0 0 4px; }
+.saves-device[open] { display: flex; flex-direction: column; gap: 1px; }
+.saves-device > .saves-row { margin-left: 14px; }
+.saves-n, .saves-label { color: var(--fg-muted); font-size: 0.9em; }
+.saves-label { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .saves-row { padding: 1px 4px; border-radius: 4px; align-items: center; }
 .saves-row input { margin-top: 0; }
 /* la fila de lo que está bajo el mouse en el esquemático (o la que lo resalta) */

@@ -3,9 +3,8 @@
 //   simulaciones en cada una, corridas con cambios entre ellas (agregar, quitar, cambiar valores,
 //   una repetida) y un opamp de TC2Lib modificado como archivos del proyecto (OA_Sample.asy +
 //   OA_Sample.sub, con saturación a ±Vsat).
-// - Examples.turbo: los ejemplos sueltos del menú, una variante cada uno. Los e2e abren además
-//   RC Filter, RLC Bode y RC Sweep (.step), que ya no están en el menú: van a
-//   tests/e2e/fixtures/Examples.turbo, con todos.
+// - tests/e2e/fixtures/Examples.turbo: los ejemplos sueltos que abren los e2e (fuera del menú),
+//   una variante cada uno.
 // - Transfer functions.turbo: las transferencias de 1er y 2do orden con RC y RLC (examples/filters/),
 //   un workbench cada una con su respuesta al escalón, su Bode y su mapa de polos y ceros; los
 //   pasatodo, con un operacional sin polos (OA_NoPole, archivos del proyecto).
@@ -211,7 +210,6 @@ async function examplesProject(names: string[], path: string) {
   writeFileSync(path, text);
   console.log(`${path}: ${ex.variants.map((v) => v.name).join(', ')} (${(text.length / 1024).toFixed(1)} kB)`);
 }
-await examplesProject(EXAMPLES, 'public/examples/Examples.turbo');
 mkdirSync('tests/e2e/fixtures', { recursive: true });
 await examplesProject(TEST_EXAMPLES, 'tests/e2e/fixtures/Examples.turbo');
 

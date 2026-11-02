@@ -1679,10 +1679,10 @@ check(
   'Menú › Acerca de abre el diálogo',
 );
 await fp.keyboard.press('Escape');
-await menu(fp, 'Ejemplos', 'Common Emitter');
+await menu(fp, 'Ejemplos', 'Transfer functions');
 await fp.locator('svg.editor .sym').first().waitFor();
 await frames(fp);
-check((await fp.locator('.capsule-names').textContent()).startsWith('Examples·Common Emitter'), `abre el ejemplo desde el menú (${await fp.locator('.capsule-names').textContent()})`);
+check((await fp.locator('.capsule-names').textContent()).startsWith('Transfer functions·'), `abre el ejemplo desde el menú (${await fp.locator('.capsule-names').textContent()})`);
 await fresh.close();
 
 check(errors.length === 0, `sin errores de consola${errors.length ? `: ${errors.join(' | ')}` : ''}`);

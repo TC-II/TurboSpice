@@ -14,8 +14,7 @@ export const REPO = 'https://github.com/TC-II/TurboSpice';
 export const SKIN_KEY = 'turbospice.skin';
 /** La letra del esquemático elegida en Configuración (#328) */
 export const SCH_FONT_KEY = 'turbospice.schFont';
-// public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez,
-// y los ejemplos sueltos, una variante cada uno de Examples.turbo
+// public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez
 export const SAMPLE = 'Sample Project.turbo';
 /** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */
 export const ADC = 'ADC.turbo';

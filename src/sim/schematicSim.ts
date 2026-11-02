@@ -1,6 +1,7 @@
 // Esquemático → simulación: netlist LTspice → ngspice, archivos de modelos de la librería
 // y nombres de vectores para las puntas de prueba.
 import { addPinCurrentSources } from '../netlist/pinCurrents.ts';
+import { stripHdl } from '../hdl/cosimMerge.ts';
 import { linkDigitalNets } from '../hdl/digitalLinks.ts';
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
@@ -125,7 +126,9 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const base = prepareSimulation(ng, (rel) => texts[rel]);
   // las instancias de Verilog con otro parameter, antes de las redes digitales: también tienen su copia sin puentes
   const v = opts.variants && (await opts.variants(base.netlist, base.files, traces));
-  const prepared = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
+  const joined = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
+  // (el atributo «Simulación» de las instancias Verilog no es un parámetro del .subckt)
+  const prepared = { ...joined, netlist: stripHdl(joined.netlist) };
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
   // (los nombres de las redes que quedaron adentro del módulo DSP de Icarus, cosimMerge.ts)

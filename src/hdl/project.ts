@@ -45,6 +45,8 @@ function symbolParams(prev: [string, string][], block: { params: Record<string, 
   const old = new Map(prev.map(([k, v]) => [key(k), v]));
   const out: [string, string][] = ELECTRICAL.map((p) => [p.name, old.get(p.name) ?? p.value]);
   for (const [k, v] of Object.entries(block.params)) if (!ELECTRICAL_NAMES.has(key(k))) out.push([k, old.get(key(k)) ?? v]);
+  // el atributo «Simulación» (cosimMerge.ts): auto, icarus (el módulo único) o gates (compuertas de XSPICE)
+  out.push(['hdl', old.get('hdl') ?? 'auto']);
   return out;
 }
 

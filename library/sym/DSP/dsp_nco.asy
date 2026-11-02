@@ -16,7 +16,7 @@ LINE Normal 8 20 12 18
 LINE Normal 12 18 16 14
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=1024
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=1024 hdl=auto
 SYMATTR Prefix X
 SYMATTR Value dsp_nco
 SYMATTR ModelFile dsp_nco.sub

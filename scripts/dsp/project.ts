@@ -11,23 +11,40 @@
 // por cables, los taps bajan a la cadena de sumadores y las realimentaciones y el reloj van por
 // etiquetas. Los símbolos son los dibujados de library/sym/DSP (scripts/gen-dsp-symbols.ts).
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { runYosys } from '@yowasp/yosys';
-import { applySynth, addVerilogModule } from '../../src/hdl/project.ts';
+import { compileIcarus, vvpForEngine, type IcarusLoader } from '../../src/hdl/icarus.ts';
+import { applySynth, addVerilogModule, looksBehavioral, setHdlMode, vvpFileOf } from '../../src/hdl/project.ts';
+import { cosimSubckt } from '../../src/hdl/synth.ts';
 import { synthesize } from '../../src/hdl/yosys.ts';
 import { newId, BENCHES, type Project, type Sim } from '../../src/project/turbo.ts';
 import type { SimView } from '../../src/sim/simList.ts';
 
 const LIB = 'library/verilog/DSP';
 const SYM = 'library/sym/DSP';
-const MODULES = ['dsp_impulse', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul'];
+const MODULES = ['dsp_clock', 'dsp_impulse', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul'];
 
-/** Agrega un módulo de la biblioteca al proyecto: su símbolo dibujado y su síntesis */
+// Icarus en WebAssembly (engine/dist-engine/icarus), para los módulos de comportamiento (el reloj)
+const ICARUS = join('engine', 'dist-engine', 'icarus');
+const icarus: IcarusLoader = {
+  program: async (name, print) => (await import(pathToFileURL(join(process.cwd(), ICARUS, `${name}.mjs`)).href)).default({ print, printErr: print }),
+  file: async (name) => new Uint8Array(readFileSync(join(ICARUS, name))),
+};
+
+/** Agrega un módulo de la biblioteca al proyecto: su símbolo dibujado y su síntesis (o su .vvp, si es de comportamiento) */
 async function withVerilog(p: Project, name: string): Promise<Project> {
   const text = readFileSync(`${LIB}/${name}.v`, 'utf8');
-  const r = await synthesize(runYosys, { [`${name}.v`]: text }, `${name}.v`, name);
-  if (r.error || !r.block) throw new Error(`${name}.v: ${r.error}`);
   // (el símbolo antes: la síntesis conserva un dibujo que no es el generado)
   const withSym = { ...p, files: [...p.files, { name: `${name}.asy`, kind: 'symbol' as const, text: readFileSync(`${SYM}/${name}.asy`, 'utf8') }] };
+  if (looksBehavioral(text)) {
+    const r = await compileIcarus(icarus, { [`${name}.v`]: text }, name);
+    if (!r.vvp || !r.ports) throw new Error(`${name}.v: ${r.error}`);
+    const block = cosimSubckt(name, r.ports, r.params ?? {}, vvpFileOf(name), `${name}.v`);
+    return applySynth(setHdlMode(addVerilogModule(withSym, name, text), name, 'behavioral'), name, text, block, vvpForEngine(r.vvp));
+  }
+  const r = await synthesize(runYosys, { [`${name}.v`]: text }, `${name}.v`, name);
+  if (r.error || !r.block) throw new Error(`${name}.v: ${r.error}`);
   return applySynth(addVerilogModule(withSym, name, text), name, text, r.block);
 }
 
@@ -85,12 +102,17 @@ class Sheet {
     this.wire(at, end);
     this.flag(end, name);
   }
-  /** El reloj de 1 MHz: una fuente de pulsos con su etiqueta clk */
+  /**
+   * El reloj de 1 MHz: el bloque dsp_clock, que corre adentro del módulo único de Icarus (sin fuente
+   * de pulsos ni puentes a lo analógico); su salida, la etiqueta clk
+   */
   clock(x: number, y: number) {
-    // voltage.asy: pines en (0, 16) y (0, 96)
-    this.lines.push(`SYMBOL voltage ${x} ${y} R0`, 'WINDOW 0 40 40 Left 2', 'WINDOW 3 40 72 Left 2', 'SYMATTR InstName Vclk', 'SYMATTR Value PULSE(0 5 0 1n 1n 499n 1u)');
-    this.stub([x, y + 16], [0, -1], 'clk');
-    this.stub([x, y + 96], [0, 1], '0');
+    // (no es la salida del diseño: el último bloque sigue siendo el de antes)
+    const keep = this.last;
+    const c = this.block('dsp_clock', x, y + 48);
+    this.last = keep;
+    this.stub(c.pins.clk, [1, 0], 'clk');
+    this.text(x - 40, y + 112, ';1 MHz clock');
   }
   text(x: number, y: number, s: string, size = 2) {
     this.lines.push(`TEXT ${x} ${y} Left ${size} ${s}`);

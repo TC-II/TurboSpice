@@ -167,6 +167,12 @@ const BOXES: Record<string, [string, string[], string[], string[]?]> = {
 const DRAW: Record<string, Drawing> = {
   ...Object.fromEntries(Object.entries(BOXES).map(([k, [label, ins, outs, bottom]]) => [k, blk(label, ins, outs, bottom)])),
   dsp_not: blk('1', ['x'], ['y'], [], { bubble: true }),
+  // una onda cuadrada
+  dsp_clock: {
+    pins: { clk: [64, 0] },
+    shapes: [box(-32, -24, 32, 24), ...line([32, 0], [64, 0]), ...line([-20, 8], [-10, 8], [-10, -8], [0, -8], [0, 8], [10, 8], [10, -8], [20, -8])],
+    name: [0, -32, 'Bottom'],
+  },
   dsp_mux2: mux(['a', 'b'], ['y'], 'sel', ''),
   dsp_mux4: mux(['a', 'b', 'c', 'd'], ['y'], 'sel', ''),
   dsp_demux2: mux(['x'], ['a', 'b'], 'sel', ''),

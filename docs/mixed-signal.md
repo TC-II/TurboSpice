@@ -101,7 +101,7 @@ Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `libr
 - Ruteo y memoria: `mux2`, `mux4`, `demux2`, `decoder` (3 → 8), `prienc` (8 → 3), `split` y `join`
   (16 ↔ 2 × 8), `ram` (16 palabras).
 - Secuencial y control: `counter`, `clkdiv`, `lfsr` (PRBS de 16 bits), `shiftreg` (SIPO), `piso`,
-  `edge`, `sync`, `pwm`, `debounce`, `oneshot`.
+  `edge`, `sync`, `pwm`, `debounce`, `oneshot`, `clock` (de comportamiento: sólo con Icarus).
 
 SAT/RND eligen saturar y redondear.
 - **Símbolos dibujados** (`library/sym/DSP`, carpeta DSP del buscador): Σ en un círculo, el tap como
@@ -124,6 +124,16 @@ SAT/RND eligen saturar y redondear.
   uno por simulación) ni con pines inout. La netlist lo dice en un comentario. Medido en la app con el
   FIR de 8 taps (100 µs con un seno): el motor pasa de ~2,7 s a ~0,14 s y armar la netlist, de ~1,3 s a
   ~0,07 s (con la síntesis de las variantes ya hecha).
+- **Atributo «Simulación»** (`hdl`, en el SpiceLine de los símbolos de módulos Verilog): `auto` (los
+  bloques DSP al módulo único, los demás como diga su módulo), `icarus` (al módulo único, también un
+  módulo propio) o `gates` (sintetizado a compuertas de XSPICE). No llega a ngspice (`stripHdl`).
+- Con varias corridas (`.step`, un `.control` que repite, varios análisis) los bloques DSP van como
+  compuertas, con un aviso: libvvp no se inicializa dos veces. (Hoy `.step` con bloques Verilog
+  sintetizados también falla, con «Formula() error» al reevaluar los parámetros de los `.subckt`: es
+  de antes.)
+- **Reloj** `dsp_clock` (de comportamiento, `#(PERIOD/2)`): corre adentro del módulo único, así el reloj
+  no pasa por lo analógico (ni una fuente de pulsos ni sus puentes). Al copiarlo al proyecto queda en
+  modo comportamiento (`looksBehavioral`). Arranca en 0: el primer flanco de subida es a PERIOD/2.
 - **Ejemplo** «DSP» (Archivo › Ejemplos, `scripts/make-dsp.ts` + `scripts/dsp/project.ts`): FIR de 8 taps
   (impulso, banda de paso y de rechazo), IIR de primer orden y biquad Butterworth (Q2.14), CIC N = 2,
   R = 8, y un mezclador con dos NCO. Los esquemáticos se dibujan en el script como diagrama de bloques.

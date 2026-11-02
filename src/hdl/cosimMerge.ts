@@ -47,6 +47,22 @@ export const MERGED_TOP = 'dsp_cosim';
 export const MERGED_INST = 'xdsp';
 export const MERGED_LINE = '* (dsp_cosim)';
 
+/**
+ * Cómo se simula una instancia de un módulo Verilog: su parámetro `hdl` (el atributo «Simulación»,
+ * que no llega a ngspice: stripHdl). auto: los bloques DSP en el módulo único y los demás como diga
+ * su módulo; icarus: en el módulo único; gates: sintetizado a compuertas de XSPICE.
+ */
+export type HdlMode = 'auto' | 'icarus' | 'gates';
+const HDL = 'hdl';
+const hdlOf = (tt: string[]): HdlMode => {
+  const v = tt.map((x) => /^hdl=(\w+)$/i.exec(x)?.[1].toLowerCase()).find((x) => x);
+  return v === 'icarus' || v === 'gates' ? v : 'auto';
+};
+/** El modo de la instancia de una línea X */
+export const hdlOfLine = (line: string): HdlMode => hdlOf(tokens(line));
+/** Las líneas X sin el parámetro hdl (no es un parámetro del .subckt) */
+export const stripHdl = (netlist: string) => netlist.replace(/^(\s*x\S*\s.*?)\s+hdl=\S+/gim, '$1');
+
 /** Las palabras de una línea, sin cortar llaves ni paréntesis ({vcc/2}) */
 const tokens = (line: string) => line.trim().match(/(?:\{[^{}]*\}|\([^()]*\)|[^\s{}()])+/g) ?? [];
 
@@ -64,7 +80,7 @@ interface Inst {
  * expresiones que se van a graficar (sus redes internas salen como puertos). null si no hay nada
  * que juntar.
  */
-export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (module: string) => boolean, traces: string[] = []): CosimMerge | null {
+export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (module: string, hdl: HdlMode) => boolean, traces: string[] = []): CosimMerge | null {
   const byName = new Map(modules.map((m) => [m.name.toLowerCase(), m]));
   const lines = netlist.split('\n');
   const insts: Inst[] = [];
@@ -81,12 +97,13 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
     const at = tt.findIndex((tok, k) => k > 0 && byName.has(tok.toLowerCase()) && (k === tt.length - 1 || /=|^params:$/i.test(tt[k + 1])));
     if (at < 0) return;
     const mod = byName.get(tt[at].toLowerCase())!;
-    if (!mergeable(mod.name) || mod.pins.some((p) => p.dir === 'inout') || at - 1 !== mod.pins.length) return;
+    if (!mergeable(mod.name, hdlOf(tt)) || mod.pins.some((p) => p.dir === 'inout') || at - 1 !== mod.pins.length) return;
     const params = new Map<string, string>();
     const electrical: string[] = [];
     for (const kv of tt.slice(at + 1)) {
       const m = /^([A-Za-z_][\w$]*)=(.+)$/.exec(kv);
       if (!m) continue;
+      if (m[1].toLowerCase() === HDL) continue;
       if (ELECTRICAL_NAMES.has(m[1].toLowerCase())) electrical.push(kv);
       else params.set(m[1].toLowerCase(), m[2]);
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MERGED_LINE, mergeCosim, mergedLine, type MergeModule } from '../../src/hdl/cosimMerge.ts';
+import { MERGED_LINE, hdlOfLine, mergeCosim, mergedLine, stripHdl, type MergeModule } from '../../src/hdl/cosimMerge.ts';
 
 // Los bloques DSP en un solo módulo de Icarus (#366)
 const bits = (n: string, w: number) => Array.from({ length: w }, (_, k) => `${n}_${w - 1 - k}`);
@@ -44,6 +44,17 @@ describe('cosimMerge', () => {
     expect([...m.ports.values()]).toContain('m__0__');
     expect(m.aliases.get('m[0]')).toBe('xdsp.w_4_d');
     expect(m.aliases.get('x1.q_1_d')).toBe('xdsp.w_3_d');
+  });
+  it('el atributo «Simulación» (hdl): gates deja la instancia como compuertas; no llega a ngspice', () => {
+    const net = NET.replace('SAT=0 W=2', 'SAT=0 W=2 hdl=gates');
+    expect(hdlOfLine(net.split('\n')[2])).toBe('gates');
+    expect(hdlOfLine(net.split('\n')[1])).toBe('auto');
+    const auto = (_m: string, hdl: string) => hdl !== 'gates';
+    // (queda una sola instancia para juntar: nada)
+    expect(mergeCosim(net, MODS, auto)).toBeNull();
+    expect(mergeCosim(NET.replace('tpd=1n W=2\n', 'tpd=1n W=2 hdl=icarus\n'), MODS, (_m, hdl) => hdl === 'icarus' || _m === 'dsp_neg')).not.toBeNull();
+    expect(stripHdl(net)).not.toMatch(/hdl=/);
+    expect(stripHdl(net)).toMatch(/^X2 .* SAT=0 W=2$/m);
   });
   it('nada que juntar con menos de dos instancias o si `mergeable` no las quiere', () => {
     expect(mergeCosim(NET, MODS, (n) => n === 'dsp_neg')).toBeNull();

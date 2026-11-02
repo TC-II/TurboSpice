@@ -21,10 +21,11 @@ export function useProjectFiles({ projectRef, editProject, synthAndReport, setMe
   const [conflict, setConflict] = useState<{ name: string; resolve(c: FileConflict): void } | null>(null);
   const askConflict = (name: string) => new Promise<FileConflict>((resolve) => setConflict({ name, resolve }));
   /** Agrega símbolos y modelos al proyecto (los demás tipos se ignoran) */
-  const addProjectFiles = async (list: { name: string; text: string }[]) => {
+  /** `hdl`: un módulo Verilog de comportamiento (Icarus), como el reloj de la biblioteca DSP */
+  const addProjectFiles = async (list: { name: string; text: string; hdl?: 'behavioral' }[]) => {
     const incoming = list.flatMap((f) => {
       const kind = projectFileKind(f.name);
-      return kind ? [{ name: f.name, kind, text: f.text }] : [];
+      return kind ? [{ name: f.name, kind, text: f.text, ...(f.hdl && kind === 'verilog' ? { hdl: f.hdl } : {}) }] : [];
     });
     if (!incoming.length) return;
     const r = await mergeFiles(projectRef.current.files, incoming, askConflict);

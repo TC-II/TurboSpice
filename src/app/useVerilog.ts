@@ -3,7 +3,7 @@
 import { useRef, type MutableRefObject } from 'react';
 import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
 import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
-import { mergeCosim, mergedLine, MERGED_LINE, MERGED_TOP } from '../hdl/cosimMerge.ts';
+import { hdlOfLine, mergeCosim, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import { t } from '../i18n/i18n.ts';
@@ -72,13 +72,25 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     const merged: string[] = [];
     // los bloques de la biblioteca DSP, en un solo módulo de Icarus (#366, cosimMerge.ts); no si
     // ya hay otro bloque de comportamiento (Icarus corre uno por simulación)
-    const behavioral = mods.some((f) => f.synth!.vvp && new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$)`, 'im').test(netlist));
+    // (salvo que vaya al módulo único también: hdl=icarus, o un bloque DSP como el reloj)
+    const joins = (name: string, hdl: HdlMode) => hdl === 'icarus' || (hdl === 'auto' && /^dsp_/i.test(name));
+    const behavioral = mods.some((f) => {
+      if (!f.synth!.vvp) return false;
+      const re = new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$).*$`, 'gim');
+      return [...netlist.matchAll(re)].some((l) => !joins(moduleOf(f), hdlOfLine(l[0])));
+    });
+    // libvvp no se inicializa dos veces: con varias corridas (.step, un .control que repite) los bloques DSP van como compuertas
+    const runs = /^\s*(foreach|repeat|dowhile|while)\b/im.test(netlist) || (netlist.match(/^\s*\.(tran|ac|dc|op|noise|tf)\b/gim)?.length ?? 0) > 1;
+    const notes: string[] = [];
+    if (runs && /^\s*x\S*\s.*\sdsp_\w+(\s|$)/im.test(netlist)) notes.push(t('The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (.step or several analyses)'));
     const m =
       !behavioral &&
+      !runs &&
       mergeCosim(
         netlist,
         mods.map((f) => ({ name: moduleOf(f), pins: f.synth!.pins, params: f.synth!.params })),
-        (name) => /^dsp_/i.test(name),
+        // (hdl: el atributo «Simulación» de cada instancia)
+        joins,
         traces,
       );
     let vvp: string | undefined;
@@ -136,7 +148,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
     const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
-    return { netlist: withSubckts(v.netlist, inline), files, warnings: v.warnings, ...(aliases ? { aliases } : {}) };
+    return { netlist: withSubckts(v.netlist, inline), files, warnings: [...notes, ...v.warnings], ...(aliases ? { aliases } : {}) };
   };
   return { synthModule, synthAndReport, synthStale, withVariants };
 }

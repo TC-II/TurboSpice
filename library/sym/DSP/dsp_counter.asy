@@ -17,7 +17,7 @@ TEXT 48 38 Center 1 down
 TEXT 0 -34 Center 2 CTR
 WINDOW 0 0 -56 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n MOD=65536 W=16
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n MOD=65536 W=16 hdl=auto
 SYMATTR Prefix X
 SYMATTR Value dsp_counter
 SYMATTR ModelFile dsp_counter.sub

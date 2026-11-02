@@ -12,7 +12,7 @@ CIRCLE Normal -10 -22 -2 -14
 TEXT 10 -6 Center 2 δ
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n STEP=0 VALUE=16384 W=16
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n STEP=0 VALUE=16384 W=16 hdl=auto
 SYMATTR Prefix X
 SYMATTR Value dsp_impulse
 SYMATTR ModelFile dsp_impulse.sub

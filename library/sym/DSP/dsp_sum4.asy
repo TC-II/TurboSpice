@@ -14,7 +14,7 @@ TEXT 58 0 Right 1 y
 TEXT 0 -66 Center 2 Σ
 WINDOW 0 0 -88 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto
 SYMATTR Prefix X
 SYMATTR Value dsp_sum4
 SYMATTR ModelFile dsp_sum4.sub

@@ -4,7 +4,7 @@ import { baseName, type SymbolInst } from '../asc/model.ts';
 import { decodeText } from '../asc/encoding.ts';
 import type { DriveFile } from '../cloud/drive.ts';
 import { DriveDialog } from '../cloud/AccountButton.tsx';
-import { moduleOf, verilogFile, verilogPorts } from '../hdl/project.ts';
+import { looksBehavioral, moduleOf, verilogFile, verilogPorts } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR, USER_DIR, scanModels } from '../library/library.ts';
 import { pdkOfSymbol } from '../library/pdk.ts';
@@ -87,7 +87,7 @@ export interface AppDialogsProps {
   project: Project;
   setProjectState(p: Project): void;
   openSub(name: string, select?: number): void;
-  addProjectFiles(list: { name: string; text: string }[]): Promise<void>;
+  addProjectFiles(list: { name: string; text: string; hdl?: 'behavioral' }[]): Promise<void>;
   removeProjectFile(name: string): void;
   makeProjectSymbol(file: string, name: string): void;
   checkSubName(except?: string): (n: string) => string | null;
@@ -145,7 +145,8 @@ export function AppDialogs(props: AppDialogsProps) {
             // (por nombre, como los del proyecto: así se usa su símbolo una vez sintetizado)
             // (con su símbolo dibujado, antes del .v: la síntesis conserva un dibujo que no es el generado)
             const sym = lib.bundle.symbols[name];
-            if (code !== undefined && !verilogFile(projectRef.current, mod)) void addProjectFiles([...(sym ? [{ name: `${mod}.asy`, text: sym }] : []), { name: `${mod}.v`, text: code }]);
+            if (code !== undefined && !verilogFile(projectRef.current, mod))
+              void addProjectFiles([...(sym ? [{ name: `${mod}.asy`, text: sym }] : []), { name: `${mod}.v`, text: code, ...(looksBehavioral(code) ? { hdl: 'behavioral' as const } : {}) }]);
             const placed = code !== undefined ? mod : name;
             if (!makesCycle([placed])) setTool({ kind: 'place', type: placed, orient: 'R0' });
           }}

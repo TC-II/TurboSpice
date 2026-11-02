@@ -14,7 +14,6 @@ import type { Status } from './NetlistMode.tsx';
 import { isPzPlot, pzRuns } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { NetlistMode } from './NetlistMode.tsx';
-import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
@@ -54,7 +53,6 @@ import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { allItems, transformItems } from './schematic/edit.ts';
-import { spiceName } from './netlist/spiceName.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { type TreeSub } from './project/Hierarchy.tsx';
@@ -71,7 +69,7 @@ import { sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
 import { type ComplexMode } from './waveform/curves.ts';
 import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { colorize, emptyPanes, plotKind, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
-import { readData, sameExceptData, writeData } from './asc/dataText.ts';
+import { sameExceptData } from './asc/dataText.ts';
 import { traceResolver } from './sim/traces.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
@@ -125,6 +123,7 @@ import { useLayoutPrefs } from './app/useLayoutPrefs.ts';
 import { EditorArea } from './app/EditorArea.tsx';
 import { ProjectPanel } from './app/ProjectPanel.tsx';
 import { runHistoryActions } from './app/runHistory.ts';
+import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
 
 
 export function App() {
@@ -559,23 +558,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // la esquina del PDK (docs/pdk.md): la de una directiva .lib, si hay, o la elegida en la barra
   // (guardada en el .asc, ;.pdk); el PDK, de los símbolos o de esa directiva
   const pdkBar = useMemo(() => {
-    const lines = doc.texts.filter((x) => x.kind === 'directive').flatMap((x) => x.text.split('\\n'));
-    let fixed: { name: string; corner?: string; line: string } | undefined;
-    for (const line of lines) {
-      const m = /^\s*\.(?:lib|include|inc)\s+["']?([^"'\s]+)["']?(?:\s+(\S+))?/i.exec(line);
-      const hit = m && pdkLib(m[1], m[2]);
-      if (hit && (hit.corner || !fixed)) fixed = { ...hit, line: line.trim() };
-    }
-    const name = pdkOfSymbols(doc.symbols.map((x) => x.type)) ?? fixed?.name;
-    if (!name) return undefined;
-    const chosen = (readData(doc, 'pdk') as { corner?: string } | undefined)?.corner;
-    return {
-      name,
-      corner: fixed?.corner ?? chosen ?? 'tt',
-      corners: PDK_CORNERS,
-      fixed: fixed?.corner ? fixed.line : undefined,
-      onChange: (corner: string) => commit(writeData(doc, 'pdk', corner === 'tt' ? undefined : { corner })),
-    };
+    return pdkBarOf(doc, commit);
   }, [doc]);
 
   const stopHidden = !!sim?.result.sizeStop && !stopPlotted;
@@ -843,20 +826,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // Redes y fuentes del circuito, para los selectores del menú de simulación
   // (en cada render de la vista: ordenar las redes con localeCompare costaba, #187)
   const info = useMemo(
-    (): CircuitInfo => ({
-      nets: [...new Set(conn.nets.map((n) => n.name).filter((n) => n))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-      sources: doc.symbols
-        .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
-        .filter((a) => /^[VI]$/i.test(a.get('Prefix') ?? ''))
-        .map((a) => spiceName(a.get('InstName') ?? ''))
-        .filter(Boolean),
-      // sondas de lazo del .stb (librería Stability)
-      probes: doc.symbols
-        .map((s) => effectiveAttrs(s, lib.symbol(s.type)))
-        .filter((a) => /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? ''))
-        .map((a) => ({ name: spiceName(a.get('InstName') ?? ''), diff: /^(LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') }))
-        .filter((p, i, all) => p.name && all.findIndex((q) => q.name === p.name) === i),
-    }),
+    (): CircuitInfo => circuitInfoOf(conn, doc, lib),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [conn, doc, lib, libVersion],
   );

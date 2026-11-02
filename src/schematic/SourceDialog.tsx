@@ -1,7 +1,8 @@
 // Ventana de configuración de fuentes independientes V e I (#47): forma de onda en pestañas
 // verticales, un dibujo con los parámetros acotados y los campos por orden de importancia.
 // Lo avanzado (AC, DC para .op, parásitos, sintaxis) va plegado.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, type WindowDefaults } from '../asc/resolve.ts';
 import type { LabelPatch } from './edit.ts';
@@ -135,7 +136,7 @@ export function SourceDialog({
     Value2: inst.attrs.get('Value2'),
     SpiceLine: inst.attrs.get('SpiceLine'),
   };
-  const parsed = useMemo(() => parseSource(original), []);
+  const [parsed] = useState(() => parseSource(original));
   // una fuente sin valor (recién colocada) arranca en Seno: abrir y apretar Enter ya deja una fuente válida
   const blankSrc = !parsed || (parsed.kind === 'dc' && !parsed.dc.trim());
   const [spec, setSpec] = useState<SourceSpec>(() => (parsed && !blankSrc ? parsed : { ...(parsed ?? emptySource()), kind: 'sine' }));
@@ -267,7 +268,7 @@ export function SourceDialog({
     .join(' ');
 
   // rótulos del nombre y del valor: si se ven en el esquemático (#71)
-  const shown = useMemo(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'), []);
+  const [shown] = useState(() => labelRows(inst, def, windowDefaults).filter((r) => r.attr === 'InstName' || r.attr === 'Value'));
   // el valor se ve por defecto sólo en DC (en las formas de onda el dibujito del símbolo ya dice
   // qué es): así arranca una fuente recién puesta y así queda al cambiar el tipo; una fuente ya
   // editada que se abre sin cambiar el tipo muestra lo que hay
@@ -276,14 +277,15 @@ export function SourceDialog({
   const autoVisible = (r: (typeof shown)[number], k: SourceKind) => (valueAuto(r) && (blankSrc || k !== openKind) ? k === 'dc' : r.visible);
   const [visible, setVisible] = useState(() => new Map(shown.map((r) => [r.win, autoVisible(r, kind)])));
   const valueTouched = useRef(false);
-  useEffect(() => {
+  const autoValueLabel = useEvent(() => {
     if (valueTouched.current) return;
     setVisible((v) => {
       const out = new Map(v);
       for (const r of shown) if (valueAuto(r)) out.set(r.win, autoVisible(r, kind));
       return out;
     });
-  }, [kind]);
+  });
+  useEffect(() => autoValueLabel(), [kind, autoValueLabel]);
   // con otro símbolo los rótulos vuelven a la posición por defecto del símbolo nuevo, así que
   // se manda lo que se ve de todos (no sólo lo que cambió respecto del símbolo de antes)
   const labels = (newType?: string) => new Map(shown.filter((r) => (newType && newType !== inst.type) || visible.get(r.win) !== r.visible).map((r) => [r.win, { visible: visible.get(r.win) }]));

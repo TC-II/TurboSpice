@@ -1,6 +1,7 @@
 // Visor de resultados: paneles apilados con eje X compartido, trazas como expresiones,
 // Bode (magnitud y fase), cursores, medidas rápidas y exportación a CSV/PNG.
-import { Fragment, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { Fragment, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -296,18 +297,15 @@ export function PlotPanel({
   const typed = { from: parseSi(dftText.from), to: parseSi(dftText.to), fs: parseSi(dftText.fs) };
   const badField = (k: 'from' | 'to' | 'fs') => dftText[k].trim() !== '' && (typed[k] === null || (k === 'fs' && !(typed.fs! > 0)));
   /** la DFT que agrega (o aplica, al editar) la barra */
-  const dftConfig = (): TraceDft => {
-    const from = typed.from ?? xRange?.[0];
-    const to = typed.to ?? xRange?.[1];
-    return { window: dftWindow, ...(from !== undefined ? { from } : {}), ...(to !== undefined ? { to } : {}), ...(typed.fs ? { fs: typed.fs } : {}) };
-  };
+  const dftConfig = useCallback((): TraceDft => {
+    const [tFrom, tTo, fs] = [parseSi(dftText.from), parseSi(dftText.to), parseSi(dftText.fs)];
+    const from = tFrom ?? xRange?.[0];
+    const to = tTo ?? xRange?.[1];
+    return { window: dftWindow, ...(from !== undefined ? { from } : {}), ...(to !== undefined ? { to } : {}), ...(fs ? { fs } : {}) };
+  }, [dftText, xRange, dftWindow]);
   const time = scale?.name === 'time' ? scale.real : undefined;
   // (la frecuencia automática recorre la simulación: sólo cuando cambia lo que la define)
-  const dftPreview = useMemo(
-    () => (time && dftOpen ? dftSampling(dftConfig(), time) : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [time, dftOpen, dftText, xRange],
-  );
+  const dftPreview = useMemo(() => (time && dftOpen ? dftSampling(dftConfig(), time) : null), [time, dftOpen, dftConfig]);
   const dftN = dftPreview ? sampleCount(dftPreview.from, dftPreview.to, dftPreview.fs) : 0;
   const dftError = !dftPreview
     ? ''
@@ -339,8 +337,9 @@ export function PlotPanel({
     }
     setDftPicking(false);
   };
-  useEffect(() => onDftPicking?.(dftPicking), [dftPicking]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => onDftPicking?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const notifyPicking = useEvent((on: boolean) => onDftPicking?.(on));
+  useEffect(() => notifyPicking(dftPicking), [dftPicking, notifyPicking]);
+  useEffect(() => () => notifyPicking(false), [notifyPicking]);
   /** Editar la DFT: la barra toma su ventana y su muestreo, y «Aplicar» los guarda en la traza */
   const startDftEdit = (i: number, ti: number) => {
     const d = panes[i]?.traces[ti]?.dft;

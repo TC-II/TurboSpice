@@ -2,6 +2,7 @@
 // variante (los otros símbolos de la misma familia), sus medidas en µm con lo que dan (W/L,
 // resistencia, capacidad) y qué rótulos se ven. Todo lo demás, en el diálogo de atributos.
 import { useMemo, useRef, useEffect, useState } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { baseName, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, type WindowDefaults } from '../asc/resolve.ts';
 import type { Library } from '../library/library.ts';
@@ -83,8 +84,9 @@ export function PdkDialog({
   }, []);
 
   // variantes: los símbolos de la misma carpeta con el mismo dibujo y los mismos parámetros
-  const variants = useMemo(() => {
-    const dir = inst.type.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase();
+  // (se arman de nuevo sólo con otro símbolo; con lo del último render)
+  const variantsOf = useEvent((type: string) => {
+    const dir = type.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase();
     const sameParams = (d: SymbolDef) =>
       parseParamList(d.attrs.get('SpiceLine') ?? '')
         .map(([k]) => k.toLowerCase())
@@ -94,7 +96,8 @@ export function PdkDialog({
       .filter((p) => p.replace(/\\/g, '/').split('/').slice(0, -1).join('/').toLowerCase() === dir)
       .map((p) => ({ path: p, def: lib.symbol(p)! }))
       .filter(({ def: d }) => d && d.attrs.get('Skin') === def?.attrs.get('Skin') && d.attrs.get('Prefix') === def?.attrs.get('Prefix') && d.pins.length === def?.pins.length && sameParams(d));
-  }, [inst.type]);
+  });
+  const variants = useMemo(() => variantsOf(inst.type), [inst.type, variantsOf]);
   const current = variants.find((v) => (v.def.attrs.get('Value') ?? '').toLowerCase() === model.toLowerCase()) ?? variants.find((v) => v.path === inst.type);
   const desc = (current?.def ?? def)?.attrs.get('Description') ?? '';
   const title = desc

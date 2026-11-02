@@ -1,6 +1,6 @@
 // Editor de bloques del Estudio (Blockly). Se carga aparte (import dinámico) para no agrandar
 // la carga inicial. Los bloques y su compilación están en src/sim/studyBlocks.ts.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as En from 'blockly/msg/en';
@@ -84,6 +84,8 @@ export default function StudyBlocks({ initial, info, onChange }: { initial: Work
   const changed = useRef(onChange);
   changed.current = onChange;
   currentInfo = info;
+  // el programa inicial se carga una sola vez
+  const [program] = useState(initial);
 
   useEffect(() => {
     defineBlocks();
@@ -97,7 +99,7 @@ export default function StudyBlocks({ initial, info, onChange }: { initial: Work
       move: { scrollbars: true, drag: true, wheel: false },
     });
     try {
-      Blockly.serialization.workspaces.load(initial as object, ws);
+      Blockly.serialization.workspaces.load(program as object, ws);
     } catch {
       // un programa que no se puede cargar (bloques de otra versión): se empieza vacío
     }
@@ -117,9 +119,7 @@ export default function StudyBlocks({ initial, info, onChange }: { initial: Work
       ro.disconnect();
       ws.dispose();
     };
-    // el programa inicial se carga una sola vez
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [program]);
 
   return <div className="study-blocks" ref={host} />;
 }

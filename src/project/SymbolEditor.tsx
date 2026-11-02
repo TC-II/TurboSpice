@@ -4,6 +4,7 @@
 // borran con Supr), pines (en la grilla), líneas, rectángulos y círculos (en pasos de 1) y textos
 // (TEXT del .asy: un clic abre su ventanita para cambiarlos).
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { GRID, WINDOW_ATTR } from '../asc/model.ts';
 import { Icon, type IconName } from '../ui/icons.tsx';
 import { AlignedText } from '../schematic/SchematicCanvas.tsx';
@@ -128,17 +129,19 @@ export function SymbolEditor({
   /** texto nuevo (sin `line`) o el que se cambia (doble clic), esperando su contenido */
   const [askText, setAskText] = useState<(Omit<SymText, 'line'> & { line?: number }) | null>(null);
   const askTextInput = useRef<HTMLInputElement>(null);
+  const askingText = !!askText;
   useEffect(() => {
-    if (!askText) return;
+    if (!askingText) return;
     const id = setTimeout(() => askTextInput.current?.focus());
     return () => clearTimeout(id);
-  }, [!!askText]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [askingText]);
   // después del click (que deja el foco en el panel)
+  const askingPin = !!askPin;
   useEffect(() => {
-    if (!askPin) return;
+    if (!askingPin) return;
     const id = setTimeout(() => askInput.current?.focus());
     return () => clearTimeout(id);
-  }, [!!askPin]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [askingPin]);
   const drag = useRef<Drag | null>(null);
   const svg = useRef<SVGSVGElement>(null);
   const aside = useRef<HTMLElement>(null);
@@ -155,7 +158,8 @@ export function SymbolEditor({
   const ps = params ?? symParams(text);
   const bodyLine = shapes.find((s) => s.kind === 'RECTANGLE')?.line;
   const isItem = (l: number) => shapes.some((s) => s.line === l) || texts.some((x) => x.line === l);
-  useEffect(() => setSel((v) => (v.every(isItem) ? v : v.filter(isItem))), [shapes, texts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dropGone = useEvent(() => setSel((v) => (v.every(isItem) ? v : v.filter(isItem))));
+  useEffect(() => dropGone(), [shapes, texts, dropGone]);
   useEffect(() => setSelPins((v) => (v.every((i) => i < pins.length) ? v : v.filter((i) => i < pins.length))), [pins]);
   // vista: lo que ocupa el símbolo. Fija mientras se arrastra y mientras el dibujo entre, para que
   // no salte con cada cambio; se reencuadra al cambiar de subcircuito o si algo queda afuera
@@ -403,14 +407,15 @@ export function SymbolEditor({
     aside.current?.focus({ preventScroll: true });
   };
   const pendingPin = useRef<(Pt & { name: string }) | null>(null);
-  useEffect(() => {
+  const placePending = useEvent(() => {
     const p = pendingPin.current;
     if (!p) return;
     const i = symPins(text).findIndex((x) => x.name.toLowerCase() === p.name.toLowerCase());
     if (i < 0) return;
     pendingPin.current = null;
     onChange(movePin(text, i, p.x, p.y));
-  }, [text]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => placePending(), [text, placePending]);
   /** lo seleccionado, corrido (dx, dy) desde el texto `orig` */
   const moveGroup = (orig: string, dx: number, dy: number) => {
     let tt = orig;

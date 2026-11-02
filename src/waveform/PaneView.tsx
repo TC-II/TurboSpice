@@ -208,7 +208,7 @@ export function PaneView(props: {
           time: false,
           distr: data.log ? 3 : 1,
           range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax,
-          ...(xRange ? { min: xRange[0], max: xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}),
+          ...(live.current.xRange ? { min: live.current.xRange[0], max: live.current.xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}),
         },
         y: { range: (u, min, max) => yRef.current ?? alignedY()?.left ?? whole('y')(u, min, max, 'y') },
         i: { range: (u, min, max) => rRef.current ?? (rightScale === 'i' ? alignedY()?.right : null) ?? whole('i')(u, min, max, 'i') },
@@ -326,7 +326,7 @@ export function PaneView(props: {
             if (data.xName === 'frequency') drawPzMarks(u, ctx, marksRef.current ?? [], markColor);
             drawMarkers(u, ctx, data, live.current, { fg, bg, accent: markColor.zero, unitOf }, labelHits);
             if (!live.current.cursorMode) return;
-            drawCursors(u, ctx, { data, index, c, previewX: live.current.previewX, fg, bg, unitOf, hits: labelHits, onCursor: (x) => live.current.onCursor(x) });
+            drawCursors(u, ctx, { data, index: live.current.index, c, previewX: live.current.previewX, fg, bg, unitOf, hits: labelHits, onCursor: (x) => live.current.onCursor(x) });
           },
         ],
       },
@@ -712,7 +712,6 @@ export function PaneView(props: {
     };
     // el gráfico se recrea sólo si cambian los datos, la grilla, el tema o el modo zoom (Z, el
     // recuadro en X e Y se configura al crearlo); xRange y los cursores se aplican aparte
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, showGrid, zoomMode, scheme, lineW, props.syncKey]);
 
   useEffect(() => {

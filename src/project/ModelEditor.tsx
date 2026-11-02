@@ -7,6 +7,7 @@
 // Los pines van, por SpiceOrder, a sus nodos; cambiarlos no toca el código: eso lo hace el botón
 // «Update pins in .lib».
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { GRID } from '../asc/model.ts';
 import { SymbolEditor } from './SymbolEditor.tsx';
 import { addFreePin, pinSide, removePin, setPinAlign, symPins, symWindows } from './symbolEdit.ts';
@@ -98,11 +99,12 @@ export function ModelEditor({
   const [symW, setSymW] = useState<number | null>(null);
   useEffect(() => setSymW(null), [name]);
   // SpiceModel sigue al netlist guardado (y ModelFile es el archivo de este módulo)
-  useEffect(() => {
+  const syncAttrs = useEvent(() => {
     let next = syncModelAttrs(symText, text);
     if (symAttr(next, 'ModelFile') !== modelFileName(name)) next = setSymAttr(next, 'ModelFile', modelFileName(name));
     if (next !== symText) storeSymbol(next);
-  }, [text, symText]); // eslint-disable-line react-hooks/exhaustive-deps
+  });
+  useEffect(() => syncAttrs(), [text, symText, syncAttrs]);
   const model = symAttr(symText, 'SpiceModel');
   // los nodos del .subckt que usa el símbolo
   const nodes = useMemo(() => (model ? subcktPins(draft, model) : null) ?? info.pins, [draft, model, info]);

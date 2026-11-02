@@ -3,6 +3,7 @@
 // (menos con pistas o pasos salteados), racha y confeti. El progreso queda en este navegador y,
 // con sesión de Google, en Drive (progress.ts).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { createPortal } from 'react-dom';
 import { chapters, CHAPTER_XP, CLEAN_XP, levelOf, levels, practiceCircuit, starsFor, STEP_XP, type Chapter, type Mem, type Practice, type Probe } from './lessons.ts';
 import { loadProgress, PROGRESS_EVENT, storeProgress, type Progress } from './progress.ts';
@@ -238,6 +239,9 @@ export function Tutorial({
   const completeRef = useRef(complete);
   completeRef.current = complete;
 
+  // (el estado de la app en el momento del chequeo, sin rehacer los intervalos en cada render)
+  const probeNow = useEvent(() => probe());
+
   // chequeo automático del paso
   useEffect(() => {
     if (!step || success) return;
@@ -245,7 +249,7 @@ export function Tutorial({
     const tick = () => {
       if (off) return;
       try {
-        if (step.check?.(probe(), mem.current)) completeRef.current();
+        if (step.check?.(probeNow(), mem.current)) completeRef.current();
       } catch {
         // un estado a medio armar: se vuelve a mirar en el próximo
       }
@@ -257,7 +261,7 @@ export function Tutorial({
       clearInterval(id);
       unwatch?.();
     };
-  }, [step, success]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, success, probeNow]);
 
   // avance parcial del paso (se refresca con el chequeo)
   const [progressText, setProgressText] = useState<string>();
@@ -265,13 +269,13 @@ export function Tutorial({
     if (!step?.progress) return setProgressText(undefined);
     const id = setInterval(() => {
       try {
-        setProgressText(step.progress!(probe(), mem.current));
+        setProgressText(step.progress!(probeNow(), mem.current));
       } catch {
         /* ídem */
       }
     }, 300);
     return () => clearInterval(id);
-  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [step, probeNow]);
 
   // ── tarjeta arrastrable ──
   const card = useRef<HTMLDivElement>(null);

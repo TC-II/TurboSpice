@@ -2,7 +2,7 @@
 // los dos ejes, grilla con escala, zoom con la rueda o arrastrando un recuadro, paneo con el botón
 // derecho o el del medio (como en los gráficos), escala logarítmica opcional, guías de ζ y ω₀,
 // corridas de .step superpuestas y resaltado cruzado entre el mapa y la tabla.
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import { SideSplit, useSideSize } from '../ui/SideSplit.tsx';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { download, schematicPng, schematicSvg } from '../schematic/exportSchematic.ts';
@@ -94,16 +94,19 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     const mags = roots.map((r) => Math.hypot(r.re, r.im) / unit).filter((m) => m > 0);
     return mags.length ? Math.floor(Math.log10(Math.min(...mags))) - 1 : 0;
   }, [roots, unit]);
-  const toXY = (re: number, im: number): [number, number] => {
-    const x = re / unit;
-    const y = im / unit;
-    if (!log) return [x, y];
-    const m = Math.hypot(x, y);
-    if (!m) return [0, 0];
-    const rho = Math.max(0, Math.log10(m) - decade0);
-    return [(rho * x) / m, (rho * y) / m];
-  };
-  const pts = roots.map((r) => toXY(r.re, r.im));
+  const toXY = useCallback(
+    (re: number, im: number): [number, number] => {
+      const x = re / unit;
+      const y = im / unit;
+      if (!log) return [x, y];
+      const m = Math.hypot(x, y);
+      if (!m) return [0, 0];
+      const rho = Math.max(0, Math.log10(m) - decade0);
+      return [(rho * x) / m, (rho * y) / m];
+    },
+    [unit, log, decade0],
+  );
+  const pts = useMemo(() => roots.map((r) => toXY(r.re, r.im)), [roots, toXY]);
 
   const fitted = useMemo((): View => {
     const xs = [0, ...pts.map((p) => p[0])];
@@ -112,9 +115,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     // la escala más grande con la que entran todas las raíces en el rectángulo (con un margen)
     const kk = Math.min(x1 > x0 ? W / ((x1 - x0) * 1.25) : Infinity, y1 > y0 ? H / ((y1 - y0) * 1.25) : Infinity);
     return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, h: Number.isFinite(kk) ? Math.min(W, H) / (2 * kk) : 1 };
-    // pts depende de roots, unit, log y decade0
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roots, unit, log, decade0, W, H]);
+  }, [pts, W, H]);
   // otras raíces o pasar a escala log: se vuelve a ajustar. Cambiar de rad/s a Hz no (#332): la
   // vista se convierte a la otra unidad (switchUnit). Las raíces se comparan por su valor (quien
   // llama puede armar las corridas de nuevo en cada render)

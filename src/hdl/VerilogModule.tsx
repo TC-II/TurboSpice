@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { t } from '../i18n/i18n.ts';
 import { portsOf } from './project.ts';
 import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
@@ -55,11 +56,12 @@ export function VerilogModule({
     setFailure(null);
   }, [name]);
   // el código va al proyecto un momento después de dejar de escribir (y al sintetizar)
+  const send = useEvent((v: string) => onText(v));
   useEffect(() => {
     if (code === lastSent.current) return;
-    const id = setTimeout(() => ((lastSent.current = code), onText(code)), 400);
+    const id = setTimeout(() => ((lastSent.current = code), send(code)), 400);
     return () => clearTimeout(id);
-  }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [code, send]);
 
   const synthesize = async () => {
     if (busy) return;

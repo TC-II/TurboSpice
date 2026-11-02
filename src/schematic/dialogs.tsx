@@ -2,6 +2,7 @@
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
 import { SlideConfirm } from '../ui/SlideConfirm.tsx';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEvent } from '../ui/useEvent.ts';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
@@ -409,11 +410,12 @@ export function AttributeDialog({
   // salvo que se haya abierto desde un rótulo; en R, L, C la tabla puede estar escondida, así que el
   // cursor va al primer campo como en cualquier otro componente
   const searchFirst = !!parts?.length && !passive && focusLabel === undefined;
-  useEffect(() => {
+  const focusFirst = useEvent(() => {
     if (searchFirst) return;
     first.current?.focus();
     first.current?.select();
-  }, []);
+  });
+  useEffect(() => focusFirst(), [focusFirst]);
   const prefix = eff.get('Prefix') ?? '';
   const check = checkValue(prefix, vals.Value ?? '');
   // parámetros de un subcircuito (bloque con SpiceLine «G=1 R=1k» en el símbolo): un campo por
@@ -435,12 +437,12 @@ export function AttributeDialog({
   // SpiceLine sin rótulo en el símbolo (R, L, C): se puede mostrar igual, debajo del valor; al
   // escribirle algo por primera vez se muestra sola, salvo que se haya elegido ocultarla
   const lineRow = rows.find((r) => r.attr === 'SpiceLine');
-  const lineAt = useMemo((): TextWindow | undefined => {
+  const [lineAt] = useState((): TextWindow | undefined => {
     const w = effectiveWindows(inst, def, windowDefaults).get(3);
     if (!w || w.align === 'Invisible') return undefined;
     const vertical = /^V/.test(w.align);
     return { ...w, x: w.x + (vertical ? 24 : 0), y: w.y + (vertical ? 0 : 24) };
-  }, []);
+  });
   const lineShown = patches.get(39)?.visible ?? false;
   const showLine = (visible: boolean) => setPatches(new Map(patches).set(39, { visible, create: lineAt }));
   const lineTouched = useRef(false);
@@ -750,18 +752,19 @@ export function LineStyleDialog({
 export function ShareDialog({ url, onClose }: { url: string; onClose(): void }) {
   const [copied, setCopied] = useState<boolean | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const copy = () =>
+  const copy = useEvent(() =>
     navigator.clipboard.writeText(url).then(
       () => setCopied(true),
       () => {
         setCopied(false);
         input.current?.select();
       },
-    );
+    ),
+  );
   useEffect(() => {
     input.current?.select();
     copy();
-  }, []);
+  }, [copy]);
   // el circuito comprimido es el parámetro c= del hash (base64url: 4 caracteres por 3 bytes)
   const packed = new URLSearchParams(url.slice(url.indexOf('#') + 1)).get('c') ?? '';
   const bytes = Math.floor((packed.length * 3) / 4);

@@ -26,7 +26,6 @@ import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
 import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, loadUserFiles, readHandle, saveProjectSession, saveResult, type RecentFile } from './schematic/autosave.ts';
 import { badLines, parseAsc } from './asc/parse.ts';
-import { serializeAsc } from './asc/serialize.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
@@ -64,7 +63,7 @@ import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
@@ -77,7 +76,7 @@ import { TextMenu } from './schematic/TextMenu.tsx';
 import { adoptSymbol, formatParamList, parseParamList, symParams } from './project/symbolEdit.ts';
 import { adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, storeModelSymbol, storeModelText } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
-import { benchesUsing, moduleFile, modules, placingCycle, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
+import { benchesUsing, moduleFile, modules, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
@@ -92,7 +91,7 @@ import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameE
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
 import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
-import { hideOpTag, moveOpTag } from './sim/opPins.ts';
+import { moveOpTag } from './sim/opPins.ts';
 import { type MeasTable } from './sim/measResults.ts';
 import { type StudyInfo } from './schematic/StudyPanel.tsx';
 import { parseAnalysis } from './sim/analyses.ts';
@@ -115,7 +114,7 @@ import type { SynthResult } from './hdl/yosys.ts';
 import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
-import { ascText, clipboardImage, registerUserFile } from './app/helpers.ts';
+import { ascText, registerUserFile } from './app/helpers.ts';
 import { HintBar, toolHint, type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
@@ -137,10 +136,8 @@ import { ModuleEditors } from './app/ModuleEditors.tsx';
 import { treeBenchesOf, treeSubsOf } from './app/projectTree.ts';
 import { buildResultsItems, buildToolGroups } from './app/toolbars.ts';
 import { contextMenus } from './app/contextMenus.ts';
+import { clipboardActions } from './app/clipboard.ts';
 
-
-/** Copia interna por si el navegador no deja leer el portapapeles */
-let clipboardFallback = '';
 
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
@@ -1664,71 +1661,7 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     if (msgs.length) setMessage(msgs.join(' · '));
   };
 
-  // Portapapeles: la selección como texto .asc (se puede pegar en otra pestaña o en un editor)
-  const copySelection = async (cut = false) => {
-    if (!selection.length) return;
-    const text = serializeAsc(extractItems(doc, selection));
-    clipboardFallback = text;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // sin permiso: queda la copia interna
-    }
-    if (cut) {
-      commit(deleteItems(doc, selection, lib));
-      setSelection([]);
-    }
-  };
-  /** Ciclos (#199): un subcircuito no se puede colocar adentro de sí mismo, ni indirectamente */
-  const makesCycle = (types: string[]): boolean => {
-    const host = pathRef.current[pathRef.current.length - 1]?.sub;
-    const c = host ? placingCycle(projectRef.current, host, types) : null;
-    if (c) setMessage(c.toLowerCase() === host!.toLowerCase() ? t("{name} can't contain itself", { name: c }) : t("{name} can't go inside {host}: {name} already contains {host}", { name: c, host: host! }));
-    return !!c;
-  };
-  const paste = async () => {
-    // una imagen en el portapapeles se pega como fondo del esquemático (figura IMAGE, en base64)
-    try {
-      for (const item of await navigator.clipboard.read()) {
-        const type = item.types.find((ty) => ty.startsWith('image/'));
-        if (!type) continue;
-        const img = await clipboardImage(await item.getType(type));
-        const at = editor.current?.cursor() ?? { x: 0, y: 0 };
-        const shape = { kind: 'IMAGE' as const, coords: [at.x, at.y, at.x + img.w, at.y + img.h], data: img.data };
-        commit({ ...doc, shapes: [...doc.shapes, shape] });
-        setTool({ kind: 'select' });
-        setSelection([{ kind: 'shape', index: doc.shapes.length }]);
-        return;
-      }
-    } catch {
-      // sin permiso o sin API de imágenes: se sigue con el texto
-    }
-    let text: string;
-    try {
-      text = await navigator.clipboard.readText();
-    } catch {
-      text = clipboardFallback;
-    }
-    if (!/^\s*Version\s/.test(text)) text = clipboardFallback;
-    if (!text) return;
-    const frag = parseAsc(text);
-    if (makesCycle(frag.symbols.map((x) => x.type))) return;
-    const at = editor.current?.cursor() ?? { x: 0, y: 0 };
-    const r = pasteItems(doc, frag, at, lib);
-    if (!r.refs.length) return;
-    commit(r.doc);
-    setTool({ kind: 'select' });
-    setSelection(r.refs);
-  };
-  const deleteSelection = () => {
-    if (opSel) {
-      setOpTags((p) => hideOpTag(p, opSel, showOp));
-      setOpSel(undefined);
-    } else if (selection.length) {
-      commit(deleteItems(doc, selection, lib));
-      setSelection([]);
-    } else setTool({ kind: 'delete' });
-  };
+  const { copySelection, makesCycle, paste, deleteSelection } = clipboardActions({ doc, lib, selection, setSelection, setTool, commit, editor, pathRef, projectRef, opSel, setOpSel, setOpTags, showOp, setMessage });
   const exportNetlist = async (which: 'net' | 'cir') => {
     const base = project.name;
     if (which === 'net') return download(`${base}.net`, new Blob([`* ${ascName()}\n${ltNetlistText(lt)}\n`], { type: 'text/plain' }));

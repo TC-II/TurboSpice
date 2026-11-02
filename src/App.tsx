@@ -7,12 +7,11 @@ import { DIGITAL_TYPE, type SimPlot } from './engine/ngspice.ts';
 import { Library, PROJECT_DIR, type LibraryBundle } from './library/library.ts';
 import { ltNetlist, ltNetlistText } from './netlist/ltnetlist.ts';
 import { netNames } from './schematic/NetNames.tsx';
-import { currentArrows } from './schematic/currentArrows.tsx';
 import { type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
-import { isPzPlot, pzRuns, rowDevice } from './waveform/ScalarViews.tsx';
+import { isPzPlot, pzRuns } from './waveform/ScalarViews.tsx';
 import { pzMarks, pzRoots } from './waveform/pz.ts';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
@@ -71,7 +70,7 @@ import { Tutorial } from './lazyViews.ts';
 import { benchesUsing, moduleFile, modules, subcktFile, subName, updateSymbol, usages } from './project/subckt.ts';
 import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
-import { buildSimulation, elementVector, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
+import { buildSimulation, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
@@ -79,9 +78,9 @@ import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { type Resolver } from './waveform/expr.ts';
-import { addTraceTo, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
+import { addTraceTo, colorize, emptyPanes, parsePlt, plotKind, serializePlt, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
-import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { moveOpTag } from './sim/opPins.ts';
 import { decode } from './asc/encoding.ts';
@@ -131,6 +130,7 @@ import { studyActions } from './app/studyActions.ts';
 import { useSavesPanel } from './app/useSavesPanel.ts';
 import { useSubcktEditing } from './app/useSubcktEditing.ts';
 import { useProjectSession } from './app/useProjectSession.ts';
+import { useHighlights } from './app/useHighlights.ts';
 
 
 export function App() {
@@ -829,91 +829,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const lvNow = path[path.length - 1];
   const { simScope, op, bias, describe, setOpTags, opSel, setOpSel, opAnnotations, annotations } = useOpPoint({ lvNow, sim, opPoint, doc, conn, lib, showOp, docKey, selection, commit });
 
-  // Sentido positivo de la corriente en los pines (punta de prueba y anotación del OP)
-  // fila de la tabla de resultados bajo el mouse: su red o sus flechas se resaltan en el esquemático
-  const [rowHover, setRowHover] = useState<string | null>(null);
-  const rowNet = rowHover ? /^V\(([^,()]+)\)$/i.exec(rowHover)?.[1] : undefined;
-  // …y el componente de la fila (@Q1[gm], Ic(Q1), I(R1)); al revés, el componente bajo el mouse resalta sus filas
-  const rowDev = rowHover ? rowDevice(rowHover) : null;
-  const rowSymbol = rowDev && !lvNow ? doc.symbols.findIndex((s) => spiceName(s.attrs.get('InstName') ?? '').toUpperCase() === rowDev) : -1;
-  // (en el panel de señales guardadas, un subcircuito U1 es XU1, como en la netlist)
-  const rowElement = rowDev && rowSymbol < 0 && !curSub ? saves?.built?.lt.elements.find((e) => e.name.replace(/§/g, '').toUpperCase() === rowDev) : undefined;
-  const [hoverDev, setHoverDev] = useState<string>();
-  const onHoverSymbol = useCallback((i: number | undefined) => setHoverDev(i === undefined ? undefined : spiceName(docRef.current.symbols[i]?.attrs.get('InstName') ?? '') || undefined), []);
-  const arrows = useMemo(() => {
-    const rowCurrent = !!rowHover && /^I/i.test(rowHover);
-    if (!sim || (lvNow ? !simScope : sim.doc.symbols !== doc.symbols) || !(showOp || tool.kind === 'probe' || rowCurrent)) return undefined;
-    const traces = panes.flatMap((p) => p.traces.map((tt, i) => ({ t: tt, color: traceColor(tt, i) }))).filter((x) => !x.t.hidden);
-    // la flecha toma el color de la traza de su corriente (la del pin o la del componente)
-    const colorOf = (target: { symbol: number; pin?: number }) => {
-      const expr = probeExpr(sim.built, target, simScope);
-      return expr ? traces.find((x) => sameExpr(x.t.expr, expr))?.color : undefined;
-    };
-    const all = currentArrows(doc, lib, simScope ? simScope.block.lt.elements : sim.built.lt.elements);
-    const perSym = new Map<number, number>();
-    for (const a of all) perSym.set(a.sym, (perSym.get(a.sym) ?? 0) + 1);
-    return all.map((a) => {
-      // la corriente del componente (sin pin) sólo colorea la flecha si es la única: en uno con
-      // varios terminales (Q, M, X…) pintaría todas, y es la de un solo terminal
-      const color = colorOf({ symbol: a.sym, pin: a.pin }) ?? (perSym.get(a.sym) === 1 ? colorOf({ symbol: a.sym }) : undefined);
-      const isRow = (target: { symbol: number; pin?: number }) => {
-        const expr = rowCurrent ? probeExpr(sim.built, target, simScope) : undefined;
-        return !!expr && sameExpr(expr, rowHover!);
-      };
-      const hl = isRow({ symbol: a.sym, pin: a.pin }) || (perSym.get(a.sym) === 1 && isRow({ symbol: a.sym }));
-      return { ...a, ...(color ? { color } : {}), ...(hl ? { hl } : {}) };
-    }).filter((a) => showOp || tool.kind === 'probe' || a.hl);
-  }, [sim, doc, lib, showOp, tool.kind, panes, lvNow, simScope, rowHover]);
-
   // Schematic | Results: la unión entre las dos pestañas cae sobre el borde derecho de la cápsula
   // del proyecto (que mide --tree-w), sea cual sea el ancho del logo o del texto en cada idioma
   const resolver = useCallback((p: SimPlot) => traceResolver(sim?.built ?? null, p, sim ? sameRuns(sim.result.plots, p) : [p]), [sim]);
-
-  // Color de cada red con una traza V(red) visible en los paneles (el cable toma el color de la
-  // traza); sólo con la punta de prueba
-  // Con la punta de prueba y sólo las señales elegidas (#314): lo que no se guardó, atenuado (no
-  // mientras se elige qué guardar: ahí lo elegido son las marcas del panel, #364)
-  const unsaved = useMemo(() => {
-    if (tool.kind !== 'probe' || savesPicking || !sim || !plot || path.length || !saveSelection(sim.built.lt.texts)) return undefined;
-    const names = new Set(plot.vectors.map((v) => v.name.toLowerCase()));
-    const nets = new Set(conn.nets.map((n) => n.name).filter((n) => n && n !== '0' && !names.has(netVector(n))).map((n) => n.toLowerCase()));
-    const symbols = new Set(
-      sim.built.lt.elements.filter((e) => {
-        const v = elementVector(sim.built, e.name);
-        return v && !names.has(v) && ![...names].some((n) => n.startsWith(`${v.replace(/\[.*$/, '')}[`));
-      }).map((e) => e.sym),
-    );
-    return { nets, symbols };
-  }, [tool.kind, savesPicking, sim, plot, path.length, conn]);
-  const netColors = useMemo(() => {
-    const m = new Map<string, string>();
-    if (tool.kind !== 'probe') return m;
-    // adentro de una instancia (#180): V(x_u1.red) colorea «red» y la red de arriba, su puerto
-    const lv = path[path.length - 1];
-    const local = (n: string) => {
-      if (!lv) return n;
-      if (!lv.inst) return undefined;
-      if (n.startsWith(lv.prefix)) return n.slice(lv.prefix.length);
-      return [...lv.ports].find(([, up]) => up.toLowerCase() === n)?.[0];
-    };
-    for (const p of panes) p.traces.forEach((tt, i) => {
-      const n = /^V\(([^()]+)\)$/i.exec(tt.expr.trim());
-      const name = n && local(n[1].toLowerCase());
-      if (name && !tt.hidden && !m.has(name)) m.set(name, traceColor(tt, i));
-    });
-    return m;
-  }, [panes, tool.kind, path]);
-  // la red resaltada al pasar sobre una traza deja de estarlo si la traza se borra (al borrarla
-  // no llega el pointerleave)
-  // (tampoco si el renglón de la leyenda se reacomoda o se pasa a otro panel bajo el cursor, ni si
-  // la ventana pierde el foco: el pointerleave de un elemento que desaparece nunca llega)
-  useEffect(() => setTraceNet(undefined), [panes]);
-  useEffect(() => {
-    const off = () => setTraceNet(undefined);
-    window.addEventListener('blur', off);
-    return () => window.removeEventListener('blur', off);
-  }, []);
-  const traceNetShown =traceNet && panes.some((p) => p.traces.some((tt) => sameExpr(tt.expr, `V(${traceNet})`))) ? traceNet : undefined;
+  const { setRowHover, rowNet, rowSymbol, rowElement, hoverDev, onHoverSymbol, arrows, unsaved, netColors, traceNetShown } = useHighlights({
+    ...{ doc, docRef, lib, conn, path, lvNow, curSub, sim, simScope, plot, panes, tool, showOp, saves, savesPicking, traceNet, setTraceNet },
+  });
 
   // Punta de prueba: agrega la traza al panel activo. Si ya está ahí no hace nada (se quita a
   // mano); si está en otro panel, queda en los dos con el mismo color

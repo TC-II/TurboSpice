@@ -5,6 +5,7 @@
 // Queda debajo de la barra de la app (la marca y el estilo siguen a la vista); las herramientas
 // del esquemático dejan su lugar a las de la vista previa: zoom, mover y elegir un área.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTremor } from './tremor.ts';
 import { createPortal } from 'react-dom';
 import type { AscDoc } from '../asc/model.ts';
 import { DEFAULT_SKIN, type Library } from '../library/library.ts';
@@ -122,6 +123,8 @@ export function ExportView({
   const skins = useMemo(() => [DEFAULT_SKIN, TREMOR, ...lib.skinNames().filter((s) => s !== DEFAULT_SKIN && s !== TREMOR)], [lib]);
   const skin = skins.includes(settings.skin) ? settings.skin : DEFAULT_SKIN;
   const tremor = skin === TREMOR;
+  // (el trazo a mano alzada, cuando llegó roughPen; hasta entonces no se exporta)
+  const pen = useTremor(tremor);
   const sheetLib = useMemo(() => lib.withSkin(tremor ? DEFAULT_SKIN : skin), [lib, skin, tremor]);
   const pickSkin = (s: string) => set({ skin: s, ...(SKIN_FONT[s] ? { font: SKIN_FONT[s] } : {}) });
 
@@ -144,6 +147,7 @@ export function ExportView({
 
   const [sheet, setSheet] = useState<Rect | null>(null);
   const [busy, setBusy] = useState(false);
+  const waiting = busy || (tremor && !pen);
   const svgRef = useRef<SVGSVGElement>(null);
   const contentRef = useRef<SVGGElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -163,7 +167,7 @@ export function ExportView({
     if (!g) return;
     const b = g.getBBox();
     setSheet(b.width || b.height ? sheetBox({ x: b.x, y: b.y, w: b.width, h: b.height }) : null);
-  }, [shown, op, cur, sheetLib, font, tremor, mathVersion]);
+  }, [shown, op, cur, sheetLib, font, pen, mathVersion]);
 
   // lo que se exporta: el área elegida o la hoja entera
   const page = sheet && area ? area : sheet;
@@ -393,7 +397,7 @@ export function ExportView({
           height={H}
         >
           <g ref={contentRef}>
-            <SchematicCanvas doc={shown} lib={sheetLib} conn={conn} selection={[]} showLoose={false} showSimCommand={layers.directives} tremor={tremor} />
+            <SchematicCanvas doc={shown} lib={sheetLib} conn={conn} selection={[]} showLoose={false} showSimCommand={layers.directives} tremor={pen} />
             {cur && <CurrentArrowsLayer items={cur.map((a) => ({ ...a, color: undefined, hl: false }))} />}
             {op && <AnnotationLayer items={op} scale={1} />}
           </g>
@@ -444,19 +448,19 @@ export function ExportView({
         </section>
         <section className="export-actions">
           <h3>{t('Download')}</h3>
-          <button className="primary" disabled={!page || busy || font !== choice.id} onClick={() => run('pdf')}>
+          <button className="primary" disabled={!page || waiting || font !== choice.id} onClick={() => run('pdf')}>
             {t('Download PDF')}
           </button>
-          <button disabled={!page || busy} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>
+          <button disabled={!page || waiting} onClick={() => run('tex')} title={t('Standalone LaTeX file with the drawing in TikZ; text between $…$ goes to LaTeX as written')}>
             {t('Download .tex (TikZ)')}
           </button>
-          <button disabled={!page || busy} onClick={() => run('png')}>
+          <button disabled={!page || waiting} onClick={() => run('png')}>
             {t('Download PNG')}
           </button>
-          <button disabled={!page || busy || !('ClipboardItem' in window)} onClick={() => run('copy')}>
+          <button disabled={!page || waiting || !('ClipboardItem' in window)} onClick={() => run('copy')}>
             {t('Copy image')}
           </button>
-          <button disabled={!page || busy} onClick={() => run('svg')}>
+          <button disabled={!page || waiting} onClick={() => run('svg')}>
             {t('Download SVG')}
           </button>
         </section>

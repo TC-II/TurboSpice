@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
-import { tremorSkin, tremorWire } from '../../src/schematic/tremor.ts';
+import { loadTremor, tremorSkin, tremorWire } from '../../src/schematic/tremor.ts';
+
+beforeAll(() => loadTremor());
 
 const { skins } = buildBundle();
 const coords = (body: string) => [...body.matchAll(/d="([^"]+)"/g)].flatMap((m) => [...m[1].matchAll(/(-?[\d.]+)[ ,](-?[\d.]+)/g)].map((p) => [Number(p[1]), Number(p[2])]));

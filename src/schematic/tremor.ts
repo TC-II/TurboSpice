@@ -1,7 +1,33 @@
 // Trazo Tremor (#330): el lápiz a mano alzada de ASC-Parser (roughPen.js) sobre los skins y los
 // cables de la hoja de export. La pantalla de trabajo no cambia. Cada dibujo se siembra con su
 // lugar en la hoja: dos resistencias no salen iguales, y la misma hoja sale siempre igual.
-import RoughPen from './roughPen.js';
+// roughPen.js (44 kB) se baja la primera vez que se elige Tremor; hasta entonces se dibuja limpio.
+import { useEffect, useState } from 'react';
+import type RoughPenModule from './roughPen.js';
+
+let pen: typeof RoughPenModule | null = null;
+let loading: Promise<void> | null = null;
+
+/** Baja roughPen (una sola vez) */
+export function loadTremor(): Promise<void> {
+  return (loading ??= import('./roughPen.js').then((m) => {
+    pen = m.default;
+  }));
+}
+
+/** ¿Se dibuja a mano alzada? Con `on`, baja roughPen y vuelve a dibujar cuando llega */
+export function useTremor(on: boolean): boolean {
+  const [ready, setReady] = useState(() => !!pen);
+  useEffect(() => {
+    if (!on || ready) return;
+    let alive = true;
+    loadTremor().then(() => alive && setReady(true));
+    return () => {
+      alive = false;
+    };
+  }, [on, ready]);
+  return on && ready;
+}
 
 type Skin = { viewBox: string; body: string };
 type Pt = [number, number];
@@ -54,6 +80,8 @@ const cache = new WeakMap<Skin, Map<string, Skin>>();
 
 /** El skin redibujado a mano alzada; los trazos llegan justo a `pins` (coordenadas del símbolo) */
 export function tremorSkin(skin: Skin, pins: Pt[], seed: string): Skin {
+  if (!pen) return skin;
+  const RoughPen = pen;
   let bySeed = cache.get(skin);
   if (!bySeed) cache.set(skin, (bySeed = new Map()));
   let out = bySeed.get(seed);
@@ -72,6 +100,8 @@ export function tremorSkin(skin: Skin, pins: Pt[], seed: string): Skin {
 
 /** Un cable a mano alzada: los dos extremos quedan donde estaban (uniones, pines, etiquetas) */
 export function tremorWire(x1: number, y1: number, x2: number, y2: number): string {
+  if (!pen) return `${x1},${y1} ${x2},${y2}`;
+  const RoughPen = pen;
   const opt = RoughPen.DEFAULTS;
   const ends: Pt[] = [
     [x1, y1],

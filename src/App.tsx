@@ -28,7 +28,7 @@ import { addRecent, dropResult, loadProjectSession, loadRecent, loadResult, load
 import { badLines, parseAsc } from './asc/parse.ts';
 import { serializeAsc } from './asc/serialize.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
-import { elementRefs, savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
+import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs, type SavableSignal } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
 import { findAnalysis, findControl, removeAnalysis } from './schematic/directivesEdit.ts';
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
@@ -40,8 +40,6 @@ import {
   activeAsc,
   addSim as addProjectSim,
   applyValues,
-  groupPeersWith,
-  propagateAttrs,
   mergeFiles,
   projectFileKind,
   lineOf,
@@ -67,7 +65,6 @@ import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, extractItems, pasteItems, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
-import { parseSource } from './sim/sources.ts';
 import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
@@ -139,6 +136,7 @@ import { ResultsPanel } from './app/ResultsPanel.tsx';
 import { ModuleEditors } from './app/ModuleEditors.tsx';
 import { treeBenchesOf, treeSubsOf } from './app/projectTree.ts';
 import { buildResultsItems, buildToolGroups } from './app/toolbars.ts';
+import { contextMenus } from './app/contextMenus.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1251,88 +1249,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   // menú del botón derecho de un comentario (tamaño, alineación)
   const [textMenu, setTextMenu] = useState<{ index: number; at: { x: number; y: number } } | null>(null);
   const closeTextMenu = useCallback(() => setTextMenu(null), []);
-  /**
-   * Ítem del botón derecho para guardar o dejar de guardar unas señales, sólo si el testbench
-   * guarda lo elegido (#314)
-   */
-  const saveItem = (refs: string[]): ContextItem | null => {
-    const sel = curSub ? null : saveSelection(doc.texts);
-    if (!sel || !refs.length) return null;
-    const next = toggleRefs(sel, refs)!;
-    const saved = next.length < sel.length;
-    const what = refs.join(' ');
-    return {
-      label: saved ? t('Don\'t save {what}', { what }) : t('Save {what}', { what }),
-      disabled: saved && !next.length,
-      onClick: () => {
-        commit(setSaveSelection(doc, next));
-        setMessage(t('Saved signals changed: simulate again with Alt+R'));
-      },
-    };
-  };
-  const netMenu = (net: string, at: { x: number; y: number }): boolean => {
-    if (net === '0') return false;
-    const item = saveItem([`V(${net})`]);
-    if (!item) return false;
-    setCtxMenu({ at, items: [item] });
-    return true;
-  };
-  const symbolMenu = (index: number, at: { x: number; y: number }): boolean => {
-    const s = doc.symbols[index];
-    const inst = s?.attrs.get('InstName');
-    if (!s || !inst) return false;
-    const eff = effectiveAttrs(s, lib.symbol(s.type));
-    const value = s.attrs.get('Value') ?? eff.get('Value') ?? '';
-    const prefix = (eff.get('Prefix') ?? '').toUpperCase();
-    // R, L, C y fuentes V de continua: el valor se edita en el mismo menú
-    const quick =
-      /^[RLC]$/.test(prefix) ||
-      (prefix === 'V' && parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') })?.kind === 'dc');
-    const p0 = snapshot();
-    const inBench = !curSub && !!sims.active;
-    const peers = inBench ? groupPeersWith(p0, sims.active, inst, s.type) : [];
-    const me = inBench ? variantOf(p0).sims.find((x) => x.id === sims.active) : undefined;
-    const canPropagate = !!me?.group && peers.length > 0;
-    // con sólo las señales elegidas (#314): guardar (o no) sus corrientes
-    const save = saveItem(elementRefs(inst, prefix));
-    // fuera de los casos rápidos, el menú sólo aparece si hay a quién propagarle (o qué guardar)
-    if (!quick && !canPropagate) {
-      if (!save) return false;
-      setCtxMenu({ at, items: [save] });
-      return true;
-    }
-    const group = p0.groups.find((g) => g.id === me?.group)?.name ?? '';
-    setCtxMenu({
-      at,
-      items: [
-        quick
-          ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: v })) } }
-          : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
-        {
-          // con el valor que se está escribiendo (#229): se aplica primero y después se propaga
-          label: (v = value) =>
-            !canPropagate
-              ? t('Propagate {inst} across the other testbenches of the workbench', { inst })
-              : t('Propagate {inst}={value} across «{group}»', { inst, value: v, group }),
-          short: t('Propagate'),
-          disabled: !canPropagate,
-          primary: true,
-          onClick: (edited) => {
-            const v = edited?.trim() || value;
-            const attrs = new Map(s.attrs);
-            if (quick && v !== value) {
-              commit(setSymbolAttrs(doc, index, { Value: v }));
-              attrs.set('Value', v);
-            }
-            editProject(propagateAttrs(snapshot(), peers, inst, s.type, attrs));
-            setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value: v, n: peers.length, group }));
-          },
-        },
-        ...(save ? [save] : []),
-      ],
-    });
-    return true;
-  };
+  const { netMenu, symbolMenu } = contextMenus({
+    ...{ doc, lib, curSub, sims, commit, snapshot, editProject, setCtxMenu, setMessage },
+    editItem: (ref) => editItem(ref), // (declarada más abajo)
+  });
   /** El nombre del proyecto es el del archivo: en Drive se renombra ya; en el equipo, al guardar */
   const renameProject = async (name: string) => {
     const newName = `${name}${EXT}`;

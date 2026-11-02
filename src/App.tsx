@@ -91,14 +91,14 @@ import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
 import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
 import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
-import { paneCurves, placeTrace, type ComplexMode } from './waveform/curves.ts';
+import { paneCurves, type ComplexMode } from './waveform/curves.ts';
 import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
-import { evalTrace, type Resolver } from './waveform/expr.ts';
+import { type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
-import { deviceParamTraces, digitalProbeExpr, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
+import { deviceParamTraces, multiPinPrefix, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
-import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, toggleOpTag, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
+import { hideOpTag, moveOpTag, noOpTags, opPinKey, opTagsData, opTagsFromData, opTagVisible, unhideOpTags, type OpPinTarget, type OpTags } from './sim/opPins.ts';
 import { instScope, scopeElementOf, type InstScope } from './sim/context.ts';
 import { type MeasTable } from './sim/measResults.ts';
 import { MeasPanel } from './sim/MeasPanel.tsx';
@@ -121,7 +121,6 @@ import { looksBehavioral, setHdlMode, vvpFileOf, withParams, applySynth, isStale
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl/variants.ts';
 import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
-import { busBits, isBusName } from './netlist/bus.ts';
 import type { SynthResult } from './hdl/yosys.ts';
 import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
@@ -141,6 +140,7 @@ import { moduleActions } from './app/modules.ts';
 import { navigation } from './app/navigation.ts';
 import { benchActions } from './app/benches.ts';
 import { useImportExport } from './app/useImportExport.ts';
+import { useProbe } from './app/useProbe.ts';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -1752,150 +1752,6 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
 
   // ⌖ de la DFT: mientras se elige, el esquemático está en la punta de prueba y lo que se pinche
   // (esté graficado o no) va a la DFT; al terminar vuelve a la herramienta de antes
-  const dftPick = useRef<Tool | null>(null);
-  const onDftPicking = (on: boolean) => {
-    if (on === !!dftPick.current) return;
-    if (on) {
-      dftPick.current = tool;
-      if (sim) setTool({ kind: 'probe' });
-    } else {
-      const back = dftPick.current;
-      dftPick.current = null;
-      setToolState((cur) => (cur.kind === 'probe' && back ? back : cur));
-    }
-  };
-  const onProbe = (target: { net?: string; symbol?: number; pin?: number }) => {
-    if (savesPicking) return pickSave(target);
-    if (!sim || !plot) return;
-    // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
-    if (!scaleOf(plot) && op) return setOpTags((p) => toggleOpTag(p, target));
-    // un cable de bus (f[10:0]): una traza por bit, en el testbench
-    if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
-      const sc = scaleOf(plot);
-      if (!sc) return;
-      // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
-      const dig = digitalProbeExpr(sim.built, busBits(target.net), target.net);
-      if (dig && hasData(dig)) return addDigitalProbe(dig);
-      const exprs = busBits(target.net)
-        .map((b) => probeExpr(sim.built, { net: b }))
-        .filter((e): e is string => {
-          if (!e) return false;
-          try {
-            evalTrace(e, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-            return true;
-          } catch {
-            return false;
-          }
-        });
-      if (!exprs.length) return setMessage(t('No data for {expr} in {name}', { expr: target.net, name: plot.name }));
-      setPanel('plot');
-      if (expanded === 'schematic') setExpanded('');
-      const i = Math.min(activePane, panes.length - 1);
-      return editPanes(exprs.reduce((ps, e) => addTraceTo(ps, i, e), panes));
-    }
-    let expr = probeExpr(sim.built, target);
-    // adentro de un subcircuito (#180): la red de esta instancia en la netlist del testbench
-    const lv = pathRef.current[pathRef.current.length - 1];
-    if (lv) {
-      if (!lv.inst) return setMessage(t('To probe inside a subcircuit, enter it from an instance (double-click it in the testbench)'));
-      // con el subcircuito tal como se simuló: tensiones y corrientes de los de adentro (#199)
-      if (simScope) expr = probeExpr(sim.built, target, simScope);
-      else {
-        if (!target.net || target.net === '0') return setMessage(t('Inside a subcircuit the probe measures voltages (click a wire)'));
-        const up = lv.ports.get(target.net.toLowerCase());
-        if (up === '0') return;
-        expr = `V(${up ?? lv.prefix + target.net})`;
-      }
-    }
-    if (!expr) return;
-    if (dftPick.current) {
-      const sc = scaleOf(plot);
-      try {
-        if (sc) evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-      } catch {
-        return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
-      }
-      return plotPanel.current?.addDft(expr);
-    }
-    // con el foco en la caja de trazas, se escribe ahí (para armar una expresión)
-    if (traceBox.current?.focused()) return traceBox.current.insert(expr);
-    // una salida de un bloque Verilog: su versión digital (la tensión se puede pedir con V())
-    if (target.net && !lv) {
-      const dig = digitalProbeExpr(sim.built, [target.net]);
-      if (dig && hasData(dig)) return addDigitalProbe(dig);
-    }
-    setPanel('plot');
-    // con los resultados colapsados, mostrarlos para ver la traza
-    if (expanded === 'schematic') setExpanded('');
-    const i = Math.min(activePane, panes.length - 1);
-    if (panes[i]?.traces.some((tt) => !tt.dft && sameExpr(tt.expr, expr))) return;
-    const sc = scaleOf(plot);
-    if (!sc) return setMessage(t('{name} has no X axis: choose another analysis to plot', { name: plot.name }));
-    try {
-      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-    } catch {
-      // con sólo las señales elegidas (#314) puede no haberse guardado: la traza queda y, como lo
-      // que usan las trazas se guarda siempre, aparece al volver a simular
-      if (saveSelection(sim.built.lt.texts)) {
-        addProbed(i, expr);
-        return setMessage(t('{expr} wasn\'t saved (only the selected signals are): it will be when you run again', { expr }));
-      }
-      return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
-    }
-    addProbed(i, expr);
-  };
-  /** ¿La expresión tiene datos en el plot que se ve? (Dig() sólo después de un transitorio) */
-  const hasData = (expr: string) => {
-    const sc = plot && scaleOf(plot);
-    if (!plot || !sc) return false;
-    try {
-      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-  /** traza digital de la punta: al panel digital (o a uno nuevo), con los resultados a la vista */
-  const addDigitalProbe = (expr: string) => {
-    setPanel('plot');
-    if (expanded === 'schematic') setExpanded('');
-    editPanes(addTraceTo(panes, Math.min(activePane, panes.length - 1), expr));
-  };
-  /** traza medida con la punta: a un eje con su unidad o libre del panel activo, o a uno nuevo (#308) */
-  const addProbed = (i: number, expr: string) => {
-    if (isComplex) return editPanes(addTraceTo(panes, i, expr));
-    const r = placeTrace(panes, i, expr);
-    editPanes(r.panes);
-    if (r.index !== i) setActivePane(r.index);
-  };
-
-  /**
-   * Punta de prueba arrastrada de un punto a otro (#308): V−V o I−I es la resta; V/I (Ω) o I/V (S)
-   * el cociente
-   */
-  const onProbePair = (from: { net?: string; symbol?: number; pin?: number }, to: { net?: string; symbol?: number; pin?: number }) => {
-    if (savesPicking || !sim || !plot || pathRef.current.length || dftPick.current) return onProbe(from);
-    const sc = scaleOf(plot);
-    if (!sc) return onProbe(from);
-    const isV = (x: typeof from) => x.net !== undefined;
-    const ea = probeExpr(sim.built, from);
-    const eb = probeExpr(sim.built, to);
-    // contra tierra, la resta es la propia tensión
-    if (isV(from) && isV(to) && (from.net === '0' || to.net === '0')) return onProbe(from.net === '0' ? to : from);
-    if (!ea || !eb) return;
-    const ratio = isV(from) !== isV(to);
-    const expr = ratio ? `${ea}/${eb}` : `${ea}-${eb}`;
-    try {
-      evalTrace(expr, { resolve: resolver(plot), scale: sc.real, scaleName: sc.name });
-    } catch {
-      return setMessage(t('No data for {expr} in {name}', { expr, name: plot.name }));
-    }
-    setPanel('plot');
-    if (expanded === 'schematic') setExpanded('');
-    const i = Math.min(activePane, panes.length - 1);
-    addProbed(i, expr);
-  };
-
   // Caja de trazas de la barra de resultados
   const traceBox = useRef<TraceBoxHandle>(null);
   // con el foco en la caja de trazas se está en modo punta de prueba (#341): un clic en una red la
@@ -2313,6 +2169,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
   const runs = useMemo(() => (plot ? (overlay && visibleRuns.length ? visibleRuns : [plot]) : []), [overlay, visibleRuns, plot]);
   const labels = useMemo(() => (sim ? stepLabels(sim.result.plots, sim.built.ng.steps) : new Map<string, string>()), [sim]);
   const isComplex = plot?.vectors.some((v) => v.imag);
+  const { onDftPicking, onProbe, onProbePair } = useProbe({
+    ...{ tool, setTool, setToolState, sim, plot, op, setOpTags, simScope, resolver, isComplex, panes, activePane, editPanes, setActivePane },
+    ...{ expanded, setExpanded, setPanel, pathRef, plotPanel, traceBox, savesPicking, pickSave, setMessage },
+  });
   // corridas de .pz (pz1…pzN con .step) y sus f₀ para marcar en el Bode
   const pzAll = useMemo(() => {
     const pzs = sim ? sim.result.plots.filter(isPzPlot) : [];

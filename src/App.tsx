@@ -47,7 +47,6 @@ import {
   setSimAsc,
   simOf,
   simsWithValue,
-  storeActive,
   valueChanges,
   withGroups,
   variantOf,
@@ -64,7 +63,7 @@ import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
 import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
-import { pickAscFiles, readAsc, saveFile } from './schematic/fileio.ts';
+import { readAsc } from './schematic/fileio.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
 import { setMeasureFont } from './schematic/geometry.ts';
@@ -100,7 +99,7 @@ import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { useSideSize } from './ui/SideSplit.tsx';
-import { AccountButton, importToDrive } from './cloud/AccountButton.tsx';
+import { AccountButton } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
@@ -138,6 +137,7 @@ import { buildResultsItems, buildToolGroups } from './app/toolbars.ts';
 import { contextMenus } from './app/contextMenus.ts';
 import { clipboardActions } from './app/clipboard.ts';
 import { tutorialState } from './app/tutorialProbe.ts';
+import { savingActions } from './app/saving.ts';
 
 
 export function App() {
@@ -858,62 +858,12 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     location.reload();
   };
 
-  const confirmDiscard = () => !dirty || window.confirm(t('There are unsaved changes. Discard them?'));
-
-  // Ya no hay "abrir" un .asc: Abrir lleva a Importar (que explica qué entra y cómo)
-  const doOpen = () => setDialog({ kind: 'importinfo' });
-
-  /** Importar .asc del equipo a la carpeta del Drive; uno solo se abre */
-  const doImport = async (picked?: { name: string; bytes: Uint8Array }[]) => {
-    const files = picked ?? (await pickAscFiles());
-    if (!files.length) return;
-    try {
-      setMessage(files.length > 1 ? t('Importing {length} files to Google Drive…', { length: files.length }) : t('Importing {p0} to Google Drive…', { p0: files[0].name }));
-      const saved = await importToDrive(files);
-      if (saved.length === 1) await openDriveFile(saved[0]);
-      else setMessage(t('Imported {length} files to «My simulations»', { length: saved.length }));
-    } catch (e) {
-      setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
-    }
-  };
-
-  /** El proyecto con el circuito (y la vista) que se están editando: para el archivo o la sesión */
-  const snapshot = (): Project => {
-    const lv = pathRef.current[pathRef.current.length - 1];
-    return lv ? storeSubckt(projectRef.current, lv.sub, ascText(docRef.current)) : storeActive(projectRef.current, ascText(docRef.current), sims.active ? liveView() : undefined);
-  };
-
-  /** El .turbo a guardar con ese nombre de archivo (el nombre del proyecto es el del archivo) */
-  const turboBytes = async (name: string) => {
-    const p = { ...snapshot(), name: projectName(name) };
-    return { p, bytes: new TextEncoder().encode(await serializeTurbo(p)) };
-  };
-  const turboName = (name: string) => (/\.turbo$/i.test(name) ? name : `${projectName(name)}${EXT}`);
-
-  const savedAs = (saved: FileState, p: Project, where = '') => {
-    setFile(saved);
-    setProjectState({ ...p, name: projectName(saved.name) });
-    setDirty(false);
-    remember(p, saved);
-    setMessage(t('Saved{where}: {name}', { where, name: saved.name }));
-  };
-
-  /** Guardar en el equipo */
-  const doSaveLocal = async (saveAs = false) => {
-    const name = turboName(file.name);
-    try {
-      // el proyecto se arma con el nombre que se eligió en el diálogo (Guardar como)
-      let p: Project | undefined;
-      const r = await saveFile(async (chosen) => {
-        const tb = await turboBytes(chosen);
-        p = tb.p;
-        return tb.bytes;
-      }, name, file.handle, saveAs);
-      if (r && p) savedAs({ ...file, name: r.name, handle: r.handle ?? file.handle }, p);
-    } catch (e) {
-      setMessage(t('Could not save: {p0}', { p0: (e as Error).message }));
-    }
-  };
+  const { confirmDiscard, doOpen, doImport, snapshot, turboBytes, turboName, savedAs, doSaveLocal } = savingActions({
+    ...{ dirty, setDirty, file, setFile, projectRef, setProjectState, pathRef, docRef, sims, remember, setDialog, setMessage },
+    // (declaradas más abajo)
+    liveView: () => liveView(),
+    openDriveFile: (d) => openDriveFile(d),
+  });
 
   const { driveConflict, setDriveConflict, setAutoDrive, resolveDriveConflict, doSaveDrive, openDriveFile } = useDrive({
     ...{ account: google.account, file, setFile, dirty, setDirty, editRev, projectRef, snapshot, turboBytes, turboName, savedAs, remember, openBytes, confirmDiscard, setDialog, setMessage },

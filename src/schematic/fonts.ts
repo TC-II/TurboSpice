@@ -18,9 +18,11 @@ export interface FontChoice {
 
 const url = (f: string) => `${import.meta.env.BASE_URL}fonts/${f}`;
 
+// la primera es la de por defecto: Arimo, la misma que el PDF, para que la pantalla mida igual en
+// cualquier máquina (la del sistema cambia con el sistema operativo)
 export const FONTS: FontChoice[] = [
-  { id: 'system', label: 'System (sans-serif)', css: 'system-ui, sans-serif', font: null, bold: true },
   { id: 'arimo', label: 'Arimo', css: 'Arimo, Arial, sans-serif', font: { family: 'Arimo', files: { normal: url('Arimo-Regular.ttf'), bold: url('Arimo-Bold.ttf') } }, bold: true },
+  { id: 'system', label: 'System (sans-serif)', css: 'system-ui, sans-serif', font: null, bold: true },
   {
     id: 'lmodern',
     label: 'Latin Modern (LaTeX)',

@@ -24,6 +24,7 @@ import {
   symbolBox,
   textBox,
   fontSize,
+  baselineOffset,
   inlineEditable,
   visibleText,
   wireVertexAt,
@@ -1597,7 +1598,8 @@ function InlineEditor({ it, onChange, onDone }: { it: InlineText; onChange(v: st
   const w = it.box ? it.box.w + fs * 0.2 : (Math.max(4, ...lines.map((l) => l.length)) + 2) * fs * 0.6;
   const h = it.box ? it.box.h + fs * 0.4 : lines.length * fs * 1.2 + fs * 0.4;
   const x = it.align === 'Right' ? it.x - w : it.align === 'Center' ? it.x - w / 2 : it.x;
-  const y = it.box ? it.y - fs / 2 - fs * 0.2 : it.align === 'Top' ? it.y : it.align === 'Bottom' ? it.y - h : it.y - fs * 0.6 - fs * 0.2;
+  // (la primera línea donde la dibuja AlignedText: su celda va de 0.8 fs arriba a 0.2 fs abajo de la línea base)
+  const y = it.box ? it.y - fs / 2 - fs * 0.2 : it.align === 'Bottom' ? it.y + baselineOffset('Bottom', fs) + fs * 0.4 - h : it.y + baselineOffset(it.align, fs) - fs * 0.8 - fs * 0.2;
   return (
     <foreignObject x={x} y={y} width={w} height={h} className="inline-text">
       <textarea

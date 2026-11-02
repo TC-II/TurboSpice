@@ -53,6 +53,12 @@ como «no movido» y se muestra en la posición óptima; uno distinto (movido a 
 se escriben las posiciones óptimas, así que LTspice abre el archivo igual a como se ve en TurboSpice.
 Arrastrar un rótulo lo mueve de a 8 desde donde estaba (las posiciones óptimas no caen en la grilla de 8).
 
+**Tamaño y alineación del texto**: como ASC-Parser (su spec §7). El tamaño 0–7 es la tabla
+8, 13, 20, 26, 32, 46, 65, 92 sin escalar; la línea base se calcula desde el ancla (Left/Right/Center
++0.3·fs; Top +1.025·fs; Bottom −0.225·fs; las V… igual, giradas alrededor del ancla) en
+`baselineOffset` de `src/schematic/geometry.ts`, y no se deja a `dominant-baseline`, que el navegador
+y svg2pdf ubican distinto: así la pantalla, el SVG, el PDF y el TikZ coinciden con ASC-Parser.
+
 **Rótulos movidos a mano** (#28): se guardan como `WINDOW` explícito (posición local del símbolo,
 alineación y tamaño); ocultar un rótulo es `WINDOW n x y Invisible size`. Al rotar o espejar,
 los rótulos que estaban en la posición por defecto pasan a la de la nueva orientación; los movidos

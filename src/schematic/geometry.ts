@@ -265,7 +265,19 @@ export const sameRef = (a: ItemRef, b: ItemRef) => a.kind === b.kind && a.index 
 /** Tamaño de letra (unidades del esquemático) para el índice de tamaño de LTspice */
 export const FONT_SIZE = [8, 13, 20, 26, 32, 46, 65, 92];
 export const fontIndex = (i: number) => Math.max(0, Math.min(7, Math.round(i)));
-export const fontSize = (i: number) => FONT_SIZE[fontIndex(i)] * 0.8;
+export const fontSize = (i: number) => FONT_SIZE[fontIndex(i)];
+
+/**
+ * Línea base de un texto alineado a la LTspice, relativa al ancla, para la alineación sin la V
+ * (Left…Bottom). Las reglas de ASC-Parser (spec §7.3): celda de alto fs con la línea base a 0.8 fs
+ * de su borde superior; Top y Bottom llevan además 0.225 fs de separación (GDI de LTspice). En un
+ * texto vertical se aplica antes de girarlo alrededor del ancla.
+ */
+export function baselineOffset(base: string, fs: number): number {
+  if (base === 'Top') return fs * 1.025;
+  if (base === 'Bottom') return -fs * 0.225;
+  return fs * 0.3;
+}
 /** Textos de menos de esto (px en pantalla) no se dibujan al alejar (#195) */
 export const MIN_TEXT_PX = 3;
 /** Cuántos tamaños de letra (desde el más chico) quedan ilegibles a esta escala: la clase lod-N del editor */
@@ -281,7 +293,7 @@ export const illegibleSizes = (scale: number) => FONT_SIZE.filter((_, i) => font
 
 let measureCtx: CanvasRenderingContext2D | null | undefined;
 /** La letra del esquemático (Configuración, #328), con la que se miden los textos */
-let measureFont = 'system-ui, sans-serif';
+let measureFont = 'Arimo, Arial, sans-serif';
 export const setMeasureFont = (css: string) => {
   measureFont = css;
 };
@@ -491,29 +503,14 @@ export function flagBox(doc: AscDoc, f: { x: number; y: number; name: string }):
 export function alignedBox(x: number, y: number, align: string, size: number, len: number): Box {
   const fs = fontSize(size);
   const w = len * fs * 0.6;
-  const h = fs;
-  switch (align) {
-    case 'Left':
-      return { x1: x, y1: y - h / 2, x2: x + w, y2: y + h / 2 };
-    case 'Right':
-      return { x1: x - w, y1: y - h / 2, x2: x, y2: y + h / 2 };
-    case 'Top':
-      return { x1: x - w / 2, y1: y, x2: x + w / 2, y2: y + h };
-    case 'Bottom':
-      return { x1: x - w / 2, y1: y - h, x2: x + w / 2, y2: y };
-    case 'VLeft':
-      return { x1: x - h / 2, y1: y - w, x2: x + h / 2, y2: y };
-    case 'VRight':
-      return { x1: x - h / 2, y1: y, x2: x + h / 2, y2: y + w };
-    case 'VCenter':
-      return { x1: x - h / 2, y1: y - w / 2, x2: x + h / 2, y2: y + w / 2 };
-    case 'VTop':
-      return { x1: x, y1: y - w / 2, x2: x + h, y2: y + w / 2 };
-    case 'VBottom':
-      return { x1: x - h, y1: y - w / 2, x2: x, y2: y + w / 2 };
-    default:
-      return { x1: x - w / 2, y1: y - h / 2, x2: x + w / 2, y2: y + h / 2 };
-  }
+  const vertical = align.startsWith('V');
+  const base = vertical ? align.slice(1) : align;
+  // la celda del texto horizontal, relativa al ancla
+  const left = base === 'Left' ? 0 : base === 'Right' ? -w : -w / 2;
+  const top = baselineOffset(base, fs) - fs * 0.8;
+  if (!vertical) return { x1: x + left, y1: y + top, x2: x + left + w, y2: y + top + fs };
+  // vertical: la misma celda girada 90° antihorario alrededor del ancla, (dx, dy) → (dy, -dx)
+  return { x1: x + top, y1: y - left - w, x2: x + top + fs, y2: y - left };
 }
 
 const HIDE_DEFAULT_VALUE = /^(QN|QP|MN|MP|JN|JP)$/i;

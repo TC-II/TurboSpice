@@ -8,7 +8,7 @@ import type { Library } from '../library/library.ts';
 import { onSegment, type Connectivity, type Net } from '../netlist/connectivity.ts';
 import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
-import { displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, unescapeAsc, visibleText, type ItemRef } from './geometry.ts';
+import { baselineOffset, displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, unescapeAsc, visibleText, type ItemRef } from './geometry.ts';
 import { arcAngles, lineDash } from './shapes.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
@@ -40,37 +40,37 @@ export function AlignedText({ x, y, align, size, children, className, label, lat
   const vertical = align.startsWith('V');
   const base = vertical ? align.slice(1) : align;
   const anchor = base === 'Left' ? 'start' : base === 'Right' ? 'end' : 'middle';
-  const baseline = base === 'Top' ? 'hanging' : base === 'Bottom' ? 'text-after-edge' : 'central';
   const fs = fontSize(size);
+  // la línea base se calcula (como ASC-Parser), no se deja a dominant-baseline: cada visor (el
+  // navegador, svg2pdf) la ubica distinto según la letra
+  const by = y + baselineOffset(base, fs);
   const math = latex && typeof children === 'string' && hasLatex(children) ? mathSvg(children) : undefined;
   if (math) {
-    // la fórmula (viewBox de MathJax, 1000 por em) alineada como lo estaría el texto
+    // la fórmula (viewBox de MathJax, 1000 por em, línea base en 0) alineada como lo estaría el texto
     const k = fs / 1000;
-    const [w, h] = [math.w * k, math.h * k];
+    const w = math.w * k;
     const x0 = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
-    const top = baseline === 'hanging' ? y : baseline === 'text-after-edge' ? y - h : y - h / 2;
     return (
       <g
         className={`math fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
         transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
         data-tex={children}
         data-x={x}
-        data-y={y}
+        data-y={by}
         data-anchor={anchor}
-        data-baseline={baseline}
+        data-baseline="alphabetic"
         data-size={fs}
       >
-        <g transform={`translate(${x0} ${top}) scale(${k}) translate(${-math.minX} ${-math.minY})`} dangerouslySetInnerHTML={{ __html: math.body }} />
+        <g transform={`translate(${x0} ${by}) scale(${k}) translate(${-math.minX} 0)`} dangerouslySetInnerHTML={{ __html: math.body }} />
       </g>
     );
   }
   return (
     <text
       x={x}
-      y={y}
+      y={by}
       fontSize={fs}
       textAnchor={anchor}
-      dominantBaseline={baseline}
       transform={vertical ? `rotate(-90 ${x} ${y})` : undefined}
       className={`fs${fontIndex(size)}${className ? ` ${className}` : ''}`}
     >

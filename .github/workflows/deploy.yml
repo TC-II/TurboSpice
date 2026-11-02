@@ -67,6 +67,8 @@ jobs:
         run: npx tsc -p tsconfig.test.json
       - name: Lint (ESLint)
         run: npm run lint
+      - name: Formato (Prettier)
+        run: npm run format:check
       - name: Traducciones (textos en español fuera de es.ts o sin traducir)
         run: node scripts/i18n/check.mjs
       - name: Smoke test del motor

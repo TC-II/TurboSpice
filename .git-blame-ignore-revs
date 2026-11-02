@@ -1,0 +1,5 @@
+# Commits de formato que git blame salta (git config blame.ignoreRevsFile .git-blame-ignore-revs;
+# GitHub lo usa solo)
+
+# Calidad (1.2): código formateado con Prettier
+36c74ffce70c80fdd6b0286ad4f33c8624b27dfe

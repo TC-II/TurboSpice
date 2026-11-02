@@ -14,6 +14,7 @@ Lo de siempre, por escrito. Para levantar el proyecto: [README](README.md) (y en
 ```sh
 npm run typecheck                 # tipos de src/, tests y scripts
 npm run lint                      # ESLint (los avisos de exhaustive-deps no frenan; los errores sí)
+npm run format:check              # Prettier (npm run format lo arregla)
 npm test                          # unitarios (vitest)
 node scripts/i18n/check.mjs       # textos en español fuera de es.ts o sin traducir
 ```

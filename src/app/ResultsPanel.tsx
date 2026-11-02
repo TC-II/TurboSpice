@@ -1,7 +1,6 @@
 // El panel de resultados: su barra (vistas, caja de trazas, plot, modo, corridas) y lo que muestra
 // (gráfico, Smith, polos y ceros, Stability, tabla, netlist, log, medidas y problemas)
 import { Suspense, type ComponentProps, type MutableRefObject, type RefObject } from 'react';
-import type { AscDoc } from '../asc/model.ts';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
@@ -23,7 +22,8 @@ import { TraceBox, type TraceBoxHandle } from '../waveform/TraceBox.tsx';
 import type { Pane, PlotState } from '../waveform/view.ts';
 import { PANEL_NAMES } from './constants.ts';
 import { ProblemsList, type Problem } from './Problems.tsx';
-import type { Dialog, HierLevel, SimRun } from './types.ts';
+import type { HierLevel, SimRun } from './types.ts';
+import { useSchematic } from './context.ts';
 
 export type ResultsView = 'plot' | 'netlist' | 'log' | 'problems' | 'meas';
 type SideSize = ReturnType<typeof useSideSize>;
@@ -59,7 +59,6 @@ export interface ResultsPanelProps {
   hiddenRuns: Set<string>;
   overlay: boolean;
   setOverlay(on: boolean): void;
-  setDialog(d: Dialog | null): void;
   sims: SimList;
   plotState: MutableRefObject<PlotState | undefined>;
   onPlotState(s: PlotState): void;
@@ -85,22 +84,20 @@ export interface ResultsPanelProps {
   lvNow: HierLevel | undefined;
   hoverDev: string | undefined;
   problems: Problem[];
-  doc: AscDoc;
   stopTime: number | undefined;
   goTo(sym: number): void;
   openSaves(choose?: boolean): void;
   plotStop(): void;
-  commit(d: AscDoc): void;
   setRunQueued(q: boolean): void;
   run(o?: { unlimited?: boolean }): void;
-  setMessage(m?: string): void;
 }
 
 export function ResultsPanel(props: ResultsPanelProps) {
+  const { setDialog, doc, commit, setMessage } = useSchematic();
   const { sim, resultsH, pltInput, importPlt, panel, setPanel, resultsItems, plot, scale, traceBox, traceNames, traceHints, addExpr, setTraceFocus, plotName, selectPlot, labels, isComplex, mode, setMode } = props;
-  const { viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, setDialog, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver } = props;
+  const { viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver } = props;
   const { activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, projectName, setRowHover, lvNow, hoverDev } = props;
-  const { problems, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage } = props;
+  const { problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run } = props;
   return (
     <>
     <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>

@@ -1,40 +1,27 @@
 // El editor del esquemático con todo lo que dibuja encima (redes, OP, flechas, resaltados), el menú
 // del botón derecho de un comentario y, al costado, el historial de corridas del testbench (#152)
-import type { ComponentProps, MutableRefObject, RefObject } from 'react';
+import type { ComponentProps, RefObject } from 'react';
 import { createPortal } from 'react-dom';
-import type { AscDoc } from '../asc/model.ts';
 import { t } from '../i18n/i18n.ts';
-import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { HistoryPanel } from '../project/HistoryPanel.tsx';
 import { modelModuleFile, modelModuleName } from '../project/modelModule.ts';
 import { moduleFile, subName } from '../project/subckt.ts';
-import type { Project } from '../project/turbo.ts';
 import { deleteItems, setText } from '../schematic/edit.ts';
-import type { ItemRef } from '../schematic/geometry.ts';
-import { SchematicEditor, type EditorHandle, type Tool } from '../schematic/SchematicEditor.tsx';
+import { SchematicEditor, type EditorHandle } from '../schematic/SchematicEditor.tsx';
 import { TextMenu } from '../schematic/TextMenu.tsx';
 import { moveOpTag, type OpTags } from '../sim/opPins.ts';
 import { simName, type SimList } from '../sim/simList.ts';
-import type { Dialog, SimRun } from './types.ts';
+import { useSchematic } from './context.ts';
 
 type EP = ComponentProps<typeof SchematicEditor>;
 type HP = ComponentProps<typeof HistoryPanel>;
 type TextMenuAt = { index: number; at: { x: number; y: number } };
 
 export interface EditorAreaProps {
-  doc: AscDoc;
-  lib: Library;
   conn: Connectivity;
-  commit(d: AscDoc): void;
-  tool: Tool;
-  setTool(tt: Tool): void;
-  selection: ItemRef[];
-  setSelection(s: ItemRef[]): void;
   editor: RefObject<EditorHandle>;
   docKey: number;
-  sim: SimRun | null;
-  curSub: string;
   /** el foco está en la caja de trazas: el esquemático queda en la punta de prueba (#341) */
   traceFocus: boolean;
   netHover: boolean;
@@ -44,9 +31,7 @@ export interface EditorAreaProps {
   savesOpen: boolean;
   /** la corrida vieja que se mira ('' = la actual) */
   viewRun: string;
-  projectRef: MutableRefObject<Project>;
   makesCycle(types: string[]): boolean;
-  setDialog(d: Dialog | null): void;
   symbolMenu: EP['onSymbolMenu'];
   netMenu: EP['onNetMenu'];
   textMenu: TextMenuAt | null;
@@ -87,7 +72,8 @@ export interface EditorAreaProps {
 }
 
 export function EditorArea(props: EditorAreaProps) {
-  const { doc, lib, conn, commit, tool, setTool, selection, setSelection, editor, docKey, sim, curSub, traceFocus, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, projectRef, makesCycle, setDialog } = props;
+  const { doc, lib, commit, tool, setTool, selection, setSelection, sim, curSub, projectRef, setDialog } = useSchematic();
+  const { conn, editor, docKey, traceFocus, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle } = props;
   const { symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved } = props;
   const { historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun } = props;
   return (

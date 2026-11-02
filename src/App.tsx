@@ -118,6 +118,7 @@ import { runHistoryActions } from './app/runHistory.ts';
 import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
 import { useProjectFiles } from './app/useProjectFiles.ts';
 import { useEvent } from './app/useEvent.ts';
+import { SchematicContext } from './app/context.ts';
 
 
 export function App() {
@@ -879,101 +880,103 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     tutorialState({ lib, doc, tbDoc, conn, plotState, project, dirty, variant, sims, curSub, docLine, tool, dialog, sim, plot, allRuns, panes, panel, treeOpen, historyOpen, showOp, bias, showNets, hasNets });
 
   return (
-    <div className="schematic-mode">
-      {tutorialOpen && (
-        <Suspense fallback={null}>
-          <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />
-        </Suspense>
-      )}
-      {/* exportando, la barra de la app queda (marca y estilo) con las herramientas de la vista previa */}
-      {slots.tools && !exporting && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
-      {slots.right && <AppBarRight slot={slots.right} {...{ theme, setTheme, switchLang, exporting, doShare }} />}
-      {slots.tabs && !exporting && <ViewTabs slot={slots.tabs} hasSim={!!sim} {...{ schematicShown, resultsShown, setExpanded, resultsSide, setSide }} />}
-      <SimRow
-        projectName={project.name}
-        bias={!!bias}
-        {...{ dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSub, curSim, sim, stopHidden }}
-        {...{ tool, setTool, showNets, hasNets, setShowNets, showOp, setShowOp, docLine, circuitInfo, lib, picker, endPick, tbDoc, doc, pdkBar, simAllCorners, openStudy, setMessage, commit }}
-      />
+    <SchematicContext.Provider value={{ lib, doc, commit, projectRef, editProject, curSub, tool, setTool, selection, setSelection, sim, setDialog, setMessage }}>
+      <div className="schematic-mode">
+        {tutorialOpen && (
+          <Suspense fallback={null}>
+            <Tutorial probe={readTutorialProbe} onPractice={loadPractice} onClose={() => setTutorialOpen(false)} />
+          </Suspense>
+        )}
+        {/* exportando, la barra de la app queda (marca y estilo) con las herramientas de la vista previa */}
+        {slots.tools && !exporting && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
+        {slots.right && <AppBarRight slot={slots.right} {...{ theme, setTheme, switchLang, exporting, doShare }} />}
+        {slots.tabs && !exporting && <ViewTabs slot={slots.tabs} hasSim={!!sim} {...{ schematicShown, resultsShown, setExpanded, resultsSide, setSide }} />}
+        <SimRow
+          projectName={project.name}
+          bias={!!bias}
+          {...{ dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSim, stopHidden }}
+          {...{ showNets, hasNets, setShowNets, showOp, setShowOp, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy }}
+        />
 
-      <div className="work-row">
-      <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
-        <div
-          onMouseMove={(e) => {
-            // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
-            if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
-            if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
-          }}
-          style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
-          className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
-          // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
-          // de prueba escribe ahí el nodo o componente
-          onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
-        >
-          <ProjectPanel
-            {...{ project, projectRef, editProject, snapshot, sims, path, curSub, curVerilog, curModel, setCurModel, tool, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, setDialog, go, goSim, openSub }}
-            {...{ benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts }}
+        <div className="work-row">
+        <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
+          <div
+            onMouseMove={(e) => {
+              // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
+              if (!hoverReveal || treeOpen || treePeek || tool.kind !== 'select') return;
+              if (e.clientX - e.currentTarget.getBoundingClientRect().left < 14) setTreePeek(true);
+            }}
+            style={curSub && symText ? ({ '--sym-w': `${symW}px` } as React.CSSProperties) : undefined}
+            className={`canvas-wrap${curSub ? ' with-hier' : ''}${treeOpen ? ' with-tree' : ''}${curSub && symText ? ' with-sym' : ''}${historyOpen && curSim && !curSub ? ' with-history' : ''}`}
+            // con el foco en la caja de trazas, un click en el esquemático no se lo saca: la punta
+            // de prueba escribe ahí el nodo o componente
+            onMouseDownCapture={(e) => traceBox.current?.focused() && e.preventDefault()}
+          >
+            <ProjectPanel
+              {...{ project, snapshot, sims, path, curVerilog, curModel, setCurModel, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, go, goSim, openSub }}
+              {...{ benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts }}
+            />
+            <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }} />
+            {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
+            <EditorArea
+              traceFocus={traceFocus}
+              {...{ conn, editor, docKey, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle }}
+              {...{ symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved }}
+              {...{ historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun }}
+            />
+            <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
+            <StatusBar
+              picking={!!picking}
+              fileName={file.name}
+              {...{ hoverSink, savesPicking, conn, message, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, offerView, acceptOfferedView, setOfferView }}
+            />
+          </div>
+
+          {sim && !curSub && (
+            <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
+          )}
+          {sim && !curSub && (
+            <ResultsPanel
+              projectName={project.name}
+              {...{ sim, resultsH, pltInput, importPlt, panel, setPanel, resultsItems, plot, scale, traceBox, traceNames, traceHints, addExpr, setTraceFocus, plotName, selectPlot, labels, isComplex, mode, setMode }}
+              {...{ viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver }}
+              {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
+              {...{ problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run }}
+            />
+          )}
+        </div>
+        {saves && (
+          <SavesPanel
+            selection={curSub ? null : saveSelection(doc.texts)}
+            mode={saves.mode}
+            onMode={(mode) => setSaves((s) => s && { ...s, mode })}
+            signals={curSub ? [] : saves.signals}
+            max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected, simLimits(!!streamPlan(sim.built.netlist)).max) : undefined}
+            onChange={(refs) => commit(setSaveSelection(doc, refs))}
+            hover={savesHover}
+            onHoverRow={setRowHover}
+            picking={savesPicking}
+            inactive={!!saves.inactive}
+            onActivate={() => {
+              setSaves((s) => s && { ...s, inactive: false });
+              if (saves.picking) setTool({ kind: 'probe' });
+            }}
+            onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
+            blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
+            onClose={closeSaves}
           />
-          <ModuleEditors {...{ project, projectRef, editProject, curSub, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, setDialog, synthModule, warnShared }} />
-          {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
-          <EditorArea
-            traceFocus={traceFocus}
-            {...{ doc, lib, conn, commit, tool, setTool, selection, setSelection, editor, docKey, sim, curSub, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, projectRef, makesCycle, setDialog }}
-            {...{ symbolMenu, netMenu, textMenu, setTextMenu, closeTextMenu, descend, editItem, onProbe, onProbePair, rowNet, traceNetShown, rowSymbol, rowElement, onHoverSymbol, setHoverTarget, netColors, shownNets, describe, annotations, opSel, setOpSel, setOpTags, arrows, pickValue, endPick, onHover, historyDiff, unsaved }}
-            {...{ historyOpen, setHistoryOpen, curSim, curRuns, viewed, currentChanges, setViewRun, restoreRun, cloneRun }}
-          />
-          <FileInputs {...{ importInput, importFiles, ltInput, doImportLtspice }} />
-          <StatusBar
-            picking={!!picking}
-            fileName={file.name}
-            {...{ hoverSink, savesPicking, tool, doc, lib, conn, message, setMessage, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, offerView, acceptOfferedView, setOfferView }}
-          />
+        )}
         </div>
 
-        {sim && !curSub && (
-          <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
-        )}
-        {sim && !curSub && (
-          <ResultsPanel
-            projectName={project.name}
-            {...{ sim, resultsH, pltInput, importPlt, panel, setPanel, resultsItems, plot, scale, traceBox, traceNames, traceHints, addExpr, setTraceFocus, plotName, selectPlot, labels, isComplex, mode, setMode }}
-            {...{ viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, setDialog, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver }}
-            {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
-            {...{ problems, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage }}
-          />
-        )}
-      </div>
-      {saves && (
-        <SavesPanel
-          selection={curSub ? null : saveSelection(doc.texts)}
-          mode={saves.mode}
-          onMode={(mode) => setSaves((s) => s && { ...s, mode })}
-          signals={curSub ? [] : saves.signals}
-          max={sim?.result.sizeStop ? signalsThatFit(sim.result.sizeStop.projected, simLimits(!!streamPlan(sim.built.netlist)).max) : undefined}
-          onChange={(refs) => commit(setSaveSelection(doc, refs))}
-          hover={savesHover}
-          onHoverRow={setRowHover}
-          picking={savesPicking}
-          inactive={!!saves.inactive}
-          onActivate={() => {
-            setSaves((s) => s && { ...s, inactive: false });
-            if (saves.picking) setTool({ kind: 'probe' });
-          }}
-          onPicking={(on) => setTool(on ? { kind: 'probe' } : { kind: 'select' })}
-          blocked={curSub ? t('The saved signals belong to the testbench: go up (Alt+↑) to change them') : undefined}
-          onClose={closeSaves}
+        <AppDialogs
+          picking={!!picking}
+          {...{ dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam }}
+          {...{ picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay }}
+          {...{ userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule }}
+          {...{ driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile }}
+          {...{ curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope }}
         />
-      )}
       </div>
-
-      <AppDialogs
-        picking={!!picking}
-        {...{ dialog, setDialog, lib, doc, conn, commit, selection, tool, setTool, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam }}
-        {...{ picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay }}
-        {...{ userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, projectRef, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule }}
-        {...{ driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile }}
-        {...{ curSim, sims, deleteSim, deleteVariant, exportName, curSub, slots, opAnnotations, sim, lvNow, simScope, setMessage }}
-      />
-    </div>
+    </SchematicContext.Provider>
   );
 }

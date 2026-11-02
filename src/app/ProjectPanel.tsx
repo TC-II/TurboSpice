@@ -1,30 +1,26 @@
 // Junto al esquemático: el aviso del subcircuito que se edita, el panel del proyecto (testbenches,
 // workbenches y módulos, #180), Ctrl+P para ir a cualquiera, y el <input> para importar subcircuitos
-import type { ComponentProps, Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
+import type { ComponentProps, Dispatch, RefObject, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '../i18n/i18n.ts';
 import { ProjectTree, QuickOpen } from '../project/Hierarchy.tsx';
 import { modelModuleFile, modelModuleName, modelModules } from '../project/modelModule.ts';
 import { modules, subName, updateSymbol } from '../project/subckt.ts';
 import type { Project, ProjectFile } from '../project/turbo.ts';
-import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { simName, type SimList } from '../sim/simList.ts';
-import type { Dialog, HierLevel } from './types.ts';
+import type { HierLevel } from './types.ts';
+import { useSchematic } from './context.ts';
 
 type TP = ComponentProps<typeof ProjectTree>;
 
 export interface ProjectPanelProps {
   project: Project;
-  projectRef: MutableRefObject<Project>;
-  editProject(p: Project): void;
   snapshot(): Project;
   sims: SimList;
   path: HierLevel[];
-  curSub: string;
   curVerilog: ProjectFile | undefined;
   curModel: string;
   setCurModel(name: string): void;
-  tool: Tool;
   treeOpen: boolean;
   /** el panel asoma (con el mouse en el borde) */
   treePeek: boolean;
@@ -34,7 +30,6 @@ export interface ProjectPanelProps {
   treeSubs: TP['subs'];
   quickOpen: boolean;
   setQuickOpen: Dispatch<SetStateAction<boolean>>;
-  setDialog(d: Dialog | null): void;
   go(next: HierLevel[]): void;
   goSim(id: string): void;
   openSub(name: string): void;
@@ -61,7 +56,8 @@ export interface ProjectPanelProps {
 }
 
 export function ProjectPanel(props: ProjectPanelProps) {
-  const { project, projectRef, editProject, snapshot, sims, path, curSub, curVerilog, curModel, setCurModel, tool, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, setDialog, go, goSim, openSub } = props;
+  const { projectRef, editProject, curSub, tool, setDialog } = useSchematic();
+  const { project, snapshot, sims, path, curVerilog, curModel, setCurModel, treeOpen, treePeek, setTreePeek, treeShown, treeBenches, treeSubs, quickOpen, setQuickOpen, go, goSim, openSub } = props;
   const { benchItem, newGroup, groupAction, renameGroupTo, moveBench, newEmptyBench, renameProject, benchAction, renameBench, newSubckt, newModel, renameModel, renameSub, deleteModel, deleteSub, exportSub, exportSubNetlist, subToUser, subImport, importSubckts } = props;
   return (
     <>

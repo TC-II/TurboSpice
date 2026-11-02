@@ -3,10 +3,8 @@
 import type { ComponentProps, CSSProperties, Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { AscDoc } from '../asc/model.ts';
 import { t } from '../i18n/i18n.ts';
-import type { Library } from '../library/library.ts';
 import type { Status } from '../NetlistMode.tsx';
 import { ProjectCapsule } from '../project/ProjectCapsule.tsx';
-import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { SimBar } from '../schematic/SimBar.tsx';
 import type { CircuitInfo, Picker } from '../schematic/simDialogs.tsx';
 import { setAnalysisLine } from '../schematic/directivesEdit.ts';
@@ -15,7 +13,7 @@ import { simName, type SimList } from '../sim/simList.ts';
 import { Icon } from '../ui/icons.tsx';
 import { MenuButton, type MenuItem } from '../ui/Menu.tsx';
 import type { Expanded } from '../ui/ResultsSplitter.tsx';
-import type { SimRun } from './types.ts';
+import { useSchematic } from './context.ts';
 
 type Toggle = Dispatch<SetStateAction<boolean>>;
 
@@ -34,13 +32,9 @@ export interface SimRowProps {
   status: Status;
   simulate(): void;
   abort(): void;
-  curSub: string;
   curSim: SimList['items'][number] | undefined;
-  sim: SimRun | null;
   /** el freno por memoria dejó los resultados sin graficar */
   stopHidden: boolean;
-  tool: Tool;
-  setTool(tt: Tool): void;
   showNets: boolean;
   hasNets: boolean;
   setShowNets: Toggle;
@@ -50,21 +44,18 @@ export interface SimRowProps {
   bias: boolean;
   docLine: string;
   circuitInfo(): CircuitInfo;
-  lib: Library;
   picker: Picker;
   endPick(v: string | null): void;
   tbDoc: AscDoc | null;
-  doc: AscDoc;
   pdkBar: ComponentProps<typeof SimBar>['pdk'];
   simAllCorners(id: string, name: string, corner: string): void;
   openStudy(): void;
-  setMessage(m?: string): void;
-  commit(d: AscDoc): void;
 }
 
 export function SimRow(props: SimRowProps) {
-  const { projectName, dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSub, curSim, sim, stopHidden } = props;
-  const { tool, setTool, showNets, hasNets, setShowNets, showOp, setShowOp, bias, docLine, circuitInfo, lib, picker, endPick, tbDoc, doc, pdkBar, simAllCorners, openStudy, setMessage, commit } = props;
+  const { curSub, sim, tool, setTool, lib, doc, setMessage, commit } = useSchematic();
+  const { projectName, dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSim, stopHidden } = props;
+  const { showNets, hasNets, setShowNets, showOp, setShowOp, bias, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy } = props;
   return (
     <>
       {/* segunda barra: el proyecto (árbol y cápsula) y la simulación */}

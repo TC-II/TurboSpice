@@ -2,25 +2,19 @@
 // preguntas pendientes: la corrida vieja que se mira, aplicar un valor en otros testbenches y la
 // vista guardada en el navegador
 import type { MutableRefObject } from 'react';
-import type { AscDoc } from '../asc/model.ts';
 import { locale, t } from '../i18n/i18n.ts';
-import type { Library } from '../library/library.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import type { ValueChange } from '../project/project.ts';
 import { hoverCoords, hoverInfo } from '../schematic/hoverInfo.ts';
-import type { Tool } from '../schematic/SchematicEditor.tsx';
 import type { PlotView } from '../waveform/view.ts';
 import { HintBar, toolHint, type Hover } from './HintBar.tsx';
+import { useSchematic } from './context.ts';
 
 export interface StatusBarProps {
   hoverSink: MutableRefObject<((h: Hover) => void) | undefined>;
   savesPicking: boolean;
-  tool: Tool;
-  doc: AscDoc;
-  lib: Library;
   conn: Connectivity;
   message: string | undefined;
-  setMessage(m?: string): void;
   /** la corrida vieja que se está mirando */
   viewed: { id: string; time: number } | undefined;
   restoreRun(id: string): void;
@@ -36,7 +30,8 @@ export interface StatusBarProps {
   setOfferView(v: null): void;
 }
 
-export function StatusBar({ hoverSink, savesPicking, tool, doc, lib, conn, message, setMessage, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, picking, offerView, fileName, acceptOfferedView, setOfferView }: StatusBarProps) {
+export function StatusBar({ hoverSink, savesPicking, conn, message, viewed, restoreRun, setViewRun, valueOffer, applyValueOffer, setValueOffer, picking, offerView, fileName, acceptOfferedView, setOfferView }: StatusBarProps) {
+  const { tool, doc, lib, setMessage } = useSchematic();
   return (
     <>
     {/* los avisos y estados van todos en la barra de abajo, a la derecha (#342): también las

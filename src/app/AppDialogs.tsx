@@ -1,12 +1,12 @@
 // Los diálogos del modo esquemático: componentes, textos y simulaciones, archivos, Drive y configuración
-import type { Dispatch, MutableRefObject, RefObject, SetStateAction } from 'react';
-import type { AscDoc, SymbolInst } from '../asc/model.ts';
+import type { Dispatch, RefObject, SetStateAction } from 'react';
+import type { SymbolInst } from '../asc/model.ts';
 import { decodeText } from '../asc/encoding.ts';
 import type { DriveFile } from '../cloud/drive.ts';
 import { DriveDialog } from '../cloud/AccountButton.tsx';
 import { moduleOf, verilogPorts } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
-import { PROJECT_DIR, USER_DIR, scanModels, type Library } from '../library/library.ts';
+import { PROJECT_DIR, USER_DIR, scanModels } from '../library/library.ts';
 import { pdkOfSymbol } from '../library/pdk.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import { FileConflictDialog } from '../project/FileConflictDialog.tsx';
@@ -22,7 +22,6 @@ import { replaceAnalysis } from '../schematic/directivesEdit.ts';
 import { addFlag, deleteItems, patchLabels, setFlagName, setShapeStyle, setSymbolAttrs, setSymbolType, setText, setWindows } from '../schematic/edit.ts';
 import { ExportView } from '../schematic/ExportView.tsx';
 import { FONTS } from '../schematic/fonts.ts';
-import type { ItemRef } from '../schematic/geometry.ts';
 import type { Annotation } from '../schematic/NetNames.tsx';
 import type { PartGroup } from '../schematic/PartTable.tsx';
 import { PdkDialog } from '../schematic/PdkDialog.tsx';
@@ -40,20 +39,14 @@ import { SlideConfirm } from '../ui/SlideConfirm.tsx';
 import { TRACE_WIDTHS, setTraceWidth } from '../waveform/lineWidth.ts';
 import { REPO } from './constants.ts';
 import { ascText } from './helpers.ts';
-import type { Dialog, FileState, HierLevel, SimRun } from './types.ts';
+import type { Dialog, FileState, HierLevel } from './types.ts';
+import { useSchematic } from './context.ts';
 
 type FileConflictAsk = { name: string; resolve(c: FileConflict): void };
 
 export interface AppDialogsProps {
   dialog: Dialog | null;
-  setDialog(d: Dialog | null): void;
-  lib: Library;
-  doc: AscDoc;
   conn: Connectivity;
-  commit(d: AscDoc): void;
-  selection: ItemRef[];
-  tool: Tool;
-  setTool(tt: Tool): void;
   setToolState(tt: Tool): void;
   shapeStyle: string;
   setShapeStyleState(style: string): void;
@@ -77,7 +70,6 @@ export interface AppDialogsProps {
   removeUserFile(name: string): void;
   makeUserSymbol(file: string, name: string): void;
   project: Project;
-  projectRef: MutableRefObject<Project>;
   setProjectState(p: Project): void;
   openSub(name: string, select?: number): void;
   addProjectFiles(list: { name: string; text: string }[]): Promise<void>;
@@ -105,21 +97,19 @@ export interface AppDialogsProps {
   deleteSim(id: string): void;
   deleteVariant(id: string): void;
   exportName(): string;
-  curSub: string;
   slots: { tools: HTMLElement | null; tabs: HTMLElement | null };
   opAnnotations(all: boolean): Annotation[] | undefined;
-  sim: SimRun | null;
   lvNow: HierLevel | undefined;
   simScope: InstScope | undefined;
-  setMessage(m?: string): void;
 }
 
 export function AppDialogs(props: AppDialogsProps) {
-  const { dialog, setDialog, lib, doc, conn, commit, selection, tool, setTool, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam } = props;
+  const { setDialog, lib, doc, commit, selection, tool, setTool, projectRef, curSub, sim, setMessage } = useSchematic();
+  const { dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam } = props;
   const { picking, picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay } = props;
-  const { userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, projectRef, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule } = props;
+  const { userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule } = props;
   const { driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile } = props;
-  const { curSim, sims, deleteSim, deleteVariant, exportName, curSub, slots, opAnnotations, sim, lvNow, simScope, setMessage } = props;
+  const { curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope } = props;
   return (
     <>
       {dialog?.kind === 'picker' && (

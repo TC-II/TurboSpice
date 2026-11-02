@@ -1,6 +1,6 @@
 // Los editores de los módulos del proyecto, junto al esquemático: el símbolo de un subcircuito, un
 // módulo «Modelo» (netlist y símbolo) y el código de un módulo Verilog (#209)
-import { Suspense, type MutableRefObject } from 'react';
+import { Suspense } from 'react';
 import type { AscDoc } from '../asc/model.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import { isStale, looksBehavioral, setHdlMode, storeVerilog, verilogSymbol, withParams } from '../hdl/project.ts';
@@ -10,14 +10,10 @@ import { modelModuleFile, modelSymbolText, storeModelSymbol, storeModelText } fr
 import { subcktSymbol } from '../project/subckt.ts';
 import { setSymParams, symParams } from '../project/symbolEdit.ts';
 import type { Project, ProjectFile } from '../project/turbo.ts';
-import type { Dialog } from './types.ts';
+import { useSchematic } from './context.ts';
 
 export interface ModuleEditorsProps {
   project: Project;
-  projectRef: MutableRefObject<Project>;
-  editProject(p: Project): void;
-  /** el subcircuito que se edita ('' en el testbench) */
-  curSub: string;
   /** el módulo Verilog que se edita */
   curVerilog: ProjectFile | undefined;
   /** el módulo «Modelo» abierto */
@@ -30,13 +26,13 @@ export interface ModuleEditorsProps {
   addPort(name: string): void;
   setSymW(w: number): void;
   liveDoc: AscDoc;
-  setDialog(d: Dialog | null): void;
   synthModule(name: string, text?: string): Promise<SynthResult>;
   /** avisa si el subcircuito se usa en otros testbenches */
   warnShared(): void;
 }
 
-export function ModuleEditors({ project, projectRef, editProject, curSub, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, setDialog, synthModule, warnShared }: ModuleEditorsProps) {
+export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }: ModuleEditorsProps) {
+  const { projectRef, editProject, curSub, setDialog } = useSchematic();
   return (
     <>
     {curSub && symText && (

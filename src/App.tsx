@@ -107,7 +107,7 @@ import { ProjectPanel } from './app/ProjectPanel.tsx';
 import { runHistoryActions } from './app/runHistory.ts';
 import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
 import { useProjectFiles } from './app/useProjectFiles.ts';
-import { useEvent } from './app/useEvent.ts';
+import { useEvent } from './ui/useEvent.ts';
 import { SchematicContext } from './app/context.ts';
 
 export function App() {

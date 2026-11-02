@@ -24,7 +24,7 @@ import { asPlotView, emptyPanes, viewFromDoc, withView, type Pane, type PlotStat
 import { BASE, DEFAULT_PROJECT } from './constants.ts';
 import { ascText } from './helpers.ts';
 import type { FileState, HierLevel, SimRun } from './types.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 /** Un ejemplo de public/examples pedido en la URL (?example=Sample%20Project.turbo) */
 const EXAMPLE_NAME = /^[\w .()-]+\.turbo$/;

@@ -11,7 +11,7 @@ import { makeSymbol, schematicPorts, subcktPins } from '../library/makeSymbol.ts
 import { loadUserFiles, saveUserFiles, type UserFile } from '../schematic/autosave.ts';
 import type { UserFileInfo } from '../schematic/dialogs.tsx';
 import { registerUserFile, userFileKind } from './helpers.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 /** `account`: la cuenta de Google con sesión (si hay); `libVersion` cambia cada vez que cambia la librería */
 export function useUserFiles(lib: Library, account: string | undefined, setMessage: (m?: string) => void) {

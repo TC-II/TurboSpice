@@ -4,7 +4,7 @@ import type { Point } from '../asc/model.ts';
 import type { ItemRef } from '../schematic/geometry.ts';
 import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { t } from '../i18n/i18n.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 export type Hover = { ref: ItemRef | null; at: Point } | null;
 

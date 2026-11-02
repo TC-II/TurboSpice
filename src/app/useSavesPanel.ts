@@ -8,7 +8,7 @@ import type { Tool } from '../schematic/SchematicEditor.tsx';
 import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs } from '../sim/saves.ts';
 import { buildSimulation } from '../sim/schematicSim.ts';
 import type { SavesState, SimRun } from './types.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 export interface SavesPanelDeps {
   saves: SavesState | null;

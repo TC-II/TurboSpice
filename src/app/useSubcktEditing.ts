@@ -25,7 +25,7 @@ import type { Project } from '../project/turbo.ts';
 import { addFlag } from '../schematic/edit.ts';
 import { fetchModelFile } from '../sim/schematicSim.ts';
 import { ascText } from './helpers.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 export interface SubcktEditingDeps {
   project: Project;

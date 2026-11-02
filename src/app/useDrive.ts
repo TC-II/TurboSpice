@@ -6,7 +6,7 @@ import { t } from '../i18n/i18n.ts';
 import { EXT, projectName, serializeTurbo, type Project } from '../project/turbo.ts';
 import { DEFAULT_NAME, DEFAULT_PROJECT } from './constants.ts';
 import type { Dialog, FileState } from './types.ts';
-import { useEvent } from './useEvent.ts';
+import { useEvent } from '../ui/useEvent.ts';
 
 export interface DriveDeps {
   /** hay sesión de Google */

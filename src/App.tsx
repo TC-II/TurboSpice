@@ -28,12 +28,12 @@ import { badLines, parseAsc } from './asc/parse.ts';
 import { SavesPanel } from './schematic/SavesPanel.tsx';
 import { savableSignals, saveSelection, setSaveSelection, targetRefs, toggleRefs } from './sim/saves.ts';
 import { type CircuitInfo, type Picker, type PickWhat } from './schematic/simDialogs.tsx';
-import { findAnalysis, findControl, removeAnalysis } from './schematic/directivesEdit.ts';
+import { findControl, removeAnalysis } from './schematic/directivesEdit.ts';
 import { signalsThatFit, simLimits } from './sim/estimate.ts';
 import { streamPlan } from './engine/ngspice.ts';
-import { ANALYSIS_LINE, type AnalysisKind } from './sim/analyses.ts';
+import { ANALYSIS_LINE } from './sim/analyses.ts';
 import { activeSim, simName, type SimList, type SimView } from './sim/simList.ts';
-import { hasParkedControl, isComplexLine, simLine, unparkControl } from './sim/complexSim.ts';
+import { simLine } from './sim/complexSim.ts';
 import {
   activeAsc,
   addSim as addProjectSim,
@@ -60,7 +60,7 @@ import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { isControlBlock } from './netlist/directives.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { addFlag, addText, allItems, dcSourcesAsCell, deleteItems, setSymbolAttrs, setText, transformItems } from './schematic/edit.ts';
+import { addFlag, allItems, dcSourcesAsCell, deleteItems, setText, transformItems } from './schematic/edit.ts';
 import { readAsc } from './schematic/fileio.ts';
 import { fontChoice, loadFont } from './schematic/fonts.ts';
 import { spiceName } from './netlist/spiceName.ts';
@@ -70,7 +70,7 @@ import { SchematicEditor, type EditorHandle, type Tool, type View as EditorView 
 import { ProjectTree, QuickOpen, type TreeSub } from './project/Hierarchy.tsx';
 import { ContextMenu, type ContextItem } from './ui/ContextMenu.tsx';
 import { TextMenu } from './schematic/TextMenu.tsx';
-import { adoptSymbol, formatParamList, parseParamList, symParams } from './project/symbolEdit.ts';
+import { adoptSymbol, symParams } from './project/symbolEdit.ts';
 import { adoptModelSymbol, modelParams, setModelParams, setSymAttr as setModelAttr, subcktParams, symAttr, syncModelAttrs, isModelModule, modelModuleFile, modelModuleName, modelModules, modelSymbolText, storeModelSymbol, storeModelText } from './project/modelModule.ts';
 import { Tutorial } from './lazyViews.ts';
 import { benchesUsing, moduleFile, modules, storeSymbol, subcktSymbolText, storeSubckt, subcktFile, subcktPorts, subName, symbolOutdated, updateSymbol, usages } from './project/subckt.ts';
@@ -90,8 +90,6 @@ import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { moveOpTag } from './sim/opPins.ts';
 import { type MeasTable } from './sim/measResults.ts';
-import { type StudyInfo } from './schematic/StudyPanel.tsx';
-import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
@@ -136,6 +134,7 @@ import { runActions } from './app/runActions.ts';
 import { FileInputs } from './app/FileInputs.tsx';
 import { StatusBar } from './app/StatusBar.tsx';
 import { useVerilog } from './app/useVerilog.ts';
+import { studyActions } from './app/studyActions.ts';
 
 
 export function App() {
@@ -1382,68 +1381,10 @@ function SchematicMode({ engine, lib, slots, onNetlist, onSkin }: {
     download(`${base}.cir`, new Blob([(await withVariants(built.netlist)).netlist], { type: 'text/plain' }));
   };
 
-  const openStudy = () => setDialog({ kind: 'study' });
-  /**
-   * Complex simulation (#241): si el testbench ya lo es, abre el Studio; si pasó a un análisis
-   * simple, recupera su .control; si nunca tuvo, abre el Studio para armarlo
-   */
-  const complexSim = () => {
-    if (curSub) return setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it'));
-    if (!isComplexLine(docLine) && hasParkedControl(doc)) return commit(unparkControl(doc));
-    openStudy();
-  };
-  /**
-   * Barrer un parámetro de un subcircuito en una instancia (#180): la instancia pasa a usar
-   * {U1_G} y se agrega «.step param U1_G list <valor>», que el Estudio muestra como un barrido
-   */
-  const sweepSubParam = (index: number, param: string, value: string, attrs: Record<string, string>) => {
-    const s = doc.symbols[index];
-    if (!s) return;
-    const def = lib.symbol(s.type);
-    const inst = s.attrs.get('InstName') ?? 'X';
-    const pname = `${inst}_${param}`.replace(/\W/g, '_');
-    const eff = attrs.SpiceLine ?? effectiveAttrs(s, def).get('SpiceLine') ?? '';
-    const defaults = parseParamList(def?.attrs.get('SpiceLine') ?? '');
-    const cur = new Map(parseParamList(eff).map(([k, v]) => [k.toLowerCase(), v]));
-    cur.set(param.toLowerCase(), `{${pname}}`);
-    const line = formatParamList(defaults.map(([k, d]): [string, string] => [k, cur.get(k.toLowerCase()) ?? d]).filter(([k, v], i) => v !== defaults[i][1] && k));
-    let d = setSymbolAttrs(doc, index, { ...attrs, SpiceLine: line });
-    const step = `.step param ${pname} list ${/^\{.*\}$/.test(value) ? '1' : value}`;
-    if (!d.texts.some((tt) => tt.kind === 'directive' && new RegExp(`\\.step\\s+param\\s+${pname}\\b`, 'i').test(tt.text))) {
-      const ys = [...d.symbols.map((x) => x.y), ...d.texts.map((x) => x.y), ...d.wires.flatMap((w) => [w.y1, w.y2]), 0];
-      const xs = [...d.symbols.map((x) => x.x), ...d.wires.flatMap((w) => [w.x1, w.x2]), 0];
-      d = addText(d, { x: Math.min(...xs), y: Math.max(...ys) + 96, align: 'Left', size: 2, kind: 'directive', text: step });
-    }
-    setDialog(null);
-    commit(d);
-    setMessage(t('{inst}: {param} = {{pname}}, swept with {step}. Edit the values in the Studio.', { inst, param, pname, step }));
-    setDialog({ kind: 'study' });
-  };
-  const studyInfo = (): StudyInfo => {
-    const found = findAnalysis(doc);
-    const kind = found ? parseAnalysis(found.value)?.kind : undefined;
-    const analysis = kind === 'ac' || kind === 'dc' || kind === 'noise' || kind === 'op' || kind === 'tf' ? kind : 'tran';
-    const params = new Set<string>();
-    for (const tt of doc.texts) {
-      if (tt.kind !== 'directive') continue;
-      for (const l of tt.text.split('\\n')) for (const m of l.matchAll(/^\s*\.param\s+(.*)$/gi)) for (const p of m[1].matchAll(/([A-Za-z_]\w*)\s*=/g)) params.add(p[1]);
-    }
-    return {
-      components: doc.symbols
-        .map((x) => effectiveAttrs(x, lib.symbol(x.type)))
-        .filter((a) => a.get('Prefix'))
-        .map((a) => ({ name: a.get('InstName') ?? '', prefix: (a.get('Prefix') ?? '')[0], value: a.get('Value') ?? '' }))
-        .filter((c) => c.name),
-      sources: circuitInfo().sources,
-      nets: circuitInfo().nets,
-      params: [...params],
-      analysis,
-    };
-  };
-
-  /** Menú de simulación; con un tipo de análisis, abre en ese tipo */
-  const openSimulation = (analysis?: AnalysisKind) => setDialog({ kind: 'sim', found: findAnalysis(doc), analysis });
-  const openControl = () => setDialog({ kind: 'control', index: findControl(doc) });
+  const { openStudy, complexSim, sweepSubParam, studyInfo, openSimulation, openControl } = studyActions({
+    ...{ doc, docLine, curSub, lib, commit, setDialog, setMessage },
+    circuitInfo: () => circuitInfo(), // (declarada más abajo)
+  });
   /**
    * Panel de señales guardadas (#314, #364), a la derecha de la simulación; `choose`: para elegir
    * (desde «Choose signals»), con «sólo lo elegido» y la punta de prueba

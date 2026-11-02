@@ -1,5 +1,5 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
-import { memo, useId, type ReactNode } from 'react';
+import { memo, useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
 import { WINDOW_ATTR, baseName, type AscDoc, type Flag, type Orient, type PinDef, type Point, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
@@ -185,7 +185,7 @@ export const SymbolView = memo(function SymbolView({
       <g transform={matrix(inst.orient, inst.x, inst.y)} className="body">
         {skin ? (
           <>
-            <g className="skin" dangerouslySetInnerHTML={{ __html: skin.body }} />
+            <SkinBody body={skin.body} mirrored={inst.orient[0] === 'M'} />
             {waveIcon && (
               <g transform="translate(-15 49.5) scale(0.65)" fill="none" className="wave-icon">
                 {waveIcon}
@@ -207,19 +207,74 @@ export const SymbolView = memo(function SymbolView({
             {def.shapes.map((s, i) => (
               <ShapeView key={i} s={s} />
             ))}
-            {def.texts.map((t, i) => (
-              <AlignedText key={`t${i}`} x={t.x} y={t.y} align={t.align} size={t.size} label>
-                {t.text}
-              </AlignedText>
-            ))}
-            {!hideLabels && def.pins.map((p, i) => <PinName key={`p${i}`} pin={p} />)}
           </>
         )}
       </g>
+      {/* los textos del símbolo van fuera de la matriz: punto transformado y alineación con
+          transformAlign (como los WINDOW y ASC-Parser), así al espejar no quedan al revés */}
+      {!skin && !waveIcon && (
+        <g className="symtext">
+          {def.texts.map((t, i) => {
+            const p = toWorld(inst, t.x, t.y);
+            return (
+              <AlignedText key={`t${i}`} x={p.x} y={p.y} align={transformAlign(t.align, inst.orient)} size={t.size} label>
+                {t.text}
+              </AlignedText>
+            );
+          })}
+          {!hideLabels && def.pins.map((p, i) => <PinName key={`p${i}`} pin={p} inst={inst} />)}
+        </g>
+      )}
       {labels}
     </g>
   );
 });
+
+/**
+ * El dibujo (skin) de un símbolo. Si la instancia está espejada, los textos del SVG se dan vuelta
+ * otra vez para que se lean: los que comparten renglón (mismo padre y línea base, como «A0.ε»
+ * armado con un texto por letra) giran juntos sobre el centro del renglón, así queda en el mismo
+ * lugar y en orden. Se hace sobre el DOM porque hace falta el ancho real de cada texto.
+ */
+function SkinBody({ body, mirrored }: { body: string; mirrored: boolean }) {
+  const ref = useRef<SVGGElement>(null);
+  useLayoutEffect(() => {
+    const g = ref.current;
+    if (!g || !mirrored) return;
+    const rows = new Map<string, { texts: SVGTextElement[]; x0: number; x1: number }>();
+    const parents: Element[] = [];
+    // idempotente (el efecto puede correr dos veces): siempre desde el transform original del skin
+    const texts = [...g.querySelectorAll('text')];
+    for (const t of texts) {
+      if (t.dataset.t === undefined) t.dataset.t = t.getAttribute('transform') ?? '';
+      if (t.dataset.t) t.setAttribute('transform', t.dataset.t);
+      else t.removeAttribute('transform');
+    }
+    for (const t of texts) {
+      let box: DOMRect;
+      try {
+        box = t.getBBox();
+      } catch {
+        continue; // sin layout (fuera del documento)
+      }
+      const m = t.transform.baseVal.consolidate()?.matrix ?? { a: 1, e: 0, f: 0 };
+      const y = Math.round((t.y.baseVal[0]?.value ?? 0) + m.f);
+      let pi = parents.indexOf(t.parentElement!);
+      if (pi < 0) pi = parents.push(t.parentElement!) - 1;
+      const key = `${pi}|${y}`;
+      const [xa, xb] = [m.e + m.a * box.x, m.e + m.a * (box.x + box.width)];
+      const row = rows.get(key) ?? { texts: [], x0: Infinity, x1: -Infinity };
+      row.texts.push(t);
+      row.x0 = Math.min(row.x0, xa, xb);
+      row.x1 = Math.max(row.x1, xa, xb);
+      rows.set(key, row);
+    }
+    for (const { texts, x0, x1 } of rows.values()) {
+      for (const t of texts) t.setAttribute('transform', `translate(${x0 + x1} 0) scale(-1 1) ${t.dataset.t}`.trim());
+    }
+  }, [body, mirrored]);
+  return <g key={mirrored ? 'm' : 'r'} ref={ref} className="skin" dangerouslySetInnerHTML={{ __html: body }} />;
+}
 
 /**
  * Nombre de un pin adentro del símbolo, como LTspice: PIN x y LEFT 8 → alineado a la izquierda, 8
@@ -232,24 +287,28 @@ const PIN_TEXT: Record<string, { align: string; dx: number; dy: number }> = {
   BOTTOM: { align: 'Bottom', dx: 0, dy: -1 },
 };
 
-function PinName({ pin }: { pin: PinDef }) {
+function PinName({ pin, inst }: { pin: PinDef; inst: SymbolInst }) {
   const name = pin.attrs.get('PinName');
   const t = PIN_TEXT[pin.align.toUpperCase()];
   if (!name || !t) return null;
+  const at = toWorld(inst, pin.x + t.dx * pin.offset, pin.y + t.dy * pin.offset);
   const text = (
-    <AlignedText x={pin.x + t.dx * pin.offset} y={pin.y + t.dy * pin.offset} align={t.align} size={1} className="pinname">
+    <AlignedText x={at.x} y={at.y} align={transformAlign(t.align, inst.orient)} size={1} className="pinname">
       {name}
     </AlignedText>
   );
   if (!isBusName(name)) return text;
   // pin de bus: una barra cruzada con la cantidad de bits, del lado de afuera
   const [ox, oy] = [-t.dx * 8, -t.dy * 8];
+  const a = toWorld(inst, pin.x + ox - 4, pin.y + oy + 4);
+  const b = toWorld(inst, pin.x + ox + 4, pin.y + oy - 4);
+  const w = toWorld(inst, pin.x + ox + (t.dy ? 6 : 0), pin.y + oy - (t.dx ? 6 : 0));
   return (
     <>
       {text}
       <g className="buspin">
-        <line x1={pin.x + ox - 4} y1={pin.y + oy + 4} x2={pin.x + ox + 4} y2={pin.y + oy - 4} />
-        <AlignedText x={pin.x + ox + (t.dy ? 6 : 0)} y={pin.y + oy - (t.dx ? 6 : 0)} align={t.dx ? 'Bottom' : 'Left'} size={1} className="buswidth">
+        <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
+        <AlignedText x={w.x} y={w.y} align={transformAlign(t.dx ? 'Bottom' : 'Left', inst.orient)} size={1} className="buswidth">
           {String(busWidth(name))}
         </AlignedText>
       </g>

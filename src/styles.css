@@ -253,7 +253,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .sym { color: var(--sch-sym); stroke: currentColor; }
 .sym .body { stroke-width: 1.4; }
 .sym .body .wave-icon { stroke-width: 2; }
-.sym .body text { fill: currentColor; stroke: none; }
+.sym .body text, .sym .symtext text { fill: currentColor; stroke: none; }
 /* skins (SVG de ASC-Parser): los valores por defecto de SVG, como los dibuja ASC-Parser: lo que no
    dice fill va relleno (flechas, signos) y lo que no dice stroke va sin trazo; en currentColor (#76) */
 .schematic .skin { fill: currentColor; stroke: none; }
@@ -280,7 +280,7 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .texts .sel text { fill: var(--sch-sel); }
 /* LaTeX (#328): la fórmula toma el color del texto que reemplaza */
 .schematic .math { stroke: none; fill: var(--sch-label); }
-.sym .body .math { fill: currentColor; }
+.sym .body .math, .sym .symtext .math { fill: currentColor; }
 .sym.sel .math.win, .sym.hover:not(.sel) .math.win, .flag.sel .math, .flag.hover:not(.sel) .math, .texts .sel .math { fill: var(--sch-sel); }
 .texts .comment .math { fill: var(--sch-drawing); }
 .texts .diff-changed .math, .sym.diff-changed .math.win { fill: var(--diff-chg); }

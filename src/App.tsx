@@ -12,17 +12,15 @@ import { type Bias } from './sim/bias.ts';
 import { symbolBox, visibleText } from './schematic/geometry.ts';
 import type { DrawnShapeKind } from './asc/model.ts';
 import type { Status } from './NetlistMode.tsx';
-import { isPzPlot, PzPlane, pzRuns, ResultTable, rowDevice } from './waveform/ScalarViews.tsx';
-import { isStbPlot, StbView, stbMainTraces } from './waveform/StbView.tsx';
+import { isPzPlot, pzRuns, rowDevice } from './waveform/ScalarViews.tsx';
+import { isStbPlot, stbMainTraces } from './waveform/StbView.tsx';
 import { isPzBodePlot, pzMarks, pzRoots } from './waveform/pz.ts';
-import { SmithChart } from './waveform/SmithChart.tsx';
 import { NetlistMode } from './NetlistMode.tsx';
 import { PDK_CORNERS, pdkLib, pdkOfSymbols } from './library/pdk.ts';
 import type { PartGroup } from './schematic/PartTable.tsx';
 import { cmpChoicesFor } from './library/cmp.ts';
 import { makeSymbol, subcktPins } from './library/makeSymbol.ts';
-import { AppMenu, MenuButton, type MenuItem } from './ui/Menu.tsx';
-import { Icon } from './ui/icons.tsx';
+import { AppMenu, type MenuItem } from './ui/Menu.tsx';
 import { Toolbar, type ToolGroup } from './ui/Toolbar.tsx';
 import { readShareHash, shareHash } from './schematic/share.ts';
 import { importLtspiceLibrary, loadLtspiceIndex, prefetchLtspice, removeLtspiceLibrary, type LtspiceIndex } from './library/ltspiceLib.ts';
@@ -88,11 +86,11 @@ import { useHistory, type History } from './schematic/useHistory.ts';
 import { mirrorX, rotateCW } from './asc/transform.ts';
 import { buildSimulation, elementVector, fetchModelFile, netVector, type BuiltSimulation } from './sim/schematicSim.ts';
 import type { PlotPanelHandle } from './waveform/PlotPanel.tsx';
-import { PlotPanel, preloadPlots } from './waveform/lazy.ts';
+import { preloadPlots } from './waveform/lazy.ts';
 import { useTraceWidth } from './waveform/lineWidth.ts';
 import { displayName, sameRuns, scaleOf, stepLabels } from './waveform/series.ts';
 import { paneCurves, type ComplexMode } from './waveform/curves.ts';
-import { TraceBox, type TraceBoxHandle } from './waveform/TraceBox.tsx';
+import { type TraceBoxHandle } from './waveform/TraceBox.tsx';
 import { type Resolver } from './waveform/expr.ts';
 import { addTraceTo, asPlotView, colorize, emptyPanes, parsePlt, plotKind, sameExpr, serializePlt, traceColor, viewFromDoc, withView, type Pane, type PlotState, type PlotView } from './waveform/view.ts';
 import { readData, sameExceptData, writeData } from './asc/dataText.ts';
@@ -100,15 +98,13 @@ import { deviceParamTraces, probeExpr, traceResolver } from './sim/traces.ts';
 import { deviceRefs } from './sim/deviceParams.ts';
 import { hideOpTag, moveOpTag } from './sim/opPins.ts';
 import { type MeasTable } from './sim/measResults.ts';
-import { MeasPanel } from './sim/MeasPanel.tsx';
 import { type StudyInfo } from './schematic/StudyPanel.tsx';
 import { parseAnalysis } from './sim/analyses.ts';
 import { loadView } from './schematic/autosave.ts';
 import { decode } from './asc/encoding.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
-import { SideSplit, useSideSize } from './ui/SideSplit.tsx';
-import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
+import { useSideSize } from './ui/SideSplit.tsx';
 import { AccountButton, importToDrive } from './cloud/AccountButton.tsx';
 import { drive, useGoogle } from './cloud/google.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
@@ -121,7 +117,7 @@ import { applyVariants, renameSubckt as renameVariant, withSubckts } from './hdl
 import { VerilogModule } from './hdl/VerilogModule.tsx';
 import { busNames } from './waveform/digital.ts';
 import type { SynthResult } from './hdl/yosys.ts';
-import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, PANEL_NAMES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
+import { BASE, DEFAULT_PROJECT, MAX_CACHED_BYTES, SAMPLE, SCH_FONT_KEY, SKIN_KEY } from './app/constants.ts';
 import type { Dialog, FileState, HierLevel, SimRun } from './app/types.ts';
 import { lsGet, lsSet, useTheme } from './app/storage.ts';
 import { ascText, clipboardImage, registerUserFile } from './app/helpers.ts';
@@ -132,7 +128,7 @@ import { useShortcuts } from './app/shortcuts.ts';
 import { useDrive } from './app/useDrive.ts';
 import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
 import { SimRow } from './app/SimRow.tsx';
-import { ProblemsList, simProblems } from './app/Problems.tsx';
+import { simProblems } from './app/Problems.tsx';
 import { runTestbench } from './app/simulate.ts';
 import { useUserFiles } from './app/useUserFiles.ts';
 import { moduleActions } from './app/modules.ts';
@@ -141,6 +137,7 @@ import { benchActions } from './app/benches.ts';
 import { useImportExport } from './app/useImportExport.ts';
 import { useProbe } from './app/useProbe.ts';
 import { useOpPoint } from './app/useOpPoint.ts';
+import { ResultsPanel } from './app/ResultsPanel.tsx';
 
 
 /** Copia interna por si el navegador no deja leer el portapapeles */
@@ -2562,140 +2559,13 @@ ${ltNetlistText(sim.built.lt)}
           <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />
         )}
         {sim && !curSub && (
-          <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>
-            <input
-              ref={pltInput}
-              type="file"
-              accept=".plt"
-              hidden
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (f) importPlt(new Uint8Array(await f.arrayBuffer()));
-                e.target.value = '';
-              }}
-            />
-            <div className="toolbar small results-bar">
-              {/* como Simular: el botón vuelve al gráfico; la flecha, a exportar y al resto de las vistas */}
-              <div className="split" role="group" aria-label={t('Results view')}>
-                <button className="active" onClick={() => setPanel('plot')} title={t('Back to the results plot')}>
-                  {t('Results')}
-                </button>
-                <MenuButton items={resultsItems} label={t('More results views')} title={t('Export, netlist, log and problems')} className="active">
-                  <Icon name="caret" size={14} />
-                </MenuButton>
-              </div>
-              {/* queda a la vista mientras se miran estos resultados, aunque se cierre el aviso (#108) */}
-              {(sim.built.missingSymbols?.length ?? 0) > 0 && (
-                <button
-                  className="incomplete-badge"
-                  onClick={() => setPanel('problems')}
-                  title={t('Missing {p0}: they were left out of the circuit and the results don\'t match the schematic', { p0: sim.built.missingSymbols.join(', ') })}
-                >
-                  {t('Incomplete simulation')}
-                </button>
-              )}
-              {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
-              {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
-              {/* en un .stb, el selector muestra sólo las magnitudes del lazo, sin los parámetros de los dispositivos (#337) */}
-              {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={isStbPlot(plot) ? undefined : traceHints} onAdd={addExpr} onFocusChange={setTraceFocus} />}
-              {panel === 'plot' && (
-                <>
-                  {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, fft de ngspice, gráficos x-y */}
-                  {sim.result.plots.length > 1 && (
-                    <select value={plotName} onChange={(e) => selectPlot(e.target.value)} aria-label={t('Result plot')} title={t('Result to view (the simulation returned several)')}>
-                      {sim.result.plots.map((p) => (
-                        <option key={p.name} value={p.name}>
-                          {p.name}
-                          {labels.has(p.name) ? ` (${labels.get(p.name)})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {isComplex && scale && (
-                    <select value={mode} onChange={(e) => setMode(e.target.value as ComplexMode)} aria-label={t('Display')}>
-                      <option value="bode">{t('Bode (dB and phase)')}</option>
-                      <option value="db">{t('Magnitude (dB)')}</option>
-                      <option value="phase">{t('Phase (°)')}</option>
-                      <option value="mag">{t('Magnitude')}</option>
-                      <option value="reim">{t('Real and imaginary')}</option>
-                      <option value="smith">{t('Smith chart')}</option>
-                    </select>
-                  )}
-                  {/* Cursores, DFT, Medidas y Ajustar (los pone el visor) */}
-                  <span className="viewer-tools" ref={setViewerTools} />
-                  {withPz && (
-                    <label className="check inline" title={t('Pole-zero map (.pz) next to the plot; its f₀ are marked on the axis')}>
-                      <input type="checkbox" checked={pzSide} onChange={(e) => setPzSide(e.target.checked)} /> {t('Poles and zeros')}
-                    </label>
-                  )}
-                  {allRuns.length > 1 && (
-                    <label className="check inline">
-                      <input type="checkbox" checked={overlay} onChange={(e) => setOverlay(e.target.checked)} /> {t('Overlay the')}{' '}
-                      {allRuns.length} {t('runs')}
-                    </label>
-                  )}
-                  {allRuns.length > 1 && overlay && (
-                    <button onClick={() => setDialog({ kind: 'runs' })} title={t('Choose which runs to show (Shift+S)')}>
-                      {t('Runs')}{hiddenRuns.size ? ` (${visibleRuns.length}/${allRuns.length})` : ''}…
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="results-body">
-              {/* un error al dibujar el gráfico (o el visor que no bajó sin red) no se lleva el resto */}
-              <ErrorBoundary resetKeys={[panel, plot, panes, mode]}>
-              {panel === 'plot' && plot && scale && isComplex && mode === 'smith' && <SmithChart plot={plot} panes={panes} resolver={resolver} />}
-              {panel === 'plot' && plot && scale && !(isComplex && mode === 'smith') && (
-                <Suspense fallback={null}>
-                <PlotPanel
-                  key={sims.active}
-                  initial={plotState.current}
-                  onState={onPlotState}
-                  handle={plotPanel}
-                  plot={plot}
-                  runs={runs}
-                  labels={labels}
-                  panes={panes}
-                  setPanes={editPanes}
-                  resolver={resolver}
-                  mode={mode}
-                  active={activePane}
-                  setActive={setActivePane}
-                  onFocusTrace={() => traceBox.current?.focus()}
-                  onDftPicking={onDftPicking}
-                  side={resultsSide}
-                  toolsHost={viewerTools}
-                  marks={withPz && pzSide ? marks : undefined}
-                  onHoverExpr={(e) => {
-                    const net = e && /^\s*V\(([^,()]+)\)\s*$/i.exec(e)?.[1];
-                    setTraceNet(net ? conn.nets.find((n) => n.name.toLowerCase() === net.toLowerCase())?.name : undefined);
-                  }}
-                />
-                </Suspense>
-              )}
-              {/* el mapa de polos o el de Stability al lado (o debajo) del gráfico, con un divisor (#336) */}
-              {panel === 'plot' && plot && scale && withPz && pzSide && mode !== 'smith' && (
-                <>
-                  <SideSplit dir={splitDir} onSize={pzSplit.set} label={t('Resize the pole-zero map')} />
-                  <PzPlane runs={pzAll} labels={labels} name={project.name} compact style={pzSplit.style} />
-                </>
-              )}
-              {panel === 'plot' && plot && scale && isStbPlot(plot) && mode !== 'smith' && (
-                <>
-                  <SideSplit dir={splitDir} onSize={stbSplit.set} label={t('Resize the stability view')} />
-                  <StbView plot={plot} name={project.name} style={stbSplit.style} />
-                </>
-              )}
-              {panel === 'plot' && plot && !scale &&
-                (pzShown.length ? <PzPlane runs={pzShown} labels={labels} name={project.name} /> : <ResultTable plot={plot} maxCols={resultsSide ? 2 : 4} onHoverRow={setRowHover} highlightDevice={lvNow ? undefined : hoverDev} />)}
-              </ErrorBoundary>
-              {panel === 'netlist' && <pre className="code">{sim.built.netlist}</pre>}
-              {panel === 'log' && <pre className="code">{sim.result.log.join('\n')}</pre>}
-              {panel === 'meas' && sim.meas && <MeasPanel table={sim.meas} />}
-              {panel === 'problems' && <ProblemsList {...{ problems, sim, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage }} />}
-            </div>
-          </section>
+          <ResultsPanel
+            projectName={project.name}
+            {...{ sim, resultsH, pltInput, importPlt, panel, setPanel, resultsItems, plot, scale, traceBox, traceNames, traceHints, addExpr, setTraceFocus, plotName, selectPlot, labels, isComplex, mode, setMode }}
+            {...{ viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, setDialog, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver }}
+            {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
+            {...{ problems, doc, stopTime, goTo, openSaves, plotStop, commit, setRunQueued, run, setMessage }}
+          />
         )}
       </div>
       {saves && (

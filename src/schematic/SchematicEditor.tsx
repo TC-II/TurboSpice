@@ -1,9 +1,8 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react';
-import { flushSync } from 'react-dom';
 import type { CircuitDiff } from '../project/diff.ts';
-import { GRID, type AscDoc, type Orient, type Point, type Shape, type DrawnShapeKind, type Wire } from '../asc/model.ts';
+import { GRID, type AscDoc, type Point, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import { connectivity, type Connectivity } from '../netlist/connectivity.ts';
 import {
@@ -29,10 +28,7 @@ import {
 } from './edit.ts';
 import { inverseOffset, toWorld } from '../asc/transform.ts';
 import { effectiveWindows } from '../asc/resolve.ts';
-import type { TextWindow } from '../asc/model.ts';
 import {
-  boxesIntersect,
-  distToSegment,
   hitTest,
   hitTestAll,
   labelAt,
@@ -41,10 +37,7 @@ import {
   snap,
   snapLabel,
   snapPoint,
-  symbolBox,
-  textBox,
   fontSize,
-  baselineOffset,
   inlineEditable,
   visibleText,
   wireVertexAt,
@@ -54,80 +47,19 @@ import {
   type Box,
   type ItemRef,
 } from './geometry.ts';
-import type { PickWhat } from './simDialogs.tsx';
 import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
-import { resizeShape, shapeBox, shapeHandles, shapeInBox } from './shapes.ts';
-import { multiPinPrefix } from '../sim/traces.ts';
+import { resizeShape, shapeHandles } from './shapes.ts';
+import { SUBCKT_DRAG, type Tool, type EditorHandle, type View, type Drag, type InlineText } from './editorTypes.ts';
+import { pinCurrents, orthoEnd, resizableBox, docBox, itemsIn, connectsAt, gridPointOnWire, freeEnd, looseWire, shapeFromClicks, dropMove, positionedAncestor, tipStyle } from './editorDoc.ts';
+import { InlineEditor } from './InlineEditor.tsx';
+import { useEvent } from '../ui/useEvent.ts';
+import { useEditorView } from './useEditorView.ts';
 
-/** ¿La corriente se mide por pin? (transistores de 3 o más pines y todos los subcircuitos) */
-const pinCurrents = (pins: number, prefix: string) => multiPinPrefix(prefix) && (pins >= 3 || /^X/i.test(prefix));
-
-/**
- * Nodos del SVG desde los que paneo y zoom mueven el dibujo ya pintado (#186): con la CPU frenada
- * 4×, ~9.000 nodos costaban ~105 ms por cuadro; con menos de esto cabe en un cuadro.
- */
-const HEAVY_NODES = 1500;
-
-/** Fin de un tramo horizontal o vertical desde `a`, según de qué lado de los 45° quede `b` */
-const orthoEnd = (a: Point, b: Point): Point => (Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? { x: b.x, y: a.y } : { x: a.x, y: b.y });
-
-export type Tool =
-  | { kind: 'select' }
-  | { kind: 'wire'; start: Point | null }
-  | { kind: 'place'; type: string; orient: Orient }
-  | { kind: 'flag'; name: string; ioPin?: string }
-  | { kind: 'text'; text: string; textKind: 'directive' | 'comment' }
-  /** T: click en el esquemático y se escribe el comentario ahí mismo (Enter o click afuera lo deja, Esc cancela) */
-  | { kind: 'comment' }
-  | { kind: 'delete' }
-  | { kind: 'probe' }
-  /** elegir una red o una fuente para un diálogo (Esc cancela) */
-  | { kind: 'pick'; what: PickWhat }
-  /**
-   * M / S de LTspice: click en un elemento (o recuadro) y sigue al cursor hasta el próximo
-   * click; `stretch` estira los cables conectados (S) o no (M)
-   */
-  | { kind: 'move'; stretch: boolean; refs: ItemRef[] | null; start: Point | null }
-  /**
-   * Figuras decorativas (LINE / RECTANGLE / CIRCLE / ARC del .asc), con `style` de línea.
-   * `pts`: los clicks hechos. Línea, rectángulo y círculo (su caja) llevan 2; el arco, 4: la
-   * caja de la elipse, el punto de inicio y el de fin (va en sentido antihorario).
-   */
-  | { kind: 'shape'; shape: DrawnShapeKind; pts: Point[]; style?: string }
-  /** lápiz: anotaciones a mano alzada (figura PATH), arrastrando con el botón izquierdo */
-  | { kind: 'pencil'; style?: string }
-  /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
-  | { kind: 'zoom'; prev: Tool };
-
-/** Tipo de dato del arrastre de un subcircuito desde el panel del proyecto (#199) */
-export const SUBCKT_DRAG = 'application/x-turbospice-subckt';
-
-export interface EditorHandle {
-  fit(): void;
-  /** encuadra sólo si no se ve nada del circuito (al pasar a otro testbench, que no guarda su vista) */
-  fitIfLost(): void;
-  /** Posición del cursor en el esquemático (para pegar/duplicar) */
-  cursor(): Point;
-  /** Elemento SVG y caja del contenido (para exportar) */
-  svg(): SVGSVGElement | null;
-  contentBox(): Box | null;
-  /** Centra la vista en una caja (p.ej. el componente de un problema) */
-  centerOn(b: Box): void;
-  /** Shift+Z: vuelve a la vista anterior (zoom anterior) */
-  zoomPrev(): void;
-  /** ¿Se desplazó con Espacio+arrastrar desde que se apretó Espacio? (si no, Espacio = ajustar) */
-  spacePanned(): boolean;
-  /** Zoom y posición (para volver al mismo lugar al subir por la jerarquía, #180) */
-  view(): View;
-  setView(v: View): void;
-  /** escribir en el lugar un comentario existente (false si no es un comentario común) */
-  editText(index: number): boolean;
-  /** Ctrl+R con un rótulo agarrado: gira el rótulo, no el componente (false si no hay ninguno) */
-  rotateLabel(): boolean;
-}
+export { SUBCKT_DRAG, type EditorHandle, type Tool, type View } from './editorTypes.ts';
+export { dropMove, shapeFromClicks, tipStyle } from './editorDoc.ts';
 
 interface Props {
   doc: AscDoc;
@@ -199,176 +131,6 @@ interface Props {
   diff?: CircuitDiff;
 }
 
-export interface View {
-  cx: number;
-  cy: number;
-  /** píxeles por unidad de LTspice */
-  scale: number;
-}
-
-type Drag =
-  /** `right`: con el botón derecho; si no se movió, al soltar es un click derecho */
-  | { mode: 'pan'; sx: number; sy: number; view: View; right?: boolean; moved?: boolean }
-  /** `editText`: click en un comentario ya seleccionado; si no se mueve, se edita en el lugar */
-  | { mode: 'move'; start: Point; refs: ItemRef[]; detach: boolean; moved: boolean; whole?: boolean; editText?: number }
-  /** agrandar o achicar un comentario desde la esquina de su caja (cambia el tamaño de letra) */
-  | { mode: 'textsize'; index: number; left: boolean; top: boolean; box: Box }
-  /** cambiar el tamaño de una figura desde una de sus manijas (shapeHandles) */
-  | { mode: 'shapesize'; index: number; handle: number }
-  /** `erase`: con la herramienta borrar, al soltar se borra lo que queda adentro */
-  | { mode: 'box'; start: Point; additive: boolean; erase?: boolean }
-  /** recuadro de la herramienta zoom */
-  | { mode: 'zoom'; start: Point }
-  /** punta de prueba apretada sobre `from`: al soltar en otro lugar, la resta o el cociente (#308) */
-  | { mode: 'probe'; start: Point; from: { net?: string; symbol?: number; pin?: number } }
-  /** trazo del lápiz en curso */
-  | { mode: 'pencil'; pts: Point[] }
-  /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
-  | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
-  /** desplazar un tramo de cable en forma perpendicular */
-  | { mode: 'segment'; start: Point; index: number }
-  /**
-   * arrastrar un rótulo (InstName/Value) de un símbolo; si su componente está seleccionado junto
-   * con otros, el mismo rótulo de todos. `at` es el ancla de cada uno en el esquemático.
-   */
-  | { mode: 'label'; start: Point; sym: number; shift: boolean; items: { sym: number; win: number; w: TextWindow; at: Point }[]; moved: boolean };
-
-interface InlineText {
-  index: number | null;
-  x: number;
-  y: number;
-  align: string;
-  size: number;
-  value: string;
-  box?: { w: number; h: number };
-}
-
-/** Caja de un comentario sin justificación vertical (las verticales no se agrandan con la esquina) */
-const resizableBox = (t: AscDoc['texts'][number] | undefined) => (t && inlineEditable(t) && !t.align.startsWith('V') && t.align !== 'Invisible' ? textBox(t) : null);
-
-function docBox(doc: AscDoc, lib: Library, showSim: boolean): Box | null {
-  const boxes: Box[] = [];
-  for (const w of doc.wires) boxes.push({ x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) });
-  for (const s of doc.symbols) boxes.push(symbolBox(s, lib.symbol(s.type), lib));
-  for (const f of doc.flags) boxes.push({ x1: f.x - 16, y1: f.y - 16, x2: f.x + 16, y2: f.y + 16 });
-  for (const t of doc.texts) {
-    const v = visibleText(t, showSim);
-    if (v) boxes.push(textBox(v));
-  }
-  for (const s of doc.shapes) boxes.push(shapeBox(s));
-  if (!boxes.length) return null;
-  return {
-    x1: Math.min(...boxes.map((b) => b.x1)),
-    y1: Math.min(...boxes.map((b) => b.y1)),
-    x2: Math.max(...boxes.map((b) => b.x2)),
-    y2: Math.max(...boxes.map((b) => b.y2)),
-  };
-}
-
-/** Elementos dentro de un recuadro de selección */
-function itemsIn(doc: AscDoc, b: Box, lib: Library, showSim: boolean): ItemRef[] {
-  const out: ItemRef[] = [];
-  doc.symbols.forEach((s, i) => boxesIntersect(symbolBox(s, lib.symbol(s.type), lib), b) && out.push({ kind: 'symbol', index: i }));
-  doc.wires.forEach((w, i) => {
-    const wb = { x1: Math.min(w.x1, w.x2), y1: Math.min(w.y1, w.y2), x2: Math.max(w.x1, w.x2), y2: Math.max(w.y1, w.y2) };
-    if (boxesIntersect(wb, b)) out.push({ kind: 'wire', index: i });
-  });
-  doc.flags.forEach((f, i) => f.x >= b.x1 && f.x <= b.x2 && f.y >= b.y1 && f.y <= b.y2 && out.push({ kind: 'flag', index: i }));
-  doc.texts.forEach((t, i) => {
-    const v = visibleText(t, showSim);
-    if (v && boxesIntersect(textBox(v), b)) out.push({ kind: 'text', index: i });
-  });
-  doc.shapes.forEach((s, i) => shapeInBox(s, b) && out.push({ kind: 'shape', index: i }));
-  return out;
-}
-
-/** ¿Hay algo conectable en p? (pin, extremo de cable, etiqueta o cable que pasa) */
-function connectsAt(doc: AscDoc, p: Point, lib: Library): boolean {
-  if (doc.flags.some((f) => f.x === p.x && f.y === p.y)) return true;
-  if (doc.symbols.some((s) => pinPoints(s, lib.symbol(s.type)).some((q) => q.x === p.x && q.y === p.y))) return true;
-  return doc.wires.some((w) => {
-    const minx = Math.min(w.x1, w.x2);
-    const maxx = Math.max(w.x1, w.x2);
-    const miny = Math.min(w.y1, w.y2);
-    const maxy = Math.max(w.y1, w.y2);
-    const cross = (w.x2 - w.x1) * (p.y - w.y1) - (w.y2 - w.y1) * (p.x - w.x1);
-    return cross === 0 && p.x >= minx && p.x <= maxx && p.y >= miny && p.y <= maxy;
-  });
-}
-
-/** Punto de la grilla sobre un cable horizontal o vertical, el más cercano a p */
-function gridPointOnWire(w: Wire, p: Point): Point | null {
-  if (w.y1 === w.y2 && w.x1 !== w.x2) return { x: Math.min(Math.max(snap(p.x), Math.min(w.x1, w.x2)), Math.max(w.x1, w.x2)), y: w.y1 };
-  if (w.x1 === w.x2 && w.y1 !== w.y2) return { x: w.x1, y: Math.min(Math.max(snap(p.y), Math.min(w.y1, w.y2)), Math.max(w.y1, w.y2)) };
-  return null;
-}
-
-/** ¿El codo en p es un extremo suelto? (arrastrarlo puede conectarlo a otra cosa) */
-function freeEnd(doc: AscDoc, p: Point): boolean {
-  const at = doc.wires.filter((w) => (w.x1 === p.x && w.y1 === p.y) || (w.x2 === p.x && w.y2 === p.y));
-  return at.length === 1 && !doc.wires.some((w) => w !== at[0] && distToSegment(p, w) === 0);
-}
-
-/** ¿El cable no toca nada en sus puntas (otro cable, un pin, una etiqueta)? */
-function looseWire(doc: AscDoc, index: number, lib: Library): boolean {
-  const w = doc.wires[index];
-  const pts = [
-    { x: w.x1, y: w.y1 },
-    { x: w.x2, y: w.y2 },
-  ];
-  const at = (p: Point, q: Point) => p.x === q.x && p.y === q.y;
-  return pts.every((p) => freeEnd(doc, p) && !doc.flags.some((f) => at(f, p)) && !doc.symbols.some((s) => pinPoints(s, lib.symbol(s.type)).some((q) => at(q, p))));
-}
-
-/**
- * Figura a partir de los clicks de la herramienta: 'more' si faltan clicks, 'invalid' si el
- * último no sirve (un punto repetido, una caja sin ancho o alto).
- */
-export function shapeFromClicks(kind: DrawnShapeKind, pts: Point[], style?: string): Shape | 'more' | 'invalid' {
-  const [a, b, start, end] = pts;
-  if (!b) return 'more';
-  if (b.x === a.x && b.y === a.y) return 'invalid';
-  const withStyle = (s: Shape): Shape => (style ? { ...s, style } : s);
-  if (kind === 'LINE' || kind === 'RECTANGLE') return withStyle({ kind, coords: [a.x, a.y, b.x, b.y] });
-  if (b.x === a.x || b.y === a.y) return 'invalid';
-  if (kind === 'CIRCLE') return withStyle({ kind, coords: [a.x, a.y, b.x, b.y] });
-  // el arco necesita además inicio y fin, distintos del centro
-  const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-  const last = pts[pts.length - 1];
-  if (pts.length > 2 && last.x === center.x && last.y === center.y) return 'invalid';
-  if (!end) return 'more';
-  // en el archivo va primero el FINAL y después el INICIO
-  return withStyle({ kind, coords: [a.x, a.y, b.x, b.y, end.x, end.y, start.x, start.y] });
-}
-
-/**
- * Segundo click con M / S (#222): suelta lo que se está moviendo y termina ahí, sin estado
- * intermedio. Se confirma el fantasma (si lo hay), la herramienta vuelve a esperar qué mover y
- * la selección se vacía (no queda resaltado: sus índices tampoco sirven tras limpiar cables).
- */
-export function dropMove<D>(tool: Tool & { kind: 'move' }, preview: D | null): { commit: D | null; tool: Tool; selection: ItemRef[] } {
-  return { commit: preview, tool: { ...tool, refs: null, start: null }, selection: [] };
-}
-
-/** Posición de la cápsula: 16 px (de pantalla) del cursor, del lado que tenga lugar */
-// el ancestro con posición en el que se ubica la cápsula (un <svg> no tiene offsetParent)
-function positionedAncestor(el: Element | null): HTMLElement | null {
-  for (let p = el?.parentElement; p; p = p.parentElement) if (getComputedStyle(p).position !== 'static') return p;
-  return null;
-}
-
-export function tipStyle(tip: { x: number; y: number; w: number; h: number }): { left?: number; right?: number; top?: number; bottom?: number } {
-  const OFF = 16;
-  const right = tip.x < tip.w - 220;
-  const below = tip.y < tip.h - 200;
-  return {
-    left: right ? tip.x + OFF : undefined,
-    right: right ? undefined : tip.w - tip.x + OFF,
-    top: below ? tip.y + OFF : undefined,
-    bottom: below ? undefined : tip.h - tip.y + OFF,
-  };
-}
-
 export function SchematicEditor(props: Props) {
   const {
     doc,
@@ -405,72 +167,7 @@ export function SchematicEditor(props: Props) {
   const [inline, setInline] = useState<InlineText | null>(null);
   const inlineRef = useRef<InlineText | null>(null);
   inlineRef.current = inline;
-  const [size, setSize] = useState({ w: 800, h: 600 });
-  const [view, setView] = useState<View>({ cx: 0, cy: 0, scale: 1 });
-  // vistas anteriores (Shift+Z); los giros seguidos de la rueda cuentan como un solo paso
-  const viewHistory = useRef<View[]>([]);
-  const lastWheel = useRef(0);
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const pushView = () => {
-    viewHistory.current.push(viewRef.current);
-    if (viewHistory.current.length > 50) viewHistory.current.shift();
-  };
-  /** Cambio de vista que se deshace con Shift+Z */
-  const zoomTo = (v: View) => {
-    pushView();
-    setView(v);
-  };
-
-  // Paneo, rueda y pellizco en un esquemático pesado (#186): cambiar el viewBox rehace el layout
-  // y el pintado de todo el SVG en cada cuadro. Durante el gesto se mueve y escala el dibujo ya
-  // pintado con un transform CSS (lo hace el compositor) y la vista se aplica al terminar.
-  const gesture = useRef<{ v: View; tx: number; ty: number; k: number } | null>(null);
-  const wheelTimer = useRef<number | undefined>(undefined);
-  /** la vista que se ve (la del gesto en curso, si hay) */
-  const liveView = () => gesture.current?.v ?? view;
-  /** Rectángulo del svg sin el transform del gesto */
-  const svgRect = () => {
-    const r = svgRef.current!.getBoundingClientRect();
-    const g = gesture.current;
-    return g ? { left: r.left - g.tx, top: r.top - g.ty, width: r.width / g.k, height: r.height / g.k } : r;
-  };
-  const clearGesture = () => {
-    const el = svgRef.current;
-    gesture.current = null;
-    clearTimeout(wheelTimer.current);
-    if (el) el.style.transform = el.style.transformOrigin = el.style.willChange = '';
-  };
-  const heavy = () => (svgRef.current?.getElementsByTagName('*').length ?? 0) > HEAVY_NODES;
-  /** Vista nueva durante un gesto */
-  const moveView = (v: View) => {
-    const el = svgRef.current;
-    if (!el || (!gesture.current && !heavy())) return setView(v);
-    const c = viewRef.current;
-    const k = v.scale / c.scale;
-    const tx = (c.cx - size.w / 2 / c.scale - (v.cx - size.w / 2 / v.scale)) * v.scale;
-    const ty = (c.cy - size.h / 2 / c.scale - (v.cy - size.h / 2 / v.scale)) * v.scale;
-    gesture.current = { v, tx, ty, k };
-    el.style.willChange = 'transform';
-    el.style.transformOrigin = '0 0';
-    el.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
-    // en un gesto largo se aplica cada tanto: lo que entra por los bordes no está pintado (la
-    // franja vacía más ancha) y, al acercar mucho, el dibujo escalado se ve borroso
-    const gapX = Math.max(tx, size.w - tx - k * size.w);
-    const gapY = Math.max(ty, size.h - ty - k * size.h);
-    if (gapX > size.w * 0.35 || gapY > size.h * 0.35 || k > 2.5) commitView();
-  };
-  /** Fin del gesto: la vista de verdad (en el mismo cuadro en que se saca el transform) */
-  const commitView = () => {
-    const g = gesture.current;
-    if (!g) return;
-    if (g.v === viewRef.current) return clearGesture();
-    flushSync(() => setView(g.v));
-  };
-  // la vista cambió (por el gesto o por otra cosa, p. ej. Ajustar): fuera el transform
-  useLayoutEffect(() => {
-    if (gesture.current) clearGesture();
-  }, [view]);
+  const { size, view, setView, viewRef, viewHistory, pushView, zoomTo, heavy, svgRect, moveView, commitView, viewOf, toDoc, onWheel } = useEditorView(svgRef);
   // Mover todo en un esquemático pesado (#195): si se mueve todo lo que se ve, nada se estira y el
   // resultado es una traslación: se desplaza el dibujo ya armado y el documento se arma al soltar
   const selectsWhole = (refs: ItemRef[]) => {
@@ -552,34 +249,27 @@ export function SchematicEditor(props: Props) {
   const longPress = useRef<number | undefined>(undefined);
 
   // la selección no puede apuntar a elementos que ya no existen (deshacer, borrar, abrir otro)
-  useEffect(() => {
+  const dropStale = useEvent(() => {
     const n = { symbol: doc.symbols.length, wire: doc.wires.length, flag: doc.flags.length, text: doc.texts.length, shape: doc.shapes.length };
     const valid = selection.filter((r) => r.index < n[r.kind]);
     if (valid.length !== selection.length) setSelection(valid);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc]);
+  });
+  useEffect(() => dropStale(), [doc, dropStale]);
 
-  useEffect(() => {
-    const el = svgRef.current!;
-    const ro = new ResizeObserver(() => setSize({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  /** Vista que muestra toda la caja, con un margen */
-  const viewOf = useCallback(
-    (b: Box, pad: number, max = 4): View => ({
-      cx: (b.x1 + b.x2) / 2,
-      cy: (b.y1 + b.y2) / 2,
-      scale: Math.min(max, Math.max(0.05, Math.min(size.w / (b.x2 - b.x1 + 2 * pad), size.h / (b.y2 - b.y1 + 2 * pad)))),
-    }),
-    [size],
-  );
   const fit = useCallback(() => {
     const b = docBox(doc, lib, showSimCommand);
     viewHistory.current.push(viewRef.current);
     setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
-  }, [doc, lib, viewOf]);
+  }, [doc, lib, showSimCommand, viewOf, setView, viewHistory, viewRef]);
+
+  /** Edita en el lugar un comentario existente; false si no es un comentario común */
+  const editInline = useEvent((index: number) => {
+    const tt = doc.texts[index];
+    if (!inlineEditable(tt)) return false;
+    setSelection([{ kind: 'text', index }]);
+    setInline({ index, x: tt.x, y: tt.y, align: tt.align, size: tt.size, value: tt.text.split('\\n').join('\n'), box: tt.box });
+    return true;
+  });
 
   useImperativeHandle(
     handle,
@@ -625,7 +315,7 @@ export function SchematicEditor(props: Props) {
       setView: (v: View) => setView(v),
       editText: (index: number) => editInline(index),
     }),
-    [fit, cursor, doc, lib, size.w, size.h],
+    [fit, cursor, doc, lib, showSimCommand, size.w, size.h, setView, viewHistory, viewRef, editInline],
   );
 
   // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)
@@ -663,36 +353,6 @@ export function SchematicEditor(props: Props) {
   const tol = 6 / view.scale;
   /** tamaños de letra que no se dibujan por ilegibles (lod-N) */
   const lod = illegibleSizes(view.scale);
-
-  const toDoc = (e: { clientX: number; clientY: number }): Point => {
-    const r = svgRect();
-    const v = liveView();
-    return { x: v.cx - size.w / 2 / v.scale + (e.clientX - r.left) / v.scale, y: v.cy - size.h / 2 / v.scale + (e.clientY - r.top) / v.scale };
-  };
-
-  const onWheel = (e: { clientX: number; clientY: number; deltaY: number; timeStamp: number }) => {
-    const p = toDoc(e);
-    const v = liveView();
-    const k = Math.exp(-e.deltaY * 0.0015);
-    const scale = Math.min(8, Math.max(0.03, v.scale * k));
-    if (e.timeStamp - lastWheel.current > 500) pushView();
-    lastWheel.current = e.timeStamp;
-    // mantener fijo el punto bajo el cursor
-    moveView({ scale, cx: p.x - (p.x - v.cx) * (v.scale / scale), cy: p.y - (p.y - v.cy) * (v.scale / scale) });
-    clearTimeout(wheelTimer.current);
-    if (gesture.current) wheelTimer.current = window.setTimeout(commitView, 150);
-  };
-  // durante el gesto el svg escalado puede no cubrir el lienzo: la rueda sobre ese borde vacío
-  // (que es el contenedor) sigue haciendo zoom
-  const wheelRef = useRef(onWheel);
-  wheelRef.current = onWheel;
-  useEffect(() => {
-    const parent = svgRef.current?.parentElement;
-    if (!parent) return;
-    const h = (e: WheelEvent) => e.target === parent && gesture.current && wheelRef.current(e);
-    parent.addEventListener('wheel', h);
-    return () => parent.removeEventListener('wheel', h);
-  }, []);
 
   /**
    * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
@@ -755,14 +415,6 @@ export function SchematicEditor(props: Props) {
       } else if (text !== doc.texts[it.index]?.text) commit(setText(doc, it.index, { text }));
     }
     if (tool.kind === 'comment') setTool({ kind: 'select' });
-  };
-  /** Edita en el lugar un comentario existente; false si no es un comentario común */
-  const editInline = (index: number) => {
-    const tt = doc.texts[index];
-    if (!inlineEditable(tt)) return false;
-    setSelection([{ kind: 'text', index }]);
-    setInline({ index, x: tt.x, y: tt.y, align: tt.align, size: tt.size, value: tt.text.split('\\n').join('\n'), box: tt.box });
-    return true;
   };
 
   // Botón derecho sin arrastrar: terminar cable / volver a seleccionar (como Esc en LTspice)
@@ -1060,11 +712,12 @@ export function SchematicEditor(props: Props) {
   // Rotar/espejar (Ctrl+R / Ctrl+E) mientras se mueve: App cambia el documento y el fantasma
   // se recalcula en el acto con la posición actual del cursor, sin esperar a mover el mouse
   // (también con la herramienta Move, M, que mueve sin arrastrar)
-  useEffect(() => {
+  const refreshMove = useEvent(() => {
     const g = snapPoint(cursorRef.current);
     if (drag?.mode === 'move') previewMove(drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach);
     else if (tool.kind === 'move' && tool.refs && tool.start) previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch);
-  }, [doc]);
+  });
+  useEffect(() => refreshMove(), [doc, refreshMove]);
 
   // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta
   const [ctrlHeld, setCtrlHeld] = useState(false);
@@ -1380,8 +1033,12 @@ export function SchematicEditor(props: Props) {
   // el comentario que se edita en el lugar no se dibuja (lo reemplaza el cuadro de texto)
   const shown = inline?.index != null ? setText(preview ?? doc, inline.index, { text: '' }) : (preview ?? doc);
   const g = snapPoint(cursor);
+  // fin del arco que se está dibujando (sigue al cursor sin la grilla)
+  const arcAt = arcEnd(tool, cursor);
+  const [gx, gy, ax, ay] = [g.x, g.y, arcAt?.x, arcAt?.y];
   // lo que se está por colocar, dibujado igual a como va a quedar (colores, InstName, tierra)
   const ghost = useMemo(() => {
+    const g = { x: gx, y: gy };
     if (tool.kind === 'place') {
       const def = lib.symbol(tool.type);
       const o = placementOrigin(def, tool.orient, g);
@@ -1406,7 +1063,7 @@ export function SchematicEditor(props: Props) {
       );
     }
     if (tool.kind === 'shape' && tool.pts.length) {
-      const pts = [...tool.pts, arcEnd(tool, cursor) ?? g];
+      const pts = [...tool.pts, ax !== undefined && ay !== undefined ? { x: ax, y: ay } : g];
       const [a, b] = pts;
       if (tool.shape !== 'ARC' || pts.length === 2) {
         // el arco, mientras se elige la caja, se ve como la elipse entera
@@ -1441,7 +1098,7 @@ export function SchematicEditor(props: Props) {
       );
     }
     return null;
-  }, [tool, g.x, g.y, lib, ctrlHeld, doc, ...(arcEnd(tool, cursor) ? [cursor.x, cursor.y] : [0, 0])]);
+  }, [tool, gx, gy, ax, ay, lib, doc]);
 
   // codos arrastrables de los cables seleccionados
   // (un extremo de cable es codo si no está sobre un pin o una etiqueta: wireVertexAt con tol 0)
@@ -1678,49 +1335,3 @@ export function SchematicEditor(props: Props) {
  * Cuadro para escribir un comentario en el lugar, dentro del svg (sigue al zoom): la primera
  * línea queda donde va a quedar el texto. Enter lo deja (Shift+Enter: otra línea), Esc cancela.
  */
-function InlineEditor({ it, onChange, onDone }: { it: InlineText; onChange(v: string): void; onDone(save: boolean): void }) {
-  const ta = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    // (después del click que lo abrió)
-    const id = requestAnimationFrame(() => {
-      ta.current?.focus();
-      ta.current?.select();
-    });
-    return () => cancelAnimationFrame(id);
-  }, []);
-  const fs = fontSize(it.size);
-  const lines = it.value.split('\n');
-  // con caja fija se escribe dentro de la caja, partiendo las líneas como al dibujarlo
-  const w = it.box ? it.box.w + fs * 0.2 : (Math.max(4, ...lines.map((l) => l.length)) + 2) * fs * 0.6;
-  const h = it.box ? it.box.h + fs * 0.4 : lines.length * fs * 1.2 + fs * 0.4;
-  const x = it.align === 'Right' ? it.x - w : it.align === 'Center' ? it.x - w / 2 : it.x;
-  // (la primera línea donde la dibuja AlignedText: su celda va de 0.8 fs arriba a 0.2 fs abajo de la línea base)
-  const y = it.box ? it.y - fs / 2 - fs * 0.2 : it.align === 'Bottom' ? it.y + baselineOffset('Bottom', fs) + fs * 0.4 - h : it.y + baselineOffset(it.align, fs) - fs * 0.8 - fs * 0.2;
-  return (
-    <foreignObject x={x} y={y} width={w} height={h} className="inline-text">
-      <textarea
-        ref={ta}
-        value={it.value}
-        spellCheck={false}
-        wrap={it.box ? 'soft' : 'off'}
-        style={{ fontSize: fs, lineHeight: 1.2, textAlign: it.align === 'Right' ? 'right' : it.align === 'Center' ? 'center' : 'left' }}
-        onPointerDown={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-        onContextMenu={(e) => e.stopPropagation()}
-        onWheel={(e) => e.stopPropagation()}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={() => onDone(true)}
-        onKeyDown={(e) => {
-          e.stopPropagation();
-          if (e.key === 'Escape') {
-            e.preventDefault();
-            onDone(false);
-          } else if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            onDone(true);
-          }
-        }}
-      />
-    </foreignObject>
-  );
-}

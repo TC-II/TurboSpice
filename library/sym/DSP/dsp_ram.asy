@@ -12,7 +12,20 @@ LINE Normal -24 48 -16 38
 LINE Normal -16 38 -8 48
 LINE Normal 16 48 16 80
 TEXT 16 38 Center 1 we
-TEXT 0 -34 Center 2 RAM
+TEXT 0 -36 Center 1 RAM
+RECTANGLE Normal -16 -12 16 12
+LINE Normal -16 -4 16 -4
+LINE Normal -16 4 16 4
+LINE Normal -74 -20 -68 -16
+LINE Normal -68 -16 -74 -12
+LINE Normal -74 12 -68 16
+LINE Normal -68 16 -74 20
+LINE Normal 70 -4 76 0
+LINE Normal 76 0 70 4
+LINE Normal -12 74 -16 68
+LINE Normal -16 68 -20 74
+LINE Normal 20 74 16 68
+LINE Normal 16 68 12 74
 WINDOW 0 0 -56 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto

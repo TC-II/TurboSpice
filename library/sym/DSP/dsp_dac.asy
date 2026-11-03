@@ -1,9 +1,19 @@
 Version 4
 SymbolType CELL
-RECTANGLE Normal -48 -32 48 32
-LINE Normal -64 0 -48 0
-LINE Normal 48 0 64 0
-TEXT 0 0 Center 3 DAC
+LINE Normal -40 -32 16 -32
+LINE Normal 16 -32 44 0
+LINE Normal 44 0 16 32
+LINE Normal 16 32 -40 32
+LINE Normal -40 32 -40 -32
+LINE Normal -40 32 16 -32
+TEXT -20 -12 Center 2 D
+TEXT 12 14 Center 2 A
+LINE Normal -64 0 -40 0
+LINE Normal 44 0 64 0
+LINE Normal -58 -4 -52 0
+LINE Normal -52 0 -58 4
+LINE Normal 54 -4 60 0
+LINE Normal 60 0 54 4
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vref=1 vcc=5

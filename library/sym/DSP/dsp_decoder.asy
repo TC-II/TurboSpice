@@ -8,6 +8,12 @@ TEXT 58 0 Right 1 y
 LINE Normal 0 32 0 64
 TEXT 0 22 Center 1 en
 TEXT 0 -20 Center 2 DEC
+LINE Normal -74 -4 -68 0
+LINE Normal -68 0 -74 4
+LINE Normal 70 -4 76 0
+LINE Normal 76 0 70 4
+LINE Normal 4 58 0 52
+LINE Normal 0 52 -4 58
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n hdl=auto

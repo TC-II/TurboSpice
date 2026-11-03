@@ -8,7 +8,7 @@
   {
    "name": "dsp_clock.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -24 32 24\nLINE Normal 32 0 64 0\nLINE Normal -20 8 -10 8\nLINE Normal -10 8 -10 -8\nLINE Normal -10 -8 0 -8\nLINE Normal 0 -8 0 8\nLINE Normal 0 8 10 8\nLINE Normal 10 8 10 -8\nLINE Normal 10 -8 20 -8\nWINDOW 0 0 -32 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n PERIOD=1000 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_clock\nSYMATTR ModelFile dsp_clock.sub\nSYMATTR Description Verilog module dsp_clock\nPIN 64 0 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -24 32 24\nLINE Normal 32 0 64 0\nLINE Normal -20 8 -10 8\nLINE Normal -10 8 -10 -8\nLINE Normal -10 -8 0 -8\nLINE Normal 0 -8 0 8\nLINE Normal 0 8 10 8\nLINE Normal 10 8 10 -8\nLINE Normal 10 -8 20 -8\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -32 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n PERIOD=1000 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_clock\nSYMATTR ModelFile dsp_clock.sub\nSYMATTR Description Verilog module dsp_clock\nPIN 64 0 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\n"
   },
   {
    "name": "dsp_clock.v",
@@ -28,13 +28,13 @@
     "params": {
      "PERIOD": "1000"
     },
-    "vvp": "#! vvp\n:ivl_version \"14.0 (devel)\" \"(9cfecc9)\";\n:ivl_delay_selection \"TYPICAL\";\n:vpi_time_precision - 12;\n:vpi_module \"/usr/local/lib/ngspice/system.vpi\";\n:vpi_module \"/usr/local/lib/ngspice/v2005_math.vpi\";\n:vpi_module \"/usr/local/lib/ngspice/va_math.vpi\";\nS_0x4e9d80 .scope module, \"dsp_clock\" \"dsp_clock\" 2 5;\n .timescale -9 -12;\n    .port_info 0 /OUTPUT 1 \"clk\";\nP_0x4e9e48 .param/l \"PERIOD\" 0 2 5, +C4<00000000000000000000001111101000>;\nv0x4e9f48_0 .var \"clk\", 0 0;\n    .scope S_0x4e9d80;\nT_0 ;\n    %pushi/vec4 0, 0, 1;\n    %store/vec4 v0x4e9f48_0, 0, 1;\n    %end;\n    .thread T_0;\n    .scope S_0x4e9d80;\nT_1 ;\n    %delay 500000, 0;\n    %load/vec4 v0x4e9f48_0;\n    %inv;\n    %store/vec4 v0x4e9f48_0, 0, 1;\n    %jmp T_1;\n    .thread T_1;\n# The file index is used to find the file name in the following table.\n:file_names 3;\n    \"N/A\";\n    \"<interactive>\";\n    \"/src/dsp_clock.v\";\n"
+    "vvp": "#! vvp\n:ivl_version \"14.0 (devel)\" \"(9cfecc9)\";\n:ivl_delay_selection \"TYPICAL\";\n:vpi_time_precision - 12;\n:vpi_module \"/usr/local/lib/ngspice/system.vpi\";\n:vpi_module \"/usr/local/lib/ngspice/v2005_math.vpi\";\n:vpi_module \"/usr/local/lib/ngspice/va_math.vpi\";\nS_0x4e9d70 .scope module, \"dsp_clock\" \"dsp_clock\" 2 5;\n .timescale -9 -12;\n    .port_info 0 /OUTPUT 1 \"clk\";\nP_0x4e9e38 .param/l \"PERIOD\" 0 2 5, +C4<00000000000000000000001111101000>;\nv0x4e9f38_0 .var \"clk\", 0 0;\n    .scope S_0x4e9d70;\nT_0 ;\n    %pushi/vec4 0, 0, 1;\n    %store/vec4 v0x4e9f38_0, 0, 1;\n    %end;\n    .thread T_0;\n    .scope S_0x4e9d70;\nT_1 ;\n    %delay 500000, 0;\n    %load/vec4 v0x4e9f38_0;\n    %inv;\n    %store/vec4 v0x4e9f38_0, 0, 1;\n    %jmp T_1;\n    .thread T_1;\n# The file index is used to find the file name in the following table.\n:file_names 3;\n    \"N/A\";\n    \"<interactive>\";\n    \"/src/dsp_clock.v\";\n"
    }
   },
   {
    "name": "dsp_impulse.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nTEXT 0 -4 Center 3 \nLINE Normal 32 0 64 0\nLINE Normal -20 12 20 12\nLINE Normal -6 12 -6 -18\nCIRCLE Normal -10 -22 -2 -14\nTEXT 10 -6 Center 2 δ\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n STEP=0 VALUE=16384 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_impulse\nSYMATTR ModelFile dsp_impulse.sub\nSYMATTR Description Verilog module dsp_impulse\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nTEXT 0 -4 Center 3 \nLINE Normal 32 0 64 0\nLINE Normal -20 12 20 12\nLINE Normal -6 12 -6 -18\nCIRCLE Normal -10 -22 -2 -14\nTEXT 10 -6 Center 2 δ\nLINE Normal 4 58 0 52\nLINE Normal 0 52 -4 58\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n STEP=0 VALUE=16384 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_impulse\nSYMATTR ModelFile dsp_impulse.sub\nSYMATTR Description Verilog module dsp_impulse\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
   },
   {
    "name": "dsp_impulse.v",
@@ -124,7 +124,7 @@
   {
    "name": "dsp_nco.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nTEXT 0 -10 Center 3 NCO\nLINE Normal 32 0 64 0\nLINE Normal -16 14 -12 10\nLINE Normal -12 10 -8 8\nLINE Normal -8 8 -4 10\nLINE Normal -4 10 0 14\nLINE Normal 0 14 4 18\nLINE Normal 4 18 8 20\nLINE Normal 8 20 12 18\nLINE Normal 12 18 16 14\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=1024 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_nco\nSYMATTR ModelFile dsp_nco.sub\nSYMATTR Description Verilog module dsp_nco\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nTEXT 0 -10 Center 3 NCO\nLINE Normal 32 0 64 0\nLINE Normal -16 14 -12 10\nLINE Normal -12 10 -8 8\nLINE Normal -8 8 -4 10\nLINE Normal -4 10 0 14\nLINE Normal 0 14 4 18\nLINE Normal 4 18 8 20\nLINE Normal 8 20 12 18\nLINE Normal 12 18 16 14\nLINE Normal 4 58 0 52\nLINE Normal 0 52 -4 58\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=1024 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_nco\nSYMATTR ModelFile dsp_nco.sub\nSYMATTR Description Verilog module dsp_nco\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
   },
   {
    "name": "dsp_nco.v",
@@ -212,7 +212,7 @@
   {
    "name": "dsp_delay.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nLINE Normal -64 0 -32 0\nTEXT 0 -4 Center 3 z⁻¹\nLINE Normal 32 0 64 0\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_delay\nSYMATTR ModelFile dsp_delay.sub\nSYMATTR Description Verilog module dsp_delay\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -64 0 NONE 0\nPINATTR PinName d[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName q[15:0]\nPINATTR SpiceOrder 3\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nLINE Normal -64 0 -32 0\nTEXT 0 -4 Center 3 z⁻¹\nLINE Normal 32 0 64 0\nLINE Normal 4 58 0 52\nLINE Normal 0 52 -4 58\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_delay\nSYMATTR ModelFile dsp_delay.sub\nSYMATTR Description Verilog module dsp_delay\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -64 0 NONE 0\nPINATTR PinName d[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName q[15:0]\nPINATTR SpiceOrder 3\n"
   },
   {
    "name": "dsp_delay.v",
@@ -364,7 +364,7 @@
   {
    "name": "dsp_tap.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nLINE Normal -32 -32 -32 32\nLINE Normal -32 32 32 0\nLINE Normal 32 0 -32 -32\nLINE Normal -64 0 -32 0\nLINE Normal 32 0 64 0\nTEXT -12 0 Center 1 h\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=16384 F=15 RND=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_tap\nSYMATTR ModelFile dsp_tap.sub\nSYMATTR Description Verilog module dsp_tap\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
+   "text": "Version 4\nSymbolType CELL\nLINE Normal -32 -32 -32 32\nLINE Normal -32 32 32 0\nLINE Normal 32 0 -32 -32\nLINE Normal -64 0 -32 0\nLINE Normal 32 0 64 0\nTEXT -12 0 Center 1 h\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=16384 F=15 RND=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_tap\nSYMATTR ModelFile dsp_tap.sub\nSYMATTR Description Verilog module dsp_tap\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
   },
   {
    "name": "dsp_tap.v",
@@ -516,7 +516,7 @@
   {
    "name": "dsp_add.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 Σ\nTEXT -38 -12 Center 1 +\nTEXT 14 -40 Center 1 +\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_add\nSYMATTR ModelFile dsp_add.sub\nSYMATTR Description Verilog module dsp_add\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
+   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 Σ\nTEXT -38 -12 Center 1 +\nTEXT 14 -40 Center 1 +\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal -4 -58 0 -52\nLINE Normal 0 -52 4 -58\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_add\nSYMATTR ModelFile dsp_add.sub\nSYMATTR Description Verilog module dsp_add\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
   },
   {
    "name": "dsp_add.v",
@@ -729,7 +729,7 @@
   {
    "name": "dsp_sub.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 Σ\nTEXT -38 -12 Center 1 +\nTEXT 14 -40 Center 1 −\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_sub\nSYMATTR ModelFile dsp_sub.sub\nSYMATTR Description Verilog module dsp_sub\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
+   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 Σ\nTEXT -38 -12 Center 1 +\nTEXT 14 -40 Center 1 −\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal -4 -58 0 -52\nLINE Normal 0 -52 4 -58\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_sub\nSYMATTR ModelFile dsp_sub.sub\nSYMATTR Description Verilog module dsp_sub\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
   },
   {
    "name": "dsp_sub.v",
@@ -942,7 +942,7 @@
   {
    "name": "dsp_shift.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nLINE Normal -32 -32 -32 32\nLINE Normal -32 32 32 0\nLINE Normal 32 0 -32 -32\nLINE Normal -64 0 -32 0\nLINE Normal 32 0 64 0\nTEXT -12 0 Center 1 2ᴷ\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n K=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_shift\nSYMATTR ModelFile dsp_shift.sub\nSYMATTR Description Verilog module dsp_shift\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
+   "text": "Version 4\nSymbolType CELL\nLINE Normal -32 -32 -32 32\nLINE Normal -32 32 32 0\nLINE Normal 32 0 -32 -32\nLINE Normal -64 0 -32 0\nLINE Normal 32 0 64 0\nTEXT -12 0 Center 1 2ᴷ\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n K=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_shift\nSYMATTR ModelFile dsp_shift.sub\nSYMATTR Description Verilog module dsp_shift\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 1\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 2\n"
   },
   {
    "name": "dsp_shift.v",
@@ -1092,7 +1092,7 @@
   {
    "name": "dsp_downsample.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nLINE Normal -64 0 -32 0\nTEXT 0 -4 Center 3 ↓M\nLINE Normal 32 0 64 0\nLINE Normal 0 -32 0 -64\nWINDOW 0 40 -40 Left 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n M=8 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_downsample\nSYMATTR ModelFile dsp_downsample.sub\nSYMATTR Description Verilog module dsp_downsample\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\nPIN 0 -64 NONE 0\nPINATTR PinName clko\nPINATTR SpiceOrder 4\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -32 -32 32 32\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nLINE Normal 0 32 0 64\nLINE Normal -64 0 -32 0\nTEXT 0 -4 Center 3 ↓M\nLINE Normal 32 0 64 0\nLINE Normal 0 -32 0 -64\nLINE Normal 4 58 0 52\nLINE Normal 0 52 -4 58\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nLINE Normal 4 -54 0 -60\nLINE Normal 0 -60 -4 -54\nWINDOW 0 40 -40 Left 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n M=8 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_downsample\nSYMATTR ModelFile dsp_downsample.sub\nSYMATTR Description Verilog module dsp_downsample\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -64 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\nPIN 0 -64 NONE 0\nPINATTR PinName clko\nPINATTR SpiceOrder 4\n"
   },
   {
    "name": "dsp_downsample.v",
@@ -1249,7 +1249,7 @@
   {
    "name": "dsp_mul.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 ×\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n F=15 RND=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_mul\nSYMATTR ModelFile dsp_mul.sub\nSYMATTR Description Verilog module dsp_mul\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
+   "text": "Version 4\nSymbolType CELL\nCIRCLE Normal -24 -24 24 24\nLINE Normal -64 0 -24 0\nLINE Normal 0 -64 0 -24\nLINE Normal 24 0 64 0\nTEXT 0 0 Center 3 ×\nLINE Normal -58 -4 -52 0\nLINE Normal -52 0 -58 4\nLINE Normal -4 -58 0 -52\nLINE Normal 0 -52 4 -58\nLINE Normal 54 -4 60 0\nLINE Normal 60 0 54 4\nWINDOW 0 -28 32 Right 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n F=15 RND=1 SAT=1 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_mul\nSYMATTR ModelFile dsp_mul.sub\nSYMATTR Description Verilog module dsp_mul\nPIN -64 0 NONE 0\nPINATTR PinName a[15:0]\nPINATTR SpiceOrder 1\nPIN 0 -64 NONE 0\nPINATTR PinName b[15:0]\nPINATTR SpiceOrder 2\nPIN 64 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
   },
   {
    "name": "dsp_mul.v",
@@ -1464,7 +1464,7 @@
   {
    "name": "dsp_fir8.asy",
    "kind": "symbol",
-   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -64 -32 64 32\nLINE Normal -80 0 -64 0\nTEXT -58 0 Left 1 x\nLINE Normal 64 0 80 0\nTEXT 58 0 Right 1 y\nLINE Normal 0 32 0 64\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nTEXT 0 -20 Center 2 FIR\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n C0=287 C1=1571 C2=5375 C3=9151 C4=9151 C5=5375 C6=1571 C7=287 F=15 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_fir8\nSYMATTR ModelFile dsp_fir8.sub\nSYMATTR Description Verilog module dsp_fir8\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -80 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 2\nPIN 80 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
+   "text": "Version 4\nSymbolType CELL\nRECTANGLE Normal -64 -32 64 32\nLINE Normal -80 0 -64 0\nTEXT -58 0 Left 1 x\nLINE Normal 64 0 80 0\nTEXT 58 0 Right 1 y\nLINE Normal 0 32 0 64\nLINE Normal -8 32 0 22\nLINE Normal 0 22 8 32\nTEXT 0 -20 Center 1 FIR\nLINE Normal -16 -6 -12 -9\nLINE Normal -12 -9 -8 -6\nLINE Normal -8 -6 -4 -3\nLINE Normal -4 -3 0 -6\nLINE Normal 0 -6 4 -9\nLINE Normal 4 -9 8 -6\nLINE Normal 8 -6 12 -3\nLINE Normal 12 -3 16 -6\nLINE Normal -16 2 -12 -1\nLINE Normal -12 -1 -8 2\nLINE Normal -8 2 -4 5\nLINE Normal -4 5 0 2\nLINE Normal 0 2 4 -1\nLINE Normal 4 -1 8 2\nLINE Normal 8 2 12 5\nLINE Normal 12 5 16 2\nLINE Normal -16 10 -12 7\nLINE Normal -12 7 -8 10\nLINE Normal -8 10 -4 13\nLINE Normal -4 13 0 10\nLINE Normal 0 10 4 7\nLINE Normal 4 7 8 10\nLINE Normal 8 10 12 13\nLINE Normal 12 13 16 10\nLINE Normal -8 14 8 -10\nLINE Normal -74 -4 -68 0\nLINE Normal -68 0 -74 4\nLINE Normal 70 -4 76 0\nLINE Normal 76 0 70 4\nLINE Normal 4 58 0 52\nLINE Normal 0 52 -4 58\nWINDOW 0 0 -40 Bottom 2\nWINDOW 3 0 0 Invisible 2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n C0=287 C1=1571 C2=5375 C3=9151 C4=9151 C5=5375 C6=1571 C7=287 F=15 W=16 hdl=auto\nSYMATTR Prefix X\nSYMATTR Value dsp_fir8\nSYMATTR ModelFile dsp_fir8.sub\nSYMATTR Description Verilog module dsp_fir8\nPIN 0 64 NONE 0\nPINATTR PinName clk\nPINATTR SpiceOrder 1\nPIN -80 0 NONE 0\nPINATTR PinName x[15:0]\nPINATTR SpiceOrder 2\nPIN 80 0 NONE 0\nPINATTR PinName y[15:0]\nPINATTR SpiceOrder 3\n"
   },
   {
    "name": "dsp_fir8.v",
@@ -1623,34 +1623,34 @@
    }
   }
  ],
- "activeTestbench": "smw0081ov5",
+ "activeTestbench": "smw04lvob5",
  "groups": [
   {
-   "id": "gmw0081ou0",
+   "id": "gmw04lvoa0",
    "name": "FIR"
   },
   {
-   "id": "gmw0081ou1",
+   "id": "gmw04lvoa1",
    "name": "IIR"
   },
   {
-   "id": "gmw0081ou2",
+   "id": "gmw04lvoa2",
    "name": "CIC"
   },
   {
-   "id": "gmw0081ou3",
+   "id": "gmw04lvoa3",
    "name": "NCO and mixer"
   },
   {
-   "id": "gmw0081ou4",
+   "id": "gmw04lvoa4",
    "name": "Mixed signal"
   }
  ],
  "testbenches": [
   {
-   "id": "smw0081ov5",
+   "id": "smw04lvob5",
    "name": "Impulse response",
-   "group": "gmw0081ou0",
+   "group": "gmw04lvoa0",
    "current": "sha256:be98a123bc5b5d62c3c48d919d925a38e605c7ba55a7bbad322b54e801da0f27",
    "view": {
     "panes": [
@@ -1688,9 +1688,9 @@
    "runs": []
   },
   {
-   "id": "smw0081ov6",
+   "id": "smw04lvob6",
    "name": "Sine 20 kHz (passband)",
-   "group": "gmw0081ou0",
+   "group": "gmw04lvoa0",
    "current": "sha256:7f122ff4c43cef669378c18a3afd390edfe6d897af2c9070c18dad5408efef06",
    "view": {
     "panes": [
@@ -1728,9 +1728,9 @@
    "runs": []
   },
   {
-   "id": "smw0081ow7",
+   "id": "smw04lvoc7",
    "name": "Sine 300 kHz (stopband)",
-   "group": "gmw0081ou0",
+   "group": "gmw04lvoa0",
    "current": "sha256:4686e734ab15fddde74e712f3262363e0390a890f5ca159564975d137c23b1cd",
    "view": {
     "panes": [
@@ -1768,9 +1768,9 @@
    "runs": []
   },
   {
-   "id": "smw0081ow8",
+   "id": "smw04lvoc8",
    "name": "First order: step",
-   "group": "gmw0081ou1",
+   "group": "gmw04lvoa1",
    "current": "sha256:c40447c39c03e48b206c16db11b07b7a5cee0e93566dd8267677d7de3107844e",
    "view": {
     "panes": [
@@ -1808,9 +1808,9 @@
    "runs": []
   },
   {
-   "id": "smw0081ow9",
+   "id": "smw04lvoc9",
    "name": "Biquad: step",
-   "group": "gmw0081ou1",
+   "group": "gmw04lvoa1",
    "current": "sha256:6d56bce9508c217adac51e9e2272990775f9dd59264a40c31a2ae22689b8fef2",
    "view": {
     "panes": [
@@ -1848,9 +1848,9 @@
    "runs": []
   },
   {
-   "id": "smw0081owa",
+   "id": "smw04lvoca",
    "name": "Step response",
-   "group": "gmw0081ou2",
+   "group": "gmw04lvoa2",
    "current": "sha256:40d8166920e5661e4c44bc25bbfe3248862a149a2bc86bceae9f51e1d2b401a7",
    "view": {
     "panes": [
@@ -1888,9 +1888,9 @@
    "runs": []
   },
   {
-   "id": "smw0081owb",
+   "id": "smw04lvocb",
    "name": "Mixer 50 kHz × 60 kHz",
-   "group": "gmw0081ou3",
+   "group": "gmw04lvoa3",
    "current": "sha256:0b204ee2dfd4f31ad32cb59592389de09b6e8a6c28400bd57c225d52ea3a7d85",
    "view": {
     "panes": [
@@ -1941,9 +1941,9 @@
    "runs": []
   },
   {
-   "id": "smw0081owc",
+   "id": "smw04lvocc",
    "name": "ADC → FIR → DAC",
-   "group": "gmw0081ou4",
+   "group": "gmw04lvoa4",
    "current": "sha256:1c78fb87a57855c1e9482680b55feead293bd12ec6ba0367939b58f470e435ca",
    "view": {
     "panes": [

@@ -10,7 +10,20 @@ LINE Normal -24 32 -16 22
 LINE Normal -16 22 -8 32
 LINE Normal 16 32 16 64
 TEXT 16 22 Center 1 clr
-TEXT 0 -20 Center 2 ∫
+TEXT 0 -20 Center 1 ∫
+LINE Normal -20 12 -12 8
+LINE Normal -12 8 -4 2
+LINE Normal -4 2 4 -4
+LINE Normal 4 -4 12 -8
+LINE Normal 12 -8 20 -10
+LINE Normal -74 -4 -68 0
+LINE Normal -68 0 -74 4
+LINE Normal 70 -4 76 0
+LINE Normal 76 0 70 4
+LINE Normal -12 58 -16 52
+LINE Normal -16 52 -20 58
+LINE Normal 20 58 16 52
+LINE Normal 16 52 12 58
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=0 W=16 hdl=auto

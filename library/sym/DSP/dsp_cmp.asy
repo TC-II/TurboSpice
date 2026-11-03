@@ -12,6 +12,16 @@ TEXT 58 0 Right 1 eq
 LINE Normal 64 32 80 32
 TEXT 58 32 Right 1 gt
 TEXT 0 -50 Center 2 a : b
+LINE Normal -74 -20 -68 -16
+LINE Normal -68 -16 -74 -12
+LINE Normal -74 12 -68 16
+LINE Normal -68 16 -74 20
+LINE Normal 70 -36 76 -32
+LINE Normal 76 -32 70 -28
+LINE Normal 70 -4 76 0
+LINE Normal 76 0 70 4
+LINE Normal 70 28 76 32
+LINE Normal 76 32 70 36
 WINDOW 0 0 -72 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto

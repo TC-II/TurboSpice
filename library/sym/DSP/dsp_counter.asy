@@ -15,6 +15,18 @@ TEXT 16 38 Center 1 en
 LINE Normal 48 48 48 80
 TEXT 48 38 Center 1 down
 TEXT 0 -34 Center 2 CTR
+LINE Normal 70 -20 76 -16
+LINE Normal 76 -16 70 -12
+LINE Normal 70 12 76 16
+LINE Normal 76 16 70 20
+LINE Normal -44 74 -48 68
+LINE Normal -48 68 -52 74
+LINE Normal -12 74 -16 68
+LINE Normal -16 68 -20 74
+LINE Normal 20 74 16 68
+LINE Normal 16 68 12 74
+LINE Normal 52 74 48 68
+LINE Normal 48 68 44 74
 WINDOW 0 0 -56 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n MOD=65536 W=16 hdl=auto

@@ -12,6 +12,14 @@ LINE Normal 32 -16 64 -16
 TEXT 26 -16 Right 0 0
 LINE Normal 32 16 64 16
 TEXT 26 16 Right 0 1
+LINE Normal 4 66 0 60
+LINE Normal 0 60 -4 66
+LINE Normal -58 -4 -52 0
+LINE Normal -52 0 -58 4
+LINE Normal 54 -20 60 -16
+LINE Normal 60 -16 54 -12
+LINE Normal 54 12 60 16
+LINE Normal 60 16 54 20
 WINDOW 0 0 -56 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto

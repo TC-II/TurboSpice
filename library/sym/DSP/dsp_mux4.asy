@@ -16,6 +16,18 @@ TEXT -26 16 Left 0 2
 LINE Normal -64 48 -32 48
 TEXT -26 48 Left 0 3
 LINE Normal 32 0 64 0
+LINE Normal 4 98 0 92
+LINE Normal 0 92 -4 98
+LINE Normal -58 -52 -52 -48
+LINE Normal -52 -48 -58 -44
+LINE Normal -58 -20 -52 -16
+LINE Normal -52 -16 -58 -12
+LINE Normal -58 12 -52 16
+LINE Normal -52 16 -58 20
+LINE Normal -58 44 -52 48
+LINE Normal -52 48 -58 52
+LINE Normal 54 -4 60 0
+LINE Normal 60 0 54 4
 WINDOW 0 0 -88 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n W=16 hdl=auto

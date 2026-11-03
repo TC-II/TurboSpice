@@ -1,18 +1,33 @@
 Version 4
 SymbolType CELL
-RECTANGLE Normal -64 -80 64 80
-LINE Normal -80 -48 -64 -48
-TEXT -58 -48 Left 1 a
-LINE Normal -80 -16 -64 -16
-TEXT -58 -16 Left 1 b
-LINE Normal -80 16 -64 16
-TEXT -58 16 Left 1 c
-LINE Normal -80 48 -64 48
-TEXT -58 48 Left 1 d
-LINE Normal 64 0 80 0
-TEXT 58 0 Right 1 y
-TEXT 0 -66 Center 2 Σ
-WINDOW 0 0 -88 Bottom 2
+CIRCLE Normal -28 -28 28 28
+TEXT 0 0 Center 3 Σ
+LINE Normal -80 -48 -44 -48
+LINE Normal -44 -48 -19 -21
+TEXT -56 -56 Center 0 a
+LINE Normal -80 -16 -44 -16
+LINE Normal -44 -16 -26 -10
+TEXT -56 -24 Center 0 b
+LINE Normal -80 16 -44 16
+LINE Normal -44 16 -26 10
+TEXT -56 8 Center 0 c
+LINE Normal -80 48 -44 48
+LINE Normal -44 48 -19 21
+TEXT -56 40 Center 0 d
+LINE Normal 80 0 44 0
+LINE Normal 44 0 28 0
+TEXT 56 -8 Center 0 y
+LINE Normal -74 -52 -68 -48
+LINE Normal -68 -48 -74 -44
+LINE Normal -74 -20 -68 -16
+LINE Normal -68 -16 -74 -12
+LINE Normal -74 12 -68 16
+LINE Normal -68 16 -74 20
+LINE Normal -74 44 -68 48
+LINE Normal -68 48 -74 52
+LINE Normal 70 -4 76 0
+LINE Normal 76 0 70 4
+WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
 SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=1 W=16 hdl=auto
 SYMATTR Prefix X

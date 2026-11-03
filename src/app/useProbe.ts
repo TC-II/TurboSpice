@@ -4,7 +4,8 @@
 import { useRef, type Dispatch, type MutableRefObject, type RefObject, type SetStateAction } from 'react';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { t } from '../i18n/i18n.ts';
-import { busBits, isBusName } from '../netlist/bus.ts';
+import { busBitNode, busBits, isBusName } from '../netlist/bus.ts';
+import type { LtNetlist } from '../netlist/ltnetlist.ts';
 import type { Tool } from '../schematic/SchematicEditor.tsx';
 import type { InstScope } from '../sim/context.ts';
 import { toggleOpTag, type OpTags } from '../sim/opPins.ts';
@@ -20,6 +21,19 @@ import { addTraceTo, sameExpr, type Pane } from '../waveform/view.ts';
 import type { HierLevel, SimRun } from './types.ts';
 
 type Target = { net?: string; symbol?: number; pin?: number };
+
+/** Una red sin rango que en el esquemático es un bus (N001 entre pines de 16 bits): "N001[15:0]"; si no, null */
+export function implicitBus(lt: LtNetlist, net: string): string | null {
+  const n = lt.conn.nets.find((x) => x.name.toLowerCase() === net.toLowerCase());
+  const hi = n && n.bits.length > 1 ? /\[(\d+)\]$/.exec(n.bits[0]) : null;
+  return hi && n!.bits.every((b, i) => b.toLowerCase() === `${net}[${Number(hi[1]) - i}]`.toLowerCase()) ? `${net}[${hi[1]}:0]` : null;
+}
+
+/** ¿El bus va a un pin de una instancia X (un bloque Verilog)? */
+function verilogBus(ng: string, bits: string[]): boolean {
+  const node = busBitNode(bits[0]).toLowerCase();
+  return ng.split('\n').some((l) => /^x/i.test(l.trim()) && l.toLowerCase().split(/\s+/).includes(node));
+}
 
 export interface ProbeDeps {
   tool: Tool;
@@ -69,14 +83,16 @@ export function useProbe(d: ProbeDeps) {
     if (!sim || !plot) return;
     // un punto de operación (sin eje X): se anota el valor en el esquemático y queda fijo (#228)
     if (!scaleOf(plot) && op) return setOpTags((p) => toggleOpTag(p, target));
-    // un cable de bus (f[10:0]): una traza por bit, en el testbench
-    if (target.net && isBusName(target.net) && !pathRef.current.length && !dftPick.current) {
+    // un cable de bus (f[10:0], o uno sin nombre entre pines de bus: N001 con sus bits N001[0]…):
+    // una traza por bit, en el testbench
+    const bus = target.net && !pathRef.current.length && !dftPick.current ? (isBusName(target.net) ? target.net : implicitBus(sim.built.lt, target.net)) : null;
+    if (bus) {
       const sc = scaleOf(plot);
       if (!sc) return;
       // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
-      const dig = digitalProbeExpr(sim.built, busBits(target.net), target.net);
+      const dig = digitalProbeExpr(sim.built, busBits(bus), bus);
       if (dig && hasData(dig)) return addDigitalProbe(dig);
-      const exprs = busBits(target.net)
+      const exprs = busBits(bus)
         .map((b) => probeExpr(sim.built, { net: b }))
         .filter((e): e is string => {
           if (!e) return false;
@@ -87,7 +103,16 @@ export function useProbe(d: ProbeDeps) {
             return false;
           }
         });
-      if (!exprs.length) return setMessage(t('No data for {expr} in {name}', { expr: target.net, name: plot.name }));
+      if (!exprs.length) {
+        // un bus entre bloques Verilog que se simularon juntos en un solo módulo de Icarus (o que no
+        // se guardó): la traza digital queda y, como lo que piden las trazas se expone, aparece al
+        // volver a simular
+        if (verilogBus(sim.built.ng.text, busBits(bus))) {
+          addDigitalProbe(`Dig(${bus})`);
+          return setMessage(t("{expr} wasn't saved in this simulation: it will be saved when you simulate again", { expr: `Dig(${bus})` }));
+        }
+        return setMessage(t('No data for {expr} in {name}', { expr: bus, name: plot.name }));
+      }
       setPanel('plot');
       if (expanded === 'schematic') setExpanded('');
       const i = Math.min(activePane, panes.length - 1);

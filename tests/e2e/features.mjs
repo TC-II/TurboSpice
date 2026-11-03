@@ -1617,7 +1617,11 @@ await page.locator('svg.editor .sym').first().waitFor();
     const p = await at(x, y);
     await page.mouse.dblclick(p.x, p.y);
   };
-  await open(236, 208); // Q1
+  // Q1 es el primer símbolo del .asc: doble click en el medio de su dibujo (no por coordenadas del
+  // esquemático, que dependen de que el encuadre ya esté quieto)
+  await page.keyboard.press('Escape');
+  const q1 = await page.locator('svg.editor .sym').first().boundingBox();
+  await page.mouse.dblclick(q1.x + q1.width / 2, q1.y + q1.height / 2);
   const dlg = page.getByRole('dialog');
   const table = dlg.locator('.parts-table');
   check(

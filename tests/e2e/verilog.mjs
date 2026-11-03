@@ -111,6 +111,12 @@ check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' })
 // un error se marca en su línea
 await code.fill(VERILOG.replace('q <= q + 1;', 'q <= ;'));
 await synthesize();
+// (el estado ya decía «Sintetizado» de antes: synthesize no espera a esta síntesis, sí al error)
+await page
+  .locator('.vm-gutter .err')
+  .first()
+  .waitFor({ timeout: 120000 })
+  .catch(() => {});
 check((await page.locator('.vm-side .err').count()) > 0 && (await page.locator('.vm-gutter .err').count()) === 1, 'un error de sintaxis se muestra y marca su línea');
 await code.fill(VERILOG);
 await synthesize();

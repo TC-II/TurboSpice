@@ -162,6 +162,16 @@ const BOXES: Record<string, [string, string[], string[], string[]?]> = {
   dsp_ram: ['RAM', ['addr', 'd'], ['q'], ['clk', 'we']],
   dsp_movavg: ['AVG', ['x'], ['y'], ['clk']],
   dsp_envelope: ['ENV', ['x'], ['y'], ['clk']],
+  dsp_sqrt: ['√x', ['x'], ['y']],
+  dsp_cordic: ['CORDIC', ['phase'], ['cos', 'sin']],
+  dsp_magphase: ['|z| ∠z', ['x', 'y'], ['mag', 'phase']],
+  dsp_cmul: ['× I/Q', ['ar', 'ai', 'br', 'bi'], ['yr', 'yi']],
+  dsp_sdm: ['ΣΔ', ['x'], ['q'], ['clk']],
+  dsp_fir8: ['FIR', ['x'], ['y'], ['clk']],
+  dsp_biquad: ['biquad', ['x'], ['y'], ['clk']],
+  dsp_cic: ['CIC ↓R', ['x'], ['y', 'valid'], ['clk']],
+  dsp_fifo: ['FIFO', ['d'], ['q', 'empty', 'full'], ['clk', 'wr', 'rd']],
+  dsp_ramp: ['ramp', [], ['y'], ['clk']],
 };
 
 const DRAW: Record<string, Drawing> = {
@@ -173,6 +183,7 @@ const DRAW: Record<string, Drawing> = {
     shapes: [box(-32, -24, 32, 24), ...line([32, 0], [64, 0]), ...line([-20, 8], [-10, 8], [-10, -8], [0, -8], [0, 8], [10, 8], [10, -8], [20, -8])],
     name: [0, -32, 'Bottom'],
   },
+  dsp_div: node('÷'),
   dsp_mux2: mux(['a', 'b'], ['y'], 'sel', ''),
   dsp_mux4: mux(['a', 'b', 'c', 'd'], ['y'], 'sel', ''),
   dsp_demux2: mux(['x'], ['a', 'b'], 'sel', ''),
@@ -233,4 +244,26 @@ for (const f of readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
   if (!r.block) throw new Error(`${f}: ${r.error}`);
   writeFileSync(join(OUT, `${name}.asy`), drawn(name, verilogSymbol(name, r.block)));
   console.log(`${name}: ${r.block.pins.length} pines`);
+}
+
+// El ADC y el DAC ideales no son Verilog: su .subckt está en library/sub/DSP (fuentes B)
+const ANALOG: { name: string; label: string; ins: string[]; outs: string[]; desc: string }[] = [
+  { name: 'dsp_adc', label: 'ADC', ins: ['vin'], outs: ['d[15:0]'], desc: 'Ideal 16-bit ADC: vin (−vref … +vref) → a Q1.15 word' },
+  { name: 'dsp_dac', label: 'DAC', ins: ['d[15:0]'], outs: ['vout'], desc: 'Ideal 16-bit DAC: a Q1.15 word → vout = vref · word / 32768' },
+];
+for (const a of ANALOG) {
+  const d = blk(
+    a.label,
+    a.ins.map((p) => p.replace(/\[.*$/, '')),
+    a.outs.map((p) => p.replace(/\[.*$/, '')),
+  );
+  const [nx, ny, nAlign] = d.name ?? [0, -40, 'Bottom'];
+  const out = ['Version 4', 'SymbolType CELL', ...d.shapes, `WINDOW 0 ${nx} ${ny} ${nAlign} 2`, 'WINDOW 3 0 0 Invisible 2'];
+  out.push('SYMATTR SpiceLine vref=1 vcc=5', 'SYMATTR Prefix X', `SYMATTR Value ${a.name}`, `SYMATTR ModelFile DSP/${a.name}.sub`, `SYMATTR Description ${a.desc}`);
+  [...a.ins, ...a.outs].forEach((p, k) => {
+    const at = d.pins[p.replace(/\[.*$/, '')];
+    out.push(`PIN ${at[0]} ${at[1]} NONE 0`, `PINATTR PinName ${p}`, `PINATTR SpiceOrder ${k + 1}`);
+  });
+  writeFileSync(join(OUT, `${a.name}.asy`), out.join('\n') + '\n');
+  console.log(`${a.name}: ${a.ins.length + a.outs.length} pines`);
 }

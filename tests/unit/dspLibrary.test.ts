@@ -18,6 +18,10 @@ describe('biblioteca DSP', () => {
     }
   });
   it('cada símbolo de DSP tiene su módulo', () => {
-    for (const path of Object.keys(b.symbols).filter((p) => p.startsWith('DSP/'))) expect(mods).toContain(path.slice(4));
+    // (o su .subckt en library/sub/DSP: el ADC y el DAC ideales)
+    for (const path of Object.keys(b.symbols).filter((p) => p.startsWith('DSP/'))) {
+      const name = path.slice(4);
+      if (!mods.includes(name)) expect(b.subs[`DSP/${name}.sub`]?.subckts, name).toContain(name);
+    }
   });
 });

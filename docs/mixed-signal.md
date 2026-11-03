@@ -93,17 +93,24 @@ Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `libr
 (`dsp_<nombre>`):
 - Aritmética: `const`, `add`, `sub`, `sum4`, `mul`, `tap` (coeficiente COEF), `shift` (×2^K), `neg`,
   `abs`, `requant` (cambio de formato: corre SHIFT bits, redondea y satura), `minmax`, `cmp`, `mac`,
-  `popcount`, `clz`.
+  `popcount`, `clz`, `div`, `sqrt`, `cmul` (multiplicador complejo I/Q).
 - DSP: `delay` (z⁻¹), `integrator`, `diff` (1 − z⁻¹), `movavg`, `envelope`, `nco`, `impulse`
   (impulso o escalón), `downsample` (↓M) y `upsample` (↑L), con su reloj `clko`, que cambia en los
   flancos de bajada de `clk`: los bloques que siguen con `clko` son sincrónicos con la muestra.
+  `cordic` (fase → cos, sen) y `magphase` (x, y → magnitud, fase), `sdm` (sigma-delta de 1 bit),
+  `ramp`. En un solo bloque: `fir8` (C0…C7), `biquad` (B0 B1 B2 A1 A2 en Q2.14) y `cic` (N, R; salida
+  normalizada, con `valid`).
 - Lógica y bits: `and`, `or`, `xor`, `not`, `mask`, `rotate`, `bitrev`, `bin2gray`, `gray2bin`, `parity`.
 - Ruteo y memoria: `mux2`, `mux4`, `demux2`, `decoder` (3 → 8), `prienc` (8 → 3), `split` y `join`
-  (16 ↔ 2 × 8), `ram` (16 palabras).
+  (16 ↔ 2 × 8), `ram` (16 palabras), `fifo` (16 palabras).
 - Secuencial y control: `counter`, `clkdiv`, `lfsr` (PRBS de 16 bits), `shiftreg` (SIPO), `piso`,
   `edge`, `sync`, `pwm`, `debounce`, `oneshot`, `clock` (de comportamiento: sólo con Icarus).
 
 SAT/RND eligen saturar y redondear.
+- **ADC y DAC ideales** (`library/sub/DSP/dsp_adc.sub`, `dsp_dac.sub`): no son Verilog sino un
+  `.subckt` con fuentes B (16 bits, Q1.15, `vref`): cuantizan sin muestrear, con cada bit en 0 o `vcc`,
+  así que se conectan directo a los bloques (la muestra la toma un z⁻¹). El ejemplo DSP tiene un
+  testbench ADC → FIR8 → DAC con dos senos analógicos.
 - **Símbolos dibujados** (`library/sym/DSP`, carpeta DSP del buscador): Σ en un círculo, el tap como
   triángulo, z⁻¹ con el reloj abajo, el MUX como trapecio, las compuertas con el rótulo IEC (&, ≥1,
   =1); los demás, una caja con los nombres de los pines adentro y los de control (clk, rst, en…) abajo. Los genera `node scripts/gen-dsp-symbols.ts` (el orden de los pines

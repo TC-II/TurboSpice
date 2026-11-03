@@ -1,0 +1,5 @@
+* DAC ideal de 16 bits (#366): una palabra en complemento a dos (Q1.15), cada bit en 0 o vcc (los
+* bloques de library/verilog/DSP), → vout = vref · palabra / 32768. Sin muestrear: cambia con los bits.
+.subckt dsp_dac d_15 d_14 d_13 d_12 d_11 d_10 d_9 d_8 d_7 d_6 d_5 d_4 d_3 d_2 d_1 d_0 vout vref=1 vcc=5
+Bout vout 0 V=vref/32768*(-32768*u(v(d_15)-vcc/2) + 16384*u(v(d_14)-vcc/2) + 8192*u(v(d_13)-vcc/2) + 4096*u(v(d_12)-vcc/2) + 2048*u(v(d_11)-vcc/2) + 1024*u(v(d_10)-vcc/2) + 512*u(v(d_9)-vcc/2) + 256*u(v(d_8)-vcc/2) + 128*u(v(d_7)-vcc/2) + 64*u(v(d_6)-vcc/2) + 32*u(v(d_5)-vcc/2) + 16*u(v(d_4)-vcc/2) + 8*u(v(d_3)-vcc/2) + 4*u(v(d_2)-vcc/2) + 2*u(v(d_1)-vcc/2) + 1*u(v(d_0)-vcc/2))
+.ends dsp_dac

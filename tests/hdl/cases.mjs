@@ -595,6 +595,119 @@ end
     },
   },
   {
+    name: 'DSP (#366): divisor, raíz cuadrada, CORDIC (cos/sen y magnitud/fase) y multiplicador complejo',
+    file: 'math.v',
+    top: 'math',
+    verilog: `${DSP}
+module math(output signed [15:0] q1, output signed [15:0] q2, output signed [15:0] q0, output signed [15:0] r,
+  output signed [15:0] c0, output signed [15:0] s0, output signed [15:0] c90, output signed [15:0] s90,
+  output signed [15:0] mag, output [15:0] ph, output signed [15:0] yr, output signed [15:0] yi);
+  wire signed [15:0] quarter, half, mquarter, zero, five;
+  wire [15:0] p90;
+  dsp_const #(.VALUE(8192)) k1(.y(quarter));
+  dsp_const #(.VALUE(16384)) k2(.y(half));
+  dsp_const #(.VALUE(-8192)) k3(.y(mquarter));
+  dsp_const #(.VALUE(0)) k4(.y(zero));
+  dsp_const #(.VALUE(5)) k5(.y(five));
+  dsp_const #(.VALUE(16384)) k6(.y(p90));
+  dsp_div u1(.a(quarter), .b(half), .y(q1));
+  dsp_div u2(.a(mquarter), .b(half), .y(q2));
+  dsp_div u3(.a(five), .b(zero), .y(q0));
+  dsp_sqrt u4(.x(quarter), .y(r));
+  dsp_cordic u5(.phase(zero), .cos(c0), .sin(s0));
+  dsp_cordic u6(.phase(p90), .cos(c90), .sin(s90));
+  dsp_magphase u7(.x(half), .y(half), .mag(mag), .phase(ph));
+  dsp_cmul u8(.ar(half), .ai(zero), .br(zero), .bi(half), .yr(yr), .yi(yi));
+endmodule`,
+    outs: ['q1', 'q2', 'q0', 'r', 'c0', 's0', 'c90', 's90', 'mag', 'ph', 'yr', 'yi'],
+    get circuit() {
+      return `X1 ${this.outs.map((n) => nodes(n, 16)).join(' ')} math\n.tran 1n 20n`;
+    },
+    check(at) {
+      // [valor, tolerancia]: el CORDIC tiene el error de sus 16 iteraciones
+      const want = {
+        q1: [16384, 0],
+        q2: [-16384, 0],
+        q0: [32767, 0],
+        r: [16384, 0],
+        c0: [32767, 4],
+        s0: [0, 4],
+        c90: [0, 4],
+        s90: [32767, 4],
+        mag: [23170, 4],
+        ph: [8192, 4],
+        yr: [0, 0],
+        yi: [8192, 0],
+      };
+      for (const [n, [v, tol]] of Object.entries(want)) {
+        const got = n === 'ph' ? uword(at, n, 16, 10e-9) : word(at, n, 16, 10e-9);
+        if (Math.abs(got - v) > tol) return `${n} = ${got} (esperaba ${v} ± ${tol})`;
+      }
+    },
+  },
+  {
+    name: 'DSP (#366): sigma-delta, FIR8, biquad, CIC, FIFO y rampa',
+    file: 'blocks.v',
+    top: 'blocks',
+    verilog: `${DSP}
+module blocks(input clk, output q, output signed [15:0] fir, output signed [15:0] iir, output signed [15:0] cic, output cv,
+  output [7:0] fq, output full, output empty, output signed [15:0] ramp);
+  wire signed [15:0] half, imp, step, small;
+  dsp_const #(.VALUE(16384)) k1(.y(half));
+  dsp_const #(.VALUE(256)) k2(.y(small));
+  dsp_impulse #(.VALUE(32767)) u0(.clk(clk), .y(imp));
+  dsp_impulse #(.VALUE(16384), .STEP(1)) u1(.clk(clk), .y(step));
+  dsp_sdm u2(.clk(clk), .x(half), .q(q));
+  dsp_fir8 u3(.clk(clk), .x(imp), .y(fir));
+  dsp_biquad u4(.clk(clk), .x(step), .y(iir));
+  dsp_cic #(.R(8), .N(2)) u5(.clk(clk), .x(small), .y(cic), .valid(cv));
+  dsp_fifo #(.W(8)) u6(.clk(clk), .wr(1'b1), .rd(1'b0), .d(8'd77), .q(fq), .empty(empty), .full(full));
+  dsp_ramp #(.STEP(256)) u7(.clk(clk), .y(ramp));
+endmodule`,
+    fresh: true,
+    circuit: `${CLK}
+X1 clk q ${nodes('fir', 16)} ${nodes('iir', 16)} ${nodes('cic', 16)} cv ${nodes('fq', 8)} full empty ${nodes('ramp', 16)} blocks tpd=1n
+.tran 1n 8u`,
+    check: (at) => {
+      // sigma-delta de 0,5: 3 de cada 4 bits en 1 (promedio (1 + 0,5)/2), en 64 ciclos
+      let ones = 0;
+      for (let k = 8; k < 72; k++) ones += at('q', k * 100e-9 + 50e-9) > 2.5 ? 1 : 0;
+      if (Math.abs(ones - 48) > 1) return `sigma-delta: ${ones} unos en 64 (esperaba 48)`;
+      // FIR8: en el ciclo k sale el coeficiente k por el impulso (el reloj sube en 0)
+      const fir = [287, 1571, 5375, 9151, 9151, 5375, 1571, 287, 0].map((c) => Math.floor((c * 32767 + 16384) / 32768));
+      for (let k = 0; k < fir.length; k++) {
+        const got = word(at, 'fir', 16, k * 100e-9 + 50e-9);
+        if (got !== fir[k]) return `FIR8 en el ciclo ${k}: ${got} (esperaba ${fir[k]})`;
+      }
+      const iir = word(at, 'iir', 16, 7.95e-6);
+      if (Math.abs(iir - 16384) > 40) return `biquad: ${iir} (esperaba ≈16384)`;
+      if (word(at, 'cic', 16, 7.95e-6) !== 256) return `CIC: ${word(at, 'cic', 16, 7.95e-6)} (esperaba 256: ganancia 1)`;
+      if (uword(at, 'fq', 8, 3e-6) !== 77 || at('full', 3e-6) < 2.5 || at('empty', 3e-6) > 2.5) return 'FIFO';
+      if (at('empty', 50e-9) > 2.5 && at('full', 50e-9) > 2.5) return 'FIFO al principio';
+      if (word(at, 'ramp', 16, 450e-9) !== 5 * 256) return `rampa: ${word(at, 'ramp', 16, 450e-9)}`;
+    },
+  },
+  {
+    name: 'DSP (#366): ADC y DAC ideales (fuentes B) alrededor de un z⁻¹',
+    file: 'adcdac.v',
+    top: 'dsp_delay',
+    verilog: readFileSync(new URL('dsp_delay.v', DSP_DIR), 'utf8'),
+    circuit: `${readFileSync(new URL('../../library/sub/DSP/dsp_adc.sub', import.meta.url), 'utf8')}
+${readFileSync(new URL('../../library/sub/DSP/dsp_dac.sub', import.meta.url), 'utf8')}
+${CLK}
+Vin vin 0 0.3
+XA vin ${nodes('d', 16)} dsp_adc vref=1
+X1 clk ${nodes('d', 16)} ${nodes('q', 16)} dsp_delay tpd=1n
+XD ${nodes('q', 16)} vout dsp_dac vref=1
+.tran 1n 400n`,
+    check: (at) => {
+      const code = word(at, 'd', 16, 50e-9);
+      if (code !== Math.floor(0.3 * 32768)) return `ADC: ${code} (esperaba ${Math.floor(0.3 * 32768)})`;
+      const v = at('vout', 350e-9);
+      if (Math.abs(v - 0.3) > 1 / 32768) return `DAC: ${v} V (esperaba 0,3 V ± 1 LSB)`;
+    },
+  },
+  {
     name: 'error de sintaxis',
     file: 'bad.v',
     verilog: `module bad(input a, output y); assign y = ; endmodule`,

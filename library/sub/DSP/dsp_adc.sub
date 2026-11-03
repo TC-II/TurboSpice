@@ -1,0 +1,24 @@
+* ADC ideal de 16 bits (#366): vin (de −vref a +vref) → una palabra en complemento a dos (Q1.15),
+* cada bit en 0 o vcc, para los bloques de library/verilog/DSP. Cuantiza sin muestrear (redondea hacia
+* abajo y satura): la muestra la toma el bloque que lo lee con su reloj (un z⁻¹).
+.subckt dsp_adc vin d_15 d_14 d_13 d_12 d_11 d_10 d_9 d_8 d_7 d_6 d_5 d_4 d_3 d_2 d_1 d_0 vref=1 vcc=5
+Bcode code 0 V=max(-32768, min(32767, floor(v(vin)/vref*32768)))
+* el código sin signo (de 0 a 65535) y sus bits
+Bword word 0 V=v(code)+65536*u(-v(code)-0.5)
+Bd15 d_15 0 V=vcc*(floor(v(word)/32768)-2*floor(v(word)/65536))
+Bd14 d_14 0 V=vcc*(floor(v(word)/16384)-2*floor(v(word)/32768))
+Bd13 d_13 0 V=vcc*(floor(v(word)/8192)-2*floor(v(word)/16384))
+Bd12 d_12 0 V=vcc*(floor(v(word)/4096)-2*floor(v(word)/8192))
+Bd11 d_11 0 V=vcc*(floor(v(word)/2048)-2*floor(v(word)/4096))
+Bd10 d_10 0 V=vcc*(floor(v(word)/1024)-2*floor(v(word)/2048))
+Bd9 d_9 0 V=vcc*(floor(v(word)/512)-2*floor(v(word)/1024))
+Bd8 d_8 0 V=vcc*(floor(v(word)/256)-2*floor(v(word)/512))
+Bd7 d_7 0 V=vcc*(floor(v(word)/128)-2*floor(v(word)/256))
+Bd6 d_6 0 V=vcc*(floor(v(word)/64)-2*floor(v(word)/128))
+Bd5 d_5 0 V=vcc*(floor(v(word)/32)-2*floor(v(word)/64))
+Bd4 d_4 0 V=vcc*(floor(v(word)/16)-2*floor(v(word)/32))
+Bd3 d_3 0 V=vcc*(floor(v(word)/8)-2*floor(v(word)/16))
+Bd2 d_2 0 V=vcc*(floor(v(word)/4)-2*floor(v(word)/8))
+Bd1 d_1 0 V=vcc*(floor(v(word)/2)-2*floor(v(word)/4))
+Bd0 d_0 0 V=vcc*(floor(v(word)/1)-2*floor(v(word)/2))
+.ends dsp_adc

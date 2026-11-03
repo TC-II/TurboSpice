@@ -23,7 +23,7 @@ import type { SimView } from '../../src/sim/simList.ts';
 
 const LIB = 'library/verilog/DSP';
 const SYM = 'library/sym/DSP';
-const MODULES = ['dsp_clock', 'dsp_impulse', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul'];
+const MODULES = ['dsp_clock', 'dsp_impulse', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul', 'dsp_fir8'];
 
 // Icarus en WebAssembly (engine/dist-engine/icarus), para los módulos de comportamiento (el reloj)
 const ICARUS = join('engine', 'dist-engine', 'icarus');
@@ -113,6 +113,10 @@ class Sheet {
     this.last = keep;
     this.stub(c.pins.clk, [1, 0], 'clk');
     this.text(x - 40, y + 112, ';1 MHz clock');
+  }
+  /** Líneas del .asc tal cual (un componente analógico de la librería) */
+  raw(...l: string[]) {
+    this.lines.push(...l);
   }
   text(x: number, y: number, s: string, size = 2) {
     this.lines.push(`TEXT ${x} ${y} Left ${size} ${s}`);
@@ -361,6 +365,41 @@ function mixer() {
   return s.done(1100, 500);
 }
 
+/**
+ * Mixto: dos senos analógicos en serie (20 kHz, en la banda de paso, y 300 kHz, en la de rechazo) →
+ * ADC ideal → el FIR de 8 taps en un solo bloque → registro de salida → DAC ideal
+ */
+function mixed() {
+  const s = new Sheet();
+  // voltage.asy: pines en (0, 16) y (0, 96); las dos fuentes, una arriba de la otra
+  s.raw('SYMBOL voltage -96 -16 R0', 'WINDOW 0 40 40 Left 2', 'WINDOW 3 40 72 Left 2', 'SYMATTR InstName V1', 'SYMATTR Value SINE(0 0.4 20k)');
+  s.raw('SYMBOL voltage -96 64 R0', 'WINDOW 0 40 40 Left 2', 'WINDOW 3 40 72 Left 2', 'SYMATTR InstName V2', 'SYMATTR Value SINE(0 0.4 300k)');
+  s.flag([-96, 160], '0');
+  s.wire([-96, 0], [-96, -48], [96, -48], [96, 0]);
+  s.flag([0, -48], 'vin');
+  const adc = s.block('dsp_adc', 192, 0);
+  s.wire([96, 0], adc.pins.vin);
+  s.text(140, -80, ';ideal ADC');
+  const fir = s.block('dsp_fir8', 480, 0);
+  s.stub(fir.pins.clk, [0, 1], 'clk');
+  s.wire(adc.pins.d, fir.pins.x);
+  s.flag([adc.pins.d[0] + 32, 0], bus('x'));
+  s.text(420, -80, ';FIR, 8 taps (one block)');
+  const r = delay(s, 768, 0);
+  s.wire(fir.pins.y, r.d);
+  const out = s.last;
+  const dac = s.block('dsp_dac', 1056, 0);
+  s.wire(r.q, dac.pins.d);
+  s.text(1000, -80, ';ideal DAC');
+  const end: Pt = [dac.pins.vout[0] + 96, 0];
+  s.wire(dac.pins.vout, end);
+  s.flag(end, 'vout');
+  s.clock(-96, 304);
+  s.text(-136, -224, ';Mixed signal: 20 kHz + 300 kHz → ideal 16-bit ADC → FIR low-pass (100 kHz at fs = 1 MHz) → ideal DAC. The 300 kHz tone is filtered out', 3);
+  s.text(-136, 480, '!.tran 0 100u');
+  return s.done(1400, 560, out);
+}
+
 // --- proyecto ------------------------------------------------------------------------------------
 
 /**
@@ -386,7 +425,7 @@ export async function build(): Promise<Project> {
   const now = Date.parse('2026-11-02T12:00:00-03:00');
   let p: Project = { name: 'DSP', created: now, modified: now, files: [], activeVariant: BENCHES, variants: [], groups: [] };
   for (const m of MODULES) p = await withVerilog(p, m);
-  const groups = ['FIR', 'IIR', 'CIC', 'NCO and mixer'].map((name) => ({ id: newId('g'), name }));
+  const groups = ['FIR', 'IIR', 'CIC', 'NCO and mixer', 'Mixed signal'].map((name) => ({ id: newId('g'), name }));
   const bench = (g: number, name: string, d: { asc: string; out: string }, nets = ['x'], split = false): Sim => ({
     id: newId('s'),
     name,
@@ -403,6 +442,25 @@ export async function build(): Promise<Project> {
     bench(1, 'Biquad: step', biquad({ kind: 'step', value: 16384 })),
     bench(2, 'Step response', cic()),
     bench(3, 'Mixer 50 kHz × 60 kHz', mixer(), ['a', 'b'], true),
+    {
+      id: newId('s'),
+      name: 'ADC → FIR → DAC',
+      asc: mixed().asc,
+      view: {
+        panes: [
+          {
+            traces: [
+              { expr: 'V(vin)', color: '#2f9e44' },
+              { expr: 'V(vout)', color: '#1c7ed6' },
+            ],
+          },
+        ],
+        active: 0,
+        plot: 'tran1',
+      } as SimView,
+      runs: [],
+      group: groups[4].id,
+    },
   ];
   return { ...p, modified: now, groups, variants: [{ id: BENCHES, name: 'DSP', base: sims[0].asc, activeSim: sims[0].id, sims }] };
 }

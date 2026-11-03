@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseStep, stepPlan, type Step } from '../../src/netlist/step.ts';
+import { parseStep, splitStepRuns, stepPlan, type Step, type StepPlan } from '../../src/netlist/step.ts';
 
 const values = (line: string) => (parseStep(line) as Step).values;
 
@@ -59,4 +59,28 @@ describe('.step', () => {
     );
     expect(stepPlan([parseStep('.step Vx 0 1 1') as Step], () => undefined)).toMatch(/no existe/);
   });
+});
+
+describe('splitStepRuns (#366: una netlist por corrida, para Icarus)', () => {
+  const steps = [parseStep('.step param k list 1 2'), parseStep('.step temp 25 85 60')] as Step[];
+  const plan = stepPlan(steps, () => undefined) as StepPlan;
+  const net = ['* t', 'R1 a 0 {k}', '.param k=1', '.tran 1u', ...plan.control, '.end'].join('\n');
+  const runs = splitStepRuns(net)!;
+  it('una por corrida, en el orden de stepPlan (el primer .step, el más rápido)', () => {
+    expect(runs).toHaveLength(plan.runs.length);
+    expect(runs.map((r) => [/^\.param k=(\S+)$/m.exec(r)?.[1], /option temp = (\S+)/.exec(r)?.[1]])).toEqual([
+      ['1', '25'],
+      ['2', '25'],
+      ['1', '85'],
+      ['2', '85'],
+    ]);
+  });
+  it('sin foreach, alterparam ni reset; el .param que había, con el valor de la corrida', () => {
+    for (const r of runs) {
+      expect(r).not.toMatch(/foreach|alterparam|^\s*reset|\$ts_step|^\s*end\s*$/m);
+      expect(r.match(/^\.param k=/gm)).toHaveLength(1);
+      expect(r).toMatch(/^\.control\n[\s\S]*^run$[\s\S]*^\.endc$/m);
+    }
+  });
+  it('null sin .step', () => expect(splitStepRuns('* t\n.tran 1u\n.end')).toBeNull());
 });

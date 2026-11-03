@@ -148,3 +148,62 @@ export function stepPlan(steps: Step[], ngName: (lt: string) => string | undefin
   }
   return { control, runs, names: steps.map((s) => stepLabel(s.target)) };
 }
+
+/**
+ * El .step partido en una netlist por corrida (#366), para lo que no puede correr dos veces en el
+ * mismo motor: un bloque Verilog de comportamiento (libvvp, de Icarus, no se inicializa dos veces).
+ * En el bloque .control de stepPlan, cada `foreach ts_stepN …` pasa a ser su valor de esa corrida
+ * y `alterparam X = …` + `reset`, un `.param X=…` en la netlist (sin reset: el circuito se arma una
+ * sola vez). El orden es el de stepPlan (el primer .step, el más rápido). null si la netlist no
+ * tiene un .step.
+ */
+export function splitStepRuns(netlist: string): string[] | null {
+  const lines = netlist.split('\n');
+  const first = lines.findIndex((l) => /^\s*foreach\s+ts_step\d+\s/i.test(l));
+  if (first < 0) return null;
+  // los foreach van seguidos, del último .step (afuera) al primero (adentro)
+  const loops: { name: string; values: string[] }[] = [];
+  let i = first;
+  for (; /^\s*foreach\s+ts_step\d+\s/i.test(lines[i] ?? ''); i++) {
+    const [, name, ...values] = lines[i].trim().split(/\s+/);
+    loops.unshift({ name, values });
+  }
+  const n = loops.length;
+  // el cuerpo, hasta los `end` que cierran los foreach
+  const isEnd = (k: number) => /^\s*end\s*$/i.test(lines[k] ?? '');
+  let close = i;
+  while (close < lines.length && !Array.from({ length: n }, (_, d) => isEnd(close + d)).every(Boolean)) close++;
+  if (close >= lines.length) return null;
+  const body = lines.slice(i, close);
+  const total = loops.reduce((acc, l) => acc * l.values.length, 1);
+  const control = lines.findLastIndex((l, k) => k < first && /^\s*\.control\b/i.test(l));
+  const out: string[] = [];
+  for (let k = 0; k < total; k++) {
+    let r = k;
+    const value = new Map<string, string>();
+    for (const l of loops) {
+      value.set(l.name.toLowerCase(), l.values[r % l.values.length]);
+      r = Math.floor(r / l.values.length);
+    }
+    const sub = (s: string) => s.replace(/\$(ts_step\d+)\b/gi, (m, v: string) => value.get(v.toLowerCase()) ?? m);
+    const params = new Map<string, string>();
+    const run = body.flatMap((l) => {
+      const ap = /^\s*alterparam\s+(\S+)\s*=\s*(\S+)\s*$/i.exec(l);
+      if (ap) {
+        params.set(ap[1], sub(ap[2]));
+        return [];
+      }
+      return /^\s*reset\s*$/i.test(l) ? [] : [sub(l).trim()];
+    });
+    // los .param del .step: el que ya estaba (".param k=1"), con el valor de esta corrida
+    const head = lines.slice(0, control).map((l) => {
+      const m = /^\s*\.param\s+([A-Za-z_]\w*)\s*=\s*\S+\s*$/i.exec(l);
+      const v = m && [...params].find(([p]) => p.toLowerCase() === m[1].toLowerCase());
+      if (!v) return l;
+      params.delete(v[0]);
+      return `.param ${v[0]}=${v[1]}`;
+    });
+    out.push([...head, ...[...params].map(([p, v]) => `.param ${p}=${v}`), ...lines.slice(control, first), ...run, ...lines.slice(close + n)].join('\n'));
+  }
+  return out;
+}

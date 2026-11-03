@@ -832,10 +832,10 @@ export const es: Record<string, string> = {
   'Poles only': 'Sólo polos',
   'Ports:': 'Puertos:',
   'Compiling {n} DSP blocks into one Icarus module…': 'Compilando {n} bloques DSP en un solo módulo de Icarus…',
-  'The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (.step or several analyses)':
-    'Los bloques DSP se simulan como compuertas: Icarus corre un solo análisis por simulación (.step o varios análisis)',
-  '{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: .step and several analyses need it synthesized (dsp_clock: a PULSE source instead)':
-    '{name} es Verilog de comportamiento (Icarus), que corre un solo análisis por simulación: .step y varios análisis lo necesitan sintetizado (dsp_clock: una fuente PULSE en su lugar)',
+  'The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (several analyses or a .control that repeats)':
+    'Los bloques DSP se simulan como compuertas: Icarus corre un solo análisis por simulación (varios análisis o un .control que repite)',
+  '{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: several analyses or a .control that repeats need it synthesized (dsp_clock: a PULSE source instead)':
+    '{name} es Verilog de comportamiento (Icarus), que corre un solo análisis por simulación: varios análisis o un .control que repite lo necesitan sintetizado (dsp_clock: una fuente PULSE en su lugar)',
   'signed(x, bits) needs two arguments': 'signed(x, bits) necesita dos argumentos',
   'pow(x, y) needs two arguments': 'pow(x, y) necesita dos argumentos',
   'Power': 'Potencia',

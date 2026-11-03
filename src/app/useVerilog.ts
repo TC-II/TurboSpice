@@ -79,18 +79,21 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       const re = new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$).*$`, 'gim');
       return [...netlist.matchAll(re)].some((l) => !joins(moduleOf(f), hdlOfLine(l[0])));
     });
-    // libvvp no se inicializa dos veces: con varias corridas (.step, un .control que repite) los bloques DSP van como compuertas
-    const runs = /^\s*(foreach|repeat|dowhile|while)\b/im.test(netlist) || (netlist.match(/^\s*\.(tran|ac|dc|op|noise|tf)\b/gim)?.length ?? 0) > 1;
+    // libvvp no se inicializa dos veces: con varias corridas en el mismo motor (un .control que repite,
+    // varios análisis) los bloques DSP van como compuertas. Un .step no: simulate.ts lo corre corrida
+    // por corrida (splitStepRuns), cada una en un motor nuevo
+    const runs = /^\s*(foreach(?!\s+ts_step\d+\s)|repeat|dowhile|while)\b/im.test(netlist) || (netlist.match(/^\s*\.(tran|ac|dc|op|noise|tf)\b/gim)?.length ?? 0) > 1;
     const notes: string[] = [];
     // un bloque de comportamiento (el reloj dsp_clock, un módulo con retardos) no puede ir como compuertas: error claro en vez de «Aborted()»
     const icarusOnly = runs && mods.find((f) => f.synth!.vvp && new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$)`, 'im').test(netlist));
     if (icarusOnly)
       throw new Error(
-        t('{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: .step and several analyses need it synthesized (dsp_clock: a PULSE source instead)', {
+        t('{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: several analyses or a .control that repeats need it synthesized (dsp_clock: a PULSE source instead)', {
           name: moduleOf(icarusOnly),
         }),
       );
-    if (runs && /^\s*x\S*\s.*\sdsp_\w+(\s|$)/im.test(netlist)) notes.push(t('The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (.step or several analyses)'));
+    if (runs && /^\s*x\S*\s.*\sdsp_\w+(\s|$)/im.test(netlist))
+      notes.push(t('The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (several analyses or a .control that repeats)'));
     const m =
       !behavioral &&
       !runs &&

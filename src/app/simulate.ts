@@ -2,11 +2,13 @@
 // simula en ngspice (otra vez sin las corrientes de los pines si la matriz quedó singular) y suma
 // a los resultados lo que se calcula después: barridos, Bode del .pz, .meas y gráficos x-y
 import type { AscDoc } from '../asc/model.ts';
-import type { EngineClient } from '../engine/client.ts';
+import type { EngineClient, SimOutcome } from '../engine/client.ts';
+import type { SimResult } from '../engine/ngspice.ts';
 import { streamPlan } from '../engine/ngspice.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Library } from '../library/library.ts';
 import { prefetchLtspice, type LtspiceIndex } from '../library/ltspiceLib.ts';
+import { splitStepRuns } from '../netlist/step.ts';
 import { lineOf } from '../project/project.ts';
 import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
@@ -51,15 +53,43 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
   // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
   // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
-  const run = (b: BuiltSimulation) => {
-    const lim = simLimits(!!streamPlan(b.netlist));
-    return engine.simulate(b.netlist, b.files, {
+  const once = (b: BuiltSimulation, netlist: string) => {
+    const lim = simLimits(!!streamPlan(netlist));
+    return engine.simulate(netlist, b.files, {
       bias: biasParams(b),
-      biasCommand: biasCommand(b.netlist).cmd,
+      biasCommand: biasCommand(netlist).cmd,
       digital: b.digitalSaves,
       maxBytes: unlimited ? lim.full : lim.max,
       project: !unlimited,
     });
+  };
+  const run = async (b: BuiltSimulation): Promise<SimOutcome> => {
+    // con Icarus (d_cosim) un .step va corrida por corrida, cada una en un motor nuevo: libvvp no se
+    // inicializa dos veces (#366). Los plots se renumeran como los del .step de ngspice (tran1, tran2…)
+    const icarus = [b.netlist, ...Object.values(b.files)].some((f) => typeof f === 'string' && /ivlng\.so/i.test(f));
+    const parts = icarus ? splitStepRuns(b.netlist) : null;
+    if (!parts || parts.length < 2) return once(b, b.netlist);
+    const merged: SimResult = { plots: [], log: [], errors: [], aborted: false };
+    const count = new Map<string, number>();
+    let ms = 0;
+    for (const part of parts) {
+      const r = await once(b, part);
+      ms += r.ms;
+      for (const p of r.result.plots) {
+        const m = /^([a-z]+)\d+$/i.exec(p.name);
+        const n = m ? (count.get(m[1]) ?? 0) + 1 : 0;
+        if (m) count.set(m[1], n);
+        merged.plots.push(m ? { ...p, name: `${m[1]}${n}` } : p);
+      }
+      merged.log.push(...r.result.log);
+      merged.errors.push(...r.result.errors.filter((e) => !merged.errors.includes(e)));
+      merged.sizeStop ??= r.result.sizeStop;
+      if (r.result.aborted) {
+        merged.aborted = true;
+        break;
+      }
+    }
+    return { result: merged, ms };
   };
   let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
   // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un

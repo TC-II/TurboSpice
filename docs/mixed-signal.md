@@ -127,11 +127,16 @@ SAT/RND eligen saturar y redondear.
 - **Atributo «Simulación»** (`hdl`, en el SpiceLine de los símbolos de módulos Verilog): `auto` (los
   bloques DSP al módulo único, los demás como diga su módulo), `icarus` (al módulo único, también un
   módulo propio) o `gates` (sintetizado a compuertas de XSPICE). No llega a ngspice (`stripHdl`).
-- Con varias corridas (`.step`, un `.control` que repite, varios análisis) los bloques DSP van como
-  compuertas, con un aviso: libvvp no se inicializa dos veces. Un bloque que sólo puede ir con Icarus
-  (`dsp_clock`, un módulo con retardos) da un error que lo dice (antes, «Aborted()» del motor). `hdl`
-  tampoco puede quedar en el encabezado de un `.subckt` (la librería le agrega los parámetros del
-  símbolo): con `.step` daba «Formula() error». Con `.step` las trazas digitales son de la última corrida.
+- **`.step` con Icarus**: ngspice lo corre en una sola sesión (`foreach` + `alterparam` + `reset`) y
+  libvvp no se inicializa dos veces, así que con un bloque de comportamiento (el módulo único, `dsp_clock`)
+  `simulate.ts` lo corre corrida por corrida: `splitStepRuns` (`netlist/step.ts`) arma una netlist por
+  corrida (el `foreach` con su valor, `.param` en vez de `alterparam` + `reset`), cada una en un motor
+  nuevo, y los plots se renumeran como los del `.step` de ngspice (`tran1`, `tran2`…); cada corrida
+  tiene sus nodos digitales. Un parameter de Verilog no puede depender del parámetro barrido (`K={k}`):
+  el módulo se compila una vez (como en la síntesis, que pide un entero). Con varios análisis o un
+  `.control` que repite, los bloques DSP van como compuertas (con un aviso) y un bloque que sólo va con
+  Icarus da un error que lo dice. `hdl` no puede quedar en el encabezado de un `.subckt`: con `.step`
+  daba «Formula() error».
 - **Reloj** `dsp_clock` (de comportamiento, `#(PERIOD/2)`): corre adentro del módulo único, así el reloj
   no pasa por lo analógico (ni una fuente de pulsos ni sus puentes). Al copiarlo al proyecto queda en
   modo comportamiento (`looksBehavioral`). Arranca en 0: el primer flanco de subida es a PERIOD/2.

@@ -29,10 +29,13 @@ export function implicitBus(lt: LtNetlist, net: string): string | null {
   return hi && n!.bits.every((b, i) => b.toLowerCase() === `${net}[${Number(hi[1]) - i}]`.toLowerCase()) ? `${net}[${hi[1]}:0]` : null;
 }
 
-/** ¿El bus va a un pin de una instancia X (un bloque Verilog)? */
-function verilogBus(ng: string, bits: string[]): boolean {
+/** Las instancias X (bloques Verilog, subcircuitos) a las que va el bus: sus líneas, en palabras */
+function busInstances(ng: string, bits: string[]): string[][] {
   const node = busBitNode(bits[0]).toLowerCase();
-  return ng.split('\n').some((l) => /^x/i.test(l.trim()) && l.toLowerCase().split(/\s+/).includes(node));
+  return ng
+    .split('\n')
+    .map((l) => l.trim().toLowerCase().split(/\s+/))
+    .filter((w) => /^x/.test(w[0]) && w.includes(node));
 }
 
 export interface ProbeDeps {
@@ -91,6 +94,18 @@ export function useProbe(d: ProbeDeps) {
       if (!sc) return;
       // si sale de un bloque Verilog, el bus digital entero (Dig(x1.d[2:0]))
       const dig = digitalProbeExpr(sim.built, busBits(bus), bus);
+      const insts = busInstances(sim.built.ng.text, busBits(bus));
+      // un bus de la biblioteca DSP (o del ADC/DAC): una muestra en complemento a dos, graficada como
+      // número; si no se guardó (adentro del módulo de Icarus que junta los bloques), la traza queda
+      // y aparece al volver a simular, porque lo que piden las trazas se expone
+      if (insts.some((w) => w.some((x) => /^dsp_/.test(x)))) {
+        const expr = `signed(${dig && hasData(dig) ? dig : `Dig(${bus})`}, ${busBits(bus).length})`;
+        setPanel('plot');
+        if (expanded === 'schematic') setExpanded('');
+        addProbed(Math.min(activePane, panes.length - 1), expr);
+        if (!hasData(expr)) setMessage(t("{expr} wasn't saved in this simulation: it will be saved when you simulate again", { expr }));
+        return;
+      }
       if (dig && hasData(dig)) return addDigitalProbe(dig);
       const exprs = busBits(bus)
         .map((b) => probeExpr(sim.built, { net: b }))
@@ -107,7 +122,7 @@ export function useProbe(d: ProbeDeps) {
         // un bus entre bloques Verilog que se simularon juntos en un solo módulo de Icarus (o que no
         // se guardó): la traza digital queda y, como lo que piden las trazas se expone, aparece al
         // volver a simular
-        if (verilogBus(sim.built.ng.text, busBits(bus))) {
+        if (insts.length) {
           addDigitalProbe(`Dig(${bus})`);
           return setMessage(t("{expr} wasn't saved in this simulation: it will be saved when you simulate again", { expr: `Dig(${bus})` }));
         }

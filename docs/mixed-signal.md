@@ -123,6 +123,10 @@ SAT/RND eligen saturar y redondear.
 - **Graficar el valor real**: `signed(Dig(y[15:0]), 16)/32768` (la función `signed(x, bits)` de las
   trazas lee un bus en complemento a dos). Conviene graficar la salida de un registro (un z⁻¹): sintetizada,
   la de un sumador tiene las carreras de sus compuertas.
+- **La punta en un bus DSP** (con nombre o sin él: `N001` entre pines de 16 bits) lo grafica así,
+  `signed(Dig(bus), 16)`, en un eje en cuentas. También el del ADC ideal, cuyos bits son tensiones:
+  `Dig()` de un bus analógico toma cada bit como 1 arriba de la mitad del nivel más alto. Un bus
+  que quedó adentro del módulo de Icarus no se guardó: la traza queda y aparece al volver a simular.
 - **Un solo módulo de Icarus** (`hdl/cosimMerge.ts`): al simular, las instancias de nivel superior de
   los bloques DSP (dos o más) se reemplazan por una sola (`xdsp`), de un módulo generado
   (`dsp_cosim`) que las instancia y cablea como en el esquemático, y que corre como un d_cosim. Los

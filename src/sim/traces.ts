@@ -47,6 +47,16 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     // (una red entre bloques Verilog que se simuló digital: su valor lógico, 0 o 1)
     return analog(findVector(plot, netVector(name)) ?? findVector(plot, name) ?? findVector(plot, `${name}_spectrum`) ?? findDigital(plot, netVector(name)));
   };
+  /**
+   * Un bus cuyos bits son tensiones (la salida del ADC ideal, de fuentes B): cada bit es 1 por
+   * encima de la mitad del nivel más alto que toma algún bit
+   */
+  const analogBus = (bits: (Wave | null)[]): Wave | null => {
+    if (!bits.length || bits.some((b) => !b)) return null;
+    let top = 0;
+    for (const b of bits) for (const v of b!.re) top = Math.max(top, v);
+    return { re: joinBits(bits.map((b) => b!.re.map((v) => (top > 0 && v > top / 2 ? 1 : 0)))) };
+  };
   const element = (name: string) => sim?.lt.elements.find((e) => e.name.toLowerCase() === name.toLowerCase() || e.name.replace(/§/g, '').toLowerCase() === name.toLowerCase());
   /** Nombre de ngspice de un dispositivo escrito en una traza ("Q1", "x_u1.q1") */
   const deviceNgName = (name: string): string | null => {
@@ -67,7 +77,7 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       if (!bus) return ev(one(args[0]));
       // (o los bits de un bus de nivel superior que se simuló digital: d[2] → d__2__)
       const bits = bus.bits.map((b) => one(`${bus.base}_${b}_d`) ?? one(`${bus.base}[${b}]`));
-      if (!bits.every((b) => b)) return null;
+      if (!bits.every((b) => b)) return analogBus(bus.bits.map((b) => node(`${bus.base}[${b}]`)));
       if (bits.some((b) => !b!.x)) return { re: joinBits(bits.map((b) => b!.real)) };
       const m = mergeEvents(bits.map((b) => ({ x: b!.x!, y: b!.real })));
       return { re: joinBits(m.ys), x: m.x };

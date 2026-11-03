@@ -3,6 +3,7 @@
 import { addPinCurrentSources } from '../netlist/pinCurrents.ts';
 import { stripHdl } from '../hdl/cosimMerge.ts';
 import { linkDigitalNets } from '../hdl/digitalLinks.ts';
+import { busRange } from '../waveform/digital.ts';
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
@@ -152,7 +153,13 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   let digitalSaves: string[] | undefined;
   if (selection) {
     const used = [...traces, ...ng.measures, control?.text.split('\\n').join('\n') ?? '', ...lt.texts.filter((tt) => /^\s*;?\s*\.four\b/im.test(tt.text)).map((tt) => tt.text)].flatMap(textRefs);
-    const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...deviceSaves(traces, lt, ng), ...op])];
+    // (un Dig() de un bus cuyos bits son tensiones, como la salida del ADC ideal: sus bits analógicos)
+    const tokens = new Set(prep.netlist.toLowerCase().split(/[\s()]+/));
+    const analogBits = used.flatMap((r) => {
+      const bus = /^dig\((.*)\)$/i.exec(r) && busRange(r.slice(4, -1));
+      return bus ? bus.bits.map((b) => netVector(`${bus.base}[${b}]`)).filter((n) => tokens.has(n) && !links.nets.includes(n)) : [];
+    });
+    const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...analogBits, ...deviceSaves(traces, lt, ng), ...op])];
     digitalSaves = [...new Set([...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)))];
     // (los nodos digitales que no existen no suman: se cuentan los que pueden ser, de más)
     vectorCount = vectors.length + 1 + digitalSaves.length;

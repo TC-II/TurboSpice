@@ -575,6 +575,26 @@ X1 clk d rise fall sq os db ${nodes('da', 8)} ${nodes('dbb', 8)} ${nodes('ram', 
     },
   },
   {
+    name: '.step con un bloque sintetizado (alterparam y reset reevalúan los parámetros del .subckt)',
+    file: 'stepinv.v',
+    fresh: true,
+    verilog: 'module stepinv(input a, output y); assign y = ~a; endmodule',
+    circuit: `Va a 0 PULSE(0 5 0 1n 1n 49n 100n)
+X1 a y stepinv vcc=5 tpd=1n
+.param k=1
+.tran 1n 200n
+.control
+foreach ts 1 2
+  alterparam k = $ts
+  reset
+  run
+end
+.endc`,
+    check: (at) => {
+      if (at('y', 25e-9) > 2.5 || at('y', 75e-9) < 2.5) return 'y no es el inverso de a';
+    },
+  },
+  {
     name: 'error de sintaxis',
     file: 'bad.v',
     verilog: `module bad(input a, output y); assign y = ; endmodule`,

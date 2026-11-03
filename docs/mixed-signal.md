@@ -128,9 +128,10 @@ SAT/RND eligen saturar y redondear.
   bloques DSP al módulo único, los demás como diga su módulo), `icarus` (al módulo único, también un
   módulo propio) o `gates` (sintetizado a compuertas de XSPICE). No llega a ngspice (`stripHdl`).
 - Con varias corridas (`.step`, un `.control` que repite, varios análisis) los bloques DSP van como
-  compuertas, con un aviso: libvvp no se inicializa dos veces. (Hoy `.step` con bloques Verilog
-  sintetizados también falla, con «Formula() error» al reevaluar los parámetros de los `.subckt`: es
-  de antes.)
+  compuertas, con un aviso: libvvp no se inicializa dos veces. Un bloque que sólo puede ir con Icarus
+  (`dsp_clock`, un módulo con retardos) da un error que lo dice (antes, «Aborted()» del motor). `hdl`
+  tampoco puede quedar en el encabezado de un `.subckt` (la librería le agrega los parámetros del
+  símbolo): con `.step` daba «Formula() error». Con `.step` las trazas digitales son de la última corrida.
 - **Reloj** `dsp_clock` (de comportamiento, `#(PERIOD/2)`): corre adentro del módulo único, así el reloj
   no pasa por lo analógico (ni una fuente de pulsos ni sus puentes). Al copiarlo al proyecto queda en
   modo comportamiento (`looksBehavioral`). Arranca en 0: el primer flanco de subida es a PERIOD/2.

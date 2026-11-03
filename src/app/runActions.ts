@@ -199,7 +199,11 @@ export function runActions(d: RunDeps) {
       } else setPanel(errs.length ? 'problems' : 'log');
     } catch (e) {
       // (abortar rechaza la simulación en curso: el estado ya lo puso abort)
-      if (!aborting.current) setStatus({ kind: 'error', message: (e as Error).message });
+      // (y a la barra de mensajes: un error de antes de llegar al motor, como uno de Verilog, no tiene pestaña de errores)
+      if (!aborting.current) {
+        setStatus({ kind: 'error', message: (e as Error).message });
+        setMessage((e as Error).message);
+      }
     }
   };
   return run;

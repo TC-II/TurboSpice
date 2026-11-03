@@ -121,9 +121,10 @@ export const vvpFileOf = (name: string) => `${name.toLowerCase()}.vvp`;
  */
 export function looksBehavioral(text: string): boolean {
   const code = text.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '').replace(/"(?:[^"\\]|\\.)*"/g, '""');
-  // (#(…) después de "module x" o de un tipo de instancia son parámetros, no retardos)
+  // (#(…) después de "module x" o de un tipo de instancia son parámetros, no retardos; después de
+  // always, initial, assign… sí lo es: «always #(T/2) clk = ~clk»)
   return (
-    /(^|[^\w)\]])#\s*[\d(]/m.test(code.replace(/\b(module\s+\w+|\w+)\s*#\s*\(/g, '$1 (')) ||
+    /(^|[^\w)\]])#\s*[\d(]/m.test(code.replace(/\b(module\s+\w+|(?!(?:always|initial|assign|forever|begin|else|or)\b)\w+)\s*#\s*\(/g, '$1 (')) ||
     /\$(display|write|monitor|strobe|finish|stop|time|realtime|random|urandom|fopen)\b|\b(forever|wait|fork)\b/.test(code)
   );
 }

@@ -55,6 +55,9 @@ describe('cosimMerge', () => {
     expect(mergeCosim(NET.replace('tpd=1n W=2\n', 'tpd=1n W=2 hdl=icarus\n'), MODS, (_m, hdl) => hdl === 'icarus' || _m === 'dsp_neg')).not.toBeNull();
     expect(stripHdl(net)).not.toMatch(/hdl=/);
     expect(stripHdl(net)).toMatch(/^X2 .* SAT=0 W=2$/m);
+    // (la librería le agrega al .subckt los parámetros del símbolo: con .step, «auto» da Formula() error)
+    expect(stripHdl('.subckt dsp_add a b y vcc=5 w=16 params: hdl=auto\nab_a x\n.ends')).toBe('.subckt dsp_add a b y vcc=5 w=16\nab_a x\n.ends');
+    expect(stripHdl('.subckt m a params: hdl=gates k=2')).toBe('.subckt m a params: k=2');
   });
   it('nada que juntar con menos de dos instancias o si `mergeable` no las quiere', () => {
     expect(mergeCosim(NET, MODS, (n) => n === 'dsp_neg')).toBeNull();

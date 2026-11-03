@@ -60,8 +60,12 @@ const hdlOf = (tt: string[]): HdlMode => {
 };
 /** El modo de la instancia de una línea X */
 export const hdlOfLine = (line: string): HdlMode => hdlOf(tokens(line));
-/** Las líneas X sin el parámetro hdl (no es un parámetro del .subckt) */
-export const stripHdl = (netlist: string) => netlist.replace(/^(\s*x\S*\s.*?)\s+hdl=\S+/gim, '$1');
+/**
+ * Sin el parámetro hdl: ni en las líneas X ni en los encabezados .subckt (la librería le agrega los
+ * parámetros del símbolo, «params: hdl=auto»). No es un número: al reevaluar los parámetros (.step,
+ * alterparam) ngspice da «Formula() error».
+ */
+export const stripHdl = (text: string) => text.replace(/^(\s*(?:x\S*|\.subckt)\s.*)$/gim, (line) => line.replace(/\s+hdl=\S+/gi, '').replace(/\s+params:\s*$/i, ''));
 
 /** Las palabras de una línea, sin cortar llaves ni paréntesis ({vcc/2}) */
 const tokens = (line: string) => line.trim().match(/(?:\{[^{}]*\}|\([^()]*\)|[^\s{}()])+/g) ?? [];

@@ -66,8 +66,9 @@ for (const c of CASES) {
     problems.push(`Yosys: ${syn.error}`);
   } else {
     const netlist = `* ${c.name}\n${syn.block.subckt}\n${c.circuit}\n.end\n`;
-    // libvvp no se puede inicializar dos veces: un motor nuevo para cada caso con Icarus
-    const eng = c.behavioral ? await Ngspice.create(factory, assets) : ng;
+    // libvvp no se puede inicializar dos veces: un motor nuevo para cada caso con Icarus (y para los
+    // que corren varias veces desde su .control, `fresh`: sus plots no se mezclan con los de antes)
+    const eng = c.behavioral || c.fresh ? await Ngspice.create(factory, assets) : ng;
     if (c.behavioral) {
       eng.writeLibs(runtime);
       eng.writeFiles(syn.vvp);

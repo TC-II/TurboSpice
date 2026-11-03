@@ -161,6 +161,9 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
 
   pane.traces.forEach((tt, ti) => {
     const base = traceColor(tt, ti);
+    // el error, sólo si no hay ninguna corrida: con .step los nodos digitales son de la última
+    let first: string | undefined;
+    let drawn = false;
     all.forEach((r, ri) => {
       const rs = scaleOf(r);
       if (!rs) return;
@@ -168,9 +171,11 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       try {
         w = evalOn(ctx, r, tt.expr, rs);
       } catch (e) {
-        if (ri === 0) errors.set(ti, (e as Error).message);
+        if (ri === 0) first = (e as Error).message;
+        if (ri === all.length - 1 && !drawn && first) errors.set(ti, first);
         return;
       }
+      drawn = true;
       // un nodo digital (sus cambios): así en un panel digital; en uno analógico, en escalones sobre el eje
       const ex = w.x && pane.digital ? w.x : undefined;
       if (w.x && !ex) w = { re: sampleEvents(w.x, w.re, rs.real) };

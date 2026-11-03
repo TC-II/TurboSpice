@@ -51,6 +51,9 @@ describe('Verilog → XSPICE (#209)', () => {
 
   it('reconoce código de comportamiento (retardos, $display) y no confunde #( de parámetros', () => {
     expect(looksBehavioral('always @(posedge clk) #5 y = ~y;')).toBe(true);
+    // un retardo con paréntesis después de always (el reloj dsp_clock), no los parámetros de una instancia
+    expect(looksBehavioral('module c #(parameter P = 10) (output reg k); always #(P / 2.0) k = ~k; endmodule')).toBe(true);
+    expect(looksBehavioral('module t; cnt #(.N(4)) u1 (.q(q)); endmodule')).toBe(false);
     expect(looksBehavioral('initial $display("hola");')).toBe(true);
     expect(looksBehavioral('module c #(parameter N = 4) (input a); cnt #(.N(8)) u1 (a); endmodule')).toBe(false);
     expect(looksBehavioral('assign y = a; // #5')).toBe(false);

@@ -128,7 +128,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const v = opts.variants && (await opts.variants(base.netlist, base.files, traces));
   const joined = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
   // (el atributo «Simulación» de las instancias Verilog no es un parámetro del .subckt)
-  const prepared = { ...joined, netlist: stripHdl(joined.netlist) };
+  const prepared = { ...joined, netlist: stripHdl(joined.netlist), files: Object.fromEntries(Object.entries(joined.files).map(([k, f]) => [k, stripHdl(f)])) };
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
   // (los nombres de las redes que quedaron adentro del módulo DSP de Icarus, cosimMerge.ts)

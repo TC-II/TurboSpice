@@ -1227,7 +1227,12 @@ export function SchematicEditor(props: Props) {
           }
         }}
         onDoubleClick={onDoubleClick}
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          // El clic derecho suelta el foco de un campo de texto (p. ej. «Add trace» del gráfico).
+          const a = document.activeElement;
+          if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) a.blur();
+        }}
       >
         <defs>
           <pattern id="grid" width={GRID} height={GRID} patternUnits="userSpaceOnUse">

@@ -5,7 +5,8 @@
 // pentágono), con flechitas que marcan el sentido de la señal. El buscador los
 // muestra como cualquier símbolo; al elegir uno, el .v se copia al proyecto y se sintetiza ahí (un
 // símbolo que no es el generado conserva su dibujo).
-// Uso: node scripts/gen-dsp-symbols.ts (después de cambiar los pines o parameter de un módulo)
+// Uso: node scripts/gen-dsp-symbols.ts (después de cambiar los pines o parameter de un módulo;
+// con --analog, sólo el ADC y el DAC)
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -198,9 +199,10 @@ function gate(kind: 'and' | 'or' | 'xor'): Drawing {
 }
 
 /** Convertidor: un pentágono que apunta hacia la salida, partido en diagonal con A y D (pines a ±64) */
-function converter(from: string, to: string, pins: [string, string]): Drawing {
+function converter(from: string, to: string, pins: [string, string], clk = false): Drawing {
   return {
-    pins: { [pins[0]]: [-64, 0], [pins[1]]: [64, 0] },
+    // (el ADC toma la muestra en el flanco de clk, abajo)
+    pins: { [pins[0]]: [-64, 0], [pins[1]]: [64, 0], ...(clk ? { clk: [-16, 64] as Pt } : {}) },
     shapes: [
       ...line([-40, -32], [16, -32], [44, 0], [16, 32], [-40, 32], [-40, -32]),
       ...line([-40, 32], [16, -32]),
@@ -208,6 +210,7 @@ function converter(from: string, to: string, pins: [string, string]): Drawing {
       text(12, 14, to, 2),
       ...line([-64, 0], [-40, 0]),
       ...line([44, 0], [64, 0]),
+      ...(clk ? [...line([-16, 32], [-16, 64]), ...line([-24, 32], [-16, 22], [-8, 32])] : []),
     ],
     name: [0, -40, 'Bottom'],
   };
@@ -353,7 +356,8 @@ function drawn(name: string, generated: string, inputs: Set<string>): string {
 }
 
 mkdirSync(OUT, { recursive: true });
-for (const f of readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
+// (--analog: sólo el ADC y el DAC, sin sintetizar los módulos)
+for (const f of process.argv.includes('--analog') ? [] : readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
   const name = f.replace(/\.v$/, '');
   const r = await synthesize(runYosys, { [f]: readFileSync(join(SRC, f), 'utf8') }, f, name);
   if (!r.block) throw new Error(`${f}: ${r.error}`);
@@ -363,11 +367,11 @@ for (const f of readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
 
 // El ADC y el DAC ideales no son Verilog: su .subckt está en library/sub/DSP (fuentes B)
 const ANALOG: { name: string; label: string; ins: string[]; outs: string[]; desc: string }[] = [
-  { name: 'dsp_adc', label: 'ADC', ins: ['vin'], outs: ['d[15:0]'], desc: 'Ideal 16-bit ADC: vin (−vref … +vref) → a Q1.15 word' },
+  { name: 'dsp_adc', label: 'ADC', ins: ['vin', 'clk'], outs: ['d[15:0]'], desc: 'Ideal 16-bit ADC: vin (−vref … +vref) → a Q1.15 word, sampled on the rising edge of clk' },
   { name: 'dsp_dac', label: 'DAC', ins: ['d[15:0]'], outs: ['vout'], desc: 'Ideal 16-bit DAC: a Q1.15 word → vout = vref · word / 32768' },
 ];
 for (const a of ANALOG) {
-  const d = a.label === 'ADC' ? converter('A', 'D', ['vin', 'd']) : converter('D', 'A', ['d', 'vout']);
+  const d = a.label === 'ADC' ? converter('A', 'D', ['vin', 'd'], true) : converter('D', 'A', ['d', 'vout']);
   const [nx, ny, nAlign] = d.name ?? [0, -40, 'Bottom'];
   const arrows = Object.entries(d.pins).flatMap(([p, at]) =>
     flowArrow(

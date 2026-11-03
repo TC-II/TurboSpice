@@ -109,9 +109,10 @@ Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `libr
 
 SAT/RND eligen saturar y redondear.
 - **ADC y DAC ideales** (`library/sub/DSP/dsp_adc.sub`, `dsp_dac.sub`): no son Verilog sino un
-  `.subckt` con fuentes B (16 bits, Q1.15, `vref`): cuantizan sin muestrear, con cada bit en 0 o `vcc`,
-  así que se conectan directo a los bloques (la muestra la toma un z⁻¹). El ejemplo DSP tiene un
-  testbench ADC → FIR8 → DAC con dos senos analógicos.
+  `.subckt` con fuentes B (16 bits, Q1.15, `vref`), con cada bit en 0 o `vcc`, así que se conectan
+  directo a los bloques. El ADC toma la muestra en el flanco de subida de `clk` (un `d_dff` de XSPICE
+  por bit): su palabra cambia una vez por ciclo. El ejemplo DSP tiene un testbench ADC → FIR8 → DAC
+  con dos senos analógicos.
 - **Símbolos dibujados** (`library/sym/DSP`, carpeta DSP del buscador): Σ en un círculo, el tap como
   triángulo, z⁻¹ con el reloj abajo, el MUX como trapecio, las compuertas con el rótulo IEC (&, ≥1,
   =1); los demás, una caja con los nombres de los pines adentro y los de control (clk, rst, en…) abajo. Los genera `node scripts/gen-dsp-symbols.ts` (el orden de los pines
@@ -134,9 +135,11 @@ SAT/RND eligen saturar y redondear.
   del módulo, pero sólo como su nodo de eventos (sin dac_bridge ni pin del `.subckt`,
   `internalOnly`), con alias para sus nombres de antes (`Dig(x24.q[15:0])`, `Dig(N001[15:0])`): la
   punta las grafica sin volver a simular. Cada cambio de una salida es un punto del transitorio, así
-  que conviene muestrear con un z⁻¹ lo que llega de afuera: el ADC ideal sigue a la entrada todo el
-  tiempo y un bloque combinacional detrás (el FIR) cambiaría en cada paso (medido con el ejemplo
-  ADC → FIR → DAC: 21 s y 112 mil puntos sin el z⁻¹ de muestreo; 0,35 s y 1800 puntos con él). No se hace si ya hay otro bloque de comportamiento (Icarus corre
+  que lo que llega de afuera conviene que esté muestreado: con un ADC que sigue a la entrada todo el
+  tiempo, un bloque combinacional detrás (el FIR) cambia en cada paso (medido con el ejemplo
+  ADC → FIR → DAC: 21 s y 112 mil puntos con el ADC sin muestrear; 0,35 s y 1800 puntos con un
+  z⁻¹ de muestreo; el ADC ahora muestrea con `clk`). No se hace si ya hay otro bloque de
+  comportamiento (Icarus corre
   uno por simulación) ni con pines inout. La netlist lo dice en un comentario. Medido en la app con el
   FIR de 8 taps (100 µs con un seno): el motor pasa de ~2,7 s a ~0,14 s y armar la netlist, de ~1,3 s a
   ~0,07 s (con la síntesis de las variantes ya hecha).

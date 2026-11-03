@@ -688,7 +688,7 @@ X1 clk q ${nodes('fir', 16)} ${nodes('iir', 16)} ${nodes('cic', 16)} cv ${nodes(
     },
   },
   {
-    name: 'DSP (#366): ADC y DAC ideales (fuentes B) alrededor de un z⁻¹',
+    name: 'DSP (#366): ADC (muestreado con clk) y DAC ideales alrededor de un z⁻¹',
     file: 'adcdac.v',
     top: 'dsp_delay',
     verilog: readFileSync(new URL('dsp_delay.v', DSP_DIR), 'utf8'),
@@ -696,12 +696,13 @@ X1 clk q ${nodes('fir', 16)} ${nodes('iir', 16)} ${nodes('cic', 16)} cv ${nodes(
 ${readFileSync(new URL('../../library/sub/DSP/dsp_dac.sub', import.meta.url), 'utf8')}
 ${CLK}
 Vin vin 0 0.3
-XA vin ${nodes('d', 16)} dsp_adc vref=1
+XA vin clk ${nodes('d', 16)} dsp_adc vref=1
 X1 clk ${nodes('d', 16)} ${nodes('q', 16)} dsp_delay tpd=1n
 XD ${nodes('q', 16)} vout dsp_dac vref=1
 .tran 1n 400n`,
     check: (at) => {
-      const code = word(at, 'd', 16, 50e-9);
+      // (muestreado en los flancos de clk)
+      const code = word(at, 'd', 16, 150e-9);
       if (code !== Math.floor(0.3 * 32768)) return `ADC: ${code} (esperaba ${Math.floor(0.3 * 32768)})`;
       const v = at('vout', 350e-9);
       if (Math.abs(v - 0.3) > 1 / 32768) return `DAC: ${v} V (esperaba 0,3 V ± 1 LSB)`;

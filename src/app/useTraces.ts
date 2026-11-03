@@ -47,12 +47,16 @@ export function useTraces({ sim, plot, labels, resolver, mode, panes, activePane
       if (!ev.toLowerCase().startsWith(`${MERGED_INST}.`) || !plot.vectors.some((v) => v.name.toLowerCase() === ev.toLowerCase())) continue;
       const bit = /^([^.]+)\[(\d+)\]$/.exec(name);
       if (bit) named.set(bit[1], [...(named.get(bit[1]) ?? []), Number(bit[2])]);
-      else if (!name.includes('.')) single.push(`Dig(${name})`);
+      else if (!name.includes('.') && !/__\d+__$/.test(name)) single.push(`Dig(${name})`);
     }
     const mergedBuses = [...named].map(([base, bits]) => `Dig(${base}[${Math.max(...bits)}:${Math.min(...bits)}])`);
-    // (sin los nodos de las fuentes que miden la corriente de cada pin, pinCurrents.ts: x1__p2 es la
-    // misma red que la de afuera del pin)
-    const vectors = plot.vectors.filter((v) => v !== sc && !merged(v) && !/__p\d+$/i.test(v.name));
+    // sólo lo del nivel del esquemático (lo de adentro de un subcircuito se puede escribir igual):
+    // sin nodos ni dispositivos jerárquicos (x1.code, @b.x1.bq0[i], @a.xdsp.ab_w_3), ni las fuentes
+    // que miden la corriente de cada pin (v__ix_x1_2, y sus nodos x1__p2, pinCurrents.ts), ni las R
+    // de gmin de los nodos sueltos, ni cada bit de un bus digital (n001__3__: está el bus entero)
+    const vectors = plot.vectors.filter(
+      (v) => v !== sc && !merged(v) && !v.name.includes('.') && !/__p\d+$|^v__ix_|r__float\d+/i.test(v.name) && !(v.type === DIGITAL_TYPE && /__\d+__$/.test(v.name)),
+    );
     // y los buses que forman los nodos digitales de los bloques Verilog (#209): Dig(x1.q[3:0])
     return [...new Set([...vectors.map(displayName), ...busNames(vectors.filter((v) => v.type === DIGITAL_TYPE).map((v) => v.name)), ...mergedBuses, ...single])];
   }, [plot, sim]);

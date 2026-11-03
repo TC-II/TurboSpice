@@ -1,24 +1,49 @@
 * ADC ideal de 16 bits (#366): vin (de −vref a +vref) → una palabra en complemento a dos (Q1.15),
-* cada bit en 0 o vcc, para los bloques de library/verilog/DSP. Cuantiza sin muestrear (redondea hacia
-* abajo y satura): la muestra la toma el bloque que lo lee con su reloj (un z⁻¹).
-.subckt dsp_adc vin d_15 d_14 d_13 d_12 d_11 d_10 d_9 d_8 d_7 d_6 d_5 d_4 d_3 d_2 d_1 d_0 vref=1 vcc=5
+* cada bit en 0 o vcc, para los bloques de library/verilog/DSP. Cuantiza con fuentes B (redondea hacia
+* abajo y satura) y toma la muestra en el flanco de subida de clk: un flip-flop D (d_dff de XSPICE) por
+* bit, así la palabra cambia una vez por ciclo (lo que sigue no cambia en cada paso del transitorio).
+* Antes del primer flanco, 0.
+.subckt dsp_adc vin clk d_15 d_14 d_13 d_12 d_11 d_10 d_9 d_8 d_7 d_6 d_5 d_4 d_3 d_2 d_1 d_0 vref=1 vcc=5
 Bcode code 0 V=max(-32768, min(32767, floor(v(vin)/vref*32768)))
-* el código sin signo (de 0 a 65535) y sus bits
+* el código sin signo (de 0 a 65535) y sus bits, sin muestrear
 Bword word 0 V=v(code)+65536*u(-v(code)-0.5)
-Bd15 d_15 0 V=vcc*(floor(v(word)/32768)-2*floor(v(word)/65536))
-Bd14 d_14 0 V=vcc*(floor(v(word)/16384)-2*floor(v(word)/32768))
-Bd13 d_13 0 V=vcc*(floor(v(word)/8192)-2*floor(v(word)/16384))
-Bd12 d_12 0 V=vcc*(floor(v(word)/4096)-2*floor(v(word)/8192))
-Bd11 d_11 0 V=vcc*(floor(v(word)/2048)-2*floor(v(word)/4096))
-Bd10 d_10 0 V=vcc*(floor(v(word)/1024)-2*floor(v(word)/2048))
-Bd9 d_9 0 V=vcc*(floor(v(word)/512)-2*floor(v(word)/1024))
-Bd8 d_8 0 V=vcc*(floor(v(word)/256)-2*floor(v(word)/512))
-Bd7 d_7 0 V=vcc*(floor(v(word)/128)-2*floor(v(word)/256))
-Bd6 d_6 0 V=vcc*(floor(v(word)/64)-2*floor(v(word)/128))
-Bd5 d_5 0 V=vcc*(floor(v(word)/32)-2*floor(v(word)/64))
-Bd4 d_4 0 V=vcc*(floor(v(word)/16)-2*floor(v(word)/32))
-Bd3 d_3 0 V=vcc*(floor(v(word)/8)-2*floor(v(word)/16))
-Bd2 d_2 0 V=vcc*(floor(v(word)/4)-2*floor(v(word)/8))
-Bd1 d_1 0 V=vcc*(floor(v(word)/2)-2*floor(v(word)/4))
-Bd0 d_0 0 V=vcc*(floor(v(word)/1)-2*floor(v(word)/2))
+Bq15 q_15 0 V=vcc*(floor(v(word)/32768)-2*floor(v(word)/65536))
+Bq14 q_14 0 V=vcc*(floor(v(word)/16384)-2*floor(v(word)/32768))
+Bq13 q_13 0 V=vcc*(floor(v(word)/8192)-2*floor(v(word)/16384))
+Bq12 q_12 0 V=vcc*(floor(v(word)/4096)-2*floor(v(word)/8192))
+Bq11 q_11 0 V=vcc*(floor(v(word)/2048)-2*floor(v(word)/4096))
+Bq10 q_10 0 V=vcc*(floor(v(word)/1024)-2*floor(v(word)/2048))
+Bq9 q_9 0 V=vcc*(floor(v(word)/512)-2*floor(v(word)/1024))
+Bq8 q_8 0 V=vcc*(floor(v(word)/256)-2*floor(v(word)/512))
+Bq7 q_7 0 V=vcc*(floor(v(word)/128)-2*floor(v(word)/256))
+Bq6 q_6 0 V=vcc*(floor(v(word)/64)-2*floor(v(word)/128))
+Bq5 q_5 0 V=vcc*(floor(v(word)/32)-2*floor(v(word)/64))
+Bq4 q_4 0 V=vcc*(floor(v(word)/16)-2*floor(v(word)/32))
+Bq3 q_3 0 V=vcc*(floor(v(word)/8)-2*floor(v(word)/16))
+Bq2 q_2 0 V=vcc*(floor(v(word)/4)-2*floor(v(word)/8))
+Bq1 q_1 0 V=vcc*(floor(v(word)/2)-2*floor(v(word)/4))
+Bq0 q_0 0 V=vcc*(floor(v(word)/1)-2*floor(v(word)/2))
+* la muestra: cada bit a digital, un d_dff con clk y de vuelta a una tensión
+Aclk [clk] [clk_e] adc_in
+Abits [q_15 q_14 q_13 q_12 q_11 q_10 q_9 q_8 q_7 q_6 q_5 q_4 q_3 q_2 q_1 q_0] [q_15_e q_14_e q_13_e q_12_e q_11_e q_10_e q_9_e q_8_e q_7_e q_6_e q_5_e q_4_e q_3_e q_2_e q_1_e q_0_e] adc_in
+Aff15 q_15_e clk_e null null s_15_e null adc_ff
+Aff14 q_14_e clk_e null null s_14_e null adc_ff
+Aff13 q_13_e clk_e null null s_13_e null adc_ff
+Aff12 q_12_e clk_e null null s_12_e null adc_ff
+Aff11 q_11_e clk_e null null s_11_e null adc_ff
+Aff10 q_10_e clk_e null null s_10_e null adc_ff
+Aff9 q_9_e clk_e null null s_9_e null adc_ff
+Aff8 q_8_e clk_e null null s_8_e null adc_ff
+Aff7 q_7_e clk_e null null s_7_e null adc_ff
+Aff6 q_6_e clk_e null null s_6_e null adc_ff
+Aff5 q_5_e clk_e null null s_5_e null adc_ff
+Aff4 q_4_e clk_e null null s_4_e null adc_ff
+Aff3 q_3_e clk_e null null s_3_e null adc_ff
+Aff2 q_2_e clk_e null null s_2_e null adc_ff
+Aff1 q_1_e clk_e null null s_1_e null adc_ff
+Aff0 q_0_e clk_e null null s_0_e null adc_ff
+Aout [s_15_e s_14_e s_13_e s_12_e s_11_e s_10_e s_9_e s_8_e s_7_e s_6_e s_5_e s_4_e s_3_e s_2_e s_1_e s_0_e] [d_15 d_14 d_13 d_12 d_11 d_10 d_9 d_8 d_7 d_6 d_5 d_4 d_3 d_2 d_1 d_0] adc_out
+.model adc_in adc_bridge(in_low={vcc*0.4} in_high={vcc*0.6})
+.model adc_ff d_dff(clk_delay=1e-12 set_delay=1e-12 reset_delay=1e-12 rise_delay=1e-12 fall_delay=1e-12)
+.model adc_out dac_bridge(out_low=0 out_high={vcc} out_undef={vcc/2} t_rise=1n t_fall=1n)
 .ends dsp_adc

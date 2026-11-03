@@ -316,6 +316,11 @@ const DRAW: Record<string, Drawing> = {
     const d = clocked('', undefined, { y: [64, 0] });
     return { ...d, shapes: [...d.shapes, ...line([32, 0], [64, 0]), ...line([-20, 12], [20, 12]), ...line([-6, 12], [-6, -18]), 'CIRCLE Normal -10 -22 -2 -14', text(10, -6, 'δ', 2)] };
   })(),
+  dsp_step: (() => {
+    // un escalón dibujado: el eje y la subida
+    const d = clocked('', undefined, { y: [64, 0] });
+    return { ...d, shapes: [...d.shapes, ...line([32, 0], [64, 0]), ...line([-20, 12], [20, 12]), ...line([-20, 12], [-8, 12], [-8, -16], [20, -16]), text(8, -2, 'u', 2)] };
+  })(),
   dsp_nco: (() => {
     const d = clocked('NCO', undefined, { y: [64, 0] });
     // una onda chiquita abajo del rótulo

@@ -95,8 +95,9 @@ Módulos de punto fijo en complemento a dos (por defecto W = 16, Q1.15) en `libr
   `abs`, `requant` (cambio de formato: corre SHIFT bits, redondea y satura), `minmax`, `cmp`, `mac`,
   `popcount`, `clz`, `div`, `sqrt`, `cmul` (multiplicador complejo I/Q).
 - DSP: `delay` (z⁻¹), `integrator`, `diff` (1 − z⁻¹), `movavg`, `envelope`, `nco`, `impulse`
-  (impulso o escalón), `downsample` (↓M) y `upsample` (↑L), con su reloj `clko`, que cambia en los
-  flancos de bajada de `clk`: los bloques que siguen con `clko` son sincrónicos con la muestra.
+  (un pulso de un ciclo), `step` (escalón), `downsample` (↓M) y `upsample` (↑L), con su reloj
+  `clko`, que cambia en los flancos de bajada de `clk`: los bloques que siguen con `clko` son
+  sincrónicos con la muestra.
   `cordic` (fase → cos, sen) y `magphase` (x, y → magnitud, fase), `sdm` (sigma-delta de 1 bit),
   `ramp`. En un solo bloque: `fir8` (C0…C7), `biquad` (B0 B1 B2 A1 A2 en Q2.14) y `cic` (N, R; salida
   normalizada, con `valid`).

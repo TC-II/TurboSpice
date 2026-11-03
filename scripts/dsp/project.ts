@@ -23,7 +23,7 @@ import type { SimView } from '../../src/sim/simList.ts';
 
 const LIB = 'library/verilog/DSP';
 const SYM = 'library/sym/DSP';
-const MODULES = ['dsp_clock', 'dsp_impulse', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul', 'dsp_fir8'];
+const MODULES = ['dsp_clock', 'dsp_impulse', 'dsp_step', 'dsp_nco', 'dsp_delay', 'dsp_tap', 'dsp_add', 'dsp_sub', 'dsp_shift', 'dsp_downsample', 'dsp_mul', 'dsp_fir8'];
 
 // Icarus en WebAssembly (engine/dist-engine/icarus), para los módulos de comportamiento (el reloj)
 const ICARUS = join('engine', 'dist-engine', 'icarus');
@@ -154,7 +154,7 @@ function biquadLp(fc: number) {
 type Source = { kind: 'impulse' | 'step'; value: number } | { kind: 'sine'; f: number };
 /** La fuente en (x, y) con su reloj; devuelve el pin de salida */
 function source(s: Sheet, src: Source, x: number, y: number): Pt {
-  const b = src.kind === 'sine' ? s.block('dsp_nco', x, y, { FREQ: Math.round((src.f / 1e6) * 65536) }) : s.block('dsp_impulse', x, y, { VALUE: src.value, STEP: src.kind === 'step' ? 1 : 0 });
+  const b = src.kind === 'sine' ? s.block('dsp_nco', x, y, { FREQ: Math.round((src.f / 1e6) * 65536) }) : s.block(src.kind === 'step' ? 'dsp_step' : 'dsp_impulse', x, y, { VALUE: src.value });
   s.stub(b.pins.clk, [0, 1], 'clk');
   const what = src.kind === 'sine' ? `${src.f / 1e3} kHz` : src.kind === 'step' ? `step ${fmt(src.value / 32768)}` : `impulse ${fmt(src.value / 32768)}`;
   s.text(x - 40, y - 80, `;${what}`);

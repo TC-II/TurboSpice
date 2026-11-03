@@ -386,7 +386,7 @@ X1 ${nodes('x', 8)} ${nodes('y', 8)} dsp_shift
     verilog: `${DSP}
 module cic(input clk, output signed [7:0] y, output slow);
   wire signed [7:0] x, i, id, d, dd;
-  dsp_impulse #(.W(8), .VALUE(5), .STEP(1)) u0(.clk(clk), .y(x));
+  dsp_step #(.W(8), .VALUE(5)) u0(.clk(clk), .y(x));
   dsp_add #(.W(8), .SAT(0)) a1(.a(x), .b(id), .y(i));
   dsp_delay #(.W(8)) z1(.clk(clk), .d(i), .q(id));
   dsp_downsample #(.W(8), .M(4)) ds(.clk(clk), .x(i), .y(d), .clko(slow));
@@ -656,13 +656,13 @@ module blocks(input clk, output q, output signed [15:0] fir, output signed [15:0
   dsp_const #(.VALUE(16384)) k1(.y(half));
   dsp_const #(.VALUE(256)) k2(.y(small));
   dsp_impulse #(.VALUE(32767)) u0(.clk(clk), .y(imp));
-  dsp_impulse #(.VALUE(16384), .STEP(1)) u1(.clk(clk), .y(step));
+  dsp_step #(.VALUE(16384)) u1(.clk(clk), .y(step));
   dsp_sdm u2(.clk(clk), .x(half), .q(q));
   dsp_fir8 u3(.clk(clk), .x(imp), .y(fir));
   dsp_biquad u4(.clk(clk), .x(step), .y(iir));
   dsp_cic #(.R(8), .N(2)) u5(.clk(clk), .x(small), .y(cic), .valid(cv));
   dsp_fifo #(.W(8)) u6(.clk(clk), .wr(1'b1), .rd(1'b0), .d(8'd77), .q(fq), .empty(empty), .full(full));
-  dsp_ramp #(.STEP(256)) u7(.clk(clk), .y(ramp));
+  dsp_ramp #(.INC(256)) u7(.clk(clk), .y(ramp));
 endmodule`,
     fresh: true,
     circuit: `${CLK}

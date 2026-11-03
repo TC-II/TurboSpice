@@ -18,7 +18,7 @@ LINE Normal 4 58 0 52
 LINE Normal 0 52 -4 58
 WINDOW 0 0 -40 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n START=0 STEP=256 W=16 hdl=auto
+SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n INC=256 START=0 W=16 hdl=auto
 SYMATTR Prefix X
 SYMATTR Value dsp_ramp
 SYMATTR ModelFile dsp_ramp.sub

@@ -125,14 +125,18 @@ SAT/RND eligen saturar y redondear.
   la de un sumador tiene las carreras de sus compuertas.
 - **La punta en un bus DSP** (con nombre o sin él: `N001` entre pines de 16 bits) lo grafica así,
   `signed(Dig(bus), 16)`, en un eje en cuentas. También el del ADC ideal, cuyos bits son tensiones:
-  `Dig()` de un bus analógico toma cada bit como 1 arriba de la mitad del nivel más alto. Un bus
-  que quedó adentro del módulo de Icarus no se guardó: la traza queda y aparece al volver a simular.
+  `Dig()` de un bus analógico toma cada bit como 1 arriba de la mitad del nivel más alto. Una red
+  entre bloques DSP sin bus (el reloj) va como `Dig(clk)`. No hace falta volver a simular.
 - **Un solo módulo de Icarus** (`hdl/cosimMerge.ts`): al simular, las instancias de nivel superior de
   los bloques DSP (dos o más) se reemplazan por una sola (`xdsp`), de un módulo generado
   (`dsp_cosim`) que las instancia y cablea como en el esquemático, y que corre como un d_cosim. Los
-  nodos que usa algo más de la netlist son puertos; las redes internas que piden las trazas también,
-  con alias para sus nombres de antes (`Dig(x24.q[15:0])`, `Dig(x[15:0])`): una traza nueva de una red
-  interna necesita volver a simular. No se hace si ya hay otro bloque de comportamiento (Icarus corre
+  nodos que usa algo más de la netlist son puertos; las redes entre bloques salen todas como salidas
+  del módulo, pero sólo como su nodo de eventos (sin dac_bridge ni pin del `.subckt`,
+  `internalOnly`), con alias para sus nombres de antes (`Dig(x24.q[15:0])`, `Dig(N001[15:0])`): la
+  punta las grafica sin volver a simular. Cada cambio de una salida es un punto del transitorio, así
+  que conviene muestrear con un z⁻¹ lo que llega de afuera: el ADC ideal sigue a la entrada todo el
+  tiempo y un bloque combinacional detrás (el FIR) cambiaría en cada paso (medido con el ejemplo
+  ADC → FIR → DAC: 21 s y 112 mil puntos sin el z⁻¹ de muestreo; 0,35 s y 1800 puntos con él). No se hace si ya hay otro bloque de comportamiento (Icarus corre
   uno por simulación) ni con pines inout. La netlist lo dice en un comentario. Medido en la app con el
   FIR de 8 taps (100 µs con un seno): el motor pasa de ~2,7 s a ~0,14 s y armar la netlist, de ~1,3 s a
   ~0,07 s (con la síntesis de las variantes ya hecha).

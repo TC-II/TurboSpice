@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { decode } from '../asc/encoding.ts';
 import { DIGITAL_TYPE, type SimPlot } from '../engine/ngspice.ts';
+import { MERGED_INST } from '../hdl/cosimMerge.ts';
 import { t } from '../i18n/i18n.ts';
 import { download } from '../schematic/exportSchematic.ts';
 import { deviceRefs } from '../sim/deviceParams.ts';
@@ -37,9 +38,24 @@ export function useTraces({ sim, plot, labels, resolver, mode, panes, activePane
   const traceNames = useMemo(() => {
     const sc = plot && scaleOf(plot);
     if (!plot) return [];
+    // las redes que quedaron adentro del módulo DSP de Icarus (xdsp.w_3_d, cosimMerge.ts): con su
+    // nombre del esquemático (Dig(N001[15:0]), Dig(valid)), no con el del módulo generado
+    const merged = (v: { name: string }) => v.name.toLowerCase().startsWith(`${MERGED_INST}.`);
+    const named = new Map<string, number[]>();
+    const single: string[] = [];
+    for (const [name, ev] of sim?.built.digitalAliases ?? []) {
+      if (!ev.toLowerCase().startsWith(`${MERGED_INST}.`) || !plot.vectors.some((v) => v.name.toLowerCase() === ev.toLowerCase())) continue;
+      const bit = /^([^.]+)\[(\d+)\]$/.exec(name);
+      if (bit) named.set(bit[1], [...(named.get(bit[1]) ?? []), Number(bit[2])]);
+      else if (!name.includes('.')) single.push(`Dig(${name})`);
+    }
+    const mergedBuses = [...named].map(([base, bits]) => `Dig(${base}[${Math.max(...bits)}:${Math.min(...bits)}])`);
+    // (sin los nodos de las fuentes que miden la corriente de cada pin, pinCurrents.ts: x1__p2 es la
+    // misma red que la de afuera del pin)
+    const vectors = plot.vectors.filter((v) => v !== sc && !merged(v) && !/__p\d+$/i.test(v.name));
     // y los buses que forman los nodos digitales de los bloques Verilog (#209): Dig(x1.q[3:0])
-    return [...new Set([...plot.vectors.filter((v) => v !== sc).map(displayName), ...busNames(plot.vectors.filter((v) => v.type === DIGITAL_TYPE).map((v) => v.name))])];
-  }, [plot]);
+    return [...new Set([...vectors.map(displayName), ...busNames(vectors.filter((v) => v.type === DIGITAL_TYPE).map((v) => v.name)), ...mergedBuses, ...single])];
+  }, [plot, sim]);
   // parámetros de los dispositivos para elegir en la caja de trazas (#202)
   const traceHints = useMemo(() => (sim ? deviceParamTraces(sim.built) : undefined), [sim]);
   /** agrega la expresión al panel activo; devuelve el error si no se puede graficar */

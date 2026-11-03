@@ -3,7 +3,7 @@
 import { useRef, type MutableRefObject } from 'react';
 import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
 import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
-import { hdlOfLine, mergeCosim, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
+import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import { t } from '../i18n/i18n.ts';
@@ -117,8 +117,10 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
         hit = { subckt: r.block.subckt, vvp: r.vvp, pins: r.block.pins };
         mergeCache.current.set(k, hit);
       }
-      netlist = m.netlist.replace(MERGED_LINE, `* DSP library blocks in one Icarus module (${m.top}): ${m.instances.join(' ')}\n${mergedLine(m, hit.pins)}`);
-      merged.push(hit.subckt);
+      // (las redes entre bloques, sólo como nodos de eventos: ver CosimMerge.internal)
+      const inner = internalOnly(hit.subckt, hit.pins, m.internal);
+      netlist = m.netlist.replace(MERGED_LINE, `* DSP library blocks in one Icarus module (${m.top}): ${m.instances.join(' ')}\n${mergedLine(m, inner.pins)}`);
+      merged.push(inner.subckt);
       vvp = hit.vvp;
       aliases = m.aliases;
     }

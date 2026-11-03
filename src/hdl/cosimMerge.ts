@@ -41,6 +41,12 @@ export interface CosimMerge {
   aliases: Map<string, string>;
   /** las instancias que se juntaron */
   instances: string[];
+  /**
+   * puertos de salida del módulo que no usa nada de afuera (las redes entre bloques): sólo su nodo
+   * de eventos, sin dac_bridge ni pin del .subckt (internalOnly), para graficarlas con Dig() sin que
+   * cada flanco sea un escalón analógico que achica el paso del transitorio
+   */
+  internal: string[];
 }
 
 export const MERGED_TOP = 'dsp_cosim';
@@ -80,9 +86,9 @@ interface Inst {
 }
 
 /**
- * Junta las instancias de los módulos que pide `mergeable` (al menos dos). `traces`: las
- * expresiones que se van a graficar (sus redes internas salen como puertos). null si no hay nada
- * que juntar.
+ * Junta las instancias de los módulos que pide `mergeable` (al menos dos). Cada red que maneja un
+ * bloque sale como puerto; `traces`, las expresiones que se van a graficar, dan los nombres con que
+ * se piden (alias). null si no hay nada que juntar.
  */
 export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (module: string, hdl: HdlMode) => boolean, traces: string[] = []): CosimMerge | null {
   const byName = new Map(modules.map((m) => [m.name.toLowerCase(), m]));
@@ -160,9 +166,10 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
   const outputs: string[] = [];
   for (const n of wire.keys()) {
     if (n === '0') continue;
-    if (driven.has(n)) {
-      if (outside.has(n) || traced.has(n)) outputs.push(n);
-    } else inputs.push(n);
+    // todas las redes entre bloques salen como puertos (no sólo las que usa la netlist o una traza):
+    // la punta grafica cualquiera sin volver a simular
+    if (driven.has(n)) outputs.push(n);
+    else inputs.push(n);
   }
 
   // el módulo: cada instancia con sus parameter y sus puertos (un bus, sus bits del más alto al más bajo)
@@ -194,7 +201,8 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
     '',
   ].join('\n');
 
-  const ports = new Map([...inputs, ...outputs].map((n) => [wire.get(n)!, original.get(n)!]));
+  const ports = new Map([...inputs, ...outputs].filter((n) => !outputs.includes(n) || outside.has(n)).map((n) => [wire.get(n)!, original.get(n)!]));
+  const internal = outputs.filter((n) => !outside.has(n)).map((n) => wire.get(n)!);
   // los nombres de antes de las salidas → su nodo de eventos en el bloque nuevo
   const aliases = new Map<string, string>();
   for (const n of outputs) {
@@ -207,14 +215,43 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
   for (const [pin, n] of pinNode) if (outputs.includes(n)) aliases.set(pin, `${MERGED_INST}.${wire.get(n)}_d`);
 
   // la netlist: la línea X nueva donde estaba la primera, sin las otras ni las R de gmin de los nodos que ya no están
-  const gone = new Set([...wire.keys()].filter((n) => !isPort.has(n) && n !== '0'));
+  const gone = new Set([...wire.keys()].filter((n) => n !== '0' && !(isPort.has(n) && (inputs.includes(n) || outside.has(n)))));
   const out = lines.flatMap((l, i) => {
     if (i === insts[0].line) return [MERGED_LINE];
     if (merged.has(i)) return [];
     const r = /^\s*r__float\d+\s+(\S+)/i.exec(l);
     return r && gone.has(r[1].toLowerCase()) ? [] : [l];
   });
-  return { netlist: out.join('\n'), verilog, top: MERGED_TOP, ports, electrical: insts[0].electrical, aliases, instances: insts.map((x) => x.name) };
+  return { netlist: out.join('\n'), verilog, top: MERGED_TOP, ports, electrical: insts[0].electrical, aliases, instances: insts.map((x) => x.name), internal };
+}
+
+/**
+ * El .subckt compilado del módulo juntado sin los pines de `internal`: esas salidas quedan como su
+ * nodo de eventos (w_3_d), sin el dac_bridge que las pasaba a una tensión
+ */
+export function internalOnly(subckt: string, pins: { name: string }[], internal: string[]): { subckt: string; pins: { name: string }[] } {
+  const drop = new Set(internal.map((w) => w.toLowerCase()));
+  const keep = pins.filter((p) => !drop.has(p.name.toLowerCase()));
+  const text = subckt
+    .split('\n')
+    .filter((l) => {
+      const ab = /^ab_(\S+)\s.*hdl_dac\s*$/i.exec(l.trim());
+      return !(ab && drop.has(ab[1].toLowerCase()));
+    })
+    .map((l) =>
+      /^\.subckt\s/i.test(l)
+        ? l.replace(
+            /^(\.subckt\s+\S+)((?:\s+\S+)*)$/i,
+            (_m, head: string, rest: string) =>
+              `${head}${rest
+                .split(/\s+/)
+                .filter((w) => !drop.has(w.toLowerCase()))
+                .join(' ')}`,
+          )
+        : l,
+    )
+    .join('\n');
+  return { subckt: text, pins: keep };
 }
 
 /** La línea X del bloque nuevo, con los nodos en el orden de los pines de su .subckt */

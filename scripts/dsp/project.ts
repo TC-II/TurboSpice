@@ -380,24 +380,29 @@ function mixed() {
   const adc = s.block('dsp_adc', 192, 0);
   s.wire([96, 0], adc.pins.vin);
   s.text(140, -80, ';ideal ADC');
-  const fir = s.block('dsp_fir8', 480, 0);
+  // el ADC sigue a la entrada todo el tiempo: el z⁻¹ toma la muestra con el reloj (así lo que sigue
+  // cambia una vez por ciclo y no en cada paso del transitorio)
+  const smp = delay(s, 448, 0);
+  s.wire(adc.pins.d, smp.d);
+  s.text(392, -80, ';sample');
+  const fir = s.block('dsp_fir8', 720, 0);
   s.stub(fir.pins.clk, [0, 1], 'clk');
-  s.wire(adc.pins.d, fir.pins.x);
-  s.flag([adc.pins.d[0] + 32, 0], bus('x'));
-  s.text(420, -80, ';FIR, 8 taps (one block)');
-  const r = delay(s, 768, 0);
+  s.wire(smp.q, fir.pins.x);
+  s.flag([smp.q[0] + 32, 0], bus('x'));
+  s.text(660, -80, ';FIR, 8 taps (one block)');
+  const r = delay(s, 1008, 0);
   s.wire(fir.pins.y, r.d);
   const out = s.last;
-  const dac = s.block('dsp_dac', 1056, 0);
+  const dac = s.block('dsp_dac', 1264, 0);
   s.wire(r.q, dac.pins.d);
-  s.text(1000, -80, ';ideal DAC');
+  s.text(1208, -80, ';ideal DAC');
   const end: Pt = [dac.pins.vout[0] + 96, 0];
   s.wire(dac.pins.vout, end);
   s.flag(end, 'vout');
   s.clock(-96, 304);
-  s.text(-136, -224, ';Mixed signal: 20 kHz + 300 kHz → ideal 16-bit ADC → FIR low-pass (100 kHz at fs = 1 MHz) → ideal DAC. The 300 kHz tone is filtered out', 3);
+  s.text(-136, -224, ';Mixed signal: 20 kHz + 300 kHz → ideal 16-bit ADC → sample (z⁻¹) → FIR low-pass (100 kHz at fs = 1 MHz) → ideal DAC. The 300 kHz tone is filtered out', 3);
   s.text(-136, 480, '!.tran 0 100u');
-  return s.done(1400, 560, out);
+  return s.done(1600, 560, out);
 }
 
 // --- proyecto ------------------------------------------------------------------------------------

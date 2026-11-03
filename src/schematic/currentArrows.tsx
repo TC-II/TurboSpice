@@ -62,6 +62,9 @@ export function currentArrows(doc: AscDoc, lib: Library, elements: { sym: number
     const s = doc.symbols[el.sym];
     const def = s && lib.symbol(s.type);
     if (!def) continue;
+    // los bloques Verilog y los de la biblioteca DSP (también el ADC/DAC ideal): pines lógicos, sin
+    // una corriente que valga la pena (el símbolo ya marca el sentido de la señal)
+    if (/\bhdl=/i.test(def.attrs.get('SpiceLine') ?? '') || /^dsp_/i.test(s.attrs?.get('Value') ?? def.attrs.get('Value') ?? '')) continue;
     const pts = pinPoints(s, def);
     const orders = def.pins.map((_, k) => order(def, k));
     const first = Math.min(...orders);

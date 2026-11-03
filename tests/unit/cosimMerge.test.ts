@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MERGED_LINE, hdlOfLine, mergeCosim, mergedLine, stripHdl, type MergeModule } from '../../src/hdl/cosimMerge.ts';
+import { MERGED_LINE, hdlOfLine, internalOnly, mergeCosim, mergedLine, stripHdl, type MergeModule } from '../../src/hdl/cosimMerge.ts';
 
 // Los bloques DSP en un solo módulo de Icarus (#366)
 const bits = (n: string, w: number) => Array.from({ length: w }, (_, k) => `${n}_${w - 1 - k}`);
@@ -27,13 +27,16 @@ describe('cosimMerge', () => {
   it('junta las instancias: puertos para lo de afuera, wire para lo interno', () => {
     const m = mergeCosim(NET, MODS, () => true)!;
     expect(m.instances).toEqual(['x1', 'x2']);
-    // clk y x[1:0] entran; sale y__1__, que usa R1 (y__0__ sólo tiene su R de gmin: queda adentro)
+    // clk y x[1:0] entran; sale y__1__, que usa R1. Las otras salidas (m[1:0], entre los bloques, e
+    // y__0__, que sólo tiene su R de gmin) son puertos del módulo sin pin en el .subckt: sólo su nodo
+    // de eventos, para graficarlas sin volver a simular
     expect([...m.ports.values()]).toEqual(['clk', 'x__1__', 'x__0__', 'y__1__']);
+    expect(m.internal).toEqual(['w_3', 'w_4', 'w_6']);
     expect(m.verilog).toMatch(/dsp_delay x1 \(\.clk\(w_0\), \.d\(\{w_1, w_2\}\), \.q\(\{w_3, w_4\}\)\);/);
     // el parameter distinto del de por omisión
     expect(m.verilog).toMatch(/dsp_neg #\(\.SAT\(0\)\) x2/);
-    expect(m.verilog).toMatch(/wire w_3, w_4, w_6;/);
-    // la R de gmin de un nodo que ya no existe se va; las de los puertos quedan
+    expect(m.verilog).toMatch(/output w_3, output w_4/);
+    // la R de gmin de un nodo que ya no existe se va
     expect(m.netlist).not.toMatch(/R__float1/);
     expect(m.netlist).not.toMatch(/^X1 /m);
     expect(m.netlist).toMatch(new RegExp(`^${MERGED_LINE.replace(/[()*]/g, '\\$&')}$`, 'm'));
@@ -41,7 +44,7 @@ describe('cosimMerge', () => {
   });
   it('las redes internas que piden las trazas salen como puertos, con sus nombres de antes', () => {
     const m = mergeCosim(NET, MODS, () => true, ['Dig(m[1:0])', 'Dig(x1.q[1:0])'])!;
-    expect([...m.ports.values()]).toContain('m__0__');
+    expect(m.internal).toContain('w_4');
     expect(m.aliases.get('m[0]')).toBe('xdsp.w_4_d');
     expect(m.aliases.get('x1.q_1_d')).toBe('xdsp.w_3_d');
   });
@@ -61,5 +64,20 @@ describe('cosimMerge', () => {
   });
   it('nada que juntar con menos de dos instancias o si `mergeable` no las quiere', () => {
     expect(mergeCosim(NET, MODS, (n) => n === 'dsp_neg')).toBeNull();
+  });
+  it('internalOnly: las salidas internas, sin dac_bridge ni pin del .subckt', () => {
+    const sub = [
+      '.subckt dsp_cosim clk w_3 w_5 vcc=5',
+      'ab_clk [clk] [clk_d] null hdl_in',
+      'ab_w_3 [w_3_d] [w_3] hdl_dac',
+      'ab_w_5 [w_5_d] [w_5] hdl_dac',
+      'acosim [clk_d] [w_3_d w_5_d] null hdl_cosim',
+      '.ends dsp_cosim',
+    ].join('\n');
+    const r = internalOnly(sub, [{ name: 'clk' }, { name: 'w_3' }, { name: 'w_5' }], ['w_3']);
+    expect(r.pins.map((p) => p.name)).toEqual(['clk', 'w_5']);
+    expect(r.subckt).toMatch(/^\.subckt dsp_cosim clk w_5 vcc=5$/m);
+    expect(r.subckt).not.toMatch(/ab_w_3/);
+    expect(r.subckt).toMatch(/acosim \[clk_d\] \[w_3_d w_5_d\]/);
   });
 });

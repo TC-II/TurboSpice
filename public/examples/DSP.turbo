@@ -1711,34 +1711,34 @@
    }
   }
  ],
- "activeTestbench": "smw05kqvs5",
+ "activeTestbench": "smw097bv05",
  "groups": [
   {
-   "id": "gmw05kqvs0",
+   "id": "gmw097buz0",
    "name": "FIR"
   },
   {
-   "id": "gmw05kqvs1",
+   "id": "gmw097buz1",
    "name": "IIR"
   },
   {
-   "id": "gmw05kqvs2",
+   "id": "gmw097buz2",
    "name": "CIC"
   },
   {
-   "id": "gmw05kqvs3",
+   "id": "gmw097buz3",
    "name": "NCO and mixer"
   },
   {
-   "id": "gmw05kqvs4",
+   "id": "gmw097buz4",
    "name": "Mixed signal"
   }
  ],
  "testbenches": [
   {
-   "id": "smw05kqvs5",
+   "id": "smw097bv05",
    "name": "Impulse response",
-   "group": "gmw05kqvs0",
+   "group": "gmw097buz0",
    "current": "sha256:7a8d5d7f08f36421ef953614398dcc65323ad9a4284706f3fda71e388896d1f8",
    "view": {
     "panes": [
@@ -1776,9 +1776,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvt6",
+   "id": "smw097bv06",
    "name": "Sine 20 kHz (passband)",
-   "group": "gmw05kqvs0",
+   "group": "gmw097buz0",
    "current": "sha256:7f122ff4c43cef669378c18a3afd390edfe6d897af2c9070c18dad5408efef06",
    "view": {
     "panes": [
@@ -1816,9 +1816,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvt7",
+   "id": "smw097bv07",
    "name": "Sine 300 kHz (stopband)",
-   "group": "gmw05kqvs0",
+   "group": "gmw097buz0",
    "current": "sha256:4686e734ab15fddde74e712f3262363e0390a890f5ca159564975d137c23b1cd",
    "view": {
     "panes": [
@@ -1856,9 +1856,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvt8",
+   "id": "smw097bv08",
    "name": "First order: step",
-   "group": "gmw05kqvs1",
+   "group": "gmw097buz1",
    "current": "sha256:5cd77350ba85fe49e150fe1418ca063b6d01fbf14009eb010d83e61c3375cb53",
    "view": {
     "panes": [
@@ -1896,9 +1896,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvt9",
+   "id": "smw097bv19",
    "name": "Biquad: step",
-   "group": "gmw05kqvs1",
+   "group": "gmw097buz1",
    "current": "sha256:c3f5f16984a36275ccb6842e61c6e96d5a9faaa0e36d40bf34721f8ce1d11c2a",
    "view": {
     "panes": [
@@ -1936,9 +1936,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvta",
+   "id": "smw097bv1a",
    "name": "Step response",
-   "group": "gmw05kqvs2",
+   "group": "gmw097buz2",
    "current": "sha256:c14274ecbb026165eb59f40d9a93d8a283b52b87f5bfc23037779dd0050bda96",
    "view": {
     "panes": [
@@ -1976,9 +1976,9 @@
    "runs": []
   },
   {
-   "id": "smw05kqvtb",
+   "id": "smw097bv1b",
    "name": "Mixer 50 kHz × 60 kHz",
-   "group": "gmw05kqvs3",
+   "group": "gmw097buz3",
    "current": "sha256:0b204ee2dfd4f31ad32cb59592389de09b6e8a6c28400bd57c225d52ea3a7d85",
    "view": {
     "panes": [
@@ -2029,10 +2029,10 @@
    "runs": []
   },
   {
-   "id": "smw05kqvtc",
+   "id": "smw097bv1c",
    "name": "ADC → FIR → DAC",
-   "group": "gmw05kqvs4",
-   "current": "sha256:1c78fb87a57855c1e9482680b55feead293bd12ec6ba0367939b58f470e435ca",
+   "group": "gmw097buz4",
+   "current": "sha256:e7b1acf64d1377992d0b3f5efe324e1a802da3a056a8c6d7023de6cdf3d93dff",
    "view": {
     "panes": [
      {
@@ -2062,6 +2062,6 @@
   "sha256:c3f5f16984a36275ccb6842e61c6e96d5a9faaa0e36d40bf34721f8ce1d11c2a": "Version 4\nSHEET 1 2100 800\nSYMBOL dsp_step -96 0 R0\nSYMATTR InstName X1\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n VALUE=16384 W=16 hdl=auto\nWIRE -96 64 -96 96\nFLAG -96 96 clk\nTEXT -136 -80 Left 2 ;step 0.500\nFLAG 32 0 x[15:0]\nWIRE -32 0 160 0\nSYMBOL dsp_tap 160 160 R90\nWINDOW 0 0 0 Invisible 2\nSYMATTR InstName X2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=329 F=14 RND=1 SAT=1 W=16 hdl=auto\nWIRE 160 0 160 96\nTEXT 208 168 Left 2 ;b0 = 0.0201\nWIRE 160 224 160 352\nSYMBOL dsp_delay 304 0 R0\nSYMATTR InstName X3\nWIRE 304 64 304 96\nFLAG 304 96 clk\nWIRE 160 0 240 0\nWIRE 368 0 448 0\nSYMBOL dsp_tap 448 160 R90\nWINDOW 0 0 0 Invisible 2\nSYMATTR InstName X4\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=658 F=14 RND=1 SAT=1 W=16 hdl=auto\nWIRE 448 0 448 96\nTEXT 496 168 Left 2 ;b1 = 0.0402\nSYMBOL dsp_add 448 352 R0\nSYMATTR InstName X5\nWIRE 160 352 384 352\nWIRE 448 224 448 288\nSYMBOL dsp_delay 592 0 R0\nSYMATTR InstName X6\nWIRE 592 64 592 96\nFLAG 592 96 clk\nWIRE 448 0 528 0\nWIRE 656 0 736 0\nSYMBOL dsp_tap 736 160 R90\nWINDOW 0 0 0 Invisible 2\nSYMATTR InstName X7\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=329 F=14 RND=1 SAT=1 W=16 hdl=auto\nWIRE 736 0 736 96\nTEXT 784 168 Left 2 ;b2 = 0.0201\nSYMBOL dsp_add 736 352 R0\nSYMATTR InstName X8\nWIRE 512 352 672 352\nWIRE 736 224 736 288\nSYMBOL dsp_delay 1024 0 R0\nSYMATTR InstName X9\nWIRE 1024 64 1024 96\nFLAG 1024 96 clk\nWIRE 960 0 928 0\nFLAG 928 0 yn[15:0]\nWIRE 1088 0 1168 0\nSYMBOL dsp_tap 1168 160 R90\nWINDOW 0 0 0 Invisible 2\nSYMATTR InstName X10\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=25576 F=14 RND=1 SAT=1 W=16 hdl=auto\nWIRE 1168 0 1168 96\nTEXT 1216 168 Left 2 ;−a1 = 1.561\nSYMBOL dsp_add 1168 352 R0\nSYMATTR InstName X11\nWIRE 800 352 1104 352\nWIRE 1168 224 1168 288\nSYMBOL dsp_delay 1312 0 R0\nSYMATTR InstName X12\nWIRE 1312 64 1312 96\nFLAG 1312 96 clk\nWIRE 1168 0 1248 0\nWIRE 1376 0 1456 0\nSYMBOL dsp_tap 1456 160 R90\nWINDOW 0 0 0 Invisible 2\nSYMATTR InstName X13\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n COEF=-10508 F=14 RND=1 SAT=1 W=16 hdl=auto\nWIRE 1456 0 1456 96\nTEXT 1504 168 Left 2 ;−a2 = -0.641\nSYMBOL dsp_add 1456 352 R0\nSYMATTR InstName X14\nWIRE 1232 352 1392 352\nWIRE 1456 224 1456 288\nFLAG 1552 352 yn[15:0]\nSYMBOL dsp_delay 1680 352 R0\nSYMATTR InstName X15\nWIRE 1680 416 1680 448\nFLAG 1680 448 clk\nWIRE 1520 352 1616 352\nWIRE 1744 352 1840 352\nFLAG 1840 352 y[15:0]\nTEXT 1624 280 Left 2 ;output register\nSYMBOL dsp_clock -96 576 R0\nSYMATTR InstName X16\nWIRE -32 576 0 576\nFLAG 0 576 clk\nTEXT -136 640 Left 2 ;1 MHz clock\nTEXT -136 -176 Left 3 ;Biquad Butterworth low-pass, direct form I: fc = 50 kHz at fs = 1 MHz. Coefficients in Q2.14 (F = 14), the feedback ones with their sign changed\nTEXT -136 704 Left 2 !.tran 0 60u\n",
   "sha256:c14274ecbb026165eb59f40d9a93d8a283b52b87f5bfc23037779dd0050bda96": "Version 4\nSHEET 1 2300 500\nSYMBOL dsp_step -96 0 R0\nSYMATTR InstName X1\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n VALUE=256 W=16 hdl=auto\nWIRE -96 64 -96 96\nFLAG -96 96 clk\nTEXT -136 -80 Left 2 ;step 0.0078\nFLAG 32 0 x[15:0]\nSYMBOL dsp_add 160 0 R0\nSYMATTR InstName X2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=0 W=16 hdl=auto\nWIRE -32 0 96 0\nWIRE 224 0 320 0\nSYMBOL dsp_delay 32 -192 R0\nSYMATTR InstName X3\nWIRE 32 -128 32 -96\nFLAG 32 -96 clk\nWIRE 320 0 320 -288\nWIRE 320 -288 -64 -288\nWIRE -64 -288 -64 -192\nWIRE -64 -192 -32 -192\nWIRE 96 -192 160 -192\nWIRE 160 -192 160 -64\nTEXT 120 96 Left 2 ;integrator 1\nSYMBOL dsp_add 640 0 R0\nSYMATTR InstName X4\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=0 W=16 hdl=auto\nWIRE 320 0 576 0\nWIRE 704 0 800 0\nSYMBOL dsp_delay 512 -192 R0\nSYMATTR InstName X5\nWIRE 512 -128 512 -96\nFLAG 512 -96 clk\nWIRE 800 0 800 -288\nWIRE 800 -288 416 -288\nWIRE 416 -288 416 -192\nWIRE 416 -192 448 -192\nWIRE 576 -192 640 -192\nWIRE 640 -192 640 -64\nTEXT 600 96 Left 2 ;integrator 2\nSYMBOL dsp_downsample 1088 0 R0\nSYMATTR InstName X6\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n M=8 W=16 hdl=auto\nWIRE 800 0 1024 0\nWIRE 1088 64 1088 96\nFLAG 1088 96 clk\nWIRE 1088 -64 1088 -96\nFLAG 1088 -96 clkd\nTEXT 1128 96 Left 2 ;↓8\nWIRE 1152 0 1248 0\nSYMBOL dsp_sub 1408 0 R0\nSYMATTR InstName X7\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=0 W=16 hdl=auto\nWIRE 1248 0 1344 0\nSYMBOL dsp_delay 1344 -192 R0\nSYMATTR InstName X8\nWIRE 1344 -128 1344 -96\nFLAG 1344 -96 clkd\nWIRE 1248 0 1248 -192\nWIRE 1248 -192 1280 -192\nWIRE 1408 -192 1408 -192\nWIRE 1408 -192 1408 -64\nTEXT 1368 96 Left 2 ;comb 1\nWIRE 1472 0 1632 0\nSYMBOL dsp_sub 1792 0 R0\nSYMATTR InstName X9\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n SAT=0 W=16 hdl=auto\nWIRE 1632 0 1728 0\nSYMBOL dsp_delay 1728 -192 R0\nSYMATTR InstName X10\nWIRE 1728 -128 1728 -96\nFLAG 1728 -96 clkd\nWIRE 1632 0 1632 -192\nWIRE 1632 -192 1664 -192\nWIRE 1792 -192 1792 -192\nWIRE 1792 -192 1792 -64\nTEXT 1752 96 Left 2 ;comb 2\nSYMBOL dsp_delay 2016 0 R0\nSYMATTR InstName X11\nWIRE 2016 64 2016 96\nFLAG 2016 96 clk\nWIRE 1856 0 1952 0\nWIRE 2080 0 2176 0\nFLAG 2176 0 y[15:0]\nTEXT 1960 -72 Left 2 ;output register\nSYMBOL dsp_clock -96 288 R0\nSYMATTR InstName X12\nWIRE -32 288 0 288\nFLAG 0 288 clk\nTEXT -136 352 Left 2 ;1 MHz clock\nTEXT -136 -416 Left 3 ;CIC decimator, N = 2, R = 8: integrators at 1 MHz, combs at 125 kHz, wrap-around arithmetic (SAT = 0). DC gain R^N = 64: a step of 256 settles at 16384\nTEXT -136 416 Left 2 !.tran 0 60u\n",
   "sha256:0b204ee2dfd4f31ad32cb59592389de09b6e8a6c28400bd57c225d52ea3a7d85": "Version 4\nSHEET 1 1100 500\nSYMBOL dsp_nco -96 0 R0\nSYMATTR InstName X1\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=3277 hdl=auto\nWIRE -96 64 -96 96\nFLAG -96 96 clk\nTEXT -136 -80 Left 2 ;50 kHz\nFLAG 32 0 a[15:0]\nSYMBOL dsp_nco 160 -256 R0\nSYMATTR InstName X2\nSYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m tr=1n tf=1n tpd=1n FREQ=3932 hdl=auto\nWIRE 160 -192 160 -160\nFLAG 160 -160 clk\nTEXT 120 -336 Left 2 ;60 kHz\nFLAG 288 -256 b[15:0]\nSYMBOL dsp_mul 352 0 R0\nSYMATTR InstName X3\nWIRE -32 0 288 0\nWIRE 224 -256 352 -256\nWIRE 352 -256 352 -64\nSYMBOL dsp_delay 576 0 R0\nSYMATTR InstName X4\nWIRE 576 64 576 96\nFLAG 576 96 clk\nWIRE 416 0 512 0\nWIRE 640 0 736 0\nFLAG 736 0 y[15:0]\nTEXT 520 -72 Left 2 ;output register\nSYMBOL dsp_clock -96 288 R0\nSYMATTR InstName X5\nWIRE -32 288 0 288\nFLAG 0 288 clk\nTEXT -136 352 Left 2 ;1 MHz clock\nTEXT -136 -432 Left 3 ;Two NCOs (50 kHz and 60 kHz) and their product: 10 kHz and 110 kHz, since sin a · sin b = [cos(a − b) − cos(a + b)] / 2\nTEXT -136 416 Left 2 !.tran 0 200u\n",
-  "sha256:1c78fb87a57855c1e9482680b55feead293bd12ec6ba0367939b58f470e435ca": "Version 4\nSHEET 1 1400 560\nSYMBOL voltage -96 -16 R0\nWINDOW 0 40 40 Left 2\nWINDOW 3 40 72 Left 2\nSYMATTR InstName V1\nSYMATTR Value SINE(0 0.4 20k)\nSYMBOL voltage -96 64 R0\nWINDOW 0 40 40 Left 2\nWINDOW 3 40 72 Left 2\nSYMATTR InstName V2\nSYMATTR Value SINE(0 0.4 300k)\nFLAG -96 160 0\nWIRE -96 0 -96 -48\nWIRE -96 -48 96 -48\nWIRE 96 -48 96 0\nFLAG 0 -48 vin\nSYMBOL dsp_adc 192 0 R0\nSYMATTR InstName X1\nWIRE 96 0 128 0\nTEXT 140 -80 Left 2 ;ideal ADC\nSYMBOL dsp_fir8 480 0 R0\nSYMATTR InstName X2\nWIRE 480 64 480 96\nFLAG 480 96 clk\nWIRE 256 0 400 0\nFLAG 288 0 x[15:0]\nTEXT 420 -80 Left 2 ;FIR, 8 taps (one block)\nSYMBOL dsp_delay 768 0 R0\nSYMATTR InstName X3\nWIRE 768 64 768 96\nFLAG 768 96 clk\nWIRE 560 0 704 0\nSYMBOL dsp_dac 1056 0 R0\nSYMATTR InstName X4\nWIRE 832 0 992 0\nTEXT 1000 -80 Left 2 ;ideal DAC\nWIRE 1120 0 1216 0\nFLAG 1216 0 vout\nSYMBOL dsp_clock -96 352 R0\nSYMATTR InstName X5\nWIRE -32 352 0 352\nFLAG 0 352 clk\nTEXT -136 416 Left 2 ;1 MHz clock\nTEXT -136 -224 Left 3 ;Mixed signal: 20 kHz + 300 kHz → ideal 16-bit ADC → FIR low-pass (100 kHz at fs = 1 MHz) → ideal DAC. The 300 kHz tone is filtered out\nTEXT -136 480 Left 2 !.tran 0 100u\n"
+  "sha256:e7b1acf64d1377992d0b3f5efe324e1a802da3a056a8c6d7023de6cdf3d93dff": "Version 4\nSHEET 1 1600 560\nSYMBOL voltage -96 -16 R0\nWINDOW 0 40 40 Left 2\nWINDOW 3 40 72 Left 2\nSYMATTR InstName V1\nSYMATTR Value SINE(0 0.4 20k)\nSYMBOL voltage -96 64 R0\nWINDOW 0 40 40 Left 2\nWINDOW 3 40 72 Left 2\nSYMATTR InstName V2\nSYMATTR Value SINE(0 0.4 300k)\nFLAG -96 160 0\nWIRE -96 0 -96 -48\nWIRE -96 -48 96 -48\nWIRE 96 -48 96 0\nFLAG 0 -48 vin\nSYMBOL dsp_adc 192 0 R0\nSYMATTR InstName X1\nWIRE 96 0 128 0\nTEXT 140 -80 Left 2 ;ideal ADC\nSYMBOL dsp_delay 448 0 R0\nSYMATTR InstName X2\nWIRE 448 64 448 96\nFLAG 448 96 clk\nWIRE 256 0 384 0\nTEXT 392 -80 Left 2 ;sample\nSYMBOL dsp_fir8 720 0 R0\nSYMATTR InstName X3\nWIRE 720 64 720 96\nFLAG 720 96 clk\nWIRE 512 0 640 0\nFLAG 544 0 x[15:0]\nTEXT 660 -80 Left 2 ;FIR, 8 taps (one block)\nSYMBOL dsp_delay 1008 0 R0\nSYMATTR InstName X4\nWIRE 1008 64 1008 96\nFLAG 1008 96 clk\nWIRE 800 0 944 0\nSYMBOL dsp_dac 1264 0 R0\nSYMATTR InstName X5\nWIRE 1072 0 1200 0\nTEXT 1208 -80 Left 2 ;ideal DAC\nWIRE 1328 0 1424 0\nFLAG 1424 0 vout\nSYMBOL dsp_clock -96 352 R0\nSYMATTR InstName X6\nWIRE -32 352 0 352\nFLAG 0 352 clk\nTEXT -136 416 Left 2 ;1 MHz clock\nTEXT -136 -224 Left 3 ;Mixed signal: 20 kHz + 300 kHz → ideal 16-bit ADC → sample (z⁻¹) → FIR low-pass (100 kHz at fs = 1 MHz) → ideal DAC. The 300 kHz tone is filtered out\nTEXT -136 480 Left 2 !.tran 0 100u\n"
  }
 }

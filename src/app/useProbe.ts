@@ -163,6 +163,13 @@ export function useProbe(d: ProbeDeps) {
     if (target.net && !lv) {
       const dig = digitalProbeExpr(sim.built, [target.net]);
       if (dig && hasData(dig)) return addDigitalProbe(dig);
+      // una red entre bloques DSP (el reloj de dsp_clock) en el módulo de Icarus: no tiene tensión,
+      // su traza es la digital
+      if (!hasData(expr) && busInstances(sim.built.ng.text, [target.net]).some((w) => w.some((x) => /^dsp_/.test(x)))) {
+        addDigitalProbe(`Dig(${target.net})`);
+        if (hasData(`Dig(${target.net})`)) return;
+        return setMessage(t("{expr} wasn't saved in this simulation: it will be saved when you simulate again", { expr: `Dig(${target.net})` }));
+      }
     }
     plotExpr(expr);
   };

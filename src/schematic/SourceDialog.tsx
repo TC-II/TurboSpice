@@ -54,7 +54,7 @@ const f = (key: FieldKey, label: string, unit: FieldDef['unit'], id: string, opt
 const LAYOUT: Record<Exclude<SourceKind, 'pwl'>, FieldDef[][]> = {
   sine: [
     [f(1, t('Amplitude'), 'V', 'amp'), f(0, 'Offset', 'V', 'off'), f(2, t('Frequency'), 'Hz', 'per'), f('per', t('Period'), 's', 'per')],
-    [f(5, t('Phase'), '°', 'phi', true), f(3, 'Tdelay', 's', 'td', true), f(4, 'Amortiguamiento θ', '1/s', 'theta', true), f(6, 'Ncycles', '', 'n', true)],
+    [f(5, t('Phase'), '°', 'phi', true), f(3, 'Tdelay', 's', 'td', true), f(4, t('Damping θ'), '1/s', 'theta', true), f(6, 'Ncycles', '', 'n', true)],
   ],
   ac: [[f('acMag', t('Amplitude'), 'V', 'amp'), f('acPhase', t('Phase'), '°', 'phi', true)]],
   pulse: [

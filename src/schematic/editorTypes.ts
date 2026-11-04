@@ -37,8 +37,6 @@ export const SUBCKT_DRAG = 'application/x-turbospice-subckt';
 
 export interface EditorHandle {
   fit(): void;
-  /** encuadra sólo si no se ve nada del circuito (al pasar a otro testbench, que no guarda su vista) */
-  fitIfLost(): void;
   /** Posición del cursor en el esquemático (para pegar/duplicar) */
   cursor(): Point;
   /** Elemento SVG y caja del contenido (para exportar) */

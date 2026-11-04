@@ -63,7 +63,7 @@ export function markerReadings(markers: Marker[], data: PaneData[]): string[] {
       if (c && (m.kind === 'a' || m.kind === 'd')) m.kind === 'a' ? (a = { x: m.x!, y, d, axis: c.axis }) : (dm = { x: m.x!, y, d, axis: c.axis });
     }
   }
-  const dd = a && dm ? delta(a, dm) : null;
+  const dd = a && dm ? delta(a, dm, dm.d.log) : null;
   const xu = dm ? xUnit(dm.d.xName) : '';
   const out = rows.map((r) => [markerName(r.m), r.trace, r.x.trim(), r.y.trim()].join('|'));
   if (dd && dm) out.push(['D − A', fix(dd.slope).trim(), fix(dd.dx, xu).trim(), fix(dd.dy, unitOf(dm.d, dm.axis)).trim()].join('|'));

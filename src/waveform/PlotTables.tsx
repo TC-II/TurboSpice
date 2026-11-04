@@ -46,7 +46,7 @@ export function CursorTable({ data, cursors, preview, setCursors }: { data: Pane
             <th>A</th>
             <th>B</th>
             <th>B − A</th>
-            <th>{t('slope')}</th>
+            <th>{data[0]?.log ? t('slope per decade') : t('slope')}</th>
           </tr>
         </thead>
         <tbody>
@@ -60,7 +60,7 @@ export function CursorTable({ data, cursors, preview, setCursors }: { data: Pane
                 <td>{fix(ya)}</td>
                 <td>{fix(yb)}</td>
                 <td>{fix(cursorDiff(a ?? NaN, b ?? NaN, ya, yb).dy)}</td>
-                <td>{fix(cursorDiff(a ?? NaN, b ?? NaN, ya, yb).slope)}</td>
+                <td>{fix(cursorDiff(a ?? NaN, b ?? NaN, ya, yb, d.log).slope)}</td>
               </tr>
             );
           })}

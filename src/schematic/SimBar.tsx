@@ -7,7 +7,7 @@
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState, type MutableRefObject, type ReactElement } from 'react';
 import { HoverPop, ProbePlacement, SimHelp } from './SimHelp.tsx';
-import { ANALYSES, formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type Sweep } from '../sim/analyses.ts';
+import { ANALYSES, formatAnalysis, isNum, parseAnalysis, sweepRange, tranRange, validateAnalysis, type Analysis, type StbMethod, type Sweep } from '../sim/analyses.ts';
 import type { Library } from '../library/library.ts';
 import type { CircuitInfo, Picker } from './simDialogs.tsx';
 import { t } from '../i18n/i18n.ts';
@@ -28,6 +28,8 @@ type BarField =
       notGround?: boolean;
       /** vacío: al posar el mouse, un globo explica qué poner (la sonda del .stb) */
       explain?: 'probe';
+      /** el valor se lee pero no sirve (ver sweepRange, tranRange) */
+      range?: string;
     }
   | { kind: 'select'; label: string; value: string; options: [string, string][]; set(v: string): Analysis }
   | { kind: 'check'; label: string; value: boolean; set(v: boolean): Analysis; title?: string }
@@ -44,22 +46,25 @@ const STARTUP_TITLE = t(
 const POINTS: Record<Sweep['type'], string> = { dec: t('Points/decade'), oct: t('Points/octave'), lin: t('Points') };
 
 /** Barrido en frecuencia: inicio, fin, puntos y tipo de barrido */
-const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => [
-  { kind: 'text', label: t('F start'), value: s.start, set: (start) => set({ ...s, start }), required: true, numeric: true },
-  { kind: 'text', label: t('F stop'), value: s.stop, set: (stop) => set({ ...s, stop }), required: true, numeric: true },
-  { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5, required: true, numeric: true },
-  {
-    kind: 'select',
-    label: t('Sweep'),
-    value: s.type,
-    options: [
-      ['dec', t('per decade')],
-      ['oct', t('per octave')],
-      ['lin', t('linear')],
-    ],
-    set: (type) => set({ ...s, type: type as Sweep['type'] }),
-  },
-];
+const sweepFields = (s: Sweep, set: (s: Sweep) => Analysis): BarField[] => {
+  const range = sweepRange(s);
+  return [
+    { kind: 'text', label: t('F start'), value: s.start, set: (start) => set({ ...s, start }), required: true, numeric: true, range: range.start },
+    { kind: 'text', label: t('F stop'), value: s.stop, set: (stop) => set({ ...s, stop }), required: true, numeric: true, range: range.stop },
+    { kind: 'text', label: POINTS[s.type], value: s.points, set: (points) => set({ ...s, points }), width: 5, required: true, numeric: true, range: range.points },
+    {
+      kind: 'select',
+      label: t('Sweep'),
+      value: s.type,
+      options: [
+        ['dec', t('per decade')],
+        ['oct', t('per octave')],
+        ['lin', t('linear')],
+      ],
+      set: (type) => set({ ...s, type: type as Sweep['type'] }),
+    },
+  ];
+};
 
 /** El barrido en dos columnas, como en Noise: F start y F stop; tipo de barrido y puntos */
 const sweepCols = (s: Sweep, set: (s: Sweep) => Analysis): BarField[][] => {
@@ -78,7 +83,7 @@ const fieldProblem = (f: Extract<BarField, { kind: 'text' }>): string | undefine
       ? t("{what} can't be ground (0): choose a node", { what: f.label })
       : f.numeric && f.value.trim() && !isNum(f.value)
         ? t('{what}: "{v}" isn\'t a number', { what: f.label, v: f.value })
-        : undefined;
+        : f.range;
 
 /** Campos de la barra por línea */
 function barRows(a: Analysis): BarField[][] {
@@ -87,8 +92,8 @@ function barRows(a: Analysis): BarField[][] {
     case 'tran':
       return [
         [
-          text(t('Stop time'), a.tstop, (tstop) => ({ ...a, tstop }), { required: true, numeric: true }),
-          text(t('Save from'), a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0', numeric: true }),
+          text(t('Stop time'), a.tstop, (tstop) => ({ ...a, tstop }), { required: true, numeric: true, range: tranRange(a).tstop }),
+          text(t('Save from'), a.tstart, (tstart) => ({ ...a, tstart }), { placeholder: '0', numeric: true, range: tranRange(a).tstart }),
           text(t('Maximum step'), a.tmax, (tmax) => ({ ...a, tmax }), { placeholder: 'auto', numeric: true }),
           {
             kind: 'checks',

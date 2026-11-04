@@ -1,6 +1,6 @@
 // Punta de prueba (#308): cada traza a un eje Y con su unidad o libre; con dos ejes ocupados, a un panel nuevo
 import { describe, expect, it } from 'vitest';
-import { exprUnit, paneUnits, placeTrace } from '../../src/waveform/curves.ts';
+import { exprUnit, hasFinite, paneUnits, placeTrace } from '../../src/waveform/curves.ts';
 
 const pane = (...exprs: string[]) => ({ traces: exprs.map((expr) => ({ expr })) });
 const exprs = (ps: { traces: { expr: string }[] }[]) => ps.map((p) => p.traces.map((t) => t.expr));
@@ -20,5 +20,13 @@ describe('ejes Y por unidad', () => {
     expect(r.index).toBe(1);
     expect(exprs(r.panes)).toEqual([['V(a)/I(R1)', 'V(a)'], ['I(R1)']]);
     expect(placeTrace([pane('V(a)/I(R1)', 'V(a)')], 0, 'V(b)').index).toBe(0);
+  });
+});
+
+describe('trazas sin nada que dibujar', () => {
+  it('una división por cero (sólo infinitos y NaN) no tiene valores finitos', () => {
+    expect(hasFinite({ re: new Float64Array([NaN, Infinity, -Infinity]) })).toBe(false);
+    expect(hasFinite({ re: new Float64Array([NaN, 1]) })).toBe(true);
+    expect(hasFinite({ re: new Float64Array([NaN]), im: new Float64Array([2]) })).toBe(true);
   });
 });

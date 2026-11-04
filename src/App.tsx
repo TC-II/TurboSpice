@@ -365,6 +365,8 @@ function SchematicMode({
   const [pzSide, setPzSide] = useState(true);
   const editor = useRef<EditorHandle>(null);
   const [docKey, setDocKey] = useState(0);
+  // otro testbench: la vista sigue, salvo que su circuito no entre entero (ver SchematicEditor)
+  const [keepKey, setKeepKey] = useState(0);
   const [netHover, setNetHover] = useState(false);
 
   // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
@@ -669,7 +671,7 @@ function SchematicMode({
   // guarda lo que se está editando (circuito, vista, pila y resultados) y trae lo de la otra
   const { leave, enter, goSim, subKey, go, goUp, openSub, descend, goUsage } = navigation({
     ...{ history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt, lib },
-    ...{ setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setMessage },
+    ...{ setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setKeepKey, setMessage },
   });
   const { checkSubName, newSubckt, createModule, renameSub, deleteSub, newModel, renameModel, deleteModel } = moduleActions({
     ...{ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport },
@@ -1142,7 +1144,7 @@ function SchematicMode({
               {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
               <EditorArea
                 traceFocus={traceFocus}
-                {...{ conn, editor, docKey, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle }}
+                {...{ conn, editor, docKey, keepKey, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle }}
                 {...{
                   symbolMenu,
                   netMenu,

@@ -65,6 +65,12 @@ describe('diferencia de cursores (B − A, #246)', () => {
     expect(d.slope).toBe(3);
   });
 
+  it('con el eje X logarítmico la pendiente es por década', () => {
+    // −20 dB entre 1 kHz y 10 kHz: −20 dB/década
+    expect(cursorDiff(1e3, 1e4, 0, -20, true).slope).toBeCloseTo(-20, 12);
+    expect(cursorDiff(1e3, 1e5, 0, -40, true).slope).toBeCloseTo(-20, 12);
+  });
+
   it('la frecuencia es 1/|B−A| (no depende del orden)', () => {
     expect(cursorDiff(0, 0.5, 0, 0).freq).toBeCloseTo(2, 12);
     expect(cursorDiff(0.5, 0, 0, 0).freq).toBeCloseTo(2, 12);

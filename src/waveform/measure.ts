@@ -139,10 +139,11 @@ export function toCsv(xName: string, xs: ArrayLike<number>, cols: { name: string
 
 /**
  * Diferencia entre los cursores B y A (B − A): en x, en y, pendiente (yB−yA)/(xB−xA)
- * y frecuencia 1/|xB−xA|.
+ * y frecuencia 1/|xB−xA|. Con el eje X logarítmico (un Bode) la pendiente es por década
+ * (−20 dB/década), no por unidad de x.
  */
-export function cursorDiff(xa: number, xb: number, ya: number, yb: number) {
+export function cursorDiff(xa: number, xb: number, ya: number, yb: number, log = false) {
   const dx = xb - xa;
   const dy = yb - ya;
-  return { dx, dy, slope: dy / dx, freq: 1 / Math.abs(dx) };
+  return { dx, dy, slope: log ? dy / Math.log10(xb / xa) : dy / dx, freq: 1 / Math.abs(dx) };
 }

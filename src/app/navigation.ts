@@ -47,12 +47,13 @@ export interface NavigationDeps {
   setValueOffer(v: null): void;
   setViewRun(id: string): void;
   setDocKey: Dispatch<SetStateAction<number>>;
+  setKeepKey: Dispatch<SetStateAction<number>>;
   setMessage(m?: string): void;
 }
 
 export function navigation(d: NavigationDeps) {
   const { history, stacks, levelViews, quietDoc, kept, projectRef, pathRef, docRef, editor, snapshot, sim, sims, lt, lib } = d;
-  const { setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setMessage } = d;
+  const { setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setKeepKey, setMessage } = d;
   const keyOf = (p: Project) => {
     const v = variantOf(p);
     return `${v.id}/${v.activeSim || 'base'}`;
@@ -85,8 +86,8 @@ export function navigation(d: NavigationDeps) {
     setValueOffer(null);
     setViewRun('');
     if (refit) setDocKey((k) => k + 1);
-    // (sin encuadrar, la vista sigue la del testbench anterior: si su circuito no se ve, se encuadra)
-    else setTimeout(() => editor.current?.fitIfLost(), 50);
+    // (sin encuadrar, la vista sigue la del testbench anterior: si su circuito no entra entero, se encuadra)
+    else setKeepKey((k) => k + 1);
     if (s && !r) restoreCached(s.id, s.asc);
   };
   /** Pasa a otra simulación de la variante ('' = el circuito base) */

@@ -996,6 +996,14 @@ export const es: Record<string, string> = {
   'size {size}': 'tamaño {size}',
   'Slide to delete': 'Deslizá para borrar',
   'slope': 'pendiente',
+  'slope per decade': 'pendiente por década',
+  'the start must be greater than 0 in a sweep per decade or octave': 'el inicio tiene que ser mayor que 0 en un barrido por década u octava',
+  "the stop can't be less than the start": 'el fin no puede ser menor que el inicio',
+  'the number of points must be greater than 0': 'la cantidad de puntos tiene que ser mayor que 0',
+  'the stop time must be greater than 0': 'el tiempo final tiene que ser mayor que 0',
+  'the start time must be less than the stop time': 'el tiempo desde el que se guarda tiene que ser menor que el tiempo final',
+  'Damping θ': 'Amortiguamiento θ',
+  '{expr} has no finite value (a division by zero?)': '{expr} no tiene ningún valor finito (¿una división por cero?)',
   'Small-signal frequency response around the operating point (.ac). Excitation sources need "AC 1" in their value.':
     'Respuesta en frecuencia de pequeña señal alrededor del punto de operación (.ac). Las fuentes de excitación necesitan "AC 1" en su valor.',
   'Small-signal harmonic and intermodulation distortion (.disto). Sources need DISTOF1/DISTOF2.':

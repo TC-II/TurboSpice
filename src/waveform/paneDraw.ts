@@ -218,9 +218,9 @@ export function drawMarkers(
   const pd = d && pointOf(d);
   if (pa && pd && a.x !== undefined && d.x !== undefined) {
     stroke(pa.px, pa.py, pd.px, pd.py, k.accent, 1.25, [2, 3]);
-    const dd = delta({ x: a.x, y: pa.y }, { x: d.x, y: pd.y });
+    const dd = delta({ x: a.x, y: pa.y }, { x: d.x, y: pd.y }, data.log);
     label(
-      [`Δx ${fmt(dd.dx, xu)}`, `Δy ${fmt(dd.dy, k.unitOf(pd.c))}`, `${t('slope')} ${fmt(dd.slope)}`, ...(xu === 's' ? [`1/Δx ${fmt(dd.inv, 'Hz')}`] : [])],
+      [`Δx ${fmt(dd.dx, xu)}`, `Δy ${fmt(dd.dy, k.unitOf(pd.c))}`, `${data.log ? t('slope per decade') : t('slope')} ${fmt(dd.slope)}`, ...(xu === 's' ? [`1/Δx ${fmt(dd.inv, 'Hz')}`] : [])],
       (pa.px + pd.px) / 2,
       (pa.py + pd.py) / 2,
       k.accent,

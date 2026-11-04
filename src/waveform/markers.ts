@@ -100,11 +100,12 @@ export const verticalCuts = (x: number, xs: ArrayLike<number>, curves: MarkCurve
 export const horizontalCuts = (level: number, axis: MarkerAxis, xs: ArrayLike<number>, curves: MarkCurve[], limit = 64) =>
   curves.filter((c) => !c.hidden && c.axis === axis).flatMap((c) => crossings(xs, c.y, level, limit).map((x) => ({ label: c.label, x })));
 
-/** Diferencias entre A y D: Δx, Δy, pendiente y 1/Δx */
-export function delta(a: { x: number; y: number }, d: { x: number; y: number }) {
+/** Diferencias entre A y D: Δx, Δy, pendiente (por década con el eje X logarítmico) y 1/Δx */
+export function delta(a: { x: number; y: number }, d: { x: number; y: number }, log = false) {
   const dx = d.x - a.x;
   const dy = d.y - a.y;
-  return { dx, dy, slope: dx ? dy / dx : NaN, inv: dx ? 1 / Math.abs(dx) : NaN };
+  const decades = log ? Math.log10(d.x / a.x) : 0;
+  return { dx, dy, slope: !dx ? NaN : log ? dy / decades : dy / dx, inv: dx ? 1 / Math.abs(dx) : NaN };
 }
 
 /** Markers válidos a partir de un JSON cualquiera (lo guardado en el .turbo) */

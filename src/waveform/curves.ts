@@ -83,6 +83,9 @@ function evalOn(ctx: CurveContext, r: SimPlot, expr: string, scale: { real: Floa
   return w;
 }
 
+/** Si la onda tiene algún valor que se pueda dibujar */
+export const hasFinite = (w: Wave) => w.re.some(Number.isFinite) || !!w.im?.some(Number.isFinite);
+
 /** Variación de un color para distinguir corridas de una misma traza */
 export function shade(hex: string, k: number, n: number): string {
   if (n <= 1 || !/^#[0-9a-f]{6}$/i.test(hex)) return hex;
@@ -170,6 +173,8 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       let w;
       try {
         w = evalOn(ctx, r, tt.expr, rs);
+        // (una división por cero da sólo infinitos o NaN: no se dibujaría nada y la traza no diría por qué)
+        if (!hasFinite(w)) throw new Error(t('{expr} has no finite value (a division by zero?)', { expr: tt.expr }));
       } catch (e) {
         if (ri === 0) first = (e as Error).message;
         if (ri === all.length - 1 && !drawn && first) errors.set(ti, first);

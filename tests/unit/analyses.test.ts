@@ -5,7 +5,7 @@ import { Library } from '../../src/library/library.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { toNgspice } from '../../src/netlist/tongspice.ts';
 import { findAnalysis, findControl, replaceAnalysis } from '../../src/schematic/directivesEdit.ts';
-import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, validateAnalysis } from '../../src/sim/analyses.ts';
+import { ANALYSES, defaultAnalysis, formatAnalysis, parseAnalysis, sweepRange, tranRange, validateAnalysis } from '../../src/sim/analyses.ts';
 import { controlBlock, controlBody } from '../../src/sim/controlSnippets.ts';
 
 const lib = new Library(buildBundle());
@@ -49,6 +49,22 @@ describe('comandos de análisis', () => {
       else expect(errs).toEqual([]);
     }
     expect(validateAnalysis({ ...defaultAnalysis('tran'), tstop: 'abc' } as never)).toHaveLength(1);
+  });
+
+  it('avisa los rangos que ngspice no rechaza o rechaza sin decir dónde', () => {
+    // .ac dec 100 100k 10: ngspice usa sus valores por defecto y sólo lo dice en el log
+    expect(sweepRange({ type: 'dec', points: '100', start: '100k', stop: '10' }).stop).toBeTruthy();
+    expect(sweepRange({ type: 'dec', points: '100', start: '0', stop: '10k' }).start).toBeTruthy();
+    // lineal: puede empezar en 0
+    expect(sweepRange({ type: 'lin', points: '100', start: '0', stop: '10k' })).toEqual({});
+    expect(sweepRange({ type: 'oct', points: '0', start: '1', stop: '10k' }).points).toBeTruthy();
+    expect(sweepRange({ type: 'dec', points: '10', start: '10', stop: '1meg' })).toEqual({});
+    // con parámetros no se puede comparar: no se avisa nada
+    expect(sweepRange({ type: 'dec', points: '10', start: '{fmin}', stop: '10' })).toEqual({});
+    expect(tranRange({ tstop: '0', tstart: '' }).tstop).toBeTruthy();
+    expect(tranRange({ tstop: '1m', tstart: '2m' }).tstart).toBeTruthy();
+    expect(tranRange({ tstop: '1m', tstart: '0.5m' })).toEqual({});
+    expect(validateAnalysis({ kind: 'ac', sweep: { type: 'dec', points: '100', start: '100k', stop: '10' } })).toHaveLength(1);
   });
 });
 

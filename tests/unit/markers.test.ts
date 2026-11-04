@@ -30,6 +30,7 @@ describe('markers', () => {
     expect(markerValue({ kind: 'm', id: 1, pane: 0, x: 2.5, trace: 'V(a)' }, xs, [up])).toBe(2.5);
     expect(markerValue({ kind: 'm', id: 1, pane: 0, x: 2.5, trace: 'nada' }, xs, [up])).toBeNaN();
     expect(delta({ x: 1, y: 1 }, { x: 3, y: 5 })).toEqual({ dx: 2, dy: 4, slope: 2, inv: 0.5 });
+    expect(delta({ x: 100, y: 0 }, { x: 1000, y: -20 }, true).slope).toBeCloseTo(-20, 12);
   });
   it('curva bajo el mouse', () => {
     const toPy = (v: number) => 100 - v * 10;

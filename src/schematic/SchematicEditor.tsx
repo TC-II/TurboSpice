@@ -138,6 +138,11 @@ interface Props {
   handle?: Ref<EditorHandle>;
   /** Cambia cada vez que se carga otro documento: ajusta la vista a su contenido */
   docKey?: number;
+  /**
+   * Cambia al cargar otro documento que sigue con la vista anterior (otro testbench, para compararlos):
+   * sólo se ajusta si el circuito nuevo no entra entero. Corre al mostrarse el documento nuevo
+   */
+  keepKey?: number;
   /** Ctrl+G: grilla; Ctrl+U: marcas de pines sueltos */
   showGrid?: boolean;
   showLoose?: boolean;
@@ -173,6 +178,7 @@ export function SchematicEditor(props: Props) {
     netColors,
     handle,
     docKey,
+    keepKey,
     netNames,
     onNameNet,
     describe,
@@ -296,6 +302,13 @@ export function SchematicEditor(props: Props) {
     viewHistory.current.push(viewRef.current);
     setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
   }, [doc, lib, showSimCommand, viewOf, setView, viewHistory, viewRef]);
+  /** Ajusta sólo si algo del circuito queda afuera de la vista (no sólo cuando no se ve nada) */
+  const fitIfLost = useCallback(() => {
+    const b = docBox(doc, lib, showSimCommand);
+    const v = viewRef.current;
+    const [hw, hh] = [size.w / 2 / v.scale, size.h / 2 / v.scale];
+    if (b && (b.x1 < v.cx - hw || b.x2 > v.cx + hw || b.y1 < v.cy - hh || b.y2 > v.cy + hh)) fit();
+  }, [doc, lib, showSimCommand, viewRef, size.w, size.h, fit]);
 
   /** Edita en el lugar un comentario existente; false si no es un comentario común */
   const editInline = useEvent((index: number) => {
@@ -310,12 +323,6 @@ export function SchematicEditor(props: Props) {
     handle,
     () => ({
       fit,
-      fitIfLost: () => {
-        const b = docBox(doc, lib, showSimCommand);
-        const v = viewRef.current;
-        const [hw, hh] = [size.w / 2 / v.scale, size.h / 2 / v.scale];
-        if (b && (b.x2 < v.cx - hw || b.x1 > v.cx + hw || b.y2 < v.cy - hh || b.y1 > v.cy + hh)) fit();
-      },
       cursor: () => snapPoint(cursor),
       svg: () => svgRef.current,
       contentBox: () => docBox(doc, lib, showSimCommand),
@@ -350,7 +357,7 @@ export function SchematicEditor(props: Props) {
       setView: (v: View) => setView(v),
       editText: (index: number) => editInline(index),
     }),
-    [fit, cursor, doc, lib, showSimCommand, size.w, size.h, setView, viewHistory, viewRef, editInline],
+    [fit, cursor, doc, lib, showSimCommand, size.w, setView, viewHistory, viewRef, editInline],
   );
 
   // Ajustar la vista al cargar otro documento (y cuando se conoce el tamaño del lienzo)
@@ -362,6 +369,15 @@ export function SchematicEditor(props: Props) {
       fit();
     }
   }, [docKey, hasSize, fit]);
+
+  // Al cargar otro testbench la vista sigue; si su circuito no entra entero, se ajusta
+  const checkedKey = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (hasSize && keepKey !== undefined && checkedKey.current !== keepKey) {
+      checkedKey.current = keepKey;
+      fitIfLost();
+    }
+  }, [keepKey, hasSize, fitIfLost]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {

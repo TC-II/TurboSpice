@@ -22,6 +22,8 @@ export interface EditorAreaProps {
   conn: Connectivity;
   editor: RefObject<EditorHandle>;
   docKey: number;
+  /** otro testbench: se encuadra sólo si su circuito no entra entero */
+  keepKey: number;
   /** el foco está en la caja de trazas: el esquemático queda en la punta de prueba (#341) */
   traceFocus: boolean;
   netHover: boolean;
@@ -75,7 +77,7 @@ export interface EditorAreaProps {
 
 export function EditorArea(props: EditorAreaProps) {
   const { doc, lib, commit, tool, setTool, selection, setSelection, sim, curSub, projectRef, setDialog } = useSchematic();
-  const { conn, editor, docKey, traceFocus, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle } = props;
+  const { conn, editor, docKey, keepKey, traceFocus, netHover, showGrid, showLoose, showSimCommand, savesOpen, viewRun, makesCycle } = props;
   const {
     symbolMenu,
     netMenu,
@@ -136,6 +138,7 @@ export function EditorArea(props: EditorAreaProps) {
         onTextMenu={(index, at) => (setTextMenu({ index, at }), true)}
         onDescend={descend}
         docKey={docKey}
+        keepKey={keepKey}
         netHover={netHover}
         doc={doc}
         lib={lib}

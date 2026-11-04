@@ -1,4 +1,5 @@
 import { t } from '../i18n/i18n.ts';
+import { parseSpiceNumber } from '../netlist/spicenum.ts';
 // Comandos de análisis: modelo editable, generación y lectura de la línea SPICE.
 // Se usa la sintaxis común a LTspice y ngspice; los análisis que sólo tiene ngspice
 // se guardan como comentario (ver netlist/directives.ts).
@@ -299,6 +300,34 @@ function parseComplete(tt: string[]): Analysis | null {
 
 export const isNum = (s: string) => /^\{.+\}$/.test(s.trim()) || /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?[a-zµμ]*$/i.test(s.trim());
 
+/** El valor de una caja, si es un número (un {parámetro} o lo que no se lee queda NaN y no se compara) */
+const valueOf = (v: string) => (isNum(v) && !/^\{/.test(v.trim()) ? parseSpiceNumber(v) : NaN);
+
+/**
+ * Valores que se leen pero no tienen sentido en un barrido, caja por caja. ngspice no siempre los
+ * rechaza: con el fin antes del inicio usa sus valores por defecto y sólo lo dice en el log
+ */
+export function sweepRange(s: Sweep): { start?: string; stop?: string; points?: string } {
+  const start = valueOf(s.start);
+  const stop = valueOf(s.stop);
+  const points = valueOf(s.points);
+  const out: { start?: string; stop?: string; points?: string } = {};
+  if (s.type !== 'lin' && start <= 0) out.start = t('the start must be greater than 0 in a sweep per decade or octave');
+  if (start > stop) out.stop = t("the stop can't be less than the start");
+  if (points <= 0) out.points = t('the number of points must be greater than 0');
+  return out;
+}
+
+/** Lo mismo en un transitorio: el tiempo final y desde cuándo se guarda */
+export function tranRange(a: { tstop: string; tstart: string }): { tstop?: string; tstart?: string } {
+  const tstop = valueOf(a.tstop);
+  const tstart = valueOf(a.tstart);
+  const out: { tstop?: string; tstart?: string } = {};
+  if (tstop <= 0) out.tstop = t('the stop time must be greater than 0');
+  if (tstart >= tstop) out.tstart = t('the start time must be less than the stop time');
+  return out;
+}
+
 /** Errores del formulario (vacío = se puede aceptar) */
 export function validateAnalysis(a: Analysis): string[] {
   const errs: string[] = [];
@@ -311,6 +340,7 @@ export function validateAnalysis(a: Analysis): string[] {
     num(s.points, t('the number of points'));
     num(s.start, t('the start'));
     num(s.stop, t('the stop'));
+    errs.push(...Object.values(sweepRange(s)));
   };
   switch (a.kind) {
     case 'tran':
@@ -318,6 +348,7 @@ export function validateAnalysis(a: Analysis): string[] {
       num(a.tstart, t('the start time'), false);
       num(a.tmax, t('the maximum step'), false);
       num(a.tstep, t('the output step'), false);
+      errs.push(...Object.values(tranRange(a)));
       break;
     case 'ac':
     case 'disto':

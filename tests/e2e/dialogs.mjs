@@ -115,7 +115,17 @@ await dialog.waitFor();
 check(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), 'buscador: el foco arranca en la búsqueda');
 await page.keyboard.press('Escape');
 await dialog.waitFor({ state: 'detached' });
-check(await componentBtn.evaluate((b) => b === document.activeElement), 'buscador: al cerrar, el foco vuelve al botón Componente');
+// (vuelve después de la tecla que lo cerró, en el próximo ciclo)
+const backToButton = await componentBtn.evaluate((b) => new Promise((ok) => setTimeout(() => ok(b === document.activeElement), 50)));
+check(backToButton, 'buscador: al cerrar, el foco vuelve al botón Componente');
+// cerrar con Enter (eligiendo) no tiene que volver a abrirlo: el Enter no le llega al botón
+await componentBtn.click();
+await dialog.waitFor();
+await page.keyboard.type('res');
+await page.keyboard.press('Enter');
+await page.waitForTimeout(300);
+check((await dialog.count()) === 0, 'buscador: elegir con Enter no lo vuelve a abrir');
+await page.keyboard.press('Escape');
 
 // (la simulación automática del ejemplo se aborta al editar: no es un error)
 const real = errors.filter((e) => !/Simulación abortada/.test(e));

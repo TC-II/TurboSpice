@@ -36,8 +36,8 @@ function onKey(e: KeyboardEvent) {
 
 /**
  * Hace modal al diálogo `box` mientras `active` (p. ej. no mientras está oculto para elegir algo
- * en el esquemático). `box` tiene que tener tabIndex={-1} para poder recibir el foco si no hay
- * otra cosa enfocada adentro.
+ * en el esquemático). La caja no lleva tabIndex: con él, un click en una parte no enfocable del
+ * diálogo (una fila de tabla) le daría el foco y el navegador desplazaría el esquemático de atrás.
  */
 export function useDialogFocus(box: RefObject<HTMLElement | null>, active = true) {
   // quién tenía el foco antes de abrir: se lee en el primer render, antes de cualquier autoFocus
@@ -47,8 +47,16 @@ export function useDialogFocus(box: RefObject<HTMLElement | null>, active = true
     if (!active || !el) return;
     open.push(el);
     if (open.length === 1) document.addEventListener('keydown', onKey);
-    // (los autoFocus de adentro corren antes o después; si ninguno tomó el foco, lo toma la caja)
-    if (!el.contains(document.activeElement)) el.focus({ preventScroll: true });
+    // si ningún autoFocus de adentro tomó el foco, va al primer control (los efectos del que usa el
+    // diálogo corren después y pueden moverlo a otro); sin controles, a la caja
+    if (!el.contains(document.activeElement)) {
+      const first = focusables(el)[0];
+      if (first) first.focus({ preventScroll: true });
+      else {
+        el.tabIndex = -1;
+        el.focus({ preventScroll: true });
+      }
+    }
     return () => {
       open.splice(open.indexOf(el), 1);
       if (!open.length) document.removeEventListener('keydown', onKey);
@@ -57,9 +65,14 @@ export function useDialogFocus(box: RefObject<HTMLElement | null>, active = true
   useEffect(
     () => () => {
       // al cerrar, si el foco quedó en la nada (el diálogo ya no está), vuelve al que lo abrió;
-      // si la app lo llevó a otro lado a propósito, se respeta
-      const now = document.activeElement;
-      if (opener instanceof HTMLElement && opener !== document.body && opener.isConnected && (!now || now === document.body)) opener.focus({ preventScroll: true });
+      // si la app lo llevó a otro lado a propósito, se respeta. Después de la tecla que lo cerró:
+      // si se cierra con Enter y el foco vuelve en el mismo keydown, el keypress de ese Enter
+      // le llega al botón que lo abrió y lo vuelve a abrir
+      if (!(opener instanceof HTMLElement) || opener === document.body) return;
+      setTimeout(() => {
+        const now = document.activeElement;
+        if (opener.isConnected && (!now || now === document.body)) opener.focus({ preventScroll: true });
+      }, 0);
     },
     [opener],
   );

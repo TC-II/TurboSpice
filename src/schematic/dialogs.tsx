@@ -99,7 +99,7 @@ export function Modal({
   }, [onClose, hidden]);
   return (
     <div className={`modal-backdrop${hidden ? ' picking' : ''}`} style={top !== null ? { paddingTop: top } : undefined} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
+      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>

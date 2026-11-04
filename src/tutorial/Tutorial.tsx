@@ -334,7 +334,7 @@ export function Tutorial({
   if (view.kind === 'hub')
     return createPortal(
       <div className="tut-hub-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div ref={hub} className="tut-hub" role="dialog" aria-modal="true" aria-label={t('TurboSpice Academy')} tabIndex={-1}>
+        <div ref={hub} className="tut-hub" role="dialog" aria-modal="true" aria-label={t('TurboSpice Academy')}>
           <header className="tut-hub-head">
             <div>
               <h2>

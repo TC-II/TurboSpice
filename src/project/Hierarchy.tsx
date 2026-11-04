@@ -619,7 +619,7 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
   };
   return (
     <div className="quick-open-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} className="quick-open" role="dialog" aria-modal="true" aria-label={t('Go to')} tabIndex={-1}>
+      <div ref={box} className="quick-open" role="dialog" aria-modal="true" aria-label={t('Go to')}>
         <input
           ref={input}
           value={q}

@@ -1612,11 +1612,6 @@ await page.locator('svg.editor .sym').first().waitFor();
 await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();
 {
-  const open = async (x, y) => {
-    await page.keyboard.press('Escape');
-    const p = await at(x, y);
-    await page.mouse.dblclick(p.x, p.y);
-  };
   // Q1 es el primer símbolo del .asc: doble click en el medio de su dibujo (no por coordenadas del
   // esquemático, que dependen de que el encuadre ya esté quieto)
   await page.keyboard.press('Escape');
@@ -1650,7 +1645,19 @@ await page.locator('svg.editor .sym').first().waitFor();
   );
   await dlg.getByRole('button', { name: 'Cancelar' }).click();
   // un resistor: doble click en la fila elige y acepta
-  await open(256, 48); // RC
+  // RC por su nombre, con el circuito entero a la vista (al abrir el ejemplo puede quedar cortado
+  // arriba, y por coordenadas el doble clic caería en la barra de simulación)
+  await page.keyboard.press('Escape');
+  const fitBtn = page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Ajustar', exact: true });
+  if (await fitBtn.count()) await fitBtn.click();
+  await steady(page);
+  const rc = await page
+    .locator('svg.editor .symbols .sym')
+    .filter({ has: page.locator('text.win', { hasText: /^RC$/ }) })
+    .locator('.body')
+    .first()
+    .boundingBox();
+  await page.mouse.dblclick(rc.x + rc.width / 2, rc.y + rc.height / 2);
   await page.getByRole('dialog').getByText('Avanzado: modelo de fabricante').click();
   await page.getByRole('dialog').getByLabel('Buscar en la librería').fill('TS_R_4k7');
   await page.getByRole('dialog').locator('.parts-table tbody tr', { hasText: 'TS_R_4k7_5%' }).dblclick();

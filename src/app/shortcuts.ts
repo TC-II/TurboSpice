@@ -115,7 +115,7 @@ export function useShortcuts(a: ShortcutActions) {
       if (e.altKey && lk === 'r') return handled(), !running && status.kind !== 'loading' && simulate();
       if (e.altKey && lk === 's') return handled(), running && abort();
       if (ctrl && lk === 'l') return handled(), showLog();
-      if (ctrl && k === 'Enter') return handled(), simulate();
+      if (ctrl && k === 'Enter') return handled(), !running && status.kind !== 'loading' && simulate();
       if (ctrl && lk === 's') return handled(), doSave(e.shiftKey);
       if (ctrl && lk === 'o') return handled(), doOpen();
       if (ctrl && lk === 'p') return handled(), setQuickOpen(true);

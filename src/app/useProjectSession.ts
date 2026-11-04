@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRe
 import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import type { SimResult } from '../engine/ngspice.ts';
-import { getLang, locale, setLang, t } from '../i18n/i18n.ts';
+import { dateTime, getLang, setLang, t } from '../i18n/i18n.ts';
 import type { Library } from '../library/library.ts';
 import { activeAsc, selectSim as selectProjectSim, simOf, variantOf, withGroups } from '../project/project.ts';
 import { asBenches, EXT, isTurboText, newProject, parseTurbo, projectFromAsc, projectName, serializeTurbo, type Project } from '../project/turbo.ts';
@@ -256,7 +256,7 @@ export function useProjectSession(d: ProjectSessionDeps) {
           if (touched.current) return;
           loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
           setDirty(session.dirty);
-          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: new Date(session.time).toLocaleString(locale()) })] : []), ...warnings];
+          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: dateTime(session.time) })] : []), ...warnings];
           if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {

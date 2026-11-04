@@ -50,7 +50,12 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
   // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
   const incomplete = analysisProblem(lineOf(simAsc) ?? '');
-  const blocking = [...built.tooBig.map((p) => p.text), ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })), ...(incomplete ? [incomplete] : [])];
+  const blocking = [
+    ...built.tooBig.map((p) => p.text),
+    ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })),
+    ...built.ng.duplicateNames.map((name) => t('{name} is the name of more than one component: rename one of them', { name })),
+    ...(incomplete ? [incomplete] : []),
+  ];
   // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
   // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
   const once = (b: BuiltSimulation, netlist: string) => {

@@ -34,6 +34,12 @@ export const getLang = () => lang;
 /** Idioma para fechas y números (toLocaleString): el de la interfaz, no el del navegador */
 export const locale = () => (lang === 'es' ? 'es-AR' : 'en-US');
 
+/**
+ * Fecha y hora de un instante, en el idioma de la app. En castellano a 24 h: es-AR sale en 12 h y
+ * hay navegadores que no ponen "p. m." (las 22:18 se leían "10:18")
+ */
+export const dateTime = (time: number | string | Date) => new Date(time).toLocaleString(locale(), lang === 'es' ? { hourCycle: 'h23' } : undefined);
+
 /** Cambia el idioma (y lo recuerda, salvo `persist: false`, que usan los tests) */
 export function setLang(l: Lang, persist = true) {
   lang = l;

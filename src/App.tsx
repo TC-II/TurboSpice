@@ -728,7 +728,9 @@ function SchematicMode({
   // sin simulación (ni bloque .control), Simular despliega el menú para elegir qué simular
   const simMenu = useRef<(() => void) | null>(null);
   const canRun = !!curSim?.line || findControl(tbDoc ?? doc) >= 0;
-  const simulate = () => (curSub ? run() : canRun ? run() : simMenu.current?.());
+  // un valor de la barra que no se pudo aplicar ("abc" de tiempo final): correr usaría el anterior
+  const barProblem = useRef<string | undefined>(undefined);
+  const simulate = () => (barProblem.current && !curSub ? setMessage(barProblem.current) : curSub ? run() : canRun ? run() : simMenu.current?.());
   const onPlotState = useCallback((s: PlotState) => {
     plotState.current = s;
   }, []);
@@ -1074,7 +1076,7 @@ function SchematicMode({
         <SimRow
           projectName={project.name}
           bias={!!bias}
-          {...{ dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSim, stopHidden }}
+          {...{ dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, barProblem, canRun, running, status, simulate, abort, curSim, stopHidden }}
           {...{ showNets, hasNets, setShowNets, showOp, setShowOp, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy }}
         />
 

@@ -27,6 +27,8 @@ export interface SimRowProps {
   renameProject(name: string): Promise<void>;
   simItems: MenuItem[];
   simMenu: MutableRefObject<(() => void) | null>;
+  /** lo que la barra de simulación muestra y no pudo aplicar (ver SimBar) */
+  barProblem: MutableRefObject<string | undefined>;
   canRun: boolean;
   running: boolean;
   status: Status;
@@ -54,7 +56,7 @@ export interface SimRowProps {
 
 export function SimRow(props: SimRowProps) {
   const { curSub, sim, tool, setTool, lib, doc, setMessage, commit } = useSchematic();
-  const { projectName, dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, canRun, running, status, simulate, abort, curSim, stopHidden } = props;
+  const { projectName, dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, barProblem, canRun, running, status, simulate, abort, curSim, stopHidden } = props;
   const { showNets, hasNets, setShowNets, showOp, setShowOp, bias, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy } = props;
   return (
     <>
@@ -179,6 +181,7 @@ export function SimRow(props: SimRowProps) {
               pdk={pdkBar}
               onAllCorners={curSim && pdkBar && !pdkBar.fixed ? () => simAllCorners(curSim.id, simName(curSim), pdkBar.corner) : undefined}
               onStudio={openStudy}
+              pendingProblem={barProblem}
               onApply={(line) => (curSub ? setMessage(t('The analysis belongs to the testbench: go up (Alt+↑) to change it')) : commit(setAnalysisLine(doc, line)))}
             />
           )}

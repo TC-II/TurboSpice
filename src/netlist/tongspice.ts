@@ -64,6 +64,8 @@ export interface NgspiceNetlist {
   warnings: string[];
   /** elementos sin valor asignado (R, C, L, fuentes…): no se simula hasta asignarlo (#256) */
   missingValues: string[];
+  /** nombres de instancia repetidos (dos R1): las corrientes y el historial no sabrían cuál es cuál */
+  duplicateNames: string[];
 }
 
 // Parámetros de L/C/V que ngspice no conoce y se expanden en elementos
@@ -107,6 +109,18 @@ function splitParams(value: string): { main: string; params: Map<string, string>
 export function sourceSyntax(letter: string, value: string): string {
   if (letter !== 'V' && letter !== 'I') return value;
   return value.replace(/\bPWL\s+REPEAT\s+FOREVER\s*\(([^)]*)\)\s*ENDREPEAT\b/i, 'PWL($1) r=0');
+}
+
+/** Los nombres de instancia que aparecen más de una vez (sin importar mayúsculas), una vez cada uno */
+export function repeatedNames(elements: readonly { name: string }[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of elements) {
+    const k = e.name.toLowerCase();
+    if (seen.has(k) && !out.some((n) => n.toLowerCase() === k)) out.push(e.name);
+    seen.add(k);
+  }
+  return out;
 }
 
 function ngspiceName(e: Element, used: Set<string>): string {
@@ -747,6 +761,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const subcktParams = new Map<string, Map<string, string>>();
   const blockNames = new Map<string, Map<string, string>>();
   const missingValues: string[] = [];
+  const duplicateNames = repeatedNames(lt.elements);
   const out: string[] = [
     `* ${title}`,
     // Constante predefinida en las expresiones de LTspice que ngspice no tiene en .param
@@ -958,6 +973,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     out.push(`.subckt ${b.name} ${b.ports.join(' ')}${b.params ? ` params: ${b.params}` : ''}`);
     const inner = new Map<string, string>();
     blockNames.set(b.name.toLowerCase(), inner);
+    for (const n of repeatedNames(b.lt.elements)) if (!duplicateNames.includes(n)) duplicateNames.push(n);
     out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams, undefined, false, false, undefined, missingValues));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;
@@ -984,6 +1000,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     blockNames,
     warnings,
     missingValues,
+    duplicateNames,
     subcktParams,
     steps: stepRuns,
     measures,

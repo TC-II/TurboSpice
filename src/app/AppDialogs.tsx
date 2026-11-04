@@ -219,6 +219,7 @@ export function AppDialogs(props: AppDialogsProps) {
           parts={partGroups(doc.symbols[dialog.index])}
           windowDefaults={lib.windowDefaults}
           focusLabel={dialog.label}
+          otherNames={doc.symbols.flatMap((s, i) => (i !== dialog.index && s.attrs.get('InstName') ? [s.attrs.get('InstName')!] : []))}
           onSweep={(param, value, attrs) => sweepSubParam(dialog.index, param, value, attrs)}
           onClose={() => setDialog(null)}
           onApply={(attrs, labels, toSelection) => {

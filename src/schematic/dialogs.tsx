@@ -380,6 +380,7 @@ export function AttributeDialog({
   windowDefaults,
   focusLabel,
   parts,
+  otherNames = [],
   onApply,
   onSweep,
   onClose,
@@ -393,6 +394,8 @@ export function AttributeDialog({
   parts?: PartGroup[];
   /** rótulo desde el que se abrió (botón derecho o doble click sobre el texto) */
   focusLabel?: number;
+  /** los InstName de los demás componentes de la hoja: un nombre repetido se avisa */
+  otherNames?: string[];
   onApply(attrs: Record<string, string>, labels: Map<number, LabelPatch>, toSelection: boolean): void;
   onClose(): void;
 }) {
@@ -555,6 +558,9 @@ export function AttributeDialog({
                   />
                 ) : (
                   <span className="attr-vis" />
+                )}
+                {k === 'InstName' && otherNames.some((n) => n.toLowerCase() === (vals.InstName ?? '').trim().toLowerCase()) && (
+                  <small className="hint warn">{t('Another component is already named {name}', { name: (vals.InstName ?? '').trim() })}</small>
                 )}
                 {k === 'Value' && (check.warn || check.info) && <small className={check.warn ? 'hint warn' : 'hint'}>{check.warn ?? check.info}</small>}
               </label>

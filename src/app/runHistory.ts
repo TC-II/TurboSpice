@@ -3,7 +3,7 @@
 import type { MutableRefObject } from 'react';
 import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
-import { locale, t } from '../i18n/i18n.ts';
+import { dateTime, t } from '../i18n/i18n.ts';
 import { addSim as addProjectSim, applyValues, setSimAsc, simOf, variantOf, type ValueChange } from '../project/project.ts';
 import type { Project } from '../project/turbo.ts';
 import type { History } from '../schematic/useHistory.ts';
@@ -58,13 +58,13 @@ export function runHistoryActions({
     viewingRef.current = false;
     setValueOffer(null);
     history.commit(parseAsc(r.asc));
-    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: new Date(r.time).toLocaleString(locale()) }));
+    setMessage(t('Brought the run from {p0} to the present (Ctrl+Z undoes it)', { p0: dateTime(r.time) }));
   };
   /** Clonar: una simulación nueva con el circuito de esa corrida */
   const cloneRun = (id: string) => {
     const r = curRuns.find((x) => x.id === id);
     if (!r || !curSim) return;
-    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${new Date(r.time).toLocaleString(locale())})`);
+    const res = addProjectSim(leave(), r.asc, `${simName(curSim) || t('No analysis')} (${dateTime(r.time)})`);
     enter(res.project);
     markDirty();
   };

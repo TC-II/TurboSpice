@@ -66,6 +66,8 @@ export const es: Record<string, string> = {
   '{name} · click to name it': '{name} · click para ponerle nombre',
   '{name} (copy)': '{name} (copia)',
   '{name} has no value assigned': '{name} no tiene valor asignado',
+  'Another component is already named {name}': 'Ya hay otro componente que se llama {name}',
+  '{name} is the name of more than one component: rename one of them': '{name} es el nombre de más de un componente: cambiale el nombre a uno',
   '{name} has no X axis: choose another analysis to plot': '{name} no tiene eje X: elegí otro análisis para graficar',
   "{name}: {k} isn't supported by ngspice and is ignored": '{name}: {k} no se soporta en ngspice y se ignora',
   '{name}: delay() with a variable delay is resolved at the .tran step': '{name}: delay() con retardo variable se resuelve al paso del .tran',

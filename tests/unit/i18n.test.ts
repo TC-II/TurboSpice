@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { es } from '../../src/i18n/es.ts';
-import { getLang, setLang, t } from '../../src/i18n/i18n.ts';
+import { dateTime, getLang, setLang, t } from '../../src/i18n/i18n.ts';
 
 afterEach(() => setLang('es', false));
 
@@ -32,5 +32,12 @@ describe('idioma de la interfaz (#72)', () => {
 
   it('ninguna traducción está vacía', () => {
     expect(Object.entries(es).filter(([, sp]) => !sp.trim())).toEqual([]);
+  });
+
+  it('la fecha y hora en castellano va a 24 h (es-AR en 12 h no siempre dice p. m.)', () => {
+    setLang('es', false);
+    expect(dateTime(new Date(2026, 10, 3, 22, 18, 28))).toMatch(/22:18:28/);
+    setLang('en', false);
+    expect(dateTime(new Date(2026, 10, 3, 22, 18, 28))).toMatch(/10:18:28\sPM/);
   });
 });

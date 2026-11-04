@@ -340,6 +340,35 @@ SYMATTR InstName D1
     expect(r.missingValues).toEqual(['C1']);
   });
 
+  it('avisa dos componentes con el mismo nombre (sin importar mayúsculas)', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL res 100 0 R0
+SYMATTR InstName r1
+SYMATTR Value 2k
+SYMBOL res 200 0 R0
+SYMATTR InstName R2
+SYMATTR Value 3k
+`);
+    expect(r.duplicateNames).toEqual(['r1']);
+  });
+
+  it('sin nombres repetidos no hay nada que avisar', () => {
+    const r = ng(`Version 4
+SHEET 1 880 680
+SYMBOL res 0 0 R0
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL res 100 0 R0
+SYMATTR InstName R2
+SYMATTR Value 2k
+`);
+    expect(r.duplicateNames).toEqual([]);
+  });
+
   it('adapta archivos de modelos de LTspice', () => {
     const lib = `.SUBCKT OA 1 2 3\n.param r 20\nE1 3 0 1 2 {Avol}\n.end OA\n`;
     const out = patchModelFile(lib, new Map([['oa', new Map([['avol', '1Meg']])]]));

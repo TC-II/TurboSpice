@@ -2,7 +2,7 @@
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DrawnShapeKind } from '../asc/model.ts';
 import type { GoogleState } from '../cloud/google.ts';
-import { locale, t } from '../i18n/i18n.ts';
+import { dateTime, locale, t } from '../i18n/i18n.ts';
 import type { LtspiceIndex } from '../library/ltspiceLib.ts';
 import type { RecentFile } from '../schematic/autosave.ts';
 import type { ItemRef } from '../schematic/geometry.ts';
@@ -341,7 +341,7 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
       label: t('Recent'),
       items: recent.map((r, i) => ({
         label: `${r.name.replace(/\.(asc|turbo)$/i, '')}${r.unsaved ? t(' (unsaved)') : ''}`,
-        title: new Date(r.time).toLocaleString(locale()),
+        title: dateTime(r.time),
         onClick: () => doRecent(i),
       })),
     },

@@ -5,7 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { Icon } from '../ui/icons.tsx';
 import type { Run } from './turbo.ts';
-import { locale, t } from '../i18n/i18n.ts';
+import { dateTime, locale, t } from '../i18n/i18n.ts';
 
 /** '' = el circuito actual */
 export type HistoryPick = string;
@@ -108,7 +108,7 @@ export function HistoryPanel({
               aria-selected={picked === r.id}
               aria-disabled={r.damaged}
               className={`history-item${picked === r.id ? ' picked' : ''}${r.damaged ? ' damaged' : ''}`}
-              title={r.damaged ? t("This run is damaged in the file: it can't be shown") : new Date(r.time).toLocaleString(locale())}
+              title={r.damaged ? t("This run is damaged in the file: it can't be shown") : dateTime(r.time)}
               onClick={() => !r.damaged && onPick(r.id)}
             >
               <span className="history-when">{when(r.time)}</span>

@@ -2,7 +2,7 @@
 // preguntas pendientes: la corrida vieja que se mira, aplicar un valor en otros testbenches y la
 // vista guardada en el navegador
 import type { MutableRefObject } from 'react';
-import { locale, t } from '../i18n/i18n.ts';
+import { dateTime, t } from '../i18n/i18n.ts';
 import type { Connectivity } from '../netlist/connectivity.ts';
 import type { ValueChange } from '../project/project.ts';
 import { hoverCoords, hoverInfo } from '../schematic/hoverInfo.ts';
@@ -73,7 +73,7 @@ export function StatusBar({
           <>
             {viewed && (
               <span className="status-offer history">
-                {t('Run from')} {new Date(viewed.time).toLocaleString(locale())} {t('· read-only')}
+                {t('Run from')} {dateTime(viewed.time)} {t('· read-only')}
                 <button onClick={() => restoreRun(viewed.id)}>{t('Restore')}</button>
                 <button onClick={() => setViewRun('')}>{t('Back to current')}</button>
               </span>

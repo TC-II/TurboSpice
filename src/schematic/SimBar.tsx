@@ -5,7 +5,7 @@
 // campo o con Enter y reemplazan el comando del esquemático. En una Complex simulation (#241) no
 // hay campos: un ícono muestra el bloque .control al pasar el mouse y abre el Studio con un clic.
 import { createPortal } from 'react-dom';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject, type ReactElement } from 'react';
 import { HoverPop, ProbePlacement, SimHelp } from './SimHelp.tsx';
 import { ANALYSES, formatAnalysis, isNum, parseAnalysis, validateAnalysis, type Analysis, type StbMethod, type Sweep } from '../sim/analyses.ts';
 import type { Library } from '../library/library.ts';
@@ -232,6 +232,7 @@ export function SimBar({
   onAllCorners,
   onStudio,
   onApply,
+  pendingProblem,
 }: {
   /** para dibujar componentes en la ayuda (la LoopProbe) */
   lib?: Library;
@@ -264,6 +265,11 @@ export function SimBar({
   /** abrir el Studio */
   onStudio(): void;
   onApply(line: string): void;
+  /**
+   * Lo que la barra muestra y no pudo aplicar (un tiempo final "abc"): la simulación correría con
+   * la línea anterior, así que Simular avisa esto en vez de correr
+   */
+  pendingProblem?: MutableRefObject<string | undefined>;
 }) {
   const line = sim?.line ?? '';
   const [draft, setDraft] = useState(() => parseAnalysis(line));
@@ -287,6 +293,19 @@ export function SimBar({
     }
   };
   const change = (a: Analysis) => (setDraft(a), apply(a));
+  // (sólo con errores: una caja válida siempre se aplica, aunque la línea se escriba distinto)
+  const draftErrors = draft && formatAnalysis(draft) !== line ? validateAnalysis(draft) : [];
+  const pending = draftErrors.length
+    ? t('{analysis}: {problems}. Complete the boxes marked in red in the simulation bar.', { analysis: ANALYSES.find((x) => x.kind === draft!.kind)!.label, problems: draftErrors.join('; ') })
+    : undefined;
+  useEffect(() => {
+    if (!pendingProblem) return;
+    pendingProblem.current = pending;
+    // sin la barra (otra simulación, un bloque .control) no queda nada pendiente
+    return () => {
+      pendingProblem.current = undefined;
+    };
+  }, [pending, pendingProblem]);
   // la tierra vale en los nodos de referencia (Input −, Output −, Reference), no en los +
   const pick = (f: Extract<BarField, { kind: 'text' }>) =>
     picker(f.list === 'nets' ? 'net' : f.list === 'probes' ? 'probe' : 'source', { ground: f.list === 'nets' && !f.notGround }).then((v) => v && change(f.set(v)));

@@ -75,6 +75,9 @@ jobs:
         run: npm run smoke
       - name: Verilog (Yosys + Icarus + ngspice)
         run: npm run hdl
+      # (el corpus grande es local; acá, los .asc del repo: leer y volver a escribir da el mismo archivo)
+      - name: Ida y vuelta de los .asc de examples/ y library/
+        run: node tests/corpus/roundtrip.mjs examples library
       # tests unitarios con cobertura de src/: el resumen va a la página del run y el detalle a un artefacto
       - name: Tests unitarios (con cobertura)
         run: |

@@ -18,6 +18,21 @@ import { t } from '../i18n/i18n.ts';
 import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, xUnit, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
 import { drawAxisHover, drawSamples, drawPzMarks, drawMarkers, drawCursors, type LabelHit } from './paneDraw.ts';
 
+// Arrastre de una traza entre paneles: el dato lleva el id de esta página, para no mover otra
+// traza si se suelta una arrastrada desde otra pestaña (sus números de panel y traza son de allá)
+const TRACE_DRAG = 'application/x-trace';
+const PAGE_ID = Math.random().toString(36).slice(2);
+const traceDragData = (pane: number, trace: number) => JSON.stringify({ page: PAGE_ID, pane, trace });
+/** Panel y traza que se están soltando, o null si no vienen de esta página */
+function droppedTrace(e: { dataTransfer: DataTransfer }): { pane: number; trace: number } | null {
+  try {
+    const d = JSON.parse(e.dataTransfer.getData(TRACE_DRAG)) as { page?: string; pane?: unknown; trace?: unknown };
+    return d.page === PAGE_ID && typeof d.pane === 'number' && typeof d.trace === 'number' ? { pane: d.pane, trace: d.trace } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function PaneView(props: {
   index: number;
   pane: Pane;
@@ -759,7 +774,7 @@ export function PaneView(props: {
       style={pane.size ? { flex: `${pane.size} 1 0` } : undefined}
       onPointerDown={props.onActivate}
       onDragOver={(e) => {
-        if (e.dataTransfer.types.includes('application/x-trace')) {
+        if (e.dataTransfer.types.includes(TRACE_DRAG)) {
           e.preventDefault();
           setDragOver(true);
         }
@@ -767,10 +782,8 @@ export function PaneView(props: {
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
         setDragOver(false);
-        const raw = e.dataTransfer.getData('application/x-trace');
-        if (!raw) return;
-        const { pane: from, trace } = JSON.parse(raw) as { pane: number; trace: number };
-        props.onDropTrace(from, trace);
+        const d = droppedTrace(e);
+        if (d) props.onDropTrace(d.pane, d.trace);
       }}
     >
       <div className="pane-legend">
@@ -789,14 +802,13 @@ export function PaneView(props: {
                 e.stopPropagation();
                 props.onPickTrace(tt.expr);
               }}
-              onDragStart={(e) => e.dataTransfer.setData('application/x-trace', JSON.stringify({ pane: index, trace: ti }))}
+              onDragStart={(e) => e.dataTransfer.setData(TRACE_DRAG, traceDragData(index, ti))}
               // soltar otra traza del mismo panel sobre esta: pasa a este lugar (cambia el orden
               // de dibujo); de otro panel, sigue de largo al panel (se mueve)
               onDrop={(e) => {
-                const raw = e.dataTransfer.getData('application/x-trace');
-                if (!raw) return;
-                const { pane: from, trace } = JSON.parse(raw) as { pane: number; trace: number };
-                if (from !== index) return;
+                const d = droppedTrace(e);
+                if (!d || d.pane !== index) return;
+                const trace = d.trace;
                 e.preventDefault();
                 e.stopPropagation();
                 setDragOver(false);

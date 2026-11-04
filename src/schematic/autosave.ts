@@ -170,11 +170,155 @@ export interface ProjectSession {
   time: number;
 }
 
-export const loadProjectSession = () => quiet(get<ProjectSession>('project'), undefined);
+// --- una sesión por pestaña ---------------------------------------------------------------------
+// Cada pestaña guarda su proyecto con su propia clave (project:<id>), para que dos pestañas
+// abiertas no se pisen el autoguardado. El id vive en sessionStorage (sobrevive a recargar la
+// pestaña) y la pestaña lo tiene tomado con un Web Lock mientras está abierta: así se sabe qué
+// sesiones son de pestañas vivas y cuáles quedaron de pestañas cerradas (o de un cierre forzado).
 
-export function saveProjectSession(s: ProjectSession): Promise<void> {
+/** Clave de las versiones anteriores, con una sola sesión para todas las pestañas */
+const LEGACY_PROJECT = 'project';
+const PROJECT_PREFIX = 'project:';
+const TAB_KEY = `${DB}.tab`;
+const tabLock = (id: string) => `${DB}:tab:${id}`;
+
+interface Locks {
+  request(name: string, opts: { ifAvailable?: boolean }, cb: (lock: unknown) => unknown): Promise<unknown>;
+  request(name: string, cb: () => unknown): Promise<unknown>;
+  query(): Promise<{ held?: { name?: string }[] }>;
+}
+const locks = (): Locks | undefined => (globalThis.navigator as { locks?: Locks } | undefined)?.locks;
+
+/** Toma el lock de la pestaña `id` hasta que se cierre; false si lo tiene otra (una pestaña duplicada) */
+function holdTab(id: string): Promise<boolean> {
+  const l = locks();
+  if (!l) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    l.request(tabLock(id), { ifAvailable: true }, (lock) => {
+      resolve(!!lock);
+      // (una promesa que no termina: el lock queda tomado mientras viva la pestaña)
+      return lock ? new Promise(() => {}) : undefined;
+    }).catch(() => resolve(true));
+  });
+}
+
+let tabIdP: Promise<string> | undefined;
+/** Id de esta pestaña (el mismo al recargarla) */
+function tabId(): Promise<string> {
+  tabIdP ??= (async () => {
+    let id: string | null = null;
+    try {
+      id = sessionStorage.getItem(TAB_KEY);
+    } catch {
+      // sin sessionStorage: un id nuevo en cada carga
+    }
+    if (id && (await holdTab(id))) return id;
+    id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      sessionStorage.setItem(TAB_KEY, id);
+    } catch {
+      // ídem
+    }
+    await holdTab(id);
+    return id;
+  })();
+  return tabIdP;
+}
+
+/** Ids de las pestañas abiertas (null si el navegador no tiene Web Locks: se toman todas por cerradas) */
+async function liveTabs(): Promise<Set<string> | null> {
+  const l = locks();
+  if (!l) return null;
+  const prefix = tabLock('');
+  const { held = [] } = await l.query();
+  return new Set(
+    held
+      .map((h) => h.name ?? '')
+      .filter((n) => n.startsWith(prefix))
+      .map((n) => n.slice(prefix.length)),
+  );
+}
+
+/** Qué hacer con las sesiones guardadas al abrir una pestaña (ver claimSession) */
+export interface SessionClaim {
+  /** clave de la sesión que restaura esta pestaña */
+  take?: string;
+  /** sesiones de pestañas cerradas que no se restauran, con trabajo sin guardar: van a recientes */
+  toRecent: string[];
+  /** claves a borrar (las de pestañas cerradas, que ya se restauraron o pasaron a recientes) */
+  drop: string[];
+  /** no hay qué restaurar, pero otra pestaña abierta tiene su proyecto */
+  elsewhere: boolean;
+}
+
+/**
+ * Elige la sesión de una pestaña que se abre. `sessions`: clave → sesión guardada; `live`: ids de
+ * las otras pestañas abiertas (null = no se sabe). Al recargar, la propia; si no, la más reciente
+ * de las que dejaron pestañas cerradas. Nunca la de otra pestaña abierta (cada una sigue con la
+ * suya; ésta empieza con un proyecto nuevo).
+ */
+export function claimSession(own: string, sessions: Map<string, Pick<ProjectSession, 'dirty' | 'time'>>, live: Set<string> | null): SessionClaim {
+  if (sessions.has(own)) return { take: own, toRecent: [], drop: [], elsewhere: false };
+  const orphans = [...sessions].filter(([k]) => k === LEGACY_PROJECT || (k.startsWith(PROJECT_PREFIX) && !live?.has(k.slice(PROJECT_PREFIX.length)))).sort(([, a], [, b]) => b.time - a.time);
+  const [first, ...rest] = orphans;
+  return {
+    take: first?.[0],
+    toRecent: rest.filter(([, s]) => s.dirty).map(([k]) => k),
+    drop: orphans.map(([k]) => k),
+    elsewhere: !first && sessions.size > 0,
+  };
+}
+
+async function allKeys(): Promise<string[]> {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const r = d.transaction(STORE).objectStore(STORE).getAllKeys();
+    r.onsuccess = () => resolve(r.result.map(String));
+    r.onerror = () => reject(r.error);
+  });
+}
+
+/** De a una pestaña por vez: dos que se abren juntas no restauran la misma sesión */
+function exclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const l = locks();
+  return l ? (l.request(`${DB}:claim`, fn) as Promise<T>) : fn();
+}
+
+/**
+ * Proyecto que restaura esta pestaña (ver claimSession). La sesión que toma pasa a ser la suya, y
+ * las demás de pestañas cerradas se borran (las que tenían cambios sin guardar quedan en recientes).
+ */
+export async function loadProjectSession(): Promise<{ session?: ProjectSession; elsewhere: boolean }> {
+  const id = await tabId();
+  const own = PROJECT_PREFIX + id;
   return quiet(
-    put('project', s).catch(() => put('project', { ...s, handle: undefined })),
+    exclusive(async () => {
+      const keys = (await allKeys()).filter((k) => k === LEGACY_PROJECT || k.startsWith(PROJECT_PREFIX));
+      const sessions = new Map<string, ProjectSession>();
+      for (const k of keys) {
+        const s = await get<ProjectSession>(k);
+        if (s) sessions.set(k, s);
+      }
+      const live = await liveTabs();
+      live?.delete(id);
+      const claim = claimSession(own, sessions, live);
+      for (const k of claim.toRecent) {
+        const s = sessions.get(k)!;
+        await addRecent({ name: s.name, asc: s.turbo, turbo: true, time: s.time, unsaved: true });
+      }
+      const taken = claim.take ? sessions.get(claim.take) : undefined;
+      if (taken && claim.take !== own) await put(own, taken).catch(() => put(own, { ...taken, handle: undefined }));
+      for (const k of claim.drop) if (k !== own) await del(k);
+      return { session: taken, elsewhere: claim.elsewhere };
+    }),
+    { session: undefined, elsewhere: false },
+  );
+}
+
+export async function saveProjectSession(s: ProjectSession): Promise<void> {
+  const key = PROJECT_PREFIX + (await tabId());
+  return quiet(
+    put(key, s).catch(() => put(key, { ...s, handle: undefined })),
     undefined,
   );
 }

@@ -229,8 +229,9 @@ export function useProjectSession(d: ProjectSessionDeps) {
   const [restored, setRestored] = useState(false);
   const restore = useEvent(() => {
     (async () => {
+      // (primero la sesión: puede pasar a recientes el trabajo sin guardar de otras pestañas cerradas)
+      const { session, elsewhere } = await loadProjectSession();
       setRecent(await loadRecent());
-      const session = await loadProjectSession();
       // el trabajo sin guardar anterior queda en recientes
       const keepSession = () => {
         if (session?.dirty) addRecent({ name: session.name, asc: session.turbo, turbo: true, time: session.time, unsaved: true }).then(setRecent);
@@ -263,6 +264,7 @@ export function useProjectSession(d: ProjectSessionDeps) {
         }
       }
       loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
+      if (elsewhere) setMessage(t('The project you were working on is open in another tab: this one starts a new project.'));
     })()
       .catch(() => {})
       .finally(() => setRestored(true));

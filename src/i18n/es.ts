@@ -445,6 +445,7 @@ export const es: Record<string, string> = {
   'X for a .subckt; D, Q, M, J… for a .model of that device': 'X para un .subckt; D, Q, M, J… para un .model de ese dispositivo',
   'The name of the .subckt or .model: changing it here renames it in the netlist, and vice versa': 'El nombre del .subckt o .model: si lo cambiás acá se renombra en el netlist, y al revés',
   'The pins of the symbol do not match the nodes of the netlist ({pins}) by SpiceOrder.': 'Los pines del símbolo no se corresponden, por SpiceOrder, con los nodos del netlist ({pins}).',
+  'The project you were working on is open in another tab: this one starts a new project.': 'El proyecto en el que estabas trabajando está abierto en otra pestaña: en ésta empieza uno nuevo.',
   'Update pins in the symbol': 'Actualizar los pines en el símbolo',
   'A parameter is saved once it has a default value (e.g. 1k)': 'Un parámetro se guarda cuando tiene valor por defecto (p. ej. 1k)',
   'Name of each instance on the schematic (X1, U1…); empty: the Prefix and a number': 'Nombre de cada instancia en el esquemático (X1, U1…); vacío: el Prefix y un número',

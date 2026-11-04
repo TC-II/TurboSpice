@@ -661,7 +661,14 @@ function SchematicMode({
     setPlotName(name);
     const kind = plotKind(name);
     const r = next ?? plotView[kind] ?? panesByKind.current.get(kind);
-    if (r) setPanes(r);
+    // "meas vs R", "op vs R" (de un .step): si nada de lo que se graficaría está ahí, sus medidas; si
+    // no, el panel quedaba con "V(out) doesn't exist" y había que saber cómo se llama cada medida
+    const pl = !next && / vs /.test(name) ? sim?.result.plots.find((p) => p.name === name) : undefined;
+    const sc = pl && scaleOf(pl);
+    const own = pl ? pl.vectors.filter((v) => v !== sc) : [];
+    const shown = (r ?? panes).some((p) => p.traces.some((tr) => own.some((v) => v.name === tr.expr.trim().toLowerCase())));
+    if (own.length && !shown) setPanes([{ traces: own.slice(0, 6).map((v) => ({ expr: v.name })) }]);
+    else if (r) setPanes(r);
   };
 
   // --- Lista de simulaciones (#39) ---
@@ -674,7 +681,7 @@ function SchematicMode({
     ...{ setProjectState, setPath, setSubTabs, setSim, showView, restoreCached, setSelection, setTool, setValueOffer, setViewRun, setDocKey, setKeepKey, setMessage },
   });
   const { checkSubName, newSubckt, createModule, renameSub, deleteSub, newModel, renameModel, deleteModel } = moduleActions({
-    ...{ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport },
+    ...{ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport, lib },
   });
   // En la base, escribir un comando de análisis (a mano o con el diálogo) crea la primera
   // simulación con ese circuito; la base se queda sin el comando

@@ -606,8 +606,9 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
   const list = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    return s ? items.filter((x) => x.label.toLowerCase().includes(s)) : items;
+    // cada palabra en el nombre o en lo que dice a la derecha (el workbench): "band bode"
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return items.filter((x) => words.every((w) => `${x.label} ${x.hint}`.toLowerCase().includes(w)));
   }, [items, q]);
   const pick = (k?: string) => {
     if (k) onPick(k);

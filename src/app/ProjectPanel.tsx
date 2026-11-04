@@ -7,7 +7,7 @@ import { ProjectTree, QuickOpen } from '../project/Hierarchy.tsx';
 import { modelModuleFile, modelModuleName, modelModules } from '../project/modelModule.ts';
 import { modules, subName, updateSymbol } from '../project/subckt.ts';
 import type { Project, ProjectFile } from '../project/turbo.ts';
-import { simName, type SimList } from '../sim/simList.ts';
+import type { SimList } from '../sim/simList.ts';
 import type { HierLevel } from './types.ts';
 import { useSchematic } from './context.ts';
 
@@ -139,7 +139,8 @@ export function ProjectPanel(props: ProjectPanelProps) {
         createPortal(
           <QuickOpen
             items={[
-              ...sims.items.map((x) => ({ key: `v:${x.id}`, label: simName(x) || t('No analysis'), hint: t('testbench') })),
+              // (con el workbench: si no, los «Step response» de cada uno eran iguales)
+              ...treeBenches.map((b) => ({ key: `v:${b.id}`, label: b.name, hint: project.groups.find((g) => g.id === b.group)?.name ?? t('testbench') })),
               ...modules(project).map((f) => ({ key: `s:${subName(f.name)}`, label: subName(f.name), hint: f.kind === 'verilog' ? t('Verilog module') : t('subcircuit') })),
               ...modelModules(project).map((f) => ({ key: `m:${modelModuleName(f)}`, label: modelModuleName(f), hint: t('model') })),
             ]}

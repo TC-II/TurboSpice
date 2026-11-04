@@ -9,6 +9,7 @@ import { t } from '../i18n/i18n.ts';
 import { addModelModule, removeModelModule, renameModelModule } from '../project/modelModule.ts';
 import { lineOf } from '../project/project.ts';
 import { addSubckt, freeSubcktName, removeSubckt, renameSubckt, usages, validSubcktName } from '../project/subckt.ts';
+import type { Library } from '../library/library.ts';
 import type { Project } from '../project/turbo.ts';
 import type { History } from '../schematic/useHistory.ts';
 import { ascText } from './helpers.ts';
@@ -32,16 +33,37 @@ export interface ModuleDeps {
   setCurModel(name: string): void;
   setDialog(d: Dialog | null): void;
   synthAndReport(name: string): Promise<void>;
+  /** para no tapar con un subcircuito un símbolo de la biblioteca */
+  lib: Library | null;
 }
 
-export function moduleActions({ projectRef, editProject, snapshot, docRef, history, stacks, subKey, pathRef, go, openSub, setSubTabs, curModel, setCurModel, setDialog, synthAndReport }: ModuleDeps) {
+export function moduleActions({
+  projectRef,
+  editProject,
+  snapshot,
+  docRef,
+  history,
+  stacks,
+  subKey,
+  pathRef,
+  go,
+  openSub,
+  setSubTabs,
+  curModel,
+  setCurModel,
+  setDialog,
+  synthAndReport,
+  lib,
+}: ModuleDeps) {
   /** Nombre de subcircuito: válido y libre (salvo `except`, el que se renombra) */
   const checkSubName = (except?: string) => (n: string) =>
     !validSubcktName(n)
       ? t('Invalid name: use letters, digits, _ or -')
       : n.toLowerCase() !== except?.toLowerCase() && projectRef.current.files.some((f) => f.name.replace(/\.[^.]*$/, '').toLowerCase() === n.toLowerCase())
         ? t('There is already a file called {name}', { name: n })
-        : null;
+        : n.toLowerCase() !== except?.toLowerCase() && lib?.hasLibrarySymbol(n)
+          ? t('{name} is a library symbol: a subcircuit with that name would replace it in the whole project', { name: n })
+          : null;
   const askSubName = (title: string, initial: string, onOk: (name: string) => void, except?: string) =>
     setDialog({
       kind: 'name',

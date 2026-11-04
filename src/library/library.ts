@@ -354,6 +354,15 @@ export class Library implements SymbolSource {
     return Object.entries(this.bundle.subs).find(([f, s]) => f.startsWith(CMP_DIR) && s.models.some((m) => m.toLowerCase() === n))?.[0];
   }
 
+  /**
+   * Hay un símbolo con ese nombre en la biblioteca (la de la app o la del usuario), sin contar los del
+   * proyecto: un subcircuito con ese nombre lo taparía en todo el proyecto (un "res" cambia todas las R)
+   */
+  hasLibrarySymbol(name: string): boolean {
+    const n = name.toLowerCase();
+    return this.byName.has(n) || this.extra.has(n);
+  }
+
   /** Todas las rutas de símbolos, para el buscador (P) */
   symbolPaths(): string[] {
     const proj = [...this.projSymbols.keys()].map((n) => `${PROJECT_DIR}/${n}`);

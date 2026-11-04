@@ -1003,6 +1003,8 @@ export const es: Record<string, string> = {
   'the stop time must be greater than 0': 'el tiempo final tiene que ser mayor que 0',
   'the start time must be less than the stop time': 'el tiempo desde el que se guarda tiene que ser menor que el tiempo final',
   'Damping θ': 'Amortiguamiento θ',
+  '{name} is a library symbol: a subcircuit with that name would replace it in the whole project':
+    '{name} es un símbolo de la biblioteca: un subcircuito con ese nombre lo reemplazaría en todo el proyecto',
   '{expr} has no finite value (a division by zero?)': '{expr} no tiene ningún valor finito (¿una división por cero?)',
   'Small-signal frequency response around the operating point (.ac). Excitation sources need "AC 1" in their value.':
     'Respuesta en frecuencia de pequeña señal alrededor del punto de operación (.ac). Las fuentes de excitación necesitan "AC 1" en su valor.',

@@ -15,8 +15,9 @@ let run: Promise<RunYosys> | null = null;
 
 // --- Icarus (engine/icarus/build.sh, copiado a public/engine/icarus) ------------------------------
 const ICARUS_URL = new URL(`${import.meta.env.BASE_URL}engine/icarus/`, self.location.href).href;
-// import() directo: el dev server de Vite le agrega ?import y rechaza los archivos de public/
-const nativeImport = new Function('u', 'return import(u)') as (u: string) => Promise<{ default: (o: object) => Promise<EmProgram> }>;
+// import() con URL absoluta (ICARUS_URL lo es): el dev server de Vite le agrega ?import sólo a las
+// rutas relativas (y rechaza así los archivos de public/); @vite-ignore lo deja como está en el build
+const nativeImport = (u: string) => import(/* @vite-ignore */ u) as Promise<{ default: (o: object) => Promise<EmProgram> }>;
 const fileCache = new Map<string, Promise<Uint8Array>>();
 const icarus: IcarusLoader = {
   program: async (name, print) => {

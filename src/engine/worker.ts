@@ -66,8 +66,9 @@ async function load(): Promise<Ngspice> {
   const hash = (f: string) => manifest?.hashes?.[f];
   // (con el hash en la URL el .mjs siempre corresponde al .wasm de la caché)
   const v = hash('ngspice.mjs');
-  // import() directo: el dev server de Vite le agrega ?import y rechaza los archivos de public/
-  const nativeImport = new Function('u', 'return import(u)') as (u: string) => Promise<unknown>;
+  // import() con URL absoluta: el dev server de Vite le agrega ?import sólo a las rutas relativas
+  // (y rechaza así los archivos de public/); @vite-ignore lo deja como está en el build
+  const nativeImport = (u: string): Promise<unknown> => import(/* @vite-ignore */ u);
   const { default: factory } = (await nativeImport(new URL(`${ENGINE_URL}ngspice.mjs${v ? `?v=${v}` : ''}`, self.location.href).href)) as {
     default: NgspiceFactory;
   };

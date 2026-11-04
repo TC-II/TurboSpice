@@ -97,6 +97,26 @@ check(!after2.includes('V1') && !after2.some((t) => t.startsWith('PULSE')) && af
 await page.keyboard.press('Control+z');
 check((await labels()).join() === after.join(), 'Ctrl+Z deshace en un paso');
 
+// --- foco de los diálogos (WCAG 2.4.3): Tab no sale del diálogo y al cerrar vuelve al botón ---
+await edit('R1');
+check((await dialog.getAttribute('aria-modal')) === 'true', 'diálogo: aria-modal');
+let escaped = 0;
+for (const back of [false, true])
+  for (let i = 0; i < 15; i++) {
+    await page.keyboard.press(back ? 'Shift+Tab' : 'Tab');
+    if (!(await dialog.evaluate((d) => d.contains(document.activeElement)))) escaped++;
+  }
+check(escaped === 0, `diálogo: Tab y Shift+Tab no salen del diálogo (${escaped} de 30 afuera)`);
+await page.keyboard.press('Escape');
+await dialog.waitFor({ state: 'detached' });
+const componentBtn = page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Componente', exact: true });
+await componentBtn.click();
+await dialog.waitFor();
+check(await page.evaluate(() => document.activeElement?.tagName === 'INPUT'), 'buscador: el foco arranca en la búsqueda');
+await page.keyboard.press('Escape');
+await dialog.waitFor({ state: 'detached' });
+check(await componentBtn.evaluate((b) => b === document.activeElement), 'buscador: al cerrar, el foco vuelve al botón Componente');
+
 // (la simulación automática del ejemplo se aborta al editar: no es un error)
 const real = errors.filter((e) => !/Simulación abortada/.test(e));
 check(!real.length, `sin errores en la página${real.length ? `: ${real.join(' | ')}` : ''}`);

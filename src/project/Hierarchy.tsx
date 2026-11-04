@@ -4,6 +4,7 @@ import { SUBCKT_DRAG } from '../schematic/SchematicEditor.tsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../schematic/dialogs.tsx';
 import { Icon } from '../ui/icons.tsx';
+import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { NameInput } from '../ui/EditableName.tsx';
 import { t } from '../i18n/i18n.ts';
 
@@ -604,6 +605,8 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
   const [q, setQ] = useState('');
   const [i, setI] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  useDialogFocus(box);
   useEffect(() => input.current?.focus(), []);
   const list = useMemo(() => {
     // cada palabra en el nombre o en lo que dice a la derecha (el workbench): "band bode"
@@ -616,7 +619,7 @@ export function QuickOpen({ items, onPick, onClose }: { items: { key: string; la
   };
   return (
     <div className="quick-open-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="quick-open" role="dialog" aria-label={t('Go to')}>
+      <div ref={box} className="quick-open" role="dialog" aria-modal="true" aria-label={t('Go to')} tabIndex={-1}>
         <input
           ref={input}
           value={q}

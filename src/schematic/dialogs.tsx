@@ -3,6 +3,7 @@ import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
 import { SlideConfirm } from '../ui/SlideConfirm.tsx';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
+import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
@@ -67,6 +68,7 @@ export function Modal({
   hidden?: boolean;
 }) {
   const box = useRef<HTMLDivElement>(null);
+  useDialogFocus(box, !hidden);
   const [top, setTop] = useState<number | null>(null);
   useLayoutEffect(() => {
     const el = box.current;
@@ -97,7 +99,7 @@ export function Modal({
   }, [onClose, hidden]);
   return (
     <div className={`modal-backdrop${hidden ? ' picking' : ''}`} style={top !== null ? { paddingTop: top } : undefined} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-label={title}>
+      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}>
         <h2>{title}</h2>
         {children}
       </div>

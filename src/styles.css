@@ -8,6 +8,8 @@
   --border: #d9dce1;
   --grid: #e6e8eb;
   --accent: #2f6fdb;
+  /* fondo de botones con texto blanco encima (≥ 4,5:1, WCAG 1.4.3) */
+  --accent-fill: #2f6fdb;
   --ok: #2b8a3e;
   --err: #c92a2a;
   --mono: ui-monospace, 'JetBrains Mono', 'Fira Code', Menlo, monospace;
@@ -22,6 +24,7 @@
     --border: #2e3239;
     --grid: #262a30;
     --accent: #5b8def;
+    --accent-fill: #3f6fd6;
     --ok: #51cf66;
     --err: #ff6b6b;
     color-scheme: dark;
@@ -35,6 +38,7 @@
   --border: #2e3239;
   --grid: #262a30;
   --accent: #5b8def;
+  --accent-fill: #3f6fd6;
   --ok: #51cf66;
   --err: #ff6b6b;
   color-scheme: dark;
@@ -58,7 +62,7 @@ select, button {
   border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px;
 }
 button { cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 button:disabled { opacity: 0.5; cursor: default; }
 .status { color: var(--fg-muted); }
 .status.ok { color: var(--ok); }
@@ -152,7 +156,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .tabs button:disabled { opacity: 0.45; cursor: default; }
 /* vistas (#55): la que se muestra va en azul; las demás, oscuras (un click las agrega) */
 .view-tabs button { background: var(--bg); color: var(--fg); box-shadow: inset 0 0 0 1px var(--border); display: inline-flex; align-items: center; border-radius: 6px 6px 0 0; }
-.view-tabs button.active { background: var(--accent); color: #fff; box-shadow: none; }
+.view-tabs button.active { background: var(--accent-fill); color: #fff; box-shadow: none; }
 .view-tabs button.alone { cursor: default; }
 .view-tabs button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
 /* segmento de la cruz o la flechita: ancho fijo (con o sin ícono), así el botón no cambia de tamaño;
@@ -163,7 +167,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .layout-btns { display: flex; gap: 2px; }
 .layout-btns button { display: inline-flex; padding: 3px; border-color: transparent; background: transparent; border-radius: 5px; color: var(--fg-muted); }
 .layout-btns button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.layout-btns button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.layout-btns button.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .pad { padding: 16px; }
 
 .netlist-mode { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -178,7 +182,7 @@ main { flex: 1; display: grid; grid-template-columns: minmax(280px, 38%) 1fr; mi
 .schematic-mode { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .toolbar { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; padding: 6px 16px; border-bottom: 1px solid var(--border); }
 .toolbar .group { display: flex; align-items: center; gap: 4px; }
-.toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toolbar button.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .toolbar.small { padding: 4px 12px; gap: 8px; }
 .toolbar .close { margin-left: auto; border: 0; background: transparent; }
 .filename { margin-left: auto; color: var(--fg-muted); font-size: 13px; max-width: 30ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -308,6 +312,8 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 35%); display: grid; place-items: start center; z-index: 10; padding: 16px; }
 .modal { background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; width: min(460px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 10px 40px rgb(0 0 0 / 30%); }
 .modal.wide { width: min(860px, 100%); }
+/* la caja recibe el foco sólo como punto de partida de Tab (useDialogFocus) */
+.modal:focus, .quick-open:focus, .tut-hub:focus { outline: none; }
 .modal.large { width: min(1280px, 100%); height: min(88vh, 1000px); max-height: none; display: flex; flex-direction: column; overflow: hidden; }
 .modal h2 { font-size: 15px; margin: 0 0 12px; }
 .modal input, .modal textarea { font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%; }
@@ -382,7 +388,7 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .sim-help { flex: none; align-self: center; margin: 0 2px; }
 .stbm-row .sim-help { align-self: flex-end; margin-bottom: 4px; }
 .sim-help-icon { box-sizing: border-box; width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; cursor: help; font: 700 13px/1 Georgia, 'Times New Roman', serif; color: var(--accent); border: 1.5px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); transition: background .15s, color .15s; }
-.sim-help:hover .sim-help-icon, .sim-help:focus-visible .sim-help-icon, .sim-help.open .sim-help-icon { background: var(--accent); color: #fff; }
+.sim-help:hover .sim-help-icon, .sim-help:focus-visible .sim-help-icon, .sim-help.open .sim-help-icon { background: var(--accent-fill); color: #fff; }
 .hpop { position: fixed; z-index: 1000; box-sizing: border-box; overflow-y: auto; padding: 12px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); box-shadow: 0 12px 36px rgb(0 0 0 / .28); color: var(--fg); font-size: 12px; line-height: 1.45; animation: hpop-in .15s ease-out; }
 @keyframes hpop-in { from { opacity: 0; transform: translateY(-4px); } }
 .hpop section + section { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
@@ -498,7 +504,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .plot-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .plot-tools button { padding: 2px 10px; font-size: 13px; }
 .plot-tools button.fit-btn { display: inline-flex; padding: 3px 6px; }
-.plot-tools button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.plot-tools button.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .expr-form { display: flex; gap: 4px; flex: 0 1 260px; max-width: 300px; }
 .expr-form input { flex: 1; min-width: 0; font: 13px var(--mono); color: var(--fg); background: var(--bg-alt); border: 1px solid var(--border); border-radius: 6px; padding: 3px 30px 3px 8px; }
 /* el "+" va dentro de la caja, al final */
@@ -578,7 +584,7 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 /* "+" para agregar un panel: aparece al acercarse al borde inferior del último */
 .pane { position: relative; }
 .pane-add { position: absolute; left: 0; right: 0; bottom: 0; height: 18px; display: flex; justify-content: center; align-items: flex-end; z-index: 2; }
-.pane-add button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: #fff; font-size: 16px; line-height: 22px; opacity: 0; transition: opacity 0.12s; }
+.pane-add button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: var(--accent-fill); color: #fff; font-size: 16px; line-height: 22px; opacity: 0; transition: opacity 0.12s; }
 .pane-add:hover button, .pane-add button:focus-visible { opacity: 1; }
 .results-body { overflow: hidden; }
 /* el contenedor no scrollea (por el visor): netlist, log y problemas llevan su propio scroll */
@@ -712,9 +718,9 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar .group.more::before { display: none; }
 .iconbar button { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px; border-color: transparent; background: transparent; border-radius: 6px; }
 .iconbar button:hover:not(:disabled), .iconbar button.open { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.iconbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.iconbar button.primary { background: var(--accent); border-color: var(--accent); color: #fff; padding: 4px 12px; }
-.iconbar button.primary:hover:not(:disabled), .iconbar button.primary.open { background: color-mix(in srgb, var(--accent) 85%, #000); }
+.iconbar button.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+.iconbar button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; padding: 4px 12px; }
+.iconbar button.primary:hover:not(:disabled), .iconbar button.primary.open { background: color-mix(in srgb, var(--accent-fill) 85%, #000); }
 .iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
 .iconbar button.run-off { background: transparent; border-color: var(--border); color: inherit; opacity: 0.55; }
 .iconbar .status { flex: 1 1 auto; min-width: 0; margin-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -803,7 +809,7 @@ kbd { font: 12px var(--mono); padding: 1px 6px; border: 1px solid var(--border);
 .problems li:has(.size-actions) { flex-wrap: wrap; }
 .problems .size-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 2px 52px; }
 .problems .size-actions button { font-size: 12px; padding: 3px 10px; }
-.problems .size-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.problems .size-actions button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .problems button.link { border: 0; background: transparent; color: var(--accent); padding: 0; font: inherit; text-decoration: underline; }
 .workspace.side { flex-direction: row; }
 .workspace.side .splitter { width: 6px; height: auto; margin: 0 0 0 -3px; cursor: col-resize; }
@@ -914,7 +920,7 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .workspace.side .canvas-wrap { min-width: 240px; }
 .split-btn { padding: 0; width: 52px; height: 20px; font-size: 11px; line-height: 1; border-radius: 6px; background: var(--bg-alt); border: 1px solid var(--border); color: var(--fg); box-shadow: 0 2px 8px rgb(0 0 0 / 18%); cursor: pointer; }
 .workspace.side .split-btn { width: 20px; height: 52px; }
-.split-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.split-btn:hover { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 @media (pointer: coarse) { .split-btn { width: 72px; height: 28px; } .workspace.side .split-btn { width: 28px; height: 72px; } }
 /* expandido: el divisor queda como pestaña en el borde */
 .splitter.expanded { cursor: default; margin: 0; height: 0; }
@@ -930,7 +936,7 @@ button.small { font-size: 12px; padding: 1px 8px; }
 /* Cuenta de Google (arriba a la derecha) */
 .account { position: relative; margin-left: auto; }
 .account-btn { width: 30px; height: 30px; padding: 0; border-radius: 50%; display: grid; place-items: center; overflow: hidden; color: var(--fg-muted); background: var(--bg); }
-.account-btn.signed-in { background: var(--accent); border-color: var(--accent); color: #fff; font: 600 14px system-ui, sans-serif; }
+.account-btn.signed-in { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font: 600 14px system-ui, sans-serif; }
 .account-btn img { width: 100%; height: 100%; object-fit: cover; }
 /* sin sesión: el botón oficial de Google (claro u oscuro según el tema), sin borde ni fondo propios */
 .account-btn.google { border: 0; background: transparent; }
@@ -1298,14 +1304,14 @@ button.hier-tab { padding-right: 10px; }
 .ctx-menu button { text-align: left; border: 0; border-radius: 5px; background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 6px 10px; }
 .ctx-menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ctx-menu button:disabled { color: var(--fg-muted); }
-.ctx-menu button.ctx-primary { margin-top: 4px; text-align: center; background: var(--accent); color: #fff; font-weight: 600; }
-.ctx-menu button.ctx-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 85%, #000); }
+.ctx-menu button.ctx-primary { margin-top: 4px; text-align: center; background: var(--accent-fill); color: #fff; font-weight: 600; }
+.ctx-menu button.ctx-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-fill) 85%, #000); }
 .ctx-menu button.ctx-primary:disabled { background: var(--bg-alt); color: var(--fg-muted); }
 .ctx-edit { display: flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; font-size: 13px; }
 .ctx-edit label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; }
 .ctx-edit span { font-family: var(--mono); white-space: nowrap; }
 .ctx-edit input { flex: 1; min-width: 0; font: 13px var(--mono); }
-.ctx-menu button.ctx-ok { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; background: var(--accent); color: #fff; }
+.ctx-menu button.ctx-ok { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; background: var(--accent-fill); color: #fff; }
 .ctx-menu button.ctx-ok:hover { background: color-mix(in srgb, var(--accent) 85%, #000); }
 /* menú de un valor (R, L, C): una caja angosta */
 .ctx-menu.ctx-quick { width: 140px; min-width: 0; max-width: none; }
@@ -1518,7 +1524,7 @@ svg.editor.tool-pencil { cursor: crosshair; }
 .tut-mission-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; margin-top: 2px; }
 .tut-count { color: var(--fg-muted); font-variant-numeric: tabular-nums; }
 .tut-badge-chip, .tut-next-chip { padding: 0 7px; border-radius: 999px; font-size: 11px; background: color-mix(in srgb, var(--tut-gold) 22%, transparent); }
-.tut-next-chip { background: var(--accent); color: #fff; }
+.tut-next-chip { background: var(--accent-fill); color: #fff; }
 .tut-hub-foot { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; color: var(--fg-muted); font-size: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 .tut-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .tut-ranks { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1625,7 +1631,7 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .saves-body > .hint { margin: 0; }
 .saves-mode { display: flex; flex-direction: column; gap: 4px; }
 .saves-pick { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; }
-.saves-pick.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.saves-pick.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .saves-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
 .saves-tools input[type='search'] { flex: 1 1 100%; }
 /* más señales de las que entran en memoria (según la última simulación cortada) */
@@ -1678,7 +1684,7 @@ button.tut-go { font-weight: 650; padding: 5px 14px; }
 .simbar .sb-pdk .pdk-chip { margin-right: 4px; font-size: 11px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .simbar .sb-pdk button { font: 12px var(--mono); padding: 2px 7px; border: 0; border-radius: 6px; background: transparent; color: var(--fg-muted); }
 .simbar .sb-pdk button:hover:not(:disabled):not(.active) { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--fg); }
-.simbar .sb-pdk button.active { background: var(--accent); color: #fff; }
+.simbar .sb-pdk button.active { background: var(--accent-fill); color: #fff; }
 .simbar .sb-pdk button:disabled { opacity: 0.35; }
 .simbar .sb-pdk button.sb-pdk-all { font: 11px system-ui, sans-serif; border-left: 1px solid var(--border); border-radius: 0 6px 6px 0; margin-left: 2px; }
 .model-pins-lib { margin-top: 6px; }

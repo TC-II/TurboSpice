@@ -4,6 +4,7 @@
 // con sesión de Google, en Drive (progress.ts).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
+import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { createPortal } from 'react-dom';
 import { chapters, CHAPTER_XP, CLEAN_XP, levelOf, levels, practiceCircuit, starsFor, STEP_XP, type Chapter, type Mem, type Practice, type Probe } from './lessons.ts';
 import { loadProgress, PROGRESS_EVENT, storeProgress, type Progress } from './progress.ts';
@@ -277,6 +278,10 @@ export function Tutorial({
     return () => clearInterval(id);
   }, [step, probeNow]);
 
+  // el mapa de misiones es modal; la tarjeta de una misión no (se trabaja en la app con ella abierta)
+  const hub = useRef<HTMLDivElement>(null);
+  useDialogFocus(hub, view.kind === 'hub');
+
   // ── tarjeta arrastrable ──
   const card = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(prog.pos);
@@ -329,7 +334,7 @@ export function Tutorial({
   if (view.kind === 'hub')
     return createPortal(
       <div className="tut-hub-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="tut-hub" role="dialog" aria-label={t('TurboSpice Academy')}>
+        <div ref={hub} className="tut-hub" role="dialog" aria-modal="true" aria-label={t('TurboSpice Academy')} tabIndex={-1}>
           <header className="tut-hub-head">
             <div>
               <h2>

@@ -41,6 +41,9 @@ export interface TutorialDeps {
   bias: unknown;
   showNets: boolean;
   hasNets: boolean;
+  netHover: boolean;
+  savesOpen: boolean;
+  pdk: { name: string; corner: string } | undefined;
 }
 
 export function tutorialState({
@@ -68,6 +71,9 @@ export function tutorialState({
   bias,
   showNets,
   hasNets,
+  netHover,
+  savesOpen,
+  pdk,
 }: TutorialDeps): TutorialProbe {
   const effective = (s: SymbolInst) => effectiveAttrs(s, lib.symbol(s.type));
   const benchDoc = tbDoc ?? doc;
@@ -88,7 +94,7 @@ export function tutorialState({
     inSub: curSub,
     symbols: doc.symbols.map((s) => {
       const e = effective(s);
-      return { type: s.type, prefix: e.get('Prefix') ?? '', value: s.attrs.get('Value') ?? e.get('Value') ?? '' };
+      return { type: s.type, prefix: e.get('Prefix') ?? '', value: s.attrs.get('Value') ?? e.get('Value') ?? '', name: s.attrs.get('InstName') ?? e.get('InstName') ?? '' };
     }),
     wires: doc.wires.length,
     grounds: doc.flags.filter((f) => f.name === '0').length,
@@ -111,5 +117,8 @@ export function tutorialState({
     historyOpen,
     showOp: showOp && !!bias,
     showNets: showNets && hasNets,
+    netHover,
+    savesOpen,
+    ...(pdk ? { pdk: { name: pdk.name, corner: pdk.corner } } : {}),
   };
 }

@@ -1054,6 +1054,9 @@ function SchematicMode({
       bias,
       showNets,
       hasNets,
+      netHover,
+      savesOpen,
+      pdk: pdkBar,
     });
 
   return (

@@ -16,7 +16,7 @@ export interface Probe {
   /** subcircuito abierto ('' = el testbench) */
   inSub: string;
   /** el esquemático que se ve */
-  symbols: { type: string; prefix: string; value: string }[];
+  symbols: { type: string; prefix: string; value: string; name: string }[];
   wires: number;
   grounds: number;
   /** etiquetas de red que no son tierra */
@@ -44,6 +44,12 @@ export interface Probe {
   historyOpen: boolean;
   showOp: boolean;
   showNets: boolean;
+  /** resaltado de la red bajo el cursor (H) */
+  netHover: boolean;
+  /** panel de señales guardadas abierto */
+  savesOpen: boolean;
+  /** PDK del testbench y su esquina (sin símbolos de PDK, undefined) */
+  pdk?: { name: string; corner: string };
 }
 
 /** Memoria de un paso (lo que había al empezarlo) */
@@ -72,7 +78,7 @@ export interface Step {
   next?: string;
 }
 
-export type Practice = 'empty' | 'rc' | 'rcTran' | 'divider';
+export type Practice = 'empty' | 'rc' | 'rcTran' | 'divider' | 'loop';
 
 export interface Chapter {
   id: string;
@@ -111,7 +117,14 @@ const turnOn = (on: (p: Probe) => boolean, already: string) => ({
   progress: (p: Probe, m: Mem) => (m.was && on(p) && !m.off ? already : undefined),
 });
 const near = (a: number, b: number) => Math.abs(a - b) <= Math.abs(b) * 1e-6;
-const kind = (line: string) => /^\s*\.(\w+)/.exec(line)?.[1].toLowerCase() ?? '';
+// los análisis que sólo tiene ngspice (.stb) se guardan como comentario: ;.stb …
+const kind = (line: string) => /^\s*;?\s*\.(\w+)/.exec(line)?.[1].toLowerCase() ?? '';
+const analysis = (line: string) => parseAnalysis(line.replace(/^\s*;\s*/, ''));
+/** cuántos símbolos hay cuyo tipo cumple con re */
+const count = (p: Probe, re: RegExp) => p.symbols.filter((s) => re.test(s.type)).length;
+const LOOP_PROBE = /(^|[\\/])LoopProbe$/i;
+const SKY130 = /^sky130[\\/]/i;
+const DSP = /(^|[\\/])dsp_/i;
 const traces = (p: Probe) => p.panes.flat();
 const directive = (p: Probe, cmd: string) => p.directives.some((d) => d.split('\\n').some((l) => new RegExp(`^\\s*\\${cmd}\\b`, 'i').test(l)));
 const looseText = (p: Probe) => (p.loose ? t('Unconnected pins: {n}', { n: p.loose }) : undefined);
@@ -163,6 +176,52 @@ SYMATTR Value 2k
 TEXT 40 232 Left 2 !.op
 `;
 
+/** Amplificador inversor (−R2/R1 = −10) con el lazo de realimentación abierto entre R2 y la salida:
+ *  el hueco es justo el largo de una LoopProbe (96) */
+const LOOP = `Version 4
+SHEET 1 880 680
+WIRE -64 32 -64 16
+WIRE -64 16 16 16
+WIRE 96 16 160 16
+WIRE 160 16 160 -64
+WIRE 160 16 208 16
+WIRE 160 -64 208 -64
+WIRE 384 -64 384 48
+WIRE 320 48 384 48
+WIRE 384 48 448 48
+WIRE 208 80 160 80
+WIRE 160 128 160 80
+WIRE -64 112 -64 128
+FLAG 160 128 0
+FLAG -64 128 0
+FLAG 448 48 out
+SYMBOL voltage -64 16 M0
+WINDOW 0 24 16 Left 2
+WINDOW 3 24 96 Left 2
+SYMATTR InstName V1
+SYMATTR Value SINE(0 1 1k) AC 1
+SYMBOL res 112 0 R90
+WINDOW 0 0 56 VBottom 2
+WINDOW 3 32 56 VTop 2
+SYMATTR InstName R1
+SYMATTR Value 1k
+SYMBOL res 304 -80 R90
+WINDOW 0 0 56 VBottom 2
+WINDOW 3 32 56 VTop 2
+SYMATTR InstName R2
+SYMATTR Value 10k
+SYMBOL TCLib\\OA_Ideal 400 0 R0
+WINDOW 0 -113 80 Left 2
+WINDOW 3 -176 32 Left 0
+WINDOW 123 -176 48 Left 0
+SYMATTR InstName U1
+SYMATTR Value Avol=1Meg
+SYMATTR Value2 GBWP=10Meg
+SYMATTR SpiceModel OA_Ideal
+SYMATTR Prefix X
+SYMATTR ModelFile TCLib/OA_Ideal.lib
+`;
+
 /** El .asc de cada práctica (null: proyecto vacío) y el nombre del proyecto */
 export function practiceCircuit(p: Practice): { name: string; asc: string | null } {
   switch (p) {
@@ -174,6 +233,8 @@ export function practiceCircuit(p: Practice): { name: string; asc: string | null
       return { name: t('Tutorial RC'), asc: RC('SYMATTR Value PULSE(0 1 0 1u 1u 5m 10m)\nSYMATTR Value2 AC 1', '.tran 20m') };
     case 'divider':
       return { name: t('Tutorial divider'), asc: DIVIDER };
+    case 'loop':
+      return { name: t('Tutorial loop'), asc: LOOP };
   }
 }
 
@@ -191,7 +252,9 @@ export function levels() {
     { xp: 300, name: t('Soldering iron') },
     { xp: 520, name: t('Oscilloscope') },
     { xp: 760, name: t('Master node') },
-    { xp: 1000, name: t('SPICE legend') },
+    { xp: 1050, name: t('Loop tamer') },
+    { xp: 1400, name: t('Tape-out') },
+    { xp: 1800, name: t('SPICE legend') },
   ];
 }
 
@@ -249,7 +312,9 @@ export function chapters(): Chapter[] {
         {
           id: 'simrow',
           title: t('The simulation bar'),
-          body: t('**New simulation** chooses what to simulate (transient, AC, DC…), **Run** runs it, and the bar to the right shows its parameters. You will use it very soon.'),
+          body: t(
+            'The split button **▾ New | Run**: **▾ New** chooses what to simulate (transient, AC, DC, stability…) and **Run** runs it. The bar to the right shows its parameters, and the ? of each analysis explains it. You will use it very soon.',
+          ),
           target: bySel('.sim-row'),
         },
         {
@@ -361,7 +426,7 @@ export function chapters(): Chapter[] {
         {
           id: 'analysis',
           title: t('Choose an analysis'),
-          body: t('Open **New simulation ▾** and choose **Transient**: the circuit over time.'),
+          body: t('Open **▾ New** (left half of the Run button) and choose **Transient**: the circuit over time.'),
           target: byLabel(t('New simulation')),
           check: (p) => kind(p.line) === 'tran',
         },
@@ -446,6 +511,15 @@ export function chapters(): Chapter[] {
           check: (p) => traces(p).some((x) => /\)\s*[-+*/]|[-+*/]\s*[VI]\(/i.test(x)),
         },
         {
+          id: 'drag',
+          title: t('From one point to another'),
+          body: t(
+            'With the probe, **drag** from one point to another instead of clicking: from wire to wire it plots the difference (V−V), and from a wire to a component, the quotient in Ω (V/I) on its own pane. Drag from the **in** wire to the resistor: V(in)/I(R1), the input impedance of the filter.',
+          ),
+          hint: t('Press on the in wire, hold the button down, and let go over the body of R1.'),
+          check: (p) => traces(p).some((x) => /[VI]\([^)]*\)\s*\/\s*[VI][a-z]?\(/i.test(x)),
+        },
+        {
           id: 'zoom',
           title: t('Zoom'),
           body: t('**Drag** a box over the plot to zoom into that part. ([[Z]] also zooms to a box and [[Shift+Z]] goes back.)'),
@@ -476,6 +550,15 @@ export function chapters(): Chapter[] {
           title: t('The big picture'),
           body: t('Press [[Space]] over the plot (or the fit button of the viewer) to see everything again.'),
           check: (p) => !p.zoomed,
+        },
+        {
+          id: 'saves',
+          title: t('Saved signals'),
+          body: t(
+            '**▾ New › Saved signals…** opens a panel to the right: save **everything** or **only some** voltages and currents. In a big circuit or a long transient it saves a lot of memory. With «only some», right-clicking a wire saves it (or stops saving it).',
+          ),
+          optional: true,
+          ...turnOn((p) => p.savesOpen, t('It is already open: look at it and go on.')),
         },
         {
           id: 'export',
@@ -510,9 +593,7 @@ export function chapters(): Chapter[] {
         {
           id: 'newbench',
           title: t('A second testbench'),
-          body: t(
-            'This testbench already simulates a transient. Choose **New simulation ▾ › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.',
-          ),
+          body: t('This testbench already simulates a transient. Choose **▾ New › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.'),
           target: byLabel(t('New simulation')),
           check: (p) => p.benches.length >= 2 && p.benches.some((b) => kind(b.line) === 'ac'),
         },
@@ -662,7 +743,7 @@ export function chapters(): Chapter[] {
         {
           id: 'open',
           title: t('Open the Studio|tut'),
-          body: t('**New simulation ▾ › Studio…** or [[Alt+E]]. It sets up sweeps, tolerances (Monte Carlo) and measurements as cards.'),
+          body: t('**▾ New › Studio…** or [[Alt+E]]. It sets up sweeps, tolerances (Monte Carlo) and measurements as cards.'),
           target: byLabel(t('New simulation')),
           check: (p) => p.dialog === 'study',
         },
@@ -727,6 +808,241 @@ export function chapters(): Chapter[] {
           id: 'hover',
           title: t('Ask any component'),
           body: t('Rest the mouse on a component: the bar at the bottom shows its parameters and its operating point. Change R2, run again and compare.'),
+        },
+        {
+          id: 'table',
+          title: t('The operating point table'),
+          body: t(
+            'The **Results** view lists every voltage and current; resting the mouse on a row highlights its component on the schematic. With transistors and diodes it also has their small-signal parameters (gm, capacitances…), and with the probe, a click on the **body of a transistor** pins a box with its operating point.',
+          ),
+          target: bySel('.results-panel'),
+        },
+      ],
+    },
+    {
+      id: 'publish',
+      icon: '🖋️',
+      title: t('A schematic to show'),
+      blurb: t('LaTeX names, net highlighting and the sheet exported to PDF, SVG or TikZ.'),
+      badge: t('Golden pen'),
+      practice: 'rc',
+      steps: [
+        {
+          id: 'latex',
+          title: t('Names with LaTeX'),
+          body: t('Names and values accept **LaTeX** between dollar signs. **Double-click** R1 and change its name to `$R_1$`: it is drawn with a subscript, and ngspice gets R_1.'),
+          hint: t('The name is the first field of the window (InstName). Values work too: $4.7\\,k\\Omega$.'),
+          check: (p) => p.symbols.some((s) => /\$[^$]+\$/.test(s.name) || /\$[^$]+\$/.test(s.value)),
+        },
+        {
+          id: 'highlight',
+          title: t('Follow a net'),
+          body: t(
+            'Press [[H]] (or the **Highlight** tool) and move the mouse over the wires: the net under the cursor gets a halo, with lines to the parts joined only by labels. [[H]] again turns it off.',
+          ),
+          ...turnOn((p) => p.netHover, t('It is already on: move the mouse over the wires and go on.')),
+        },
+        {
+          id: 'export',
+          title: t('The sheet, full-screen'),
+          body: t(
+            'The **PDF** button of the toolbar (or **File › Export to PDF…**) shows the sheet full-screen to export it: vector PDF, SVG, PNG, the clipboard or **TikZ** for LaTeX. Nothing travels to a server.',
+          ),
+          target: byLabel(t('Export to PDF')),
+          check: (p) => p.dialog === 'export',
+        },
+        {
+          id: 'skins',
+          title: t('Its look'),
+          body: t('In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs), the font, the zoom and the area to crop. Tremor draws it as if by hand.'),
+        },
+        {
+          id: 'settings',
+          title: t('Your preferences'),
+          body: t('**☰ › Settings…** keeps the skin and the font of the schematic, the thickness of the traces and the rest of your preferences. Open it.'),
+          target: bySel('.app-menu-btn'),
+          check: (p) => p.dialog === 'settings',
+        },
+      ],
+    },
+    {
+      id: 'stability',
+      icon: '🌀',
+      title: t('Is it stable?'),
+      blurb: t('Loop gain with a loop probe (.stb): phase and gain margins, GFT and Tian.'),
+      badge: t('Steady hand'),
+      practice: 'loop',
+      steps: [
+        {
+          id: 'probe',
+          title: t('A probe in the loop'),
+          body: t(
+            'This inverting amplifier has its feedback **open** between R2 and the output (the red mark). Press [[P]], open the **Stability** folder and put a **LoopProbe** in the gap. The loop signal enters by its arrow: from the output toward R2.',
+          ),
+          hint: t('Ctrl+R twice turns it around before placing it. It is exactly as long as the gap: one pin on R2, the other on the wire of the output.'),
+          check: (p) => count(p, LOOP_PROBE) > 0 && p.loose === 0,
+          progress: looseText,
+        },
+        {
+          id: 'analysis',
+          title: t('The stability analysis'),
+          body: t('Open **▾ New** and choose **Stability (loop gain)**. Outside this analysis the probe is just a wire: it does not change .op, .tran or .ac.'),
+          target: byLabel(t('New simulation')),
+          check: (p) => kind(p.line) === 'stb',
+        },
+        {
+          id: 'which',
+          title: t('Which probe?'),
+          body: t('The **Loop probe** field of the bar is waiting for you: click the **LP1** probe on the schematic. A circuit can have several, and each one measures its own loop.'),
+          target: bySel('.simbar'),
+          check: (p) => !!(analysis(p.line) as { probe?: string } | null)?.probe?.trim(),
+        },
+        {
+          id: 'run',
+          title: t('Measure the loop'),
+          body: t('Press **Run** ([[Alt+R]]).'),
+          target: byLabel(t('Run|verb')),
+          check: (p) => p.hasResult && p.resultKind === 'stb',
+        },
+        {
+          id: 'margins',
+          title: t('The margins'),
+          body: t(
+            'You see the Bode plot of the loop gain and, on the right, **PM** (phase margin), **GM** (gain margin) and the map of poles of the closed loop. A phase margin of 45° or more is a calm loop; near 0°, it rings or oscillates.',
+          ),
+          target: bySel('.results-panel'),
+        },
+        {
+          id: 'closed',
+          title: t('The closed loop'),
+          body: t('With GFT (the default method), write **V1** in **Input source** and **out** in **Output**, and run again: you also get the closed-loop gain G, G∞, G0 and the equivalent A and β.'),
+          target: bySel('.simbar'),
+          optional: true,
+          check: (p) => {
+            const a = analysis(p.line) as { input?: string; output?: string } | null;
+            return !!a?.input?.trim() && !!a?.output?.trim();
+          },
+        },
+        {
+          id: 'tian',
+          title: t('Another method'),
+          body: t('Change the **Method** to **Tian**: the A-β model (T = −Aβ), the same as stb in Spectre. It does not care which way the probe points.'),
+          target: bySel('.simbar'),
+          check: (p) => (analysis(p.line) as { method?: string } | null)?.method === 'tian',
+        },
+        {
+          id: 'more',
+          title: t('Differential loops'),
+          body: t(
+            'For a differential pair, **LoopProbe_Dif** measures the differential and the common mode in a single simulation. The **Loop stability** example of the menu has both probes, the root locus and the step response that confirms the margins.',
+          ),
+        },
+      ],
+    },
+    {
+      id: 'pdk',
+      icon: '🔲',
+      title: t('Integrated circuits'),
+      blurb: t('Transistors of the sky130 and GF180 PDKs, their dimensions and the process corners.'),
+      badge: t('Silicon wafer'),
+      practice: 'empty',
+      steps: [
+        {
+          id: 'place',
+          title: t('A transistor of a real process'),
+          body: t('Press [[P]], open the **sky130** folder (SkyWater, 130 nm) and place an **nfet_01v8**, an NMOS of 1.8 V. The **gf180** folder has those of GlobalFoundries.'),
+          hint: t('You can write nfet_01v8 in the search box of the component explorer.'),
+          check: (p) => count(p, SKY130) > 0,
+        },
+        {
+          id: 'size',
+          title: t('Its dimensions'),
+          body: t('**Double-click** it: W and L (in µm), the variant (lvt, hvt, 5 V…), the multiplier m, and what they give (W/L, gate area).'),
+          check: (p) => p.dialog === 'attrs' && count(p, SKY130) > 0,
+        },
+        {
+          id: 'analysis',
+          title: t('No directives'),
+          body: t('Choose **▾ New › Operating point**. You do not need any .lib: the models come from the symbols you use.'),
+          target: byLabel(t('New simulation')),
+          check: (p) => kind(p.line) === 'op',
+        },
+        {
+          id: 'corner',
+          title: t('The corner'),
+          body: t('With a PDK symbol, the simulation bar starts with the **corner**: tt (typical), ff (fast), ss (slow), sf and fs. Choose **ss**: it is saved with the testbench.'),
+          target: bySel('.simbar'),
+          check: (p) => p.pdk?.corner === 'ss',
+        },
+        {
+          id: 'all',
+          title: t('Every corner'),
+          body: t('The **All** button next to the corner makes a testbench per corner from this one, with the corner in its name. That way you compare them all.'),
+          target: bySel('.simbar'),
+          // uno por esquina (tt, ff, ss, sf, fs); volver a apretarlo no los repite
+          check: (p) => p.benches.length >= 5,
+        },
+        {
+          id: 'example',
+          title: t('A CMOS inverter'),
+          body: t(
+            'The **sky130** and **gf180** examples of the menu have the output curves of the NMOS and an inverter in tt, ff and ss. With results, a click of the probe on the **body of a transistor** pins a box with its operating point (gm, capacitances, vdsat…) that you can plot.',
+          ),
+          target: bySel('.app-menu-btn'),
+        },
+      ],
+    },
+    {
+      id: 'dsp',
+      icon: '🎛️',
+      title: t('Digital signal processing'),
+      blurb: t('Filters as block diagrams: fixed-point blocks in Verilog, buses plotted as numbers.'),
+      badge: t('Golden FIR'),
+      practice: 'empty',
+      steps: [
+        {
+          id: 'open',
+          title: t('A project of filters'),
+          body: t('Open **☰ › Examples › DSP**: FIR, IIR and CIC filters and a mixer with an NCO, in fixed point (Q1.15), one workbench each.'),
+          target: bySel('.app-menu-btn'),
+          check: (p) => p.modules.some((x) => DSP.test(x.name)),
+        },
+        {
+          id: 'blocks',
+          title: t('Block diagrams'),
+          body: t(
+            'Each block is a Verilog module of the **DSP** library: Σ adds, the triangle multiplies by a coefficient, z⁻¹ delays one sample and **dsp_clock** is the clock. The thick wires are 16-bit buses.',
+          ),
+          target: bySel('.canvas-wrap'),
+        },
+        {
+          id: 'run',
+          title: t('Simulate it'),
+          body: t('Press **Run** ([[Alt+R]]). The blocks are joined into a single module that Icarus Verilog simulates together with the analog part.'),
+          target: byLabel(t('Run|verb')),
+          check: (p) => p.hasResult && p.resultKind === 'tran',
+        },
+        {
+          id: 'bus',
+          title: t('A bus as a number'),
+          body: t('With the probe, click a **bus** between two blocks: it is plotted as a number, `signed(Dig(bus), 16)`, on an axis of its own. No need to simulate again.'),
+          hint: t('Divided by 32768 it is the real value in Q1.15: edit the trace in the box of traces.'),
+          start: (p) => ({ had: traces(p) }),
+          check: (p, m) => traces(p).some((x) => /Dig\s*\(/i.test(x) && !(m.had as string[]).includes(x)),
+        },
+        {
+          id: 'place',
+          title: t('Your own blocks'),
+          body: t('Press [[P]] and open the **DSP** folder: arithmetic, filters, NCO, CORDIC, FIFO, ideal ADC and DAC… Place one: its .v is copied to the project and synthesized there.'),
+          start: (p) => ({ n: count(p, DSP) }),
+          check: (p, m) => count(p, DSP) > (m.n as number),
+        },
+        {
+          id: 'params',
+          title: t('Its parameters'),
+          body: t(
+            '**Right-click** a block: its parameters (COEF, K, SAT…) are in its SpiceLine, per instance, and `hdl` chooses how it runs: auto, icarus (behavioral, fast) or gates (synthesized to XSPICE gates). **Double-click** goes down into its Verilog code.',
+          ),
         },
       ],
     },

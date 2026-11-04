@@ -41,6 +41,8 @@ const probe = (p: Partial<Probe> = {}): Probe => ({
   historyOpen: false,
   showOp: false,
   showNets: false,
+  netHover: false,
+  savesOpen: false,
   ...p,
 });
 const step = (ch: string, id: string) =>
@@ -55,7 +57,7 @@ describe('tutorial', () => {
     for (const c of cs) {
       expect(c.steps.length).toBeGreaterThan(2);
       // cada misión arranca de cero, en su proyecto de práctica
-      expect(['empty', 'rc', 'rcTran', 'divider']).toContain(c.practice);
+      expect(['empty', 'rc', 'rcTran', 'divider', 'loop']).toContain(c.practice);
       expect(new Set(c.steps.map((s) => s.id)).size).toBe(c.steps.length);
     }
   });
@@ -81,9 +83,24 @@ describe('tutorial', () => {
     expect(practiceCircuit('empty').asc).toBeNull();
   });
 
+  it('la práctica de estabilidad tiene el lazo abierto justo donde va la LoopProbe', () => {
+    const doc = parseAsc(practiceCircuit('loop').asc!);
+    const { conn } = ltNetlist(doc, lib);
+    // un solo pin suelto: el de R2 del lado de la salida
+    const loose = [...conn.pinNet.values()].filter((n) => n.pins.length === 1 && !n.labels.length);
+    expect(loose.length).toBe(1);
+    expect(doc.symbols.every((s) => lib.symbol(s.type))).toBe(true);
+    // con la sonda en el hueco (como en el ejemplo «Loop Gain (.stb)») no queda nada suelto
+    const asc = practiceCircuit('loop').asc!.replace('SYMBOL TCLib', 'SYMBOL Stability\\LoopProbe 336 -64 R180\nSYMATTR InstName LP1\nSYMBOL TCLib');
+    const full = parseAsc(asc);
+    const c2 = ltNetlist(full, lib).conn;
+    expect([...c2.pinNet.values()].filter((n) => n.pins.length === 1 && !n.labels.length)).toEqual([]);
+    expect(full.symbols.every((s, si) => lib.symbol(s.type)!.pins.every((_, pi) => c2.pinNet.has(`${si}:${pi}`)))).toBe(true);
+  });
+
   it('los pasos se cumplen con el estado que piden', () => {
-    const R = (value: string) => ({ type: 'res', prefix: 'R', value });
-    const C = (value: string) => ({ type: 'cap', prefix: 'C', value });
+    const R = (value: string) => ({ type: 'res', prefix: 'R', value, name: 'R1' });
+    const C = (value: string) => ({ type: 'cap', prefix: 'C', value, name: 'C1' });
     const values = step('draw', 'values');
     expect(values.check!(probe({ symbols: [R('1k'), C('1u')] }), {})).toBe(true);
     expect(values.check!(probe({ symbols: [R('1000'), C('1µ')] }), {})).toBe(true);
@@ -105,6 +122,42 @@ describe('tutorial', () => {
     const expr = step('plot', 'expr');
     expect(expr.check!(probe({ panes: [['V(out)']] }), {})).toBe(false);
     expect(expr.check!(probe({ panes: [['V(out)', 'V(in)-V(out)']] }), {})).toBe(true);
+
+    // arrastrar con la punta de un cable a un componente: el cociente V/I
+    const drag = step('plot', 'drag');
+    expect(drag.check!(probe({ panes: [['V(in)-V(out)']] }), {})).toBe(false);
+    expect(drag.check!(probe({ panes: [['V(out)'], ['V(in)/I(R1)']] }), {})).toBe(true);
+
+    // .stb: se guarda como comentario
+    expect(step('stability', 'analysis').check!(probe({ line: ';.stb  dec 10 1 100meg gft' }), {})).toBe(true);
+    const which = step('stability', 'which');
+    expect(which.check!(probe({ line: ';.stb LP1 dec 10 1 100meg gft' }), {})).toBe(true);
+    expect(step('stability', 'tian').check!(probe({ line: ';.stb LP1 dec 10 1 100meg tian' }), {})).toBe(true);
+    expect(step('stability', 'tian').check!(probe({ line: ';.stb LP1 dec 10 1 100meg gft' }), {})).toBe(false);
+    const lp = { type: 'Stability\\LoopProbe', prefix: 'X', value: '', name: 'LP1' };
+    expect(step('stability', 'probe').check!(probe({ symbols: [lp], loose: 1 }), {})).toBe(false);
+    expect(step('stability', 'probe').check!(probe({ symbols: [lp] }), {})).toBe(true);
+
+    // PDK: el símbolo, la esquina y un testbench por esquina
+    const nfet = { type: 'sky130\\nfet_01v8', prefix: 'X', value: 'sky130_fd_pr__nfet_01v8', name: 'M1' };
+    expect(step('pdk', 'place').check!(probe({ symbols: [nfet] }), {})).toBe(true);
+    expect(step('pdk', 'corner').check!(probe({ pdk: { name: 'sky130', corner: 'ss' } }), {})).toBe(true);
+    expect(step('pdk', 'corner').check!(probe({ pdk: { name: 'sky130', corner: 'tt' } }), {})).toBe(false);
+    const all = step('pdk', 'all');
+    const benches = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `s${i}`, custom: true, line: '.op', runs: 0 }));
+    expect(all.check!(probe({ benches: benches(2) }), {})).toBe(false);
+    expect(all.check!(probe({ benches: benches(5) }), {})).toBe(true);
+
+    // DSP: un bus nuevo graficado como número
+    const bus = step('dsp', 'bus');
+    const had = probe({ panes: [['signed(Dig(x1.y[15:0]),16)/32768']] });
+    const mb = bus.start!(had);
+    expect(bus.check!(had, mb)).toBe(false);
+    expect(bus.check!(probe({ panes: [['signed(Dig(x1.y[15:0]),16)/32768', 'signed(Dig(N003[15:0]), 16)']] }), mb)).toBe(true);
+
+    // LaTeX en el nombre
+    expect(step('publish', 'latex').check!(probe({ symbols: [{ type: 'res', prefix: 'R', value: '1k', name: '$R_1$' }] }), {})).toBe(true);
+    expect(step('publish', 'latex').check!(probe({ symbols: [{ type: 'res', prefix: 'R', value: '1k', name: 'R1' }] }), {})).toBe(false);
 
     const sweep = step('study', 'sweep');
     expect(sweep.check!(probe({ directives: ['.param x=1', '.tran 1m'] }), {})).toBe(false);
@@ -135,9 +188,11 @@ describe('pasos que piden abrir o prender algo', () => {
       ['project', 'history'],
       ['op', 'annotate'],
       ['op', 'nets'],
+      ['plot', 'saves'],
+      ['publish', 'highlight'],
     ]) {
       const s = step(ch, id);
-      const key = ({ panel: 'treeOpen', open: 'treeOpen', history: 'historyOpen', annotate: 'showOp', nets: 'showNets' } as const)[id as 'panel'];
+      const key = ({ panel: 'treeOpen', open: 'treeOpen', history: 'historyOpen', annotate: 'showOp', nets: 'showNets', saves: 'savesOpen', highlight: 'netHover' } as const)[id as 'panel'];
       const on = probe({ [key]: true });
       const off = probe({ [key]: false });
       const mem = s.start!(on);

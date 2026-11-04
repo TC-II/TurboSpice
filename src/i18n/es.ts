@@ -2054,6 +2054,8 @@ export const es: Record<string, string> = {
   'Soldering iron': 'Soldador',
   'Oscilloscope': 'Osciloscopio',
   'Master node': 'Nodo maestro',
+  'Loop tamer': 'Domador de lazos',
+  'Tape-out': 'Tape-out',
   'SPICE legend': 'Leyenda del SPICE',
   'First contact': 'Primer contacto',
   'Find your way around: menu, tools, project panel and shortcuts.': 'Ubicate: el menú, las herramientas, el panel del proyecto y los atajos.',
@@ -2072,8 +2074,8 @@ export const es: Record<string, string> = {
   'The capsule with the name of the project opens the **project panel**: your testbenches and modules live there. **Click it.**':
     'La cápsula con el nombre del proyecto abre el **panel del proyecto**: ahí viven tus testbenches y tus módulos. **Hacele clic.**',
   'The simulation bar': 'La barra de simulación',
-  '**New simulation** chooses what to simulate (transient, AC, DC…), **Run** runs it, and the bar to the right shows its parameters. You will use it very soon.':
-    '**Nueva simulación** elige qué simular (transitorio, AC, DC…), **Correr** la corre y la barra de la derecha muestra sus parámetros. La vas a usar muy pronto.',
+  'The split button **▾ New | Run**: **▾ New** chooses what to simulate (transient, AC, DC, stability…) and **Run** runs it. The bar to the right shows its parameters, and the ? of each analysis explains it. You will use it very soon.':
+    'El botón partido **▾ Nuevo | Correr**: **▾ Nuevo** elige qué simular (transitorio, AC, DC, estabilidad…) y **Correr** lo corre. La barra de la derecha muestra sus parámetros, y el ? de cada análisis lo explica. La vas a usar muy pronto.',
   'Moving around the sheet': 'Moverse por la hoja',
   'The **mouse wheel** zooms, dragging with the **right button** (or the wheel) moves the sheet, and [[Space]] fits everything in view. **Zoom with the wheel** over the schematic.':
     'La **rueda del mouse** hace zoom, arrastrar con el **botón derecho** (o con la rueda) mueve la hoja y [[Espacio]] ajusta todo a la vista. **Hacé zoom con la rueda** sobre el esquemático.',
@@ -2112,7 +2114,8 @@ export const es: Record<string, string> = {
   'Choose an analysis, set its parameters, configure the source and run.': 'Elegí un análisis, ajustá sus parámetros, configurá la fuente y corré.',
   'Spark of life': 'Chispa de vida',
   'Choose an analysis': 'Elegí un análisis',
-  'Open **New simulation ▾** and choose **Transient**: the circuit over time.': 'Abrí **Nueva simulación ▾** y elegí **Transitorio**: el circuito en el tiempo.',
+  'Open **▾ New** (left half of the Run button) and choose **Transient**: the circuit over time.':
+    'Abrí **▾ Nuevo** (la mitad izquierda del botón Correr) y elegí **Transitorio**: el circuito en el tiempo.',
   'How long?': '¿Cuánto tiempo?',
   'The bar shows the parameters of the transient. Change the **stop time** to **20m** (20 ms) and press [[Enter]].':
     'La barra muestra los parámetros del transitorio. Cambiá el **tiempo final** a **20m** (20 ms) y apretá [[Enter]].',
@@ -2165,8 +2168,8 @@ export const es: Record<string, string> = {
   'Open the panel': 'Abrí el panel',
   'Click the project capsule to open its panel.': 'Hacé clic en la cápsula del proyecto para abrir su panel.',
   'A second testbench': 'Un segundo testbench',
-  'This testbench already simulates a transient. Choose **New simulation ▾ › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.':
-    'Este testbench ya simula un transitorio. Elegí **Nueva simulación ▾ › AC (Bode)**: como un testbench tiene una sola simulación, se crea un **testbench nuevo** con una copia del circuito.',
+  'This testbench already simulates a transient. Choose **▾ New › AC (Bode)**: since a testbench has a single simulation, a **new testbench** is created with a copy of the circuit.':
+    'Este testbench ya simula un transitorio. Elegí **▾ Nuevo › AC (Bode)**: como un testbench tiene una sola simulación, se crea un **testbench nuevo** con una copia del circuito.',
   'Bode': 'Bode',
   'Run it ([[Alt+R]]) and probe **out**: magnitude and phase of the RC filter.': 'Corrélo ([[Alt+R]]) y medí **out**: módulo y fase del filtro RC.',
   'For the AC analysis the source needs "AC 1" in its small-signal value: the practice circuit already has it.':
@@ -2217,8 +2220,8 @@ export const es: Record<string, string> = {
   'The Studio': 'El Estudio',
   'Sweeps and measurements without writing SPICE.': 'Barridos y mediciones sin escribir SPICE.',
   'Magnifying glass': 'Lupa',
-  '**New simulation ▾ › Studio…** or [[Alt+E]]. It sets up sweeps, tolerances (Monte Carlo) and measurements as cards.':
-    '**Nueva simulación ▾ › Estudio…** o [[Alt+E]]. Arma barridos, tolerancias (Monte Carlo) y mediciones como tarjetas.',
+  '**▾ New › Studio…** or [[Alt+E]]. It sets up sweeps, tolerances (Monte Carlo) and measurements as cards.':
+    '**▾ Nuevo › Estudio…** o [[Alt+E]]. Arma barridos, tolerancias (Monte Carlo) y mediciones como tarjetas.',
   'Add a **sweep** of **R1** with the values **1k 2k 5k** and accept.': 'Agregá un **barrido** de **R1** con los valores **1k 2k 5k** y aceptá.',
   'In the sweep card: what to vary = a component, R1; how = a list of values.': 'En la tarjeta del barrido: qué variar = un componente, R1; cómo = una lista de valores.',
   'Several runs': 'Varias corridas',
@@ -2254,6 +2257,109 @@ export const es: Record<string, string> = {
   'Keep exploring': 'Seguí explorando',
   'The **Examples** of the menu are complete projects: transfer functions, transistor amplifiers, ADCs… Open one and explore it with everything you learned.':
     'Los **Ejemplos** del menú son proyectos completos: funciones de transferencia, amplificadores con transistores, ADCs… Abrí uno y exploralo con todo lo que aprendiste.',
+  // misiones y pasos agregados después (estabilidad, PDK, DSP, la hoja para mostrar, la punta y las señales guardadas)
+  'Tutorial loop': 'Tutorial lazo',
+  'From one point to another': 'De un punto a otro',
+  'With the probe, **drag** from one point to another instead of clicking: from wire to wire it plots the difference (V−V), and from a wire to a component, the quotient in Ω (V/I) on its own pane. Drag from the **in** wire to the resistor: V(in)/I(R1), the input impedance of the filter.':
+    'Con la punta, **arrastrá** de un punto a otro en vez de hacer clic: de cable a cable grafica la resta (V−V), y de un cable a un componente, el cociente en Ω (V/I) en su propio panel. Arrastrá del cable **in** a la resistencia: V(in)/I(R1), la impedancia de entrada del filtro.',
+  'Press on the in wire, hold the button down, and let go over the body of R1.': 'Apretá sobre el cable in, mantené el botón y soltalo sobre el cuerpo de R1.',
+  '**▾ New › Saved signals…** opens a panel to the right: save **everything** or **only some** voltages and currents. In a big circuit or a long transient it saves a lot of memory. With «only some», right-clicking a wire saves it (or stops saving it).':
+    '**▾ Nuevo › Señales guardadas…** abre un panel a la derecha: guardar **todo** o **sólo algunas** tensiones y corrientes. En un circuito grande o un transitorio largo ahorra mucha memoria. Con «sólo algunas», el botón derecho en un cable lo guarda (o lo deja de guardar).',
+  'The operating point table': 'La tabla del punto de operación',
+  'The **Results** view lists every voltage and current; resting the mouse on a row highlights its component on the schematic. With transistors and diodes it also has their small-signal parameters (gm, capacitances…), and with the probe, a click on the **body of a transistor** pins a box with its operating point.':
+    'La vista **Resultados** lista cada tensión y corriente; dejar el mouse sobre una fila resalta su componente en el esquemático. Con transistores y diodos tiene también sus parámetros de pequeña señal (gm, capacidades…), y con la punta, un clic en el **cuerpo de un transistor** deja fijo un cuadro con su punto de operación.',
+  'A schematic to show': 'Un esquemático para mostrar',
+  'LaTeX names, net highlighting and the sheet exported to PDF, SVG or TikZ.': 'Nombres en LaTeX, resaltado de redes y la hoja exportada a PDF, SVG o TikZ.',
+  'Golden pen': 'Pluma de oro',
+  'Names with LaTeX': 'Nombres con LaTeX',
+  'Names and values accept **LaTeX** between dollar signs. **Double-click** R1 and change its name to `$R_1$`: it is drawn with a subscript, and ngspice gets R_1.':
+    'Los nombres y los valores aceptan **LaTeX** entre signos de pesos. Hacé **doble clic** en R1 y cambiale el nombre a `$R_1$`: se dibuja con subíndice, y a ngspice le llega R_1.',
+  'The name is the first field of the window (InstName). Values work too: $4.7\\,k\\Omega$.': 'El nombre es el primer campo de la ventana (InstName). Con los valores también anda: $4.7\\,k\\Omega$.',
+  'Follow a net': 'Seguí una red',
+  'Press [[H]] (or the **Highlight** tool) and move the mouse over the wires: the net under the cursor gets a halo, with lines to the parts joined only by labels. [[H]] again turns it off.':
+    'Apretá [[H]] (o la herramienta **Resaltar**) y pasá el mouse por los cables: la red bajo el cursor se ve con un halo, con líneas hacia las partes unidas sólo por etiquetas. [[H]] otra vez lo apaga.',
+  'It is already on: move the mouse over the wires and go on.': 'Ya está prendido: pasá el mouse por los cables y seguí.',
+  'The sheet, full-screen': 'La hoja a pantalla completa',
+  'The **PDF** button of the toolbar (or **File › Export to PDF…**) shows the sheet full-screen to export it: vector PDF, SVG, PNG, the clipboard or **TikZ** for LaTeX. Nothing travels to a server.':
+    'El botón **PDF** de la barra (o **Archivo › Exportar a PDF…**) muestra la hoja a pantalla completa para exportarla: PDF vectorial, SVG, PNG, el portapapeles o **TikZ** para LaTeX. Nada viaja a un servidor.',
+  'Its look': 'Su aspecto',
+  'In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs), the font, the zoom and the area to crop. Tremor draws it as if by hand.':
+    'En esa vista elegís el **skin** de los símbolos (Default, Tremor, Boca Jrs), la letra, el zoom y el área a recortar. Tremor lo dibuja como a mano.',
+  'Your preferences': 'Tus preferencias',
+  '**☰ › Settings…** keeps the skin and the font of the schematic, the thickness of the traces and the rest of your preferences. Open it.':
+    '**☰ › Configuración…** guarda el skin y la letra del esquemático, el grosor de las trazas y el resto de tus preferencias. Abrila.',
+  'Is it stable?': '¿Es estable?',
+  'Loop gain with a loop probe (.stb): phase and gain margins, GFT and Tian.': 'Ganancia de lazo con una sonda de lazo (.stb): márgenes de fase y de ganancia, GFT y Tian.',
+  'Steady hand': 'Pulso firme',
+  'A probe in the loop': 'Una sonda en el lazo',
+  'This inverting amplifier has its feedback **open** between R2 and the output (the red mark). Press [[P]], open the **Stability** folder and put a **LoopProbe** in the gap. The loop signal enters by its arrow: from the output toward R2.':
+    'Este amplificador inversor tiene la realimentación **abierta** entre R2 y la salida (la marca roja). Apretá [[P]], abrí la carpeta **Stability** y poné una **LoopProbe** en el hueco. La señal del lazo entra por su flecha: de la salida hacia R2.',
+  'Ctrl+R twice turns it around before placing it. It is exactly as long as the gap: one pin on R2, the other on the wire of the output.':
+    'Ctrl+R dos veces la da vuelta antes de ponerla. Mide justo lo que el hueco: un pin en R2 y el otro en el cable de la salida.',
+  'The stability analysis': 'El análisis de estabilidad',
+  'Open **▾ New** and choose **Stability (loop gain)**. Outside this analysis the probe is just a wire: it does not change .op, .tran or .ac.':
+    'Abrí **▾ Nuevo** y elegí **Estabilidad (ganancia de lazo)**. Fuera de este análisis la sonda es un cable: no cambia .op, .tran ni .ac.',
+  'Which probe?': '¿Qué sonda?',
+  'The **Loop probe** field of the bar is waiting for you: click the **LP1** probe on the schematic. A circuit can have several, and each one measures its own loop.':
+    'El campo **Sonda de lazo** de la barra te está esperando: hacé clic en la sonda **LP1** del esquemático. Un circuito puede tener varias, y cada una mide su lazo.',
+  'Measure the loop': 'Medí el lazo',
+  'Press **Run** ([[Alt+R]]).': 'Apretá **Correr** ([[Alt+R]]).',
+  'The margins': 'Los márgenes',
+  'You see the Bode plot of the loop gain and, on the right, **PM** (phase margin), **GM** (gain margin) and the map of poles of the closed loop. A phase margin of 45° or more is a calm loop; near 0°, it rings or oscillates.':
+    'Se ve el Bode de la ganancia de lazo y, a la derecha, **PM** (margen de fase), **GM** (margen de ganancia) y el mapa de polos del lazo cerrado. Un margen de fase de 45° o más es un lazo tranquilo; cerca de 0°, oscila o casi.',
+  'The closed loop': 'El lazo cerrado',
+  'With GFT (the default method), write **V1** in **Input source** and **out** in **Output**, and run again: you also get the closed-loop gain G, G∞, G0 and the equivalent A and β.':
+    'Con GFT (el método por defecto), escribí **V1** en **Fuente de entrada** y **out** en **Salida**, y corré otra vez: también da la ganancia de lazo cerrado G, G∞, G0 y la A y la β equivalentes.',
+  'Another method': 'Otro método',
+  'Change the **Method** to **Tian**: the A-β model (T = −Aβ), the same as stb in Spectre. It does not care which way the probe points.':
+    'Cambiá el **Método** a **Tian**: el modelo A-β (T = −Aβ), el mismo que stb de Spectre. No le importa hacia dónde apunte la sonda.',
+  'Differential loops': 'Lazos diferenciales',
+  'For a differential pair, **LoopProbe_Dif** measures the differential and the common mode in a single simulation. The **Loop stability** example of the menu has both probes, the root locus and the step response that confirms the margins.':
+    'En un amplificador diferencial, **LoopProbe_Dif** mide el modo diferencial y el común en una sola simulación. El ejemplo **Loop stability** del menú tiene las dos sondas, el lugar de raíces y la respuesta al escalón que confirma los márgenes.',
+  'Integrated circuits': 'Circuitos integrados',
+  'Transistors of the sky130 and GF180 PDKs, their dimensions and the process corners.': 'Transistores de los PDK sky130 y GF180, sus medidas y las esquinas del proceso.',
+  'Silicon wafer': 'Oblea de silicio',
+  'A transistor of a real process': 'Un transistor de un proceso real',
+  'Press [[P]], open the **sky130** folder (SkyWater, 130 nm) and place an **nfet_01v8**, an NMOS of 1.8 V. The **gf180** folder has those of GlobalFoundries.':
+    'Apretá [[P]], abrí la carpeta **sky130** (SkyWater, 130 nm) y poné un **nfet_01v8**, un NMOS de 1,8 V. La carpeta **gf180** tiene los de GlobalFoundries.',
+  'You can write nfet_01v8 in the search box of the component explorer.': 'Podés escribir nfet_01v8 en la búsqueda del explorador de componentes.',
+  'Its dimensions': 'Sus medidas',
+  '**Double-click** it: W and L (in µm), the variant (lvt, hvt, 5 V…), the multiplier m, and what they give (W/L, gate area).':
+    'Hacele **doble clic**: W y L (en µm), la variante (lvt, hvt, 5 V…), el multiplicador m, y lo que dan (W/L, área de compuerta).',
+  'No directives': 'Sin directivas',
+  'Choose **▾ New › Operating point**. You do not need any .lib: the models come from the symbols you use.':
+    'Elegí **▾ Nuevo › Punto de operación**. No hace falta ningún .lib: los modelos salen de los símbolos que usás.',
+  'The corner': 'La esquina',
+  'With a PDK symbol, the simulation bar starts with the **corner**: tt (typical), ff (fast), ss (slow), sf and fs. Choose **ss**: it is saved with the testbench.':
+    'Con un símbolo de PDK, la barra de simulación empieza por la **esquina**: tt (típica), ff (rápida), ss (lenta), sf y fs. Elegí **ss**: se guarda con el testbench.',
+  'Every corner': 'Todas las esquinas',
+  'The **All** button next to the corner makes a testbench per corner from this one, with the corner in its name. That way you compare them all.':
+    'El botón **Todas** al lado de la esquina arma un testbench por esquina a partir de éste, con la esquina en el nombre. Así las comparás todas.',
+  'A CMOS inverter': 'Un inversor CMOS',
+  'The **sky130** and **gf180** examples of the menu have the output curves of the NMOS and an inverter in tt, ff and ss. With results, a click of the probe on the **body of a transistor** pins a box with its operating point (gm, capacitances, vdsat…) that you can plot.':
+    'Los ejemplos **sky130** y **gf180** del menú tienen las curvas de salida del NMOS y un inversor en tt, ff y ss. Con resultados, un clic de la punta en el **cuerpo de un transistor** deja fijo un cuadro con su punto de operación (gm, capacidades, vdsat…) que podés graficar.',
+  'Digital signal processing': 'Procesamiento digital de señales',
+  'Filters as block diagrams: fixed-point blocks in Verilog, buses plotted as numbers.': 'Filtros como diagramas de bloques: bloques de punto fijo en Verilog y buses graficados como números.',
+  'Golden FIR': 'FIR de oro',
+  'A project of filters': 'Un proyecto de filtros',
+  'Open **☰ › Examples › DSP**: FIR, IIR and CIC filters and a mixer with an NCO, in fixed point (Q1.15), one workbench each.':
+    'Abrí **☰ › Ejemplos › DSP**: filtros FIR, IIR y CIC y un mezclador con un NCO, en punto fijo (Q1.15), un workbench cada uno.',
+  'Block diagrams': 'Diagramas de bloques',
+  'Each block is a Verilog module of the **DSP** library: Σ adds, the triangle multiplies by a coefficient, z⁻¹ delays one sample and **dsp_clock** is the clock. The thick wires are 16-bit buses.':
+    'Cada bloque es un módulo Verilog de la biblioteca **DSP**: Σ suma, el triángulo multiplica por un coeficiente, z⁻¹ retrasa una muestra y **dsp_clock** es el reloj. Los cables gruesos son buses de 16 bits.',
+  'Simulate it': 'Simulalo',
+  'Press **Run** ([[Alt+R]]). The blocks are joined into a single module that Icarus Verilog simulates together with the analog part.':
+    'Apretá **Correr** ([[Alt+R]]). Los bloques se juntan en un solo módulo que Icarus Verilog simula junto con la parte analógica.',
+  'A bus as a number': 'Un bus como número',
+  'With the probe, click a **bus** between two blocks: it is plotted as a number, `signed(Dig(bus), 16)`, on an axis of its own. No need to simulate again.':
+    'Con la punta, hacé clic en un **bus** entre dos bloques: se grafica como número, `signed(Dig(bus), 16)`, en un eje propio. No hace falta volver a simular.',
+  'Divided by 32768 it is the real value in Q1.15: edit the trace in the box of traces.': 'Dividido por 32768 es el valor real en Q1.15: editá la traza en la caja de trazas.',
+  'Your own blocks': 'Tus propios bloques',
+  'Press [[P]] and open the **DSP** folder: arithmetic, filters, NCO, CORDIC, FIFO, ideal ADC and DAC… Place one: its .v is copied to the project and synthesized there.':
+    'Apretá [[P]] y abrí la carpeta **DSP**: aritmética, filtros, NCO, CORDIC, FIFO, ADC y DAC ideales… Poné uno: su .v se copia al proyecto y se sintetiza ahí.',
+  'Its parameters': 'Sus parámetros',
+  '**Right-click** a block: its parameters (COEF, K, SAT…) are in its SpiceLine, per instance, and `hdl` chooses how it runs: auto, icarus (behavioral, fast) or gates (synthesized to XSPICE gates). **Double-click** goes down into its Verilog code.':
+    'Hacé **clic derecho** en un bloque: sus parámetros (COEF, K, SAT…) están en su SpiceLine, por instancia, y `hdl` elige cómo corre: auto, icarus (de comportamiento, rápido) o gates (sintetizado a compuertas de XSPICE). Con **doble clic** bajás a su código Verilog.',
   // señales guardadas (#314)
   ' Or save only some signals (Simulate › Saved signals…).': ' O guardá sólo algunas señales (Simular › Señales guardadas…).',
   'The saved signals belong to the testbench: go up (Alt+↑) to change them': 'Las señales guardadas son del testbench: subí (Alt+↑) para cambiarlas',

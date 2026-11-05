@@ -64,13 +64,24 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
     if (el && sim) return sim.ng.names.get(el.name)?.toLowerCase() ?? null;
     return name.includes('.') ? hierDevice(name) : name.toLowerCase();
   };
+  const blockNode = new Map<string, string | null>();
   return (fn, args) => {
     const f = fn.toLowerCase();
     // nodo digital (#209): Dig(q), con el mismo alcance de nombres que V(); Dig(x1.q[3:0]) es el bus
     // de los bits x1.q_3_d … x1.q_0_d
     if (f === 'dig') {
       const alias = (n: string) => sim?.digitalAliases?.get(n.toLowerCase());
-      const one = (n: string) => findDigital(plot, netVector(n)) ?? findDigital(plot, n) ?? (alias(n) ? findDigital(plot, alias(n)!) : undefined);
+      // (o una red del esquemático que sale de un bloque Verilog: d[0] → x1.d_0_d, como la grafica la punta)
+      const fromBlock = (n: string) => {
+        const k = n.toLowerCase();
+        if (!blockNode.has(k)) blockNode.set(k, sim && !k.includes('.') ? verilogDigitalNode(sim, n) : null);
+        return blockNode.get(k);
+      };
+      const one = (n: string) => {
+        const v = findDigital(plot, netVector(n)) ?? findDigital(plot, n) ?? (alias(n) ? findDigital(plot, alias(n)!) : undefined);
+        const b = v ? null : fromBlock(n);
+        return v ?? (b ? findDigital(plot, b) : undefined);
+      };
       // sus cambios, con sus instantes (x): no se llevan a la grilla del transitorio (#314)
       const ev = (v: SimVector | undefined): Wave | null => (v ? (v.x ? { re: v.real, x: v.x } : wave(v)) : null);
       const bus = busRange(args[0]);
@@ -230,23 +241,20 @@ function subcktOf(sim: BuiltSimulation, name: string): { pins: string[]; body: s
 }
 
 /**
- * Lo que mide la punta de prueba en una red que sale de un bloque Verilog: su versión digital,
- * `Dig(x1.d_2_d)`; en un bus con todos sus bits del mismo puerto, el bus entero (`Dig(x1.d[2:0])`).
+ * Lo que mide la punta de prueba en una red que sale de un bloque Verilog: su versión digital, con
+ * el nombre del cable en el esquemático (`Dig(d[2])`, no el nodo de adentro `x1.d_2_d`: el resolver
+ * los traduce con `verilogDigitalNode`); en un cable de bus, el bus entero (`Dig(d[2:0])`).
  * `bits`: las redes de lo que se clickeó (una sola, o los bits de un cable de bus). null si alguna
  * no sale de un bloque Verilog.
  */
 export function digitalProbeExpr(sim: BuiltSimulation, bits: string[], bus?: string): string | null {
   // una red entre bloques que se simuló digital (digitalLinks.ts) es un nodo de eventos con su nombre
   const linked = (b: string) => sim.digitalNets?.has(netVector(b));
-  if (bits.length && bits.every(linked)) {
-    if (bits.length === 1) return `Dig(${bits[0]})`;
-    return bus && busRange(bus) ? `Dig(${bus})` : null;
-  }
-  const nodes = bits.map((b) => verilogDigitalNode(sim, b));
-  if (!nodes.length || nodes.some((x) => !x)) return null;
-  if (nodes.length === 1) return `Dig(${nodes[0]})`;
-  // d_2_d, d_1_d, d_0_d de la misma instancia → Dig(x1.d[2:0]) (busRange los vuelve a armar así)
-  const parts = nodes.map((x) => /^(.+)_(\d+)_d$/.exec(x!));
+  if (!bits.length || !bits.every((b) => linked(b) || verilogDigitalNode(sim, b))) return null;
+  if (bits.length === 1) return `Dig(${bits[0]})`;
+  if (bus && busRange(bus)) return `Dig(${bus})`;
+  // d[1], d[0] → Dig(d[1:0]), si son bits seguidos de un mismo nombre
+  const parts = bits.map((b) => /^(.+)\[(\d+)\]$/.exec(b));
   const [first] = parts;
   const idx = parts.map((p) => (p ? Number(p[2]) : NaN));
   const step = Math.sign(idx[idx.length - 1] - idx[0]);

@@ -30,9 +30,10 @@ Todo corre en el navegador: ngspice-47 en WebAssembly con XSPICE, y Yosys en Web
   antes del `.end`. Esas redes se grafican como `Dig(red)` (`V(red)` da su valor lógico) y un
   `Dig(x1.q_0_d)` guardado de antes sigue andando (`digitalAliases`).
 - **Punta de prueba** en una red que sale de un bloque Verilog (un pin de salida o inout): grafica su
-  versión digital, `Dig(x1.d_0_d)`, y en un cable de bus con todos los bits del mismo puerto, el bus
-  entero (`Dig(x1.d[2:0])`). El nodo sale del puente `ab_<pin>` del `.subckt` generado
-  (`verilogDigitalNode` en `sim/traces.ts`). En las entradas del bloque, fuera de un transitorio o al
+  versión digital con el nombre del cable en el esquemático, `Dig(d[0])`, y en un cable de bus el bus
+  entero (`Dig(d[2:0])`). El resolver traduce ese nombre al nodo de adentro del bloque (`x1.d_0_d`),
+  que sale del puente `ab_<pin>` del `.subckt` generado (`verilogDigitalNode` en `sim/traces.ts`);
+  `Dig(x1.d_0_d)` escrito a mano sigue andando. En las entradas del bloque, fuera de un transitorio o al
   armar una expresión en la caja de trazas sigue siendo `V()`; la tensión se pide escribiéndola.
 
 - **Señales guardadas** (#314): el motor entrega cada nodo digital como **eventos** (el instante y

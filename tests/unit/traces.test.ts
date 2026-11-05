@@ -1,6 +1,6 @@
 // Corrientes de la punta de prueba en componentes de varios pines (#53)
 import { describe, expect, it } from 'vitest';
-import type { SimPlot } from '../../src/engine/ngspice.ts';
+import { DIGITAL_TYPE, type SimPlot } from '../../src/engine/ngspice.ts';
 import type { BuiltSimulation } from '../../src/sim/schematicSim.ts';
 import { addPinCurrentSources } from '../../src/netlist/pinCurrents.ts';
 import { digitalProbeExpr, multiPinPrefix, probeExpr, traceResolver, verilogDigitalNode } from '../../src/sim/traces.ts';
@@ -112,10 +112,20 @@ describe('punta de prueba en la salida de un bloque Verilog (#209)', () => {
     expect(verilogDigitalNode(vsim, 'otra')).toBeNull();
   });
   it('un bit es Dig(); los bits de un puerto, el bus entero', () => {
-    expect(digitalProbeExpr(vsim, ['d[1]'])).toBe('Dig(x1.d_1_d)');
-    expect(digitalProbeExpr(vsim, ['d[1]', 'd[0]'])).toBe('Dig(x1.d[1:0])');
-    expect(digitalProbeExpr(vsim, ['d[0]', 'd[1]'])).toBe('Dig(x1.d[0:1])');
+    // con el nombre del cable, no el nodo de adentro del bloque
+    expect(digitalProbeExpr(vsim, ['d[1]'])).toBe('Dig(d[1])');
+    expect(digitalProbeExpr(vsim, ['d[1]', 'd[0]'])).toBe('Dig(d[1:0])');
+    expect(digitalProbeExpr(vsim, ['d[0]', 'd[1]'])).toBe('Dig(d[0:1])');
+    expect(digitalProbeExpr(vsim, ['d[1]', 'd[0]'], 'bus[1:0]')).toBe('Dig(bus[1:0])');
     // con un bit que no sale del bloque, la tensión de siempre
     expect(digitalProbeExpr(vsim, ['d[1]', 'clk'])).toBeNull();
+  });
+  it('el resolver lleva el nombre del cable al nodo del bloque', () => {
+    const dig = (name: string, v: number) => ({ name, type: DIGITAL_TYPE, real: Float64Array.of(v), x: Float64Array.of(0) });
+    const plot = { name: 'tran1', vectors: [{ name: 'time', type: 1, real: Float64Array.of(0, 1) }, dig('x1.d_1_d', 1), dig('x1.d_0_d', 0)] } as unknown as SimPlot;
+    const r = traceResolver(vsim, plot);
+    expect(r('Dig', ['d[1]'])?.re[0]).toBe(1);
+    expect(r('Dig', ['d[1:0]'])?.re[0]).toBe(2);
+    expect(r('Dig', ['x1.d_1_d'])?.re[0]).toBe(1);
   });
 });

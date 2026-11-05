@@ -175,10 +175,24 @@ await page.getByRole('combobox', { name: 'Base de Dig(x1.q[1:0])' }).selectOptio
 await frames(page);
 check((await page.locator('.digital-lanes .dl-value').first().textContent()) === '0b00', 'y en binario al cambiar el radix');
 check(!(await addTrace('Dig(x1.no_existe)')), 'un nodo digital que no existe da error');
+// la punta en el bus de salida: la traza digital con el nombre del cable, no el del nodo del bloque
+{
+  const svg = page.locator('svg.editor');
+  const box = await svg.boundingBox();
+  const [vx, vy, vw, vh] = (await svg.getAttribute('viewBox')).split(' ').map(Number);
+  // (sin el foco en la caja de trazas: ahí la punta escribe)
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.mouse.click(box.x + ((504 - vx) / vw) * box.width, box.y + ((384 - vy) / vh) * box.height);
+  await frames(page);
+  const digital = (await panes()).find((p) => p.startsWith('D:')) ?? '';
+  check(digital.split(',').includes('Dig(q[1:0])'), `la punta en el bus q[1:0] grafica Dig(q[1:0]) (${digital})`);
+  const vals = await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('.dl-value').allTextContents();
+  check(vals.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `y con los valores del bus (${vals.slice(0, 4)})`);
+}
 // arrastrar una traza analógica a un panel digital no hace nada
 const chip = page.locator('.pane:not(.digital) .trace-chip').first();
 await chip.dragTo(page.locator('.pane.digital'));
-check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q[1])', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d)']), 'una traza analógica no se puede pasar a un panel digital');
+check(JSON.stringify(await panes()) === JSON.stringify(['A:V(q[1])', 'D:Dig(x1.q[1:0]),Dig(x1.q_0_d),Dig(q[1:0])']), 'una traza analógica no se puede pasar a un panel digital');
 
 // --- tri-state: la alta impedancia (Z) se ve distinta de lo desconocido (X) ---
 await newModule('tri2', 'Verilog');

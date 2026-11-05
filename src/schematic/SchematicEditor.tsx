@@ -171,7 +171,6 @@ export function SchematicEditor(props: Props) {
     selection,
     setSelection,
     onEdit,
-    onEditLabel,
     onProbe,
     onProbePair,
     highlightNet,
@@ -478,9 +477,9 @@ export function SchematicEditor(props: Props) {
     } else if (tool.kind === 'zoom') setTool(tool.prev);
     else if (tool.kind !== 'select') setTool({ kind: 'select' });
     else {
+      // un label (nombre, valor…) cuenta como el cuerpo de su componente
       const label = labelAt(doc, p, lib, tol, lod);
-      if (label && onEditLabel) return onEditLabel(label.sym, label.win);
-      const hit = hitTest(doc, p, lib, tol, showSimCommand);
+      const hit = label ? ({ kind: 'symbol', index: label.sym } as const) : hitTest(doc, p, lib, tol, showSimCommand);
       // un componente con menú propio (#180: propagar al grupo): lo muestra quien lo pide
       if (hit?.kind === 'symbol' && screen && props.onSymbolMenu?.(hit.index, screen)) return;
       const net = hit?.kind === 'wire' ? conn.netAt({ x: doc.wires[hit.index].x1, y: doc.wires[hit.index].y1 })?.name : hit?.kind === 'flag' ? conn.netAt(doc.flags[hit.index])?.name : undefined;
@@ -1071,10 +1070,10 @@ export function SchematicEditor(props: Props) {
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool.kind !== 'select' || inlineRef.current) return;
     const p = toDoc(e);
+    // doble clic en un label: la ventana completa del componente, igual que en el cuerpo
     const label = labelAt(doc, p, lib, tol, lod);
-    if (label && onEditLabel) return onEditLabel(label.sym, label.win);
-    if (wireGesture(p, tol)) return;
-    const hit = hitTest(doc, p, lib, tol, showSimCommand);
+    if (!label && wireGesture(p, tol)) return;
+    const hit = label ? ({ kind: 'symbol', index: label.sym } as const) : hitTest(doc, p, lib, tol, showSimCommand);
     // doble clic en un subcircuito del proyecto: bajar a su esquemático (#180)
     if (hit?.kind === 'symbol' && props.onDescend?.(hit.index)) return;
     if (hit?.kind === 'text' && editInline(hit.index)) return;
@@ -1246,8 +1245,9 @@ export function SchematicEditor(props: Props) {
         onContextMenu={(e) => {
           e.preventDefault();
           // El clic derecho suelta el foco de un campo de texto (p. ej. «Add trace» del gráfico).
+          // (salvo el del menú que este mismo clic acaba de abrir: «R1 = [valor]»)
           const a = document.activeElement;
-          if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) a.blur();
+          if ((a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) && !a.closest('.ctx-menu')) a.blur();
         }}
       >
         <defs>

@@ -25,12 +25,23 @@ function EditRow({ it, v, setV, onClose }: { it: ContextItem; v: string; setV(v:
     onClose();
     if (v.trim() && v !== it.edit!.value) it.edit!.onCommit(v.trim());
   };
+  // el foco al campo con todo seleccionado: lo que se escriba reemplaza el valor
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const go = () => {
+      input.current?.focus();
+      input.current?.select();
+    };
+    go();
+    const r = requestAnimationFrame(go);
+    return () => cancelAnimationFrame(r);
+  }, []);
   return (
     <div className="ctx-edit">
       <label>
         <span>{text(it)}</span>
         <input
-          autoFocus
+          ref={input}
           value={v}
           spellCheck={false}
           onFocus={(e) => e.currentTarget.select()}

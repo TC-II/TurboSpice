@@ -17,7 +17,7 @@ interface Suggestion {
 const MAX_SUGGESTIONS = 12;
 
 /** lo que se está escribiendo antes del cursor y qué se puede poner en su lugar */
-function suggestionsAt(before: string, names: string[], hints: Map<string, string> | undefined, help: FunctionHelp[]): { from: number; items: Suggestion[] } {
+function suggestionsAt(before: string, names: string[], hints: Map<string, string> | undefined, help: FunctionHelp[], all = false): { from: number; items: Suggestion[] } {
   const signals: Suggestion[] = [...names.map((n) => ({ text: n })), ...[...(hints ?? [])].filter(([n]) => !names.includes(n)).map(([n, label]) => ({ text: n, label }))];
   const starts = (s: string, w: string) => s.toLowerCase().startsWith(w.toLowerCase());
   // V(o, I(R…: los nombres que ya traen su V( o I(
@@ -27,13 +27,15 @@ function suggestionsAt(before: string, names: string[], hints: Map<string, strin
     if (items.length) return { from: before.length - call[1].length, items: items.slice(0, MAX_SUGGESTIONS) };
   }
   const word = /[A-Za-z_@][\w@.[\]]*$/.exec(before);
+  // Ctrl+Espacio sin nada escrito: todo el catálogo (la lista se desplaza)
+  if (all && !word) return { from: before.length, items: [...help.map((f) => ({ text: f.name, fn: f })), ...signals] };
   if (!word || (word.index > 0 && /[\w.]/.test(before[word.index - 1]))) return { from: before.length, items: [] };
   const w = word[0];
   const fns = help.filter((f) => starts(f.name, w) && f.name.length >= w.length).map((f) => ({ text: f.name, fn: f }));
   const items = [...fns, ...signals.filter((s) => starts(s.text, w) && s.text.length > w.length)];
   // ya escrito entero y sin otra opción: no hace falta la lista
   if (items.length === 1 && !items[0].fn && items[0].text.toLowerCase() === w.toLowerCase()) return { from: word.index, items: [] };
-  return { from: word.index, items: items.slice(0, MAX_SUGGESTIONS) };
+  return { from: word.index, items: all ? items : items.slice(0, MAX_SUGGESTIONS) };
 }
 
 /** la función cuyo paréntesis está abierto en el cursor, y en qué argumento está */
@@ -88,12 +90,14 @@ export function TraceBox({
   const [cursor, setCursor] = useState(0);
   // la lista aparece al escribir y se cierra al elegir, con Esc o al salir de la caja
   const [open, setOpen] = useState(false);
+  // abierta con Ctrl+Espacio: sin límite de opciones
+  const [all, setAll] = useState(false);
   const [sel, setSel] = useState(0);
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const help = useMemo(functionHelp, []);
   const before = expr.slice(0, cursor);
-  const sugg = useMemo(() => suggestionsAt(before, names, hints, help), [before, names, hints, help]);
+  const sugg = useMemo(() => suggestionsAt(before, names, hints, help, all), [before, names, hints, help, all]);
   const list = open ? sugg.items : [];
   const call = useMemo(() => callAt(before, help), [before, help]);
   const syncCursor = () => setCursor(input.current?.selectionStart ?? expr.length);
@@ -104,12 +108,13 @@ export function TraceBox({
       setCursor(at);
     });
 
-  const accept = (s: Suggestion) => {
+  const accept = (s: Suggestion, from = sugg.from) => {
     const text = s.fn ? `${s.text}(` : s.text;
-    setExpr(expr.slice(0, sugg.from) + text + expr.slice(cursor));
+    setExpr(expr.slice(0, from) + text + expr.slice(cursor));
     setOpen(false);
+    setAll(false);
     setError(undefined);
-    moveCursor(input.current, sugg.from + text.length);
+    moveCursor(input.current, from + text.length);
   };
   // si la caja desaparece con el foco adentro, no llega el blur
   const focusChange = useRef(onFocusChange);
@@ -127,6 +132,7 @@ export function TraceBox({
       setExpr(expr.slice(0, a) + text + expr.slice(b));
       setError(undefined);
       setOpen(false);
+      setAll(false);
       // el cursor queda después de lo escrito
       moveCursor(el, a + text.length);
     },
@@ -138,6 +144,7 @@ export function TraceBox({
     const err = onAdd(e);
     setError(err);
     setOpen(false);
+    setAll(false);
     if (!err) {
       setExpr('');
       setCursor(0);
@@ -166,7 +173,7 @@ export function TraceBox({
           aria-invalid={!!error}
           placeholder={t('Add trace: V(out)/V(in), I(R1), @Q1[gm]…')}
           aria-label={t('Expression')}
-          title={t('Enter or + adds the trace (T: go to the box). With the focus here, clicking a node or component on the schematic types its name')}
+          title={t('Enter or + adds the trace (T: go to the box; Ctrl+Space: list of functions and signals). With the focus here, clicking a node or component on the schematic types its name')}
           onChange={(e) => {
             setExpr(e.target.value);
             setCursor(e.target.selectionStart ?? e.target.value.length);
@@ -176,6 +183,16 @@ export function TraceBox({
           }}
           onSelect={syncCursor}
           onKeyDown={(e) => {
+            if (e.key === ' ' && e.ctrlKey) {
+              e.preventDefault();
+              // una sola opción: se completa sin abrir la lista
+              const only = suggestionsAt(before, names, hints, help, true);
+              if (only.items.length === 1) return accept(only.items[0], only.from);
+              setOpen(true);
+              setAll(true);
+              setSel(0);
+              return;
+            }
             if (!list.length) return;
             const k = Math.min(sel, list.length - 1);
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -189,6 +206,7 @@ export function TraceBox({
               e.preventDefault();
               e.stopPropagation();
               setOpen(false);
+              setAll(false);
             }
           }}
           onFocus={() => {
@@ -197,6 +215,7 @@ export function TraceBox({
           }}
           onBlur={() => {
             setOpen(false);
+            setAll(false);
             setFocused(false);
             onFocusChange?.(false);
           }}

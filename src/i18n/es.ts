@@ -388,8 +388,8 @@ export const es: Record<string, string> = {
   'empty = the same': 'vacío = el mismo',
   'Empty pane: probe with the probe tool, type an expression or drag a trace here.': 'Panel vacío: medí con la punta de prueba, escribí una expresión o arrastrá una traza acá.',
   'Empty variant: no circuit or simulations': 'Variante vacía: sin circuito ni simulaciones',
-  'Enter or + adds the trace (T: go to the box). With the focus here, clicking a node or component on the schematic types its name':
-    'Enter o + agrega la traza (T: ir a la caja). Con el foco acá, click en un nodo o componente del esquemático escribe su nombre',
+  'Enter or + adds the trace (T: go to the box; Ctrl+Space: list of functions and signals). With the focus here, clicking a node or component on the schematic types its name':
+    'Enter o + agrega la traza (T: ir a la caja; Ctrl+Espacio: lista de funciones y señales). Con el foco acá, click en un nodo o componente del esquemático escribe su nombre',
   'Enter saves · Esc cancels': 'Enter guarda · Esc cancela',
   'Error in the engine Worker': 'Error en el Worker del motor',
   'Errors': 'Errores',

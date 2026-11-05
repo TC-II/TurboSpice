@@ -36,7 +36,9 @@ await openExample(page, 'Common Emitter');
 await page.locator('svg.editor .sym').first().waitFor();
 await simulate();
 
-const options = await page.locator('#trace-names option').evaluateAll((os) => os.map((o) => o.value));
+await page.locator('.expr-form input').fill('@Q1[');
+const options = await page.locator('#trace-suggest [role=option] .expr-suggest-name').allTextContents();
+await page.locator('.expr-form input').fill('');
 check(
   ['@Q1[gm]', '@Q1[gpi]', '@Q1[cpi]', '@Q1[vbe]'].every((o) => options.includes(o)),
   'la caja de trazas ofrece los parámetros de Q1',

@@ -1770,3 +1770,12 @@ svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #
 .hint-bar .status-offer button { font-size: 11px; line-height: 14px; padding: 0 8px; }
 .hint-bar .status-offer.history { padding: 0 6px; border-radius: 4px; background: color-mix(in srgb, var(--diff-chg) 30%, transparent); }
 .workspace.side .stb-view .pz-view.compact { flex: 1 1 auto; }
+/* caja de trazas: sugerencias de funciones y señales, y la firma de la función, como en una planilla */
+.expr-form input[aria-invalid='true'] { border-color: var(--warn, #d97706); }
+.expr-suggest, .expr-signature { position: absolute; top: calc(100% + 3px); left: 0; z-index: 40; min-width: 100%; max-width: 420px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 6px 18px rgb(0 0 0 / 20%); font-size: 12px; }
+.expr-suggest { margin: 0; padding: 3px; list-style: none; max-height: 260px; overflow-y: auto; width: max-content; }
+.expr-suggest li { display: flex; flex-direction: column; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+.expr-suggest li[aria-selected='true'] { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.expr-signature { display: flex; flex-direction: column; padding: 4px 8px; width: max-content; pointer-events: none; }
+.expr-suggest-name { font-family: var(--mono); color: var(--fg); white-space: nowrap; }
+.expr-suggest-desc { color: var(--fg-muted); white-space: normal; }

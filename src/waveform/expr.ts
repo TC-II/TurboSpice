@@ -62,6 +62,44 @@ export const FUNCTIONS = [
   'signed',
 ];
 
+/** Ayuda de la caja de trazas (tipo planilla): firma y descripción de cada función */
+export interface FunctionHelp {
+  name: string;
+  args: string[];
+  desc: string;
+}
+
+export const functionHelp = (): FunctionHelp[] => [
+  { name: 'V', args: ['node', 'node2?'], desc: t('Node voltage, or the difference between two nodes') },
+  { name: 'I', args: ['element'], desc: t('Current through an element (Ic, Ib, Ie… for a transistor pin)') },
+  { name: 'Dig', args: ['node'], desc: t('Digital node or bus: Dig(q[3:0])') },
+  { name: 'db', args: ['x'], desc: t('Magnitude in decibels: 20·log10|x|') },
+  { name: 'mag', args: ['x'], desc: t('Magnitude |x| (also abs)') },
+  { name: 'abs', args: ['x'], desc: t('Magnitude |x| (also mag)') },
+  { name: 'ph', args: ['x'], desc: t('Phase in degrees, unwrapped (also phase)') },
+  { name: 'phase', args: ['x'], desc: t('Phase in degrees, unwrapped (also ph)') },
+  { name: 're', args: ['x'], desc: t('Real part (also real)') },
+  { name: 'real', args: ['x'], desc: t('Real part (also re)') },
+  { name: 'im', args: ['x'], desc: t('Imaginary part (also imag)') },
+  { name: 'imag', args: ['x'], desc: t('Imaginary part (also im)') },
+  { name: 'sqrt', args: ['x'], desc: t('Square root') },
+  { name: 'exp', args: ['x'], desc: t('Exponential eˣ') },
+  { name: 'ln', args: ['x'], desc: t('Natural logarithm (also log)') },
+  { name: 'log', args: ['x'], desc: t('Natural logarithm (also ln)') },
+  { name: 'log10', args: ['x'], desc: t('Base-10 logarithm') },
+  { name: 'sin', args: ['x'], desc: t('Sine (radians)') },
+  { name: 'cos', args: ['x'], desc: t('Cosine (radians)') },
+  { name: 'tan', args: ['x'], desc: t('Tangent (radians)') },
+  { name: 'atan', args: ['x'], desc: t('Arctangent (radians)') },
+  { name: 'sgn', args: ['x'], desc: t('Sign: −1, 0 or 1') },
+  { name: 'd', args: ['x'], desc: t('Derivative with respect to the X axis') },
+  { name: 'integ', args: ['x'], desc: t('Cumulative integral along the X axis') },
+  { name: 'min', args: ['a', 'b'], desc: t('Point-by-point minimum') },
+  { name: 'max', args: ['a', 'b'], desc: t('Point-by-point maximum') },
+  { name: 'pow', args: ['x', 'y'], desc: t('x raised to y') },
+  { name: 'signed', args: ['x', 'bits'], desc: t("A bus read as a two's complement number") },
+];
+
 export class ExprError extends Error {}
 
 export function parseExpr(src: string): Node {

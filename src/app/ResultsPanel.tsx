@@ -157,7 +157,20 @@ export function ResultsPanel(props: ResultsPanelProps) {
           {/* la vista elegida en el menú (netlist, log…); el botón no cambia */}
           {panel !== 'plot' && <span className="results-view">{PANEL_NAMES[panel]}</span>}
           {/* en un .stb, el selector muestra sólo las magnitudes del lazo, sin los parámetros de los dispositivos (#337) */}
-          {panel === 'plot' && plot && scale && <TraceBox handle={traceBox} names={traceNames} hints={isStbPlot(plot) ? undefined : traceHints} onAdd={addExpr} onFocusChange={setTraceFocus} />}
+          {panel === 'plot' && plot && scale && (
+            <TraceBox
+              handle={traceBox}
+              names={traceNames}
+              hints={isStbPlot(plot) ? undefined : traceHints}
+              onAdd={(e) => {
+                // el error va a la barra de avisos, no al lado de la caja (que la achicaba)
+                const err = addExpr(e);
+                if (err) setMessage(err);
+                return err;
+              }}
+              onFocusChange={setTraceFocus}
+            />
+          )}
           {panel === 'plot' && (
             <>
               {/* varios plots: un .control con varios análisis, .step (op vs R), .meas, fft de ngspice, gráficos x-y */}

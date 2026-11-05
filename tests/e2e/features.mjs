@@ -682,7 +682,8 @@ const paneChips = (i) => page.locator('.pane').nth(i).locator('.trace-chip .name
 check((await paneChips(1)).join() === 'V(out)/V(n001)', `expresión en el panel nuevo (${await paneChips(1)})`);
 await page.getByLabel('Expresión').fill('V(nada)');
 await page.keyboard.press('Enter');
-check(/no existe/.test(await page.locator('.expr-form .hint.warn').textContent()), 'una expresión inválida avisa y no se agrega');
+// (el error va a la barra de avisos, no al lado de la caja)
+check(/no existe/.test(await page.locator('.status-msg').textContent()), 'una expresión inválida avisa en la barra de avisos y no se agrega');
 await page.getByLabel('Expresión').fill('');
 await page.locator('.pane').nth(1).locator('.trace-chip').dragTo(page.locator('.pane').nth(0).locator('.pane-chart'));
 check((await paneChips(0)).join() === 'V(out),V(out)/V(n001)', `arrastrar una traza la pasa a otro panel (${await paneChips(0)})`);

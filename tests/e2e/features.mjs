@@ -405,8 +405,11 @@ check(
 const dnd = async (src, dst) => {
   const dt = await page.evaluateHandle(() => new DataTransfer());
   await src.dispatchEvent('dragstart', { dataTransfer: dt });
-  await dst.dispatchEvent('dragover', { dataTransfer: dt });
-  await dst.dispatchEvent('drop', { dataTransfer: dt });
+  // soltar en el centro: junto al borde de arriba o abajo crea un panel nuevo
+  const b = await dst.boundingBox();
+  const at = { dataTransfer: dt, clientX: b.x + b.width / 2, clientY: b.y + b.height / 2 };
+  await dst.dispatchEvent('dragover', at);
+  await dst.dispatchEvent('drop', at);
   // (tras soltar, el chip suele haberse ido del panel: sin esperar los 30 s por defecto)
   await src.dispatchEvent('dragend', { dataTransfer: dt }, { timeout: 500 }).catch(() => {});
 };

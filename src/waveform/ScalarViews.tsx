@@ -1,4 +1,5 @@
 // Resultados sin eje X: tabla ordenable (.op, .tf, .sens, ruido integrado); el plano s (.pz) está en PzPlane.
+import { winOf } from '../ui/hostWindow.ts';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { SimPlot } from '../engine/ngspice.ts';
 import { deviceParams, parseDeviceVector } from '../sim/deviceParams.ts';
@@ -20,7 +21,7 @@ export function ResultTable({ plot, maxCols = 2, onHoverRow, highlightDevice }: 
   useEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
+    const ro = new (winOf(el).ResizeObserver)(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);

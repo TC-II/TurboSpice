@@ -14,7 +14,7 @@ import { type Marker } from './markers.ts';
 import { parseSi } from './dft.ts';
 import { useTraceWidth } from './lineWidth.ts';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
-import { useHostWindow } from '../ui/hostWindow.ts';
+import { useHostWindow, winOf } from '../ui/hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
 import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, mountIn, xUnit, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
 import { drawAxisHover, drawSamples, drawPzMarks, drawMarkers, drawCursors, type LabelHit } from './paneDraw.ts';
@@ -696,7 +696,7 @@ export function PaneView(props: {
     root.addEventListener('pointercancel', up);
     root.addEventListener('contextmenu', context);
     root.addEventListener('wheel', wheel, { passive: false });
-    const ro = new ResizeObserver(() => {
+    const ro = new (winOf(el).ResizeObserver)(() => {
       u.setSize({ width: Math.max(100, el.clientWidth), height: Math.max(80, el.clientHeight) });
       // (el área nueva se conoce cuando uPlot aplica el tamaño)
       if (dec) {

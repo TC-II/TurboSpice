@@ -67,7 +67,7 @@ export function ViewTabs({
   setExpanded(e: Expanded): void;
   resultsSide: boolean;
   setSide(side: boolean): void;
-  /** los resultados están en otra ventana */
+  /** los resultados están en otra ventana (con los otros dos botones vuelven a la principal) */
   detached: boolean;
   toggleDetached(): void;
 }) {
@@ -148,10 +148,22 @@ export function ViewTabs({
         </button>
       </nav>
       <div className="layout-btns" role="group" aria-label={t('Results layout')}>
-        <button className={resultsSide ? 'active' : ''} aria-pressed={resultsSide} aria-label={t('Results on the side')} title={t('Results on the side')} onClick={() => setSide(true)}>
+        <button
+          className={!detached && resultsSide ? 'active' : ''}
+          aria-pressed={!detached && resultsSide}
+          aria-label={t('Results on the side')}
+          title={t('Results on the side')}
+          onClick={() => (detached && toggleDetached(), setSide(true))}
+        >
           <Icon name="layoutSide" size={16} />
         </button>
-        <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label={t('Results below')} title={t('Results below')} onClick={() => setSide(false)}>
+        <button
+          className={!detached && !resultsSide ? 'active' : ''}
+          aria-pressed={!detached && !resultsSide}
+          aria-label={t('Results below')}
+          title={t('Results below')}
+          onClick={() => (detached && toggleDetached(), setSide(false))}
+        >
           <Icon name="layoutStack" size={16} />
         </button>
         <button

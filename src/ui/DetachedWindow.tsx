@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { HostWindow } from './hostWindow.ts';
 import { useEvent } from './useEvent.ts';
+import { setPixelRatioOf } from './pixelRatio.ts';
 
 /** Abre (o trae al frente) la ventana; tiene que llamarse desde un clic (bloqueador de popups) */
 export function openDetached(name: string, w = 1100, h = 720): Window | null {
@@ -82,6 +83,16 @@ export function DetachedWindow({
     win.addEventListener('mouseup', fwdMouse);
     win.addEventListener('resize', fwdWin);
     win.addEventListener('scroll', fwdWin, true);
+    // los gráficos, con la escala de píxeles de esta ventana (puede estar en otro monitor); al
+    // pasarla de monitor cambia
+    let res: MediaQueryList | null = null;
+    const ratio = () => {
+      setPixelRatioOf(win);
+      res?.removeEventListener('change', ratio);
+      res = win.matchMedia(`(resolution: ${win.devicePixelRatio}dppx)`);
+      res.addEventListener('change', ratio);
+    };
+    ratio();
     win.addEventListener('pagehide', closed);
     // los atajos (sin el foco en un campo) los atiende la principal
     win.addEventListener('keydown', key);
@@ -96,6 +107,8 @@ export function DetachedWindow({
       win.removeEventListener('resize', fwdWin);
       win.removeEventListener('scroll', fwdWin, true);
       win.removeEventListener('pagehide', closed);
+      res?.removeEventListener('change', ratio);
+      setPixelRatioOf(null);
       win.removeEventListener('keydown', key);
       win.removeEventListener('keyup', key);
       window.removeEventListener('pagehide', closeWin);

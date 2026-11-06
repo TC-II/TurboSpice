@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { loadTranslations } from './i18n/i18n.ts';
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import './styles.css';
+// (antes que uPlot)
+import './ui/pixelRatio.ts';
 
 // las traducciones (si la interfaz no está en inglés) antes que la app: hay textos que se arman
 // al importar los módulos

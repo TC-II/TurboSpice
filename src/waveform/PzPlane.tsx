@@ -2,6 +2,7 @@
 // los dos ejes, grilla con escala, zoom con la rueda o arrastrando un recuadro, paneo con el botón
 // derecho o el del medio (como en los gráficos), escala logarítmica opcional, guías de ζ y ω₀,
 // corridas de .step superpuestas y resaltado cruzado entre el mapa y la tabla.
+import { winOf } from '../ui/hostWindow.ts';
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import { SideSplit, useSideSize } from '../ui/SideSplit.tsx';
 import type { SimPlot } from '../engine/ngspice.ts';
@@ -71,7 +72,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
       const h = Math.max(60, Math.floor(box.clientHeight) - GT - GB);
       setSize((o) => (o.w === w && o.h === h ? o : { w, h }));
     };
-    const ro = new ResizeObserver(fit);
+    const ro = new (winOf(el).ResizeObserver)(fit);
     ro.observe(el);
     ro.observe(box);
     return () => ro.disconnect();

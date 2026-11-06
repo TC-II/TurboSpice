@@ -1,3 +1,4 @@
+import { winOf } from '../ui/hostWindow.ts';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { Curve } from './curves.ts';
 import { formatRadix, logicState, type Radix } from './digital.ts';
@@ -99,7 +100,7 @@ export function DigitalLanes({
   useEffect(() => {
     const el = host.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => (setWidth(el.clientWidth), setHeight(el.clientHeight)));
+    const ro = new (winOf(el).ResizeObserver)(() => (setWidth(el.clientWidth), setHeight(el.clientHeight)));
     ro.observe(el);
     setWidth(el.clientWidth);
     setHeight(el.clientHeight);

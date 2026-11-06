@@ -7,3 +7,9 @@ import { createContext, useContext } from 'react';
 export const HostWindow = createContext<Window | null>(null);
 
 export const useHostWindow = () => useContext(HostWindow) ?? window;
+
+/**
+ * La ventana de un elemento. Para lo que se crea con su constructor (ResizeObserver): el de la
+ * principal no se entera de los cambios de tamaño en la otra ventana.
+ */
+export const winOf = (el: Element) => (el.ownerDocument.defaultView ?? window) as typeof window;

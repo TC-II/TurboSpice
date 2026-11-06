@@ -1,3 +1,4 @@
+import { winOf } from '../ui/hostWindow.ts';
 import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
 import { mountIn } from './plotShared.ts';
@@ -87,7 +88,7 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
       cursor: { drag: { x: true, y: true, uni: 20 } },
     };
     const u = new uPlot(opts, data, mountIn(el));
-    const ro = new ResizeObserver(() => u.setSize({ width: el.clientWidth, height: height() }));
+    const ro = new (winOf(el).ResizeObserver)(() => u.setSize({ width: el.clientWidth, height: height() }));
     ro.observe(el);
     return () => {
       ro.disconnect();

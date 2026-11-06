@@ -39,3 +39,14 @@ export const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined :
  * (abajo) y la columna de números (a los costados), no toda la caja del eje */
 export const AXIS_X_BAND = 28;
 export const AXIS_Y_BAND = 44;
+
+/**
+ * Dónde monta uPlot el gráfico. Con el elemento, uPlot pregunta `instanceof HTMLElement`, que en la
+ * ventana aparte de los resultados (otro `window`) da falso: se lo agrega con la otra forma.
+ */
+export const mountIn =
+  (el: HTMLElement): Exclude<ConstructorParameters<typeof uPlot>[2], HTMLElement | undefined> =>
+  (u, init) => {
+    el.appendChild(u.root);
+    init();
+  };

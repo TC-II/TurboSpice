@@ -1779,3 +1779,9 @@ svg.export-sheet .texts .ngspice text, svg.export-sheet .current-arrow { fill: #
 .expr-signature { display: flex; flex-direction: column; padding: 4px 8px; width: max-content; pointer-events: none; }
 .expr-suggest-name { font-family: var(--mono); color: var(--fg); white-space: nowrap; }
 .expr-suggest-desc { color: var(--fg-muted); white-space: normal; }
+
+/* resultados en otra ventana (DetachedWindow) */
+.results-bar .detach-btn { margin-left: auto; border: 0; background: transparent; padding: 2px 4px; color: var(--fg-muted); }
+.results-bar .detach-btn:hover { color: var(--fg); }
+.workspace.detached { height: 100%; }
+.detached-empty { margin: auto; color: var(--fg-muted); }

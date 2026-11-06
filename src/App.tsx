@@ -109,6 +109,7 @@ import { circuitInfoOf, pdkBarOf } from './app/circuitInfo.ts';
 import { useProjectFiles } from './app/useProjectFiles.ts';
 import { useEvent } from './ui/useEvent.ts';
 import { SchematicContext } from './app/context.ts';
+import { DetachedWindow, openDetached } from './ui/DetachedWindow.tsx';
 
 export function App() {
   // (el motor arranca cuando llegó la librería, #190)
@@ -350,6 +351,19 @@ function SchematicMode({
   const stbSplit = useSideSize('stb', splitDir);
   const [resultsH, setResultsH] = useState<number>(() => Number(lsGet(sizeKey)) || 0);
   useEffect(() => setResultsH(Number(lsGet(sizeKey)) || 0), [sizeKey]);
+  // los resultados en otra ventana del navegador (para el segundo monitor); la principal queda con
+  // el esquemático solo. Cerrar esa ventana los devuelve
+  const [resultsWin, setResultsWin] = useState<Window | null>(null);
+  const detachResults = () => {
+    const w = openDetached('turbospice-results');
+    if (w) setResultsWin(w);
+    else setMessage(t('The browser blocked the window: allow pop-ups for this page'));
+  };
+  const dockResults = () => {
+    resultsWin?.close();
+    setResultsWin(null);
+    setTimeout(() => editor.current?.fit(), 50);
+  };
   // esquemático o resultados expandidos a toda la ventana (#24)
   const [expanded, setExpandedState] = useExpanded(!!sim && !dialog);
   const setExpanded = (e: Expanded) => {
@@ -878,7 +892,7 @@ function SchematicMode({
     setTool(selection.length ? { kind: 'move', stretch, refs: selection, start: editor.current?.cursor() ?? null } : { kind: 'move', stretch, refs: null, start: null });
   const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
   // (con los resultados colapsados el visor no se ve: el teclado vuelve al esquemático)
-  const viewerKeys = () => area.current === 'viewer' && !!sim && expanded !== 'schematic' && panel === 'plot' && !!plotPanel.current;
+  const viewerKeys = () => area.current === 'viewer' && !!sim && (!!resultsWin || expanded !== 'schematic') && panel === 'plot' && !!plotPanel.current;
 
   const { importInput, importFiles, subImport, exportSub, subToUser, exportSubNetlist, importSubckts, exportZip } = useImportExport({
     ...{ lib, projectRef, editProject, snapshot, markDirty, leave, enter, confirmDiscard, openBytes, askConflict, userFiles, storeUserFiles, setTool, setMessage },
@@ -1070,6 +1084,67 @@ function SchematicMode({
       pdk: pdkBar,
     });
 
+  // (la misma vista va acá o en la ventana aparte)
+  const resultsPanel = sim && !curSub && (
+    <ResultsPanel
+      projectName={project.name}
+      detached={!!resultsWin}
+      onDetach={resultsWin ? dockResults : detachResults}
+      {...{
+        sim,
+        resultsH: resultsWin ? 0 : resultsH,
+        pltInput,
+        importPlt,
+        panel,
+        setPanel,
+        resultsItems,
+        plot,
+        scale,
+        traceBox,
+        traceNames,
+        traceHints,
+        addExpr,
+        setTraceFocus,
+        plotName,
+        selectPlot,
+        labels,
+        isComplex,
+        mode,
+        setMode,
+      }}
+      {...{
+        viewerTools,
+        setViewerTools,
+        withPz,
+        pzSide,
+        setPzSide,
+        allRuns,
+        visibleRuns,
+        hiddenRuns,
+        overlay,
+        setOverlay,
+        sims,
+        plotState,
+        onPlotState,
+        plotPanel,
+        runs,
+        panes,
+        editPanes,
+        resolver,
+      }}
+      {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
+      {...{ problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run }}
+    />
+  );
+  // una tecla en la ventana aparte: los atajos del visor (o con Ctrl, los generales) de la principal
+  const resultsWinKey = (e: KeyboardEvent) => {
+    area.current = 'viewer';
+    if (!(viewerKeys() || e.ctrlKey || e.metaKey || /^F\d+$/.test(e.key))) return;
+    const c = new KeyboardEvent(e.type, e);
+    window.dispatchEvent(c);
+    if (c.defaultPrevented) e.preventDefault();
+  };
+
   return (
     <SchematicContext.Provider value={{ lib, doc, commit, projectRef, editProject, curSub, tool, setTool, selection, setSelection, sim, setDialog, setMessage }}>
       <div className="schematic-mode">
@@ -1081,7 +1156,15 @@ function SchematicMode({
         {/* exportando, la barra de la app queda (marca y estilo) con las herramientas de la vista previa */}
         {slots.tools && !exporting && createPortal(<Toolbar label={t('Tools')} groups={toolGroups} lead={<AppMenu menus={menus} />} />, slots.tools)}
         {slots.right && <AppBarRight slot={slots.right} {...{ theme, setTheme, switchLang, exporting, doShare }} />}
-        {slots.tabs && !exporting && <ViewTabs slot={slots.tabs} hasSim={!!sim} {...{ schematicShown, resultsShown, setExpanded, resultsSide, setSide }} />}
+        {slots.tabs && !exporting && (
+          <ViewTabs
+            slot={slots.tabs}
+            hasSim={!!sim}
+            {...{ schematicShown, resultsShown, setExpanded, resultsSide, setSide }}
+            detached={!!resultsWin}
+            toggleDetached={resultsWin ? dockResults : detachResults}
+          />
+        )}
         <SimRow
           projectName={project.name}
           bias={!!bias}
@@ -1090,7 +1173,7 @@ function SchematicMode({
         />
 
         <div className="work-row">
-          <div className={`workspace${resultsSide ? ' side' : ''}${sim && expanded ? ` expand-${expanded}` : ''}`}>
+          <div className={`workspace${resultsSide ? ' side' : ''}${resultsWin ? ' expand-schematic' : sim && expanded ? ` expand-${expanded}` : ''}`}>
             <div
               onMouseMove={(e) => {
                 // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
@@ -1194,56 +1277,8 @@ function SchematicMode({
               />
             </div>
 
-            {sim && !curSub && <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />}
-            {sim && !curSub && (
-              <ResultsPanel
-                projectName={project.name}
-                {...{
-                  sim,
-                  resultsH,
-                  pltInput,
-                  importPlt,
-                  panel,
-                  setPanel,
-                  resultsItems,
-                  plot,
-                  scale,
-                  traceBox,
-                  traceNames,
-                  traceHints,
-                  addExpr,
-                  setTraceFocus,
-                  plotName,
-                  selectPlot,
-                  labels,
-                  isComplex,
-                  mode,
-                  setMode,
-                }}
-                {...{
-                  viewerTools,
-                  setViewerTools,
-                  withPz,
-                  pzSide,
-                  setPzSide,
-                  allRuns,
-                  visibleRuns,
-                  hiddenRuns,
-                  overlay,
-                  setOverlay,
-                  sims,
-                  plotState,
-                  onPlotState,
-                  plotPanel,
-                  runs,
-                  panes,
-                  editPanes,
-                  resolver,
-                }}
-                {...{ activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, setRowHover, lvNow, hoverDev }}
-                {...{ problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run }}
-              />
-            )}
+            {sim && !curSub && !resultsWin && <ResultsSplitter side={resultsSide} sizeKey={sizeKey} setSize={setResultsH} expanded={expanded} setExpanded={setExpanded} />}
+            {!resultsWin && resultsPanel}
           </div>
           {saves && (
             <SavesPanel
@@ -1268,6 +1303,17 @@ function SchematicMode({
           )}
         </div>
 
+        {resultsWin && (
+          <DetachedWindow
+            win={resultsWin}
+            title={`${project.name} · ${t('Results')} — TurboSpice`}
+            className="workspace expand-results detached"
+            onKey={resultsWinKey}
+            onClose={() => setResultsWin(null)}
+          >
+            {resultsPanel || <p className="detached-empty">{curSub ? t('The results belong to the testbench: go up (Alt+↑) to see them') : t('Run a simulation to see the results here')}</p>}
+          </DetachedWindow>
+        )}
         <AppDialogs
           picking={!!picking}
           {...{ dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam }}

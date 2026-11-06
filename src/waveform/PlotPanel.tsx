@@ -2,6 +2,7 @@
 // Bode (magnitud y fase), cursores, medidas rápidas y exportación a CSV/PNG.
 import { Fragment, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
+import { useHostWindow } from '../ui/hostWindow.ts';
 import { createPortal, flushSync } from 'react-dom';
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
@@ -110,6 +111,7 @@ export function PlotPanel({
   side,
   toolsHost,
 }: Props) {
+  const win = useHostWindow();
   const [dftOpen, setDftOpen] = useState(false);
   // ⌖: elegir con un click en su cápsula la traza cuya DFT se agrega (#245)
   const [dftPicking, setDftPicking] = useState(false);
@@ -281,12 +283,12 @@ export function PlotPanel({
     const y0 = e.clientY;
     const move = (ev: PointerEvent) => resizePanes(i, ev.clientY - y0, false, start);
     const up = (ev: PointerEvent) => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
+      win.removeEventListener('pointermove', move);
+      win.removeEventListener('pointerup', up);
       resizePanes(i, ev.clientY - y0, true, start);
     };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    win.addEventListener('pointermove', move);
+    win.addEventListener('pointerup', up);
   };
   /** doble clic en un divisor: todos los paneles vuelven a repartirse por igual */
   const resetSizes = () => {
@@ -370,9 +372,9 @@ export function PlotPanel({
         setDftEdit(null);
       }
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [dftPicking, dftEdit]);
+    win.addEventListener('keydown', onKey, true);
+    return () => win.removeEventListener('keydown', onKey, true);
+  }, [dftPicking, dftEdit, win]);
   const isF = (i: number) => isDftPane(panes[i]);
   /**
    * Marker nuevo donde está el mouse (o en `at`). M, A y D van sobre la curva bajo el mouse (o la

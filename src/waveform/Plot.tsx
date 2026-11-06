@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import uPlot from 'uplot';
+import { mountIn } from './plotShared.ts';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
 import { exactRange, logLabeled } from './scales.ts';
@@ -85,7 +86,7 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
       ],
       cursor: { drag: { x: true, y: true, uni: 20 } },
     };
-    const u = new uPlot(opts, data, el);
+    const u = new uPlot(opts, data, mountIn(el));
     const ro = new ResizeObserver(() => u.setSize({ width: el.clientWidth, height: height() }));
     ro.observe(el);
     return () => {

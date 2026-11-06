@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { NameInput } from './EditableName.tsx';
 import { Icon, type IconName } from './icons.tsx';
+import { useHostWindow } from './hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
 
 /** Botón chico a la derecha de un ítem (duplicar, borrar, historial…) */
@@ -56,6 +57,7 @@ export function MenuButton({
   openRef?: { current: (() => void) | null };
   children: ReactNode;
 }) {
+  const win = useHostWindow();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const btn = useRef<HTMLButtonElement>(null);
@@ -72,13 +74,13 @@ export function MenuButton({
         btn.current?.focus();
       }
     };
-    window.addEventListener('pointerdown', down);
-    window.addEventListener('keydown', key, true);
+    win.addEventListener('pointerdown', down);
+    win.addEventListener('keydown', key, true);
     return () => {
-      window.removeEventListener('pointerdown', down);
-      window.removeEventListener('keydown', key, true);
+      win.removeEventListener('pointerdown', down);
+      win.removeEventListener('keydown', key, true);
     };
-  }, [open]);
+  }, [open, win]);
 
   return (
     <div className="menu-top" ref={root}>
@@ -133,6 +135,7 @@ function MenuList({
   /** En un submenú: volver al ítem que lo abrió (flecha izquierda) */
   onBack?(): void;
 }) {
+  const win = useHostWindow();
   const list = useRef<HTMLDivElement>(null);
   const [sub, setSub] = useState<{ i: number; focus: boolean } | null>(null);
   useEffect(() => {
@@ -146,7 +149,7 @@ function MenuList({
     if (!el) return;
     const r = el.getBoundingClientRect();
     // el ancho del documento, no innerWidth: en el celular la lista desbordada agranda la ventana
-    const over = r.right - (document.documentElement.clientWidth - 8);
+    const over = r.right - (el.ownerDocument.documentElement.clientWidth - 8);
     if (over <= 0 || getComputedStyle(el).position !== 'absolute') return;
     if (isSub) el.classList.add('flip');
     else el.style.left = `${-Math.min(over, Math.max(0, r.left - 8))}px`;
@@ -156,7 +159,7 @@ function MenuList({
   const buttons = () => [...(list.current?.querySelectorAll<HTMLButtonElement>(':scope > .menu-item > button:not(:disabled)') ?? [])];
   const move = (d: number) => {
     const btns = buttons();
-    const i = btns.indexOf(document.activeElement as HTMLButtonElement);
+    const i = btns.indexOf(win.document.activeElement as HTMLButtonElement);
     btns[(i + d + btns.length) % btns.length]?.focus();
   };
   const focusItem = (i: number) => list.current?.querySelector<HTMLButtonElement>(`:scope > .menu-item[data-i="${i}"] > button`)?.focus();

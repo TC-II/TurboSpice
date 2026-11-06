@@ -66,6 +66,8 @@ const P: Record<string, ReactNode> = {
   help: <path d="M7.5 7.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5v.7M10 14.5v.01M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16" />,
   sun: <path d="M10 6.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7M10 2v2M10 16v2M2 10h2M16 10h2M4.3 4.3l1.4 1.4M14.3 14.3l1.4 1.4M4.3 15.7l1.4-1.4M14.3 5.7l1.4-1.4" />,
   moon: <path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8" />,
+  popout: <path d="M11 3.5h5.5V9M16.5 3.5 9.5 10.5M14 12v4.5H3.5V6H8" />,
+  dock: <path d="M10.5 9.5V4M10.5 9.5H16M10.5 9.5l6-6M14 12v4.5H3.5V6H8" />,
   results: <path d="M3 16.5h14M3 3.5v13M5.5 13l3-4 3 2 4.5-6" />,
   // disposición de los resultados: al costado (dos columnas) o abajo (dos filas)
   layoutSide: (

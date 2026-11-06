@@ -123,7 +123,7 @@ export function TraceBox({
 
   useImperativeHandle(handle, () => ({
     focus: () => input.current?.focus(),
-    focused: () => !!input.current && document.activeElement === input.current,
+    focused: () => !!input.current && input.current.ownerDocument.activeElement === input.current,
     input: () => input.current,
     insert: (text) => {
       const el = input.current;

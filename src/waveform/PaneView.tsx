@@ -14,8 +14,9 @@ import { type Marker } from './markers.ts';
 import { parseSi } from './dft.ts';
 import { useTraceWidth } from './lineWidth.ts';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
+import { useHostWindow } from '../ui/hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
-import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, xUnit, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
+import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, mountIn, xUnit, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
 import { drawAxisHover, drawSamples, drawPzMarks, drawMarkers, drawCursors, type LabelHit } from './paneDraw.ts';
 
 // Arrastre de una traza entre paneles: el dato lleva el id de esta página, para no mover otra
@@ -95,6 +96,7 @@ export function PaneView(props: {
   /** mouse sobre el área del gráfico (px desde su esquina) o afuera (null) */
   onPointer(p: { px: number; py: number } | null): void;
 }) {
+  const win = useHostWindow();
   const { index, pane, data, xRange, yRange, zoomMode, removing, showGrid, cursorMode, cursors, onCursor } = props;
   const host = useRef<HTMLDivElement>(null);
   const chart = useRef<uPlot | null>(null);
@@ -363,7 +365,11 @@ export function PaneView(props: {
     const firstX = opts.scales!.x;
     let redecimate = 0;
     // (antes de crear el gráfico no se sabe dónde queda el área: de sobra, el ancho entero)
-    const u: uPlot = new uPlot(opts, (dec ? dec.view(firstX.min ?? x0, firstX.max ?? x1, Math.max(100, el.clientWidth) * devicePixelRatio, data.log) : [data.x, ...ys]) as uPlot.AlignedData, el);
+    const u: uPlot = new uPlot(
+      opts,
+      (dec ? dec.view(firstX.min ?? x0, firstX.max ?? x1, Math.max(100, el.clientWidth) * devicePixelRatio, data.log) : [data.x, ...ys]) as uPlot.AlignedData,
+      mountIn(el),
+    );
     /** lo visible en [min, max], en las columnas de píxeles del área del gráfico */
     const view = (min: number, max: number) => dec!.view(min, max, u.bbox.width, data.log, u.bbox.left) as uPlot.AlignedData;
     setX.current = (min, max) => {
@@ -670,8 +676,8 @@ export function PaneView(props: {
       el.classList.add('zoom-cancelled');
       if (e instanceof MouseEvent) {
         const block = (ev: Event) => ev.preventDefault();
-        window.addEventListener('contextmenu', block, { capture: true, once: true });
-        setTimeout(() => window.removeEventListener('contextmenu', block, { capture: true }), 500);
+        win.addEventListener('contextmenu', block, { capture: true, once: true });
+        setTimeout(() => win.removeEventListener('contextmenu', block, { capture: true }), 500);
       }
     };
     root.addEventListener('pointerdown', markDown, true);
@@ -679,10 +685,10 @@ export function PaneView(props: {
     root.addEventListener('pointerup', markUp, true);
     root.addEventListener('pointercancel', markUp, true);
     root.addEventListener('pointerdown', selStart);
-    window.addEventListener('pointerup', selEnd);
-    window.addEventListener('pointercancel', selEnd);
-    window.addEventListener('mousedown', selCancel, true);
-    window.addEventListener('keydown', selCancel, true);
+    win.addEventListener('pointerup', selEnd);
+    win.addEventListener('pointercancel', selEnd);
+    win.addEventListener('mousedown', selCancel, true);
+    win.addEventListener('keydown', selCancel, true);
     root.addEventListener('pointerdown', down);
     root.addEventListener('pointermove', move);
     root.addEventListener('pointerleave', leave);
@@ -710,10 +716,10 @@ export function PaneView(props: {
       root.removeEventListener('pointerup', markUp, true);
       root.removeEventListener('pointercancel', markUp, true);
       root.removeEventListener('pointerdown', selStart);
-      window.removeEventListener('pointerup', selEnd);
-      window.removeEventListener('pointercancel', selEnd);
-      window.removeEventListener('mousedown', selCancel, true);
-      window.removeEventListener('keydown', selCancel, true);
+      win.removeEventListener('pointerup', selEnd);
+      win.removeEventListener('pointercancel', selEnd);
+      win.removeEventListener('mousedown', selCancel, true);
+      win.removeEventListener('keydown', selCancel, true);
       root.removeEventListener('pointerdown', down);
       root.removeEventListener('pointermove', move);
       root.removeEventListener('pointerleave', leave);
@@ -727,7 +733,7 @@ export function PaneView(props: {
     };
     // el gráfico se recrea sólo si cambian los datos, la grilla, el tema o el modo zoom (Z, el
     // recuadro en X e Y se configura al crearlo); xRange y los cursores se aplican aparte
-  }, [data, showGrid, zoomMode, scheme, lineW, props.syncKey]);
+  }, [data, showGrid, zoomMode, scheme, lineW, props.syncKey, win]);
 
   useEffect(() => {
     const u = chart.current;
@@ -951,10 +957,10 @@ export function PaneView(props: {
               setEdit(null);
             }}
           />,
-          document.body,
+          win.document.body,
         )}
       {/* (en body: un ancestro del panel con transform haría que position: fixed no sea la ventana) */}
-      {menu && pane.traces[menu.ti] && createPortal(<ContextMenu at={menu.at} onClose={() => setMenu(null)} items={traceMenu(menu.ti, pane.traces[menu.ti])} />, document.body)}
+      {menu && pane.traces[menu.ti] && createPortal(<ContextMenu at={menu.at} onClose={() => setMenu(null)} items={traceMenu(menu.ti, pane.traces[menu.ti])} />, win.document.body)}
       {props.onAddBelow && (
         <div className="pane-add">
           <button aria-label={t('Add pane')} title={t('Add a pane below (P)')} onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>

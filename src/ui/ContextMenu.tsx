@@ -1,6 +1,7 @@
 // Menú flotante del botón derecho (#180): unas pocas acciones en el lugar del clic.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './icons.tsx';
+import { useHostWindow } from './hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
 
 export interface ContextItem {
@@ -61,6 +62,7 @@ function EditRow({ it, v, setV, onClose }: { it: ContextItem; v: string; setV(v:
 }
 
 export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number }; items: ContextItem[]; onClose(): void }) {
+  const win = useHostWindow();
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(at);
   const editItem = items.find((it) => it.edit);
@@ -70,21 +72,22 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
     const el = box.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    setPos({ x: Math.min(at.x, window.innerWidth - r.width - 8), y: Math.min(at.y, window.innerHeight - r.height - 8) });
+    const w = el.ownerDocument.defaultView ?? window;
+    setPos({ x: Math.min(at.x, w.innerWidth - r.width - 8), y: Math.min(at.y, w.innerHeight - r.height - 8) });
   }, [at]);
   useEffect(() => {
     const down = (e: PointerEvent) => !box.current?.contains(e.target as Node) && onClose();
     const key = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), onClose());
     // (el clic que lo abrió no lo cierra)
     // (en captura: el esquemático detiene la propagación de sus clics)
-    const tt = setTimeout(() => window.addEventListener('pointerdown', down, true), 0);
-    window.addEventListener('keydown', key, true);
+    const tt = setTimeout(() => win.addEventListener('pointerdown', down, true), 0);
+    win.addEventListener('keydown', key, true);
     return () => {
       clearTimeout(tt);
-      window.removeEventListener('pointerdown', down, true);
-      window.removeEventListener('keydown', key, true);
+      win.removeEventListener('pointerdown', down, true);
+      win.removeEventListener('keydown', key, true);
     };
-  }, [onClose]);
+  }, [onClose, win]);
   return (
     <div ref={box} className={`ctx-menu${editItem ? ' ctx-quick' : ''}`} role="menu" style={{ left: pos.x, top: pos.y }}>
       {items.map((it, i) =>

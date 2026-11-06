@@ -56,6 +56,8 @@ export function ViewTabs({
   setExpanded,
   resultsSide,
   setSide,
+  detached,
+  toggleDetached,
 }: {
   slot: HTMLElement;
   /** hay resultados */
@@ -65,6 +67,9 @@ export function ViewTabs({
   setExpanded(e: Expanded): void;
   resultsSide: boolean;
   setSide(side: boolean): void;
+  /** los resultados están en otra ventana */
+  detached: boolean;
+  toggleDetached(): void;
 }) {
   // las vistas arrancan donde termina el panel del proyecto (--tree-w), si hay lugar
   const viewTabs = useRef<HTMLElement>(null);
@@ -148,6 +153,15 @@ export function ViewTabs({
         </button>
         <button className={!resultsSide ? 'active' : ''} aria-pressed={!resultsSide} aria-label={t('Results below')} title={t('Results below')} onClick={() => setSide(false)}>
           <Icon name="layoutStack" size={16} />
+        </button>
+        <button
+          className={detached ? 'active' : ''}
+          aria-pressed={detached}
+          aria-label={t('Results in another window')}
+          title={detached ? t('Back to the main window (closing this window does the same)') : t('Open the results in another window (for a second monitor)')}
+          onClick={toggleDetached}
+        >
+          <Icon name="popout" size={16} />
         </button>
       </div>
     </>,

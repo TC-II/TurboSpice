@@ -90,6 +90,10 @@ export interface ResultsPanelProps {
   plotStop(): void;
   setRunQueued(q: boolean): void;
   run(o?: { unlimited?: boolean }): void;
+  /** en la ventana aparte */
+  detached: boolean;
+  /** pasar a otra ventana (o volver a la principal, si ya está aparte) */
+  onDetach(): void;
 }
 
 export function ResultsPanel(props: ResultsPanelProps) {
@@ -119,7 +123,7 @@ export function ResultsPanel(props: ResultsPanelProps) {
   const { viewerTools, setViewerTools, withPz, pzSide, setPzSide, allRuns, visibleRuns, hiddenRuns, overlay, setOverlay, sims, plotState, onPlotState, plotPanel, runs, panes, editPanes, resolver } =
     props;
   const { activePane, setActivePane, onDftPicking, resultsSide, marks, setTraceNet, conn, splitDir, pzSplit, stbSplit, pzAll, pzShown, projectName, setRowHover, lvNow, hoverDev } = props;
-  const { problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run } = props;
+  const { problems, stopTime, goTo, openSaves, plotStop, setRunQueued, run, detached, onDetach } = props;
   return (
     <>
       <section className="results-panel" style={resultsH ? { flexBasis: resultsH } : undefined}>
@@ -213,6 +217,11 @@ export function ResultsPanel(props: ResultsPanelProps) {
                 </button>
               )}
             </>
+          )}
+          {detached && (
+            <button className="detach-btn" onClick={onDetach} aria-label={t('Back to the main window')} title={t('Back to the main window (closing this window does the same)')}>
+              <Icon name="dock" size={16} />
+            </button>
           )}
         </div>
         <div className="results-body">

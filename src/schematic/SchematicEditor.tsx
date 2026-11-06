@@ -860,7 +860,8 @@ export function SchematicEditor(props: Props) {
     }
     if (tool.kind === 'probe') {
       setHoverNet(probe?.net);
-      setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined ? 'i' : '');
+      // el cuerpo de un componente de 3+ terminales no mide corriente (va por pin): sin la "A"
+      setProbeKind(probe?.net ? 'v' : probe?.symbol !== undefined && !probe.body ? 'i' : '');
     }
     if (props.netHover && tool.kind !== 'probe' && tool.kind !== 'pick') {
       setHoverNet(drag ? undefined : probeTarget(p)?.net);

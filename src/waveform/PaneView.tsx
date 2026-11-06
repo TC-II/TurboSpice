@@ -141,7 +141,7 @@ export function PaneView(props: {
   useEffect(() => {
     const el = host.current;
     if (!el || !data.curves.length) return;
-    const css = getComputedStyle(el);
+    const css = winOf(el).getComputedStyle(el);
     const muted = css.getPropertyValue('--fg-muted').trim();
     const grid = css.getPropertyValue('--grid').trim();
     const fg = css.getPropertyValue('--fg').trim();

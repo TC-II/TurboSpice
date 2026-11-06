@@ -45,10 +45,16 @@ export function DetachedWindow({
 
   useEffect(() => {
     const d = win.document;
+    // los <link> de estilos cargan aparte: hasta que estén, los gráficos leerían los colores del
+    // CSS vacíos (ejes invisibles, grilla del color de otra línea)
+    const loading: Promise<unknown>[] = [];
     const copy = (n: Node) => {
       if (!(n instanceof HTMLStyleElement || (n instanceof HTMLLinkElement && n.rel === 'stylesheet'))) return;
       const c = n.cloneNode(true) as HTMLElement;
-      if (n instanceof HTMLLinkElement) (c as HTMLLinkElement).href = n.href;
+      if (n instanceof HTMLLinkElement) {
+        (c as HTMLLinkElement).href = n.href;
+        loading.push(new Promise((ok) => (c.addEventListener('load', ok), c.addEventListener('error', ok))));
+      }
       d.head.appendChild(c);
     };
     d.head.replaceChildren();
@@ -74,7 +80,8 @@ export function DetachedWindow({
     const root = d.createElement('div');
     root.id = 'root';
     d.body.replaceChildren(root);
-    setBox(root);
+    let live = true;
+    void Promise.all(loading).then(() => live && setBox(root));
 
     // uPlot termina el arrastre con el mouseup de su `document` y recalcula posiciones con el
     // resize/scroll de su `window`, que son los de la principal
@@ -101,6 +108,7 @@ export function DetachedWindow({
     const closeWin = () => win.close();
     window.addEventListener('pagehide', closeWin);
     return () => {
+      live = false;
       heads.disconnect();
       attrs.disconnect();
       win.removeEventListener('mouseup', fwdMouse);

@@ -263,6 +263,24 @@ export function PlotPanel({
     if (!tt || from === to || !acceptsTrace(panes[to], tt) || panes[to].traces.some((o) => sameTrace(o, tt))) return;
     setPanes(panes.map((p, k) => (k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : k === to ? { ...p, traces: [...p.traces, tt], digital: panes[from].digital } : p)));
   };
+  /** Traza soltada junto al borde de un panel: va a un panel nuevo arriba o abajo de él */
+  const moveTraceToNewPane = (from: number, ti: number, at: number, where: 'above' | 'below') => {
+    const tt = panes[from]?.traces[ti];
+    // la única traza de su panel soltada en su mismo panel: no cambia nada
+    if (!tt || (from === at && panes[from].traces.length === 1)) return;
+    const target = panes[at];
+    // con alturas elegidas, el nuevo se lleva la mitad de la del panel junto al que se inserta
+    const half = target.size ? Math.round(target.size / 2) : undefined;
+    const fresh: Pane = { traces: [tt], digital: panes[from].digital, ...(half ? { size: half } : {}) };
+    const next = panes.flatMap((p, k) => {
+      let q = k === from ? { ...p, traces: p.traces.filter((_, j) => j !== ti) } : p;
+      if (k !== at) return [q];
+      if (half) q = { ...q, size: target.size! - half };
+      return where === 'above' ? [fresh, q] : [q, fresh];
+    });
+    setPanes(next);
+    setActive(where === 'above' ? at : at + 1);
+  };
   // Divisor entre paneles: arrastrarlo cambia la altura de los dos de al lado. Durante el
   // arrastre sólo se toca el DOM; al soltar, cada panel guarda su alto (size) en la vista
   const panesRef = useRef<HTMLDivElement>(null);
@@ -739,7 +757,7 @@ export function PlotPanel({
                   setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
                 }}
                 onChange={(f) => update(i, f)}
-                onDropTrace={(from, ti) => moveTrace(from, ti, i)}
+                onDropTrace={(from, ti, where) => (where === 'in' ? moveTrace(from, ti, i) : moveTraceToNewPane(from, ti, i, where))}
                 xRange={isF(i) ? (fRanges[i] ?? null) : range}
                 yRange={yRanges[i] ?? null}
                 rRange={rRanges[i] ?? null}

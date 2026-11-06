@@ -521,6 +521,10 @@ button.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 5
 .pane-split:hover, .pane-split:focus-visible { background: color-mix(in srgb, var(--accent) 45%, transparent); outline: none; }
 .pane { flex: 1 1 0; display: flex; flex-direction: column; min-height: 110px; border: 1px solid transparent; border-radius: 8px; padding: 2px 4px; }
 .pane.active { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+/* traza arrastrada junto al borde de arriba/abajo: se pinta la franja donde se insertará un panel nuevo */
+.pane.drop-above::before, .pane.drop-below::after { content: ''; position: absolute; left: 4px; right: 4px; height: 28px; max-height: 25%; border-radius: 6px; border: 1px dashed var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); pointer-events: none; z-index: 5; }
+.pane.drop-above::before { top: 0; }
+.pane.drop-below::after { bottom: 0; }
 .pane.drop { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .pane-chart { flex: 1; min-height: 0; overflow: hidden; }
 .pane-chart:focus { outline: none; }

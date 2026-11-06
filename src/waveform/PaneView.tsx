@@ -34,6 +34,16 @@ function droppedTrace(e: { dataTransfer: DataTransfer }): { pane: number; trace:
   }
 }
 
+/** dónde cae una traza arrastrada: dentro del panel o en uno nuevo arriba/abajo */
+export type DropWhere = 'in' | 'above' | 'below';
+/** franja junto al borde superior/inferior que crea un panel nuevo (px, a lo sumo un cuarto del alto) */
+const EDGE_PX = 28;
+function dropWhere(e: React.DragEvent<HTMLElement>): DropWhere {
+  const r = e.currentTarget.getBoundingClientRect();
+  const edge = Math.min(EDGE_PX, r.height / 4);
+  return e.clientY - r.top < edge ? 'above' : r.bottom - e.clientY < edge ? 'below' : 'in';
+}
+
 export function PaneView(props: {
   index: number;
   pane: Pane;
@@ -43,7 +53,8 @@ export function PaneView(props: {
   canRemove: boolean;
   onRemove(): void;
   onChange(f: (p: Pane) => Pane): void;
-  onDropTrace(fromPane: number, trace: number): void;
+  /** traza soltada: en el panel, o en un panel nuevo arriba/abajo si se soltó junto a ese borde */
+  onDropTrace(fromPane: number, trace: number, where: DropWhere): void;
   xRange: Range | null;
   /** eje Y fijo (zoom a recuadro); null = todo el rango de los datos (no se reajusta con el zoom en X, #200) */
   yRange: Range | null;
@@ -119,7 +130,7 @@ export function PaneView(props: {
   const [hover, setHover] = useState<number | null>(null);
   // valor escrito a mano en la etiqueta de una línea (V, H) o de un cursor: dónde va la caja y qué hace
   const [edit, setEdit] = useState<{ x: number; y: number; w: number; text: string; commit(v: number): void } | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [dragOver, setDragOver] = useState<DropWhere | null>(null);
   // menú del botón derecho sobre una traza de la leyenda
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number } | null>(null);
   /** cápsula bajo el mouse (muestra la información de su DFT) */
@@ -775,21 +786,24 @@ export function PaneView(props: {
 
   return (
     <div
-      className={`pane${pane.digital ? ' digital' : ''}${props.active ? ' active' : ''}${dragOver ? ' drop' : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
+      className={`pane${pane.digital ? ' digital' : ''}${props.active ? ' active' : ''}${dragOver === 'in' ? ' drop' : dragOver ? ` drop-${dragOver}` : ''}${removing ? ' removing' : ''}${zoomMode ? ' zooming' : ''}`}
       // con un tamaño elegido (divisor entre paneles), la altura es proporcional a él
       style={pane.size ? { flex: `${pane.size} 1 0` } : undefined}
       onPointerDown={props.onActivate}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TRACE_DRAG)) {
           e.preventDefault();
-          setDragOver(true);
+          setDragOver(dropWhere(e));
         }
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragLeave={(e) => {
+        // pasar a un hijo (la leyenda, el gráfico) también dispara dragleave: sólo cuenta salir del panel
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(null);
+      }}
       onDrop={(e) => {
-        setDragOver(false);
+        setDragOver(null);
         const d = droppedTrace(e);
-        if (d) props.onDropTrace(d.pane, d.trace);
+        if (d) props.onDropTrace(d.pane, d.trace, dropWhere(e));
       }}
     >
       <div className="pane-legend">
@@ -817,7 +831,7 @@ export function PaneView(props: {
                 const trace = d.trace;
                 e.preventDefault();
                 e.stopPropagation();
-                setDragOver(false);
+                setDragOver(null);
                 props.onChange((p) => reorderTrace(p, trace, ti));
               }}
               onPointerEnter={() => (props.onHoverExpr?.(tt.expr), setChipHover(ti))}

@@ -351,6 +351,8 @@ export class Library implements SymbolSource {
   /** Archivo de library/cmp que define este .model (como la standard.bjt que incluye LTspice) */
   cmpFileDefining(name: string): string | undefined {
     const n = name.toLowerCase();
+    // si un archivo del proyecto o del usuario lo define (.include models.txt), gana ése (#367)
+    if ([...this.projModels.values(), ...this.userModels.values()].some((s) => s.models.some((m) => m.toLowerCase() === n))) return undefined;
     return Object.entries(this.bundle.subs).find(([f, s]) => f.startsWith(CMP_DIR) && s.models.some((m) => m.toLowerCase() === n))?.[0];
   }
 

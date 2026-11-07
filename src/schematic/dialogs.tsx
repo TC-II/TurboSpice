@@ -7,7 +7,7 @@ import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
-import { cmpApply, type CmpPart } from '../library/cmp.ts';
+import { cmpApply, isDefaultMosSize, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
 import { defaultWindows, effectiveAttrs, effectiveWindows, shownAlign, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
@@ -464,7 +464,13 @@ export function AttributeDialog({
   const pick = (p: CmpPart) => {
     const a = cmpApply(p);
     setPicked(p.name);
-    const next = { ...vals, Value: a.Value, ...(a.SpiceLine !== null || p.kind !== 'res' ? { SpiceLine: a.SpiceLine ?? '' } : {}) };
+    const next = {
+      ...vals,
+      Value: a.Value,
+      ...(a.SpiceLine !== null || p.kind !== 'res' ? { SpiceLine: a.SpiceLine ?? '' } : {}),
+      // MOS de proceso: su W/L por omisión, salvo que ya tenga un tamaño puesto a mano (#367)
+      ...(a.Value2 && isDefaultMosSize(vals.Value2 ?? '') ? { Value2: a.Value2 } : {}),
+    };
     setVals(next);
     return next;
   };

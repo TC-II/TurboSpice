@@ -120,6 +120,7 @@ export const CMP_COLUMNS: Record<CmpKind, CmpColumn[]> = {
   ],
   mos: [
     { key: '@channel', label: t('Channel') },
+    { key: 'level', label: 'Level' },
     { key: 'vds', label: 'Vds', unit: 'V' },
     { key: 'ron', label: 'Ron', unit: 'Ω' },
     { key: 'qg', label: 'Qg', unit: 'C' },
@@ -174,8 +175,9 @@ export function compareCells(a: string, b: string, dir: 1 | -1): number {
 
 export function cmpCell(p: CmpPart, key: string): string {
   if (key === '@type') return p.type;
-  if (key === '@channel') return p.flags.has('pchan') ? 'P' : 'N';
-  const v = p.params.get(key) ?? '';
+  if (key === '@channel') return p.flags.has('pchan') || p.type === 'PMOS' ? 'P' : 'N';
+  // (BSIM4, level 54, llama vth0 al umbral)
+  const v = p.params.get(key) ?? (key === 'vto' ? p.params.get('vth0') : undefined) ?? '';
   return key === 'mfg' ? v.replace(/_/g, ' ') : v;
 }
 
@@ -196,10 +198,13 @@ export function cmpChoicesFor(prefix: string, symbol: string): { kind: CmpKind; 
     case 'JP':
       return [{ kind: 'jft', label: 'JFET', accept: (p) => p.type === (pre === 'JN' ? 'NJF' : 'PJF') }];
     case 'MN':
-    case 'MP':
-      // VDMOS es de 3 terminales: los símbolos de 4 (nmos4, pmos4) no lo usan
-      if (/4$/.test(sym)) return [];
-      return [{ kind: 'mos', label: 'MOSFET', accept: (p) => p.type === 'VDMOS' && p.flags.has('pchan') === (pre === 'MP') }];
+    case 'MP': {
+      // VDMOS (los discretos) es de 3 terminales: los símbolos de 4 (nmos4, pmos4) sólo muestran
+      // los MOS de proceso (NMOS/PMOS con W y L, #367); los de 3, los dos
+      const p4 = /4$/.test(sym);
+      const process = (p: CmpPart) => p.type === (pre === 'MP' ? 'PMOS' : 'NMOS');
+      return [{ kind: 'mos', label: 'MOSFET', accept: (p) => process(p) || (!p4 && p.type === 'VDMOS' && p.flags.has('pchan') === (pre === 'MP')) }];
+    }
     case 'C':
       return [{ kind: 'cap', label: t('Capacitors'), accept: () => true }];
     case 'L':
@@ -218,7 +223,7 @@ export function cmpChoicesFor(prefix: string, symbol: string): { kind: CmpKind; 
  * Atributos a escribir al elegir una pieza: los semiconductores usan el nombre del modelo como
  * valor; los pasivos, su valor principal y los parásitos en SpiceLine (como LTspice).
  */
-export function cmpApply(p: CmpPart): { Value: string; SpiceLine: string | null } {
+export function cmpApply(p: CmpPart): { Value: string; SpiceLine: string | null; Value2?: string } {
   const g = (k: string) => p.params.get(k);
   const line = (pairs: [string, string | undefined][]) => pairs.filter(([, v]) => v).map(([k, v]) => `${k}=${v}`).join(' ') || null;
   switch (p.kind) {
@@ -231,9 +236,24 @@ export function cmpApply(p: CmpPart): { Value: string; SpiceLine: string | null 
     case 'res':
       return { Value: g('r') ?? p.name, SpiceLine: null };
     default:
-      return { Value: p.name, SpiceLine: null };
+      return { Value: p.name, SpiceLine: null, ...(MOS_SIZES[p.name.toLowerCase()] ? { Value2: MOS_SIZES[p.name.toLowerCase()] } : {}) };
   }
 }
+
+/**
+ * Tamaño con el que queda un MOS de proceso al elegirlo de la lista (Value2), #367: los de 1 µm
+ * como en los ejercicios del curso (inversor de N 2u/1u y P 6u/1u, la relación de KP es 3:1);
+ * los de 50 nm, L mínima y la misma relación 1:2 de Baker.
+ */
+export const MOS_SIZES: Record<string, string> = {
+  n_1u: 'l=1u w=2u',
+  p_1u: 'l=1u w=6u',
+  n_50n: 'l=50n w=100n',
+  p_50n: 'l=50n w=200n',
+};
+
+/** ¿Value2 está vacío o es el tamaño por omisión de algún modelo? (entonces se reemplaza al elegir otro) */
+export const isDefaultMosSize = (v2: string): boolean => !v2.trim() || Object.values(MOS_SIZES).includes(v2.trim().toLowerCase());
 
 /** Parámetros que sólo informa LTspice (tabla de componentes) y que ngspice no acepta */
 const LTSPICE_ONLY = /\b(iave|vpk|ipk|vceo|icrating|mfg|type)\s*=\s*[^\s,)]+/gi;

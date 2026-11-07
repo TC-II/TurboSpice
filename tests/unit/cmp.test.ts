@@ -63,9 +63,32 @@ describe('qué lista ve cada símbolo', () => {
     const pmos = names('MP', 'pmos');
     expect(pmos).toContain('IRF9640');
     expect(pmos).not.toContain('IRF740');
-    expect(names('MN', 'nmos4')).toEqual([]); // VDMOS es de 3 terminales
+    // nmos4/pmos4: sólo los MOS de proceso (VDMOS es de 3 terminales); nmos/pmos: los dos (#367)
+    expect(names('MN', 'nmos4')).toEqual(['N_1u', 'N_50n']);
+    expect(names('MP', 'pmos4')).toEqual(['P_1u', 'P_50n']);
+    expect(pmos).toContain('P_1u');
     expect(cmpChoicesFor('L', 'ind').map((c) => c.label)).toEqual(['Inductores', 'Ferrites']);
     expect(cmpChoicesFor('V', 'voltage')).toEqual([]);
+  });
+
+  it('MOS de proceso: canal y W/L de los ejercicios al elegirlos (#367)', () => {
+    const mos = lib.parts('mos');
+    const part = (n: string) => mos.find((p) => p.name === n)!;
+    expect(cmpCell(part('P_1u'), '@channel')).toBe('P');
+    expect(cmpCell(part('N_50n'), '@channel')).toBe('N');
+    expect(part('N_1u').params.get('level')).toBe('3');
+    expect(cmpApply(part('N_1u')).Value2).toBe('l=1u w=2u');
+    expect(cmpApply(part('P_1u')).Value2).toBe('l=1u w=6u');
+    expect(cmpApply(part('IRF740')).Value2).toBeUndefined();
+    expect(cmpCell(part('N_50n'), 'vto')).toBe('0.22');
+  });
+
+  it('un MOS de proceso definido en el proyecto (.include models.txt) gana al de library/cmp (#367)', () => {
+    const own = new Library(buildBundle());
+    expect(own.cmpFileDefining('N_1u')).toBe('cmp/standard.mos');
+    own.setProjectFiles([{ name: 'models.txt', kind: 'model', text: '.MODEL N_1u NMOS LEVEL=3 VTO=0.8' }]);
+    expect(own.cmpFileDefining('N_1u')).toBeUndefined();
+    expect(own.cmpFileDefining('P_1u')).toBe('cmp/standard.mos');
   });
 
   it('elegir un pasivo pone su valor y los parásitos en SpiceLine', () => {

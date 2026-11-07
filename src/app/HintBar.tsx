@@ -89,7 +89,9 @@ export function toolHint(tt: Tool): string {
       return t('Click to start {what} · Draw › Line style · Esc to finish', { what });
     }
     case 'pencil':
-      return t('Drag to draw freehand · Esc to finish');
+      return t('Drag to draw freehand · Shift+F: eraser · Esc to finish');
+    case 'eraser':
+      return t('Drag over a stroke to erase pieces of it · F: pencil · Esc to finish');
     case 'zoom':
       return t('Drag a box to zoom (click: zoom in) · Shift+Z: previous zoom');
     case 'pick':

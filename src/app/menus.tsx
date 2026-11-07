@@ -139,7 +139,7 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
     { label: t('Rectangle'), shortcut: 'K', onClick: shapeTool('RECTANGLE') },
     { label: t('Circle'), shortcut: 'O', onClick: shapeTool('CIRCLE') },
     { label: t('Arc'), shortcut: 'U', onClick: shapeTool('ARC') },
-    { label: t('Pencil (freehand)'), onClick: () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) }) },
+    { label: t('Pencil (freehand)'), shortcut: 'F', onClick: () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) }) },
     { label: t('Paste image'), onClick: () => void paste() },
     'sep',
     { label: t('Line style…'), onClick: () => openLineStyle() },

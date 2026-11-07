@@ -10,9 +10,10 @@ cd /d "%~dp0"
 set "ROOT=%~dp0"
 set "ROOT=%ROOT:~0,-1%"
 
-rem Which branch to serve. main runs in this folder; dev runs in its own
-rem detached worktree (.claude\worktrees\dev-local), so this checkout keeps its branch.
-set "BRANCH=main"
+rem What to serve. 1 runs this folder as it is (its current branch, with any
+rem uncommitted changes); dev runs origin/dev in its own detached worktree
+rem (.claude\worktrees\dev-local), so this checkout keeps its branch.
+set "BRANCH=local"
 set "PORT=5173"
 set "DIR=%ROOT%"
 
@@ -35,13 +36,13 @@ if errorlevel 1 (
 echo.
 echo   TurboSpice
 echo.
-echo     1. main - the stable branch   http://localhost:5173/TurboSpice/
-echo     2. dev  - the dev branch      http://localhost:5182/TurboSpice/  (default)
+echo     1. local - this folder, with your current changes   http://localhost:5173/TurboSpice/  (default)
+echo     2. dev   - origin/dev, what is pushed                http://localhost:5182/TurboSpice/
 echo.
-rem Enter (or anything but 1) opens dev; main has to be chosen with 1.
+rem Enter (or anything but 2) opens this folder; dev has to be chosen with 2.
 set "PICK="
-set /p "PICK=  Choose 1 or 2 [2]: "
-if not "!PICK!"=="1" (
+set /p "PICK=  Choose 1 or 2 [1]: "
+if "!PICK!"=="2" (
   set "BRANCH=dev"
   set "PORT=5182"
   set "DIR=%ROOT%\.claude\worktrees\dev-local"

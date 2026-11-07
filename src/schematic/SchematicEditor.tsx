@@ -52,6 +52,8 @@ import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
 import { resizeShape, shapeHandles } from './shapes.ts';
+import { eraseAt, newStrokeStyle, penPrefs, strokeCoords, usePenPrefs } from './pen.ts';
+import { PenCapsule } from './PenCapsule.tsx';
 import { SUBCKT_DRAG, type Tool, type EditorHandle, type View, type Drag, type InlineText } from './editorTypes.ts';
 import {
   pinCurrents,
@@ -221,6 +223,7 @@ export function SchematicEditor(props: Props) {
   const cursorRef = useRef(cursor);
   cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
+  const pen = usePenPrefs();
   const [preview, setPreview] = useState<AscDoc | null>(null);
   // para el Ctrl+R de la ventana con un rótulo agarrado (fuera del ciclo de render)
   const dragNow = useRef(drag);
@@ -693,8 +696,15 @@ export function SchematicEditor(props: Props) {
         return;
       }
       case 'pencil':
-        setDrag({ mode: 'pencil', pts: [{ x: Math.round(p.x), y: Math.round(p.y) }] });
+        setDrag({ mode: 'pencil', pts: [p] });
         return;
+      case 'eraser': {
+        setDrag({ mode: 'erase', last: p });
+        const nd = eraseAt(doc, p, pen.eraser / view.scale);
+        previewNow.current = nd === doc ? null : nd;
+        setPreview(previewNow.current);
+        return;
+      }
       case 'shape': {
         const at = arcEnd(tool, p) ?? g;
         const s = shapeFromClicks(tool.shape, [...tool.pts, at], tool.style);
@@ -888,7 +898,22 @@ export function SchematicEditor(props: Props) {
     if (drag.mode === 'pencil') {
       // un punto cada ~2 px de pantalla: el trazo sigue la mano sin llenarse de puntos
       const last = drag.pts[drag.pts.length - 1];
-      if (Math.hypot(p.x - last.x, p.y - last.y) * view.scale >= 2) setDrag({ ...drag, pts: [...drag.pts, { x: Math.round(p.x), y: Math.round(p.y) }] });
+      if (Math.hypot(p.x - last.x, p.y - last.y) * view.scale >= 2) setDrag({ ...drag, pts: [...drag.pts, p] });
+      return;
+    }
+    if (drag.mode === 'erase') {
+      // la goma pasa por todo el camino desde el movimiento anterior (no sólo por donde cae el mouse)
+      const r = pen.eraser / view.scale;
+      const steps = Math.max(1, Math.ceil(Math.hypot(p.x - drag.last.x, p.y - drag.last.y) / (r / 2)));
+      // (previewNow: con movimientos seguidos el estado todavía no se renderizó)
+      const from = previewNow.current ?? doc;
+      let nd = from;
+      for (let i = 1; i <= steps; i++) nd = eraseAt(nd, { x: drag.last.x + ((p.x - drag.last.x) * i) / steps, y: drag.last.y + ((p.y - drag.last.y) * i) / steps }, r);
+      if (nd !== from) {
+        previewNow.current = nd;
+        setPreview(nd);
+      }
+      setDrag({ ...drag, last: p });
       return;
     }
     if (drag.mode === 'pan') {
@@ -965,8 +990,14 @@ export function SchematicEditor(props: Props) {
     }
     if (!drag) return;
     if (drag.mode === 'pencil' && drag.pts.length > 1) {
-      const style = tool.kind === 'pencil' ? tool.style : undefined;
-      commit({ ...doc, shapes: [...doc.shapes, { kind: 'PATH', coords: drag.pts.flatMap((q) => [q.x, q.y]), ...(style ? { style } : {}) }] });
+      const style = newStrokeStyle(penPrefs(), tool.kind === 'pencil' ? tool.style : undefined);
+      const coords = strokeCoords(drag.pts, 0.5 / view.scale);
+      if (coords.length >= 4) commit({ ...doc, shapes: [...doc.shapes, { kind: 'PATH', coords, ...(style ? { style } : {}) }] });
+    }
+    if (drag.mode === 'erase' && previewNow.current) {
+      commit(previewNow.current);
+      setPreview(null);
+      setSelection([]);
     }
     if (drag.mode === 'pan') commitView();
     if (drag.mode === 'pan' && drag.right && !drag.moved) {
@@ -1278,10 +1309,11 @@ export function SchematicEditor(props: Props) {
         {drag?.mode === 'pencil' && (
           <g className="schematic">
             <g className="shapes">
-              <polyline points={drag.pts.map((q) => `${q.x},${q.y}`).join(' ')} />
+              <ShapeView s={{ kind: 'PATH', coords: drag.pts.flatMap((q) => [q.x, q.y]), style: newStrokeStyle(pen, tool.kind === 'pencil' ? tool.style : undefined) }} />
             </g>
           </g>
         )}
+        {tool.kind === 'eraser' && <circle className="eraser-cursor" cx={cursor.x} cy={cursor.y} r={pen.eraser / view.scale} />}
         {tool.kind === 'wire' && tool.start && (
           // el cable que se está trazando, igual a como va a quedar (horizontal/vertical, o recto con Ctrl)
           <g className="wires drawing">
@@ -1378,7 +1410,8 @@ export function SchematicEditor(props: Props) {
           tool.kind !== 'pick' &&
           tool.kind !== 'delete' &&
           tool.kind !== 'move' &&
-          tool.kind !== 'pencil' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
+          tool.kind !== 'pencil' &&
+          tool.kind !== 'eraser' && <circle cx={(arcEnd(tool, cursor) ?? g).x} cy={(arcEnd(tool, cursor) ?? g).y} r={3 / view.scale} className="snap-cursor" />}
       </svg>
       {pinned && (
         <div className="bias-tip pinned" role="dialog" aria-label={pinned.info?.title} style={pinnedStyle(pinned)} onPointerDown={(e) => e.stopPropagation()}>
@@ -1404,6 +1437,7 @@ export function SchematicEditor(props: Props) {
           </div>
         </div>
       )}
+      {(tool.kind === 'pencil' || tool.kind === 'eraser') && <PenCapsule tool={tool} setTool={setTool} />}
       {tip && (
         <div
           className="bias-tip"

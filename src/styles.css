@@ -258,6 +258,19 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .sym .body { stroke-width: 1.4; }
 .sym .body .wave-icon { stroke-width: 2; }
 .sym .body text, .sym .symtext text { fill: currentColor; stroke: none; }
+/* grosor de las líneas del esquemático en pantalla (Configuración › Grosor de líneas): --sch-lw multiplica
+   el ancho de cables, figuras y símbolos; los skins traen su ancho en línea (casi todos 1.5 px) */
+svg.editor .wires line { stroke-width: calc(1.6px * var(--sch-lw, 1)); }
+svg.editor .wires line.sel { stroke-width: calc(2.4px * var(--sch-lw, 1)); }
+svg.editor .wires line.bus { stroke-width: calc(4.5px * var(--sch-lw, 1)); }
+svg.editor .wires line.bus.sel { stroke-width: calc(5.5px * var(--sch-lw, 1)); }
+svg.editor .buspin line { stroke-width: calc(1.6px * var(--sch-lw, 1)); }
+svg.editor .shapes > * { stroke-width: calc(1.4px * var(--sch-lw, 1)); }
+svg.editor .shapes > .sel { stroke-width: calc(2.2px * var(--sch-lw, 1)); }
+svg.editor .sym .body { stroke-width: calc(1.4px * var(--sch-lw, 1)); }
+svg.editor .flag { stroke-width: calc(1px * var(--sch-lw, 1)); }
+svg.editor .sym .body .wave-icon { stroke-width: calc(2px * var(--sch-lw, 1)); }
+:root[data-sch-lw] svg.editor .skin [style*='stroke-width'] { stroke-width: calc(1.5px * var(--sch-lw, 1)) !important; }
 /* skins (SVG de ASC-Parser): los valores por defecto de SVG, como los dibuja ASC-Parser: lo que no
    dice fill va relleno (flechas, signos) y lo que no dice stroke va sin trazo; en currentColor (#76) */
 .schematic .skin { fill: currentColor; stroke: none; }
@@ -729,6 +742,10 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 .iconbar button.primary:hover:not(:disabled), .iconbar button.primary.open { background: color-mix(in srgb, var(--accent-fill) 85%, #000); }
 .iconbar button.labeled { padding: 4px 10px; border-color: var(--border); }
 .iconbar button.run-off { background: transparent; border-color: var(--border); color: inherit; opacity: 0.55; }
+/* los grupos de íconos (de Archivo a Borrar), angostos para que entren en monitores chicos: el ícono queda igual */
+.iconbar .group[data-group] { gap: 0; padding: 0 3px 0 4px; }
+.iconbar .group[data-group]:first-child { padding-left: 0; }
+.iconbar .group[data-group] button:not(.labeled):not(.primary) { padding: 4px 3px; }
 .iconbar .status { flex: 1 1 auto; min-width: 0; margin-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Simular partido: acción principal + flecha con los tipos de análisis */
 .split { display: inline-flex; align-items: stretch; }
@@ -1407,7 +1424,24 @@ button.hier-tab { padding-right: 10px; }
 .trace-chip select.radix { font: 11px var(--mono); padding: 0 2px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); color: var(--fg); }
 .images > .sel rect { stroke: var(--sch-sel); stroke-width: 2.2; stroke-dasharray: 6 4; }
 .images image { opacity: 0.85; }
-svg.editor.tool-pencil { cursor: crosshair; }
+/* lápiz: un lápiz chico con la punta en el punto que dibuja (borde blanco: se ve en los dos temas) */
+svg.editor.tool-pencil { cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2722%27%20height%3D%2722%27%20viewBox%3D%270%200%2020%2020%27%3E%3Cg%20fill%3D%27none%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpath%20d%3D%27M2.5%2017.5l1-4%209-9%203%203-9%209z%27%20stroke%3D%27%23fff%27%20stroke-width%3D%273%27%2F%3E%3Cpath%20d%3D%27M2.5%2017.5l1-4%209-9%203%203-9%209zM11%206l3%203%27%20stroke%3D%27%23222%27%20stroke-width%3D%271.3%27%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E") 3 19, crosshair; }
+svg.editor.tool-eraser { cursor: none; }
+.eraser-cursor { fill: color-mix(in srgb, var(--sch-sel) 12%, transparent); stroke: var(--sch-sel); stroke-width: 1.2; vector-effect: non-scaling-stroke; pointer-events: none; }
+/* cápsula del lápiz (F): arriba del esquemático, centrada */
+.pen-capsule { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 2px; padding: 3px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 999px; box-shadow: 0 4px 16px rgb(0 0 0 / 16%); }
+.pen-capsule button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 6px; border: 1px solid transparent; border-radius: 999px; background: transparent; color: var(--fg); font-size: 12px; }
+.pen-capsule button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pen-capsule button.active { background: var(--accent-fill); color: #fff; }
+.pen-capsule svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.pen-capsule .pen-dot { display: block; border-radius: 50%; background: currentColor; }
+.pen-capsule .pen-level { min-width: 22px; padding: 0 3px; }
+.pen-capsule .pen-level.chosen { border-color: var(--border); }
+.pen-capsule .pen-ring { display: block; box-sizing: border-box; border-radius: 50%; border: 1.5px solid currentColor; }
+.pen-capsule .pen-swatch { min-width: 24px; padding: 0; }
+.pen-capsule .pen-swatch span { display: block; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 20%); }
+.pen-capsule .pen-swatch.active { background: transparent; border-color: var(--accent); }
+.pen-capsule .pen-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
 
 /* Editor de módulos «Modelo»: netlist y atributos a la izquierda, símbolo a la derecha */
 .model-editor { position: absolute; inset: 0; z-index: 7; background: var(--bg); }

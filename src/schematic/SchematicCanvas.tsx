@@ -1,5 +1,5 @@
 // Render SVG de un esquemático LTspice (sin interacción: la maneja SchematicEditor).
-import { memo, useId, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { memo, useId, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import type { CircuitDiff, Mark } from '../project/diff.ts';
 import { WINDOW_ATTR, baseName, type AscDoc, type Flag, type Orient, type PinDef, type Point, type Shape, type SymbolDef, type SymbolInst } from '../asc/model.ts';
 import { effectiveAttrs, effectiveWindows } from '../asc/resolve.ts';
@@ -9,7 +9,8 @@ import { onSegment, type Connectivity, type Net } from '../netlist/connectivity.
 import { busWidth, isBusName } from '../netlist/bus.ts';
 import { isNgspiceComment } from '../netlist/directives.ts';
 import { baselineOffset, displayValue, flagDirection, fontIndex, fontSize, junctionPoints, pinPoints, textBox, textLines, unescapeAsc, visibleText, type ItemRef } from './geometry.ts';
-import { arcAngles, lineDash } from './shapes.ts';
+import { arcAngles, lineDash, shapePoints } from './shapes.ts';
+import { parsePenStyle, smoothPath } from './pen.ts';
 import { parseSource } from '../sim/sources.ts';
 import { KINDS } from './sourceIcons.tsx';
 import { tremorSkin, tremorWire } from './tremor.ts';
@@ -102,8 +103,14 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
       return <ellipse className={className} cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} />;
     case 'ARC':
       return <path className={className} d={arcPath(c)} strokeDasharray={dash} />;
-    case 'PATH':
-      return <polyline className={className} points={c.join(' ')} strokeDasharray={dash} />;
+    case 'PATH': {
+      // lápiz: grosor en unidades del esquemático (sigue al zoom), color propio y curva suave
+      const pen = parsePenStyle(s.style);
+      const style: CSSProperties | undefined =
+        pen.width || pen.color ? { ...(pen.width ? { strokeWidth: pen.width, vectorEffect: 'none' } : {}), ...(pen.color && className !== 'sel' ? { stroke: `#${pen.color}` } : {}) } : undefined;
+      if (pen.smooth) return <path className={className} d={smoothPath(shapePoints(s))} strokeDasharray={dash} style={style} />;
+      return <polyline className={className} points={c.join(' ')} strokeDasharray={dash} style={style} />;
+    }
     case 'IMAGE': {
       const [x, y, w, h] = [Math.min(c[0], c[2]), Math.min(c[1], c[3]), Math.abs(c[2] - c[0]), Math.abs(c[3] - c[1])];
       return (

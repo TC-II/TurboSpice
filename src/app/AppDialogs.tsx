@@ -99,6 +99,8 @@ export interface AppDialogsProps {
   setConflict(c: FileConflictAsk | null): void;
   schFont: string;
   setSchFont(id: string): void;
+  schLw: number;
+  setSchLw(level: number): void;
   onSkin(name: string): void;
   hoverReveal: boolean;
   setHoverReveal(on: boolean): void;
@@ -123,8 +125,25 @@ export function AppDialogs(props: AppDialogsProps) {
   const { dialog, conn, setToolState, shapeStyle, setShapeStyleState, makesCycle, adoptNetlistFor, adoptSymbolFor, partGroups, sweepSubParam } = props;
   const { picking, picker, circuitInfo, studyInfo, allRuns, labels, hiddenRuns, setHiddenRuns, setOverlay } = props;
   const { userFileInfo, addUserFiles, removeUserFile, makeUserSymbol, project, setProjectState, openSub, addProjectFiles, removeProjectFile, makeProjectSymbol, checkSubName, createModule } = props;
-  const { driveConflict, setDriveConflict, resolveDriveConflict, conflict, setConflict, schFont, setSchFont, onSkin, hoverReveal, setHoverReveal, traceW, importInput, file, setFile, openDriveFile } =
-    props;
+  const {
+    driveConflict,
+    setDriveConflict,
+    resolveDriveConflict,
+    conflict,
+    setConflict,
+    schFont,
+    setSchFont,
+    schLw,
+    setSchLw,
+    onSkin,
+    hoverReveal,
+    setHoverReveal,
+    traceW,
+    importInput,
+    file,
+    setFile,
+    openDriveFile,
+  } = props;
   const { curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope } = props;
   return (
     <>
@@ -377,6 +396,14 @@ export function AppDialogs(props: AppDialogsProps) {
                   value: schFont,
                   options: FONTS.map((f) => ({ value: f.id, label: f.label })),
                   onChange: setSchFont,
+                },
+                {
+                  kind: 'choice',
+                  label: t('Line thickness'),
+                  hint: t('The thickness of wires, symbols and drawings on screen'),
+                  value: String(schLw),
+                  options: [t('Thin'), t('Medium'), t('Thick')].map((label, i) => ({ value: String(i), label })),
+                  onChange: (v) => setSchLw(Number(v)),
                 },
                 {
                   kind: 'choice',

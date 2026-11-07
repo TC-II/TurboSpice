@@ -244,7 +244,7 @@ function SchematicMode({
   // módulo «Modelo» abierto en su editor ('' = ninguno); se cierra al cambiar de nivel o de testbench
   const [curModel, setCurModel] = useState('');
   const [message, setMessage] = useState<string>();
-  const { hoverReveal, setHoverReveal, schFont, setSchFont, traceW, treePeek, setTreePeek, setTreePref, treeOpen, symW, setSymW, treeShown } = useLayoutPrefs(hasSubs, setMessage);
+  const { hoverReveal, setHoverReveal, schFont, setSchFont, schLw, setSchLw, traceW, treePeek, setTreePeek, setTreePref, treeOpen, symW, setSymW, treeShown } = useLayoutPrefs(hasSubs, setMessage);
   const [quickOpen, setQuickOpen] = useState(false);
   const levelViews = useRef(new Map<string, EditorView>());
   // el próximo cambio de `history` no es una edición (se abrió un archivo o se cambió de simulación)
@@ -443,6 +443,7 @@ function SchematicMode({
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
   const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const pencilTool = () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) });
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(false);
@@ -1025,6 +1026,7 @@ function SchematicMode({
       descend,
       startMove,
       shapeTool,
+      pencilTool,
       deleteSelection,
     },
   });
@@ -1327,6 +1329,8 @@ function SchematicMode({
             setConflict,
             schFont,
             setSchFont,
+            schLw,
+            setSchLw,
             onSkin,
             hoverReveal,
             setHoverReveal,

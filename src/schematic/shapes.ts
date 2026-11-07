@@ -5,6 +5,7 @@
 import type { Point, Shape } from '../asc/model.ts';
 import type { Box } from './geometry.ts';
 import { t } from '../i18n/i18n.ts';
+import { parsePenStyle } from './pen.ts';
 
 /** Estilos de línea de LTspice (`[style]` al final de la línea): sin estilo = sólida */
 export const LINE_STYLES = [
@@ -15,7 +16,8 @@ export const LINE_STYLES = [
   { value: '4', label: t('Dash-dot-dot'), dash: '10 5 2 5 2 5' },
 ] as const;
 
-export const lineDash = (style?: string) => LINE_STYLES.find((s) => s.value === (style ?? ''))?.dash;
+/** (en un PATH el estilo trae además grosor, color y suavizado: sólo cuenta su dígito) */
+export const lineDash = (style?: string) => LINE_STYLES.find((s) => s.value === (parsePenStyle(style).dash ?? ''))?.dash;
 
 /** Ángulos (paramétricos) de inicio y el recorrido antihorario de un arco */
 export function arcAngles(c: number[]) {

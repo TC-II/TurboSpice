@@ -53,6 +53,7 @@ export interface ShortcutActions {
   descend(si: number): boolean;
   startMove(stretch: boolean): void;
   shapeTool(shape: DrawnShapeKind): () => void;
+  pencilTool(): void;
   deleteSelection(): void;
 }
 
@@ -101,6 +102,7 @@ export function useShortcuts(a: ShortcutActions) {
     descend,
     startMove,
     shapeTool,
+    pencilTool,
     deleteSelection,
   } = a;
   useEffect(() => {
@@ -223,6 +225,10 @@ export function useShortcuts(a: ShortcutActions) {
           return handled(), shapeTool('ARC')();
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
+        case 'f':
+        case 'F':
+          // lápiz; con Shift, la goma
+          return handled(), e.shiftKey ? setTool({ kind: 'eraser' }) : pencilTool();
         case 'n':
           return handled(), setDialog({ kind: 'flag' });
         case 'Delete':

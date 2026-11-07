@@ -29,6 +29,8 @@ export type Tool =
   | { kind: 'shape'; shape: DrawnShapeKind; pts: Point[]; style?: string }
   /** lápiz: anotaciones a mano alzada (figura PATH), arrastrando con el botón izquierdo */
   | { kind: 'pencil'; style?: string }
+  /** goma: borra pedazos de los trazos del lápiz, arrastrando */
+  | { kind: 'eraser' }
   /** Z: arrastrar un recuadro y ajustar la vista a él; después vuelve a `prev` */
   | { kind: 'zoom'; prev: Tool };
 
@@ -81,6 +83,8 @@ export type Drag =
   | { mode: 'probe'; start: Point; from: { net?: string; symbol?: number; pin?: number; body?: boolean } }
   /** trazo del lápiz en curso */
   | { mode: 'pencil'; pts: Point[] }
+  /** goma apretada; `last`: dónde estaba en el movimiento anterior */
+  | { mode: 'erase'; last: Point }
   /** mover un codo de cable; `base` es el documento con el cable ya partido si hizo falta */
   | { mode: 'vertex'; base: AscDoc; at: Point; free: boolean; commitBase: boolean }
   /** desplazar un tramo de cable en forma perpendicular */

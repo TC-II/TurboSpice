@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildBundle } from '../../scripts/build-library.mjs';
+import { buildBundle, normalizeSkin } from '../../scripts/build-library.mjs';
 import { Library } from '../../src/library/library.ts';
 
 const TRANSISTORS = ['npn', 'pnp', 'NPN_ideal', 'PNP_ideal', 'nmos', 'pmos', 'nmos4', 'pmos4', 'nm_ic', 'pm_ic', 'nm_ic_4', 'pm_ic_4', 'njf', 'pjf'];
@@ -71,5 +71,13 @@ describe('trazos de los skins (#231)', () => {
   it('los signos + y − de la fuente de tensión llevan contorno de 1 px', () => {
     expect(skins.voltage.body).toContain('stroke-width: 1px');
     expect(skins.voltage.body).not.toMatch(/stroke-width:\s*\.5/);
+  });
+
+  it('stroke-width como atributo pasa a style, para el grosor de líneas de la Configuración (#367)', () => {
+    const { body } = normalizeSkin('<svg viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="0" stroke="#000000" stroke-width="1.5"/><path d="M0 0" style="fill:none" stroke-width="2"/></svg>');
+    expect(body).not.toMatch(/\sstroke-width="/);
+    expect(body).toContain('<line style="stroke-width: 1.5px;"');
+    expect(body).toContain('style="fill:none;stroke-width: 2px;"');
+    for (const n of ['nmos', 'nmos4', 'nm_ic', 'pm_ic_4']) expect(skins[n].body).not.toMatch(/\sstroke-width="/);
   });
 });

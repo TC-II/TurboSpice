@@ -58,7 +58,15 @@ export function normalizeSkin(svg) {
         .join('');
       return style ? ` style="${style}"` : '';
     })
-    .replace(/\sid="[^"]*"/g, '');
+    .replace(/\sid="[^"]*"/g, '')
+    // stroke-width como atributo (stroke-width="1.5", SVG que no son de Illustrator) pasa a style,
+    // como los de clase: el grosor de líneas de la Configuración (styles.css) busca style (#367)
+    .replace(/<[^>]*\sstroke-width="[^"]*"[^>]*>/g, (tag) => {
+      const w = /\sstroke-width="([^"]*)"/.exec(tag)[1];
+      const decl = `stroke-width: ${/^[\d.]+$/.test(w) ? `${w}px` : w};`;
+      const t = tag.replace(/\sstroke-width="[^"]*"/, '');
+      return /\sstyle="/.test(t) ? t.replace(/\sstyle="([^"]*)"/, (_, st) => ` style="${st}${/;\s*$/.test(st) || !st ? '' : ';'}${decl}"`) : t.replace(/^<([\w-]+)/, `<$1 style="${decl}"`);
+    });
   // en un skin a color (Boca Jrs) el blanco es un color más (la flecha blanca sobre el azul): queda
   // blanco; en uno en blanco y negro es el fondo, y en el tema oscuro sigue al fondo
   const colored = /#(?!(?:000|fff|000000|ffffff)\b)[0-9a-f]{3}(?:[0-9a-f]{3})?\b/i.test(body);

@@ -6,7 +6,7 @@ import { t } from '../i18n/i18n.ts';
 import { fontChoice, loadFont } from '../schematic/fonts.ts';
 import { setMeasureFont } from '../schematic/geometry.ts';
 import { useTraceWidth } from '../waveform/lineWidth.ts';
-import { SCH_FONT_KEY } from './constants.ts';
+import { SCH_FONT_KEY, SCH_LINE_WIDTHS, SCH_LW_KEY } from './constants.ts';
 import { lsGet, lsSet } from './storage.ts';
 
 /** `hasSubs`: el proyecto tiene subcircuitos o modelos (sin elección del usuario, el panel se abre) */
@@ -25,6 +25,23 @@ export function useLayoutPrefs(hasSubs: boolean, setMessage: (m?: string) => voi
   }, [schFont, setMessage]);
   const setSchFont = (id: string) => (lsSet(SCH_FONT_KEY, id), setSchFontState(id));
   const traceW = useTraceWidth();
+  // grosor de las líneas del esquemático: 0 fino, 1 medio (el de por omisión), 2 grueso (variable --sch-lw)
+  const [schLw, setSchLwState] = useState(() => {
+    const s = lsGet(SCH_LW_KEY);
+    const v = Number(s);
+    return s !== null && s !== '' && SCH_LINE_WIDTHS[v] ? v : 1;
+  });
+  useEffect(() => {
+    const root = document.documentElement;
+    if (schLw) {
+      root.style.setProperty('--sch-lw', String(SCH_LINE_WIDTHS[schLw]));
+      root.setAttribute('data-sch-lw', String(schLw));
+    } else {
+      root.style.removeProperty('--sch-lw');
+      root.removeAttribute('data-sch-lw');
+    }
+  }, [schLw]);
+  const setSchLw = (v: number) => (lsSet(SCH_LW_KEY, String(v)), setSchLwState(v));
   const setHoverReveal = (on: boolean) => (lsSet('turbospice.treeHover', on ? '1' : '0'), setHoverRevealState(on));
   const [treePeek, setTreePeek] = useState(false);
   // panel de proyecto: lo que eligió el usuario; si nunca eligió, abierto si hay subcircuitos. Quien
@@ -57,5 +74,5 @@ export function useLayoutPrefs(hasSubs: boolean, setMessage: (m?: string) => voi
   };
   // con «mostrar al acercar el mouse» el panel oculto queda como un borde visible (#251)
   const treeShown = treeOpen || treePeek || hoverReveal;
-  return { hoverReveal, setHoverReveal, schFont, setSchFont, traceW, treePeek, setTreePeek, setTreePref, treeOpen, symW, setSymW, treeShown };
+  return { hoverReveal, setHoverReveal, schFont, setSchFont, schLw, setSchLw, traceW, treePeek, setTreePeek, setTreePref, treeOpen, symW, setSymW, treeShown };
 }

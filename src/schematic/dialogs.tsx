@@ -435,8 +435,11 @@ export function AttributeDialog({
   };
   // MOS de proceso (no VDMOS, el discreto de 3 terminales): un campo por dimensión física arriba de
   // Value2, como la ventana «Monolithic MOSFET» de LTspice; escriben en Value2 (#367)
-  const vdmos = parts?.some((g) => g.parts.some((p) => p.type === 'VDMOS' && p.name.toLowerCase() === (vals.Value ?? '').trim().toLowerCase()));
-  const geometry = mos && !vdmos;
+  // sólo con un modelo de proceso elegido (N_1u…) o un Value2 que ya tenga L, W…: no con el NMOS
+  // por omisión ni con un VDMOS
+  const valueName = (vals.Value ?? '').trim().toLowerCase();
+  const process = parts?.some((g) => g.parts.some((p) => (p.type === 'NMOS' || p.type === 'PMOS') && p.name.toLowerCase() === valueName));
+  const geometry = mos && (process || MOS_GEOMETRY.some((g) => getInstParam(vals.Value2 ?? '', g.key)));
   // capacitor e inductor (#310): la condición inicial es el IC= de su SpiceLine
   const icUnit = /^c$/i.test(prefix) ? 'V' : /^l$/i.test(prefix) ? 'A' : undefined;
   const IC_RE = /(^|\s)ic\s*=\s*(\{[^}]*\}|\S+)/i;

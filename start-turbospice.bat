@@ -36,10 +36,12 @@ echo.
 echo   TurboSpice
 echo.
 echo     1. main - the stable branch   http://localhost:5173/TurboSpice/
-echo     2. dev  - the dev branch      http://localhost:5182/TurboSpice/
+echo     2. dev  - the dev branch      http://localhost:5182/TurboSpice/  (default)
 echo.
-choice /c 12 /n /m "  Choose 1 or 2: "
-if errorlevel 2 (
+rem Enter (or anything but 1) opens dev; main has to be chosen with 1.
+set "PICK="
+set /p "PICK=  Choose 1 or 2 [2]: "
+if not "!PICK!"=="1" (
   set "BRANCH=dev"
   set "PORT=5182"
   set "DIR=%ROOT%\.claude\worktrees\dev-local"

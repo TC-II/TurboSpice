@@ -50,6 +50,12 @@ export function scanModels(text: string): { subckts: string[]; models: string[] 
   return { subckts, models };
 }
 
+/**
+ * Nombres viejos de símbolos de la librería que siguen abriendo con el nuevo (los .asc hechos con
+ * TCLib usan nm_nobulk/pm_nobulk, que pasaron a nm_ic/pm_ic, #367)
+ */
+export const SYMBOL_ALIASES: Record<string, string> = { nm_nobulk: 'nm_ic', pm_nobulk: 'pm_ic' };
+
 export class Library implements SymbolSource {
   readonly windowDefaults: WindowDefaults;
   private byPath = new Map<string, string>();
@@ -111,7 +117,8 @@ export class Library implements SymbolSource {
   /** Busca como LTspice: por ruta relativa a lib/sym y, si no, por nombre base (sin mayúsculas) */
   private resolvePath(type: string): string | undefined {
     const path = symbolPath(type).toLowerCase();
-    return this.byPath.get(path) ?? this.byName.get(baseName(type).toLowerCase());
+    const name = baseName(type).toLowerCase();
+    return this.byPath.get(path) ?? this.byName.get(name) ?? (SYMBOL_ALIASES[name] ? this.byName.get(SYMBOL_ALIASES[name]) : undefined);
   }
 
   symbol(type: string): SymbolDef | undefined {
@@ -145,7 +152,9 @@ export class Library implements SymbolSource {
     if (!path) return undefined;
     let def = this.cache.get(path);
     if (!def) {
-      def = parseAsy(extra ?? lt?.text ?? this.bundle.symbols[path], baseName(type));
+      // (un alias se lee con el nombre nuevo: el def queda en caché por ruta y lo comparten)
+      const named = !extra && !lt && SYMBOL_ALIASES[name] && !this.byName.has(name) ? SYMBOL_ALIASES[name] : baseName(type);
+      def = parseAsy(extra ?? lt?.text ?? this.bundle.symbols[path], named);
       this.cache.set(path, def);
     }
     return def;
@@ -271,7 +280,8 @@ export class Library implements SymbolSource {
 
   skin(type: string) {
     // un símbolo puede usar el dibujo de otro (SYMATTR Skin nmos4: los de PDK, sky130/nfet_01v8)
-    const name = this.symbol(type)?.attrs.get('Skin') ?? baseName(type);
+    const base = baseName(type);
+    const name = this.symbol(type)?.attrs.get('Skin') ?? SYMBOL_ALIASES[base.toLowerCase()] ?? base;
     const set = this.skinSet;
     return set?.[name] ?? set?.[name.toLowerCase()] ?? this.bundle.skins[name] ?? this.bundle.skins[name.toLowerCase()];
   }

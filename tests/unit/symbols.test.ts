@@ -50,4 +50,17 @@ describe('símbolos agregados (#75)', () => {
     // nm_ic_4: el bulk es su propio pin (48,48), como nmos4
     expect(net).toMatch(/^M3 \S+ \S+ \S+ sub NMOS$/m);
   });
+
+  it('nm_nobulk y pm_nobulk (TCLib) abren como nm_ic y pm_ic, con su dibujo (#367)', () => {
+    for (const [old, now] of [
+      ['nm_nobulk', 'nm_ic'],
+      ['pm_nobulk', 'pm_ic'],
+    ]) {
+      expect(lib.symbol(old)?.pins.map((p) => p.attrs.get('PinName'))).toEqual(lib.symbol(now)?.pins.map((p) => p.attrs.get('PinName')));
+      expect(lib.skin(old)).toBeDefined();
+      expect(lib.skin(old)).toBe(lib.skin(now));
+      // y las posiciones de rótulos del nuevo
+      expect(lib.symbol(old)?.name).toBe(now);
+    }
+  });
 });

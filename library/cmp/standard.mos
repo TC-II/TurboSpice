@@ -8,7 +8,7 @@
 * De R. J. Baker, CMOS Circuit Design, Layout, and Simulation (cmosedu.com), con tamaños reales:
 *   N_1u, P_1u    LEVEL 3, proceso de 1 um, Vdd = 5 V
 *   N_50n, P_50n  BSIM4 (level 54), proceso de 50 nm, Vdd = 1 V
-.MODEL N_1u NMOS LEVEL  = 3
+.MODEL N_1u NMOS LEVEL  = 3 mfg=R._J._Baker
 + TOX    = 200E-10         NSUB   = 1E17            GAMMA  = 0.5
 + PHI    = 0.7             VTO    = 0.8             DELTA  = 3.0
 + UO     = 650             ETA    = 3.0E-6          THETA  = 0.1
@@ -18,7 +18,7 @@
 + CGDO   = 200E-12         CGSO   = 200E-12         CGBO   = 1E-10
 + CJ     = 400E-6          PB     = 1               MJ     = 0.5
 + CJSW   = 300E-12         MJSW   = 0.5
-.model  N_50n  nmos  level = 54
+.model  N_50n  nmos  level = 54 mfg=R._J._Baker
 +binunit = 1            paramchk= 1            mobmod  = 0
 +capmod  = 2            igcmod  = 1            igbmod  = 1            geomod  = 1
 +diomod  = 1            rdsmod  = 0            rbodymod= 1            rgatemod= 1
@@ -78,7 +78,7 @@
 +rbps    = 15           rbdb    = 15           rbsb    = 15           ngcon   = 1
 .model IRF9640 VDMOS(pchan Rg=3 Vto=-3.5 Rd=.15 Rs=.15 Rb=.15 Kp=8 lambda=.01 mtriode=.5 Cgdmax=1.5n Cgdmin=.07n Cgs=1n Cjo=1n Is=38p ksubthres=.1 mfg=International_Rectifier Vds=-200 Ron=.5 Qg=44n)
 .model BS250P VDMOS(pchan Rg=160 VTO=-3.193 RS=2.041 RD=0.697 IS=2E-13 KP=0.277 Cjo=105p LAMBDA=1.2E-2 RB=0.309 Rds=1.2E8 Cgdmax=57p Cgdmin=5p CGS=47p TT=86.56n BV=45 IBV=10u)
-.MODEL P_1u PMOS LEVEL  = 3
+.MODEL P_1u PMOS LEVEL  = 3 mfg=R._J._Baker
 + TOX    = 200E-10         NSUB   = 1E17            GAMMA  = 0.6
 + PHI    = 0.7             VTO    = -0.9            DELTA  = 0.1
 + UO     = 250             ETA    = 0               THETA  = 0.1
@@ -88,7 +88,7 @@
 + CGDO   = 200E-12         CGSO   = 200E-12         CGBO   = 1E-10
 + CJ     = 400E-6          PB     = 1               MJ     = 0.5
 + CJSW   = 300E-12         MJSW   = 0.5
-.model  P_50n  pmos  level = 54
+.model  P_50n  pmos  level = 54 mfg=R._J._Baker
 +binunit = 1            paramchk= 1            mobmod  = 0
 +capmod  = 2            igcmod  = 1            igbmod  = 1            geomod  = 1
 +diomod  = 1            rdsmod  = 0            rbodymod= 1            rgatemod= 1

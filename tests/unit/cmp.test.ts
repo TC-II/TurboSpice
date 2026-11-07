@@ -85,6 +85,9 @@ describe('qué lista ve cada símbolo', () => {
     expect(cmpApply(part('P_1u')).Value2).toBe('l=1u w=6u');
     expect(cmpApply(part('IRF740')).Value2).toBeUndefined();
     expect(cmpCell(part('N_50n'), 'vto')).toBe('0.22');
+    expect(cmpCell(part('P_1u'), 'mfg')).toBe('R. J. Baker');
+    // y ngspice no lo ve (es sólo informativo)
+    expect(stripLtspiceInfo('.MODEL N_1u NMOS LEVEL  = 3 mfg=R._J._Baker').trimEnd()).toBe('.MODEL N_1u NMOS LEVEL  = 3');
   });
 
   it('un MOS de proceso definido en el proyecto (.include models.txt) gana al de library/cmp (#367)', () => {

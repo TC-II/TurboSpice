@@ -1,5 +1,5 @@
 // Genera library/sym/<pdk>/<dispositivo>.asy: los dispositivos más usados de sky130 y GF180MCU,
-// con los gráficos de los símbolos base (nmos4, pmos4, res2, cap, diode, pnp, pnp4). Los MOS,
+// con los gráficos de los símbolos base (nm_ic_4, pm_ic_4: los MOS de integrado, #367; res2, cap, diode, pnp, pnp4). Los MOS,
 // resistencias, capacitores y BJT son subcircuitos (Prefix X, Value = el subcircuito, SpiceLine =
 // sus parámetros: un SpiceModel sin ModelFile sería, como en LTspice, el archivo); los diodos,
 // .model sueltos. En sky130 (.option scale=1u) W y L van en µm; en GF180, en metros (1u).
@@ -13,7 +13,7 @@ const SYM = join(dirname(fileURLToPath(import.meta.url)), '..', 'library', 'sym'
 
 /**
  * Los gráficos y pines de un símbolo base (sin sus SYMATTR), con su skin SVG (SYMATTR Skin: el
- * dibujo con flecha de nmos4, pmos4…; las líneas del .asy son el respaldo sin skin).
+ * dibujo de nm_ic_4, pm_ic_4…; las líneas del .asy son el respaldo sin skin).
  */
 const base = (name) => {
   const lines = readFileSync(join(SYM, `${name}.asy`), 'utf8')
@@ -22,7 +22,7 @@ const base = (name) => {
   return Object.assign(lines, { skin: name });
 };
 /** Nombre de instancia por defecto según el símbolo base (como en xschem: XM1, XR1…) */
-const INST = { nmos4: 'XM1', pmos4: 'XM1', res2: 'XR1', cap: 'XC1', npn4: 'XQ1', pnp: 'XQ1', pnp4: 'XQ1', diode: 'D1' };
+const INST = { nm_ic_4: 'XM1', pm_ic_4: 'XM1', res2: 'XR1', cap: 'XC1', npn4: 'XQ1', pnp: 'XQ1', pnp4: 'XQ1', diode: 'D1' };
 
 // resistencia de 3 terminales: la de res2 y el cuerpo a la derecha
 const res3 = Object.assign(
@@ -66,15 +66,15 @@ function writePdk(pdk, symbols) {
   const sub = (name, sym, desc, value) => [name, sym, 'X', `sky130_fd_pr__${name}`, value, `sky130 ${desc} (sky130_fd_pr__${name}). W and L in µm.`];
   const mos = (name, sym, desc, value) => sub(name, base(sym), desc, value);
   writePdk('sky130', [
-    mos('nfet_01v8', 'nmos4', 'NMOS 1.8 V', 'W=1 L=0.15 nf=1'),
-    mos('nfet_01v8_lvt', 'nmos4', 'NMOS 1.8 V, low Vt', 'W=1 L=0.15 nf=1'),
-    mos('nfet_03v3_nvt', 'nmos4', 'NMOS 3.3 V, native', 'W=1 L=0.5 nf=1'),
-    mos('nfet_05v0_nvt', 'nmos4', 'NMOS 5 V, native', 'W=1 L=0.9 nf=1'),
-    mos('nfet_g5v0d10v5', 'nmos4', 'NMOS 5 V gate, 10.5 V drain', 'W=1 L=0.5 nf=1'),
-    mos('pfet_01v8', 'pmos4', 'PMOS 1.8 V', 'W=1 L=0.15 nf=1'),
-    mos('pfet_01v8_lvt', 'pmos4', 'PMOS 1.8 V, low Vt', 'W=1 L=0.35 nf=1'),
-    mos('pfet_01v8_hvt', 'pmos4', 'PMOS 1.8 V, high Vt', 'W=1 L=0.15 nf=1'),
-    mos('pfet_g5v0d10v5', 'pmos4', 'PMOS 5 V gate, 10.5 V drain', 'W=1 L=0.5 nf=1'),
+    mos('nfet_01v8', 'nm_ic_4', 'NMOS 1.8 V', 'W=1 L=0.15 nf=1'),
+    mos('nfet_01v8_lvt', 'nm_ic_4', 'NMOS 1.8 V, low Vt', 'W=1 L=0.15 nf=1'),
+    mos('nfet_03v3_nvt', 'nm_ic_4', 'NMOS 3.3 V, native', 'W=1 L=0.5 nf=1'),
+    mos('nfet_05v0_nvt', 'nm_ic_4', 'NMOS 5 V, native', 'W=1 L=0.9 nf=1'),
+    mos('nfet_g5v0d10v5', 'nm_ic_4', 'NMOS 5 V gate, 10.5 V drain', 'W=1 L=0.5 nf=1'),
+    mos('pfet_01v8', 'pm_ic_4', 'PMOS 1.8 V', 'W=1 L=0.15 nf=1'),
+    mos('pfet_01v8_lvt', 'pm_ic_4', 'PMOS 1.8 V, low Vt', 'W=1 L=0.35 nf=1'),
+    mos('pfet_01v8_hvt', 'pm_ic_4', 'PMOS 1.8 V, high Vt', 'W=1 L=0.15 nf=1'),
+    mos('pfet_g5v0d10v5', 'pm_ic_4', 'PMOS 5 V gate, 10.5 V drain', 'W=1 L=0.5 nf=1'),
     sub('res_high_po_0p35', res3, 'Poly resistor, high sheet, 0.35 µm wide (~1 kΩ/□)', 'L=3.5'),
     sub('res_high_po_0p69', res3, 'Poly resistor, high sheet, 0.69 µm wide (~1 kΩ/□)', 'L=3.5'),
     sub('res_xhigh_po_0p35', res3, 'Poly resistor, extra high sheet, 0.35 µm wide (~2 kΩ/□)', 'L=3.5'),
@@ -90,11 +90,11 @@ function writePdk(pdk, symbols) {
   const mos = (name, sym, desc, value) => sub(name, base(sym), desc, value);
   const res = (name, desc) => sub(name, res3, `${desc}; r_width and r_length in meters`, 'r_width=1u r_length=10u');
   writePdk('gf180', [
-    mos('nfet_03v3', 'nmos4', 'NMOS 3.3 V; W and L in meters', 'W=1u L=0.28u nf=1'),
-    mos('pfet_03v3', 'pmos4', 'PMOS 3.3 V; W and L in meters', 'W=1u L=0.28u nf=1'),
-    mos('nfet_06v0', 'nmos4', 'NMOS 6 V; W and L in meters', 'W=1u L=0.7u nf=1'),
-    mos('pfet_06v0', 'pmos4', 'PMOS 6 V; W and L in meters', 'W=1u L=0.55u nf=1'),
-    mos('nfet_06v0_nvt', 'nmos4', 'NMOS 6 V, native; W and L in meters', 'W=1u L=1.8u nf=1'),
+    mos('nfet_03v3', 'nm_ic_4', 'NMOS 3.3 V; W and L in meters', 'W=1u L=0.28u nf=1'),
+    mos('pfet_03v3', 'pm_ic_4', 'PMOS 3.3 V; W and L in meters', 'W=1u L=0.28u nf=1'),
+    mos('nfet_06v0', 'nm_ic_4', 'NMOS 6 V; W and L in meters', 'W=1u L=0.7u nf=1'),
+    mos('pfet_06v0', 'pm_ic_4', 'PMOS 6 V; W and L in meters', 'W=1u L=0.55u nf=1'),
+    mos('nfet_06v0_nvt', 'nm_ic_4', 'NMOS 6 V, native; W and L in meters', 'W=1u L=1.8u nf=1'),
     res('ppolyf_u', 'unsalicided P+ poly resistor (~350 Ω/□)'),
     res('ppolyf_u_1k', 'high-resistance poly resistor (~1 kΩ/□)'),
     res('ppolyf_u_3k', 'high-resistance poly resistor (~3 kΩ/□)'),

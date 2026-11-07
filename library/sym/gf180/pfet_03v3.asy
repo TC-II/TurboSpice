@@ -1,15 +1,16 @@
 Version 4
 SymbolType CELL
-LINE Normal 0 80 16 80
-LINE Normal 16 32 16 80
-LINE Normal 24 16 24 40
-LINE Normal 24 56 24 80
-LINE Normal 24 24 48 24
-LINE Normal 48 24 48 0
-LINE Normal 24 72 48 72
-LINE Normal 48 72 48 96
-LINE Normal 24 48 48 48
-LINE Normal 24 40 24 56
+LINE Normal 48 80 48 96
+LINE Normal 48 80 40 80
+LINE Normal 16 80 40 84
+LINE Normal 16 80 40 76
+LINE Normal 40 84 40 76
+LINE Normal 16 8 16 88
+LINE Normal 0 80 8 80
+LINE Normal 8 16 8 80
+LINE Normal 48 16 16 16
+LINE Normal 48 0 48 16
+LINE Normal 16 48 48 48
 WINDOW 0 56 32 Left 2
 WINDOW 3 56 72 Left 2
 WINDOW 39 56 96 Left 2
@@ -18,7 +19,7 @@ SYMATTR InstName XM1
 SYMATTR Value pfet_03v3
 SYMATTR SpiceLine W=1u L=0.28u nf=1
 SYMATTR Description GF180MCU PMOS 3.3 V; W and L in meters (pfet_03v3).
-SYMATTR Skin pmos4
+SYMATTR Skin pm_ic_4
 PIN 48 0 NONE 0
 PINATTR PinName D
 PINATTR SpiceOrder 1

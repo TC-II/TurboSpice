@@ -9,7 +9,7 @@ Vienen de **open_pdks**, los mismos que usan xschem y los tutoriales, con sus no
 - Los símbolos están en `sky130/` y `gf180/` en la librería (`library/sym/<pdk>/`, generados por
   `scripts/gen-pdk-symbols.mjs`). Los MOS, resistencias, capacitores y BJT son subcircuitos:
   `Value` es el nombre y `SpiceLine` los parámetros. Los diodos son `.model` sueltos. Usan el
-  dibujo de los símbolos base (`SYMATTR Skin nmos4`: con la flecha del skin SVG).
+  dibujo de los símbolos base (`SYMATTR Skin nm_ic_4`/`pm_ic_4`, los MOS de integrado).
 - Doble click en uno abre su diálogo (`src/schematic/PdkDialog.tsx`): la variante (los otros
   símbolos de la misma carpeta con el mismo dibujo y parámetros: normal, lvt, hvt, 5 V…), las
   medidas siempre en µm (en gf180 se guardan en metros, con «u»), lo que dan (W/L, área de

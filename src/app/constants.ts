@@ -14,6 +14,9 @@ export const REPO = 'https://github.com/TC-II/TurboSpice';
 export const SKIN_KEY = 'turbospice.skin';
 /** La letra del esquemático elegida en Configuración (#328) */
 export const SCH_FONT_KEY = 'turbospice.schFont';
+/** grosor de las líneas del esquemático: nivel (0, 1, 2) y cuánto multiplica cada uno */
+export const SCH_LW_KEY = 'turbospice.schLineWidth';
+export const SCH_LINE_WIDTHS = [1, 1.4, 1.8] as const;
 // public/examples (scripts/make-examples.ts): el proyecto de muestra, que se abre la primera vez
 export const SAMPLE = 'Sample Project.turbo';
 /** simulación mixta (#209, scripts/make-adc.ts): un workbench por ADC, una sola entrada en el menú */

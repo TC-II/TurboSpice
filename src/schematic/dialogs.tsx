@@ -7,7 +7,7 @@ import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
-import { cmpApply, isDefaultMosSize, type CmpPart } from '../library/cmp.ts';
+import { cmpApply, getInstParam, isDefaultMosSize, MOS_GEOMETRY, setInstParam, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
 import { defaultWindows, effectiveAttrs, effectiveWindows, shownAlign, type WindowDefaults } from '../asc/resolve.ts';
 import { transformAlign } from '../asc/transform.ts';
@@ -402,7 +402,9 @@ export function AttributeDialog({
   onClose(): void;
 }) {
   const eff = effectiveAttrs(inst, def);
-  const keys = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2'].filter((k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine');
+  // MOS: Value2 siempre a la vista (lleva L, W, AD… como en LTspice), #367
+  const mos = /^M[NP]$/i.test(eff.get('Prefix') ?? '');
+  const keys = ['InstName', 'Value', 'Value2', 'SpiceModel', 'SpiceLine', 'SpiceLine2'].filter((k) => k === 'InstName' || k === 'Value' || eff.has(k) || k === 'SpiceLine' || (mos && k === 'Value2'));
   const [vals, setVals] = useState<Record<string, string>>(Object.fromEntries(keys.map((k) => [k, eff.get(k) ?? ''])));
   const [rows, setRows] = useState(() => labelRows(inst, def, windowDefaults));
   const [patches, setPatches] = useState(new Map<number, LabelPatch>());
@@ -431,6 +433,10 @@ export function AttributeDialog({
     const next = defaults.map(([n, d]): [string, string] => [n, n === k ? v : (cur.get(n.toLowerCase()) ?? d)]).filter(([n, x], i) => x.trim() && x !== defaults[i][1] && n);
     setVals({ ...vals, SpiceLine: formatParamList(next) });
   };
+  // MOS de proceso (no VDMOS, el discreto de 3 terminales): un campo por dimensión física arriba de
+  // Value2, como la ventana «Monolithic MOSFET» de LTspice; escriben en Value2 (#367)
+  const vdmos = parts?.some((g) => g.parts.some((p) => p.type === 'VDMOS' && p.name.toLowerCase() === (vals.Value ?? '').trim().toLowerCase()));
+  const geometry = mos && !vdmos;
   // capacitor e inductor (#310): la condición inicial es el IC= de su SpiceLine
   const icUnit = /^c$/i.test(prefix) ? 'V' : /^l$/i.test(prefix) ? 'A' : undefined;
   const IC_RE = /(^|\s)ic\s*=\s*(\{[^}]*\}|\S+)/i;
@@ -531,6 +537,23 @@ export function AttributeDialog({
               </label>
             ))}
             <small className="hint">{t('Default values come from the subcircuit; a value can be an expression like {G}.')}</small>
+          </fieldset>
+        )}
+        {geometry && (
+          <fieldset className="sub-params mos-geom">
+            <legend>{t('Physical dimensions')}</legend>
+            {MOS_GEOMETRY.map((g) => (
+              <label key={g.key} className="attr-row">
+                <span>{t(g.label)}</span>
+                <input
+                  value={getInstParam(vals.Value2 ?? '', g.key)}
+                  spellCheck={false}
+                  placeholder={g.unit}
+                  onChange={(e) => setVals({ ...vals, Value2: setInstParam(vals.Value2 ?? '', g.key, e.target.value) })}
+                />
+                <span className="attr-vis" />
+              </label>
+            ))}
           </fieldset>
         )}
         {keys

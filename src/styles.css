@@ -320,6 +320,8 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .attrs { display: flex; flex-direction: column; gap: 8px; }
 .attrs label { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 8px; font-size: 13px; color: var(--fg-muted); }
 .attrs label.attr-row { grid-template-columns: 96px 1fr 18px; }
+/* dimensiones del MOS de proceso: rótulos largos como en LTspice («Drain perimeter (PD)») */
+.attrs .mos-geom label.attr-row { grid-template-columns: 190px 1fr 18px; }
 .attrs .attr-vis { width: auto; margin: 0; }
 .attrs label.line-style { grid-template-columns: 18px 104px 1fr; color: var(--fg); cursor: pointer; }
 .attrs label.line-style input { width: auto; margin: 0; }

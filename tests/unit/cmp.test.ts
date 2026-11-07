@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
-import { CMP_FILES, cmpApply, cmpCell, cmpChoicesFor, compareCells, parseCmp, stripLtspiceInfo, type CmpKind } from '../../src/library/cmp.ts';
+import { CMP_FILES, getInstParam, setInstParam, cmpApply, cmpCell, cmpChoicesFor, compareCells, parseCmp, stripLtspiceInfo, type CmpKind } from '../../src/library/cmp.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
 import { prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
@@ -65,6 +65,10 @@ describe('qué lista ve cada símbolo', () => {
     expect(pmos).not.toContain('IRF740');
     // nmos4/pmos4: sólo los MOS de proceso (VDMOS es de 3 terminales); nmos/pmos: los dos (#367)
     expect(names('MN', 'nmos4')).toEqual(['N_1u', 'N_50n']);
+    // en la lista de 3 pines van después de 2N7002 (N) y de BS250P (P)
+    const nmos = names('MN', 'nmos');
+    expect(nmos.slice(nmos.indexOf('2N7002'), nmos.indexOf('2N7002') + 3)).toEqual(['2N7002', 'N_1u', 'N_50n']);
+    expect(pmos.slice(pmos.indexOf('BS250P'), pmos.indexOf('BS250P') + 3)).toEqual(['BS250P', 'P_1u', 'P_50n']);
     expect(names('MP', 'pmos4')).toEqual(['P_1u', 'P_50n']);
     expect(pmos).toContain('P_1u');
     expect(cmpChoicesFor('L', 'ind').map((c) => c.label)).toEqual(['Inductores', 'Ferrites']);
@@ -130,6 +134,18 @@ describe('al simular', () => {
   it('si el esquemático define el modelo, no se incluye el de la librería', () => {
     const doc = asc('SYMBOL diode 0 0 R0\nSYMATTR InstName D1\nSYMATTR Value 1N4148\nTEXT 0 200 Left 2 !.model 1N4148 D(Is=1n)\n');
     expect(toNgspice(ltNetlist(doc, lib), 't', resolver).includes).toEqual([]);
+  });
+
+  it('parámetros de instancia del MOS en Value2 (L, W, AD…), #367', () => {
+    expect(getInstParam('l=1u w=2u', 'w')).toBe('2u');
+    expect(getInstParam('l=1u w={W0}', 'W')).toBe('{W0}');
+    expect(getInstParam('l=1u', 'ad')).toBe('');
+    expect(setInstParam('l=1u w=2u', 'w', '4u')).toBe('l=1u w=4u');
+    expect(setInstParam('l=1u w=2u', 'ad', '10p')).toBe('l=1u w=2u ad=10p');
+    expect(setInstParam('l=1u w=2u nf=2', 'w', '')).toBe('l=1u nf=2');
+    expect(setInstParam('', 'm', '2')).toBe('m=2');
+    // "as" no confunde a "pd" ni al revés
+    expect(setInstParam('as=1p ps=2u', 'as', '3p')).toBe('as=3p ps=2u');
   });
 
   it('stripLtspiceInfo sólo toca las líneas .model', () => {

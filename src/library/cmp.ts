@@ -252,6 +252,30 @@ export const MOS_SIZES: Record<string, string> = {
   p_50n: 'l=50n w=200n',
 };
 
+/** Dimensiones físicas de un MOS de proceso (como la ventana «Monolithic MOSFET» de LTspice): van en Value2 */
+export const MOS_GEOMETRY: { key: string; label: string; unit: string }[] = [
+  { key: 'l', label: 'Length (L)', unit: 'm' },
+  { key: 'w', label: 'Width (W)', unit: 'm' },
+  { key: 'ad', label: 'Drain area (AD)', unit: 'm²' },
+  { key: 'as', label: 'Source area (AS)', unit: 'm²' },
+  { key: 'pd', label: 'Drain perimeter (PD)', unit: 'm' },
+  { key: 'ps', label: 'Source perimeter (PS)', unit: 'm' },
+  { key: 'm', label: 'Parallel devices (M)', unit: '' },
+];
+
+const instParamRe = (k: string) => new RegExp(String.raw`(^|\s)${k}\s*=\s*(\{[^}]*\}|\S+)`, 'i');
+
+/** Valor de un parámetro de instancia («l=1u w=2u», k = 'w' → '2u'); '' si no está */
+export const getInstParam = (line: string, k: string): string => instParamRe(k).exec(line)?.[2] ?? '';
+
+/** Cambia (o agrega, o quita si v está vacío) un parámetro de instancia y deja el resto como está */
+export function setInstParam(line: string, k: string, v: string): string {
+  const re = instParamRe(k);
+  const val = v.trim();
+  if (re.test(line)) return line.replace(re, val ? `$1${k}=${val}` : '$1').replace(/\s+/g, ' ').trim();
+  return val ? `${line.trim()} ${k}=${val}`.trim() : line;
+}
+
 /** ¿Value2 está vacío o es el tamaño por omisión de algún modelo? (entonces se reemplaza al elegir otro) */
 export const isDefaultMosSize = (v2: string): boolean => !v2.trim() || Object.values(MOS_SIZES).includes(v2.trim().toLowerCase());
 

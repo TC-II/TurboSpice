@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { Library } from '../../src/library/library.ts';
 
-const TRANSISTORS = ['npn', 'pnp', 'NPN_ideal', 'PNP_ideal', 'nmos', 'pmos', 'nmos4', 'pmos4', 'nm_nobulk', 'pm_nobulk', 'njf', 'pjf'];
+const TRANSISTORS = ['npn', 'pnp', 'NPN_ideal', 'PNP_ideal', 'nmos', 'pmos', 'nmos4', 'pmos4', 'nm_ic', 'pm_ic', 'nm_ic_4', 'pm_ic_4', 'njf', 'pjf'];
 
 describe('skins de transistores (#57)', () => {
   const { skins } = buildBundle();

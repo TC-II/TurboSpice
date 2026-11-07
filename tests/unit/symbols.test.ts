@@ -9,7 +9,7 @@ const bundle = buildBundle();
 const lib = new Library(bundle);
 
 describe('símbolos agregados (#75)', () => {
-  it.each(['nm_nobulk', 'pm_nobulk', 'voltage2', 'signal', 'cell', 'xtal'])('%s: símbolo, skin y posiciones de rótulos', (n) => {
+  it.each(['nm_ic', 'pm_ic', 'nm_ic_4', 'pm_ic_4', 'voltage2', 'signal', 'cell', 'xtal'])('%s: símbolo, skin y posiciones de rótulos', (n) => {
     expect(lib.symbol(n), n).toBeDefined();
     expect(bundle.skins[n], n).toBeDefined();
   });
@@ -28,11 +28,14 @@ describe('símbolos agregados (#75)', () => {
       'SYMBOL Misc\\xtal 384 0 R0',
       'SYMATTR InstName C1',
       'SYMATTR Value 10p',
-      'SYMBOL nm_nobulk 512 0 R0',
+      'SYMBOL nm_ic 512 0 R0',
       'SYMATTR InstName M1',
       'FLAG 560 96 0',
-      'SYMBOL pm_nobulk 640 0 R0',
+      'SYMBOL pm_ic 640 0 R0',
       'SYMATTR InstName M2',
+      'SYMBOL nm_ic_4 768 0 R0',
+      'SYMATTR InstName M3',
+      'FLAG 816 48 sub',
       '',
     ].join('\n');
     const net = ltNetlistText(ltNetlist(parseAsc(src), lib));
@@ -44,5 +47,7 @@ describe('símbolos agregados (#75)', () => {
     const m1 = /^M1 (\S+) (\S+) (\S+) (\S+) NMOS$/m.exec(net);
     expect(m1?.[4]).toBe(m1?.[3]);
     expect(net).toMatch(/^M2 \S+ \S+ \S+ \S+ PMOS$/m);
+    // nm_ic_4: el bulk es su propio pin (48,48), como nmos4
+    expect(net).toMatch(/^M3 \S+ \S+ \S+ sub NMOS$/m);
   });
 });

@@ -5,7 +5,7 @@
     <line x1="0" y1="80" x2="16" y2="80" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <line x1="48" y1="22.9" x2="48" y2="0" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <polyline points="16,79.9 16,48 16,16" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    <line x1="37.9" y1="48" x2="48" y2="48" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="21.7" y1="48" x2="48" y2="48" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <line x1="48" y1="48.1" x2="48" y2="73" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <line x1="48.1" y1="73" x2="21.7" y2="73" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     <line x1="21.7" y1="23" x2="48" y2="23" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -15,6 +15,6 @@
       <line x1="21.7" y1="13" x2="21.7" y2="33" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       <line x1="21.7" y1="63" x2="21.7" y2="83" fill="none" stroke="#000000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </g>
-    <path d="M37.5 43.3 C37.8 43.2 38 43.4 38 43.7 L38 52.3 C38 52.6 37.7 52.8 37.5 52.7 L22.3 48 Z" fill="#000000"/>
+    <path d="M36.9 43.3 C37.2 43.2 37.4 43.4 37.4 43.7 L37.4 52.3 C37.4 52.6 37.1 52.8 36.9 52.7 L21.7 48 Z" fill="#000000"/>
   </g>
 </svg>

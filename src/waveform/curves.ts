@@ -5,7 +5,7 @@ import { deviceExprUnit } from '../sim/deviceParams.ts';
 import { analyze, defaultFs, spectrum, WINDOWS } from './dft.ts';
 import { evalTrace, unwrapDeg, type Resolver, type Wave } from './expr.ts';
 import { isLogScale, resample, sampleEvents, scaleOf, si } from './series.ts';
-import { PALETTE, addTraceTo, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
+import { palette, addTraceTo, isDftPane, sameExpr, sameDft, traceColor, type Pane, type TraceDft, type Trace } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 import { digitalWidth, isDigitalExpr } from './digital.ts';
 
@@ -186,7 +186,7 @@ export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
       if (w.x && !ex) w = { re: sampleEvents(w.x, w.re, rs.real) };
       const toX = (y: Float64Array) => (ex || r === ctx.plot ? y : resample(rs.real, y, scale.real));
       const runLabel = all.length > 1 ? ` · ${ctx.labels.get(r.name) ?? r.name}` : '';
-      const color = perRunColor ? PALETTE[ri % PALETTE.length] : shade(base, ri, all.length);
+      const color = perRunColor ? palette()[ri % palette().length] : shade(base, ri, all.length);
       const parts: { y: Float64Array; axis: Curve['axis']; dash: boolean; suffix: string }[] = [];
       if (w.im) {
         complex = true;

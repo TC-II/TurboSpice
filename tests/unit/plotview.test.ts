@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { siFixed } from '../../src/waveform/series.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
-import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE, parsePlt, reorderTrace, serializePlt, traceColor, type Pane } from '../../src/waveform/view.ts';
+import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE_LIGHT as PALETTE, parsePlt, reorderTrace, serializePlt, traceColor, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
   it('seno: pico a pico, eficaz, frecuencia', () => {

@@ -4,7 +4,7 @@
 // Trabaja sobre el JSON de Blockly, sin depender de Blockly (se puede testear en Node).
 import { formatSpiceNumber, parseSpiceNumber } from '../netlist/spicenum.ts';
 import { parseStep } from '../netlist/step.ts';
-import { PALETTE, type PlotView } from '../waveform/view.ts';
+import { PALETTE_LIGHT, type PlotView } from '../waveform/view.ts';
 import type { MeasAnalysis } from './meas.ts';
 import { measureLines, MEASURE_KINDS, stepLine, type MeasureKind, type Study, type StudyMeasure, type StudySweep, type SweepTarget } from './study.ts';
 import { t } from '../i18n/i18n.ts';
@@ -102,7 +102,7 @@ export const BLOCK_MEASURES: [MeasureKind, string, MeasAnalysis | null][] = [
 /** Colores del bloque "Graficar señal" (la paleta del visor) */
 export const PLOT_COLORS: [string, string][] = [
   [t('automatic'), 'auto'],
-  ...(['green', 'blue', 'red', 'turquoise', 'violet', 'gray', 'orange', 'olive', 'fuchsia', 'dark blue'] as const).map((n, i): [string, string] => [t(n), PALETTE[i]]),
+  ...(['blue', 'red', 'green', 'yellow', 'violet', 'turquoise', 'orange', 'fuchsia', 'olive', 'dark blue'] as const).map((n, i): [string, string] => [t(n), PALETTE_LIGHT[i]]),
 ];
 
 /** Definiciones JSON de los bloques propios; los desplegables de componentes los completa la UI */

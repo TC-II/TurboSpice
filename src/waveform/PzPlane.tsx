@@ -9,7 +9,7 @@ import type { SimPlot } from '../engine/ngspice.ts';
 import { download, schematicPng, schematicSvg } from '../schematic/exportSchematic.ts';
 import { complexText, niceStep, pzCsv, pzRoots, rootInfo, ticks, unstable, type Root } from './pz.ts';
 import { si } from './series.ts';
-import { PALETTE } from './view.ts';
+import { palette } from './view.ts';
 import { t } from '../i18n/i18n.ts';
 
 const ZETAS = [0.1, 0.2, 0.3, 0.5, 0.707];
@@ -87,7 +87,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
   const SH = H + GT + GB;
   const multi = runs.length > 1;
   const runLabel = (run: number) => labels?.get(runs[run]?.name) ?? runs[run]?.name ?? '';
-  const color = (r: Root) => (multi ? PALETTE[r.run % PALETTE.length] : undefined);
+  const color = (r: Root) => (multi ? palette()[r.run % palette().length] : undefined);
 
   // coordenadas del dibujo: s (o s/2π) y, en escala log, |s| → décadas conservando el ángulo
   const unit = hz ? 2 * Math.PI : 1;
@@ -260,7 +260,7 @@ export function PzPlane({ runs, labels, name = t('poles and zeros'), compact, lo
     <ul className="pz-legend">
       {runs.map((p, i) => (
         <li key={p.name}>
-          <i style={{ background: PALETTE[i % PALETTE.length] }} />
+          <i style={{ background: palette()[i % palette().length] }} />
           {runLabel(i)}
         </li>
       ))}

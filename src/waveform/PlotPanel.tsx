@@ -12,7 +12,7 @@ import type { Resolver } from './expr.ts';
 import { toCsv } from './measure.ts';
 import { extent } from './scales.ts';
 import { scaleOf, si } from './series.ts';
-import { PALETTE, acceptsTrace, colorFor, sameDft, isDftPane, reorderTrace, sameTrace, traceColor, type Cursors, type Pane, type PlotState, type TraceDft } from './view.ts';
+import { palette, acceptsTrace, colorFor, sameDft, isDftPane, reorderTrace, sameTrace, traceColor, type Cursors, type Pane, type PlotState, type TraceDft } from './view.ts';
 import { addMarker, asMarkers, pickCurve, remapPanes, sameMarker, type Marker, type MarkerAxis, type MarkerKind } from './markers.ts';
 import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
 import { Icon } from '../ui/icons.tsx';
@@ -347,7 +347,7 @@ export function PlotPanel({
     let color = colorFor(panes, expr);
     // otra DFT de la misma señal (otra ventana o muestreo): otro color, para distinguirlas
     const all = panes.flatMap((p) => p.traces.map((tt, k) => ({ tt, c: traceColor(tt, k).toLowerCase() })));
-    if (all.some(({ tt, c }) => tt.dft && c === color && !sameTrace(tt, tr))) color = PALETTE.find((c) => !all.some((o) => o.c === c)) ?? color;
+    if (all.some(({ tt, c }) => tt.dft && c === color && !sameTrace(tt, tr))) color = palette().find((c) => !all.some((o) => o.c === c)) ?? color;
     if (i >= 0) {
       if (!panes[i].traces.some((tt) => sameTrace(tt, tr))) update(i, (p) => ({ ...p, traces: [...p.traces, { ...tr, color }] }));
       setActive(i);

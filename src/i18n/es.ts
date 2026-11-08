@@ -1335,6 +1335,7 @@ export const es: Record<string, string> = {
   'turquoise': 'turquesa',
   'violet': 'violeta',
   'gray': 'gris',
+  'yellow': 'amarillo',
   'orange': 'naranja',
   'olive': 'oliva',
   'fuchsia': 'fucsia',

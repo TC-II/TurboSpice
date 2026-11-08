@@ -113,10 +113,29 @@ export interface PlotState {
   markerMode?: boolean;
 }
 
-/** Paleta por defecto (se distingue en fondo claro y oscuro) */
-export const PALETTE = ['#2f9e44', '#1c7ed6', '#e03131', '#0c8599', '#ae3ec9', '#868e96', '#e8590c', '#5c940d', '#c2255c', '#1864ab'];
+/**
+ * Paletas por tema, con la misma secuencia de tonos: azul, rojo, verde, amarillo, violeta,
+ * turquesa, naranja, fucsia, lima, índigo. La clara es más oscura (contraste ≥ 3 sobre blanco);
+ * la oscura, vívida.
+ */
+export const PALETTE_LIGHT = ['#1971c2', '#e03131', '#2f9e44', '#b8860b', '#ae3ec9', '#0c8599', '#d9480f', '#c2255c', '#5c940d', '#6741d9'];
+export const PALETTE_DARK = ['#228be6', '#fa5252', '#40c057', '#fab005', '#be4bdb', '#15aabf', '#fd7e14', '#e64980', '#82c91e', '#7950f2'];
 
-export const traceColor = (t: Trace, i: number) => t.color ?? PALETTE[i % PALETTE.length];
+/** ¿Tema oscuro? (elegido, o el del sistema si no se eligió) */
+export function isDarkTheme(): boolean {
+  if (typeof document === 'undefined') return false;
+  const t = document.documentElement.dataset.theme;
+  if (t) return t === 'dark';
+  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches;
+}
+
+/** Paleta del tema actual */
+export const palette = (): string[] => (isDarkTheme() ? PALETTE_DARK : PALETTE_LIGHT);
+
+export const traceColor = (t: Trace, i: number) => {
+  const p = palette();
+  return t.color ?? p[i % p.length];
+};
 
 /**
  * Paneles con el color de cada traza fijo (las que no tienen toman el que muestran por su
@@ -133,7 +152,8 @@ export function colorFor(panes: Pane[], expr: string): string {
   const same = all.find((t) => sameExpr(t.expr, expr));
   if (same) return same.color;
   const used = new Set(all.map((t) => t.color));
-  return PALETTE.find((c) => !used.has(c)) ?? PALETTE[all.length % PALETTE.length];
+  const p = palette();
+  return p.find((c) => !used.has(c)) ?? p[all.length % p.length];
 }
 
 /**
@@ -303,7 +323,7 @@ export function serializePlt(view: PlotView): string {
         .map((t, i) => {
           // (la paleta propia sigue el orden de la de LTspice)
           const c = t.color?.toLowerCase();
-          const color = c ? ([LT_COLORS.indexOf(c), PALETTE.indexOf(c)].find((k) => k >= 0) ?? i) : i;
+          const color = c ? ([LT_COLORS.indexOf(c), PALETTE_LIGHT.indexOf(c), PALETTE_DARK.indexOf(c)].find((k) => k >= 0) ?? i) : i;
           const axis = kind === 'ac' ? 0 : isCurrent(t.expr) ? 0x2100000 : 0x80000;
           return `{${axis + 2 + color},0,"${t.expr}"}`;
         })

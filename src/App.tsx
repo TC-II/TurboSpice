@@ -813,7 +813,9 @@ function SchematicMode({
 
   const rotateOrMirror = (op: 'rotate' | 'mirror') => {
     if (op === 'rotate' && editor.current?.rotateLabel()) return;
-    if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
+    // lo pegado que sigue al cursor (Ctrl+V) gira dentro de su documento todavía sin confirmar
+    if (tool.kind === 'move' && tool.base && tool.refs) setTool({ ...tool, base: transformItems(tool.base, tool.refs, op, lib) });
+    else if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
     else if (selection.length) commit(transformItems(doc, selection, op, lib));
   };
 

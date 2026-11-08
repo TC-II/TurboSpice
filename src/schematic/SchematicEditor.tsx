@@ -16,6 +16,7 @@ import {
   dragSegment,
   dragSegmentStraight,
   moveItems,
+  connectPasted,
   moveVertex,
   moveVertexStraight,
   placeSymbol,
@@ -232,9 +233,10 @@ export function SchematicEditor(props: Props) {
   // un tramo o un codo (se reordenan y fusionan): con el documento al que corresponden, para no
   // usarlos con otro
   const [previewMoved, setPreviewMoved] = useState<{ doc: AscDoc; wires: Wire[] } | null>(null);
-  const previewMove = (refs: ItemRef[], dx: number, dy: number, stretch: boolean) => {
+  // (`base`: lo pegado con Ctrl+V, que todavía no está en el documento)
+  const previewMove = (refs: ItemRef[], dx: number, dy: number, stretch: boolean, base: AscDoc = doc) => {
     const wires: Wire[] = [];
-    const next = moveItems(doc, refs, dx, dy, stretch, lib, wires);
+    const next = moveItems(base, refs, dx, dy, stretch, lib, wires);
     setPreview(next);
     setPreviewMoved({ doc: next, wires });
   };
@@ -474,6 +476,7 @@ export function SchematicEditor(props: Props) {
   const rightClick = (p: Point, screen?: { x: number; y: number }) => {
     if (tool.kind === 'wire' && tool.start) setTool({ kind: 'wire', start: null });
     else if (tool.kind === 'shape' && tool.pts.length) setTool({ ...tool, pts: [] });
+    else if (tool.kind === 'move' && tool.base) setTool({ kind: 'select' });
     else if (tool.kind === 'move' && tool.refs) {
       setPreview(null);
       setTool({ ...tool, refs: null, start: null });
@@ -677,7 +680,9 @@ export function SchematicEditor(props: Props) {
         if (tool.refs && tool.start) {
           // segundo click: se suelta donde está y termina
           const r = dropMove(tool, preview);
-          if (r.commit) commit(r.commit);
+          // lo pegado soltado sin moverlo: se conecta igual que al moverlo
+          if (tool.base && (!r.commit || r.commit === tool.base)) commit(connectPasted(tool.base, tool.refs, lib));
+          else if (r.commit) commit(r.commit);
           setPreview(null);
           setSelection(r.selection);
           setTool(r.tool);
@@ -776,9 +781,17 @@ export function SchematicEditor(props: Props) {
   const refreshMove = useEvent(() => {
     const g = snapPoint(cursorRef.current);
     if (drag?.mode === 'move') previewMove(drag.refs, g.x - drag.start.x, g.y - drag.start.y, !drag.detach);
-    else if (tool.kind === 'move' && tool.refs && tool.start) previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch);
+    else if (tool.kind === 'move' && tool.refs && tool.start) previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, tool.base);
   });
   useEffect(() => refreshMove(), [doc, refreshMove]);
+  // Ctrl+V: lo pegado se ve ya en el cursor (sin esperar a mover el mouse); al soltarlo o con
+  // Esc (la herramienta cambia) se va el fantasma, y con Esc no queda nada en el documento
+  const pasting = tool.kind === 'move' && tool.base ? tool : null;
+  useEffect(() => {
+    if (!pasting) return;
+    refreshMove();
+    return () => setPreview(null);
+  }, [pasting, refreshMove]);
 
   // Ctrl apretado mientras se dibuja un cable: el fantasma va en línea recta
   const [ctrlHeld, setCtrlHeld] = useState(false);
@@ -892,7 +905,7 @@ export function SchematicEditor(props: Props) {
     } else if (tip) setTip(null);
     if (tool.kind === 'move' && tool.refs && tool.start && !drag) {
       const g = snapPoint(p);
-      previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch);
+      previewMove(tool.refs, g.x - tool.start.x, g.y - tool.start.y, tool.stretch, tool.base);
     }
     if (!drag) return;
     if (drag.mode === 'pencil') {

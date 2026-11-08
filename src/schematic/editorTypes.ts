@@ -20,7 +20,18 @@ export type Tool =
    * M / S de LTspice: click en un elemento (o recuadro) y sigue al cursor hasta el próximo
    * click; `stretch` estira los cables conectados (S) o no (M)
    */
-  | { kind: 'move'; stretch: boolean; refs: ItemRef[] | null; start: Point | null }
+  | {
+      kind: 'move';
+      stretch: boolean;
+      refs: ItemRef[] | null;
+      start: Point | null;
+      /**
+       * Ctrl+V: el documento con lo pegado (todavía sin confirmar, sin conectar). Lo pegado sigue
+       * al cursor como con M; el click lo suelta y conecta (un solo paso de deshacer) y Esc lo
+       * descarta sin tocar el documento.
+       */
+      base?: AscDoc;
+    }
   /**
    * Figuras decorativas (LINE / RECTANGLE / CIRCLE / ARC del .asc), con `style` de línea.
    * `pts`: los clicks hechos. Línea, rectángulo y círculo (su caja) llevan 2; el arco, 4: la

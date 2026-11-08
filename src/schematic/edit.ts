@@ -828,8 +828,9 @@ export function extractItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
 /**
  * Pega un fragmento con su esquina superior izquierda en `at` (sobre la grilla). Los
  * componentes cuyo nombre ya existe en el documento reciben uno nuevo, como al duplicar.
+ * Con `raw` no se cortan cables (no se conecta nada): es lo pegado que todavía sigue al cursor.
  */
-export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): { doc: AscDoc; refs: ItemRef[] } {
+export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library, raw = false): { doc: AscDoc; refs: ItemRef[] } {
   const pts: Point[] = [...frag.symbols, ...frag.flags, ...frag.texts, ...frag.wires.flatMap(ends), ...frag.shapes.flatMap((x) => shapePoints(x).slice(0, 2))];
   if (!pts.length) return { doc, refs: [] };
   const dx = snap(at.x - Math.min(...pts.map((p) => p.x)));
@@ -859,7 +860,12 @@ export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library): 
     ...frag.texts.map((_, i) => ({ kind: 'text' as const, index: doc.texts.length + i })),
     ...frag.shapes.map((_, i) => ({ kind: 'shape' as const, index: doc.shapes.length + i })),
   ];
-  return cutNew(out, refs, lib);
+  return raw ? { doc: out, refs } : cutNew(out, refs, lib);
+}
+
+/** Conecta lo pegado con `raw` que se suelta sin moverlo: corta los cables como al pegar */
+export function connectPasted(doc: AscDoc, refs: ItemRef[], lib: Library): AscDoc {
+  return cutNew(doc, refs, lib).doc;
 }
 
 /** Mueve el rótulo `win` (0 = InstName, 3 = Value…) de un símbolo: queda como WINDOW explícito */

@@ -21,6 +21,7 @@ import {
   moveVertex,
   moveVertexStraight,
   pasteItems,
+  connectPasted,
   placeSymbol,
   previewSelection,
   removeVertex,
@@ -544,6 +545,18 @@ describe('un cable no atraviesa componentes (#45)', () => {
       { kind: 'wire', index: 3 },
     ]);
     expect(net(r.doc)).toMatch(/^R1 a b /m);
+  });
+
+  it('Ctrl+V: lo pegado que sigue al cursor (raw) no conecta nada hasta soltarlo', () => {
+    const frag = asc('SYMBOL res 0 0 R0\nSYMATTR InstName R1\n');
+    const r = pasteItems(wire2, frag, { x: 0, y: 0 }, lib, true);
+    // encima del cable: todavía no lo parte
+    expect(ws(r.doc)).toEqual(ws(wire2));
+    // soltado ahí mismo, conecta como al pegar de una
+    expect(ws(connectPasted(r.doc, r.refs, lib))).toEqual(ws(pasteItems(wire2, frag, { x: 0, y: 0 }, lib).doc));
+    // movido lejos antes de soltar: el cable queda entero
+    const moved = moveItems(r.doc, r.refs, 480, 0, false, lib);
+    expect(ws(moved)).toEqual(ws(wire2));
   });
 
   it('pegar un cable que atraviesa un componente lo parte en tramos seleccionados', () => {

@@ -88,12 +88,12 @@ export function clipboardActions({ doc, lib, selection, setSelection, setTool, c
     if (!text) return;
     const frag = parseAsc(text);
     if (makesCycle(frag.symbols.map((x) => x.type))) return;
+    // lo pegado queda pegado al cursor como con M: el click lo suelta (y conecta), Esc lo descarta
     const at = editor.current?.cursor() ?? { x: 0, y: 0 };
-    const r = pasteItems(doc, frag, at, lib);
+    const r = pasteItems(doc, frag, at, lib, true);
     if (!r.refs.length) return;
-    commit(r.doc);
-    setTool({ kind: 'select' });
-    setSelection(r.refs);
+    setSelection([]);
+    setTool({ kind: 'move', stretch: false, refs: r.refs, start: at, base: r.doc });
   };
   const deleteSelection = () => {
     if (opSel) {

@@ -122,6 +122,9 @@ export function shapeFromClicks(kind: DrawnShapeKind, pts: Point[], style?: stri
  * la selección se vacía (no queda resaltado: sus índices tampoco sirven tras limpiar cables).
  */
 export function dropMove<D>(tool: Tool & { kind: 'move' }, preview: D | null): { commit: D | null; tool: Tool; selection: ItemRef[] } {
+  // lo pegado (Ctrl+V): vuelve a seleccionar y queda seleccionado lo que no es cable (los
+  // índices de los cables cambian al limpiarlos; los de los demás no)
+  if (tool.base) return { commit: preview, tool: { kind: 'select' }, selection: (tool.refs ?? []).filter((r) => r.kind !== 'wire') };
   return { commit: preview, tool: { ...tool, refs: null, start: null }, selection: [] };
 }
 

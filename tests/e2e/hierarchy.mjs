@@ -27,6 +27,14 @@ await page.locator('[aria-label="Correr"]:enabled').waitFor({ timeout: 30000 });
 await page.locator('svg.editor .sym').first().waitFor();
 
 const svg = page.locator('svg.editor');
+// Ctrl+V deja lo pegado en el cursor (como M): un click en el mismo lugar lo suelta
+const pasteHere = async () => {
+  const b = await svg.boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.keyboard.press('Control+v');
+  await frames(page);
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+};
 const simulate = async () => {
   await page.getByLabel('Correr', { exact: true }).click();
   await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
@@ -64,8 +72,7 @@ TEXT 0 300 Left 2 !.tran 1m
 `;
 await newProject(page);
 await page.evaluate((t) => navigator.clipboard.writeText(t), flat);
-await page.keyboard.press('Control+v');
-await page.keyboard.press('Escape');
+await pasteHere();
 await frames(page);
 await simulate();
 await showOp();
@@ -100,8 +107,7 @@ await svg.click({ position: { x: 5, y: 5 } });
 await page.keyboard.press('Control+a');
 await page.keyboard.press('Delete');
 await page.evaluate((t) => navigator.clipboard.writeText(t), div);
-await page.keyboard.press('Control+v');
-await page.keyboard.press('Escape');
+await pasteHere();
 await frames(page);
 // arriba, la instancia U1 en lugar de R1 y R2 (el pin «in» del símbolo generado queda en x − 32)
 await page.locator('.project-tree .tree-row[data-bench] .tree-name').first().click();
@@ -122,8 +128,7 @@ await svg.click({ position: { x: 5, y: 5 } });
 await page.keyboard.press('Control+a');
 await page.keyboard.press('Delete');
 await page.evaluate((t) => navigator.clipboard.writeText(t), parent);
-await page.keyboard.press('Control+v');
-await page.keyboard.press('Escape');
+await pasteHere();
 await frames(page);
 check((await page.locator('svg.editor .sym').count()) === 2, 'arriba quedan V1 y una instancia de DIV');
 await simulate();
@@ -133,8 +138,7 @@ check(top.includes('3V') && before.filter((x) => x === '3V').length === top.filt
 
 // --- colocarlo dos veces ---
 await page.evaluate((t) => navigator.clipboard.writeText(t), 'Version 4\nSHEET 1 880 680\nSYMBOL DIV 480 0 R0\nSYMATTR InstName X9\n');
-await page.keyboard.press('Control+v');
-await page.keyboard.press('Escape');
+await pasteHere();
 await frames(page);
 check((await page.locator('svg.editor .sym').count()) === 3, 'el subcircuito se colocó dos veces');
 await simulate();

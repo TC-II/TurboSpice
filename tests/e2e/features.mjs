@@ -1115,6 +1115,9 @@ await page.keyboard.press('Control+c');
 const dest = await at(480, 160);
 await page.mouse.move(dest.x, dest.y);
 await page.keyboard.press('Control+v');
+await frames(page);
+// lo pegado sigue al cursor (como M) y se suelta con un click
+await page.mouse.click(dest.x + 64, dest.y);
 // con los resultados colapsados (no descartados) el pegado puede tardar un poco más en dibujarse
 await page.waitForFunction((n) => document.querySelectorAll('svg.editor .symbols .sym').length === n, nSyms + 1, { timeout: 3000 }).catch(() => {});
 check((await syms()) === nSyms + 1, 'Ctrl+C / Ctrl+V pega una copia');
@@ -1225,7 +1228,14 @@ const top =
   'Version 4\nSHEET 1 880 680\nWIRE -96 -16 -96 0\nWIRE -96 0 -32 0\nWIRE 32 0 96 0\nWIRE 160 0 224 0\nFLAG -96 64 0\nFLAG 32 0 b\nFLAG 224 0 c\nSYMBOL voltage -96 -32 R0\nSYMATTR InstName V1\nSYMATTR Value 3\nSYMBOL div 0 0 R0\nSYMATTR InstName X1\nSYMBOL amp3 128 0 R0\nSYMATTR InstName X2\nTEXT -96 128 Left 2 !.op\n';
 await newProject(page);
 await page.evaluate((t) => navigator.clipboard.writeText(t), top);
-await page.keyboard.press('Control+v');
+{
+  // lo pegado sigue al cursor: un click lo suelta
+  const b = await page.locator('svg.editor').boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.keyboard.press('Control+v');
+  await frames(page);
+  await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+}
 await page.getByLabel('Correr', { exact: true }).click();
 await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
 const opRows = await page.locator('.result-table tbody tr').allTextContents();

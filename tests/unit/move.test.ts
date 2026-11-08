@@ -11,6 +11,16 @@ describe('soltar con M / S (#222)', () => {
       expect(r.tool).toEqual({ kind: 'move', stretch, refs: null, start: null });
     });
   }
+  it('Ctrl+V: soltar lo pegado vuelve a seleccionar y deja seleccionado lo que no es cable', () => {
+    const refs = [
+      { kind: 'symbol' as const, index: 2 },
+      { kind: 'wire' as const, index: 5 },
+    ];
+    const r = dropMove({ kind: 'move', stretch: false, refs, start: { x: 0, y: 0 }, base: { symbols: [] } as never }, 'doc');
+    expect(r.commit).toBe('doc');
+    expect(r.tool).toEqual({ kind: 'select' });
+    expect(r.selection).toEqual([{ kind: 'symbol', index: 2 }]);
+  });
   it('sin fantasma no confirma nada', () => {
     const r = dropMove({ kind: 'move', stretch: false, refs: [], start: { x: 0, y: 0 } }, null);
     expect(r.commit).toBeNull();

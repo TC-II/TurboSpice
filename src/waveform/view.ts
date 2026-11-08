@@ -135,10 +135,26 @@ export const palette = (): string[] => (isDarkTheme() ? PALETTE_DARK : PALETTE_L
 export const traceColor = (t: Trace, i: number) => {
   const p = palette();
   if (!t.color) return p[i % p.length];
-  // un color fijado de la paleta del otro tema pasa al mismo lugar de la del tema actual
+  // un color fijado de la paleta del otro tema (o de la vieja) pasa al mismo tono de la del tema actual
   const c = t.color.toLowerCase();
   const k = (p === PALETTE_DARK ? PALETTE_LIGHT : PALETTE_DARK).indexOf(c);
-  return k >= 0 ? p[k] : t.color;
+  if (k >= 0) return p[k];
+  const old = OLD_PALETTE_TONE[c];
+  return old !== undefined ? p[old] : t.color;
+};
+
+/** Paleta anterior (archivos guardados antes): cada color → lugar del mismo tono en la nueva */
+const OLD_PALETTE_TONE: Record<string, number> = {
+  '#2f9e44': 2,
+  '#1c7ed6': 0,
+  '#e03131': 1,
+  '#0c8599': 8,
+  '#ae3ec9': 7,
+  '#868e96': 9,
+  '#e8590c': 3,
+  '#5c940d': 6,
+  '#c2255c': 4,
+  '#1864ab': 0,
 };
 
 /**

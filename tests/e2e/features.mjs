@@ -1112,7 +1112,10 @@ await page.keyboard.press('Escape');
 const r1 = await at(88, -32);
 await page.mouse.click(r1.x, r1.y);
 await page.keyboard.press('Control+c');
-const dest = await at(480, 160);
+// (dentro del editor: el click que suelta lo pegado tiene que caer sobre el esquemático)
+const edBox = await page.locator('svg.editor').boundingBox();
+const far = await at(480, 160);
+const dest = { x: Math.min(far.x, edBox.x + edBox.width - 160), y: Math.min(far.y, edBox.y + edBox.height - 80) };
 await page.mouse.move(dest.x, dest.y);
 await page.keyboard.press('Control+v');
 await frames(page);

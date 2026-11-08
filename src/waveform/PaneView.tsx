@@ -9,7 +9,7 @@ import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, sampleEvents, si } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
-import { PALETTE, cursorForClick, reorderTrace, traceColor, type CursorKey, type Cursors, type Pane, type Trace } from './view.ts';
+import { palette, cursorForClick, reorderTrace, traceColor, type CursorKey, type Cursors, type Pane, type Trace } from './view.ts';
 import { type Marker } from './markers.ts';
 import { parseSi } from './dft.ts';
 import { useTraceWidth } from './lineWidth.ts';
@@ -778,7 +778,7 @@ export function PaneView(props: {
   const colorItem = (ti: number, tt: Trace, open = false): ContextItem => ({
     label: t('Color'),
     onClick: () => undefined,
-    swatches: { colors: PALETTE, current: traceColor(tt, ti), onPick: (color) => setTrace(ti, (x) => ({ ...x, color })), open },
+    swatches: { colors: palette(), current: traceColor(tt, ti), onPick: (color) => setTrace(ti, (x) => ({ ...x, color })), open, only: open },
   });
   const traceMenu = (ti: number, tt: Trace): ContextItem[] => [
     colorItem(ti, tt),

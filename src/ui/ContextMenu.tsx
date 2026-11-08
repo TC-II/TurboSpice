@@ -18,7 +18,7 @@ export interface ContextItem {
   /** campo editable en el propio menú («R1 = [valor]»): Enter o el tick lo aplican */
   edit?: { value: string; onCommit(value: string): void };
   /** submenú lateral de muestras de color («Color»): al elegir una se cierra el menú */
-  swatches?: { colors: string[]; current: string; onPick(color: string): void; /** abierto desde el principio */ open?: boolean };
+  swatches?: { colors: string[]; current: string; onPick(color: string): void; /** abierto desde el principio */ open?: boolean; /** sólo la caja de colores, sin la fila «Color» */ only?: boolean };
 }
 
 const text = (it: ContextItem, v?: string) => (typeof it.label === 'function' ? it.label(v) : it.label);
@@ -79,6 +79,31 @@ function SwatchRow({ it, onClose }: { it: ContextItem; onClose(): void }) {
     setLeft(parent.right + r.width + 8 > w.innerWidth && parent.left - r.width - 8 >= 0);
   }, [open]);
   const cur = sw.current.toLowerCase();
+  const swatchButtons = (
+    <>
+      {sw.colors.map((c) => (
+        <button
+          key={c}
+          role="menuitemradio"
+          aria-checked={c.toLowerCase() === cur}
+          aria-label={c}
+          title={c}
+          className={`ctx-swatch${c.toLowerCase() === cur ? ' current' : ''}`}
+          style={{ background: c }}
+          onClick={() => {
+            onClose();
+            sw.onPick(c);
+          }}
+        />
+      ))}
+    </>
+  );
+  if (sw.only)
+    return (
+      <div className="ctx-flyout ctx-flyout-only" role="menu" aria-label={text(it)}>
+        {swatchButtons}
+      </div>
+    );
   return (
     <div className="ctx-sub" onPointerEnter={() => setOpen(true)} onPointerLeave={() => setOpen(false)}>
       <button role="menuitem" aria-haspopup="menu" aria-expanded={open} className="ctx-sub-btn" disabled={it.disabled} onClick={() => setOpen((o) => !o)}>
@@ -87,21 +112,7 @@ function SwatchRow({ it, onClose }: { it: ContextItem; onClose(): void }) {
       </button>
       {open && (
         <div ref={fly} className={`ctx-flyout${left ? ' left' : ''}`} role="menu" aria-label={text(it)}>
-          {sw.colors.map((c) => (
-            <button
-              key={c}
-              role="menuitemradio"
-              aria-checked={c.toLowerCase() === cur}
-              aria-label={c}
-              title={c}
-              className={`ctx-swatch${c.toLowerCase() === cur ? ' current' : ''}`}
-              style={{ background: c }}
-              onClick={() => {
-                onClose();
-                sw.onPick(c);
-              }}
-            />
-          ))}
+          {swatchButtons}
         </div>
       )}
     </div>

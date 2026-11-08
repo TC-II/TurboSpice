@@ -118,7 +118,7 @@ export interface PlotState {
  * amarillo, oliva, violeta, celeste, blanco/gris. La oscura es la elegida por el usuario; la
  * clara usa tonos más oscuros para que se vean sobre blanco.
  */
-export const PALETTE_LIGHT = ['#1971c2', '#e03131', '#2f9e44', '#e8590c', '#c2255c', '#b8860b', '#5c940d', '#6741d9', '#0c8599', '#495057'];
+export const PALETTE_LIGHT = ['#1971c2', '#e03131', '#2f9e44', '#e8590c', '#c2255c', '#b39200', '#5c940d', '#6741d9', '#0c8599', '#495057'];
 export const PALETTE_DARK = ['#4262ff', '#ff4a4a', '#00f200', '#ff6a00', '#ff00e3', '#ffff00', '#4b6f00', '#7600f0', '#4deaff', '#eeeeee'];
 
 /** ¿Tema oscuro? (elegido, o el del sistema si no se eligió) */
@@ -134,7 +134,11 @@ export const palette = (): string[] => (isDarkTheme() ? PALETTE_DARK : PALETTE_L
 
 export const traceColor = (t: Trace, i: number) => {
   const p = palette();
-  return t.color ?? p[i % p.length];
+  if (!t.color) return p[i % p.length];
+  // un color fijado de la paleta del otro tema pasa al mismo lugar de la del tema actual
+  const c = t.color.toLowerCase();
+  const k = (p === PALETTE_DARK ? PALETTE_LIGHT : PALETTE_DARK).indexOf(c);
+  return k >= 0 ? p[k] : t.color;
 };
 
 /**

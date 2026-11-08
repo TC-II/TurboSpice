@@ -28,6 +28,10 @@ export const isVccSymbol = (type: string) => baseName(type).toLowerCase() === 'v
 export function quickValue(prefix: string, type: string, attrs: Attrs, value: string): QuickValue | null {
   const P = prefix.toUpperCase();
   if (/^[RLC]$/.test(P)) return { shown: value, store: same };
+  if (P === 'X' && isVccSymbol(type)) {
+    const m = /^\s*V\s*=\s*(.*)$/i.exec(value);
+    return { shown: (m ? m[1] : value).trim(), store: (typed) => `V=${typed.trim().replace(/^V\s*=\s*/i, '')}` };
+  }
   if (P === 'V' || P === 'I') {
     const v = (attrs.Value ?? '').trim();
     // una fuente de corriente recién colocada (Value "I") es una continua sin valor

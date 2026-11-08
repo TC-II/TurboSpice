@@ -1939,7 +1939,7 @@ export const es: Record<string, string> = {
   'Simulation aborted: the results shown are from the previous run': 'Simulación abortada: los resultados que se ven son de la corrida anterior',
   '{file}: {n} lines could not be read and were kept as they are (the first one: {line})': '{file}: {n} líneas no se pudieron leer y quedaron tal cual (la primera: {line})',
   'Hide': 'Ocultar',
-  'Color…': 'Color…',
+  'Color': 'Color',
   'DFT of this trace': 'DFT de esta traza',
   'Edit the DFT (window and sampling)': 'Editar la DFT (ventana y muestreo)',
   'Cursor {name} on this trace': 'Cursor {name} en esta traza',

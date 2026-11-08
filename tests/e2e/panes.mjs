@@ -72,6 +72,18 @@ await page.getByRole('menuitem', { name: 'Enviar atrás' }).click();
 await frames(page);
 check((await chips()).join() === 'V(out),V(int),V(vin)', `«Enviar atrás» la manda al principio (${await chips()})`);
 
+// --- menú de una traza: «Color» primero, con las muestras de la paleta al costado ---
+await page.locator('.trace-chip', { hasText: 'V(out)' }).click({ button: 'right' });
+const traceItems = await page.locator('.ctx-menu > [role=menuitem], .ctx-menu > .ctx-sub > [role=menuitem]').allTextContents();
+check(/^Color/.test(traceItems[0]) && !traceItems.includes('Expresión'), `el menú de la traza empieza con Color y no tiene Expresión (${traceItems})`);
+await page.locator('.ctx-sub-btn').hover();
+const swatches = page.locator('.ctx-flyout .ctx-swatch');
+check((await swatches.count()) >= 8 && (await page.locator('.ctx-flyout .ctx-swatch.current').count()) === 1, 'la lista de colores muestra la paleta con el actual marcado');
+const pickedColor = await swatches.last().getAttribute('title');
+await swatches.last().click();
+await frames(page);
+check((await page.locator('.trace-chip', { hasText: 'V(out)' }).locator('input[type=color]').inputValue()) === pickedColor, `elegir una muestra cambia el color de la traza (${pickedColor})`);
+
 // --- se guarda con la vista ---
 const h3 = await heights();
 await autosaved(page);

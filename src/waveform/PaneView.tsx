@@ -9,7 +9,7 @@ import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, sampleEvents, si } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
 import { formatRadix, RADIXES, radixLabel, type Radix } from './digital.ts';
-import { cursorForClick, reorderTrace, traceColor, type CursorKey, type Cursors, type Pane, type Trace } from './view.ts';
+import { PALETTE, cursorForClick, reorderTrace, traceColor, type CursorKey, type Cursors, type Pane, type Trace } from './view.ts';
 import { type Marker } from './markers.ts';
 import { parseSi } from './dft.ts';
 import { useTraceWidth } from './lineWidth.ts';
@@ -777,9 +777,12 @@ export function PaneView(props: {
   /** menú del botón derecho de una traza: lo de la leyenda y lo que agrega el visor */
   const setTrace = (ti: number, f: (x: Trace) => Trace) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? f(x) : x)) }));
   const traceMenu = (ti: number, tt: Trace): ContextItem[] => [
-    { label: t('Expression'), onClick: () => undefined, edit: { value: tt.expr, onCommit: (v) => setTrace(ti, (x) => ({ ...x, expr: v })) } },
+    {
+      label: t('Color'),
+      onClick: () => undefined,
+      swatches: { colors: PALETTE, current: traceColor(tt, ti), onPick: (color) => setTrace(ti, (x) => ({ ...x, color })) },
+    },
     { label: tt.hidden ? t('Show') : t('Hide'), onClick: () => setTrace(ti, (x) => ({ ...x, hidden: !x.hidden })) },
-    { label: t('Color…'), onClick: () => colorInputs.current.get(ti)?.click() },
     ...props.traceActions(ti),
     { label: t('Remove'), onClick: () => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) })) },
   ];

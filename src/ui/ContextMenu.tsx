@@ -17,6 +17,8 @@ export interface ContextItem {
   onClick(edited?: string): void;
   /** campo editable en el propio menú («R1 = [valor]»): Enter o el tick lo aplican */
   edit?: { value: string; onCommit(value: string): void };
+  /** submenú lateral de muestras de color («Color»): al elegir una se cierra el menú */
+  swatches?: { colors: string[]; current: string; onPick(color: string): void };
 }
 
 const text = (it: ContextItem, v?: string) => (typeof it.label === 'function' ? it.label(v) : it.label);
@@ -61,6 +63,51 @@ function EditRow({ it, v, setV, onClose }: { it: ContextItem; v: string; setV(v:
   );
 }
 
+/** fila con un submenú de colores al costado (se abre con el mouse encima o con un clic); del otro lado si no entra */
+function SwatchRow({ it, onClose }: { it: ContextItem; onClose(): void }) {
+  const sw = it.swatches!;
+  const [open, setOpen] = useState(false);
+  const [left, setLeft] = useState(false);
+  const fly = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = fly.current;
+    if (!open || !el) return;
+    const w = el.ownerDocument.defaultView ?? window;
+    const r = el.getBoundingClientRect();
+    // a la derecha si entra; si no, a la izquierda (si ahí tampoco, se queda a la derecha)
+    const parent = el.parentElement!.getBoundingClientRect();
+    setLeft(parent.right + r.width + 8 > w.innerWidth && parent.left - r.width - 8 >= 0);
+  }, [open]);
+  const cur = sw.current.toLowerCase();
+  return (
+    <div className="ctx-sub" onPointerEnter={() => setOpen(true)} onPointerLeave={() => setOpen(false)}>
+      <button role="menuitem" aria-haspopup="menu" aria-expanded={open} className="ctx-sub-btn" disabled={it.disabled} onClick={() => setOpen((o) => !o)}>
+        <span>{text(it)}</span>
+        <span aria-hidden="true">▸</span>
+      </button>
+      {open && (
+        <div ref={fly} className={`ctx-flyout${left ? ' left' : ''}`} role="menu" aria-label={text(it)}>
+          {sw.colors.map((c) => (
+            <button
+              key={c}
+              role="menuitemradio"
+              aria-checked={c.toLowerCase() === cur}
+              aria-label={c}
+              title={c}
+              className={`ctx-swatch${c.toLowerCase() === cur ? ' current' : ''}`}
+              style={{ background: c }}
+              onClick={() => {
+                onClose();
+                sw.onPick(c);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number }; items: ContextItem[]; onClose(): void }) {
   const win = useHostWindow();
   const box = useRef<HTMLDivElement>(null);
@@ -93,6 +140,8 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
       {items.map((it, i) =>
         it.edit ? (
           <EditRow key={i} it={it} v={edited} setV={setEdited} onClose={onClose} />
+        ) : it.swatches ? (
+          <SwatchRow key={i} it={it} onClose={onClose} />
         ) : (
           <button
             key={i}

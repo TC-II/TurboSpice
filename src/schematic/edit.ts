@@ -458,7 +458,8 @@ export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library, trac
     }
     if (i === track?.index) track.out.push(...wires.slice(from));
   });
-  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+  // si el extremo cae en medio de otro cable, se une en T (igual que dibujarlo con W)
+  return touched ? mergeCollinear({ ...doc, wires: splitAt(wires, to) }, lib) : doc;
 }
 
 /**
@@ -508,7 +509,7 @@ export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Libra
     return w;
   });
   if (track && wires[track.index]) track.out.push(wires[track.index]);
-  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+  return touched ? mergeCollinear({ ...doc, wires: splitAt(wires, to) }, lib) : doc;
 }
 
 /**

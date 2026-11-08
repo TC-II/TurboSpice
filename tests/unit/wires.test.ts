@@ -694,3 +694,24 @@ describe('selección del fantasma al mover cables (#315)', () => {
     expect(previewSelection(sel, d, p)).toEqual([]);
   });
 });
+
+describe('extremo suelto soltado sobre otro cable', () => {
+  const d = asc('WIRE 0 0 128 0\nWIRE 64 64 64 160\nFLAG 0 0 a\nFLAG 128 0 b\nFLAG 64 160 c\n');
+  it('moveVertex lo une en T, igual que dibujarlo con W', () => {
+    const m = moveVertex(d, { x: 64, y: 64 }, { x: 64, y: 0 }, lib);
+    expect(ws(m)).toEqual(ws(addWire(d, { x: 64, y: 0 }, { x: 64, y: 160 }, lib)));
+    expect(ws(m)).toContainEqual([0, 0, 64, 0]);
+    expect(ws(m)).toContainEqual([64, 0, 128, 0]);
+    expect(connectivity(m, (t) => lib.symbol(t)).nets).toHaveLength(1);
+  });
+  it('moveVertexStraight también', () => {
+    const m = moveVertexStraight(d, { x: 64, y: 64 }, { x: 64, y: 0 }, lib);
+    expect(ws(m)).toContainEqual([0, 0, 64, 0]);
+    expect(ws(m)).toContainEqual([64, 0, 128, 0]);
+  });
+  it('fuera del cable no parte nada', () => {
+    const m = moveVertex(d, { x: 64, y: 64 }, { x: 64, y: 16 }, lib);
+    expect(ws(m)).toContainEqual([0, 0, 128, 0]);
+    expect(sameConnections(d, m, lib)).toBe(true);
+  });
+});

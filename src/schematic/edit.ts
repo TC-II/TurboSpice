@@ -2,6 +2,7 @@
 import type { AscDoc, Flag, Orient, Point, SchText, Shape, SymbolInst, TextWindow, Wire } from '../asc/model.ts';
 import { defaultWindows, effectiveWindows, ltspiceDefaultAs, ltspiceWindows, shownAlign } from '../asc/resolve.ts';
 import { connectivity, onSegment } from '../netlist/connectivity.ts';
+import { DIGITAL_DEFAULT_SPICELINE, isLibraryDigital } from '../netlist/digital.ts';
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { parseSource } from '../sim/sources.ts';
@@ -141,6 +142,8 @@ export function placeSymbol(doc: AscDoc, type: string, at: Point, orient: Orient
   const dflt = def?.attrs.get('InstName')?.toUpperCase();
   if (!dflt || (/\d$/.test(dflt) && doc.symbols.some((o) => (o.attrs.get('InstName') ?? lib.symbol(o.type)?.attrs.get('InstName') ?? '').toUpperCase() === dflt)))
     attrs.set('InstName', nextInstName(doc, nameLetter(def), lib));
+  // bloque digital: SpiceLine Vhigh=5 (sin WINDOW 39 en el símbolo: queda oculto)
+  if (isLibraryDigital(def?.attrs) && !def?.attrs.get('SpiceLine')) attrs.set('SpiceLine', DIGITAL_DEFAULT_SPICELINE);
   const sym: SymbolInst = { type, x: at.x, y: at.y, orient, windows: new Map(), attrs };
   // colocado sobre un cable: el cable se parte en sus pines, no queda en corto
   return cutNew({ ...doc, symbols: [...doc.symbols, sym] }, [{ kind: 'symbol', index: doc.symbols.length }], lib).doc;

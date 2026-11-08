@@ -458,7 +458,8 @@ export function moveVertex(doc: AscDoc, p: Point, to: Point, lib?: Library, trac
     }
     if (i === track?.index) track.out.push(...wires.slice(from));
   });
-  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+  // si el extremo cae en medio de otro cable, se une en T (igual que dibujarlo con W)
+  return touched ? mergeCollinear({ ...doc, wires: splitAt(wires, to) }, lib) : doc;
 }
 
 /**
@@ -508,7 +509,7 @@ export function moveVertexStraight(doc: AscDoc, p: Point, to: Point, lib?: Libra
     return w;
   });
   if (track && wires[track.index]) track.out.push(wires[track.index]);
-  return touched ? mergeCollinear({ ...doc, wires }, lib) : doc;
+  return touched ? mergeCollinear({ ...doc, wires: splitAt(wires, to) }, lib) : doc;
 }
 
 /**
@@ -577,6 +578,47 @@ export function sameConnections(a: AscDoc, b: AscDoc, lib: Library): boolean {
       .sort()
       .join('|');
   return sig(a) === sig(b);
+}
+
+/** Parte los cables que pasan por el interior de alguno de los puntos `pts` (uniones en T) */
+export function splitWiresAt(doc: AscDoc, pts: Point[]): AscDoc {
+  const wires = pts.reduce(splitAt, doc.wires);
+  return wires.length === doc.wires.length ? doc : { ...doc, wires };
+}
+
+/**
+ * Como sameConnections, pero admite uniones nuevas justo en los puntos `pts` (los extremos
+ * nuevos de un tramo arrastrado): las redes pueden juntarse con la del tramo (`seg`, un punto
+ * del tramo en `a`) sólo por lo que hay en esos puntos; nunca se parten, y nada se une por
+ * otro lado (p. ej. el interior del tramo pasando sobre un pin).
+ */
+export function joinsOnlyAt(a: AscDoc, b: AscDoc, lib: Library, seg: Point, pts: Point[]): boolean {
+  const ca = connectivity(a, (t) => lib.symbol(t));
+  const cb = connectivity(b, (t) => lib.symbol(t));
+  const toks = (n: { pins: { sym: number; pin: number }[]; labels: string[] } | undefined) => [...(n?.pins.map((p) => `${p.sym}:${p.pin}`) ?? []), ...(n?.labels.map((l) => `@${l}`) ?? [])];
+  const parent = new Map<string, string>();
+  const find = (k: string): string => {
+    if (!parent.has(k)) parent.set(k, k);
+    const r = parent.get(k)!;
+    return r === k ? k : find(r);
+  };
+  const union = (x: string, y: string) => parent.set(find(y), find(x));
+  for (const n of ca.nets) for (const t of toks(n)) union(toks(n)[0], t);
+  for (const t of toks(ca.netAt(seg))) union('seg#', t);
+  for (const p of pts) for (const t of toks(ca.netAt(p))) union('seg#', t);
+  const groups = (part: string[][]) =>
+    part
+      .map((g) => g.sort().join(' '))
+      .sort()
+      .join('|');
+  const exp = new Map<string, string[]>();
+  for (const n of ca.nets)
+    for (const t of toks(n)) {
+      const r = find(t);
+      if (!exp.has(r)) exp.set(r, []);
+      if (!exp.get(r)!.includes(t)) exp.get(r)!.push(t);
+    }
+  return groups([...exp.values()]) === groups(cb.nets.map((n) => [...new Set(toks(n))]).filter((g) => g.length));
 }
 
 const sameWindow = (a: TextWindow, b: TextWindow) => a.x === b.x && a.y === b.y && a.align === b.align && a.size === b.size;

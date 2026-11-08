@@ -22,6 +22,8 @@ import {
   placeSymbol,
   removeVertex,
   sameConnections,
+  splitWiresAt,
+  joinsOnlyAt,
   setWindows,
   previewSelection,
   splitWire,
@@ -749,12 +751,24 @@ export function SchematicEditor(props: Props) {
     // dónde termina el cable agarrado, para que el naranja no pase a los tramos nuevos (#315)
     const wires: Wire[] = [];
     const sel = selection.find((r) => r.kind === 'wire');
-    const nd =
+    let nd =
       d.mode === 'vertex'
         ? (straight ? moveVertexStraight : moveVertex)(d.base, d.at, g, lib, sel && d.base === doc ? { index: sel.index, out: wires } : undefined)
         : (straight ? dragSegmentStraight : dragSegment)(doc, d.index, g.x - d.start.x, g.y - d.start.y, lib, wires);
+    // un tramo puede quedar con un extremo sobre un pin, una etiqueta o un cable: se une ahí
+    // (sólo en sus extremos nuevos; si pasa por encima de algo con el interior, no)
+    let joins = false;
+    if (d.mode === 'segment' && nd !== from && wires[0] && !sameConnections(doc, nd, lib)) {
+      const w0 = doc.wires[d.index];
+      const pts = [
+        { x: wires[0].x1, y: wires[0].y1 },
+        { x: wires[0].x2, y: wires[0].y2 },
+      ];
+      const split = splitWiresAt(nd, pts);
+      if (w0 && joinsOnlyAt(doc, split, lib, { x: w0.x1, y: w0.y1 }, pts)) [nd, joins] = [split, true];
+    }
     if (nd === from) setPreview(null);
-    else if ((d.mode === 'vertex' && d.free) || sameConnections(doc, nd, lib)) {
+    else if ((d.mode === 'vertex' && d.free) || joins || sameConnections(doc, nd, lib)) {
       setPreview(nd);
       setPreviewMoved({ doc: nd, wires });
     }

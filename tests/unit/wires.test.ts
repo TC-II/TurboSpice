@@ -26,6 +26,8 @@ import {
   previewSelection,
   removeVertex,
   sameConnections,
+  joinsOnlyAt,
+  splitWiresAt,
   setSymbolType,
   splitWire,
   transformItems,
@@ -713,5 +715,43 @@ describe('extremo suelto soltado sobre otro cable', () => {
     const m = moveVertex(d, { x: 64, y: 64 }, { x: 64, y: 16 }, lib);
     expect(ws(m)).toContainEqual([0, 0, 128, 0]);
     expect(sameConnections(d, m, lib)).toBe(true);
+  });
+});
+
+describe('tramo arrastrado que termina sobre un pin o un cable', () => {
+  // R1: pines en (16,16) y (16,96); el tramo horizontal tiene el extremo derecho suelto
+  const R = 'SYMBOL res 0 0 R0\nSYMATTR InstName R1\nFLAG -48 160 x\nFLAG 16 96 a\n';
+  const ends = (w: Wire) => [
+    { x: w.x1, y: w.y1 },
+    { x: w.x2, y: w.y2 },
+  ];
+  it('se une si el extremo nuevo cae en el pin', () => {
+    const d = asc(`WIRE -48 48 16 48
+WIRE -48 48 -48 160
+${R}`);
+    const out: Wire[] = [];
+    const m = dragSegment(d, 0, 0, -32, lib, out);
+    expect(sameConnections(d, m, lib)).toBe(false);
+    expect(joinsOnlyAt(d, m, lib, { x: -48, y: 48 }, ends(out[0]))).toBe(true);
+  });
+  it('no se une si pasa por encima del pin con el interior', () => {
+    const d = asc(`WIRE -48 48 64 48
+WIRE -48 48 -48 160
+${R}`);
+    const out: Wire[] = [];
+    const m = dragSegment(d, 0, 0, -32, lib, out);
+    expect(joinsOnlyAt(d, m, lib, { x: -48, y: 48 }, ends(out[0]))).toBe(false);
+  });
+  it('si el extremo cae en medio de un cable, lo parte y se une', () => {
+    const d = asc(`WIRE -48 128 80 128
+WIRE -48 128 -48 160
+WIRE 80 0 80 96
+FLAG 80 96 y
+${R}`);
+    const out: Wire[] = [];
+    const m = splitWiresAt(dragSegment(d, 0, 0, -64, lib, out), ends(out[0]));
+    expect(ws(m)).toContainEqual([80, 0, 80, 64]);
+    expect(ws(m)).toContainEqual([80, 64, 80, 96]);
+    expect(joinsOnlyAt(d, m, lib, { x: -48, y: 128 }, ends(out[0]))).toBe(true);
   });
 });

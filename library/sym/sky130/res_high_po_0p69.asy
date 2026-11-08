@@ -11,7 +11,7 @@ SYMATTR Prefix X
 SYMATTR InstName XR1
 SYMATTR Value sky130_fd_pr__res_high_po_0p69
 SYMATTR SpiceLine L=3.5
-SYMATTR Description sky130 Poly resistor, high sheet, 0.69 µm wide (~1 kΩ/□) (sky130_fd_pr__res_high_po_0p69). W and L in µm.
+SYMATTR Description sky130 Poly resistor, high sheet, 0.69 µm wide (~350 Ω/□) (sky130_fd_pr__res_high_po_0p69). W and L in µm.
 PIN 16 0 NONE 0
 PINATTR PinName R0
 PINATTR SpiceOrder 1

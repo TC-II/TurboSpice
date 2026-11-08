@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 820" width="940" height="820" font-family="system-ui, sans-serif">
+<style>
+svg{background:#fff} .w{fill:none;stroke:#222;stroke-width:2;stroke-linejoin:round} .r{stroke:#b5432b} .c,.cp{stroke:#2563a8;stroke-dasharray:0} .cp{stroke-width:3}
+.dk{stroke-width:3} .dio{fill:#e8c84a;stroke:#222;stroke-width:2} .dot{fill:#222} .pin{fill:#fff;stroke:#222;stroke-width:2.5}
+.box{fill:#f7f8fa;stroke:#888;stroke-width:1.5;stroke-dasharray:8 5} .core{fill:#e6f0e3;stroke:#3c7a3c;stroke-width:2}
+text{fill:#222;font-size:14px} .lb{font-weight:600} .sm{font-size:12px;fill:#444} .tiny{font-size:11px;fill:#3c7a3c;font-weight:700}
+.nd{font-size:12px;font-style:italic;fill:#666} .code{font-family:monospace;font-size:13px;fill:#555} .pinl{font-weight:700} .note{font-size:13px;fill:#333}
+</style>
+<text x="470" y="630" text-anchor="middle" font-size="17" font-weight="700">sky130 nfet_01v8 — circuito interno equivalente (BSIM4)</text>
+<rect x="40" y="70" width="840" height="490" rx="10" class="box"/>
+<text x="52" y="92" class="code" text-anchor="start">.subckt sky130_fd_pr__nfet_01v8  d g s b</text>
+<circle cx="450" cy="30" r="7" class="pin"/>
+<circle cx="450" cy="600" r="7" class="pin"/>
+<circle cx="20" cy="300" r="7" class="pin"/>
+<circle cx="900" cy="300" r="7" class="pin"/>
+<text x="468" y="36" class="pinl" text-anchor="start">d (drain)</text>
+<text x="468" y="606" class="pinl" text-anchor="start">s (source)</text>
+<text x="20" y="282" class="pinl" text-anchor="middle">g</text>
+<text x="900" y="282" class="pinl" text-anchor="middle">b</text>
+<rect x="340" y="240" width="220" height="120" rx="6" class="core"/>
+<text x="450" y="268" class="lb" text-anchor="middle">MOS intrínseco</text>
+<text x="450" y="288" class="sm" text-anchor="middle">BSIM4 v4.5 (level 54)</text>
+<text x="450" y="308" class="sm" text-anchor="middle">I<tspan baseline-shift='sub' font-size='10'>ds</tspan>(V<tspan baseline-shift='sub' font-size='10'>gs</tspan>, V<tspan baseline-shift='sub' font-size='10'>ds</tspan>, V<tspan baseline-shift='sub' font-size='10'>bs</tspan>)</text>
+<text x="450" y="330" class="sm" text-anchor="middle">R<tspan baseline-shift='sub' font-size='10'>S</tspan>/R<tspan baseline-shift='sub' font-size='10'>D</tspan> dentro de I<tspan baseline-shift='sub' font-size='10'>ds</tspan></text>
+<text x="450" y="346" class="sm" text-anchor="middle">(rdsmod=0, rdsw)</text>
+<polyline class="w " points="450,37 450,240"/>
+<polyline class="w " points="450,360 450,593"/>
+<polyline class="w " points="27,300 340,300"/>
+<text x="328" y="294" class="tiny" text-anchor="end">G</text>
+<text x="566" y="294" class="tiny" text-anchor="start">B'</text>
+<circle cx="450" cy="140" r="4" class="dot"/>
+<circle cx="450" cy="470" r="4" class="dot"/>
+<circle cx="230" cy="300" r="4" class="dot"/>
+<polyline class="w " points="560,300 660,300"/>
+<circle cx="660" cy="300" r="4" class="dot"/>
+<text x="652" y="322" class="nd" text-anchor="end">bNodePrime</text>
+<polyline class="w r" points="690,300 696.875,293 710.625,307 724.375,293 738.125,307 751.875,293 765.625,307 779.375,293 793.125,307 800,300"/>
+<text x="745.0" y="286" class="lb" text-anchor="middle">RBPB</text>
+<text x="745.0" y="324" class="sm" text-anchor="middle">rbpb</text>
+<polyline class="w " points="660,300 690,300"/>
+<polyline class="w " points="800,300 893,300"/>
+<circle cx="840" cy="300" r="4" class="dot"/>
+<circle cx="660" cy="140" r="4" class="dot"/>
+<text x="668" y="162" class="nd" text-anchor="start">dbNode</text>
+<polyline class="w r" points="660,175 653,180.625 667,191.875 653,203.125 667,214.375 653,225.625 667,236.875 653,248.125 667,259.375 660,265"/>
+<text x="674" y="220.0" class="lb" text-anchor="start">RBPD</text>
+<text x="674" y="236.0" class="sm" text-anchor="start">rbpd</text>
+<polyline class="w " points="660,140 660,175"/>
+<polyline class="w " points="660,265 660,300"/>
+<polygon class="dio" points="567.0,129 567.0,151 545.0,140"/>
+<polyline class="w dk" points="545.0,129 545.0,151"/>
+<polyline class="w " points="660,140 567.0,140"/>
+<polyline class="w " points="545.0,140 450,140"/>
+<text x="555.0" y="122" class="lb" text-anchor="middle">D<tspan baseline-shift='sub' font-size='10'>DB</tspan>  (juntura p-sub / n+ drain)</text>
+<polyline class="w r" points="700,140 706.25,133 718.75,147 731.25,133 743.75,147 756.25,133 768.75,147 781.25,133 793.75,147 800,140"/>
+<text x="750.0" y="126" class="lb" text-anchor="middle">RBDB</text>
+<text x="750.0" y="164" class="sm" text-anchor="middle">rbdb</text>
+<polyline class="w " points="660,140 700,140"/>
+<polyline class="w " points="800,140 840,140 840,300"/>
+<circle cx="660" cy="470" r="4" class="dot"/>
+<text x="668" y="492" class="nd" text-anchor="start">sbNode</text>
+<polyline class="w r" points="660,335 653,340.625 667,351.875 653,363.125 667,374.375 653,385.625 667,396.875 653,408.125 667,419.375 660,425"/>
+<text x="674" y="380.0" class="lb" text-anchor="start">RBPS</text>
+<text x="674" y="396.0" class="sm" text-anchor="start">rbps</text>
+<polyline class="w " points="660,300 660,335"/>
+<polyline class="w " points="660,425 660,470"/>
+<polygon class="dio" points="567.0,459 567.0,481 545.0,470"/>
+<polyline class="w dk" points="545.0,459 545.0,481"/>
+<polyline class="w " points="660,470 567.0,470"/>
+<polyline class="w " points="545.0,470 450,470"/>
+<text x="555.0" y="452" class="lb" text-anchor="middle">D<tspan baseline-shift='sub' font-size='10'>SB</tspan>  (juntura p-sub / n+ source)</text>
+<polyline class="w r" points="700,470 706.25,463 718.75,477 731.25,463 743.75,477 756.25,463 768.75,477 781.25,463 793.75,477 800,470"/>
+<text x="750.0" y="456" class="lb" text-anchor="middle">RBSB</text>
+<text x="750.0" y="494" class="sm" text-anchor="middle">rbsb</text>
+<polyline class="w " points="660,470 700,470"/>
+<polyline class="w " points="800,470 840,470 840,300"/>
+<polyline class="w " points="230,300 230,250"/>
+<polyline class="w c" points="230,250 230,210.0"/>
+<polyline class="w c" points="230,220.0 230,180"/>
+<polyline class="w cp" points="216,210.0 244,210.0"/>
+<polyline class="w cp" points="216,220.0 244,220.0"/>
+<text x="210" y="219.0" class="lb" text-anchor="end">C<tspan baseline-shift='sub' font-size='10'>GD</tspan></text>
+<text x="210" y="235.0" class="sm" text-anchor="end">intr. + cgdo</text>
+<polyline class="w " points="230,180 230,140 450,140"/>
+<polyline class="w " points="230,300 230,350"/>
+<polyline class="w c" points="230,350 230,380.0"/>
+<polyline class="w c" points="230,390.0 230,420"/>
+<polyline class="w cp" points="216,380.0 244,380.0"/>
+<polyline class="w cp" points="216,390.0 244,390.0"/>
+<text x="210" y="389.0" class="lb" text-anchor="end">C<tspan baseline-shift='sub' font-size='10'>GS</tspan></text>
+<text x="210" y="405.0" class="sm" text-anchor="end">intr. + cgso</text>
+<polyline class="w " points="230,420 230,470 450,470"/>
+<text x="130" y="540" class="sm" text-anchor="middle">C<tspan baseline-shift='sub' font-size='10'>GB</tspan> (G→B', intr. + cgbo): no dibujada</text>
+<text x="40" y="650" class="note" text-anchor="start">Cada transistor del PDK es un .subckt con UN solo elemento M: no agrega R, C ni diodos externos.</text>
+<text x="40" y="670" class="note" text-anchor="start">Todo lo dibujado sale de las llaves del modelo BSIM4 (iguales en los 180 bins .model …__model.0 … .179,</text>
+<text x="40" y="690" class="note" text-anchor="start">que ngspice elige según W y L):</text>
+<text x="40" y="710" class="note" text-anchor="start">• rbodymod = 1 → red de 5 resistencias de sustrato (RBPB, RBPD, RBPS, RBDB, RBSB)</text>
+<text x="40" y="730" class="note" text-anchor="start">• diomod = 1 → diodos de juntura S-B y D-B (con AS/AD, PS/PD)      • rgatemod = 0 → sin R de compuerta</text>
+<text x="40" y="750" class="note" text-anchor="start">• rdsmod = 0 → R de source/drain (rdsw) incluida en la ecuación de I_ds, sin nodos internos</text>
+<text x="40" y="770" class="note" text-anchor="start">• igcmod = igbmod = 0 → sin corriente de túnel de compuerta    • trnqsmod = acnqsmod = 0 → modelo cuasi-estático</text>
+<text x="40" y="790" class="note" text-anchor="start">Igual para pfet_01v8, *_g5v0d10v5, *_03v3_nvt… (en los PMOS los diodos van al revés: p+ → n-well).</text>
+</svg>

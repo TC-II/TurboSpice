@@ -15,7 +15,16 @@ Vienen de **open_pdks**, los mismos que usan xschem y los tutoriales, con sus no
   medidas siempre en µm (en gf180 se guardan en metros, con «u»), lo que dan (W/L, área de
   compuerta, R ≈ R□·L/W, C ≈ densidad·W·L, con los valores de la descripción del símbolo) y qué
   rótulos se ven. «Todos los atributos…» abre el diálogo de siempre.
-  - **sky130**: MOS de 1.8, 3.3 y 5 V, resistencias de poly, MIM, PNP y diodo. Por
+  - **sky130** (97): MOS de 1.8, 3.3, 5, 10.5, 16 y 20 V (con los LDMOS aislados `nfet_20v0_iso` y
+    `_reverse_iso`, de 5 pines: `sub` es el sustrato), los de ESD y los `special_*` de SRAM; todas
+    las resistencias (poly de todos los anchos, difusión, n-well, p-well aislado y las
+    `res_generic_*` de cada metal, éstas como `.model r` con prefijo R); MIM de metal 3 y 4,
+    varactores y las 28 celdas VPP (tamaño fijo, con su valor en tt en la descripción); NPN, PNP y
+    los diodos `pw2nd` y `pd2nw`. Afuera, los `rf_*` (celdas de medición de tamaño fijo) y los que
+    el PDK trae rotos: `nfet_20v0_nvt_iso` (no está en ninguna esquina), `special_pfet_pass`
+    (llama a un subcircuito que no existe), `special_nfet_01v8` y `special_pfet_01v8_hvt` (pasan un
+    `nf` que no declaran). Algunos sólo tienen bins para tamaños fijos: `pfet_01v8_mvt` (L=0.15,
+    W=0.84 o 1.68), `special_nfet_pass_lvt` y `_flash`; lo dice la descripción. Por
     `.option scale=1u` del PDK, **W y L van en µm** (`W=1 L=0.15`); el área de los diodos, en µm²
     (`area=1 pj=4`: el `.model` trae `area=1e12` por defecto, que con `scale` da corrientes absurdas).
   - **gf180**: MOS de 3.3 y 6 V y nativo (`nfet_03v3`, `pfet_06v0`, `nfet_06v0_nvt`…),

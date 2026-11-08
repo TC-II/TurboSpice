@@ -11,7 +11,7 @@ WINDOW 3 84 68 Left 2
 SYMATTR Prefix X
 SYMATTR InstName XQ1
 SYMATTR Value sky130_fd_pr__pnp_05v5_W0p68L0p68
-SYMATTR Description sky130 vertical PNP, 0.68 × 0.68 µm emitter (sky130_fd_pr__pnp_05v5_W0p68L0p68). W and L in µm.
+SYMATTR Description sky130 vertical PNP, 0.68 × 0.68 µm emitter (sky130_fd_pr__pnp_05v5_W0p68L0p68).
 SYMATTR Skin pnp
 PIN 64 0 NONE 0
 PINATTR PinName C

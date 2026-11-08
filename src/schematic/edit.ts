@@ -6,7 +6,7 @@ import { DIGITAL_DEFAULT_SPICELINE, isLibraryDigital } from '../netlist/digital.
 import { localAlign, mirrorX, rotateCW, toWorld } from '../asc/transform.ts';
 import type { Library } from '../library/library.ts';
 import { parseSource } from '../sim/sources.ts';
-import { localBox, pinPoints, pivotNear, snap, symbolPivot, type ItemRef } from './geometry.ts';
+import { localBox, pinPoints, pivotNear, snap, symbolBox, symbolPivot, type ItemRef } from './geometry.ts';
 import { mapShape, shapePoints, shiftShape } from './shapes.ts';
 
 const samePt = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
@@ -836,8 +836,23 @@ export function extractItems(doc: AscDoc, refs: ItemRef[]): AscDoc {
 export function pasteItems(doc: AscDoc, frag: AscDoc, at: Point, lib: Library, raw = false): { doc: AscDoc; refs: ItemRef[] } {
   const pts: Point[] = [...frag.symbols, ...frag.flags, ...frag.texts, ...frag.wires.flatMap(ends), ...frag.shapes.flatMap((x) => shapePoints(x).slice(0, 2))];
   if (!pts.length) return { doc, refs: [] };
-  const dx = snap(at.x - Math.min(...pts.map((p) => p.x)));
-  const dy = snap(at.y - Math.min(...pts.map((p) => p.y)));
+  // con `raw` (sigue al cursor) el cursor queda en el centro de lo pegado; si no, en la esquina
+  const box = raw
+    ? [
+        ...pts,
+        ...frag.symbols.flatMap((s) => {
+          const b = symbolBox(s, lib.symbol(s.type), lib);
+          return [
+            { x: b.x1, y: b.y1 },
+            { x: b.x2, y: b.y2 },
+          ];
+        }),
+      ]
+    : pts;
+  const xs = box.map((p) => p.x);
+  const ys = box.map((p) => p.y);
+  const dx = snap(at.x - (raw ? (Math.min(...xs) + Math.max(...xs)) / 2 : Math.min(...xs)));
+  const dy = snap(at.y - (raw ? (Math.min(...ys) + Math.max(...ys)) / 2 : Math.min(...ys)));
   const nameOf = (s: SymbolInst) => (s.attrs.get('InstName') ?? lib.symbol(s.type)?.attrs.get('InstName') ?? '').toUpperCase();
   let symbols = doc.symbols;
   for (const s of frag.symbols) {

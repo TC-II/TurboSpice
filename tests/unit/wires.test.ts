@@ -553,7 +553,9 @@ describe('un cable no atraviesa componentes (#45)', () => {
     // encima del cable: todavía no lo parte
     expect(ws(r.doc)).toEqual(ws(wire2));
     // soltado ahí mismo, conecta como al pegar de una
-    expect(ws(connectPasted(r.doc, r.refs, lib))).toEqual(ws(pasteItems(wire2, frag, { x: 0, y: 0 }, lib).doc));
+    // (con raw el cursor queda en el centro: se compara con el pegado directo en el mismo lugar)
+    const placed = r.doc.symbols[r.doc.symbols.length - 1];
+    expect(ws(connectPasted(r.doc, r.refs, lib))).toEqual(ws(pasteItems(wire2, frag, { x: placed.x, y: placed.y }, lib).doc));
     // movido lejos antes de soltar: el cable queda entero
     const moved = moveItems(r.doc, r.refs, 480, 0, false, lib);
     expect(ws(moved)).toEqual(ws(wire2));

@@ -147,7 +147,7 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
     };
   }, [onClose, win]);
   return (
-    <div ref={box} className={`ctx-menu${editItem ? ' ctx-quick' : ''}`} role="menu" style={{ left: pos.x, top: pos.y }}>
+    <div ref={box} className={`ctx-menu${editItem ? ' ctx-quick' : ''}${items.length === 1 && items[0].swatches?.only ? ' ctx-swatches-only' : ''}`} role="menu" style={{ left: pos.x, top: pos.y }}>
       {items.map((it, i) =>
         it.edit ? (
           <EditRow key={i} it={it} v={edited} setV={setEdited} onClose={onClose} />

@@ -1340,6 +1340,7 @@ button.hier-tab { padding-right: 10px; }
 .ctx-sub { position: relative; display: flex; flex-direction: column; }
 .ctx-menu button.ctx-sub-btn { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .ctx-flyout { position: absolute; top: -4px; left: 100%; margin-left: 2px; display: grid; grid-template-columns: repeat(5, 22px); gap: 4px; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 25%); }
+.ctx-menu.ctx-swatches-only { min-width: 0; width: max-content; padding: 4px; }
 .ctx-flyout.ctx-flyout-only { position: static; margin: 0; border: 0; box-shadow: none; padding: 2px; }
 .ctx-flyout.left { left: auto; right: 100%; margin: 0 2px 0 0; }
 .ctx-menu button.ctx-swatch { width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid transparent; }

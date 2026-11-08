@@ -137,12 +137,16 @@ export function SourceDialog({
     SpiceLine: inst.attrs.get('SpiceLine'),
   };
   const [parsed] = useState(() => parseSource(original));
-  // una fuente sin valor (recién colocada) arranca en Seno: abrir y apretar Enter ya deja una fuente válida
+  // una fuente sin valor (recién colocada) arranca en Seno (la de corriente, en continua, con 1 A):
+  // abrir y apretar Enter ya deja una fuente válida
   const blankSrc = !parsed || (parsed.kind === 'dc' && !parsed.dc.trim());
-  const [spec, setSpec] = useState<SourceSpec>(() => (parsed && !blankSrc ? parsed : { ...(parsed ?? emptySource()), kind: 'sine' }));
+  const [spec, setSpec] = useState<SourceSpec>(() => {
+    if (parsed && !blankSrc) return parsed;
+    return current ? { ...(parsed ?? emptySource()), kind: 'dc', dc: '1' } : { ...(parsed ?? emptySource()), kind: 'sine' };
+  });
   // valores que la ventana completó sola (DC al abrir, AC o Valor DC al entrar a esas pestañas):
   // si no se tocaron, se sacan al ir a otra pestaña (mirar AC no debe dejar un "AC 1" puesto)
-  const autoFilled = useRef<{ acMag?: string; dc?: string }>({});
+  const autoFilled = useRef<{ acMag?: string; dc?: string }>(current && blankSrc ? { dc: '1' } : {});
   // los parámetros de cada forma de onda se recuerdan al cambiar de pestaña
   const [argsBy, setArgsBy] = useState<Partial<Record<SourceKind, string[]>>>(() => ({ ...DEFAULT_ARGS, ...(parsed ? { [parsed.kind]: parsed.args } : {}) }));
   const [text, setText] = useState<string | null>(() => (parsed || !original.Value.trim() ? null : [original.Value, original.Value2, original.SpiceLine].filter(Boolean).join(' ')));

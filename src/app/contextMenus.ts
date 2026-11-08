@@ -10,11 +10,11 @@ import { setSymbolAttrs } from '../schematic/edit.ts';
 import type { ItemRef } from '../schematic/geometry.ts';
 import { elementRefs, saveSelection, setSaveSelection, toggleRefs } from '../sim/saves.ts';
 import type { SimList } from '../sim/simList.ts';
-import { parseSource } from '../sim/sources.ts';
 import type { ContextItem } from '../ui/ContextMenu.tsx';
 import { isControlBlock } from '../netlist/directives.ts';
 import { isNativeSwitch, isTcSwitch } from '../schematic/SwitchDialog.tsx';
 import { ANALYSIS_LINE } from '../sim/analyses.ts';
+import { quickValue } from './quickValue.ts';
 import type { Dialog } from './types.ts';
 
 export interface ContextMenuDeps {
@@ -88,10 +88,10 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
     const inst = s?.attrs.get('InstName');
     if (!s || !inst) return false;
     const eff = effectiveAttrs(s, lib.symbol(s.type));
-    const value = s.attrs.get('Value') ?? eff.get('Value') ?? '';
     const prefix = (eff.get('Prefix') ?? '').toUpperCase();
-    // R, L, C y fuentes V de continua: el valor se edita en el mismo menú
-    const quick = /^[RLC]$/.test(prefix) || (prefix === 'V' && parseSource({ Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') })?.kind === 'dc');
+    // R, L, C, fuentes V e I de continua y Vcc: el valor se edita en el mismo menú
+    const quick = quickValue(prefix, s.type, { Value: s.attrs.get('Value'), Value2: s.attrs.get('Value2'), SpiceLine: s.attrs.get('SpiceLine') }, s.attrs.get('Value') ?? eff.get('Value') ?? '');
+    const value = quick ? quick.shown : (s.attrs.get('Value') ?? eff.get('Value') ?? '');
     const p0 = snapshot();
     const inBench = !curSub && !!sims.active;
     const peers = inBench ? groupPeersWith(p0, sims.active, inst, s.type) : [];
@@ -110,7 +110,7 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
       at,
       items: [
         quick
-          ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: v })) } }
+          ? { label: `${inst} =`, onClick: () => {}, edit: { value, onCommit: (v) => commit(setSymbolAttrs(doc, index, { Value: quick.store(v) })) } }
           : { label: t('Edit {inst}…', { inst }), onClick: () => editItem({ kind: 'symbol', index }) },
         {
           // con el valor que se está escribiendo (#229): se aplica primero y después se propaga
@@ -123,8 +123,9 @@ export function contextMenus({ doc, lib, curSub, sims, commit, snapshot, editPro
             const v = edited?.trim() || value;
             const attrs = new Map(s.attrs);
             if (quick && v !== value) {
-              commit(setSymbolAttrs(doc, index, { Value: v }));
-              attrs.set('Value', v);
+              const stored = quick.store(v);
+              commit(setSymbolAttrs(doc, index, { Value: stored }));
+              attrs.set('Value', stored);
             }
             editProject(propagateAttrs(snapshot(), peers, inst, s.type, attrs));
             setMessage(t('{inst} = {value} propagated to {n} testbenches of «{group}»', { inst, value: v, n: peers.length, group }));

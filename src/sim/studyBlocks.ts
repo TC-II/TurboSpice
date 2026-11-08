@@ -102,7 +102,7 @@ export const BLOCK_MEASURES: [MeasureKind, string, MeasAnalysis | null][] = [
 /** Colores del bloque "Graficar señal" (la paleta del visor) */
 export const PLOT_COLORS: [string, string][] = [
   [t('automatic'), 'auto'],
-  ...(['blue', 'red', 'green', 'yellow', 'violet', 'turquoise', 'orange', 'fuchsia', 'olive', 'dark blue'] as const).map((n, i): [string, string] => [t(n), PALETTE_LIGHT[i]]),
+  ...(['blue', 'red', 'green', 'orange', 'fuchsia', 'yellow', 'olive', 'violet', 'turquoise', 'gray'] as const).map((n, i): [string, string] => [t(n), PALETTE_LIGHT[i]]),
 ];
 
 /** Definiciones JSON de los bloques propios; los desplegables de componentes los completa la UI */

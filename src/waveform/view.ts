@@ -114,12 +114,12 @@ export interface PlotState {
 }
 
 /**
- * Paletas por tema, con la misma secuencia de tonos: azul, rojo, verde, amarillo, violeta,
- * turquesa, naranja, fucsia, lima, índigo. La clara es más oscura (contraste ≥ 3 sobre blanco);
- * la oscura, vívida.
+ * Paletas por tema, con la misma secuencia de tonos: azul, rojo, verde, naranja, fucsia,
+ * amarillo, oliva, violeta, celeste, blanco/gris. La oscura es la elegida por el usuario; la
+ * clara usa tonos más oscuros para que se vean sobre blanco.
  */
-export const PALETTE_LIGHT = ['#1971c2', '#e03131', '#2f9e44', '#b8860b', '#ae3ec9', '#0c8599', '#d9480f', '#c2255c', '#5c940d', '#6741d9'];
-export const PALETTE_DARK = ['#228be6', '#fa5252', '#40c057', '#fab005', '#be4bdb', '#15aabf', '#fd7e14', '#e64980', '#82c91e', '#7950f2'];
+export const PALETTE_LIGHT = ['#1971c2', '#e03131', '#2f9e44', '#e8590c', '#c2255c', '#b8860b', '#5c940d', '#6741d9', '#0c8599', '#495057'];
+export const PALETTE_DARK = ['#4262ff', '#ff4a4a', '#00f200', '#ff6a00', '#ff00e3', '#ffff00', '#4b6f00', '#7600f0', '#4deaff', '#eeeeee'];
 
 /** ¿Tema oscuro? (elegido, o el del sistema si no se eligió) */
 export function isDarkTheme(): boolean {

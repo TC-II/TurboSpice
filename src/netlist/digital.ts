@@ -48,6 +48,22 @@ const GATES = new Set(['and', 'or', 'xor', 'buf']);
 const FLOPS = new Set(['dflop', 'srflop', 'schmitt', 'counter']);
 const SPECIAL = new Set(['phasedet', 'samplehold', 'modulator', 'varistor']);
 
+/** Modelos de los bloques digitales de la biblioteca (library/sym/Digital) */
+const LIBRARY_DIGITAL = new Set([...GATES, ...FLOPS, 'phasedet']);
+
+/**
+ * SpiceLine con que se coloca un bloque digital nuevo (#370): `Vhigh=5`, oculto. Vhigh es el nivel
+ * alto de las salidas (el dac_bridge interno trabaja en 0…1 y la fuente B escala a Vlow…Vhigh) y
+ * el umbral pasa a (Vhigh+Vlow)/2 = 2,5 V. No se pone en el .asy: un símbolo con SpiceLine lo
+ * heredan los archivos ya guardados (y los de LTspice), que seguirían con 1 V.
+ */
+export const DIGITAL_DEFAULT_SPICELINE = 'Vhigh=5';
+
+/** ¿Es el símbolo (atributos del .asy) un bloque digital de la biblioteca (dispositivo A)? */
+export function isLibraryDigital(attrs: Map<string, string> | undefined): boolean {
+  return (attrs?.get('Prefix') ?? '').toUpperCase() === 'A' && LIBRARY_DIGITAL.has((attrs?.get('SpiceModel') ?? '').trim().toLowerCase());
+}
+
 /** Parámetros "k=v" o "k v" (LTspice acepta los dos; v puede ser {expr}) de la línea A */
 function params(text: string): Map<string, string> {
   const out = new Map<string, string>();

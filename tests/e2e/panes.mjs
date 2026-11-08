@@ -82,7 +82,10 @@ check((await swatches.count()) >= 8 && (await page.locator('.ctx-flyout .ctx-swa
 const pickedColor = await swatches.last().getAttribute('title');
 await swatches.last().click();
 await frames(page);
-check((await page.locator('.trace-chip', { hasText: 'V(out)' }).locator('input[type=color]').inputValue()) === pickedColor, `elegir una muestra cambia el color de la traza (${pickedColor})`);
+// el círculo de color de la traza abre la misma paleta, con el color elegido marcado
+await page.locator('.trace-chip', { hasText: 'V(out)' }).locator('.swatch').click();
+check((await page.locator('.ctx-flyout .ctx-swatch.current').getAttribute('title')) === pickedColor, `elegir una muestra cambia el color de la traza (${pickedColor})`);
+await page.keyboard.press('Escape');
 
 // --- se guarda con la vista ---
 const h3 = await heights();

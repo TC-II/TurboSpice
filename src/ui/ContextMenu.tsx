@@ -18,7 +18,7 @@ export interface ContextItem {
   /** campo editable en el propio menú («R1 = [valor]»): Enter o el tick lo aplican */
   edit?: { value: string; onCommit(value: string): void };
   /** submenú lateral de muestras de color («Color»): al elegir una se cierra el menú */
-  swatches?: { colors: string[]; current: string; onPick(color: string): void };
+  swatches?: { colors: string[]; current: string; onPick(color: string): void; /** abierto desde el principio */ open?: boolean };
 }
 
 const text = (it: ContextItem, v?: string) => (typeof it.label === 'function' ? it.label(v) : it.label);
@@ -66,7 +66,7 @@ function EditRow({ it, v, setV, onClose }: { it: ContextItem; v: string; setV(v:
 /** fila con un submenú de colores al costado (se abre con el mouse encima o con un clic); del otro lado si no entra */
 function SwatchRow({ it, onClose }: { it: ContextItem; onClose(): void }) {
   const sw = it.swatches!;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!it.swatches?.open);
   const [left, setLeft] = useState(false);
   const fly = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {

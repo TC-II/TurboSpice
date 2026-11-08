@@ -132,10 +132,9 @@ export function PaneView(props: {
   const [edit, setEdit] = useState<{ x: number; y: number; w: number; text: string; commit(v: number): void } | null>(null);
   const [dragOver, setDragOver] = useState<DropWhere | null>(null);
   // menú del botón derecho sobre una traza de la leyenda
-  const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number } | null>(null);
+  const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number; colorOnly?: boolean } | null>(null);
   /** cápsula bajo el mouse (muestra la información de su DFT) */
   const [chipHover, setChipHover] = useState<number | null>(null);
-  const colorInputs = useRef(new Map<number, HTMLInputElement>());
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
   // la grilla del tema oscuro queda sobre el fondo claro)
   const [scheme, setScheme] = useState(0);
@@ -776,12 +775,13 @@ export function PaneView(props: {
 
   /** menú del botón derecho de una traza: lo de la leyenda y lo que agrega el visor */
   const setTrace = (ti: number, f: (x: Trace) => Trace) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? f(x) : x)) }));
+  const colorItem = (ti: number, tt: Trace, open = false): ContextItem => ({
+    label: t('Color'),
+    onClick: () => undefined,
+    swatches: { colors: PALETTE, current: traceColor(tt, ti), onPick: (color) => setTrace(ti, (x) => ({ ...x, color })), open },
+  });
   const traceMenu = (ti: number, tt: Trace): ContextItem[] => [
-    {
-      label: t('Color'),
-      onClick: () => undefined,
-      swatches: { colors: PALETTE, current: traceColor(tt, ti), onPick: (color) => setTrace(ti, (x) => ({ ...x, color })) },
-    },
+    colorItem(ti, tt),
     { label: tt.hidden ? t('Show') : t('Hide'), onClick: () => setTrace(ti, (x) => ({ ...x, hidden: !x.hidden })) },
     ...props.traceActions(ti),
     { label: t('Remove'), onClick: () => props.onChange((p) => ({ traces: p.traces.filter((_, k) => k !== ti) })) },
@@ -845,15 +845,16 @@ export function PaneView(props: {
               }}
               title={err ?? t('Click: show/hide · drag onto another trace to reorder, or to another pane · color in the square')}
             >
-              <label className="swatch" style={{ background: traceColor(tt, ti) }}>
-                <input
-                  type="color"
-                  ref={(el) => (el ? colorInputs.current.set(ti, el) : colorInputs.current.delete(ti))}
-                  aria-label={t('Color of {expr}', { expr: props.labelOf(tt) })}
-                  value={traceColor(tt, ti)}
-                  onChange={(e) => props.onChange((p) => ({ traces: p.traces.map((x, k) => (k === ti ? { ...x, color: e.target.value } : x)) }))}
-                />
-              </label>
+              <button
+                type="button"
+                className="swatch"
+                style={{ background: traceColor(tt, ti) }}
+                aria-label={t('Color of {expr}', { expr: props.labelOf(tt) })}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setMenu({ at: { x: r.left, y: r.bottom }, ti, colorOnly: true });
+                }}
+              />
               <button
                 className="name"
                 onClick={() =>
@@ -977,7 +978,12 @@ export function PaneView(props: {
           win.document.body,
         )}
       {/* (en body: un ancestro del panel con transform haría que position: fixed no sea la ventana) */}
-      {menu && pane.traces[menu.ti] && createPortal(<ContextMenu at={menu.at} onClose={() => setMenu(null)} items={traceMenu(menu.ti, pane.traces[menu.ti])} />, win.document.body)}
+      {menu &&
+        pane.traces[menu.ti] &&
+        createPortal(
+          <ContextMenu at={menu.at} onClose={() => setMenu(null)} items={menu.colorOnly ? [colorItem(menu.ti, pane.traces[menu.ti], true)] : traceMenu(menu.ti, pane.traces[menu.ti])} />,
+          win.document.body,
+        )}
       {props.onAddBelow && (
         <div className="pane-add">
           <button aria-label={t('Add pane')} title={t('Add a pane below (P)')} onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>

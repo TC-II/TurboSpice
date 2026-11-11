@@ -6,6 +6,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { makeExplicit, type SymbolSource } from '../asc/resolve.ts';
 import { serializeAsc } from '../asc/serialize.ts';
+import { forLtspice } from './pen.ts';
 import { t } from '../i18n/i18n.ts';
 
 // Tipos mínimos de la File System Access API (no están en lib.dom de TypeScript 5.7)
@@ -113,7 +114,7 @@ export async function openProjectFile(): Promise<PickedFile | null> {
 export function ascBytes(doc: AscDoc, lib: SymbolSource, encoding?: AscEncoding): { bytes: Uint8Array; missing: string[] } {
   const { doc: explicit, missing } = makeExplicit(doc, lib);
   // los comentarios con datos (;.study, ;.plot), debajo del dibujo: en LTspice se ven
-  return { bytes: encode(serializeAsc(placeDataTexts(explicit)), encoding).bytes, missing };
+  return { bytes: encode(serializeAsc(forLtspice(placeDataTexts(explicit))), encoding).bytes, missing };
 }
 
 /**

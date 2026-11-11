@@ -443,7 +443,10 @@ function SchematicMode({
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
   const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
-  const pencilTool = () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const pencilTool = (eraser?: boolean) => {
+    if (tool.kind === 'pencil' || tool.kind === 'eraser' || tool.kind === 'shape') return setTool({ kind: 'select' });
+    setTool(eraser ? { kind: 'eraser' } : { kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) });
+  };
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(false);

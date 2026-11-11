@@ -1475,6 +1475,7 @@ svg.editor.tool-eraser { cursor: none; }
 .pen-capsule .pen-swatch { min-width: 24px; padding: 0; }
 .pen-capsule .pen-swatch span { display: block; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 20%); }
 .pen-capsule .pen-swatch.active { background: transparent; border-color: var(--accent); }
+.pen-capsule button:disabled { opacity: 0.35; pointer-events: none; }
 .pen-capsule .pen-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
 
 /* Editor de módulos «Modelo»: netlist y atributos a la izquierda, símbolo a la derecha */

@@ -38,7 +38,8 @@ export interface ShortcutActions {
   setMessage(m?: string): void;
   rotateOrMirror(op: 'rotate' | 'mirror'): void;
   copySelection(cut?: boolean): void;
-  paste(): void;
+  /** `data`: lo que trae el evento paste del navegador (sin pedir permiso); sin él, se lee el portapapeles */
+  paste(data?: DataTransfer | null): void;
   setTool(tt: Tool): void;
   selectAll(): void;
   setSelection(s: ItemRef[]): void;
@@ -53,7 +54,8 @@ export interface ShortcutActions {
   descend(si: number): boolean;
   startMove(stretch: boolean): void;
   shapeTool(shape: DrawnShapeKind): () => void;
-  pencilTool(): void;
+  /** F: lápiz; Shift+F: goma; estando en ese modo, vuelve a seleccionar */
+  pencilTool(eraser?: boolean): void;
   deleteSelection(): void;
 }
 
@@ -185,7 +187,8 @@ export function useShortcuts(a: ShortcutActions) {
       if (ctrl && lk === 'e') return handled(), rotateOrMirror('mirror');
       if (ctrl && lk === 'c') return handled(), copySelection();
       if (ctrl && lk === 'x') return handled(), copySelection(true);
-      if (ctrl && lk === 'v') return handled(), paste();
+      // Ctrl+V: lo atiende el evento paste del navegador (más abajo), que no muestra el cartel "Pegar"
+      if (ctrl && lk === 'v') return;
       if (ctrl && lk === 'a') return handled(), setTool({ kind: 'select' }), selectAll();
       if (ctrl && lk === 'g') return handled(), setShowGrid((v) => !v);
       if (ctrl && lk === 'u') return handled(), setShowLoose((v) => !v);
@@ -228,7 +231,7 @@ export function useShortcuts(a: ShortcutActions) {
         case 'f':
         case 'F':
           // lápiz; con Shift, la goma
-          return handled(), e.shiftKey ? setTool({ kind: 'eraser' }) : pencilTool();
+          return handled(), pencilTool(e.shiftKey);
         case 'n':
           return handled(), setDialog({ kind: 'flag' });
         case 'Delete':
@@ -264,9 +267,17 @@ export function useShortcuts(a: ShortcutActions) {
       if (viewerKeys()) plotPanel.current?.action('fit');
       else if (area.current === 'schematic' && !editor.current?.spacePanned()) editor.current?.fit();
     };
+    const onPaste = (e: ClipboardEvent) => {
+      const el = e.target;
+      if (dialog || el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
+      e.preventDefault();
+      paste(e.clipboardData);
+    };
+    window.addEventListener('paste', onPaste);
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKeyUp);
     return () => {
+      window.removeEventListener('paste', onPaste);
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('keyup', onKeyUp);
     };

@@ -55,7 +55,7 @@ import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
 import { AlignedText, FlagView, SchematicCanvas, ShapeView, SymbolView } from './SchematicCanvas.tsx';
 import { resizeShape, shapeHandles } from './shapes.ts';
-import { eraseAt, newStrokeStyle, penPrefs, strokeCoords, usePenPrefs } from './pen.ts';
+import { eraseAt, newShapeStyle, newStrokeStyle, parsePenStyle, penPrefs, restyleShapes, strokeCoords, usePenPrefs } from './pen.ts';
 import { PenCapsule } from './PenCapsule.tsx';
 import { SUBCKT_DRAG, type Tool, type EditorHandle, type View, type Drag, type InlineText } from './editorTypes.ts';
 import {
@@ -227,6 +227,8 @@ export function SchematicEditor(props: Props) {
   cursorRef.current = cursor;
   const [drag, setDrag] = useState<Drag | null>(null);
   const pen = usePenPrefs();
+  // figuras (no imágenes) seleccionadas: la cápsula del lápiz les cambia grosor y color
+  const selectedStrokes = useMemo(() => selection.flatMap((r) => (r.kind === 'shape' && doc.shapes[r.index] && doc.shapes[r.index].kind !== 'IMAGE' ? [r.index] : [])), [selection, doc.shapes]);
   const [preview, setPreview] = useState<AscDoc | null>(null);
   // para el Ctrl+R de la ventana con un rótulo agarrado (fuera del ciclo de render)
   const dragNow = useRef(drag);
@@ -714,7 +716,7 @@ export function SchematicEditor(props: Props) {
       }
       case 'shape': {
         const at = arcEnd(tool, p) ?? g;
-        const s = shapeFromClicks(tool.shape, [...tool.pts, at], tool.style);
+        const s = shapeFromClicks(tool.shape, [...tool.pts, at], newShapeStyle(pen, tool.style));
         if (s === 'invalid') return;
         if (s === 'more') return setTool({ ...tool, pts: [...tool.pts, at] });
         commit({ ...doc, shapes: [...doc.shapes, s] });
@@ -1188,7 +1190,7 @@ export function SchematicEditor(props: Props) {
         const kind = tool.shape === 'ARC' ? 'CIRCLE' : tool.shape;
         return (
           <g className="shapes">
-            <ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: tool.style }} />
+            <ShapeView s={{ kind, coords: [a.x, a.y, b.x, b.y], style: newShapeStyle(penPrefs(), tool.style) }} />
           </g>
         );
       }
@@ -1210,7 +1212,7 @@ export function SchematicEditor(props: Props) {
         <>
           {box}
           <g className="shapes">
-            <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, end.x, end.y, pts[2].x, pts[2].y], style: tool.style }} />
+            <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, end.x, end.y, pts[2].x, pts[2].y], style: newShapeStyle(penPrefs(), tool.style) }} />
           </g>
         </>
       );
@@ -1464,7 +1466,19 @@ export function SchematicEditor(props: Props) {
           </div>
         </div>
       )}
-      {(tool.kind === 'pencil' || tool.kind === 'eraser') && <PenCapsule tool={tool} setTool={setTool} />}
+      {(tool.kind === 'pencil' || tool.kind === 'eraser' || tool.kind === 'shape' || (tool.kind === 'select' && selectedStrokes.length > 0)) && (
+        <PenCapsule
+          tool={tool}
+          setTool={setTool}
+          hasStrokes={doc.shapes.some((x) => x.kind === 'PATH')}
+          selected={selectedStrokes.length ? parsePenStyle(doc.shapes[selectedStrokes[0]]?.style) : undefined}
+          restyle={(patch) => commit(restyleShapes(doc, selectedStrokes, patch))}
+          clearAll={() => {
+            commit({ ...doc, shapes: doc.shapes.filter((x) => x.kind !== 'PATH') });
+            setSelection([]);
+          }}
+        />
+      )}
       {tip && (
         <div
           className="bias-tip"

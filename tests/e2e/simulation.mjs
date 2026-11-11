@@ -138,7 +138,7 @@ const probe = async (x, y) => {
   await page.mouse.click(p.x, p.y);
   await frames(page);
 };
-const benchName = () => page.locator('.capsule-variant').textContent();
+const benchName = () => page.locator('.proj-capsule').getAttribute('data-bench');
 await simType(page, 'Barrido DC');
 // RC Filter ya tiene su simulación: elegir otro tipo crea otro testbench (mismo circuito, mismo grupo)
 // sin nombre propio, el testbench se llama como su análisis

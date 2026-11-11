@@ -17,8 +17,11 @@ export function NameInput({
   taken,
   onDone,
   label,
+  acceptUnchanged,
 }: {
   value: string;
+  /** el nombre que viene se puede aceptar tal cual (una carpeta nueva: «Nueva carpeta») */
+  acceptUnchanged?: boolean;
   /** nombres de los demás (no se pueden repetir) */
   taken?: string[];
   /** el nombre nuevo, o null si se canceló */
@@ -53,13 +56,13 @@ export function NameInput({
         e.stopPropagation();
         if (e.key === 'Enter') {
           e.preventDefault();
-          if (!err) finish(text.trim() === value ? null : text.trim());
+          if (!err) finish(text.trim() === value && !acceptUnchanged ? null : text.trim());
         } else if (e.key === 'Escape') {
           e.preventDefault();
           finish(null);
         }
       }}
-      onBlur={() => finish(err || text.trim() === value ? null : text.trim())}
+      onBlur={() => finish(err || (text.trim() === value && !acceptUnchanged) ? null : text.trim())}
     />
   );
 }

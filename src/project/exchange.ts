@@ -1,6 +1,6 @@
 // Ida y vuelta con LTspice (#157). Exportar una variante: un .zip con un .asc por simulación (el
 // circuito actual, sin historial) y los archivos del proyecto que usan. Exportar todo: un .zip con
-// una carpeta por variante. Importar: un .zip (cada carpeta, y la raíz, es una variante con una
+// una carpeta por variante; con testbenches, una carpeta por workbench (y los sueltos en la raíz). Importar: un .zip (cada carpeta, y la raíz, es una variante con una
 // simulación por .asc) o varios archivos sueltos (cada .asc, una variante); los .asy/.lib/.sub
 // van a los archivos del proyecto.
 import { decode, decodeText } from '../asc/encoding.ts';
@@ -76,9 +76,9 @@ export function runSummary(circuit: string | undefined, before: Record<string, s
   return [...(circuit && circuit !== t('no changes') ? [circuit] : []), ...changed].join(', ');
 }
 
-/** Los .asc de una variante: uno por simulación (la base, si no tiene ninguna) */
-export function variantAscs(v: Variant): { name: string; asc: string }[] {
-  const list = v.sims.length ? v.sims.map((s) => ({ label: simLabel(s), asc: s.asc })) : [{ label: v.name, asc: v.base }];
+/** Los .asc de unas simulaciones (uno por cada una, sin repetir nombre); sin ninguna, `fallback` */
+function simsAscs(sims: Sim[], fallback?: { label: string; asc: string }): { name: string; asc: string }[] {
+  const list = sims.length ? sims.map((s) => ({ label: simLabel(s), asc: s.asc })) : fallback ? [fallback] : [];
   const taken: string[] = [];
   return list.map((x) => {
     const name = uniqueFileName(`${safeName(x.label.replace(/^\.+/, ''))}.asc`, taken);
@@ -87,9 +87,13 @@ export function variantAscs(v: Variant): { name: string; asc: string }[] {
   });
 }
 
-/** Entradas del zip de una variante (dentro de `dir`, si se da) */
-export function variantEntries(p: Project, v: Variant, lib: SymbolSource, dir = ''): ZipEntry[] {
-  const ascs = variantAscs(v);
+/** Los .asc de una variante: uno por simulación (la base, si no tiene ninguna) */
+export function variantAscs(v: Variant): { name: string; asc: string }[] {
+  return simsAscs(v.sims, { label: v.name, asc: v.base });
+}
+
+/** Entradas del zip: los .asc (dentro de `dir`, si se da) y los archivos del proyecto que usan, al lado */
+function ascEntries(p: Project, ascs: { name: string; asc: string }[], lib: SymbolSource, dir = ''): ZipEntry[] {
   const enc = new TextEncoder();
   return [
     // todo explícito, como al guardar un .asc (así LTspice lo abre igual)
@@ -101,16 +105,42 @@ export function variantEntries(p: Project, v: Variant, lib: SymbolSource, dir = 
   ];
 }
 
+/** Entradas del zip de una variante (dentro de `dir`, si se da) */
+export function variantEntries(p: Project, v: Variant, lib: SymbolSource, dir = ''): ZipEntry[] {
+  return ascEntries(p, variantAscs(v), lib, dir);
+}
+
+/**
+ * Entradas del zip de un proyecto con testbenches: una carpeta por workbench (con su nombre), con sus
+ * testbenches y los archivos que usan (así cada carpeta se abre sola en LTspice); los testbenches
+ * sueltos, en la raíz
+ */
+export function benchEntries(p: Project, v: Variant, lib: SymbolSource): ZipEntry[] {
+  const groups = p.groups.filter((g) => v.sims.some((s) => s.group === g.id));
+  const loose = v.sims.filter((s) => !s.group || !groups.some((g) => g.id === s.group));
+  const rootAscs = simsAscs(loose, groups.length ? undefined : { label: v.name, asc: v.base });
+  // las carpetas no chocan entre sí ni con lo de la raíz
+  const taken = rootAscs.map((a) => a.name);
+  return [
+    ...ascEntries(p, rootAscs, lib),
+    ...groups.flatMap((g) => {
+      const dir = uniqueFileName(safeName(g.name) || 'Workbench', taken);
+      taken.push(dir);
+      return ascEntries(p, simsAscs(v.sims.filter((s) => s.group === g.id)), lib, `${dir}/`);
+    }),
+  ];
+}
+
 export function exportVariantZip(p: Project, variantId: string, lib: SymbolSource): { name: string; bytes: Uint8Array } {
   const v = variantOf(p, variantId);
-  // con testbenches (una sola variante) el .zip es el del proyecto
-  const name = p.variants.length === 1 ? `${safeName(p.name)}.zip` : `${safeName(p.name)} - ${safeName(v.name)}.zip`;
-  return { name, bytes: makeZip(variantEntries(p, v, lib)) };
+  // con testbenches (una sola variante) el .zip es el del proyecto, con una carpeta por workbench
+  if (p.variants.length === 1) return { name: `${safeName(p.name)}.zip`, bytes: makeZip(benchEntries(p, v, lib)) };
+  return { name: `${safeName(p.name)} - ${safeName(v.name)}.zip`, bytes: makeZip(variantEntries(p, v, lib)) };
 }
 
 export function exportAllZip(p: Project, lib: SymbolSource): { name: string; bytes: Uint8Array } {
-  // testbenches: un .asc por testbench, sin carpetas
-  if (p.variants.length === 1) return { name: `${safeName(p.name)}.zip`, bytes: makeZip(variantEntries(p, p.variants[0], lib)) };
+  // testbenches: una carpeta por workbench, y los sueltos en la raíz
+  if (p.variants.length === 1) return { name: `${safeName(p.name)}.zip`, bytes: makeZip(benchEntries(p, p.variants[0], lib)) };
   const taken: string[] = [];
   const entries = p.variants.flatMap((v) => {
     const dir = uniqueFileName(safeName(v.name), taken);

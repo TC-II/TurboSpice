@@ -188,15 +188,40 @@ deshacer (§5).
 
 ## 6. Guardado y Google Drive
 - **Local**: al editar, con un *debounce* de unos segundos; al simular, inmediato.
-- **Drive**: al simular y al guardar a mano. Las subidas se encolan y se manda sólo la última (nunca
-  dos en paralelo).
-- **Conflictos**: al abrir se guarda el `version` del archivo en Drive. Antes de cada subida se compara
-  con el de Drive; si cambió (otra pestaña u otra máquina), **no se sobrescribe** y se avisa, con las
-  opciones de recargar la de Drive, guardar la mía como copia o sobrescribir.
+- **Drive**: al guardar a mano, al simular y, con cambios sin subir, solo a los 30 s del primer
+  cambio. Las subidas se encolan y se manda sólo la última (nunca dos en paralelo).
+- **Conflictos**: al abrir se guarda la revisión del contenido (`headRevisionId`). Antes de cada
+  subida se compara con la de Drive; si cambió (otra pestaña u otra máquina), **no se sobrescribe** y
+  se avisa, con las opciones de recargar la de Drive, guardar la mía como copia o sobrescribir. Si el
+  archivo se mandó a la papelera o se borró, se guarda uno nuevo (en su carpeta, si sigue).
+- **Fallas** (`src/cloud/drive.ts`): cada llamada tiene tiempo máximo (30 s; las subidas, más según el
+  tamaño) y lo pasajero (sin conexión, 429, 5xx, límite de pedidos) se reintenta hasta 4 veces con
+  espera exponencial (respeta `Retry-After`). Las creaciones usan ids de `generateIds`: reintentarlas
+  no duplica archivos. Los errores llegan como `DriveError` con su tipo. Si el guardado automático
+  falla por algo pasajero, se reintenta solo (15 s, 30 s, 1 min, 2 min, 5 min) y al volver la conexión.
+- **Sesión** (`src/cloud/google.ts`): Google da tokens de 1 h a una página sin servidor, y pedir otro
+  abre una ventanita (con el permiso ya dado se cierra sola). Esa ventana sale **sólo en un gesto de
+  Drive** (Guardar, Abrir, Reconectar, iniciar sesión), nunca en un click cualquiera. Lo de fondo
+  (guardado automático, «My symbols and models», el progreso del tutorial) usa `driveBg`, que nunca abre
+  ventanas: con el token vencido, el indicador pide reconectar y al reconectar se sube lo pendiente. El
+  token se guarda en `localStorage` y se comparte entre pestañas. El pedido tiene tiempo máximo (2 min)
+  y se puede cancelar.
+- **Indicador** (`CloudStatus`, junto a la cápsula del proyecto): sólo en el navegador / todavía no en
+  Drive / guardado (hace cuánto) / cambios por subir / subiendo / sin conexión / sesión vencida /
+  error / conflicto. Al tocarlo: carpeta, último guardado, *Guardar ahora*, *Reconectar*, *Mover…* y
+  *Todos mis proyectos…*. `<html data-drive-sync="…">` lleva el mismo estado (para los e2e).
+- **Mis proyectos** (`ProjectsDialog`): la carpeta `TurboSpice` con subcarpetas. Buscar en todas,
+  ordenar, renombrar en la fila, duplicar, mover (árbol de carpetas o arrastrando a una carpeta o a la
+  ruta), papelera con *Deshacer* y vista de la papelera para recuperar, carpetas nuevas e importar
+  `.turbo`/`.asc` del equipo a la carpeta abierta. *Guardar como* elige nombre y carpeta
+  (`DriveSaveDialog`). La librería se lee en una sola consulta paginada (con `drive.file`, Drive
+  devuelve sólo lo que creó la app).
+- La carpeta raíz se marca con `appProperties` (`turbospice=root`): se la encuentra aunque el usuario la
+  mueva o la renombre. Si hubiera varias (dos pestañas que la crearon a la vez), se usa siempre la
+  marcada más vieja.
 - El archivo se sube como `application/json`, marcado con `appProperties` (`turbospice=1`).
-  `list()` muestra los `.turbo`.
 - Se usa la subida *resumable* si el JSON supera los 5 MB.
-- Se mantiene el scope `drive.file` y la carpeta `TurboSpice`.
+- Se mantiene el scope `drive.file`.
 
 ## 7. Importar y exportar
 - **Abrir un `.asc`**: crea en memoria un proyecto con una variante y una simulación por cada

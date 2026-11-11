@@ -5,6 +5,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Status } from '../NetlistMode.tsx';
 import { ProjectCapsule } from '../project/ProjectCapsule.tsx';
+import { CloudStatus } from '../cloud/CloudStatus.tsx';
 import { SimBar } from '../schematic/SimBar.tsx';
 import type { CircuitInfo, Picker } from '../schematic/simDialogs.tsx';
 import { setAnalysisLine } from '../schematic/directivesEdit.ts';
@@ -19,6 +20,8 @@ type Toggle = Dispatch<SetStateAction<boolean>>;
 
 export interface SimRowProps {
   projectName: string;
+  /** workbench del testbench que se ve (si está en uno) */
+  workbench?: string;
   dirty: boolean;
   treeOpen: boolean;
   toggleTree(): void;
@@ -52,12 +55,33 @@ export interface SimRowProps {
   pdkBar: ComponentProps<typeof SimBar>['pdk'];
   simAllCorners(id: string, name: string, corner: string): void;
   openStudy(): void;
+  /** el proyecto en Google Drive: el indicador junto a la cápsula */
+  drive: ComponentProps<typeof CloudStatus>;
 }
 
 export function SimRow(props: SimRowProps) {
   const { curSub, sim, tool, setTool, lib, doc, setMessage, commit } = useSchematic();
-  const { projectName, dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, barProblem, canRun, running, status, simulate, abort, curSim, stopHidden } = props;
-  const { showNets, hasNets, setShowNets, showOp, setShowOp, bias, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy } = props;
+  const {
+    projectName,
+    workbench,
+    dirty,
+    treeOpen,
+    toggleTree,
+    schematicShown,
+    setExpanded,
+    renameProject,
+    simItems,
+    simMenu,
+    barProblem,
+    canRun,
+    running,
+    status,
+    simulate,
+    abort,
+    curSim,
+    stopHidden,
+  } = props;
+  const { showNets, hasNets, setShowNets, showOp, setShowOp, bias, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy, drive } = props;
   return (
     <>
       {/* segunda barra: el proyecto (árbol y cápsula) y la simulación */}
@@ -65,6 +89,7 @@ export function SimRow(props: SimRowProps) {
         <div className="group">
           <ProjectCapsule
             project={projectName}
+            workbench={workbench}
             bench={(curSim && simName(curSim)) || t('No analysis')}
             dirty={dirty}
             open={treeOpen}
@@ -76,6 +101,7 @@ export function SimRow(props: SimRowProps) {
             }}
             onRename={renameProject}
           />
+          <CloudStatus {...drive} />
         </div>
         <div className="group fixed">
           {/* un solo botón partido (#331): New elige el análisis (en otro testbench si éste ya tiene);

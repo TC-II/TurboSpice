@@ -1,25 +1,31 @@
-// Circulito de la cuenta de Google (arriba a la derecha) y diálogo para abrir desde Drive.
+// Circulito de la cuenta de Google (arriba a la derecha): iniciar sesión, el estado de la sesión
+// (conectada, vencida: reconectar, esperando la ventana de Google: cancelar), «Mis proyectos» y la
+// carpeta en Drive, y cerrar sesión.
 import { useEffect, useRef, useState } from 'react';
-import { Modal } from '../schematic/dialogs.tsx';
-import { pickAscFiles } from '../schematic/fileio.ts';
-import type { DriveFile } from './drive.ts';
-import { FOLDER_NAME, uniqueName } from './drive.ts';
-import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
+import { FOLDER_NAME, errorKind } from './drive.ts';
+import { cancelConnect, driveBg, folderUrl, initial, reconnect, signIn, signOut, useGoogle, type Account } from './google.ts';
 import { Icon } from '../ui/icons.tsx';
-import { dateTime, t } from '../i18n/i18n.ts';
+import { locale, t } from '../i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
+
+/** Pedido de abrir «Mis proyectos» (lo escucha el modo esquemático, que tiene los diálogos) */
+export const OPEN_PROJECTS_EVENT = 'turbospice:open-projects';
 
 function Avatar({ account }: { account: Account }) {
   const [broken, setBroken] = useState(false);
   return account.photoLink && !broken ? <img src={account.photoLink} alt="" referrerPolicy="no-referrer" onError={() => setBroken(true)} /> : <span>{initial(account)}</span>;
 }
 
+/** Hora (HH:MM) en que vence la sesión */
+const until = (ms: number) => new Date(ms).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
+
 /** No se muestra si no hay Client ID configurado */
 export function AccountButton() {
   const g = useGoogle();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rootId, setRootId] = useState<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -34,21 +40,32 @@ export function AccountButton() {
     };
   }, [open]);
 
+  // la carpeta TurboSpice, para el link (de fondo: sin ventanas)
+  useEffect(() => {
+    if (!open || g.status !== 'connected' || rootId) return;
+    driveBg.folderId().then(setRootId, () => {});
+  }, [open, g.status, rootId]);
+  useEffect(() => setRootId(null), [g.account?.emailAddress]);
+
   if (!g.enabled) return null;
+  const fail = (e: Error) => errorKind(e) !== 'cancelled' && setError(e.message);
   const login = () => {
     setError(null);
-    signIn().then(
-      () => setOpen(false),
-      (e: Error) => setError(e.message),
-    );
+    signIn().then(() => setOpen(false), fail);
+  };
+  const again = () => {
+    setError(null);
+    reconnect().catch(fail);
   };
   const a = g.account;
+  const connecting = g.status === 'connecting';
+  const expired = !!a && g.status === 'expired';
   return (
     <div className="account" ref={box}>
       <button
-        className={`account-btn${a ? ' signed-in' : ' google'}`}
+        className={`account-btn${a ? ' signed-in' : ' google'}${expired ? ' expired' : ''}`}
         aria-label={a ? t('Google account: {displayName}', { displayName: a.displayName }) : t('Sign in with Google')}
-        title={a ? `${a.displayName}${a.emailAddress ? ` (${a.emailAddress})` : ''}` : t('Sign in with Google')}
+        title={a ? `${a.displayName}${a.emailAddress ? ` (${a.emailAddress})` : ''}${expired ? ` · ${t('session expired')}` : ''}` : t('Sign in with Google')}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
@@ -63,6 +80,7 @@ export function AccountButton() {
           </>
         )}
       </button>
+      {expired && <span className="account-dot" aria-hidden="true" />}
       {open && (
         <div className="account-menu" role="menu">
           {a ? (
@@ -71,13 +89,37 @@ export function AccountButton() {
                 <strong>{a.displayName}</strong>
                 {a.emailAddress && <span>{a.emailAddress}</span>}
               </div>
-              <p className="hint">
-                {t('Your simulations live in the «')}
-                {FOLDER_NAME}
-                {t('» folder of your Google Drive: Open (Ctrl+O) lists them and Save (Ctrl+S) saves them there.')}
-              </p>
+              <div className={`account-session ${g.status}`} role="status">
+                <span className="dot" aria-hidden="true" />
+                {connecting ? (
+                  <>
+                    <span>{t('Waiting for the Google window…')}</span>
+                    <button type="button" className="link" onClick={cancelConnect}>
+                      {t('Cancel')}
+                    </button>
+                  </>
+                ) : expired ? (
+                  <>
+                    <span>{t('Session expired')}</span>
+                    <button type="button" className="link" onClick={again}>
+                      {t('Reconnect')}
+                    </button>
+                  </>
+                ) : (
+                  <span>{g.expires ? t('Connected to Google Drive (until {time})', { time: until(g.expires) }) : t('Connected to Google Drive')}</span>
+                )}
+              </div>
+              {expired && <p className="hint">{t('Google gives web pages 1-hour sessions. Your work is kept in this browser; reconnect and pending changes upload on their own.')}</p>}
+              <button role="menuitem" onClick={() => (window.dispatchEvent(new Event(OPEN_PROJECTS_EVENT)), setOpen(false))}>
+                <Icon name="folders" size={16} /> {t('My projects…')}
+              </button>
+              {rootId && (
+                <a role="menuitem" className="menu-link" href={folderUrl(rootId)} target="_blank" rel="noreferrer noopener" onClick={() => setOpen(false)}>
+                  <Icon name="external" size={16} /> {t('Open the «{folder}» folder in Google Drive', { folder: FOLDER_NAME })}
+                </a>
+              )}
               <button role="menuitem" onClick={() => (signOut(), setOpen(false))}>
-                {t('Sign out')}
+                <Icon name="logout" size={16} /> {t('Sign out')}
               </button>
             </>
           ) : (
@@ -89,160 +131,22 @@ export function AccountButton() {
                 <li>
                   TurboSpice <strong>{t('can only see the files it creates itself')}</strong>.
                 </li>
+                <li>{t('Organize your projects in folders, from any computer.')}</li>
               </ul>
-              <button role="menuitem" className="primary" onClick={login} disabled={g.busy}>
-                {g.busy ? 'Conectando…' : t('Sign in with Google')}
-              </button>
+              {connecting ? (
+                <button role="menuitem" onClick={cancelConnect}>
+                  {t('Waiting for the Google window…')} · {t('Cancel')}
+                </button>
+              ) : (
+                <button role="menuitem" className="primary" onClick={login}>
+                  {t('Sign in with Google')}
+                </button>
+              )}
             </>
           )}
-          {error && <p className="hint warn">{error}</p>}
+          {(error ?? g.error) && <p className="hint warn">{error ?? g.error}</p>}
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Sube .asc del equipo a la carpeta TurboSpice (sin pisar: «x (2).asc» si el nombre ya está).
- * `taken`: nombres que ya hay en la carpeta (si no se pasa, se consulta).
- */
-export async function importToDrive(picked: { name: string; bytes: Uint8Array }[], taken?: string[]): Promise<DriveFile[]> {
-  const used = taken ? [...taken] : (await drive.list()).map((f) => f.name);
-  const out: DriveFile[] = [];
-  for (const p of picked) {
-    const name = uniqueName(p.name, used);
-    used.push(name);
-    out.push(await drive.save(name, p.bytes));
-  }
-  return out;
-}
-
-/**
- * "Mis simulaciones": la carpeta TurboSpice del Drive como lugar de trabajo. Buscar, abrir,
- * renombrar, duplicar, mandar a la papelera e importar .asc del equipo (se suben a la carpeta).
- */
-export function DriveDialog({
-  currentId,
-  onOpen,
-  onRenamed,
-  onTrashed,
-  onClose,
-}: {
-  /** archivo abierto ahora (se marca en la lista) */
-  currentId?: string;
-  onOpen(f: DriveFile): void;
-  onRenamed?(f: DriveFile): void;
-  onTrashed?(id: string): void;
-  onClose(): void;
-}) {
-  const [files, setFiles] = useState<DriveFile[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [query, setQuery] = useState('');
-  const reload = () => drive.list().then(setFiles, (e: Error) => setError(e.message));
-  useEffect(() => {
-    reload();
-  }, []);
-
-  const run = async (what: string, f: () => Promise<unknown>) => {
-    setBusy(what);
-    setError(null);
-    try {
-      await f();
-      await reload();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  };
-  const names = (files ?? []).map((f) => f.name);
-  const rename = (f: DriveFile) => {
-    const ext = /\.turbo$/i.test(f.name) ? '.turbo' : '.asc';
-    const n = window.prompt(t('New name'), f.name.replace(/\.(asc|turbo)$/i, ''))?.trim();
-    if (!n) return;
-    const name = `${n.replace(/\.(asc|turbo)$/i, '')}${ext}`;
-    if (name === f.name) return;
-    if (names.some((x) => x.toLowerCase() === name.toLowerCase())) return setError(t("There's already a «{name}» in the folder", { name }));
-    run('Renombrando…', async () => onRenamed?.(await drive.rename(f.id, name)));
-  };
-  const duplicate = (f: DriveFile) => run('Duplicando…', () => drive.copy(f.id, uniqueName(f.name.replace(/(\.(asc|turbo))?$/i, t(' (copy)$1')), names)));
-  const trash = (f: DriveFile) => {
-    if (!window.confirm(t('Move «{name}» to the Google Drive trash?', { name: f.name }))) return;
-    run('Borrando…', async () => (await drive.trash(f.id), onTrashed?.(f.id)));
-  };
-  const importLocal = async () => {
-    const picked = await pickAscFiles();
-    if (!picked.length) return;
-    let saved: DriveFile[] = [];
-    await run(picked.length > 1 ? t('Importing {length} files…', { length: picked.length }) : t('Importing…'), async () => {
-      saved = await importToDrive(picked, names);
-    });
-    // uno solo: se abre directamente; varios: quedan en la lista
-    if (saved.length === 1) onOpen(saved[0]);
-  };
-
-  const q = query.trim().toLowerCase();
-  const shown = (files ?? []).filter((f) => !q || f.name.toLowerCase().includes(q));
-  return (
-    <Modal title={t('My simulations')} onClose={onClose} large>
-      <div className="drive-browser">
-        <p className="hint">
-          {t('Folder «')}
-          {FOLDER_NAME}
-          {t('» folder of your Google Drive.')}
-        </p>
-        <input
-          type="search"
-          className="drive-search"
-          placeholder={t('Search by name…')}
-          value={query}
-          autoFocus
-          spellCheck={false}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && shown.length === 1 && onOpen(shown[0])}
-        />
-        {error && <p className="hint warn">{error}</p>}
-        {!files ? (
-          !error && <p className="hint">{t('Loading…')}</p>
-        ) : !files.length ? (
-          <p className="hint">{t('No projects yet. Save with Ctrl+S or import an .asc from your computer.')}</p>
-        ) : !shown.length ? (
-          <p className="hint">
-            {t('Nothing matches «')}
-            {query}».
-          </p>
-        ) : (
-          <ul className="drive-list">
-            {shown.map((f) => (
-              <li key={f.id} className={f.id === currentId ? 'current' : ''}>
-                <button className="drive-open" onClick={() => onOpen(f)} title={t('Open')} disabled={!!busy}>
-                  <span>{f.name}</span>
-                  {f.modifiedTime && <span className="hint">{dateTime(f.modifiedTime)}</span>}
-                </button>
-                <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>
-                  <Icon name="edit" size={14} />
-                </button>
-                <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>
-                  ⧉
-                </button>
-                <button className="drive-act" title={t('Move to trash')} aria-label={t('Delete {name}', { name: f.name })} onClick={() => trash(f)} disabled={!!busy}>
-                  <Icon name="trash" size={14} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-      <div className="buttons">
-        {busy && <span className="hint">{busy}</span>}
-        <button type="button" onClick={importLocal} disabled={!!busy} title={t("Uploads one or more .asc files from your computer to the folder and opens the file (if it's just one)")}>
-          {t('Import from computer…')}
-        </button>
-        <button type="button" onClick={onClose}>
-          {t('Close')}
-        </button>
-      </div>
-    </Modal>
   );
 }

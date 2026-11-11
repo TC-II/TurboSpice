@@ -12,6 +12,8 @@
   --accent-fill: #1d3c8f;
   --ok: #2b8a3e;
   --err: #c92a2a;
+  /* aviso (sesión vencida, sin conexión): ámbar legible sobre el fondo */
+  --warn-c: #b35c00;
   /* color categórico: Verilog / HDL / bloques de control */
   --kind-hdl: #6b4fa0;
   --r-sm: 2px;
@@ -36,6 +38,7 @@
     --shadow-pop: 0 6px 20px rgb(0 0 0 / 50%);
     --ok: #51cf66;
     --err: #ff6b6b;
+    --warn-c: #ffa94d;
     color-scheme: dark;
   }
 }
@@ -52,6 +55,7 @@
   --shadow-pop: 0 6px 20px rgb(0 0 0 / 50%);
   --ok: #51cf66;
   --err: #ff6b6b;
+  --warn-c: #ffa94d;
   color-scheme: dark;
 }
 
@@ -991,26 +995,129 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .account-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; width: 260px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow-pop); display: flex; flex-direction: column; gap: 6px; }
 .account-who { display: flex; flex-direction: column; font-size: 13px; overflow-wrap: anywhere; }
 .account-who span { color: var(--fg-muted); font-size: 12px; }
-.drive-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow: auto; }
-.drive-list button { width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border: 0; background: transparent; padding: 6px 8px; border-radius: var(--r); text-align: left; font-size: 13px; }
-.drive-list button:hover, .drive-list button:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: none; }
-.drive-list .hint { margin: 0; white-space: nowrap; }
-/* Mis simulaciones: buscador y acciones por archivo */
+/* sesión vencida: un punto ámbar sobre el circulito */
+.account-btn.expired { box-shadow: 0 0 0 2px var(--warn-c); }
+.account-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; border-radius: 50%; background: var(--warn-c); border: 2px solid var(--bg-alt); pointer-events: none; }
+.account-menu { width: 300px; }
+.account-menu > button[role='menuitem'], .account-menu > a.menu-link { display: flex; align-items: center; gap: 8px; text-align: left; }
+.account-menu > button[role='menuitem']:not(.primary) { border: 0; background: transparent; padding: 6px 8px; margin: 0 -4px; }
+.account-menu > button[role='menuitem']:not(.primary):hover { background: var(--bg-alt); }
+.account-menu > button.primary { justify-content: center; }
+a.menu-link { color: var(--fg); text-decoration: none; padding: 6px 8px; margin: 0 -4px; border-radius: var(--r); font-size: 13px; }
+a.menu-link:hover { background: var(--bg-alt); }
+.account-session { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--fg-muted); padding: 6px 8px; margin: 0 -4px; border-radius: var(--r); background: var(--bg-alt); }
+.account-session .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; }
+.account-session.expired .dot { background: var(--warn-c); }
+.account-session.connecting .dot { background: var(--accent); animation: drive-pulse 1s ease-in-out infinite alternate; }
+button.link { border: 0; background: transparent; padding: 0; color: var(--accent); font-size: 12px; text-decoration: underline; cursor: pointer; }
+button.link:hover:not(:disabled) { background: transparent; }
+
+/* Indicador del proyecto en Drive, junto a la cápsula del proyecto */
+.cloud-status { position: relative; display: inline-flex; flex: none; }
+.cloud-btn { position: relative; display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid transparent; background: transparent; color: var(--fg-muted); border-radius: var(--r); }
+.cloud-btn:hover:not(:disabled) { color: var(--fg); background: var(--bg-alt); }
+.cloud-btn.synced { color: var(--ok); }
+.cloud-btn.pending, .cloud-btn.saving { color: var(--accent); }
+.cloud-btn.attention { color: var(--warn-c); border-color: color-mix(in srgb, var(--warn-c) 45%, transparent); background: color-mix(in srgb, var(--warn-c) 10%, transparent); }
+.cloud-btn.error, .cloud-btn.conflict { color: var(--err); border-color: color-mix(in srgb, var(--err) 45%, transparent); background: color-mix(in srgb, var(--err) 8%, transparent); }
+.cloud-spin { position: absolute; inset: 3px; border-radius: 50%; border: 2px solid transparent; border-top-color: currentColor; animation: drive-spin 0.9s linear infinite; pointer-events: none; }
+.cloud-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 320px; max-width: calc(100vw - 24px); padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); font-size: 13px; }
+.cloud-pop .hint { margin: 0; }
+.cloud-head { display: flex; align-items: center; gap: 8px; }
+.cloud-head.synced { color: var(--ok); }
+.cloud-head.auth, .cloud-head.offline { color: var(--warn-c); }
+.cloud-head.error, .cloud-head.conflict { color: var(--err); }
+.cloud-head strong { color: var(--fg); font-weight: 600; }
+.cloud-facts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0; }
+.cloud-facts dt { color: var(--fg-muted); }
+.cloud-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.cloud-facts a { color: var(--accent); text-decoration: none; }
+.cloud-facts a:hover { text-decoration: underline; }
+.cloud-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.cloud-actions button, .cloud-actions .button-link, .cloud-all { display: inline-flex; align-items: center; gap: 6px; }
+.cloud-all { border: 0; border-top: 1px solid var(--border); border-radius: 0; background: transparent; padding: 8px 0 0; color: var(--accent); }
+.cloud-all:hover:not(:disabled) { background: transparent; text-decoration: underline; }
+
+/* enlaces con aspecto de botón (abrir en Google Drive) */
+a.button-link { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--r); color: var(--fg); background: var(--bg); text-decoration: none; font-size: 13px; }
+a.button-link:hover { background: var(--bg-alt); }
+.buttons .spacer { flex: 1; }
+.buttons { align-items: center; flex-wrap: wrap; }
+.buttons > button, .buttons > a.button-link { display: inline-flex; align-items: center; gap: 6px; }
+
+/* cargando / error con reintento (los diálogos de Drive) */
+.drive-state { display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px dashed var(--border); border-radius: var(--r); font-size: 13px; color: var(--fg-muted); }
+.drive-state.warn { color: var(--err); border-style: solid; border-color: color-mix(in srgb, var(--err) 40%, var(--border)); }
+.drive-state > span:not(.spinner) { flex: 1; }
+.spinner { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: drive-spin 0.8s linear infinite; }
+@keyframes drive-spin { to { transform: rotate(360deg); } }
+@keyframes drive-pulse { from { opacity: 0.35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .spinner, .cloud-spin { animation-duration: 3s; } .account-session.connecting .dot { animation: none; } }
+
+/* Mis proyectos: ruta, herramientas, buscador, lista con carpetas */
 .drive-browser { display: flex; flex-direction: column; gap: 10px; flex: 1; min-height: 0; }
-.modal.large .drive-list { flex: 1; max-height: none; border: 1px solid var(--border); border-radius: var(--r); padding: 4px; }
-.modal.large .drive-list button { font-size: 14px; padding: 9px 10px; }
-.modal.large .drive-search { font-size: 14px; padding: 8px 10px; }
-.drive-browser > .hint { margin: 0; }
+.drive-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.drive-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; flex: 1; min-width: 0; font-size: 14px; }
+.crumb-wrap { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.crumb-sep { color: var(--fg-muted); padding: 0 2px; }
+.crumb { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; padding: 4px 8px; color: var(--fg-muted); max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crumb.here { color: var(--fg); font-weight: 600; }
+.crumb.drop, .drive-list li.drop { outline: 2px dashed var(--accent); outline-offset: -2px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.drive-tools { display: flex; align-items: center; gap: 6px; }
+.drive-tools select { padding: 4px 8px; }
+button.icon-only { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; }
+button.icon-only.on { color: var(--accent); border-color: var(--accent); }
 .drive-search { width: 100%; }
+.modal.large .drive-search { font-size: 14px; padding: 8px 10px; }
+.drive-note { display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: var(--r); background: var(--bg-alt); font-size: 13px; }
+.drive-note > span { flex: 1; }
+.drive-note.warn { color: var(--err); background: color-mix(in srgb, var(--err) 8%, var(--bg)); }
+.drive-note .icon-only { width: 24px; height: 24px; border: 0; background: transparent; }
+.drive-move { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--r); background: color-mix(in srgb, var(--accent) 5%, var(--bg)); font-size: 13px; }
+.drive-move .folder-tree { max-height: 30vh; }
+.drive-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 24px; text-align: center; color: var(--fg-muted); border: 1px dashed var(--border); border-radius: var(--r); }
+.drive-empty p { margin: 0; }
+.drive-list { list-style: none; margin: 0; padding: 4px; overflow: auto; flex: 1; min-height: 0; border: 1px solid var(--border); border-radius: var(--r); }
 .drive-list li { display: flex; align-items: center; gap: 2px; border-radius: var(--r); }
-.drive-list li.current { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.drive-list li.current .drive-open > span:first-child { font-weight: 600; }
-.drive-list .drive-open { flex: 1; min-width: 0; }
-.drive-list .drive-open > span:first-child { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.drive-list .drive-open > .hint { flex: none; }
-@media (max-width: 560px) { .drive-list .drive-open > .hint { display: none; } }
-.drive-list .drive-act { width: 30px; flex: none; justify-content: center; padding: 6px 0; opacity: 0.55; }
-.drive-list li:hover .drive-act, .drive-list .drive-act:focus-visible { opacity: 1; }
+.drive-list li + li { margin-top: 1px; }
+.drive-list li:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.drive-list li.current { background: color-mix(in srgb, var(--accent) 11%, transparent); }
+.drive-list li.current .drive-name { font-weight: 600; }
+.drive-list .drive-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; padding: 8px 10px; border-radius: var(--r); text-align: left; font-size: 14px; color: var(--fg); }
+.drive-list .drive-open:disabled { opacity: 1; cursor: default; }
+.drive-list .drive-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.drive-list .drive-open > .icon { flex: none; color: var(--fg-muted); }
+.drive-list li.folder .drive-open > .icon { color: var(--accent); }
+.drive-list .drive-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drive-list .drive-where { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--fg-muted); }
+.drive-list .drive-badge { flex: none; font-size: 11px; padding: 1px 6px; border-radius: 999px; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); }
+.drive-list .hint { flex: none; margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.drive-list .renaming { cursor: default; }
+.drive-list .renaming .name-input { font: 14px var(--sans); }
+.drive-list .drive-act { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; padding: 0; border: 0; background: transparent; color: var(--fg-muted); border-radius: var(--r); opacity: 0; text-decoration: none; }
+.drive-list .drive-act.labeled { width: auto; display: inline-flex; gap: 6px; padding: 0 10px; opacity: 1; border: 1px solid var(--border); }
+.drive-list li:hover .drive-act, .drive-list li:focus-within .drive-act, .drive-list .drive-act:focus-visible { opacity: 1; }
+.drive-list .drive-act:hover { color: var(--fg); background: var(--bg-alt); }
+.drive-list .drive-act[aria-label^='Delete']:hover, .drive-list .drive-act[aria-label^='Borrar']:hover { color: var(--err); }
+.drive-list li[draggable='true'] { cursor: grab; }
+@media (hover: none) { .drive-list .drive-act { opacity: 1; } }
+@media (max-width: 640px) { .drive-list .drive-open > .hint, .drive-list .drive-where { display: none; } }
+
+/* Guardar como / mover: árbol de carpetas */
+.drive-save { display: flex; flex-direction: column; gap: 12px; }
+.drive-save-name { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-muted); }
+.drive-save-name input { font: 14px var(--sans); }
+.drive-save-where { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--fg-muted); }
+.folder-tree { list-style: none; margin: 0; padding: 4px; max-height: 40vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--r); }
+.folder-row { width: 100%; display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 6px 8px; text-align: left; font-size: 13px; color: var(--fg); border-radius: var(--r); }
+.folder-row > .icon { color: var(--accent); flex: none; }
+.folder-row > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.folder-row.on { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 600; }
+.new-folder-name { display: inline-flex; align-items: center; gap: 6px; }
+.new-folder-name .name-input { width: auto; font: 13px var(--sans); }
+.drive-replace { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 8px 10px; border-radius: var(--r); background: color-mix(in srgb, var(--warn-c) 12%, var(--bg)); font-size: 13px; }
+.drive-replace > span { flex: 1 1 200px; }
+.drive-replace > .icon { color: var(--warn-c); }
 
 /* Ventana de fuentes V/I (#47): pestañas verticales unidas al panel */
 .modal:has(.srcdlg) { padding-bottom: 12px; }
@@ -1524,6 +1631,9 @@ svg.editor.tool-eraser { cursor: none; }
 .sim-row > .group:first-child + .group::before { display: none; }
 .iconbar.sim-row .proj-capsule { width: 100%; height: 100%; margin: 0; padding: 0 12px; border: 0; border-radius: 0; background: transparent; }
 .iconbar.sim-row .proj-capsule:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+/* el estado en Google Drive, a la derecha de la cápsula (dentro del ancho del panel) */
+.sim-row > .group:first-child:has(.cloud-status) .proj-capsule { flex: 1 1 0; min-width: 0; width: auto; }
+.sim-row > .group:first-child .cloud-status { align-self: center; margin-right: 8px; }
 /* New y Run, un solo botón partido (#331): se pinta la mitad que sigue */
 .sim-split { display: inline-flex; align-items: stretch; }
 .sim-split > .menu-top > button { height: 100%; gap: 4px; padding: 4px 10px 4px 7px; border-top-right-radius: 0; border-bottom-right-radius: 0; }
@@ -1556,6 +1666,15 @@ svg.editor.tool-eraser { cursor: none; }
 /* renombrando el proyecto: el campo ocupa el lugar del nombre, a la derecha del ícono */
 .iconbar.sim-row div.proj-capsule { display: flex; align-items: center; }
 .iconbar.sim-row div.proj-capsule .name-input { flex: 1 1 auto; min-width: 0; height: 22px; padding: 0 4px; font-size: 13px; line-height: 20px; box-sizing: border-box; }
+/* la cápsula: toda abre el panel; el botón accesible es el ícono del árbol */
+.iconbar .proj-capsule { cursor: pointer; }
+.iconbar .proj-capsule .capsule-toggle { flex: none; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; line-height: 0; cursor: pointer; }
+.iconbar .proj-capsule .capsule-toggle:hover:not(:disabled) { background: transparent; }
+.iconbar .proj-capsule .capsule-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-sm); }
+/* el lápiz para renombrar el proyecto: aparece al pasar el mouse, como en el árbol */
+.iconbar .proj-capsule .capsule-edit { display: none; flex: none; padding: 2px; margin: 0 -2px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--fg-muted); line-height: 0; }
+.proj-capsule:hover .capsule-edit, .proj-capsule:focus-within .capsule-edit { display: inline-flex; }
+.iconbar .proj-capsule .capsule-edit:hover:not(:disabled) { color: var(--fg); background: color-mix(in srgb, var(--fg) 10%, transparent); }
 .tool-sep { flex: none; align-self: stretch; width: 1px; margin: 2px 4px; background: var(--border); }
 .xval.dft-info { color: var(--fg); }
 .simbar .sb-checks.inline { flex-direction: row; gap: 10px; }

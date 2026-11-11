@@ -41,10 +41,12 @@ En el repo: *Settings → Pages → Source: GitHub Actions*.
 ## Google Drive (opcional)
 
 Con un OAuth Client ID de Google aparece un circulito de cuenta arriba a la derecha: con la sesión
-iniciada, *Guardar* sube el `.asc` a la carpeta **TurboSpice** del Drive del usuario y *Archivo → Abrir
-de Google Drive…* lista esos archivos. El guardado en el equipo y el autoguardado siguen igual
-(*Archivo → Guardar en el equipo…*). Se usa Google Identity Services con el scope mínimo
-`drive.file`: la app sólo ve los archivos que creó ella. Sin Client ID no aparece nada de esto.
+iniciada, *Guardar* sube el proyecto (`.turbo`) a la carpeta **TurboSpice** del Drive del usuario, y
+*Abrir* (Ctrl+O) muestra *Mis proyectos*, donde se organizan en subcarpetas. Una nube junto al nombre
+del proyecto dice si está al día en Drive. El guardado en el navegador sigue igual. Se usa Google
+Identity Services con el scope mínimo `drive.file`: la app sólo ve los archivos que creó ella. Sin
+Client ID no aparece nada de esto. Detalles (sesión, reintentos, conflictos):
+[`docs/turbo-formato.md` § 6](docs/turbo-formato.md).
 
 Para crear el Client ID (no hay secreto: el ID es público y va en el JavaScript):
 

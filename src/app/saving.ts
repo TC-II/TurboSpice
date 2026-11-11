@@ -2,7 +2,8 @@
 // Importar (los .asc del equipo van a la carpeta del Drive)
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { AscDoc } from '../asc/model.ts';
-import { importToDrive } from '../cloud/AccountButton.tsx';
+import { importToDrive } from '../cloud/projects.ts';
+import { drive } from '../cloud/google.ts';
 import type { DriveFile } from '../cloud/drive.ts';
 import { t } from '../i18n/i18n.ts';
 import { storeActive } from '../project/project.ts';
@@ -43,9 +44,9 @@ export function savingActions({ dirty, setDirty, file, setFile, projectRef, setP
     if (!files.length) return;
     try {
       setMessage(files.length > 1 ? t('Importing {length} files to Google Drive…', { length: files.length }) : t('Importing {p0} to Google Drive…', { p0: files[0].name }));
-      const saved = await importToDrive(files);
+      const saved = await importToDrive(drive, files);
       if (saved.length === 1) await openDriveFile(saved[0]);
-      else setMessage(t('Imported {length} files to «My simulations»', { length: saved.length }));
+      else setMessage(t('Imported {length} files to «My projects»', { length: saved.length }));
     } catch (e) {
       setMessage(t('Could not import: {p0}', { p0: (e as Error).message }));
     }

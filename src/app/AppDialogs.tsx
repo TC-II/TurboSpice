@@ -3,7 +3,8 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import { baseName, type SymbolInst } from '../asc/model.ts';
 import { decodeText } from '../asc/encoding.ts';
 import type { DriveFile } from '../cloud/drive.ts';
-import { DriveDialog } from '../cloud/AccountButton.tsx';
+import { ProjectsDialog } from '../cloud/ProjectsDialog.tsx';
+import { DriveSaveDialog } from '../cloud/DriveSaveDialog.tsx';
 import { looksBehavioral, moduleOf, verilogFile, verilogPorts } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR, USER_DIR, scanModels } from '../library/library.ts';
@@ -109,6 +110,8 @@ export interface AppDialogsProps {
   file: FileState;
   setFile: Dispatch<SetStateAction<FileState>>;
   openDriveFile(d: DriveFile): Promise<void>;
+  /** Guardar como en Drive: nombre (sin extensión), carpeta y, si se reemplaza, el id */
+  saveDriveAs(name: string, parent: string | undefined, replaceId?: string): Promise<void>;
   curSim: SimList['items'][number] | undefined;
   sims: SimList;
   deleteSim(id: string): void;
@@ -143,6 +146,7 @@ export function AppDialogs(props: AppDialogsProps) {
     file,
     setFile,
     openDriveFile,
+    saveDriveAs,
   } = props;
   const { curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope } = props;
   return (
@@ -446,7 +450,7 @@ export function AppDialogs(props: AppDialogsProps) {
         />
       )}
       {dialog?.kind === 'drive' && (
-        <DriveDialog
+        <ProjectsDialog
           currentId={file.driveId}
           onOpen={openDriveFile}
           onRenamed={(f) => {
@@ -454,7 +458,16 @@ export function AppDialogs(props: AppDialogsProps) {
             setFile({ ...file, name: f.name });
             setProjectState({ ...projectRef.current, name: projectName(f.name) });
           }}
-          onTrashed={(id) => id === file.driveId && setFile({ ...file, driveId: undefined })}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === 'driveSave' && (
+        <DriveSaveDialog
+          mode={dialog.mode}
+          name={projectName(file.name)}
+          driveId={file.driveId}
+          onSave={(name, parent, replaceId) => saveDriveAs(name, parent, replaceId)}
+          onMoved={() => setMessage(t('Moved in Google Drive: {name}', { name: file.name }))}
           onClose={() => setDialog(null)}
         />
       )}

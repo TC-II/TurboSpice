@@ -2058,7 +2058,7 @@ export const es: Record<string, string> = {
   'Back': 'Volver',
   'Start!': '¡Empezar!',
   'Mission complete!': '¡Misión cumplida!',
-  'New badge: 🏅 {badge}': 'Insignia nueva: 🏅 {badge}',
+  'New badge: {badge}': 'Insignia nueva: {badge}',
   'Level up! You are now: {name}': '¡Subiste de nivel! Ahora sos: {name}',
   'Without hints or skipped steps you get 3 stars: play it again whenever you want.': 'Sin pistas ni pasos salteados te llevás 3 estrellas: jugala de nuevo cuando quieras.',
   'Missions': 'Misiones',
@@ -2203,8 +2203,8 @@ export const es: Record<string, string> = {
   'For the AC analysis the source needs "AC 1" in its small-signal value: the practice circuit already has it.':
     'Para el análisis AC la fuente necesita "AC 1" en su valor de pequeña señal: el circuito de práctica ya lo tiene.',
   'Names that say something': 'Nombres que digan algo',
-  'In the panel, the ✎ button of the testbench (it appears when you rest the mouse on it) renames it: call it **Bode**.':
-    'En el panel, el botón ✎ del testbench (aparece al dejar el mouse encima) lo renombra: llamalo **Bode**.',
+  'In the panel, the pencil button of the testbench (it appears when you rest the mouse on it) renames it: call it **Bode**.':
+    'En el panel, el botón del lápiz del testbench (aparece al dejar el mouse encima) lo renombra: llamalo **Bode**.',
   'Back and forth': 'Ida y vuelta',
   'Click the other testbench in the panel: each one keeps its circuit, its simulation and its results.':
     'Hacé clic en el otro testbench del panel: cada uno guarda su circuito, su simulación y sus resultados.',
@@ -2214,8 +2214,8 @@ export const es: Record<string, string> = {
   'Moving testbenches': 'Mover testbenches',
   '**Drag** a testbench by its name and drop it **onto another workbench** to move it there.': '**Arrastrá** un testbench por su nombre y soltalo **sobre otro workbench** para moverlo ahí.',
   'The run history': 'El historial de corridas',
-  'Every time you simulate, the exact circuit is saved. The 🕑 button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.':
-    'Cada vez que simulás se guarda el circuito exacto. El botón 🕑 de un testbench (con la cantidad de corridas) abre su **historial**: qué cambió entre corridas, y podés restaurar una vieja.',
+  'Every time you simulate, the exact circuit is saved. The clock button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.':
+    'Cada vez que simulás se guarda el circuito exacto. El botón del reloj de un testbench (con la cantidad de corridas) abre su **historial**: qué cambió entre corridas, y podés restaurar una vieja.',
   'Propagating values': 'Propagar valores',
   'When the testbenches of a workbench share components, **right-clicking** one (R1) offers to **propagate** its value to the others of the workbench. That way you change the design once.':
     'Cuando los testbenches de un workbench comparten componentes, el **clic derecho** en uno (R1) ofrece **propagar** su valor a los demás del workbench. Así cambiás el diseño una sola vez.',

@@ -5,6 +5,7 @@ import { pickAscFiles } from '../schematic/fileio.ts';
 import type { DriveFile } from './drive.ts';
 import { FOLDER_NAME, uniqueName } from './drive.ts';
 import { drive, initial, signIn, signOut, useGoogle, type Account } from './google.ts';
+import { Icon } from '../ui/icons.tsx';
 import { dateTime, t } from '../i18n/i18n.ts';
 
 const BASE = import.meta.env.BASE_URL;
@@ -220,13 +221,13 @@ export function DriveDialog({
                   {f.modifiedTime && <span className="hint">{dateTime(f.modifiedTime)}</span>}
                 </button>
                 <button className="drive-act" title={t('Rename')} aria-label={t('Rename {name}', { name: f.name })} onClick={() => rename(f)} disabled={!!busy}>
-                  ✎
+                  <Icon name="edit" size={14} />
                 </button>
                 <button className="drive-act" title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: f.name })} onClick={() => duplicate(f)} disabled={!!busy}>
                   ⧉
                 </button>
                 <button className="drive-act" title={t('Move to trash')} aria-label={t('Delete {name}', { name: f.name })} onClick={() => trash(f)} disabled={!!busy}>
-                  🗑
+                  <Icon name="trash" size={14} />
                 </button>
               </li>
             ))}

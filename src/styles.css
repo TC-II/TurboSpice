@@ -261,7 +261,8 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .schematic line, .schematic path, .schematic rect, .schematic ellipse, .schematic polyline, .schematic polygon, .schematic circle { vector-effect: non-scaling-stroke; }
 .wires line { stroke: var(--sch-sym); stroke-width: 1.6; }
 .shapes > * { stroke: var(--sch-drawing); stroke-width: 1.4; }
-.shapes > .sel { stroke: var(--sch-sel); stroke-width: 2.2; }
+/* seleccionada: conserva su color (se ve el cambio de color al instante) y se marca con un halo naranja */
+.shapes > .sel { stroke-width: 2.2; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--sch-sel) 55%, transparent)); }
 .wires line.sel { stroke: var(--sch-sel); stroke-width: 2.4; }
 .wires line.hover { stroke: var(--sch-sel); }
 /* buses: cables más gruesos y pines de bus con una barra y la cantidad de bits */
@@ -762,7 +763,8 @@ button.sort { border: 0; background: transparent; padding: 0; color: var(--fg-mu
 /* los grupos de íconos (de Archivo a Borrar), angostos para que entren en monitores chicos: el ícono queda igual */
 .iconbar .group[data-group] { gap: 0; padding: 0 3px 0 4px; }
 .iconbar .group[data-group]:first-child { padding-left: 0; }
-.iconbar .group[data-group] button:not(.labeled):not(.primary) { padding: 4px 3px; }
+/* caja cuadrada (ícono de 18px + 4px de aire por lado, borde incluido) con el ícono centrado; los anchos (1,5×) crecen */
+.iconbar .group[data-group] button:not(.labeled):not(.primary) { box-sizing: border-box; min-width: 26px; height: 26px; padding: 0 3px; justify-content: center; }
 .iconbar .status { flex: 1 1 auto; min-width: 0; margin-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Simular partido: acción principal + flecha con los tipos de análisis */
 .split { display: inline-flex; align-items: stretch; }

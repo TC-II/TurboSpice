@@ -97,7 +97,7 @@ export function ShapeView({ s, className }: { s: Shape; className?: string }) {
   // grosor (en unidades del esquemático, sigue al zoom) y color propios del lápiz y las figuras
   const pen = parsePenStyle(s.style);
   const style: CSSProperties | undefined =
-    pen.width || pen.color ? { ...(pen.width ? { strokeWidth: pen.width, vectorEffect: 'none' } : {}), ...(pen.color && className !== 'sel' ? { stroke: `#${pen.color}` } : {}) } : undefined;
+    pen.width || pen.color ? { ...(pen.width ? { strokeWidth: pen.width, vectorEffect: 'none' } : {}), ...(pen.color ? { stroke: `#${pen.color}` } : {}) } : undefined;
   switch (s.kind) {
     case 'LINE':
       return <line className={className} x1={c[0]} y1={c[1]} x2={c[2]} y2={c[3]} strokeDasharray={dash} style={style} />;

@@ -28,7 +28,7 @@
 *
 * Behaviour:
 *   - Vbe = {Vbe} at Ic = {Iref}, and it moves only n*60 mV per decade of
-*     current (12 mV/decade with the default n = 0.2): an almost fixed Vbe
+*     current (1.2 mV/decade with the default n = 0.02): an almost fixed Vbe
 *   - Ic = hfe * Ib exactly in the forward active region (no Early effect
 *     unless {Va} is given)
 *   - the knee is sharp: the BC junction has its own ideality {ns}, so the
@@ -64,8 +64,8 @@
 *   - a small n makes Vbe flat but the junction steep. ngspice clamps the
 *     diode IS to 1e-28 and the BJT limiter ignores NF, so the junction uses
 *     a normal IS and the zero volt ammeters Vf/Vr become fixed offsets that
-*     place the knee at {Vbe}. Values of n from 0.1 to 1 converge; 1 is a
-*     real silicon junction, 0.1 an almost ideal one.
+*     place the knee at {Vbe}. Values of n from 0.02 to 1 converge; 1 is a
+*     real silicon junction, 0.02 an almost ideal one.
 *   - the reverse beta br is not a parameter. It is fixed internally to
 *     br = min(1, 0.5*(Vbe/Vsat-1)), which keeps
 *     (1+br)*{Vsat} < {Vbe}: the device is passive for any {Vsat} < {Vbe}.
@@ -80,14 +80,14 @@
 *   Vbe    Vbe at Ic = Iref                                0.7
 *   Vsat   Vce at the saturation knee                       0.3
 *   Iref   current at which Vbe is exact                    1m
-*   n      junction ideality (0.1 almost ideal, 1 silicon) 0.2
+*   n      junction ideality (0.02 ideal, 1 silicon)     0.02
 *   ns     ideality of the BC junction: sets how sharp the
-*          saturation knee is (10-90 % in ~13 mV at 0.05)  0.05
+*          saturation knee is (10-90 % in ~2 mV at 0.01)   0.01
 *   Va     Early voltage (0 = no Early effect)            0
 *   cje, cjc  junction capacitances                       2p, 1p
 *   tf     forward transit time                           0
 
-.SUBCKT NPN_nice C B E PARAMS: hfe=100 Vbe=0.7 Vsat=0.3 Iref=1m n=0.2 ns=0.05 Va=0 cje=2p cjc=1p tf=0
+.SUBCKT NPN_nice C B E PARAMS: hfe=100 Vbe=0.7 Vsat=0.3 Iref=1m n=0.02 ns=0.01 Va=0 cje=2p cjc=1p tf=0
 .param vt0=0.025852 isd=1e-18
 .param br={min(1, 0.5*(Vbe/Vsat-1))}
 .param ga={Va > 0 ? 1/Va : 0}

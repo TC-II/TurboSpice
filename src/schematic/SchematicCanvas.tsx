@@ -94,20 +94,20 @@ function arcPath(c: number[]): string {
 export function ShapeView({ s, className }: { s: Shape; className?: string }) {
   const c = s.coords;
   const dash = lineDash(s.style);
+  // grosor (en unidades del esquemático, sigue al zoom) y color propios del lápiz y las figuras
+  const pen = parsePenStyle(s.style);
+  const style: CSSProperties | undefined =
+    pen.width || pen.color ? { ...(pen.width ? { strokeWidth: pen.width, vectorEffect: 'none' } : {}), ...(pen.color ? { stroke: `#${pen.color}` } : {}) } : undefined;
   switch (s.kind) {
     case 'LINE':
-      return <line className={className} x1={c[0]} y1={c[1]} x2={c[2]} y2={c[3]} strokeDasharray={dash} />;
+      return <line className={className} x1={c[0]} y1={c[1]} x2={c[2]} y2={c[3]} strokeDasharray={dash} style={style} />;
     case 'RECTANGLE':
-      return <rect className={className} x={Math.min(c[0], c[2])} y={Math.min(c[1], c[3])} width={Math.abs(c[2] - c[0])} height={Math.abs(c[3] - c[1])} strokeDasharray={dash} />;
+      return <rect className={className} x={Math.min(c[0], c[2])} y={Math.min(c[1], c[3])} width={Math.abs(c[2] - c[0])} height={Math.abs(c[3] - c[1])} strokeDasharray={dash} style={style} />;
     case 'CIRCLE':
-      return <ellipse className={className} cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} />;
+      return <ellipse className={className} cx={(c[0] + c[2]) / 2} cy={(c[1] + c[3]) / 2} rx={Math.abs(c[2] - c[0]) / 2} ry={Math.abs(c[3] - c[1]) / 2} strokeDasharray={dash} style={style} />;
     case 'ARC':
-      return <path className={className} d={arcPath(c)} strokeDasharray={dash} />;
+      return <path className={className} d={arcPath(c)} strokeDasharray={dash} style={style} />;
     case 'PATH': {
-      // lápiz: grosor en unidades del esquemático (sigue al zoom), color propio y curva suave
-      const pen = parsePenStyle(s.style);
-      const style: CSSProperties | undefined =
-        pen.width || pen.color ? { ...(pen.width ? { strokeWidth: pen.width, vectorEffect: 'none' } : {}), ...(pen.color && className !== 'sel' ? { stroke: `#${pen.color}` } : {}) } : undefined;
       if (pen.smooth) return <path className={className} d={smoothPath(shapePoints(s))} strokeDasharray={dash} style={style} />;
       return <polyline className={className} points={c.join(' ')} strokeDasharray={dash} style={style} />;
     }

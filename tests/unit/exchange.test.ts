@@ -5,7 +5,7 @@ import { decode } from '../../src/asc/encoding.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { Library } from '../../src/library/library.ts';
 import { exportAllZip, exportVariantZip, importEntries, safeName, usedFiles } from '../../src/project/exchange.ts';
-import { addSim, lineOf, renameSim, storeActive, variantOf } from '../../src/project/project.ts';
+import { addGroup, addSim, lineOf, renameSim, storeActive, variantOf } from '../../src/project/project.ts';
 import { asBenches, newProject, type Project } from '../../src/project/turbo.ts';
 import { crc32, makeZip, readZip } from '../../src/project/zip.ts';
 
@@ -89,6 +89,26 @@ describe('exportar e importar (#157)', () => {
     const entries = await readZip(z.bytes);
     expect(entries.map((e) => e.path)).toEqual(['Tran 0 - 10m.asc', 'Bode_fino.asc', 'miop.asy', 'miop.sub']);
     expect(decode(entries[1].data).text).toContain('.ac dec 10 1 1meg');
+  });
+
+  it('una carpeta por workbench, con su nombre; los testbenches sueltos en la raíz', async () => {
+    let p = sample();
+    const v = variantOf(p);
+    const g1 = addGroup(p, 'Filtros: pasivos');
+    p = g1.project;
+    const g2 = addGroup(p, 'Vacío');
+    p = g2.project;
+    // el de Bode va al workbench «Filtros: pasivos»; el transitorio queda suelto
+    p = { ...p, variants: [{ ...v, sims: v.sims.map((s, i) => (i === 1 ? { ...s, group: g1.id } : s)) }] };
+    const z = exportAllZip(p, lib);
+    expect(exportVariantZip(p, p.activeVariant, lib).name).toBe(z.name);
+    const entries = await readZip(z.bytes);
+    // (los archivos que usa van con él; el workbench vacío no deja carpeta)
+    expect(entries.map((e) => e.path)).toEqual(['Tran 0 - 10m.asc', 'Filtros_ pasivos/Bode_fino.asc', 'Filtros_ pasivos/miop.asy', 'Filtros_ pasivos/miop.sub']);
+    // importarlo de vuelta: cada carpeta es un workbench (la app le da su grupo), con su nombre
+    const r = importEntries(newProject('Otro'), entries, z.name);
+    expect(r.variants).toEqual(['Filtro_ RC', 'Filtros_ pasivos']);
+    expect(r.files.map((f) => f.name)).toEqual(['miop.asy', 'miop.sub']);
   });
 
   it('importar el zip exportado agrega sus testbenches', async () => {

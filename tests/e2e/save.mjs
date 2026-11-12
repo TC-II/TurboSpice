@@ -30,10 +30,11 @@ class FakeDrive {
   inflight = 0;
   maxInflight = 0;
   tokens = []; // tokens vistos
+  generated = 0; // ids generados (generateIds)
   #n = 0;
   add(f) {
-    const id = `id${++this.#n}`;
-    const file = { id, version: '1', rev: `rev${++this.#n}`, modifiedTime: new Date().toISOString(), trashed: false, parents: [], data: Buffer.alloc(0), ...f };
+    const id = f.id ?? `id${++this.#n}`;
+    const file = { version: '1', rev: `rev${++this.#n}`, modifiedTime: new Date().toISOString(), trashed: false, parents: [], data: Buffer.alloc(0), ...f, id };
     this.files.set(id, file);
     this.later(file);
     return file;
@@ -67,10 +68,25 @@ class FakeDrive {
     return this.log.filter((l) => l.kind === 'upload');
   }
 }
-const meta = ({ id, name, modifiedTime, version, rev }) => ({ id, name, modifiedTime, version, headRevisionId: rev });
+const meta = ({ id, name, mimeType, parents, modifiedTime, version, rev, trashed, appProperties }) => ({
+  id,
+  name,
+  mimeType,
+  parents,
+  modifiedTime,
+  version,
+  headRevisionId: rev,
+  trashed,
+  explicitlyTrashed: trashed,
+  appProperties,
+});
 
 /** Evalúa (lo justo) las consultas `q` que usa la app */
 function matches(f, q) {
+  // la librería entera, y la carpeta raíz (por su marca o por nombre en la raíz)
+  if (q === 'trashed = false or trashed = true') return true;
+  if (q.includes("appProperties has { key='turbospice'"))
+    return f.mimeType === FOLDER && !f.trashed && (f.appProperties?.turbospice === 'root' || (f.name === 'TurboSpice' && f.parents.includes('root')));
   // se parte por « and » fuera de las comillas (hay nombres como «My symbols and models.json»)
   const clauses = [];
   let cur = '';
@@ -130,6 +146,7 @@ async function attachDrive(context, fake) {
     try {
       if (fake.delay) await new Promise((r) => setTimeout(r, fake.delay));
       if (path === '/drive/v3/about') return json(200, { user: { displayName: 'Test User', emailAddress: 'test@example.com' } });
+      if (path === '/drive/v3/files/generateIds') return json(200, { ids: Array.from({ length: Number(url.searchParams.get('count') ?? 10) }, () => `gen${++fake.generated}`) });
       if (path === '/drive/v3/files' && method === 'GET') {
         const q = url.searchParams.get('q') ?? '';
         const files = [...fake.files.values()].filter((f) => matches(f, q)).sort((a, b) => b.modifiedTime.localeCompare(a.modifiedTime));
@@ -137,7 +154,7 @@ async function attachDrive(context, fake) {
       }
       if (path === '/drive/v3/files' && method === 'POST') {
         const m = JSON.parse(req.postData() ?? '{}');
-        const f = fake.add({ name: m.name, mimeType: m.mimeType, parents: (m.parents ?? []).map((p) => (p === 'root' ? 'root' : p)) });
+        const f = fake.add({ id: m.id, name: m.name, mimeType: m.mimeType, parents: m.parents ?? [], appProperties: m.appProperties });
         return json(200, meta(f));
       }
       let m;
@@ -149,7 +166,12 @@ async function attachDrive(context, fake) {
           return json(200, meta(f));
         }
         if (method === 'PATCH') {
-          Object.assign(f, JSON.parse(req.postData() ?? '{}'), { version: String(Number(f.version) + 1) });
+          const body = JSON.parse(req.postData() ?? '{}');
+          Object.assign(f, body, { version: String(Number(f.version) + 1) });
+          // mover de carpeta
+          const to = url.searchParams.get('addParents');
+          const from = url.searchParams.get('removeParents');
+          if (to) f.parents = [...f.parents.filter((x) => x !== from), to];
           return json(200, meta(f));
         }
       }
@@ -157,7 +179,14 @@ async function attachDrive(context, fake) {
         const src = fake.files.get(decodeURIComponent(m[1]));
         if (!src) return json(404, { error: { message: 'File not found' } });
         const mm = JSON.parse(req.postData() ?? '{}');
-        const f = fake.add({ name: mm.name ?? `Copy of ${src.name}`, mimeType: src.mimeType, parents: mm.parents ?? src.parents, appProperties: src.appProperties, data: Buffer.from(src.data) });
+        const f = fake.add({
+          id: mm.id,
+          name: mm.name ?? `Copy of ${src.name}`,
+          mimeType: src.mimeType,
+          parents: mm.parents ?? src.parents,
+          appProperties: src.appProperties,
+          data: Buffer.from(src.data),
+        });
         return json(200, meta(f));
       }
       // subida por partes (desde 5 MB): 1) metadatos → Location; 2) PUT del contenido a Location
@@ -166,7 +195,7 @@ async function attachDrive(context, fake) {
         if (!up) return json(404, { error: { message: 'upload session not found' } });
         fake.sessions.delete(url.searchParams.get('upload_id'));
         const data = req.postDataBuffer() ?? Buffer.alloc(0);
-        if (!up.id) return json(200, meta(fake.add({ name: up.meta.name, mimeType: up.meta.mimeType, parents: up.meta.parents ?? [], appProperties: up.meta.appProperties, data })));
+        if (!up.id) return json(200, meta(fake.add({ id: up.meta.id, name: up.meta.name, mimeType: up.meta.mimeType, parents: up.meta.parents ?? [], appProperties: up.meta.appProperties, data })));
         const f = fake.files.get(up.id);
         fake.touch(f, { name: up.meta.name, data });
         return json(200, meta(f));
@@ -183,7 +212,7 @@ async function attachDrive(context, fake) {
       if ((m = path.match(/^\/upload\/drive\/v3\/files(?:\/([^/]+))?$/))) {
         const { meta: mm, data } = parseMultipart(req.postDataBuffer(), req.headers()['content-type']);
         if (method === 'POST') {
-          const f = fake.add({ name: mm.name, mimeType: mm.mimeType, parents: mm.parents ?? [], appProperties: mm.appProperties, data });
+          const f = fake.add({ id: mm.id, name: mm.name, mimeType: mm.mimeType, parents: mm.parents ?? [], appProperties: mm.appProperties, data });
           return json(200, meta(f));
         }
         const f = fake.files.get(decodeURIComponent(m[1]));
@@ -276,6 +305,14 @@ const saveAs = async (page) => {
   await clearToast(page);
   await page.keyboard.press('Control+Shift+s');
 };
+/** Guardar como: abre el diálogo, espera las carpetas y escribe el nombre */
+async function saveAsDialog(page, name) {
+  await saveAs(page);
+  const d = page.getByRole('dialog').filter({ has: page.locator('.drive-save') });
+  await d.locator('.folder-tree').waitFor({ timeout: 10000 });
+  await d.getByRole('textbox', { name: 'Nombre del proyecto' }).fill(name);
+  return d;
+}
 /** El .turbo guardado: JSON válido y con el proyecto */
 const project = (buf) => {
   try {
@@ -359,7 +396,7 @@ const flags = (p) => (p ? (JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.len
   check(!(await dirty(page)), 'Drive: al final no quedan cambios sin guardar');
 
   // -- 401: token vencido → pide otro y reintenta, sin molestar
-  await page.evaluate(() => sessionStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'expired', expires: Date.now() + 3600e3 })));
+  await page.evaluate(() => localStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'expired', expires: Date.now() + 3600e3 })));
   await page.reload();
   await page.locator('svg.editor .sym').first().waitFor();
   // (que termine de restaurar la sesión antes de seguir)
@@ -371,9 +408,18 @@ const flags = (p) => (p ? (JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.len
   check(ok401, `Drive: con el token vencido (401) pide otro y guarda (${await toast(page)})`);
   check(fake.uploads().length - up2 === 1 && fake.projects().length === 1, 'Drive: tras recargar la página sigue guardando sobre el mismo archivo');
 
-  // -- error del servidor: avisa y queda sin guardar; el siguiente intento funciona
+  // -- un 500 suelto: se reintenta solo, sin molestar
   await edit(page);
+  const up500 = fake.uploads().length;
   fake.failNext.push(500);
+  await save(page);
+  check(await waitToast(page, /Se guardó|Saved|Guardado/), `Drive: un 500 suelto se reintenta y guarda (${await toast(page)})`);
+  await settle(page);
+  check(fake.uploads().length - up500 === 2 && !(await dirty(page)), `Drive: con un reintento (${fake.uploads().length - up500} subidas)`);
+
+  // -- error del servidor que sigue: avisa y queda sin guardar; el siguiente intento funciona
+  await edit(page);
+  fake.failNext.push(500, 500, 500, 500);
   await save(page);
   check(await waitToast(page, /No se pudo guardar|Could not save/), `Drive: un 500 se avisa (${await toast(page)})`);
   check(await dirty(page), 'Drive: con el error, sigue marcado sin guardar');
@@ -415,52 +461,72 @@ const flags = (p) => (p ? (JSON.stringify(p).match(/FLAG [-\d]+ [-\d]+ 0/g)?.len
   await settle(page);
   check(project(copy.data)?.name !== 'otra pestaña' && copy.rev !== copyRev, '«Sobrescribir» sube igual');
 
-  // -- Guardar como, con un nombre que ya existe: si no se confirma, no se toca nada
+  // -- Guardar como, con un nombre que ya existe: pregunta (en el diálogo); si no se confirma, no se toca nada
   const count = fake.projects().length;
   const up4 = fake.uploads().length;
-  page.answers.push('Sample Project', false);
-  await saveAs(page);
-  await settle(page);
+  let sa = await saveAsDialog(page, 'Sample Project');
+  await sa.getByRole('button', { name: 'Guardar', exact: true }).click();
   check(
-    page.dialogs.some((d) => /^confirm: .*Sample Project\.turbo/.test(d)),
-    `Drive: Guardar como con un nombre existente pregunta si reemplazar (${page.dialogs.slice(-2).join(' / ')})`,
+    await sa
+      .locator('.drive-replace')
+      .waitFor({ timeout: 5000 })
+      .then(
+        () => true,
+        () => false,
+      ),
+    'Drive: Guardar como con un nombre existente pregunta si reemplazar',
   );
+  await sa.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await settle(page);
   check(fake.uploads().length === up4 && fake.projects().length === count, 'Drive: al cancelar, no se sube nada');
-  page.answers.push('Sample Project', true);
-  await saveAs(page);
+  sa = await saveAsDialog(page, 'Sample Project');
+  await sa.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await sa.getByRole('button', { name: 'Reemplazar', exact: true }).click();
   await waitToast(page, /Google Drive/);
   await settle(page);
   const last = fake.uploads().at(-1);
   check(fake.uploads().length === up4 + 1 && last.method === 'PATCH' && last.path.endsWith(`/${f.id}`) && fake.projects().length === count, 'Drive: al aceptar, reemplaza ese archivo (no crea otro)');
   // -- Guardar como con un nombre nuevo (y caracteres raros)
-  page.answers.push("Filtro d'O «ñ» 2");
-  await saveAs(page);
+  sa = await saveAsDialog(page, "Filtro d'O «ñ» 2");
+  await sa.getByRole('button', { name: 'Guardar', exact: true }).click();
   await waitToast(page, /Google Drive/);
   await settle(page);
   const nf = fake.byName("Filtro d'O «ñ» 2.turbo");
   check(!!nf && fake.projects().length === count + 1, `Drive: Guardar como con un nombre nuevo crea «Filtro d'O «ñ» 2.turbo» (${fake.projects().map((x) => x.name)})`);
   check(project(nf?.data ?? Buffer.alloc(0))?.name === "Filtro d'O «ñ» 2", 'Drive: el proyecto toma el nombre nuevo');
   check((await page.locator('.capsule-project').textContent()) === "Filtro d'O «ñ» 2", 'Drive: y se ve en la cápsula');
-  // -- Guardar como cancelado (prompt vacío): nada
+  // -- Guardar como en una carpeta nueva (creada en el mismo diálogo)
+  sa = await saveAsDialog(page, 'En carpeta');
+  await sa.getByRole('button', { name: 'Nueva carpeta' }).click();
+  await sa.getByRole('textbox', { name: 'Nombre de la carpeta' }).fill('Prácticas');
+  await sa.getByRole('textbox', { name: 'Nombre de la carpeta' }).press('Enter');
+  await sa.locator('.folder-row.on', { hasText: 'Prácticas' }).waitFor({ timeout: 5000 });
+  await sa.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await waitToast(page, /Google Drive/);
+  await settle(page);
+  const sub = [...fake.files.values()].find((x) => x.mimeType === FOLDER && x.name === 'Prácticas');
+  const inSub = [...fake.files.values()].find((x) => x.name === 'En carpeta.turbo');
+  check(!!sub && sub.parents.includes(fake.folderId()) && !!inSub && inSub.parents.includes(sub.id), 'Drive: Guardar como en una carpeta nueva la crea dentro de TurboSpice y guarda adentro');
+  // -- Guardar como cancelado: nada
   const up5 = fake.uploads().length;
-  page.answers.push(false);
-  await saveAs(page);
+  sa = await saveAsDialog(page, 'No se guarda');
+  await sa.getByRole('button', { name: 'Cancelar', exact: true }).click();
   // (que no suba nada sólo se prueba dejando pasar un rato)
   await page.waitForTimeout(800);
-  check(fake.uploads().length === up5, 'Drive: cancelar el nombre de Guardar como no sube nada');
+  check(fake.uploads().length === up5, 'Drive: cancelar Guardar como no sube nada');
 
   // -- abrir desde Drive lo guardado: mismo proyecto
   const reopened = await newPage(context);
   await reopened.getByRole('button', { name: 'Menú', exact: true }).click();
   const menuItems = await reopened.getByRole('menu').getByRole('menuitem').allTextContents();
-  check(menuItems.some((x) => /Mis simulaciones|My simulations/.test(x)) || true, 'Drive: hay acceso a Mis simulaciones');
+  check(menuItems.some((x) => /Mis proyectos|My projects/.test(x)) || true, 'Drive: hay acceso a Mis proyectos');
   await reopened.keyboard.press('Escape');
   check(!reopened.errors.length && !page.errors.length, `Drive: sin errores en la página${[...page.errors, ...reopened.errors].length ? `: ${[...page.errors, ...reopened.errors].join(' | ')}` : ''}`);
   await context.close();
 }
 
 // =============================================================================================
-// 1b. «Mis simulaciones»: abrir, renombrar, duplicar, papelera; subida por partes (≥ 5 MB);
+// 1b. «Mis proyectos»: abrir, renombrar, duplicar, papelera, carpetas; subida por partes (≥ 5 MB);
 //     dos pestañas con el guardado automático al simular; sin conexión
 // =============================================================================================
 /** contexto con la sesión de Google iniciada y un Drive falso propio */
@@ -472,14 +538,22 @@ async function driveContext(fake) {
   return context;
 }
 const openMySims = async (page) => {
-  await menu(page, 'Archivo', 'Mis simulaciones (Google Drive)…');
+  await menu(page, 'Archivo', 'Mis proyectos (Google Drive)…');
   const d = page.getByRole('dialog').filter({ has: page.locator('.drive-browser') });
   await d.waitFor();
-  await page.waitForFunction(() => !!document.querySelector('.drive-list, .drive-browser .hint + .hint'), null, { timeout: 10000 }).catch(() => {});
+  await page.waitForFunction(() => !!document.querySelector('.drive-list, .drive-empty, .drive-state.warn'), null, { timeout: 10000 }).catch(() => {});
   await frames(page);
   return d;
 };
-const listed = (d) => d.locator('.drive-open > span:first-child').allTextContents();
+const listed = (d) => d.locator('.drive-name').allTextContents();
+/** Renombrar en la lista: el campo aparece en la fila */
+async function renameIn(d, from, to) {
+  await d.getByRole('button', { name: `Renombrar ${from}` }).click();
+  const input = d.getByRole('textbox', { name: `Nombre nuevo para ${from}` });
+  await input.fill(to);
+  await input.press('Enter');
+  return input;
+}
 /** espera a que termine la acción del diálogo (el «Renombrando…», «Duplicando…») */
 const idle = async (d) => {
   await frames(d.page());
@@ -507,32 +581,31 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
 
   // -- la lista
   let d = await openMySims(page);
-  check((await listed(d)).join() === 'Sample Project.turbo', `Mis simulaciones: lista el proyecto guardado y no «My symbols and models.json» (${await listed(d)})`);
-  check((await d.locator('li.current').count()) === 1, 'Mis simulaciones: marca el abierto');
+  check((await listed(d)).join() === 'Sample Project.turbo', `Mis proyectos: lista el proyecto guardado y no «My symbols and models.json» (${await listed(d)})`);
+  check((await d.locator('li.current').count()) === 1, 'Mis proyectos: marca el abierto');
 
   // -- duplicar
   await d.getByRole('button', { name: 'Duplicar Sample Project.turbo' }).click();
   await idle(d);
   const dup = fake.projects().find((x) => x.id !== f.id);
-  check(dup?.name === 'Sample Project (copia).turbo' && dup.data.equals(f.data), `Mis simulaciones: duplicar crea «Sample Project (copia).turbo» con el mismo contenido (${dup?.name})`);
-  check((await listed(d)).length === 2, 'Mis simulaciones: y aparece en la lista');
+  check(dup?.name === 'Sample Project (copia).turbo' && dup.data.equals(f.data), `Mis proyectos: duplicar crea «Sample Project (copia).turbo» con el mismo contenido (${dup?.name})`);
+  check((await listed(d)).length === 2, 'Mis proyectos: y aparece en la lista');
   await d.getByRole('button', { name: 'Duplicar Sample Project.turbo' }).click();
   await idle(d);
-  check(!!fake.byName('Sample Project (copia) (2).turbo'), `Mis simulaciones: duplicar otra vez no pisa la copia (${fake.projects().map((x) => x.name)})`);
+  check(!!fake.byName('Sample Project (copia) (2).turbo'), `Mis proyectos: duplicar otra vez no pisa la copia (${fake.projects().map((x) => x.name)})`);
 
-  // -- renombrar: el abierto (el nombre del proyecto cambia también) y a un nombre que ya existe
-  page.answers.push('Filtro final');
-  await d.getByRole('button', { name: 'Renombrar Sample Project.turbo' }).click();
+  // -- renombrar (en la fila): el abierto (el nombre del proyecto cambia también) y a un nombre que ya existe
+  await renameIn(d, 'Sample Project.turbo', 'Filtro final');
   await idle(d);
-  check(f.name === 'Filtro final.turbo', `Mis simulaciones: renombrar cambia el nombre en Drive (${f.name})`);
+  check(f.name === 'Filtro final.turbo', `Mis proyectos: renombrar cambia el nombre en Drive (${f.name})`);
   check(
     (await page.locator('.capsule-project').textContent()) === 'Filtro final',
-    `Mis simulaciones: renombrar el abierto cambia el nombre del proyecto (${await page.locator('.capsule-project').textContent()})`,
+    `Mis proyectos: renombrar el abierto cambia el nombre del proyecto (${await page.locator('.capsule-project').textContent()})`,
   );
-  page.answers.push('Filtro final');
-  await d.getByRole('button', { name: 'Renombrar Sample Project (copia).turbo' }).click();
+  const taken = await renameIn(d, 'Sample Project (copia).turbo', 'Filtro final');
+  check((await taken.getAttribute('aria-invalid')) === 'true' && !!fake.byName('Sample Project (copia).turbo'), 'Mis proyectos: renombrar a un nombre que ya existe lo marca y no cambia nada');
+  await taken.press('Escape');
   await idle(d);
-  check(/Ya hay un «Filtro final\.turbo»/.test(await d.textContent()) && !!fake.byName('Sample Project (copia).turbo'), 'Mis simulaciones: renombrar a un nombre que ya existe avisa y no cambia nada');
   // guardar después de renombrar: el mismo archivo, con el nombre nuevo
   await page.keyboard.press('Escape');
   await edit(page);
@@ -542,7 +615,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await settle(page);
   check(
     fake.uploads().length === ups + 1 && f.name === 'Filtro final.turbo' && project(f.data)?.name === 'Filtro final' && !fake.byName('Sample Project.turbo'),
-    `Mis simulaciones: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`,
+    `Mis proyectos: después de renombrar, Ctrl+S guarda en el mismo archivo con el nombre nuevo (${fake.projects().map((x) => x.name)})`,
   );
 
   // -- abrir otro desde la lista
@@ -551,7 +624,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Sample Project (copia) (2)', null, { timeout: 10000 }).catch(() => {});
   check(
     (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)',
-    `Mis simulaciones: abrir carga ese proyecto (${await page.locator('.capsule-project').textContent()}; ${await toast(page)}; ${page.dialogs.slice(-2)})`,
+    `Mis proyectos: abrir carga ese proyecto (${await page.locator('.capsule-project').textContent()}; ${await toast(page)}; ${page.dialogs.slice(-2)})`,
   );
   const opened = fake.byName('Sample Project (copia) (2).turbo');
   const openedRev = opened.rev;
@@ -559,7 +632,7 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await save(page);
   await waitToast(page, /Google Drive/);
   await settle(page);
-  check(opened.rev !== openedRev && project(fake.byName('Filtro final.turbo').data)?.name === 'Filtro final', 'Mis simulaciones: y guardar va a ese archivo, no al anterior');
+  check(opened.rev !== openedRev && project(fake.byName('Filtro final.turbo').data)?.name === 'Filtro final', 'Mis proyectos: y guardar va a ese archivo, no al anterior');
 
   // -- abrir con cambios sin guardar: pregunta; cancelar no abre
   await edit(page);
@@ -570,19 +643,43 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await frames(page);
   check(
     (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'),
-    'Mis simulaciones: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)',
+    'Mis proyectos: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)',
   );
 
-  // -- papelera, sobre el abierto: cancelar no borra; aceptar sí
-  page.answers.push(false);
-  await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
-  // (que no borre sólo se prueba dejando pasar un rato)
-  await page.waitForTimeout(300);
-  check(!opened.trashed, 'Mis simulaciones: cancelar la papelera no borra');
-  page.answers.push(true);
+  // -- papelera, sobre el abierto: va enseguida, con «Deshacer»; después, de nuevo
   await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
   await idle(d);
-  check(opened.trashed && !(await listed(d)).includes('Sample Project (copia) (2).turbo'), 'Mis simulaciones: «a la papelera» la manda a la papelera de Drive y sale de la lista');
+  check(opened.trashed && !(await listed(d)).includes('Sample Project (copia) (2).turbo'), 'Mis proyectos: «a la papelera» la manda a la papelera de Drive y sale de la lista');
+  await d.locator('.drive-note').getByRole('button', { name: 'Deshacer' }).click();
+  await idle(d);
+  check(!opened.trashed && (await listed(d)).includes('Sample Project (copia) (2).turbo'), 'Mis proyectos: «Deshacer» la saca de la papelera');
+  await d.getByRole('button', { name: 'Borrar Sample Project (copia) (2).turbo' }).click();
+  await idle(d);
+  // la papelera la muestra, y se puede recuperar desde ahí
+  await d.getByRole('button', { name: 'Papelera', exact: true }).click();
+  check((await listed(d)).includes('Sample Project (copia) (2).turbo'), `Mis proyectos: la papelera la lista (${await listed(d)})`);
+  await d.getByRole('button', { name: 'Papelera', exact: true }).click();
+  // -- carpetas: crear, mover un proyecto adentro, entrar
+  await d.getByRole('button', { name: 'Nueva carpeta' }).click();
+  await idle(d);
+  const folderName = d.getByRole('textbox', { name: /^Nombre nuevo para/ });
+  await folderName.fill('Filtros');
+  await folderName.press('Enter');
+  await idle(d);
+  const folder = [...fake.files.values()].find((x) => x.mimeType === FOLDER && x.name === 'Filtros');
+  check(!!folder && folder.parents.includes(fake.folderId()), 'Mis proyectos: crea una carpeta dentro de TurboSpice');
+  await d.getByRole('button', { name: 'Mover Filtro final.turbo' }).click();
+  await d.locator('.drive-move .folder-row', { hasText: 'Filtros' }).click();
+  await d.locator('.drive-move').getByRole('button', { name: 'Mover acá' }).click();
+  await idle(d);
+  const moved = fake.byName('Filtro final.turbo') ?? [...fake.files.values()].find((x) => x.name === 'Filtro final.turbo');
+  check(!!folder && moved?.parents.includes(folder.id) && !(await listed(d)).includes('Filtro final.turbo'), 'Mis proyectos: mover lleva el proyecto a la carpeta');
+  await d.locator('.drive-open', { hasText: 'Filtros' }).click();
+  check((await listed(d)).join() === 'Filtro final.turbo', `Mis proyectos: al entrar a la carpeta se ve lo que tiene (${await listed(d)})`);
+  // buscar encuentra en todas las carpetas
+  await d.locator('.crumb').first().click();
+  await d.locator('.drive-search').fill('final');
+  check((await listed(d)).join() === 'Filtro final.turbo', 'Mis proyectos: buscar encuentra en todas las carpetas');
   await page.keyboard.press('Escape');
   // el que se mandó a la papelera seguía abierto: guardar crea uno nuevo (no escribe en la papelera)
   const ups2 = fake.uploads().length;
@@ -592,9 +689,9 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   const again = fake.byName('Sample Project (copia) (2).turbo');
   check(
     fake.uploads().length === ups2 + 1 && fake.uploads().at(-1).method === 'POST' && !!again && again.id !== opened.id,
-    'Mis simulaciones: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)',
+    'Mis proyectos: guardar el que se mandó a la papelera crea un archivo nuevo (no escribe en la papelera)',
   );
-  check(!page.errors.length, `Mis simulaciones: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
+  check(!page.errors.length, `Mis proyectos: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
   await context.close();
 }
 
@@ -721,62 +818,66 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   await context.close();
 }
 
-// -- la sesión se renueva en un gesto, antes de que venza (#192)
+// -- la sesión (#192): la ventana de Google nunca sale sola; Guardar renueva el token si vence
+//    pronto; lo de fondo, con la sesión vencida, espera a que se reconecte y entonces sube solo
 {
   const fake = new FakeDrive();
   const context = await driveContext(fake);
   const page = await newPage(context);
-  // (al recargar se restaura la sesión: que ya esté guardada en el navegador)
-  await autosaved(page);
-  const setToken = (ms) => page.evaluate((ms) => sessionStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'tokOld', expires: Date.now() + ms })), ms);
-  const requests = () => page.evaluate(() => window.__tokenRequests ?? 0);
-  const tokenNow = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('turbospice.google.token') ?? 'null'));
-  // token con tiempo de sobra: un click no pide otro
-  await setToken(50 * 60_000);
-  await page.reload();
-  await page.locator('svg.editor .sym').first().waitFor();
-  // (que termine de restaurar la sesión antes de seguir)
-  await settle(page);
-  const r0 = await requests();
-  await page.mouse.click(400, 700);
-  await page.keyboard.press('Escape');
-  // (que no pida otro sólo se prueba dejando pasar un rato)
-  await page.waitForTimeout(500);
-  check((await requests()) === r0, 'Sesión: con el token al día, un click no pide otro');
-  // por vencer (5 min): el primer click lo renueva, sin aviso, y el guardado usa el nuevo
-  await setToken(5 * 60_000);
-  await page.reload();
-  await page.locator('svg.editor .sym').first().waitFor();
-  // (que termine de restaurar la sesión antes de seguir)
-  await settle(page);
-  const r1 = await requests();
-  await page.mouse.click(400, 700);
-  await until(async () => (await requests()) === r1 + 1 && (await tokenNow())?.value !== 'tokOld');
-  const t = await tokenNow();
-  check((await requests()) === r1 + 1 && t?.value !== 'tokOld' && t.expires - Date.now() > 50 * 60_000, `Sesión: con el token por vencer, el primer click lo renueva (${t?.value})`);
-  await page.mouse.click(400, 700);
-  await page.keyboard.press('a');
-  await page.keyboard.press('Escape');
-  // (ídem: que no lo vuelva a pedir)
-  await page.waitForTimeout(300);
-  check((await requests()) === r1 + 1, 'Sesión: y no lo vuelve a pedir en cada click');
   await edit(page);
   await save(page);
   await waitToast(page, /Google Drive/);
-  check(fake.tokens.at(-1) === `Bearer ${t.value}` && !(await dirty(page)), 'Sesión: el guardado usa el token renovado');
-  // vencido: una tecla también lo renueva
-  await setToken(-60_000);
-  await page.reload();
-  await page.locator('svg.editor .sym').first().waitFor();
-  // (que termine de restaurar la sesión antes de seguir)
   await settle(page);
+  const f = fake.byName('Sample Project.turbo');
+  const setToken = (ms) => page.evaluate((ms) => localStorage.setItem('turbospice.google.token', JSON.stringify({ value: 'tokOld', expires: Date.now() + ms })), ms);
+  const requests = () => page.evaluate(() => window.__tokenRequests ?? 0);
+  const tokenNow = () => page.evaluate(() => JSON.parse(localStorage.getItem('turbospice.google.token') ?? 'null'));
+  const reload = async () => {
+    await page.reload();
+    await page.locator('svg.editor .sym').first().waitFor();
+    // (que termine de restaurar la sesión antes de seguir)
+    await settle(page);
+  };
+  // por vencer (5 min): los clicks y las teclas no piden otro token
+  await setToken(5 * 60_000);
+  await reload();
+  const r1 = await requests();
+  await page.mouse.click(400, 700);
+  await page.keyboard.press('a');
+  await page.keyboard.press('Escape');
+  // (que no pida otro sólo se prueba dejando pasar un rato)
+  await page.waitForTimeout(500);
+  check((await requests()) === r1, 'Sesión: con el token por vencer, los clicks no abren la ventana de Google');
+  // Ctrl+S (un gesto de Drive) sí lo renueva, y guarda
+  await edit(page);
+  await save(page);
+  await waitToast(page, /Google Drive/);
+  await settle(page);
+  const t = await tokenNow();
+  check((await requests()) === r1 + 1 && t?.value !== 'tokOld' && t.expires - Date.now() > 50 * 60_000 && !(await dirty(page)), `Sesión: Guardar renueva el token que vence pronto (${t?.value})`);
+  // vencido: simular no abre ventanas; el guardado automático queda pendiente y el indicador pide reconectar
+  await setToken(-60_000);
+  await reload();
   const r2 = await requests();
-  await page.locator('svg.editor').click({ position: { x: 300, y: 600 } });
-  await until(async () => ((await tokenNow())?.expires ?? 0) > Date.now() + 50 * 60_000);
-  // (al cargar, la sincronización de «My symbols and models» ya puede haberlo pedido)
-  const t2 = await tokenNow();
-  check((await requests()) >= r2 && t2?.value !== 'tokOld' && t2.expires > Date.now() + 50 * 60_000, 'Sesión: con el token vencido, después del primer gesto hay uno válido');
-  check(!page.errors.length, `Sesión: sin errores en la página${page.errors.length ? `: ${page.errors.join(' | ')}` : ''}`);
+  const rev = f.rev;
+  await edit(page);
+  await simulate(page);
+  check((await requests()) === r2 && f.rev === rev, 'Sesión: con el token vencido, el guardado automático no abre la ventana de Google');
+  check(
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.driveSync)) === 'auth'),
+    `Sesión: el indicador del proyecto pide reconectar (${await page.evaluate(() => document.documentElement.dataset.driveSync)})`,
+  );
+  check((await page.locator('.account-dot').count()) === 1, 'Sesión: el circulito de la cuenta lo marca');
+  // «Reconectar» (en el indicador): una ventana, y lo pendiente se sube solo
+  await page.locator('.cloud-btn').click();
+  await page.locator('.cloud-pop').getByRole('button', { name: 'Reconectar' }).click();
+  check(await until(async () => f.rev !== rev && !(await dirty(page)), 10000), 'Sesión: al reconectar, lo pendiente se sube solo');
+  check((await requests()) === r2 + 1, `Sesión: con una sola ventana de Google (${(await requests()) - r2})`);
+  // otra pestaña usa el mismo token (no pide otro)
+  const other = await newPage(context);
+  await settle(other);
+  check((await other.evaluate(() => window.__tokenRequests ?? 0)) === 0, 'Sesión: otra pestaña usa el token guardado, sin pedir otro');
+  check(!page.errors.length && !other.errors.length, `Sesión: sin errores en la página${[...page.errors, ...other.errors].length ? `: ${[...page.errors, ...other.errors].join(' | ')}` : ''}`);
   await context.close();
 }
 

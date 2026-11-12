@@ -100,7 +100,40 @@ const P: Record<string, ReactNode> = {
       <circle cx="15.5" cy="10" r="1.4" />
     </g>
   ),
+  // lecciones y avisos
+  compass: <path d="M10 2.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15M12.8 7.2l-1.6 4-4 1.6 1.6-4z" />,
+  edit: <path d="M12.5 4l3.5 3.5L7 16.5H3.5V13zM11 5.5l3.5 3.5" />,
+  bolt: <path d="M11 2.5 4.5 11H10l-1 6.5L15.5 9H10z" />,
+  folders: <path d="M2.5 7.5v8.5h13V7.5zM2.5 7.5v-3h4l1.5 1.5h5.5v1.5M17.5 8.5V14" />,
+  block: <path d="M4 6h4V4.5a1.5 1.5 0 0 1 3 0V6h4v4h-1.5a1.5 1.5 0 0 0 0 3H15v4H4z" />,
+  scope: <path d="M7 3.5l3 1.5-2.5 5-3-1.5zM9 9.5a4.5 4.5 0 0 1 3 6.5M4.5 17h10M8 14.5h3" />,
+  search: <path d="M8.5 3a5.5 5.5 0 1 0 0 11 5.5 5.5 0 1 0 0-11M12.5 12.5l5 5" />,
+  feather: <path d="M16.5 3.5c-6 0-10 4-10 9l-2 4M16.5 3.5c0 5-3 9-8 9.5M6.5 12.5h5" />,
+  loop: <path d="M4 10a6 6 0 0 1 10.5-4M16 3v3.5h-3.5M16 10a6 6 0 0 1-10.5 4M4 17v-3.5h3.5" />,
+  sliders: <path d="M3 5.5h2.5M9.5 5.5H17M5.5 5.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0M3 14.5h7.5M14.5 14.5H17M10.5 14.5a2 2 0 1 0 4 0 2 2 0 0 0-4 0" />,
+  medal: <path d="M10 8a4.5 4.5 0 1 1 0 9 4.5 4.5 0 0 1 0-9M7 8.3 5 2.5h3.5L10 5.5M13 8.3l2-5.8h-3.5" />,
+  bulb: <path d="M7.5 14.5v-1.2C6 12.3 5 10.8 5 9a5 5 0 0 1 10 0c0 1.8-1 3.3-2.5 4.3v1.2zM8 17.5h4" />,
+  flame: <path d="M10 2.5c.5 3 4.5 4.5 4.5 9a4.5 4.5 0 0 1-9 0c0-1.5.6-2.6 1.5-3.5.2 1 .6 1.6 1.2 2C8 7.5 8.5 4.5 10 2.5z" />,
+  gear: <path d="M10 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10M10 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4M10 2.5V5M10 15v2.5M2.5 10H5M15 10h2.5" />,
+  star: <path d="M10 2.5l2.3 4.8 5.2.7-3.8 3.6.9 5.2L10 14.3l-4.6 2.5.9-5.2L2.5 8l5.2-.7z" />,
+  warning: <path d="M10 3 18 16.5H2zM10 8v4M10 14.2v.01" />,
   caret: <path d="M6 8.5 10 12.5 14 8.5" />,
+  // Google Drive: la nube y sus estados (al día, subiendo, sin conexión, con problemas)
+  cloud: <path d="M6 15.5a3.5 3.5 0 0 1-.4-7A5 5 0 0 1 15.2 8a3.8 3.8 0 0 1-.7 7.5z" />,
+  cloudOk: <path d="M6 15.5a3.5 3.5 0 0 1-.4-7A5 5 0 0 1 15.2 8a3.8 3.8 0 0 1-.7 7.5zM7.8 11.6l1.6 1.6 3.2-3.4" />,
+  cloudUp: <path d="M6 15.5a3.5 3.5 0 0 1-.4-7A5 5 0 0 1 15.2 8a3.8 3.8 0 0 1-.7 7.5zM10 13.5v-4.5M8 11l2-2 2 2" />,
+  cloudOff: <path d="M6 15.5a3.5 3.5 0 0 1-.4-7 5 5 0 0 1 2-3M10.5 3.6A5 5 0 0 1 15.2 8a3.8 3.8 0 0 1 1.7 6.3M3 3l14 14" />,
+  cloudWarn: <path d="M6 15.5a3.5 3.5 0 0 1-.4-7A5 5 0 0 1 15.2 8a3.8 3.8 0 0 1-.7 7.5zM10 8.5v3M10 13.3v.01" />,
+  folder: <path d="M2.5 5v11h15V7.5h-8L8 5z" />,
+  folderNew: <path d="M2.5 5v11h15V7.5h-8L8 5zM10 9.5v4.5M7.8 11.8h4.4" />,
+  folderMove: <path d="M2.5 5v11h15V7.5h-8L8 5zM7 12h6M11 10l2 2-2 2" />,
+  external: <path d="M11 3.5h5.5V9M16.5 3.5 9 11M14 12v4.5H3.5V6H8" />,
+  refresh: <path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.7h-3.7" />,
+  restore: <path d="M4 10a6 6 0 1 0 1.8-4.3M4 3.5v3.7h3.7M10 7v3.5l2.2 1.5" />,
+  duplicate: <path d="M7 7h9.5v9.5H7zM4 13V3.5h9.5" />,
+  project: <path d="M5 2.5h7l3 3v12H5zM12 2.5v3h3M7.5 10h5M7.5 13h3" />,
+  user: <path d="M10 3a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7M3.5 17.5a6.5 6.5 0 0 1 13 0" />,
+  logout: <path d="M8 3.5H3.5v13H8M13 6.5l3.5 3.5-3.5 3.5M16.5 10H7.5" />,
 };
 
 export type IconName = keyof typeof P;

@@ -61,15 +61,15 @@ function theme(dark: boolean): Blockly.Theme {
     base: Blockly.Themes.Classic,
     componentStyles: dark
       ? {
-          workspaceBackgroundColour: '#1e2126',
-          toolboxBackgroundColour: '#16181c',
-          toolboxForegroundColour: '#e4e6ea',
-          flyoutBackgroundColour: '#262a30',
-          flyoutForegroundColour: '#e4e6ea',
+          workspaceBackgroundColour: '#1c1c1a',
+          toolboxBackgroundColour: '#141413',
+          toolboxForegroundColour: '#e8e6e1',
+          flyoutBackgroundColour: '#262522',
+          flyoutForegroundColour: '#e8e6e1',
           scrollbarColour: '#4a4f57',
           insertionMarkerColour: '#ffffff',
         }
-      : { workspaceBackgroundColour: '#fafbfc', toolboxBackgroundColour: '#f4f5f7', flyoutBackgroundColour: '#eceef1' },
+      : { workspaceBackgroundColour: '#ffffff', toolboxBackgroundColour: '#f3f2ee', flyoutBackgroundColour: '#e7e5df' },
     fontStyle: { family: 'system-ui, sans-serif', size: 11 },
   });
 }

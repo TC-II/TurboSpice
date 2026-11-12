@@ -74,9 +74,9 @@ export function buildToolGroups({
           title: t('Export to PDF or LaTeX'),
           onClick: doExport,
         },
-        // con la sesión de Google, Abrir muestra «Mis simulaciones»; sin sesión, Abrir/Importar
+        // con la sesión de Google, Abrir muestra «Mis proyectos»; sin sesión, Abrir/Importar
         google.account
-          ? { icon: 'open', label: t('Open'), title: t('My simulations (Google Drive)'), onClick: () => setDialog({ kind: 'drive' }) }
+          ? { icon: 'open', label: t('Open'), title: t('My projects (Google Drive)'), onClick: () => setDialog({ kind: 'drive' }) }
           : { icon: 'open', label: t('Open'), title: t('Open (import .turbo, .zip, .asc…)'), shortcut: 'Ctrl+O', onClick: doOpen },
       ],
     },

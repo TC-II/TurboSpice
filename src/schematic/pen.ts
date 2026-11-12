@@ -7,7 +7,7 @@
 // de simplificar el trazo (Ramer–Douglas–Peucker, tolerancia de medio píxel de pantalla): quedan
 // muchos menos puntos que tomando uno cada 2 px, así que el archivo no crece aunque haya decimales.
 import { useEffect, useState } from 'react';
-import type { AscDoc, Point } from '../asc/model.ts';
+import type { AscDoc, Point, Shape } from '../asc/model.ts';
 
 /**
  * Estilo de un PATH, en las palabras del final de su línea: un dígito = guiones (como LTspice),
@@ -93,6 +93,9 @@ export function usePenPrefs(): PenPrefs {
 
 /** el estilo con que se guarda un trazo nuevo */
 export const newStrokeStyle = (p: PenPrefs, dash?: string) => penStyleString({ dash: dash || undefined, width: p.width, color: p.color || undefined, smooth: p.smooth });
+
+/** el estilo con que se guarda una figura nueva (línea, rectángulo, círculo, arco): guiones, grosor y color, sin suavizado */
+export const newShapeStyle = (p: PenPrefs, dash?: string) => penStyleString({ dash: parsePenStyle(dash).dash, width: p.width, color: p.color || undefined });
 
 const q = (v: number) => Math.round(v * 10) / 10;
 
@@ -219,4 +222,68 @@ export function eraseAt(doc: AscDoc, c: Point, r: number): AscDoc {
     return pieces.map((pp) => ({ ...s, coords: pp.flatMap((p) => [p.x, p.y]) }));
   });
   return changed ? { ...doc, shapes } : doc;
+}
+
+/** puntos de la curva suave de `smoothPath`, `n` por tramo (para escribirla como segmentos) */
+function smoothPoints(pts: Point[], n: number): Point[] {
+  if (pts.length < 3) return pts;
+  const out: Point[] = [pts[0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
+    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    for (let k = 1; k <= n; k++) {
+      const u = k / n;
+      const v = 1 - u;
+      const [a, b, c, d] = [v * v * v, 3 * v * v * u, 3 * v * u * u, u * u * u];
+      out.push({ x: a * p1.x + b * c1.x + c * c2.x + d * p2.x, y: a * p1.y + b * c1.y + c * c2.y + d * p2.y });
+    }
+  }
+  return out;
+}
+
+/**
+ * El documento tal como lo entiende LTspice: su .asc no tiene PATH, ni IMAGE, ni coordenadas con decimales, ni
+ * más estilo de línea que el dígito de guiones (una palabra de más en LINE/RECTANGLE/… y no abre).
+ * Cada trazo del lápiz pasa a una cadena de LINE con coordenadas enteras (la curva suave, muestreada);
+ * grosor y color no existen en LTspice y se pierden. Los .turbo conservan el trazo original.
+ */
+export function forLtspice(doc: AscDoc): AscDoc {
+  const dashOf = (style?: string) => parsePenStyle(style).dash;
+  const withDash = (s: Shape): Shape => {
+    const { style: _, ...rest } = s;
+    const dash = dashOf(s.style);
+    return dash ? { ...rest, style: dash } : rest;
+  };
+  const shapes = doc.shapes.flatMap((s): Shape[] => {
+    // LTspice no tiene imágenes en el .asc (no abre el archivo): se omiten; el .turbo las conserva
+    if (s.kind === 'IMAGE') return [];
+    if (s.kind !== 'PATH') return [withDash(s)];
+    let pts: Point[] = [];
+    for (let i = 0; i + 1 < s.coords.length; i += 2) pts.push({ x: s.coords[i], y: s.coords[i + 1] });
+    if (parsePenStyle(s.style).smooth) pts = smoothPoints(pts, 6);
+    const ints = pts.map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) })).filter((p, i, a) => !i || p.x !== a[i - 1].x || p.y !== a[i - 1].y);
+    const dash = dashOf(s.style);
+    return ints.slice(1).map((b, i): Shape => ({ kind: 'LINE', coords: [ints[i].x, ints[i].y, b.x, b.y], ...(dash ? { style: dash } : {}) }));
+  });
+  return { ...doc, shapes };
+}
+
+/** cambia grosor, color o suavizado de las figuras `indices`, dejando lo demás de su estilo (el suavizado sólo vale en un PATH) */
+export function restyleShapes(doc: AscDoc, indices: number[], patch: Partial<PenStyle>): AscDoc {
+  const set = new Set(indices);
+  return {
+    ...doc,
+    shapes: doc.shapes.map((s, i): Shape => {
+      if (!set.has(i) || s.kind === 'IMAGE') return s;
+      const next = { ...parsePenStyle(s.style), ...patch };
+      if (s.kind !== 'PATH') delete next.smooth;
+      const { style: _, ...rest } = s;
+      const style = penStyleString(next);
+      return style ? { ...rest, style } : rest;
+    }),
+  };
 }

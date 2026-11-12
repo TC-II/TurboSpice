@@ -57,8 +57,9 @@ import { traceResolver } from './sim/traces.ts';
 import { download } from './schematic/exportSchematic.ts';
 import { ResultsSplitter, refitsSchematic, toggleResults, useExpanded, type Expanded } from './ui/ResultsSplitter.tsx';
 import { useSideSize } from './ui/SideSplit.tsx';
-import { AccountButton } from './cloud/AccountButton.tsx';
-import { drive, useGoogle } from './cloud/google.ts';
+import { AccountButton, OPEN_PROJECTS_EVENT } from './cloud/AccountButton.tsx';
+import { drive, driveBg, useGoogle } from './cloud/google.ts';
+import { errorKind } from './cloud/drive.ts';
 import { connectProgress, PROGRESS_NAME } from './tutorial/progress.ts';
 import { Logo } from './ui/Logo.tsx';
 import { t } from './i18n/i18n.ts';
@@ -385,12 +386,16 @@ function SchematicMode({
 
   // archivos del usuario: al cambiar, la librería cambia (se recalcula la netlist y el dibujo)
   const account = google.account?.emailAddress ?? google.account?.displayName;
-  const { userFiles, libVersion, setLibVersion, storeUserFiles, addUserFiles, removeUserFile, makeUserSymbol, userFileInfo } = useUserFiles(lib, account, setMessage);
-  // el progreso del tutorial también (PROGRESS_NAME): así no se repite en otra máquina
+  const connected = google.status === 'connected';
+  const { userFiles, libVersion, setLibVersion, storeUserFiles, addUserFiles, removeUserFile, makeUserSymbol, userFileInfo } = useUserFiles(lib, account, connected, setMessage);
+  // el progreso del tutorial también (PROGRESS_NAME): así no se repite en otra máquina. De fondo:
+  // sin sesión válida no molesta, y al reconectar se vuelve a unir
   useEffect(() => {
-    if (!account) return;
-    return connectProgress(drive, (e) => setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: PROGRESS_NAME, message: e.message })));
-  }, [account]);
+    if (!account || !connected) return;
+    return connectProgress(driveBg, (e) => {
+      if (!['auth', 'offline', 'timeout', 'cancelled'].includes(errorKind(e))) setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: PROGRESS_NAME, message: e.message }));
+    });
+  }, [account, connected]);
   useEffect(() => setCurModel(''), [path, sims.active]);
   // archivos del proyecto (#155): se registran en la librería antes que los del usuario
   useEffect(() => {
@@ -443,7 +448,10 @@ function SchematicMode({
   // estilo de línea de las figuras que se dibujen (Dibujar › Estilo de línea)
   const [shapeStyle, setShapeStyleState] = useState('');
   const shapeTool = (shape: DrawnShapeKind) => () => setTool({ kind: 'shape', shape, pts: [], ...(shapeStyle ? { style: shapeStyle } : {}) });
-  const pencilTool = () => setTool({ kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) });
+  const pencilTool = (eraser?: boolean) => {
+    if (tool.kind === 'pencil' || tool.kind === 'eraser' || tool.kind === 'shape') return setTool({ kind: 'select' });
+    setTool(eraser ? { kind: 'eraser' } : { kind: 'pencil', ...(shapeStyle ? { style: shapeStyle } : {}) });
+  };
   const openLineStyle = (shapes = selection.filter((r) => r.kind === 'shape').map((r) => r.index)) => setDialog({ kind: 'lineStyle', shapes });
   // Ctrl+G / Ctrl+U: grilla y marcas de pines sueltos
   const [showGrid, setShowGrid] = useState(false);
@@ -547,9 +555,15 @@ function SchematicMode({
     openDriveFile: (d) => openDriveFile(d),
   });
 
-  const { driveConflict, setDriveConflict, setAutoDrive, resolveDriveConflict, doSaveDrive, openDriveFile } = useDrive({
-    ...{ account: google.account, file, setFile, dirty, setDirty, editRev, projectRef, snapshot, turboBytes, turboName, savedAs, remember, openBytes, confirmDiscard, setDialog, setMessage },
+  const { driveConflict, setDriveConflict, setAutoDrive, resolveDriveConflict, doSaveDrive, saveDriveAs, openDriveFile, sync, syncNow, reconnectDrive } = useDrive({
+    ...{ google, file, setFile, dirty, setDirty, editRev, projectRef, snapshot, turboBytes, turboName, savedAs, remember, openBytes, confirmDiscard, setDialog, setMessage },
   });
+  // el menú de la cuenta pide «Mis proyectos» (está fuera del modo esquemático)
+  useEffect(() => {
+    const h = () => setDialog({ kind: 'drive' });
+    window.addEventListener(OPEN_PROJECTS_EVENT, h);
+    return () => window.removeEventListener(OPEN_PROJECTS_EVENT, h);
+  }, [setDialog]);
 
   // Con la sesión de Google iniciada, Guardar va al Drive; si no, al equipo
   const doSave = (saveAs = false) => (google.account ? doSaveDrive(saveAs) : doSaveLocal(saveAs));
@@ -1002,7 +1016,8 @@ function SchematicMode({
       abort,
       showLog,
       doSave,
-      doOpen,
+      // con la sesión de Google, Ctrl+O muestra «Mis proyectos» (como el botón Abrir)
+      doOpen: () => (google.account ? setDialog({ kind: 'drive' }) : doOpen()),
       setQuickOpen,
       goUp,
       reapplyView,
@@ -1171,8 +1186,18 @@ function SchematicMode({
         )}
         <SimRow
           projectName={project.name}
+          workbench={project.groups.find((g) => g.id === variant.sims.find((s) => s.id === sims.active)?.group)?.name}
           bias={!!bias}
           {...{ dirty, treeOpen, toggleTree, schematicShown, setExpanded, renameProject, simItems, simMenu, barProblem, canRun, running, status, simulate, abort, curSim, stopHidden }}
+          drive={{
+            sync,
+            driveId: file.driveId,
+            fileName: file.name,
+            onSaveNow: syncNow,
+            onReconnect: reconnectDrive,
+            onOpenProjects: () => setDialog({ kind: 'drive' }),
+            onMove: () => setDialog({ kind: 'driveSave', mode: 'move' }),
+          }}
           {...{ showNets, hasNets, setShowNets, showOp, setShowOp, docLine, circuitInfo, picker, endPick, tbDoc, pdkBar, simAllCorners, openStudy }}
         />
 
@@ -1341,6 +1366,7 @@ function SchematicMode({
             file,
             setFile,
             openDriveFile,
+            saveDriveAs,
           }}
           {...{ curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope }}
         />

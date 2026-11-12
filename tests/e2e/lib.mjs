@@ -83,7 +83,7 @@ export async function openExample(page, name) {
     await steady(page);
   }
 
-  await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.capsule-variant')?.textContent === v, variant);
+  await page.waitForFunction((v) => document.querySelector('.capsule-project')?.textContent === 'Examples' && document.querySelector('.proj-capsule')?.dataset.bench === v, variant);
   // (el esquemático nuevo se encuadra después de abrirlo: hasta que se quede quieto, un click por
   // coordenadas cae en otro lado; en la CI, más lenta, el doble click en Q1 no abría la tabla)
   await steady(page);

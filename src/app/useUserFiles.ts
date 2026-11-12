@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { decodeText } from '../asc/encoding.ts';
 import { parseAsc } from '../asc/parse.ts';
-import { drive } from '../cloud/google.ts';
+import { driveBg } from '../cloud/google.ts';
+import { errorKind } from '../cloud/drive.ts';
 import { USER_LIBRARY_NAME, mergeUserFiles, pullUserLibrary, pushUserLibrary, userLibraryText } from '../cloud/userLibrary.ts';
 import { t } from '../i18n/i18n.ts';
 import { USER_DIR, scanModels, type Library } from '../library/library.ts';
@@ -13,8 +14,14 @@ import type { UserFileInfo } from '../schematic/dialogs.tsx';
 import { registerUserFile, userFileKind } from './helpers.ts';
 import { useEvent } from '../ui/useEvent.ts';
 
-/** `account`: la cuenta de Google con sesión (si hay); `libVersion` cambia cada vez que cambia la librería */
-export function useUserFiles(lib: Library, account: string | undefined, setMessage: (m?: string) => void) {
+/** Lo que no se avisa con un cartel: la sesión vencida o sin conexión (se vuelve a sincronizar al reconectar) */
+const quiet = (e: unknown) => ['auth', 'offline', 'timeout', 'cancelled'].includes(errorKind(e));
+
+/**
+ * `account`: la cuenta de Google con sesión (si hay); `connected`: con token válido (al reconectar se
+ * vuelve a sincronizar); `libVersion` cambia cada vez que cambia la librería
+ */
+export function useUserFiles(lib: Library, account: string | undefined, connected: boolean, setMessage: (m?: string) => void) {
   const [userFiles, setUserFiles] = useState<UserFile[]>([]);
   const [libVersion, setLibVersion] = useState(0);
   useEffect(() => {
@@ -27,30 +34,30 @@ export function useUserFiles(lib: Library, account: string | undefined, setMessa
   const currentLib = useEvent(() => lib);
   useEffect(() => {
     userLibId.current = undefined;
-    if (!account) return;
+    if (!account || !connected) return;
     let off = false;
     (async () => {
-      const remote = await pullUserLibrary(drive);
+      const remote = await pullUserLibrary(driveBg);
       const merged = mergeUserFiles(remote.files ?? [], await loadUserFiles());
       if (off) return;
       for (const f of merged) registerUserFile(currentLib(), f);
       setUserFiles(merged);
       saveUserFiles(merged);
       setLibVersion((v) => v + 1);
-      userLibId.current = remote.files && userLibraryText(merged) === userLibraryText(remote.files) ? remote.id : await pushUserLibrary(drive, merged, remote.id);
-    })().catch((e: Error) => !off && setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
+      userLibId.current = remote.files && userLibraryText(merged) === userLibraryText(remote.files) ? remote.id : await pushUserLibrary(driveBg, merged, remote.id);
+    })().catch((e: Error) => !off && !quiet(e) && setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
     return () => {
       off = true;
     };
-  }, [account, currentLib, setMessage]);
+  }, [account, connected, currentLib, setMessage]);
   const storeUserFiles = (next: UserFile[]) => {
     setUserFiles(next);
     saveUserFiles(next);
     setLibVersion((v) => v + 1);
-    if (account)
-      pushUserLibrary(drive, next, userLibId.current)
+    if (account && connected)
+      pushUserLibrary(driveBg, next, userLibId.current)
         .then((id) => (userLibId.current = id))
-        .catch((e: Error) => setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
+        .catch((e: Error) => !quiet(e) && setMessage(t('Could not sync «{name}» with Google Drive: {message}', { name: USER_LIBRARY_NAME, message: e.message })));
   };
   const addUserFiles = async (files: File[]) => {
     const next = [...userFiles];

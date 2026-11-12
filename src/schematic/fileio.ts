@@ -6,6 +6,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { makeExplicit, type SymbolSource } from '../asc/resolve.ts';
 import { serializeAsc } from '../asc/serialize.ts';
+import { forLtspice } from './pen.ts';
 import { t } from '../i18n/i18n.ts';
 
 // Tipos mínimos de la File System Access API (no están en lib.dom de TypeScript 5.7)
@@ -38,15 +39,15 @@ export function readAsc(bytes: Uint8Array, name: string): Omit<OpenedFile, 'hand
   return { doc: parseAsc(text), name, encoding };
 }
 
-/** Elegir uno o más .asc del equipo y leer sus bytes tal cual (para importarlos a Drive) */
+/** Elegir uno o más .asc o .turbo del equipo y leer sus bytes tal cual (para importarlos a Drive) */
 export function pickAscFiles(): Promise<{ name: string; bytes: Uint8Array }[]> {
   return new Promise((resolve) => {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = '.asc';
+    input.accept = '.asc,.turbo';
     input.multiple = true;
     input.onchange = async () => {
-      const files = [...(input.files ?? [])].filter((f) => /\.asc$/i.test(f.name));
+      const files = [...(input.files ?? [])].filter((f) => /\.(asc|turbo)$/i.test(f.name));
       resolve(await Promise.all(files.map(async (f) => ({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }))));
     };
     input.oncancel = () => resolve([]);
@@ -113,7 +114,7 @@ export async function openProjectFile(): Promise<PickedFile | null> {
 export function ascBytes(doc: AscDoc, lib: SymbolSource, encoding?: AscEncoding): { bytes: Uint8Array; missing: string[] } {
   const { doc: explicit, missing } = makeExplicit(doc, lib);
   // los comentarios con datos (;.study, ;.plot), debajo del dibujo: en LTspice se ven
-  return { bytes: encode(serializeAsc(placeDataTexts(explicit)), encoding).bytes, missing };
+  return { bytes: encode(serializeAsc(forLtspice(placeDataTexts(explicit))), encoding).bytes, missing };
 }
 
 /**

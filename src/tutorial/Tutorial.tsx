@@ -354,7 +354,9 @@ export function Tutorial({
               return (
                 <li key={c.id}>
                   <button className={`tut-mission${st ? ' complete' : ''}${i === nextUp ? ' next' : ''}`} onClick={() => setView({ kind: 'intro', ch: i })}>
-                    <span className="tut-mission-icon">{c.icon}</span>
+                    <span className="tut-mission-icon">
+                      <Icon name={c.icon} size={28} />
+                    </span>
                     <span className="tut-mission-text">
                       <span className="tut-mission-title">
                         {t('Mission {n}', { n: i + 1 })} · {c.title}
@@ -365,7 +367,11 @@ export function Tutorial({
                         <span className="tut-count">
                           {d}/{c.steps.length}
                         </span>
-                        {st > 0 && <span className="tut-badge-chip">🏅 {c.badge}</span>}
+                        {st > 0 && (
+                          <span className="tut-badge-chip">
+                            <Icon name="medal" size={13} /> {c.badge}
+                          </span>
+                        )}
                         {i === nextUp && <span className="tut-next-chip">{t('Next')}</span>}
                       </span>
                     </span>
@@ -409,7 +415,9 @@ export function Tutorial({
     body = (
       <>
         <div className="tut-intro-head">
-          <span className="tut-big-icon">{c.icon}</span>
+          <span className="tut-big-icon">
+            <Icon name={c.icon} size={40} />
+          </span>
           <div>
             <div className="tut-kicker">{t('Mission {n}', { n: view.ch + 1 })}</div>
             <h3>{c.title}</h3>
@@ -437,11 +445,17 @@ export function Tutorial({
     const next = view.ch + 1 < list.length ? view.ch + 1 : -1;
     body = (
       <div className="tut-done">
-        <div className="tut-medal">{c.icon}</div>
+        <div className="tut-medal">
+          <Icon name={c.icon} size={40} />
+        </div>
         <h3>{t('Mission complete!')}</h3>
         <Stars n={view.stars} animate />
         <p className="tut-earned">+{view.xp} XP</p>
-        {view.first && <p className="tut-badge-won">{t('New badge: 🏅 {badge}', { badge: c.badge })}</p>}
+        {view.first && (
+          <p className="tut-badge-won">
+            <Icon name="medal" size={15} /> {t('New badge: {badge}', { badge: c.badge })}
+          </p>
+        )}
         {view.levelUp && <p className="tut-levelup">{t('Level up! You are now: {name}', { name: view.levelUp })}</p>}
         {view.stars < 3 && <p className="tut-sub">{t('Without hints or skipped steps you get 3 stars: play it again whenever you want.')}</p>}
         {levelBar}
@@ -478,7 +492,11 @@ export function Tutorial({
         </h3>
         <p className="tut-body">{rich(s.body)}</p>
         {progressText && !success && <p className="tut-progress">{progressText}</p>}
-        {hint && s.hint && <p className="tut-hint">💡 {rich(s.hint)}</p>}
+        {hint && s.hint && (
+          <p className="tut-hint">
+            <Icon name="bulb" size={14} /> {rich(s.hint)}
+          </p>
+        )}
         {success && success.xp > 0 && <span className="tut-float">+{success.xp} XP</span>}
         <div className="tut-actions">
           {s.hint && !hint && !success && (
@@ -490,7 +508,7 @@ export function Tutorial({
               }}
               title={t('A hint costs a star in this mission')}
             >
-              💡 {t('Hint')}
+              <Icon name="bulb" size={14} /> {t('Hint')}
             </button>
           )}
           {auto && !success && (
@@ -526,7 +544,9 @@ export function Tutorial({
       {createPortal(
         <div ref={card} className={`tut-card${min ? ' min' : ''}${view.kind === 'done' ? ' celebrate' : ''}`} style={placed} role="dialog" aria-label={t('Tutorial')}>
           <header className="tut-card-head" {...dragProps}>
-            <span className="tut-card-icon">{c.icon}</span>
+            <span className="tut-card-icon">
+              <Icon name={c.icon} size={16} />
+            </span>
             <span className="tut-card-title">
               {c.title}
               {stepNo > 0 && (
@@ -538,7 +558,7 @@ export function Tutorial({
             </span>
             {streak >= 2 && view.kind === 'play' && (
               <span className="tut-streak" title={t('Steps in a row without hints')}>
-                🔥 ×{streak}
+                <Icon name="flame" size={14} /> ×{streak}
               </span>
             )}
             <span className="tut-xp-chip">{prog.xp} XP</span>

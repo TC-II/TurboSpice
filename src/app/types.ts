@@ -29,6 +29,8 @@ export type Dialog =
   | { kind: 'about' }
   | { kind: 'settings' }
   | { kind: 'drive' }
+  /** Guardar como en Drive (nombre y carpeta) o mover el proyecto abierto a otra carpeta */
+  | { kind: 'driveSave'; mode: 'saveAs' | 'move' }
   /** borrar una simulación (con el control deslizante) */
   | { kind: 'deleteSim'; id: string }
   | { kind: 'deleteVariant'; id: string }

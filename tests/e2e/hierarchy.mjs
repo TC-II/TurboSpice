@@ -35,9 +35,30 @@ const pasteHere = async () => {
   await frames(page);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
 };
+const OUT = process.argv[3] ?? 'test-results';
+/** Si la simulación no termina: captura y estado de la página (en CI no hay otra forma de ver qué pasó). */
+const dumpStall = async () => {
+  try {
+    await page.screenshot({ path: `${OUT}/hierarchy-stall.png` });
+    const info = await page.evaluate(() => ({
+      syms: document.querySelectorAll('svg.editor .sym').length,
+      correr: [...document.querySelectorAll('[aria-label="Correr"]')].map((b) => ({ disabled: b.disabled, cls: b.className })),
+      status: [...document.querySelectorAll('[class*="status"], [role="status"]')].map((e) => `${e.className}: ${e.textContent.slice(0, 120)}`),
+      dialogs: [...document.querySelectorAll('[role="dialog"], dialog[open]')].map((e) => e.textContent.slice(0, 120)),
+    }));
+    console.log('hierarchy-stall', JSON.stringify(info), 'errores de página:', JSON.stringify(errors));
+  } catch (e) {
+    console.log('hierarchy-stall: no se pudo capturar', e.message);
+  }
+};
 const simulate = async () => {
   await page.getByLabel('Correr', { exact: true }).click();
-  await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+  try {
+    await page.locator('.status.ok, .status.err').waitFor({ timeout: 30000 });
+  } catch (e) {
+    await dumpStall();
+    throw e;
+  }
   // (al abrirse los resultados el esquemático se reacomoda)
   await steady(page);
 };

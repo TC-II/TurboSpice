@@ -53,3 +53,15 @@ describe('lápiz', () => {
     expect(eraseCircle(line, { x: 0, y: 0 }, 200)).toEqual([]);
   });
 });
+
+describe('exportar a LTspice', () => {
+  it('los trazos pasan a LINE enteras y las figuras quedan sólo con el dígito de guiones', async () => {
+    const { forLtspice } = await import('../../src/schematic/pen.ts');
+    const doc = parseAsc('Version 4\nSHEET 1 880 680\nPATH Normal 3 0 0 10.4 0.2 20 20 1 w3 s\nRECTANGLE Normal 0 0 32 32 2 w3 cff0000\nCIRCLE Normal 0 0 32 32 w6\n');
+    const text = serializeAsc(forLtspice(doc));
+    expect(text).not.toMatch(/PATH|IMAGE|\bw\d|\bc[0-9a-f]{6}|\d\.\d/);
+    expect(text).toContain('RECTANGLE Normal 0 0 32 32 2\r\n');
+    expect(text).toContain('CIRCLE Normal 0 0 32 32\r\n');
+    expect(text.match(/^LINE Normal \d+ \d+ \d+ \d+ 1$/gm)!.length).toBeGreaterThan(2);
+  });
+});

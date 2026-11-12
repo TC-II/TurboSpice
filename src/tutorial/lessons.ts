@@ -4,6 +4,7 @@
 import { parseAnalysis } from '../sim/analyses.ts';
 import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import { t } from '../i18n/i18n.ts';
+import type { IconName } from '../ui/icons.tsx';
 
 /** Lo que el tutorial puede ver de la app */
 export interface Probe {
@@ -82,7 +83,7 @@ export type Practice = 'empty' | 'rc' | 'rcTran' | 'divider' | 'loop';
 
 export interface Chapter {
   id: string;
-  icon: string;
+  icon: IconName;
   title: string;
   blurb: string;
   badge: string;
@@ -275,7 +276,7 @@ export function chapters(): Chapter[] {
   return [
     {
       id: 'tour',
-      icon: '🧭',
+      icon: 'compass',
       title: t('First contact'),
       blurb: t('Find your way around: menu, tools, project panel and shortcuts.'),
       badge: t('Golden compass'),
@@ -338,7 +339,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'draw',
-      icon: '✏️',
+      icon: 'edit',
       title: t('Your first circuit'),
       blurb: t('Draw an RC circuit: components, wires, ground, labels and values.'),
       badge: t('Golden soldering iron'),
@@ -417,7 +418,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'simulate',
-      icon: '⚡',
+      icon: 'bolt',
       title: t("Let's simulate!"),
       blurb: t('Choose an analysis, set its parameters, configure the source and run.'),
       badge: t('Spark of life'),
@@ -471,7 +472,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'plot',
-      icon: '📈',
+      icon: 'results',
       title: t('Plot lab'),
       blurb: t('Probe, currents, expressions, zoom, cursors, markers and panes.'),
       badge: t('Oscilloscope'),
@@ -570,7 +571,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'project',
-      icon: '🗂️',
+      icon: 'folders',
       title: t('Workbenches and testbenches'),
       blurb: t('Organize a project: several simulations of a circuit, grouped and with their history.'),
       badge: t('Master plan'),
@@ -607,7 +608,7 @@ export function chapters(): Chapter[] {
         {
           id: 'rename',
           title: t('Names that say something'),
-          body: t('In the panel, the ✎ button of the testbench (it appears when you rest the mouse on it) renames it: call it **Bode**.'),
+          body: t('In the panel, the pencil button of the testbench (it appears when you rest the mouse on it) renames it: call it **Bode**.'),
           target: bySel('.project-tree .tree-row.active'),
           check: (p) => p.benches.some((b) => b.custom),
         },
@@ -642,7 +643,7 @@ export function chapters(): Chapter[] {
           id: 'history',
           title: t('The run history'),
           body: t(
-            'Every time you simulate, the exact circuit is saved. The 🕑 button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.',
+            'Every time you simulate, the exact circuit is saved. The clock button of a testbench (with the number of runs) opens its **history**: what changed between runs, and you can restore an old one.',
           ),
           target: bySel('.project-tree .tree-runs:not(.none)'),
           ...turnOn((p) => p.historyOpen, t('It is already open: look at it and go on.')),
@@ -658,7 +659,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'module',
-      icon: '🧩',
+      icon: 'block',
       title: t('Build a module'),
       blurb: t('Your own subcircuit: drawn inside, with ports, symbol and instances.'),
       badge: t('Black box'),
@@ -734,7 +735,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'study',
-      icon: '🔬',
+      icon: 'scope',
       title: t('The Studio'),
       blurb: t('Sweeps and measurements without writing SPICE.'),
       badge: t('Magnifying glass'),
@@ -777,7 +778,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'op',
-      icon: '🔍',
+      icon: 'search',
       title: t('Operating point'),
       blurb: t('Voltages and currents annotated on the schematic, and the names of the nets.'),
       badge: t('Multimeter'),
@@ -821,7 +822,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'publish',
-      icon: '🖋️',
+      icon: 'feather',
       title: t('A schematic to show'),
       blurb: t('LaTeX names, net highlighting and the sheet exported to PDF, SVG or TikZ.'),
       badge: t('Golden pen'),
@@ -867,7 +868,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'stability',
-      icon: '🌀',
+      icon: 'loop',
       title: t('Is it stable?'),
       blurb: t('Loop gain with a loop probe (.stb): phase and gain margins, GFT and Tian.'),
       badge: t('Steady hand'),
@@ -941,7 +942,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'pdk',
-      icon: '🔲',
+      icon: 'component',
       title: t('Integrated circuits'),
       blurb: t('Transistors of the sky130 and GF180 PDKs, their dimensions and the process corners.'),
       badge: t('Silicon wafer'),
@@ -994,7 +995,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'dsp',
-      icon: '🎛️',
+      icon: 'sliders',
       title: t('Digital signal processing'),
       blurb: t('Filters as block diagrams: fixed-point blocks in Verilog, buses plotted as numbers.'),
       badge: t('Golden FIR'),
@@ -1048,7 +1049,7 @@ export function chapters(): Chapter[] {
     },
     {
       id: 'save',
-      icon: '💾',
+      icon: 'save',
       title: t('Save and share'),
       blurb: t('Name your project, save it, share it and take it to LTspice.'),
       badge: t('Golden floppy'),

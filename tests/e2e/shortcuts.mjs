@@ -134,8 +134,9 @@ check((await symPos()) === before, 'Ctrl+Z deshace el movimiento');
 // --- J / K: líneas y rectángulos decorativos ---
 const shapes = () => svg.locator('.shapes > *').count();
 await page.keyboard.press('j');
-const l1 = await at(-64, -96);
-const l2 = await at(64, -96);
+// (la cápsula del lápiz aparece arriba del lienzo con la herramienta de figuras: se dibuja por debajo)
+const l1 = await at(-64, -56);
+const l2 = await at(64, -56);
 await page.mouse.click(l1.x, l1.y);
 await page.mouse.click(l2.x, l2.y);
 await page.keyboard.press('k');

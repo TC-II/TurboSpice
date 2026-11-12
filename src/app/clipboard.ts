@@ -61,26 +61,36 @@ export function clipboardActions({ doc, lib, selection, setSelection, setTool, c
       );
     return !!c;
   };
-  const paste = async () => {
-    // una imagen en el portapapeles se pega como fondo del esquemático (figura IMAGE, en base64)
+  /**
+   * Pega. Con `data` (el evento paste de Ctrl+V) se usa lo que trae, sin pedir nada al navegador;
+   * sin él (menú Editar › Pegar) hay que leer el portapapeles, y el navegador puede mostrar su cartel.
+   */
+  const paste = async (data?: DataTransfer | null) => {
+    // una imagen en el portapapeles se pega como imagen del esquemático (figura IMAGE, en base64)
+    const putImage = async (blob: Blob) => {
+      const img = await clipboardImage(blob);
+      const at = editor.current?.cursor() ?? { x: 0, y: 0 };
+      const shape = { kind: 'IMAGE' as const, coords: [at.x, at.y, at.x + img.w, at.y + img.h], data: img.data };
+      commit({ ...doc, shapes: [...doc.shapes, shape] });
+      setTool({ kind: 'select' });
+      setSelection([{ kind: 'shape', index: doc.shapes.length }]);
+    };
     try {
-      for (const item of await navigator.clipboard.read()) {
-        const type = item.types.find((ty) => ty.startsWith('image/'));
-        if (!type) continue;
-        const img = await clipboardImage(await item.getType(type));
-        const at = editor.current?.cursor() ?? { x: 0, y: 0 };
-        const shape = { kind: 'IMAGE' as const, coords: [at.x, at.y, at.x + img.w, at.y + img.h], data: img.data };
-        commit({ ...doc, shapes: [...doc.shapes, shape] });
-        setTool({ kind: 'select' });
-        setSelection([{ kind: 'shape', index: doc.shapes.length }]);
-        return;
+      if (data) {
+        const file = Array.from(data.files).find((f) => f.type.startsWith('image/'));
+        if (file) return await putImage(file);
+      } else {
+        for (const item of await navigator.clipboard.read()) {
+          const type = item.types.find((ty) => ty.startsWith('image/'));
+          if (type) return await putImage(await item.getType(type));
+        }
       }
     } catch {
       // sin permiso o sin API de imágenes: se sigue con el texto
     }
     let text: string;
     try {
-      text = await navigator.clipboard.readText();
+      text = data ? data.getData('text/plain') : await navigator.clipboard.readText();
     } catch {
       text = clipboardFallback;
     }

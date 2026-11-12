@@ -279,7 +279,7 @@ export function ProjectTree({
           )}
           <span className="tree-actions">
             <button onClick={() => setRenaming(`b:${b.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: b.name })}>
-              ✎
+              <Icon name="edit" size={13} />
             </button>
             <button onClick={() => onBenchAction(b.id, 'duplicate')} title={t('Duplicate')} aria-label={t('Duplicate {name}', { name: b.name })}>
               <Icon name="copy" size={13} />
@@ -309,7 +309,10 @@ export function ProjectTree({
             <li>
               <div className="tree-row tree-sub">
                 <button className="tree-name" onClick={() => onBenchItem(b.id, 'sim')} title={t('Simulation settings')}>
-                  <span className="tree-glyph">⚙</span> {b.detail}
+                  <span className="tree-glyph">
+                    <Icon name="gear" size={12} />
+                  </span>{' '}
+                  {b.detail}
                 </button>
               </div>
             </li>
@@ -392,7 +395,7 @@ export function ProjectTree({
         </button>
         <span className="tree-actions">
           <button onClick={() => onRename(s.name)} title={t('Rename')} aria-label={t('Rename {name}', { name: s.name })}>
-            ✎
+            <Icon name="edit" size={13} />
           </button>
           {(!s.type || s.type === 'model') && (
             <>
@@ -413,7 +416,7 @@ export function ProjectTree({
                 title={t('Copy to My symbols and models (to use it in other projects)')}
                 aria-label={t('Copy {name} to My symbols and models', { name: s.name })}
               >
-                ☆
+                <Icon name="star" size={13} />
               </button>
             </>
           )}
@@ -424,7 +427,7 @@ export function ProjectTree({
       </div>
       {s.stale?.map((x, i) => (
         <div key={i} className="tree-warn" style={{ paddingLeft: 24 + depth * 14 }}>
-          ⚠{' '}
+          <Icon name="warning" size={13} />{' '}
           <button className="link" onClick={x.go} title={t('Go to {inst}', { inst: x.inst })}>
             {x.inst}
           </button>{' '}
@@ -509,7 +512,7 @@ export function ProjectTree({
                 )}
                 <span className="tree-actions">
                   <button onClick={() => setRenaming(`g:${g.id}`)} title={t('Rename')} aria-label={t('Rename {name}', { name: g.name })}>
-                    ✎
+                    <Icon name="edit" size={13} />
                   </button>
                   <button
                     onClick={() => onGroupAction(g.id)}

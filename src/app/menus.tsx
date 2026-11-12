@@ -204,7 +204,7 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
       label: t('File'),
       items: [
         { label: t('New project'), onClick: doNew },
-        ...(google.account ? [{ label: t('My simulations (Google Drive)…'), onClick: () => setDialog({ kind: 'drive' }) }] : []),
+        ...(google.account ? [{ label: t('My projects (Google Drive)…'), onClick: () => setDialog({ kind: 'drive' }) }] : []),
         { label: t('Open/Import…'), title: t('.turbo, .zip, .asc (each one, a testbench), .asy, .lib, .sub'), shortcut: 'Ctrl+O', onClick: doOpen },
         { label: t('Save'), shortcut: 'Ctrl+S', onClick: () => doSave(false) },
         { label: t('Save as…'), shortcut: 'Ctrl+Shift+S', onClick: () => doSave(true) },

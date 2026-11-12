@@ -942,6 +942,9 @@ button.small { font-size: 12px; padding: 1px 8px; }
 .dft-tools .dft-field { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: var(--fg-muted); white-space: nowrap; }
 .dft-tools .dft-field input { width: 5.5em; font: 12px var(--mono); padding: 2px 4px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--bg); color: var(--fg); }
 .dft-tools .dft-field input::placeholder { color: var(--fg-muted); opacity: 0.8; }
+.axes-tools { display: flex; flex-wrap: wrap; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+.axes-tools .dft-field input[type='checkbox'] { width: auto; margin: 0; }
+.axes-tools .axes-x input { width: 9em; }
 .dft-tools .dft-field.bad input { border-color: var(--err); color: var(--err); }
 .plot-info.dft-sampling { white-space: nowrap; }
 .plot-info.dft-sampling.err { color: var(--err); }

@@ -50,6 +50,8 @@ export interface PaneData {
   info?: string[];
   /** vista en X sin zoom, si no es todo `x` (DFT de distintas grillas: hasta la menor frecuencia máxima) */
   home?: [number, number];
+  /** eje Y izquierdo logarítmico (los valores ≤ 0 no se dibujan) */
+  logY?: boolean;
 }
 
 export interface CurveContext {
@@ -59,6 +61,10 @@ export interface CurveContext {
   labels: Map<string, string>;
   resolver(p: SimPlot): Resolver;
   mode: ComplexMode;
+  /** magnitud del eje X elegida por el usuario ("V(g)", "I(VD)"…); sin ella, el barrido del análisis */
+  xExpr?: string;
+  /** eje X logarítmico pedido (sólo si todo X es positivo) */
+  logX?: boolean;
 }
 
 /** Expresiones ya evaluadas, por resolvedor y plot (ocultar una traza o cambiarle el color no la recalcula) */
@@ -147,8 +153,106 @@ export function sweepSegments(x: Float64Array): [number, number][] {
   return segs;
 }
 
+/** Eje X positivo: admite escala logarítmica */
+const positive = (x: Float64Array) => x.length > 1 && x[0] > 0;
+
 export function paneCurves(pane: Pane, ctx: CurveContext): PaneData {
   if (isDftPane(pane)) return dftCurves(pane, ctx);
+  const custom = !!ctx.xExpr?.trim() && !pane.digital;
+  const d = custom ? customXCurves(pane, ctx, ctx.xExpr!.trim()) : sweepCurves(pane, ctx);
+  if (custom || ctx.logX !== undefined) d.log = !!ctx.logX && positive(d.x);
+  if (pane.logY) for (const c of d.curves) if (c.axis === 'y') c.y = c.y.map((v) => (v > 0 ? v : NaN));
+  return { ...d, logY: !!pane.logY };
+}
+
+/**
+ * Valores de X de cada tramo de una corrida, crecientes: la expresión del eje X evaluada en la
+ * corrida y cortada donde vuelve atrás el barrido original (un .dc anidado). Un tramo que no es
+ * monótono en la nueva magnitud no se puede dibujar como función de ella: error.
+ */
+function xSegments(ctx: CurveContext, r: SimPlot, xExpr: string, segs: [number, number][]): { a: number; b: number; rev: boolean; xs: Float64Array }[] {
+  const rs = scaleOf(r)!;
+  const w = evalOn(ctx, r, xExpr, rs);
+  return segs.map(([a, b]) => {
+    let xs = w.re.slice(a, b);
+    const rev = xs.length > 1 && xs[xs.length - 1] < xs[0];
+    if (rev) xs = xs.reverse();
+    for (let k = 1; k < xs.length; k++) if (!(xs[k] >= xs[k - 1])) throw new Error(t('{expr} is not monotonic: it cannot be the X axis', { expr: xExpr }));
+    return { a, b, rev, xs };
+  });
+}
+
+/** Unión ordenada y sin repetidos de varias grillas */
+function mergeGrids(grids: Float64Array[]): Float64Array {
+  if (grids.length === 1) return grids[0];
+  const all = new Float64Array(grids.reduce((n, g) => n + g.length, 0));
+  let o = 0;
+  for (const g of grids) all.set(g, (o += g.length) - g.length);
+  all.sort();
+  let n = 0;
+  for (let k = 0; k < all.length; k++) if (k === 0 || all[k] !== all[n - 1]) all[n++] = all[k];
+  return all.slice(0, n);
+}
+
+/** Curvas con la magnitud elegida en el eje X: cada corrida (o tramo de un .dc anidado) llevada a una grilla común */
+function customXCurves(pane: Pane, ctx: CurveContext, xExpr: string): PaneData {
+  const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
+  const errors = new Map<number, string>();
+  const curves: Curve[] = [];
+  const empty = (msg: string): PaneData => {
+    pane.traces.forEach((_, ti) => errors.set(ti, msg));
+    return { x: new Float64Array(0), xName: xExpr, log: false, curves, errors, yUnit: '', iUnit: 'A' };
+  };
+  let parts: { r: SimPlot; ri: number; segs: ReturnType<typeof xSegments> }[];
+  try {
+    parts = all.map((r, ri) => {
+      const rs = scaleOf(r)!;
+      return { r, ri, segs: xSegments(ctx, r, xExpr, all.length === 1 ? sweepSegments(rs.real) : [[0, rs.real.length]]) };
+    });
+  } catch (e) {
+    return empty((e as Error).message);
+  }
+  const x = mergeGrids(parts.flatMap((p) => p.segs.map((s) => s.xs)));
+  const visible = pane.traces.filter((tt) => !tt.hidden);
+  const [leftUnit = '', rightUnit] = paneUnits(visible);
+  const nested = all.length === 1 && parts[0].segs.length > 1;
+  const perRunColor = pane.traces.length === 1 && all.length > 1;
+  pane.traces.forEach((tt, ti) => {
+    const base = traceColor(tt, ti);
+    for (const { r, ri, segs } of parts) {
+      let w;
+      try {
+        w = evalOn(ctx, r, tt.expr, scaleOf(r)!);
+        if (w.x) w = { re: sampleEvents(w.x, w.re, scaleOf(r)!.real) };
+        if (w.im) throw new Error(t('With another quantity on the X axis, the traces must be real'));
+      } catch (e) {
+        errors.set(ti, (e as Error).message);
+        return;
+      }
+      const axis: Curve['axis'] = rightUnit !== undefined && exprUnit(tt.expr) === rightUnit ? 'i' : 'y';
+      segs.forEach(({ a, b, rev, xs }, si) => {
+        const ys = w.re.slice(a, b);
+        if (rev) ys.reverse();
+        const run = nested ? si : ri;
+        const runLabel = nested ? `#${si + 1}` : all.length > 1 ? (ctx.labels.get(r.name) ?? r.name) : undefined;
+        curves.push({
+          label: `${tt.expr}${runLabel ? (nested ? ` ${runLabel}` : ` · ${runLabel}`) : ''}`,
+          trace: ti,
+          run,
+          color: nested ? shade(base, si, segs.length) : perRunColor ? palette()[ri % palette().length] : shade(base, ri, all.length),
+          dash: false,
+          axis,
+          y: xs === x ? ys : resample(xs, ys, x),
+          hidden: !!tt.hidden,
+          ...(runLabel ? { runLabel } : {}),
+        });
+      });
+    }
+  });
+  return { x, xName: xExpr, log: false, curves, errors, yUnit: leftUnit, iUnit: rightUnit ?? 'A' };
+}
+
+function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
   const scale = scaleOf(ctx.plot)!;
   const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
   const segs = all.length === 1 ? sweepSegments(scale.real) : [[0, scale.real.length] as [number, number]];

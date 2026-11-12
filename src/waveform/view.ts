@@ -44,6 +44,8 @@ export interface Pane {
    * a esto (el alto en px de cuando se eligió). Sin él, los paneles se reparten por igual.
    */
   size?: number;
+  /** eje Y izquierdo logarítmico */
+  logY?: boolean;
 }
 
 /**
@@ -111,6 +113,10 @@ export interface PlotState {
   /** markers (M, V, H, A, D); faltan en lo guardado antes de que existieran */
   markers?: Marker[];
   markerMode?: boolean;
+  /** magnitud del eje X elegida (vacía: el barrido del análisis) */
+  xExpr?: string;
+  /** eje X logarítmico (sin definir: el del análisis) */
+  logX?: boolean;
 }
 
 /**

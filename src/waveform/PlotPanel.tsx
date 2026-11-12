@@ -137,6 +137,11 @@ export function PlotPanel({
   const [cursorMode, setCursorMode] = useState(init?.cursorMode ?? false);
   const [cursors, setCursors] = useState<Cursors>(init?.cursors ?? {});
   const [showStats, setShowStats] = useState(false);
+  // eje X elegido (magnitud y escala) y la barra de «Ejes» que lo edita, con el rango de X e Y
+  const [xExpr, setXExpr] = useState(init?.xExpr ?? '');
+  const [logX, setLogX] = useState<boolean | undefined>(init?.logX);
+  const [axesOpen, setAxesOpen] = useState(false);
+  const [axesText, setAxesText] = useState({ x: '', x0: '', x1: '', y0: '', y1: '' });
   // markers como en ViVA (M, V, H, A, D): se guardan con la simulación, como los cursores
   const [markerMode, setMarkerMode] = useState(init?.markerMode ?? false);
   const [markers, setMarkers] = useState<Marker[]>(() => asMarkers(init?.markers));
@@ -160,15 +165,15 @@ export function PlotPanel({
   // recalcula los demás ni recrea sus gráficos
   const curveCache = useRef<{ key: unknown[]; byPane: WeakMap<Pane, PaneData> }>({ key: [], byPane: new WeakMap() });
   const data = useMemo(() => {
-    const key = [plot, runs, labels, resolver, mode];
+    const key = [plot, runs, labels, resolver, mode, xExpr, logX];
     if (key.some((k, i) => k !== curveCache.current.key[i])) curveCache.current = { key, byPane: new WeakMap() };
     const m = curveCache.current.byPane;
     return panes.map((p) => {
       let d = m.get(p);
-      if (!d) m.set(p, (d = paneCurves(p, { plot, runs, labels, resolver, mode })));
+      if (!d) m.set(p, (d = paneCurves(p, { plot, runs, labels, resolver, mode, xExpr, logX })));
       return d;
     });
-  }, [panes, plot, runs, labels, resolver, mode]);
+  }, [panes, plot, runs, labels, resolver, mode, xExpr, logX]);
 
   // Otro tipo de análisis (otro eje X): volver al rango completo y sin cursores. Al volver
   // a simular el mismo análisis se mantienen el zoom y los cursores.
@@ -186,8 +191,18 @@ export function PlotPanel({
     setMarkers([]);
   }, [scaleName]);
   useEffect(() => {
-    onState?.({ scale: scaleName, xRange, yRanges, cursors, cursorMode, ...(markers.length ? { markers } : {}), ...(markerMode ? { markerMode } : {}) });
-  }, [scaleName, xRange, yRanges, cursors, cursorMode, markers, markerMode, onState]);
+    onState?.({
+      scale: scaleName,
+      xRange,
+      yRanges,
+      cursors,
+      cursorMode,
+      ...(markers.length ? { markers } : {}),
+      ...(markerMode ? { markerMode } : {}),
+      ...(xExpr ? { xExpr } : {}),
+      ...(logX !== undefined ? { logX } : {}),
+    });
+  }, [scaleName, xRange, yRanges, cursors, cursorMode, markers, markerMode, onState, xExpr, logX]);
   // (un marker seleccionado que ya no está, deja de estarlo)
   useEffect(() => {
     if (selMarker && !markers.some((m) => sameMarker(m, selMarker))) setSelMarker(null);
@@ -592,6 +607,50 @@ export function PlotPanel({
   };
   const timeData = data.filter((_, k) => !isF(k));
   const freqData = data.filter((_, k) => isF(k));
+  // barra de «Ejes»: muestra lo que se ve ahora y aplica lo escrito (vacío = automático)
+  const fmtAxis = (r: Range | null | undefined, k: 0 | 1) => (r ? si(r[k], 4) : '');
+  const openAxes = () => {
+    const y = yRanges[active];
+    setAxesText({ x: xExpr, x0: fmtAxis(xRange, 0), x1: fmtAxis(xRange, 1), y0: fmtAxis(y, 0), y1: fmtAxis(y, 1) });
+    setAxesOpen(true);
+  };
+  const axisNum = (s: string) => (s.trim() ? parseSi(s) : undefined);
+  const badAxis = (k: keyof typeof axesText) => k !== 'x' && axisNum(axesText[k]) !== undefined && !Number.isFinite(axisNum(axesText[k]));
+  /** rango de dos campos: ambos o ninguno; uno solo completa con el borde visible de ahora */
+  const axisRange = (a: string, b: string, now: () => Range | undefined): Range | null => {
+    const lo = axisNum(a);
+    const hi = axisNum(b);
+    if (lo === undefined && hi === undefined) return null;
+    const cur = now();
+    const r: Range = [lo ?? cur?.[0] ?? NaN, hi ?? cur?.[1] ?? NaN];
+    if (!(r[1] > r[0])) return null;
+    return r;
+  };
+  const applyAxes = () => {
+    const nx = axesText.x.trim();
+    const sameX = nx === xExpr;
+    if (!sameX) {
+      setXExpr(nx);
+      // (los límites escritos eran de la magnitud anterior)
+      setAxesText((old) => ({ ...old, x: nx, x0: '', x1: '' }));
+      setCursors({});
+      setMarkers([]);
+    }
+    const chart = charts.current.get(active);
+    const x = sameX ? axisRange(axesText.x0, axesText.x1, () => (chart ? [chart.scales.x.min!, chart.scales.x.max!] : undefined)) : null;
+    const y = axisRange(axesText.y0, axesText.y1, () => (chart ? [chart.scales.y.min!, chart.scales.y.max!] : undefined));
+    const ys = { ...zoomNow.current.y };
+    if (y) ys[active] = y;
+    else delete ys[active];
+    zoomTo(x, ys);
+  };
+  const resetAxes = () => {
+    setXExpr('');
+    setLogX(undefined);
+    setPanes(panes.map((p) => (p.logY ? { ...p, logY: undefined } : p)));
+    setAxesText({ x: '', x0: '', x1: '', y0: '', y1: '' });
+    zoomTo(null, {});
+  };
   const unplaced = cursorMode && cursors.a === undefined && cursors.b === undefined;
   const previewX = unplaced ? hoverX : undefined;
   const editedTrace = dftEdit ? panes[dftEdit.pane]?.traces[dftEdit.trace] : undefined;
@@ -619,6 +678,13 @@ export function PlotPanel({
       </button>
       <button className={showStats ? 'active' : ''} onClick={() => setShowStats((v) => !v)} title={t('Maximum, minimum, peak-to-peak, average, RMS and frequency in the visible range')}>
         {t('Stats')}
+      </button>
+      <button
+        className={axesOpen ? 'active' : ''}
+        onClick={() => (axesOpen ? setAxesOpen(false) : openAxes())}
+        title={t('Axes: the quantity on the X axis, the ranges of X and Y and logarithmic scales')}
+      >
+        {t('Axes')}
       </button>
       <button
         className="fit-btn"
@@ -717,6 +783,43 @@ export function PlotPanel({
   return (
     <div className={`plot-panel${dftPicking ? ' dft-picking' : ''}`} data-marker-readings={markers.length ? markerReadings(markers, data).join('\n') : undefined}>
       {toolsHost ? createPortal(tools, toolsHost) : <div className="plot-tools">{tools}</div>}
+      {axesOpen && (
+        <div className="dft-tools axes-tools">
+          {(
+            [
+              ['x', t('X axis'), t('Quantity on the X axis: any expression, e.g. V(g) or I(VD) (empty: the swept variable)'), 'axes-x'],
+              ['x0', 'X min', t('Start of the X axis (empty: automatic)'), ''],
+              ['x1', 'X max', t('End of the X axis (empty: automatic)'), ''],
+              ['y0', 'Y min', t('Bottom of the Y axis of the active pane (empty: automatic)'), ''],
+              ['y1', 'Y max', t('Top of the Y axis of the active pane (empty: automatic)'), ''],
+            ] as const
+          ).map(([k, name, title, cls]) => (
+            <label key={k} className={`dft-field ${cls}${badAxis(k) ? ' bad' : ''}`} title={title}>
+              {name}
+              <input
+                aria-label={name}
+                value={axesText[k]}
+                spellCheck={false}
+                placeholder={k === 'x' ? (scaleName ?? '') : t('auto')}
+                onChange={(e) => setAxesText((old) => ({ ...old, [k]: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && applyAxes()}
+              />
+            </label>
+          ))}
+          <label className="dft-field" title={t('Logarithmic X axis (only if all of X is positive)')}>
+            <input type="checkbox" checked={!!data[0]?.log} onChange={(e) => setLogX(e.target.checked)} />
+            {t('log X')}
+          </label>
+          <label className="dft-field" title={t('Logarithmic Y axis of the active pane (values ≤ 0 are not drawn)')}>
+            <input type="checkbox" checked={!!panes[active]?.logY} onChange={(e) => update(active, (p) => ({ ...p, logY: e.target.checked || undefined }))} />
+            {t('log Y')}
+          </label>
+          <button className="primary" disabled={(['x0', 'x1', 'y0', 'y1'] as const).some(badAxis)} onClick={applyAxes}>
+            {t('Apply')}
+          </button>
+          <button onClick={resetAxes}>{t('Reset')}</button>
+        </div>
+      )}
       {(zoomMode || removing) && <p className="hint plot-info">{zoomMode ? t('Drag a box to zoom · Esc cancels') : t("Click a trace's name to remove it · Esc finishes")}</p>}
       {plot.info && <p className="hint plot-info">{plot.info}</p>}
       {/* cursores y medidas: a la derecha de los paneles con los resultados abajo (son anchos y

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import uPlot from 'uplot';
-import { curveOn, type Curve, type PaneData } from './curves.ts';
+import { curveOn, exprUnit, type Curve, type PaneData } from './curves.ts';
 import { nearestIndex, stepPoint, valueAt } from './measure.ts';
 import { alignScales, exactRange, extent, logLabeled, mapTicks, niceTicks, panBy, wheelZoom, zoomAt, type Aligned } from './scales.ts';
 import { decimator } from './decimate.ts';
@@ -42,6 +42,13 @@ function dropWhere(e: React.DragEvent<HTMLElement>): DropWhere {
   const r = e.currentTarget.getBoundingClientRect();
   const edge = Math.min(EDGE_PX, r.height / 4);
   return e.clientY - r.top < edge ? 'above' : r.bottom - e.clientY < edge ? 'below' : 'in';
+}
+
+/** Nombre del eje X con su unidad: "time (s)", "v-sweep (V)", "V(g) (V)" */
+function xAxisLabel(name: string): string {
+  const n = name.toLowerCase();
+  const unit = xUnit(name) || (n === 'v-sweep' ? 'V' : n === 'i-sweep' ? 'A' : n === 'temp-sweep' ? '°C' : n === 'res-sweep' ? 'Ω' : exprUnit(name));
+  return unit ? `${name} (${unit})` : name;
 }
 
 export function PaneView(props: {
@@ -204,7 +211,7 @@ export function PaneView(props: {
         const divs = [4, 5, 6, 7, 8].filter((n) => n <= most);
         aligned = hasRight ? alignScales(full('y'), full(rightScale), divs.length ? divs : [3]) : null;
       }
-      return yRef.current || rRef.current ? null : aligned;
+      return yRef.current || rRef.current || data.logY ? null : aligned;
     };
     const divsOf = (u: uPlot) => Math.max(2, Math.round(u.bbox.height / devicePixelRatio / 45));
     const leftSplits = (u: uPlot, _i: number, min: number, max: number) => alignedY()?.leftTicks ?? niceTicks(min, max, divsOf(u));
@@ -237,7 +244,9 @@ export function PaneView(props: {
           range: (_u, min, max) => exactRange(min, max, data.log) as uPlot.Range.MinMax,
           ...(live.current.xRange ? { min: live.current.xRange[0], max: live.current.xRange[1] } : data.home ? { min: home[0], max: home[1] } : {}),
         },
-        y: { range: (u, min, max) => yRef.current ?? alignedY()?.left ?? whole('y')(u, min, max, 'y') },
+        y: data.logY
+          ? { distr: 3, log: 10, range: (_u, min, max) => yRef.current ?? (exactRange(min, max, true) as uPlot.Range.MinMax) }
+          : { range: (u, min, max) => yRef.current ?? alignedY()?.left ?? whole('y')(u, min, max, 'y') },
         i: { range: (u, min, max) => rRef.current ?? (rightScale === 'i' ? alignedY()?.right : null) ?? whole('i')(u, min, max, 'i') },
         ph: { range: (u, min, max) => rRef.current ?? (rightScale === 'ph' ? alignedY()?.right : null) ?? whole('ph')(u, min, max, 'ph') },
       },
@@ -252,11 +261,20 @@ export function PaneView(props: {
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
+          label: xAxisLabel(data.xName),
+          labelSize: 18,
         },
         {
           scale: 'y',
-          values: ticks('Y'),
-          ...(hasRight ? { splits: leftSplits } : {}),
+          ...(data.logY
+            ? {
+                space: 30,
+                values: (_u: uPlot, tt: number[]) => {
+                  const lab = logLabeled(tt);
+                  return tt.map((v, i) => (lab[i] ? si(v, 3) : ''));
+                },
+              }
+            : { values: ticks('Y'), ...(hasRight ? { splits: leftSplits } : {}) }),
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },

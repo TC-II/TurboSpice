@@ -27,75 +27,91 @@
 *
 *
 * Behaviour:
-*   - Vbe is clamped to {Vbe} whenever the BE junction is forward biased,
-*     and Vbc to {Vbe} whenever the BC junction is forward biased
-*   - Ic = hfe * Ib   exactly, in the forward active region
-*   - Vce stays near {Vsat} in saturation
-*   - reverse active region works with a beta of hfe/rbeta
+*   - Vbe = {Vbe} at Ic = {Iref}, and it moves only n*60 mV per decade of
+*     current (12 mV/decade with the default n = 0.2): an almost fixed Vbe
+*   - Ic = hfe * Ib exactly in the forward active region (no Early effect
+*     unless {Va} is given)
+*   - the knee is sharp: the BC junction has its own ideality {ns}, so the
+*     whole transition happens within a few mV of {Vsat}
+*   - in saturation Vce sits at about {Vsat}
+*   - not meant for the reverse active region: the reverse channel exists
+*     only so the transistor saturates (see below)
+*   - cutoff is clean: the junctions leak about 1e-18 A
 *
-* THE DEVICE IS PASSIVE. This is the whole point of the Bct formulation
-* below and it is worth stating explicitly, because it is easy to get wrong.
-* A transistor can only restrict the current the external circuit offers it;
-* it can never source current the circuit did not supply, and it can never
-* deliver net power. Writing the collector current as a plain current-
-* controlled current source (F C E Vf {hfe}) looks correct and is not: such
-* a source imposes hfe*Ib regardless of Vce, so with the collector and the
-* emitter shorted together it happily manufactures collector current out of
-* nothing, and for Vce < 0 it pumps energy into the circuit. Bct instead is
-* written as hfe*Ib multiplied by a factor that is 0 at Vce = 0 and 1 for
-* Vce > {Vsat}: that makes it a non-negative conductance, so the collector
-* branch always absorbs power, as a real device must.
+* The model is the Ebers-Moll transport model, the same structure as the
+* Gummel-Poon BJT of SPICE with only its ideal part:
+*   - two exponential junction diodes (BE and BC) whose currents are the
+*     forward and reverse base currents
+*   - two LINEAR current-controlled current sources that carry hfe times the
+*     forward base current from collector to emitter and br times the
+*     reverse base current back
+* Saturation is not imposed by any switching factor: when Vce falls under
+* {Vsat} the BC junction turns on and its transport term cancels the forward
+* one, as in a real transistor. The BC junction is shifted so that it
+* reaches the same current at Vbe-{Vsat} that the BE junction carries at
+* {Vbe}; that is what puts the knee at {Vsat}.
 *
-* Convergence notes:
-*   - The only nonlinear elements are the two junction diodes and Bct. There
-*     are no divisions by a node voltage or by a branch current, and no
-*     limit() or abs(), all of which have zero or undefined derivatives
-*     exactly at the cutoff and saturation operating points.
-*   - epsilon/revepsilon round the diode knees so the gradient stays
-*     continuous.
-*   - The junction capacitances break the otherwise purely algebraic
-*     feedback loop in transient analysis.
-*   - A stage driven deep into saturation makes Ic insensitive to Vce, so
-*     the first Newton step overshoots badly and LTspice falls back to gmin
-*     or source stepping. It always converges, but not on the direct
-*     iteration. Raising {vk} softens the knee and helps, at the cost of a
-*     less constant Vce in saturation.
+* Convergence notes (why this replaces the previous version):
+*   - the previous model used LTspice ideal diodes (Ron/Roff/Vfwd), which
+*     ngspice does not have and get translated to piecewise-linear sources,
+*     and a behavioural source hfe*I(Vf)*tanh(...). Its Jacobian had a slope
+*     of hfe/Ron = 1e4 S and kinks at every corner, so Newton overshot and
+*     needed gmin or source stepping, and often failed.
+*   - here the only nonlinear elements are two ordinary ngspice diodes, which
+*     have junction voltage limiting (pnjlim) built for exactly this
+*     exponential, and everything else is linear. Operating point,
+*     transient and AC converge on the direct Newton iteration.
+*   - a small n makes Vbe flat but the junction steep. ngspice clamps the
+*     diode IS to 1e-28 and the BJT limiter ignores NF, so the junction uses
+*     a normal IS and the zero volt ammeters Vf/Vr become fixed offsets that
+*     place the knee at {Vbe}. Values of n from 0.1 to 1 converge; 1 is a
+*     real silicon junction, 0.1 an almost ideal one.
+*   - the reverse beta br is not a parameter. It is fixed internally to
+*     br = min(1, 0.5*(Vbe/Vsat-1)), which keeps
+*     (1+br)*{Vsat} < {Vbe}: the device is passive for any {Vsat} < {Vbe}.
 *
-* Vsat is NOT exactly constant in saturation, and it cannot be. A passive
-* device must carry zero collector current at Vce = 0, so deep in saturation
-* Vce falls as Ic falls. Real transistors behave the same way; this model
-* holds Vce between roughly 0.85*{Vsat} and {Vsat} over a 100:1 range of
-* overdrive, which is flatter than a real device.
+* Small signal (AC): gm = Ic/(n*Vt) and r_pi = hfe/gm, as in a real
+* transistor but with n making it n times smaller. {cje} and {cjc} are
+* fixed junction capacitances and {tf} the forward transit time (diffusion
+* capacitance tf*gm), so fT = 1/(2*pi*tf) when tf dominates.
+*
+* Parameters:
+*   hfe    forward beta                                   100
+*   Vbe    Vbe at Ic = Iref                                0.7
+*   Vsat   Vce at the saturation knee                       0.3
+*   Iref   current at which Vbe is exact                    1m
+*   n      junction ideality (0.1 almost ideal, 1 silicon) 0.2
+*   ns     ideality of the BC junction: sets how sharp the
+*          saturation knee is (10-90 % in ~13 mV at 0.05)  0.05
+*   Va     Early voltage (0 = no Early effect)            0
+*   cje, cjc  junction capacitances                       2p, 1p
+*   tf     forward transit time                           0
 
-.SUBCKT NPN_nice C B E PARAMS: hfe=100 Vbe=0.7 Vsat=0.3 rbeta=20 cje=2p cjc=1p droff=100G dron=10m deps=10m vk={Vsat/15}
+.SUBCKT NPN_nice C B E PARAMS: hfe=100 Vbe=0.7 Vsat=0.3 Iref=1m n=0.2 ns=0.05 Va=0 cje=2p cjc=1p tf=0
+.param vt0=0.025852 isd=1e-18
+.param br={min(1, 0.5*(Vbe/Vsat-1))}
+.param ga={Va > 0 ? 1/Va : 0}
+.param vof={Vbe-n*vt0*ln(Iref/hfe/isd)}
+.param vor={Vbe-Vsat-ns*vt0*ln(Iref/br/isd)}
 
+**Base emitter junction. Vf measures the forward base current
+Vf  B  Nf {vof}
+Dbe Nf E  DJF
+**Base collector junction. Vr measures the reverse base current
+Vr  B  Nr {vor}
+Dbc Nr C  DJR
 
-**Base emitter junction: fixes Vbe, and its current is the base current
-Vf  B  Nf  0
-Dbe Nf E   Dbe_mod
+**Transport: forward and reverse channels, linear in the base currents
+F1  C  E  Vf {hfe}
+F2  E  C  Vr {br}
+**Early effect: output conductance Ic/Va, only when Va > 0
+Bea C  E  I = {hfe*ga}*I(Vf)*V(C,E)
 
-**Base collector junction: an ordinary junction at the same {Vbe}. It only
-**conducts in the reverse active region and when the external circuit forces
-**Vce below zero. It must NOT be used to clamp Vce at {Vsat}: that would put
-**its threshold at {Vbe-Vsat}, below the BE threshold, so it would win the
-**base current whenever Vce is small and collapse Vbe.
-Vr  B  Nr  0
-Dbc Nr C   Dbc_mod
+**Junction capacitances and diffusion capacitance
+Cbe B  E  {cje}
+Cbc B  C  {cjc}
 
-**Transport. The first term is the forward channel, the second the reverse
-**one. The 0.5*(1+tanh(...)) factor is the channel modulation: 0 for
-**Vce below {Vsat}, 1 above, switching over a width {vk}. Because it is
-**non-negative and the current only flows when the corresponding voltage is
-**positive, the branch is a passive conductance.
-Bct C  E   I = hfe*I(Vf)*0.5*(1+tanh((V(C,E)-Vsat)/vk)) - (hfe/rbeta)*I(Vr)*0.5*(1+tanh((V(E,C)-Vsat)/vk))
-
-**Junction capacitances, needed so the transport loop is not purely algebraic
-Cbe B  E   {cje}
-Cbc B  C   {cjc}
-
-
-**Models for the diodes
-.model Dbe_mod D(Ron={dron} Roff={droff} Vfwd={Vbe} epsilon={deps} revepsilon={deps})
-.model Dbc_mod D(Ron={dron} Roff={droff} Vfwd={Vbe} epsilon={deps} revepsilon={deps})
+.model DJF D(IS={isd} N={n} TT={tf*hfe})
+.model DJR D(IS={isd} N={ns} TT={tf*br})
 
 .ends NPN_nice

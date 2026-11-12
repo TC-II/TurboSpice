@@ -16,7 +16,7 @@ SYMATTR SpiceLine Vsat=.3
 SYMATTR Prefix X
 SYMATTR SpiceModel NPN_nice
 SYMATTR ModelFile TCLib/npn_ideal.lib
-SYMATTR Description Ideal Bipolar NPN transistor, handle with care. Created by Javier Petrucci and Agustin Gullino (ITBA)
+SYMATTR Description Ideal Bipolar NPN transistor, Ebers-Moll with almost fixed Vbe (n), configurable Vsat, Va, cje, cjc, tf. Created by Javier Petrucci and Agustin Gullino (ITBA)
 PIN 64 0 NONE 0
 PINATTR PinName C
 PINATTR SpiceOrder 1

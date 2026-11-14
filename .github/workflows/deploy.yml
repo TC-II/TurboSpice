@@ -263,3 +263,33 @@ jobs:
           path: site
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Espejo en Cloudflare Pages (turbospice.pages.dev): desde algunas redes la ruta hasta la CDN de
+  # GitHub Pages se corta a veces. Es el mismo sitio que arma «deploy», bajo /TurboSpice/ para no
+  # recompilar con otra ruta base; / redirige ahí. Si falla, el deploy a GitHub Pages no se entera.
+  cloudflare:
+    needs: site
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    concurrency:
+      group: cloudflare-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: site-*
+          path: sites
+      - name: Juntar main en /TurboSpice/ y dev en /TurboSpice/dev/
+        run: |
+          test -d sites/site-main || { echo "Falta el build de main"; exit 1; }
+          mkdir -p cf/TurboSpice
+          cp -r sites/site-main/. cf/TurboSpice/
+          if [ -d sites/site-dev ]; then mkdir -p cf/TurboSpice/dev && cp -r sites/site-dev/. cf/TurboSpice/dev/; fi
+          printf '/ /TurboSpice/ 302\n/TurboSpice /TurboSpice/ 301\n' > cf/_redirects
+      - name: Publicar en Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@4 pages project create turbospice --production-branch main || true
+          npx --yes wrangler@4 pages deploy cf --project-name turbospice --branch main --commit-dirty=true

@@ -8,6 +8,111 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      Pantalla de arranque fallido: si la app no llega a montarse (un JS que no baja, un navegador
+      viejo, una red que corta), en vez de quedar en blanco muestra qué pasó y con qué navegador, para
+      que el usuario mande una captura. Script clásico en ES5 a propósito: tiene que correr también
+      donde los módulos no corren. main.tsx avisa que arrancó con window.__turboBoot.ok().
+    -->
+    <script>
+      (function () {
+        var done = false;
+        var errors = [];
+        var es = false;
+        try {
+          es = localStorage.getItem('turbospice.lang') === 'es' || /^es/i.test(navigator.language || '');
+        } catch (e) {}
+        var T = es
+          ? {
+              title: 'TurboSpice no pudo arrancar',
+              load: 'Una parte de la página no se pudo cargar o falló al arrancar.',
+              slow: 'La página está tardando demasiado en cargar.',
+              old: 'Este navegador no soporta lo que necesita TurboSpice. Probá con Chrome, Firefox, Edge o Safari actualizados.',
+              help: 'Si sigue pasando, mandá una captura de esta pantalla a quien te pasó el enlace.',
+              retry: 'Reintentar',
+              details: 'Detalles',
+            }
+          : {
+              title: 'TurboSpice could not start',
+              load: 'Part of the page failed to load or crashed while starting.',
+              slow: 'The page is taking too long to load.',
+              old: "This browser doesn't support what TurboSpice needs. Try an up-to-date Chrome, Firefox, Edge or Safari.",
+              help: 'If it keeps happening, send a screenshot of this screen to whoever gave you the link.',
+              retry: 'Retry',
+              details: 'Details',
+            };
+
+        function esc(s) {
+          return String(s).replace(/[&<>]/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+          });
+        }
+
+        function show(reason) {
+          if (done) return;
+          done = true;
+          var conn = navigator.connection;
+          var info = [
+            'URL: ' + location.href,
+            'Navegador: ' + navigator.userAgent,
+            'Online: ' + navigator.onLine + (conn && conn.effectiveType ? ' (' + conn.effectiveType + ')' : ''),
+            'Fecha: ' + new Date().toISOString(),
+          ].concat(errors.length ? ['', 'Errores:'].concat(errors) : []);
+          var root = document.getElementById('root');
+          root.innerHTML =
+            '<div style="font:15px/1.5 system-ui,sans-serif;max-width:680px;margin:48px auto;padding:0 16px;color:#222">' +
+            '<h1 style="font-size:22px">' + esc(T.title) + '</h1>' +
+            '<p>' + esc(reason) + '</p><p>' + esc(T.help) + '</p>' +
+            '<p><button onclick="location.reload()" style="font:inherit;padding:6px 14px">' + esc(T.retry) + '</button></p>' +
+            '<h2 style="font-size:15px">' + esc(T.details) + '</h2>' +
+            '<pre style="white-space:pre-wrap;word-break:break-all;background:#f3f3f3;padding:12px;font-size:12px">' +
+            esc(info.join('\n')) + '</pre></div>';
+          document.body.style.background = '#fff';
+        }
+
+        function describe(e) {
+          if (!e) return 'error';
+          return (e.name ? e.name + ': ' : '') + (e.message || e);
+        }
+
+        // errores de JS y archivos (script, css) que no bajan; con capture se ven también los de recursos
+        window.addEventListener(
+          'error',
+          function (ev) {
+            var t = ev.target;
+            if (t && t !== window && (t.src || t.href)) errors.push('No cargó: ' + (t.src || t.href));
+            else errors.push(describe(ev.error) + (ev.filename ? ' @ ' + ev.filename + ':' + ev.lineno : ''));
+            if (!done && errors.length === 1) setTimeout(function () { if (!window.__turboBoot.started) show(T.load); }, 3000);
+          },
+          true,
+        );
+        window.addEventListener('unhandledrejection', function (ev) {
+          errors.push('Promesa: ' + describe(ev.reason));
+        });
+
+        window.__turboBoot = {
+          started: false,
+          ok: function () {
+            this.started = true;
+            done = true;
+          },
+          fail: function (err) {
+            errors.push(describe(err));
+            show(T.load);
+          },
+        };
+
+        // sin módulos ES no arranca nada (navegador muy viejo)
+        if (!('noModule' in document.createElement('script'))) {
+          show(T.old);
+          return;
+        }
+        // red lenta o colgada: el motor solo pesa ~6 MB, pero la interfaz tiene que aparecer antes
+        setTimeout(function () {
+          if (!window.__turboBoot.started) show(T.slow);
+        }, 25000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

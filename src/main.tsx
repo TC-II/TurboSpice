@@ -13,14 +13,41 @@ import './ui/pixelRatio.ts';
 
 // las traducciones (si la interfaz no está en inglés) antes que la app: hay textos que se arman
 // al importar los módulos
+// pantalla de arranque fallido de index.html (sin ella, p. ej. en los tests, no hace nada)
+const boot = (window as { __turboBoot?: { ok(): void; fail(err: unknown): void } }).__turboBoot;
+const RELOADED = 'turbospice.bootReload';
+
+// Un chunk que no baja suele ser un index viejo en caché tras un deploy (los archivos con hash del
+// build anterior ya no existen): se recarga una sola vez; si vuelve a fallar, se muestra el error.
+function failed(err: unknown) {
+  try {
+    if (!sessionStorage.getItem(RELOADED)) {
+      sessionStorage.setItem(RELOADED, '1');
+      location.reload();
+      return;
+    }
+  } catch {}
+  boot?.fail(err);
+}
+
+window.addEventListener('vite:preloadError', (ev) => {
+  ev.preventDefault();
+  failed((ev as Event & { payload?: unknown }).payload);
+});
+
 loadTranslations()
   .then(() => import('./App.tsx'))
-  .then(({ App }) =>
+  .then(({ App }) => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <ErrorBoundary scope="app">
           <App />
         </ErrorBoundary>
       </StrictMode>,
-    ),
-  );
+    );
+    boot?.ok();
+    try {
+      sessionStorage.removeItem(RELOADED);
+    } catch {}
+  })
+  .catch(failed);

@@ -286,12 +286,15 @@ jobs:
           cp -r sites/site-main/. cf/TurboSpice/
           if [ -d sites/site-dev ]; then mkdir -p cf/TurboSpice/dev && cp -r sites/site-dev/. cf/TurboSpice/dev/; fi
           printf '/ /TurboSpice/ 302\n/TurboSpice /TurboSpice/ 301\n' > cf/_redirects
-          # Pages no acepta archivos de más de 25 MiB (el wasm de Yosys pesa ~68 MB): se sacan y se
-          # redirigen a la copia de GitHub Pages, que manda Access-Control-Allow-Origin: *
+          # Pages no acepta archivos de más de 25 MiB (el wasm de Yosys pesa ~68 MB): se parten en
+          # <archivo>.part0, .part1… de 20 MiB y <archivo>.parts dice cuántas son; el worker de
+          # Yosys las junta (src/hdl/splitFetch.ts)
           find cf -type f -size +24M | while read -r f; do
-            p="${f#cf}"
-            echo "$p https://tc-ii.github.io$p 302" >> cf/_redirects
+            split -b 20M -d -a 1 "$f" "$f.part"
+            n=$(ls "$f".part? | wc -l)
+            echo "$n" > "$f.parts"
             rm "$f"
+            echo "$f: $n partes"
           done
           cat cf/_redirects
       - name: Publicar en Cloudflare Pages

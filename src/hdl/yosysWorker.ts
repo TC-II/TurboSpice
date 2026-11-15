@@ -3,7 +3,12 @@
 // traban la interfaz mientras corren.
 import { compileIcarus, vvpForEngine, type EmProgram, type IcarusLoader } from './icarus.ts';
 import { cosimSubckt, HdlError } from './synth.ts';
+import { splitFetch } from './splitFetch.ts';
 import { synthesize, type RunYosys, type SynthResult } from './yosys.ts';
+
+// @yowasp/yosys toma globalThis.fetch al cargarse (import() más abajo): en el espejo de Cloudflare
+// su wasm está partido (src/hdl/splitFetch.ts)
+globalThis.fetch = splitFetch(globalThis.fetch.bind(globalThis));
 
 export type YosysRequest =
   | { id: number; kind?: 'yosys'; files: Record<string, string>; source: string; top?: string; params?: Record<string, string> }

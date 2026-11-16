@@ -239,6 +239,15 @@ export const es: Record<string, string> = {
   'Click a V or I source to choose it · Esc cancels': 'Click en una fuente V o I para elegirla · Esc cancela',
   'Click a wire or pin to choose its net · Esc cancels': 'Click en un cable o pin para elegir su red · Esc cancela',
   'Click a wire to see its voltage or a component for its current · Esc to edit': 'Click en un cable para ver su tensión o en un componente para su corriente · Esc para editar',
+  'The components were already numbered in order': 'Los componentes ya estaban numerados en orden',
+  'Click the components in the order you want them numbered · right-click finishes (the rest follow in reading order) · Esc cancels':
+    'Hacé click en los componentes en el orden en que los querés numerar · click derecho termina (los que faltan siguen en orden de lectura) · Esc cancela',
+  'Renumber components': 'Reenumerar componentes',
+  'R1, R2, C1… from left to right and top to bottom; names that are not letter + number (RL, R_2) are kept':
+    'R1, R2, C1… de izquierda a derecha y de arriba hacia abajo; los nombres que no son letra + número (RL, R_2) no se tocan',
+  'Renumber by clicking': 'Reenumerar con clicks',
+  'Every component loses its number (R?, C?…) and gets the next one as you click it; names that are not letter + number are kept':
+    'Cada componente pierde su número (R?, C?…) y recibe el siguiente al hacerle click; los nombres que no son letra + número no se tocan',
   'Click an element to delete it · drag a box to delete everything inside · Esc to finish':
     'Click en un elemento para borrarlo · arrastrar un recuadro borra todo lo que queda adentro · Esc para terminar',
   'Click on the plot to set cursor A, then click again for B. Drag the lines to move them.': 'Click en el gráfico para fijar el cursor A y otro click para el B. Arrastrá las líneas para moverlas.',

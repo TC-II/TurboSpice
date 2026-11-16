@@ -70,6 +70,7 @@ import { ascText, registerUserFile } from './app/helpers.ts';
 import { type Hover } from './app/HintBar.tsx';
 import { AppDialogs } from './app/AppDialogs.tsx';
 import { buildMenus } from './app/menus.tsx';
+import { renumberAll } from './schematic/renumber.ts';
 import { useShortcuts } from './app/shortcuts.ts';
 import { useDrive } from './app/useDrive.ts';
 import { AppBarRight, ViewTabs } from './app/AppBarSlots.tsx';
@@ -907,6 +908,12 @@ function SchematicMode({
   // [SchKeyBoardShortCut] y [RawKeyBoardShortCut]); los del visor, con el mouse sobre los gráficos
   const startMove = (stretch: boolean) =>
     setTool(selection.length ? { kind: 'move', stretch, refs: selection, start: editor.current?.cursor() ?? null } : { kind: 'move', stretch, refs: null, start: null });
+  const renumber = () => {
+    setTool({ kind: 'select' });
+    const next = renumberAll(doc, lib);
+    if (next !== doc) commit(next);
+    else setMessage(t('The components were already numbered in order'));
+  };
   const zoomBox = () => setTool({ kind: 'zoom', prev: tool.kind === 'zoom' ? tool.prev : tool });
   // (con los resultados colapsados el visor no se ve: el teclado vuelve al esquemático)
   const viewerKeys = () => area.current === 'viewer' && !!sim && (!!resultsWin || expanded !== 'schematic') && panel === 'plot' && !!plotPanel.current;
@@ -972,7 +979,26 @@ function SchematicMode({
       doExport,
       exportNetlist,
     },
-    ...{ copySelection, deleteSelection, selectAll, rotateOrMirror, startMove, run, abort, showLog, showOp, setShowOp, netHover, setNetHover, zoomBox, showGrid, setShowGrid, showLoose, setShowLoose },
+    ...{
+      copySelection,
+      deleteSelection,
+      selectAll,
+      rotateOrMirror,
+      startMove,
+      renumber,
+      run,
+      abort,
+      showLog,
+      showOp,
+      setShowOp,
+      netHover,
+      setNetHover,
+      zoomBox,
+      showGrid,
+      setShowGrid,
+      showLoose,
+      setShowLoose,
+    },
     ...{ showSimCommand, toggleSimCommand, showNets, setShowNets, resultsSide, setSide, treeOpen, toggleTree, resultsShown, toggleResultsPanel, onNetlist, doExample, doRecent },
   });
 

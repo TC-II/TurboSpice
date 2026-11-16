@@ -14,6 +14,8 @@ export type Tool =
   | { kind: 'comment' }
   | { kind: 'delete' }
   | { kind: 'probe' }
+  /** reenumerar con clicks: `order`, los componentes ya clickeados (índices de símbolos), en orden */
+  | { kind: 'renumber'; order: number[] }
   /** elegir una red o una fuente para un diálogo (Esc cancela) */
   | { kind: 'pick'; what: PickWhat }
   /**

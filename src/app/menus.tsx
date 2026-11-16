@@ -62,6 +62,8 @@ export interface MenuActions {
   selectAll(): void;
   rotateOrMirror(op: 'rotate' | 'mirror'): void;
   startMove(stretch: boolean): void;
+  /** reenumerar R1, R2… en orden de lectura (izquierda a derecha, de arriba hacia abajo) */
+  renumber(): void;
   run(): void;
   abort(): void;
   showLog(): void;
@@ -118,6 +120,7 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
     selectAll,
     rotateOrMirror,
     startMove,
+    renumber,
     run,
     abort,
     showLog,
@@ -240,6 +243,17 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
         { label: t('Mirror'), shortcut: 'Ctrl+E', onClick: () => rotateOrMirror('mirror') },
         'sep',
         { label: t('Move (without stretching wires)'), shortcut: 'M', onClick: () => startMove(false) },
+        'sep',
+        {
+          label: t('Renumber components'),
+          title: t('R1, R2, C1… from left to right and top to bottom; names that are not letter + number (RL, R_2) are kept'),
+          onClick: renumber,
+        },
+        {
+          label: t('Renumber by clicking'),
+          title: t('Every component loses its number (R?, C?…) and gets the next one as you click it; names that are not letter + number are kept'),
+          onClick: () => setTool({ kind: 'renumber', order: [] }),
+        },
       ],
     },
     {

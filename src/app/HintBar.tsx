@@ -75,6 +75,8 @@ export function toolHint(tt: Tool): string {
       return t('Click where the comment goes and type · Enter or click outside to finish · Shift+Enter for a new line · Esc to cancel');
     case 'delete':
       return t('Click an element to delete it · drag a box to delete everything inside · Esc to finish');
+    case 'renumber':
+      return t('Click the components in the order you want them numbered · right-click finishes (the rest follow in reading order) · Esc cancels');
     case 'probe':
       return t('Click a wire to see its voltage or a component for its current · Esc to edit');
     case 'move':

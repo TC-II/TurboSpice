@@ -125,7 +125,7 @@ export function instLetter(prefix: string): string {
 }
 
 /** Letra para numerar un símbolo: la de su InstName por defecto si la trae (LP1 → LP), si no la del prefijo */
-function nameLetter(def: { attrs: Map<string, string> } | undefined): string {
+export function nameLetter(def: { attrs: Map<string, string> } | undefined): string {
   const m = /^([A-Za-z_]+)\d+$/.exec(def?.attrs.get('InstName') ?? '');
   return m ? m[1] : instLetter(def?.attrs.get('Prefix') ?? 'X');
 }

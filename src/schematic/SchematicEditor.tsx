@@ -5,6 +5,7 @@ import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Point, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
 import { connectivity, type Connectivity } from '../netlist/connectivity.ts';
+import { applyRenumber, finishRenumber, renumberable, renumberLetter } from './renumber.ts';
 import {
   addFlag,
   addText,
@@ -485,7 +486,11 @@ export function SchematicEditor(props: Props) {
       setPreview(null);
       setTool({ ...tool, refs: null, start: null });
     } else if (tool.kind === 'zoom') setTool(tool.prev);
-    else if (tool.kind !== 'select') setTool({ kind: 'select' });
+    else if (tool.kind === 'renumber') {
+      // termina: lo clickeado queda en ese orden y lo que faltó sigue en orden de lectura
+      if (tool.order.length) commit(finishRenumber(doc, tool.order, lib));
+      setTool({ kind: 'select' });
+    } else if (tool.kind !== 'select') setTool({ kind: 'select' });
     else {
       // un label (nombre, valor…) cuenta como el cuerpo de su componente
       const label = labelAt(doc, p, lib, tol, lod);
@@ -675,6 +680,18 @@ export function SchematicEditor(props: Props) {
         setSelection([]);
         setInline({ index: null, x: Math.round(p.x), y: Math.round(p.y), align: 'Left', size: 2, value: '' });
         return;
+      case 'renumber': {
+        const label = labelAt(doc, p, lib, tol, lod);
+        const hit = label ? ({ kind: 'symbol', index: label.sym } as const) : hitTest(doc, p, lib, tol, showSimCommand);
+        if (hit?.kind !== 'symbol' || tool.order.includes(hit.index) || renumberLetter(doc, hit.index, lib) === null) return;
+        const order = [...tool.order, hit.index];
+        // el último que faltaba: queda hecho (un solo paso de deshacer)
+        if (order.length >= renumberable(doc, lib).length) {
+          commit(finishRenumber(doc, order, lib));
+          setTool({ kind: 'select' });
+        } else setTool({ kind: 'renumber', order });
+        return;
+      }
       case 'delete':
         // un click borra lo que está bajo la cruz; arrastrando, todo lo del recuadro (al soltar)
         setDrag({ mode: 'box', start: p, additive: false, erase: true });
@@ -802,6 +819,13 @@ export function SchematicEditor(props: Props) {
   useEffect(() => refreshMove(), [doc, refreshMove]);
   // Ctrl+V: lo pegado se ve ya en el cursor (sin esperar a mover el mouse); al soltarlo o con
   // Esc (la herramienta cambia) se va el fantasma, y con Esc no queda nada en el documento
+  // reenumerar con clicks: los que faltan se ven como R?, C?… y los clickeados con su número nuevo
+  const renumbering = tool.kind === 'renumber' ? tool : null;
+  useEffect(() => {
+    if (!renumbering) return;
+    setPreview(applyRenumber(doc, renumbering.order, lib, true));
+    return () => setPreview(null);
+  }, [renumbering, doc, lib]);
   const pasting = tool.kind === 'move' && tool.base ? tool : null;
   useEffect(() => {
     if (!pasting) return;

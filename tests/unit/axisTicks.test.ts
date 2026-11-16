@@ -7,7 +7,11 @@ describe('marcas de los ejes (#193)', () => {
     const out = axisTicks(tt);
     expect(new Set(out).size).toBe(tt.length);
     expect(out[0]).toBe('999.60m');
-    expect(out[6]).toBe('999.90m');
+    expect(out[6]).toBe('Δ+300µ');
+  });
+  it('más de 4 cifras: valor base en la más baja y Δ en las demás', () => {
+    const tt = [-0.2684894, -0.2684892, -0.268489, -0.2684888, -0.2684886];
+    expect(axisTicks(tt)).toEqual(['-268.4894m', 'Δ+200n', 'Δ+400n', 'Δ+600n', 'Δ+800n']);
   });
   it('enteros', () => expect(axisTicks([0, 1, 2, 3, 4, 5])).toEqual(['0', '1', '2', '3', '4', '5']));
   it('simétrico con prefijo único', () => expect(axisTicks([-1e-3, -5e-4, 0, 5e-4, 1e-3])).toEqual(['-1.0m', '-0.5m', '0', '0.5m', '1.0m']));

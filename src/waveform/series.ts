@@ -75,12 +75,22 @@ export const si = (x: number, digits = 4): string => formatSi(x, digits, DISPLAY
  * Etiquetas de las marcas de un eje: un solo prefijo SI (el de la marca de mayor módulo) y los
  * decimales que pide el paso entre marcas, así nunca se repiten aunque el rango sea mínimo
  * (0.9996, 0.99965… → "999.60m", "999.65m"…). Sin marcas válidas devuelve ''.
- * No usa offset (p. ej. "+999.6m") cuando las etiquetas quedan largas.
+ * Si eso pide más de 4 cifras significativas, desplazamiento común: la marca más baja lleva el
+ * valor completo y las demás sólo la diferencia con ella ("-268.4894m", "Δ+2.0n", "Δ+4.0n"…).
  */
 export function axisTicks(tt: (number | null)[]): string[] {
+  const { labels, sig } = plainTicks(tt);
+  if (sig <= 4) return labels;
+  const base = tt.reduce<number | null>((b, x) => (x != null && Number.isFinite(x) && (b == null || x < b) ? x : b), null)!;
+  const d = plainTicks(tt.map((x) => (x == null || !Number.isFinite(x) ? x : parseFloat((x - base).toPrecision(12))))).labels;
+  return tt.map((x, k) => (x == null || !Number.isFinite(x) ? '' : x === base ? labels[k] : `Δ${d[k].startsWith('-') ? '' : '+'}${d[k]}`));
+}
+
+/** Etiquetas sin desplazamiento y cuántas cifras significativas usan */
+function plainTicks(tt: (number | null)[]): { labels: string[]; sig: number } {
   const v = tt.filter((x): x is number => x != null && Number.isFinite(x));
   const max = Math.max(0, ...v.map(Math.abs));
-  if (max === 0) return tt.map((x) => (x == null ? '' : '0'));
+  if (max === 0) return { labels: tt.map((x) => (x == null ? '' : '0')), sig: 1 };
   let e = Math.min(4, Math.max(-5, Math.floor(Math.log10(max) / 3)));
   let step = Infinity;
   for (let i = 1; i < v.length; i++) {
@@ -91,11 +101,13 @@ export function axisTicks(tt: (number | null)[]): string[] {
   // 999.97m con 2 decimales redondea a 1000.00m: sube de prefijo
   if (e < 4 && Math.round((max / 10 ** (3 * e)) * 10 ** decimals(e)) / 10 ** decimals(e) >= 1000) e++;
   const dec = decimals(e);
-  return tt.map((x) => {
+  const ints = Math.max(1, Math.floor(Math.log10(max / 10 ** (3 * e)) + 1e-9) + 1);
+  const labels = tt.map((x) => {
     if (x == null || !Number.isFinite(x)) return '';
     const m = parseFloat((x / 10 ** (3 * e)).toFixed(dec));
     return `${m === 0 ? '0' : m.toFixed(dec)}${m === 0 ? '' : DISPLAY_PREFIXES[e + 5]}`;
   });
+  return { labels, sig: ints + dec };
 }
 
 /**

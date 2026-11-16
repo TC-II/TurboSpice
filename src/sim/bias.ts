@@ -134,8 +134,11 @@ export function elementBias(sim: BuiltSimulation, bias: Bias, el: Element, scope
   const title = (scope ? `${scope.prefix}${el.name}` : el.name).replace(/§/g, '');
   const pol = /^(QP|MP|JP)$/i.test(el.prefix) ? -1 : 1;
   switch (ng[0]) {
-    case 'r':
-      return { title, lines: [`I = ${fmt(i, 'A')}`, `V = ${fmt(vab, 'V')}`, `P = ${fmt(p('p'), 'W')}`], short: fmt(i, 'A') };
+    case 'r': {
+      // P = V·I: el @r[p] de ngspice en el OP puede venir sin calcular (daba 2.437TW con 33µA y 33µV)
+      const pr = i !== undefined && vab !== undefined ? Math.abs(i * vab) : p('p');
+      return { title, lines: [`I = ${fmt(i, 'A')}`, `V = ${fmt(vab, 'V')}`, `P = ${fmt(pr, 'W')}`], short: fmt(i, 'A') };
+    }
     case 'c':
     case 'l':
       return { title, lines: [`I = ${fmt(i, 'A')}`, `V = ${fmt(vab, 'V')}`], short: ng[0] === 'l' ? fmt(i, 'A') : fmt(vab, 'V') };

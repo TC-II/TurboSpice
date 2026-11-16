@@ -170,6 +170,19 @@ export function PaneView(props: {
       u.root.dataset[`ticks${scale}`] = out.join('|');
       return out;
     };
+    /**
+     * Ancho del eje Y según sus etiquetas: con un rango angosto alrededor de un valor grande
+     * («-268.4886m») no entraban en 58 px y se cortaban.
+     */
+    const ySize = (u: uPlot, values: string[] | null, i: number) => {
+      if (!values?.length) return 58;
+      const ctx = u.ctx;
+      ctx.save();
+      ctx.font = (u.axes[i] as { font?: [string, number] }).font?.[0] ?? ctx.font;
+      const w = Math.max(...values.map((v) => ctx.measureText(v).width)) / (uPlot.pxRatio || 1);
+      ctx.restore();
+      return Math.max(58, Math.ceil(w) + 18);
+    };
     const hasRight = data.curves.some((c) => c.axis !== 'y');
     const rightScale = data.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i';
     const rightUnit = rightScale === 'ph' ? '°' : data.iUnit;
@@ -278,11 +291,13 @@ export function PaneView(props: {
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
-          size: 58,
+          size: ySize,
           label: data.yUnit || undefined,
           labelSize: 14,
         },
-        ...(hasRight ? [{ scale: rightScale, side: 1, values: ticks('R'), splits: rightSplits, stroke: muted, grid: { show: false }, size: 58, label: rightUnit, labelSize: 14 } as uPlot.Axis] : []),
+        ...(hasRight
+          ? [{ scale: rightScale, side: 1, values: ticks('R'), splits: rightSplits, stroke: muted, grid: { show: false }, size: ySize, label: rightUnit, labelSize: 14 } as uPlot.Axis]
+          : []),
       ],
       series: [
         { label: data.xName },

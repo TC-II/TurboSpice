@@ -95,7 +95,8 @@ export function ticks(lo: number, hi: number, step: number): number[] {
   return out;
 }
 
-const CSV_HEAD = [t('run'), t('type'), 'n', 're [rad/s]', 'im [rad/s]', 'f0 [Hz]', 'Q', 'zeta', 'tau [s]'];
+/** (al exportar, no al importar: sigue el idioma elegido) */
+const csvHead = () => [t('run'), t('type'), 'n', 're [rad/s]', 'im [rad/s]', 'f0 [Hz]', 'Q', 'zeta', 'tau [s]'];
 
 /** Tabla de raíces a CSV */
 export function pzCsv(roots: Root[], label: (run: number) => string): string {
@@ -103,7 +104,7 @@ export function pzCsv(roots: Root[], label: (run: number) => string): string {
     const i = rootInfo(r);
     return [label(r.run), r.kind === 'pole' ? t('pole') : t('zero'), r.n, r.re, r.im, i.f0, i.q, i.zeta, i.tau].map((x) => (typeof x === 'number' ? (Number.isFinite(x) ? String(x) : '') : `"${x}"`));
   });
-  return [CSV_HEAD.join(','), ...rows.map((r) => r.join(','))].join('\n') + '\n';
+  return [csvHead().join(','), ...rows.map((r) => r.join(','))].join('\n') + '\n';
 }
 
 /** "−1.2k + j3.4k" */

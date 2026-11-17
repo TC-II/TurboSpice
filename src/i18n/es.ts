@@ -2790,4 +2790,11 @@ export const es: Record<string, string> = {
   'Reset': 'Restablecer',
   '{expr} is not monotonic: it cannot be the X axis': '{expr} no es monótona: no puede ser el eje X',
   'With another quantity on the X axis, the traces must be real': 'Con otra magnitud en el eje X, las trazas tienen que ser reales',
+  // Verilog, autoguardado y tablas del visor (revisión Dev2)
+  'The Icarus engine is not installed on this server': 'El motor Icarus no está instalado en este servidor',
+  'The Yosys engine is not installed on this server': 'El motor Yosys no está instalado en este servidor',
+  'Icarus could not run: {msg}': 'No se pudo correr Icarus: {msg}',
+  "Autosave failed: the browser's storage is full or blocked. Save the project to a file so you don't lose work.":
+    'Falló el autoguardado: el almacenamiento del navegador está lleno o bloqueado. Guardá el proyecto en un archivo para no perder trabajo.',
+  '… and {n} more traces': '… y {n} trazas más',
 };

@@ -315,11 +315,14 @@ export async function loadProjectSession(): Promise<{ session?: ProjectSession; 
   );
 }
 
-export async function saveProjectSession(s: ProjectSession): Promise<void> {
+/** Guarda la sesión de esta pestaña; false si no se pudo (almacenamiento lleno o bloqueado) */
+export async function saveProjectSession(s: ProjectSession): Promise<boolean> {
   const key = PROJECT_PREFIX + (await tabId());
   return quiet(
-    put(key, s).catch(() => put(key, { ...s, handle: undefined })),
-    undefined,
+    put(key, s)
+      .catch(() => put(key, { ...s, handle: undefined }))
+      .then(() => true),
+    false,
   );
 }
 

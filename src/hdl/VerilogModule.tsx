@@ -4,6 +4,7 @@ import { t } from '../i18n/i18n.ts';
 import { portsOf } from './project.ts';
 import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
 import type { SynthResult } from './yosys.ts';
+import { engineErrorText } from './engineError.ts';
 
 /**
  * Vista de un módulo Verilog del proyecto (#209), en lugar del esquemático de un subcircuito:
@@ -92,7 +93,7 @@ export function VerilogModule({
   const beh = mode === 'behavioral';
   const status = busy
     ? { cls: 'busy', text: beh ? t('Compiling…') : t('Synthesizing…') }
-    : result?.error
+    : result?.error || failure
       ? { cls: 'err', text: beh ? t('Compilation failed') : t('Synthesis failed') }
       : stale
         ? { cls: 'stale', text: t('Changes not synthesized yet (it is synthesized before simulating)') }
@@ -111,6 +112,7 @@ export function VerilogModule({
           onChange={(e) => {
             onMode(e.target.value as 'synth' | 'behavioral');
             setResult(null);
+            setFailure(null);
           }}
         >
           <option value="synth">{t('Synthesis (Yosys)')}</option>
@@ -160,7 +162,7 @@ export function VerilogModule({
               </button>
             </p>
           )}
-          {failure && <p className="err">{t('Yosys could not run: {msg}', { msg: failure })}</p>}
+          {failure && <p className="err">{engineErrorText(failure, beh)}</p>}
           {result?.error && <p className="err">{result.error}</p>}
           {result?.block?.warnings.map((w) => (
             <p key={w} className="hint">

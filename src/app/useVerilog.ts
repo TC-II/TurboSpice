@@ -5,6 +5,7 @@ import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
 import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
 import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
+import { engineErrorText } from '../hdl/engineError.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR, type Library } from '../library/library.ts';
@@ -47,7 +48,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       const r = await synthModule(name);
       setMessage(r.error ? t('{name}: {error}', { name, error: r.error }) : t('{name}: symbol ready in the component browser (F2) under "{PROJECT_DIR}"', { name, PROJECT_DIR }));
     } catch (e) {
-      setMessage(t('Yosys could not run: {msg}', { msg: (e as Error).message }));
+      setMessage(engineErrorText((e as Error).message, verilogFile(projectRef.current, name)?.hdl === 'behavioral'));
     }
   };
   /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */

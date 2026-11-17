@@ -54,7 +54,8 @@ export interface RunDeps {
   /** la corrida anterior del testbench (para el resumen de cambios) */
   prevRun(): RunRecord | undefined;
   snapshot(): Project;
-  editProject(p: Project): void;
+  /** actualiza el proyecto sin marcarlo como modificado (el historial de corridas no es una edición del usuario) */
+  setProjectState(p: Project): void;
   setAutoDrive: Dispatch<SetStateAction<number>>;
   ascName(): string;
   allTraces(): string[];
@@ -95,7 +96,7 @@ export function runActions(d: RunDeps) {
     setMessage,
     prevRun,
     snapshot,
-    editProject,
+    setProjectState,
     setAutoDrive,
   } = d;
   const { ascName, allTraces, synthStale, withVariants, setOpPoint, expanded, setExpanded, setSim, setHiddenRuns, setPlotName, plotView, panes, setPanes, setStopPlotted, setPanel, setTool } = d;
@@ -120,7 +121,8 @@ export function runActions(d: RunDeps) {
       const last = prevRun();
       const p0 = snapshot();
       const files = runFilesOf(p0, simAsc);
-      editProject(recordRun(p0, id, simAsc, Date.now(), last ? runSummary(diffCircuits(parseAsc(last.asc), doc).summary, last.files, files) : undefined, files).project);
+      // correr no es editar: el historial queda en el proyecto (y se autoguarda) pero no lo marca como modificado
+      setProjectState(recordRun(p0, id, simAsc, Date.now(), last ? runSummary(diffCircuits(parseAsc(last.asc), doc).summary, last.files, files) : undefined, files).project);
       setAutoDrive((n) => n + 1);
     }
     try {

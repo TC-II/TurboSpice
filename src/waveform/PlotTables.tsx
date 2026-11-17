@@ -8,7 +8,9 @@ import { type Range, MAX_ROWS, fmt, fix, xUnit } from './plotShared.ts';
 export function CursorTable({ data, cursors, preview, setCursors }: { data: PaneData[]; cursors: Cursors; preview?: boolean; setCursors(f: (c: Cursors) => Cursors): void }) {
   const { a, b } = cursors;
   const dx = a !== undefined && b !== undefined ? b - a : NaN;
-  const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
+  const all = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c })));
+  const rows = all.slice(0, MAX_ROWS);
+  const cut = all.length - rows.length;
   const labels = [...new Set(data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => c.label)))];
   const xu = xUnit(data[0]?.xName);
   const traceSelect = (k: 'ta' | 'tb', name: string) => (
@@ -66,6 +68,11 @@ export function CursorTable({ data, cursors, preview, setCursors }: { data: Pane
               </tr>
             );
           })}
+          {cut > 0 && (
+            <tr className="more">
+              <td colSpan={5}>{t('… and {n} more traces', { n: cut })}</td>
+            </tr>
+          )}
           <tr className="dx">
             <td>{data[0]?.xName}</td>
             <td className={preview ? 'xa preview' : 'xa'} title={preview ? t('Follows the mouse: click to fix it') : undefined}>
@@ -82,7 +89,9 @@ export function CursorTable({ data, cursors, preview, setCursors }: { data: Pane
 }
 
 export function StatsTable({ data, range }: { data: PaneData[]; range: Range | null }) {
-  const rows = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c }))).slice(0, MAX_ROWS);
+  const all = data.flatMap((d) => d.curves.filter((c) => !c.hidden).map((c) => ({ d, c })));
+  const rows = all.slice(0, MAX_ROWS);
+  const cut = all.length - rows.length;
   const db = (d: PaneData, c: Curve) => d.yUnit === 'dB' && c.axis === 'y';
   return (
     <table className="scalars readout">
@@ -120,6 +129,11 @@ export function StatsTable({ data, range }: { data: PaneData[]; range: Range | n
             </tr>
           );
         })}
+        {cut > 0 && (
+          <tr className="more">
+            <td colSpan={7}>{t('… and {n} more traces', { n: cut })}</td>
+          </tr>
+        )}
       </tbody>
     </table>
   );

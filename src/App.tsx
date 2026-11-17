@@ -121,11 +121,14 @@ export function App() {
   const [libError, setLibError] = useState<string>();
 
   useEffect(() => {
+    // (al desmontar, el motor se termina sin reabrirlo: lo que llegue después se ignora)
+    let disposed = false;
     fetch(`${BASE}library/bundle.json`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(async (b: LibraryBundle) => {
         const l = new Library(b);
         for (const f of await loadUserFiles()) registerUserFile(l, f);
+        if (disposed) return;
         engine.start();
         const skin = lsGet(SKIN_KEY);
         setLib(skin ? l.withSkin(skin) : l);
@@ -136,10 +139,14 @@ export function App() {
           .catch(() => {});
       })
       .catch((e: Error) => {
+        if (disposed) return;
         engine.start();
         setLibError(t('Could not load the library: {message}', { message: e.message }));
       });
-    return () => engine.abort();
+    return () => {
+      disposed = true;
+      engine.dispose();
+    };
   }, [engine]);
 
   // lugares de la barra superior que llena el modo esquemático: el menú (junto al nombre), las
@@ -621,7 +628,7 @@ function SchematicMode({
       setMessage,
       prevRun,
       snapshot,
-      editProject,
+      setProjectState,
       setAutoDrive,
     },
     ...{ ascName, allTraces, synthStale, withVariants, setOpPoint, expanded, setExpanded, setSim, setHiddenRuns, setPlotName, plotView, panes, setPanes, setStopPlotted, setPanel, setTool },

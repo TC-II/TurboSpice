@@ -4,6 +4,7 @@ import { SlideConfirm } from '../ui/SlideConfirm.tsx';
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
 import { useDialogFocus } from '../ui/useDialogFocus.ts';
+import { isTopModal, pushModal } from '../ui/modalStack.ts';
 import { Logo } from '../ui/Logo.tsx';
 import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
@@ -91,9 +92,16 @@ export function Modal({
       window.removeEventListener('resize', onResize);
     };
   }, [hidden]);
+  // con diálogos apilados, Escape sólo cierra el de más arriba (los ocultos no cuentan)
+  const modalId = useRef(Symbol('modal'));
   useEffect(() => {
     if (hidden) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const pop = pushModal(modalId.current);
+    return pop;
+  }, [hidden]);
+  useEffect(() => {
+    if (hidden) return;
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && isTopModal(modalId.current) && onClose();
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onClose, hidden]);

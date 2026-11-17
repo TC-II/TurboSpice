@@ -23,7 +23,7 @@ const friendly = (msg: string) => (OUT_OF_MEMORY_RE.test(msg) ? OUT_OF_MEMORY : 
 export class EngineClient {
   onStatus?: (status: string, percent: number) => void;
 
-  private worker?: Worker;
+  private worker: Worker | null = null;
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private readyP!: Promise<void>;
@@ -100,6 +100,19 @@ export class EngineClient {
   /** Corta la simulación en curso: termina el Worker y levanta uno nuevo. */
   abort(): void {
     this.restart(t('Simulation aborted'));
+  }
+
+  /**
+   * Termina el Worker sin levantar otro (al desmontar la app): lo pendiente se rechaza y un
+   * start() posterior lo vuelve a crear.
+   */
+  dispose(): void {
+    this.worker?.terminate();
+    this.worker = null;
+    const orphans = [...this.pending.values()];
+    this.pending.clear();
+    for (const p of orphans) p.reject(new Error(t('Simulation aborted')));
+    // (readyP queda resuelta o rechazada: el próximo start() crea la suya)
   }
 
   /**

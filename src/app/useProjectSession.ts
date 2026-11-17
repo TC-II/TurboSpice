@@ -299,7 +299,9 @@ export function useProjectSession(d: ProjectSessionDeps) {
   // pilas de deshacer no se guardan, #154)
   // (data-autosave en <html>: «pending» hasta que termina el último guardado, «saved» después; lo esperan los e2e)
   const autosaveSeq = useRef(0);
+  const autosaveWarned = useRef(false);
   const projectNow = useEvent(snapshot);
+  const warnMessage = useEvent((m: string) => setMessage(m));
   useEffect(() => {
     if (!restored) return;
     const seq = ++autosaveSeq.current;
@@ -307,11 +309,20 @@ export function useProjectSession(d: ProjectSessionDeps) {
     const tt = setTimeout(() => {
       serializeTurbo(projectNow())
         .then((turbo) => saveProjectSession({ name: file.name, handle: file.handle, driveId: file.driveId, driveVersion: file.driveVersion, turbo, dirty, time: Date.now() }))
-        .then(() => seq === autosaveSeq.current && (document.documentElement.dataset.autosave = 'saved'))
+        .then((ok) => {
+          if (seq !== autosaveSeq.current) return;
+          document.documentElement.dataset.autosave = ok ? 'saved' : 'failed';
+          // un solo aviso por racha de fallos; al volver a guardar bien se rearma
+          if (ok) autosaveWarned.current = false;
+          else if (!autosaveWarned.current) {
+            autosaveWarned.current = true;
+            warnMessage(t("Autosave failed: the browser's storage is full or blocked. Save the project to a file so you don't lose work."));
+          }
+        })
         .catch((e) => console.error(e));
     }, 600);
     return () => clearTimeout(tt);
-  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode, projectNow]);
+  }, [restored, history.state, project, file, dirty, panes, activePane, plotName, mode, projectNow, warnMessage]);
 
   // Migración: vista guardada en el navegador para este nombre de archivo (versiones
   // anteriores) y el .asc no trae la suya: se ofrece incorporarla

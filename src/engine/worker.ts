@@ -60,15 +60,28 @@ const loadIcarus = () =>
     }),
   ).then(Object.fromEntries));
 
-async function load(): Promise<Ngspice> {
+/** Lo que no cambia entre una instancia de ngspice y la siguiente: se baja y compila una sola vez por Worker */
+interface Assets {
+  hash(f: string): string | undefined;
+  factory: NgspiceFactory;
+  spinit: string;
+  codemodels: Record<string, Uint8Array>;
+}
+let assets: Promise<Assets> | null = null;
+/** el wasm ya compilado (se llena con la primera instancia); las siguientes sólo lo instancian */
+let wasmModule: WebAssembly.Module | undefined;
+
+const ok = (r: Response, file: string) => {
+  if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`);
+  return r;
+};
+
+async function fetchAssets(): Promise<Assets> {
   // el manifest se revalida siempre: dice qué versión de cada archivo va
   // (tras un deploy un 404 llega como HTML: se dice cuál archivo falta en vez de un error de JSON o de wasm)
-  const ok = (r: Response, file: string) => {
-    if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`);
-    return r;
-  };
-  manifest = (await ok(await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' }), 'manifest.json').json()) as Manifest;
-  const hash = (f: string) => manifest?.hashes?.[f];
+  const mf = (await ok(await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' }), 'manifest.json').json()) as Manifest;
+  manifest = mf;
+  const hash = (f: string) => mf.hashes?.[f];
   // (con el hash en la URL el .mjs siempre corresponde al .wasm de la caché)
   const v = hash('ngspice.mjs');
   // import() con URL absoluta: el dev server de Vite le agrega ?import sólo a las rutas relativas
@@ -79,18 +92,37 @@ async function load(): Promise<Ngspice> {
   };
   const [spinit, ...cms] = await Promise.all([
     fetch(`${ENGINE_URL}spinit`).then((r) => ok(r, 'spinit').text()),
-    ...manifest.codemodels.map((f) => engineFile(f, hash(f)).then((r) => ok(r, f).arrayBuffer())),
+    ...mf.codemodels.map((f) => engineFile(f, hash(f)).then((r) => ok(r, f).arrayBuffer())),
   ]);
-  const codemodels = Object.fromEntries(manifest.codemodels.map((f, i) => [f, new Uint8Array(cms[i])]));
+  const codemodels = Object.fromEntries(mf.codemodels.map((f, i) => [f, new Uint8Array(cms[i])]));
+  return { hash, factory, spinit, codemodels };
+}
 
-  // el wasm desde la caché, compilado mientras llega (instantiateStreaming); si eso falla, de la red
+/** Una instancia nueva de ngspice; lo que no cambia se carga una sola vez (si falló, el próximo intento reintenta) */
+async function load(): Promise<Ngspice> {
+  assets ??= fetchAssets().catch((e) => {
+    assets = null;
+    throw e;
+  });
+  const { hash, factory, spinit, codemodels } = await assets;
+
+  // el wasm desde la caché, compilado mientras llega (instantiateStreaming); si eso falla, de la red.
+  // Una vez compilado, las instancias siguientes reusan el módulo (sin red ni recompilar)
   let wasmFailed!: (e: unknown) => void;
   const failed = new Promise<never>((_, reject) => (wasmFailed = reject));
   const instantiateWasm = (imports: WebAssembly.Imports, done: (i: WebAssembly.Instance, m: WebAssembly.Module) => void) => {
+    const compiled = wasmModule;
+    if (compiled) {
+      WebAssembly.instantiate(compiled, imports).then((inst) => done(inst, compiled), wasmFailed);
+      return {};
+    }
     engineFile('ngspice.wasm', hash('ngspice.wasm'))
       .then((r) => WebAssembly.instantiateStreaming(r, imports))
       .catch(async () => WebAssembly.instantiate(await (await fetch(`${ENGINE_URL}ngspice.wasm`)).arrayBuffer(), imports))
-      .then((r) => done(r.instance, r.module), wasmFailed);
+      .then((r) => {
+        wasmModule = r.module;
+        done(r.instance, r.module);
+      }, wasmFailed);
     return {};
   };
 

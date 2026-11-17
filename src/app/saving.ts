@@ -30,10 +30,29 @@ export interface SavingDeps {
   openDriveFile(d: DriveFile): Promise<void>;
   setDialog(d: Dialog | null): void;
   setMessage(m?: string): void;
+  /** pregunta (con un diálogo de la app) si se descartan los cambios sin guardar */
+  askDiscard(): Promise<boolean>;
 }
 
-export function savingActions({ dirty, setDirty, file, setFile, projectRef, setProjectState, pathRef, docRef, sims, liveView, remember, openDriveFile, setDialog, setMessage }: SavingDeps) {
-  const confirmDiscard = () => !dirty || window.confirm(t('There are unsaved changes. Discard them?'));
+export function savingActions({
+  dirty,
+  setDirty,
+  file,
+  setFile,
+  projectRef,
+  setProjectState,
+  pathRef,
+  docRef,
+  sims,
+  liveView,
+  remember,
+  openDriveFile,
+  setDialog,
+  setMessage,
+  askDiscard,
+}: SavingDeps) {
+  /** true si se puede reemplazar el proyecto abierto: no tiene cambios sin guardar o el usuario aceptó perderlos */
+  const confirmDiscard = async () => !dirty || askDiscard();
 
   // Ya no hay "abrir" un .asc: Abrir lleva a Importar (que explica qué entra y cómo)
   const doOpen = () => setDialog({ kind: 'importinfo' });

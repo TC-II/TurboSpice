@@ -15,9 +15,23 @@ export const sampleUrl = (url) => `${url}${url.includes('?') ? '&' : '?'}example
  *  primero en pasar a «Más herramientas»), desde ese desplegable */
 export async function newProject(page) {
   const button = page.getByRole('toolbar', { name: 'Herramientas' }).getByRole('button', { name: 'Nuevo', exact: true });
-  if (await button.count()) return button.click();
-  await page.getByRole('button', { name: 'Más herramientas' }).click();
-  await page.getByRole('menuitem', { name: 'Nuevo', exact: true }).click();
+  if (await button.count()) await button.click();
+  else {
+    await page.getByRole('button', { name: 'Más herramientas' }).click();
+    await page.getByRole('menuitem', { name: 'Nuevo', exact: true }).click();
+  }
+  await discardIfAsked(page);
+}
+/** «Cambios sin guardar» (el diálogo de la app al abrir otro proyecto con cambios): si aparece, los descarta */
+export async function discardIfAsked(page, ms = 500) {
+  const b = page.getByRole('button', { name: 'Descartar los cambios', exact: true });
+  try {
+    await b.waitFor({ timeout: ms });
+  } catch {
+    return false; // no preguntó: no había cambios
+  }
+  await b.click();
+  return true;
 }
 export const showSimCommand = (target) => target.addInitScript(() => localStorage.setItem('turbospice.showSimCommand', '1'));
 
@@ -71,6 +85,7 @@ export async function openExample(page, name) {
   const { readFileSync } = await import('node:fs');
   const buffer = readFileSync(new URL('./fixtures/Examples.turbo', import.meta.url));
   await page.locator('input[type=file][accept*=".turbo"]').first().setInputFiles({ name: 'Examples.turbo', mimeType: 'application/json', buffer });
+  await discardIfAsked(page);
   await page.waitForFunction(() => document.querySelector('.capsule-project')?.textContent === 'Examples');
   // el testbench se elige en el panel del proyecto (y el panel queda como estaba)
   const closed = !(await page.locator('.project-tree').count());

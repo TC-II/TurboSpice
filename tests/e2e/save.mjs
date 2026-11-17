@@ -637,13 +637,15 @@ const conflictOf = (p) => p.getByRole('dialog').filter({ hasText: 'cambió en Go
   // -- abrir con cambios sin guardar: pregunta; cancelar no abre
   await edit(page);
   d = await openMySims(page);
-  page.answers.push(false);
   await d.getByRole('button', { name: /^Filtro final\.turbo/ }).click();
-  await until(() => page.dialogs.at(-1)?.startsWith('confirm:'));
+  // (el diálogo de la app, encima de Mis proyectos: «Seguir editando» vuelve a la lista)
+  const ask = page.getByRole('dialog', { name: 'Cambios sin guardar' });
+  await ask.waitFor();
+  await ask.getByRole('button', { name: 'Seguir editando', exact: true }).click();
   await frames(page);
   check(
-    (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !!page.dialogs.at(-1)?.startsWith('confirm:'),
-    'Mis proyectos: con cambios sin guardar, pregunta antes de abrir otro (y cancelar no abre)',
+    (await page.locator('.capsule-project').textContent()) === 'Sample Project (copia) (2)' && !(await ask.count()) && (await d.count()) === 1,
+    'Mis proyectos: con cambios sin guardar, pregunta antes de abrir otro (cancelar no abre y vuelve a la lista)',
   );
 
   // -- papelera, sobre el abierto: va enseguida, con «Deshacer»; después, de nuevo

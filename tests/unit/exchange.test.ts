@@ -4,7 +4,7 @@ import { emptyDoc, type AscDoc } from '../../src/asc/model.ts';
 import { decode } from '../../src/asc/encoding.ts';
 import { serializeAsc } from '../../src/asc/serialize.ts';
 import { Library } from '../../src/library/library.ts';
-import { exportAllZip, exportVariantZip, importEntries, safeName, usedFiles } from '../../src/project/exchange.ts';
+import { exportAllZip, exportVariantZip, importEntries, safeName, subcktFilesFrom, usedFiles } from '../../src/project/exchange.ts';
 import { addGroup, addSim, lineOf, renameSim, storeActive, variantOf } from '../../src/project/project.ts';
 import { asBenches, newProject, type Project } from '../../src/project/turbo.ts';
 import { crc32, makeZip, readZip } from '../../src/project/zip.ts';
@@ -142,5 +142,23 @@ describe('exportar e importar (#157)', () => {
   it('nombres de archivo válidos y archivos usados', () => {
     expect(safeName('a/b:c*?"<>|. ')).toBe('a_b_c_');
     expect(usedFiles(sample().files, [asc('.op')]).map((f) => f.name)).toEqual([]);
+  });
+});
+
+describe('subcktFilesFrom: lee UTF-8 en .lib y .asy', () => {
+  it('un .lib y un .asy en UTF-8 conservan los acentos y la µ', () => {
+    const enc = new TextEncoder();
+    const lib = '* Filtro «µ» ñ\n.subckt F a b\nC1 a b 10µ\n.ends\n';
+    const asy = 'Version 4\nSymbolType BLOCK\nTEXT 0 0 Left 2 µ\n';
+    const files = subcktFilesFrom(
+      [
+        { path: 'f.lib', data: Uint8Array.from([0xef, 0xbb, 0xbf, ...enc.encode(lib)]) },
+        { path: 'f.asy', data: enc.encode(asy) },
+      ],
+      [],
+      (name) => ({ name: `${name}.asy`, kind: 'symbol', text: '' }),
+    );
+    expect(files.find((f) => f.name === 'f.lib')?.text).toBe(lib);
+    expect(files.find((f) => f.name === 'f.asy')?.text).toBe(asy);
   });
 });

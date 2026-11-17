@@ -88,11 +88,11 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
   // Atajos de LTspice ([NetKeyBoardShortCut]); valen también escribiendo en la netlist
   const editor = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLPreElement>(null);
-  const goToLine = () => {
+  // «Ir a la línea» (Ctrl+G): una caja en la barra, no el prompt del navegador
+  const [lineAsk, setLineAsk] = useState(false);
+  const goToLine = (n: number) => {
     const ta = editor.current;
-    if (!ta) return;
-    const n = Number(window.prompt(t('Go to line:')));
-    if (!Number.isInteger(n) || n < 1) return;
+    if (!ta || !Number.isInteger(n) || n < 1) return;
     const lines = netlist.split('\n');
     const start = lines.slice(0, n - 1).reduce((s, l) => s + l.length + 1, 0);
     const end = start + (lines[n - 1]?.length ?? 0);
@@ -117,7 +117,7 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
         logRef.current?.focus();
       } else if (ctrl && k === 'g') {
         e.preventDefault();
-        goToLine();
+        setLineAsk(true);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -144,6 +144,26 @@ export function NetlistMode({ engine }: { engine: EngineClient }) {
           </button>
         )}
         <StatusText status={status} />
+        {lineAsk && (
+          <label className="goto-line">
+            {t('Go to line:')}{' '}
+            <input
+              type="number"
+              min={1}
+              autoFocus
+              onBlur={() => setLineAsk(false)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter' && e.key !== 'Escape') return;
+                e.preventDefault();
+                e.stopPropagation();
+                const n = Number(e.currentTarget.value);
+                setLineAsk(false);
+                if (e.key === 'Enter') goToLine(n);
+                else editor.current?.focus();
+              }}
+            />
+          </label>
+        )}
       </header>
 
       <main className="netlist-main">

@@ -723,6 +723,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
 
 function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: SourceSpec): void; current: boolean }) {
   const [sel, setSel] = useState(-1);
+  const [csvEmpty, setCsvEmpty] = useState(false);
   const svg = useRef<SVGSVGElement>(null);
   const table = useRef<HTMLDivElement>(null);
   const drag = useRef<{ geo: Geo; moved: boolean } | null>(null);
@@ -809,6 +810,9 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
               setSel(s.i);
             }
           }}
+          // arrastre cancelado o captura perdida (Alt+Tab, gesto del sistema): se suelta sin reordenar
+          onPointerCancel={() => (drag.current = null)}
+          onLostPointerCapture={() => (drag.current = null)}
         >
           <rect
             x={0}
@@ -906,11 +910,18 @@ function PwlEditor({ spec, setSpec, current }: { spec: SourceSpec; setSpec(s: So
         <button type="button" onClick={() => (setPts([...pts, ['', '']]), setSel(pts.length))}>
           {t('+ Point')}
         </button>
-        <CsvImport onPoints={(p) => (setPts(p), setSel(-1))} />
+        <CsvImport
+          onPoints={(p) => {
+            // un archivo sin pares válidos no borra los puntos que había
+            setCsvEmpty(p.length === 0);
+            if (p.length) setPts(p), setSel(-1);
+          }}
+        />
         <label className="src-check">
           <input type="checkbox" checked={spec.repeat} onChange={(e) => setSpec({ ...spec, repeat: e.target.checked })} /> {t('Repeat')}
         </label>
       </div>
+      {csvEmpty && <p className="hint warn">{t('No valid time,value pairs in the file: the points were left as they were.')}</p>}
     </>
   );
 }
@@ -973,17 +984,29 @@ function CsvImport({ onPoints }: { onPoints(p: [string, string][]): void }) {
   );
 }
 
-/** Líneas "t, v" (o con ; o tab); se saltan los encabezados y lo que no son dos números */
+/** Las dos primeras celdas de una línea del CSV, si son números (la coma decimal se pasa a punto) */
+function csvPair(line: string): [string, string] | null {
+  const num = (c: string | undefined) => c !== undefined && isFinite(spiceNumber(c));
+  const trim = (cells: string[]) => cells.map((c) => c.trim()).filter(Boolean);
+  let cells: string[];
+  if (/[;\t]/.test(line)) {
+    // con ; o tab de separador, la coma es la decimal ("0,001;0,5")
+    cells = trim(line.split(/[;\t]/)).map((c) => c.replace(',', '.'));
+  } else {
+    cells = trim(line.split(','));
+    // sin ;/tab, "t,v" separa con la coma; si no sale, es "0,001 0,5" (espacios y coma decimal)
+    if (!(cells.length >= 2 && num(cells[0]) && num(cells[1]))) cells = trim(line.split(/\s+/)).map((c) => c.replace(',', '.'));
+  }
+  return cells.length >= 2 && num(cells[0]) && num(cells[1]) ? [cells[0], cells[1]] : null;
+}
+
+/** Puntos "t, v" de un CSV (separador , ; tab o espacios, con coma decimal si corresponde); se saltan
+ *  encabezados y lo que no son dos números, y salen ordenados por tiempo (PWL lo exige creciente) */
 export function csvPoints(text: string): [string, string][] {
   const out: [string, string][] = [];
   for (const line of text.split(/\r?\n/)) {
-    const cells = line
-      .split(/[;,\t]|\s+/)
-      .map((c) => c.trim())
-      .filter(Boolean);
-    if (cells.length < 2) continue;
-    if (!isFinite(spiceNumber(cells[0])) || !isFinite(spiceNumber(cells[1]))) continue;
-    out.push([cells[0], cells[1]]);
+    const pair = csvPair(line);
+    if (pair) out.push(pair);
   }
-  return out;
+  return out.sort((a, b) => spiceNumber(a[0]) - spiceNumber(b[0]));
 }

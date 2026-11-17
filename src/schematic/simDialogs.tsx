@@ -439,8 +439,12 @@ export function ControlDialog({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) onApply(body);
               if (e.key === 'Tab') {
+                // Tab pone dos espacios en la selección (insert() es para snippets: agrega saltos de línea)
                 e.preventDefault();
-                insert('  ');
+                const el = e.currentTarget;
+                const [a, b] = [el.selectionStart, el.selectionEnd];
+                setBody(`${body.slice(0, a)}  ${body.slice(b)}`);
+                setTimeout(() => el.setSelectionRange(a + 2, a + 2));
               }
             }}
           />

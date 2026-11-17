@@ -186,3 +186,13 @@ describe('.turbo: ida y vuelta de todos los ejemplos', () => {
     }
   });
 });
+
+describe('nombre propio «Testbench N»', () => {
+  it('un testbench que el usuario llamó «Testbench 2» conserva el nombre al guardar y abrir', async () => {
+    const p0 = newProject('P');
+    const sim = { ...p0.variants[0].sims[0], name: 'Testbench 2' };
+    const p = { ...p0, variants: [{ ...p0.variants[0], sims: [sim] }] };
+    const { project } = await parseTurbo(await serializeTurbo(p));
+    expect(project.variants[0].sims[0].name).toBe('Testbench 2');
+  });
+});

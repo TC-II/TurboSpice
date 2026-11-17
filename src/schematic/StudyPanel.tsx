@@ -78,7 +78,7 @@ function Card({ title, enabled, onToggle, onRemove, children, extra }: { title: 
     <section className={`study-card${enabled ? '' : ' off'}`}>
       <header>
         <label className="check inline">
-          <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} aria-label={`Activar ${title}`} />
+          <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} aria-label={t('Enable {p0}', { p0: title })} />
           <strong>{title}</strong>
         </label>
         {extra}

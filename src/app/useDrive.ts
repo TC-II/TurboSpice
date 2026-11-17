@@ -26,9 +26,20 @@ export interface DriveDeps {
   savedAs(saved: FileState, p: Project, where?: string): void;
   remember(p: Project, f: FileState, unsaved?: boolean): void;
   openBytes(bytes: Uint8Array, name: string, at?: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'>): Promise<void>;
-  confirmDiscard(): boolean;
+  confirmDiscard(): Promise<boolean>;
   setDialog(d: Dialog | null): void;
   setMessage(m?: string): void;
+}
+
+/**
+ * ¿Hay en Drive algo que esta copia no vio? Sin versión conocida (un reciente cuya descarga falló, o
+ * una copia sin guardar) también cuenta: no se sabe qué se pisaría, así que se pregunta.
+ */
+export function driveChanged(known: string | undefined, current: string | undefined): boolean {
+  // un número es el `version` de Drive que guardaban las versiones anteriores (sube solo, #176):
+  // no sirve para comparar con la revisión del contenido
+  if (known && /^\d+$/.test(known)) return false;
+  return !!current && current !== known;
 }
 
 /** El proyecto abierto respecto de Drive (para el indicador) */
@@ -130,9 +141,7 @@ export function useDrive({
         const folder = client.cachedLibrary?.find((x) => x.id === m.parent);
         return recreate(client, folder && !folder.trashed ? folder.id : undefined);
       }
-      // un número es el `version` de Drive que guardaban las versiones anteriores (sube solo, #176):
-      // no sirve para comparar con la revisión del contenido
-      if (f.driveVersion && !/^\d+$/.test(f.driveVersion) && m.version && m.version !== f.driveVersion) return setDriveConflict({ name: m.name });
+      if (driveChanged(f.driveVersion, m.version)) return setDriveConflict({ name: m.name });
     }
     const rev = editRev.current;
     const p = { ...snapshotRef.current(), name: projectName(name) };
@@ -321,7 +330,7 @@ export function useDrive({
   useEffect(() => autoName(), [account, connected, dirty, autoName]);
 
   const openDriveFile = async (d: DriveFile) => {
-    if (!confirmDiscard()) return;
+    if (!(await confirmDiscard())) return;
     try {
       const bytes = await drive.download(d.id);
       setDialog(null);

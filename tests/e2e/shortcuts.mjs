@@ -266,8 +266,10 @@ await page.keyboard.press('Escape');
 await menu(page, 'Ver', 'Editor de netlist (SPICE)');
 await page.locator('.netlist-editor textarea').waitFor();
 await page.locator('.netlist-editor textarea').click();
-page.once('dialog', (d) => d.accept('3'));
+// (una caja en la barra, no el prompt del navegador)
 await page.keyboard.press('Control+g');
+await page.locator('.goto-line input').fill('3');
+await page.keyboard.press('Enter');
 const sel = await page.locator('.netlist-editor textarea').evaluate((t) => t.value.slice(0, t.selectionStart).split('\n').length);
 check(sel === 3, `Ctrl+G va a la línea 3 (${sel})`);
 await page.keyboard.press('Alt+r');

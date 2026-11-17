@@ -648,7 +648,7 @@ function reorientWindows(sym: SymbolInst, orient: Orient, lib: Library): SymbolI
 }
 
 /** Último punto fijo usado por documento resultante: rotar/espejar otra vez lo reutiliza */
-const lastPivot = new WeakMap<AscDoc, { key: string; c: Point }>();
+const lastPivot = new WeakMap<AscDoc, { keys: string[]; c: Point }>();
 const refsKey = (refs: ItemRef[]) =>
   refs
     .map((r) => `${r.kind}${r.index}`)
@@ -663,7 +663,7 @@ const refsKey = (refs: ItemRef[]) =>
  */
 export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Point {
   const last = lastPivot.get(doc);
-  if (last && last.key === refsKey(refs)) return last.c;
+  if (last && last.keys.includes(refsKey(refs))) return last.c;
   const one = refs.length === 1 && refs[0].kind === 'symbol' ? doc.symbols[refs[0].index] : undefined;
   const oneDef = one && lib.symbol(one.type);
   if (one && oneDef) {
@@ -701,7 +701,16 @@ export function transformPivot(doc: AscDoc, refs: ItemRef[], lib: Library): Poin
 
 /** Rota (90° horario) o espeja la selección alrededor de un punto fijo (transformPivot) */
 export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): AscDoc {
-  if (!refs.length) return doc;
+  return transformSelection(doc, refs, op, lib).doc;
+}
+
+/**
+ * Como transformItems, pero devuelve también la selección vista sobre el documento nuevo: al
+ * partir y fundir cables los índices cambian (como al mover), y con la selección vieja quedarían
+ * elegidos otros cables.
+ */
+export function transformSelection(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mirror', lib: Library): { doc: AscDoc; refs: ItemRef[] } {
+  if (!refs.length) return { doc, refs };
   const c = transformPivot(doc, refs, lib);
   const tp = (p: Point): Point => (op === 'rotate' ? { x: c.x - (p.y - c.y) + 0, y: c.y + (p.x - c.x) + 0 } : { x: 2 * c.x - p.x + 0, y: p.y });
 
@@ -725,9 +734,13 @@ export function transformItems(doc: AscDoc, refs: ItemRef[], op: 'rotate' | 'mir
     shapes: doc.shapes.map((x, i) => (sh.has(i) ? mapShape(x, tp, op === 'mirror') : x)),
   };
   // rotado sobre un cable: se parte en sus pines igual que al moverlo
-  const out = mergeCollinear(cutNew(turned, refs, lib).doc, lib);
-  lastPivot.set(out, { key: refsKey(refs), c });
-  return out;
+  const cut = cutNew(turned, refs, lib);
+  const out = mergeCollinear(cut.doc, lib);
+  // los cables elegidos, donde terminaron (los tramos tras partir), buscados sobre el resultado fundido
+  const segs = cut.refs.filter((r) => r.kind === 'wire').map((r) => cut.doc.wires[r.index]);
+  const newRefs: ItemRef[] = [...cut.refs.filter((r) => r.kind !== 'wire'), ...wiresOn(out, segs).map((index) => ({ kind: 'wire' as const, index }))];
+  lastPivot.set(out, { keys: [refsKey(refs), refsKey(newRefs)], c });
+  return { doc: out, refs: newRefs };
 }
 
 export function setSymbolAttrs(doc: AscDoc, index: number, attrs: Record<string, string | null>): AscDoc {

@@ -22,7 +22,7 @@ export interface ProjectFileDeps {
   recent: RecentFile[];
   setLtIndex(index: LtspiceIndex | undefined): void;
   turboBytes(name: string): Promise<{ p: Project; bytes: Uint8Array }>;
-  confirmDiscard(): boolean;
+  confirmDiscard(): Promise<boolean>;
   openBytes(bytes: Uint8Array, name: string, at?: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'>, variant?: string): Promise<void>;
   remember(p: Project, f: FileState, unsaved?: boolean): void;
   loadDoc(d: AscDoc, ascName: string): Project;
@@ -32,6 +32,13 @@ export interface ProjectFileDeps {
   warnMissing(d: AscDoc): void;
   setDialog(d: Dialog | null): void;
   setMessage(m?: string): void;
+}
+
+/** Los bytes de un ejemplo de public/examples; un 404 o la falta de red no deben llegar a abrirse como proyecto */
+export async function fetchExample(name: string, get: typeof fetch = fetch): Promise<Uint8Array> {
+  const r = await get(`${BASE}examples/${encodeURIComponent(name)}`);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return new Uint8Array(await r.arrayBuffer());
 }
 
 export function projectFileActions({
@@ -98,7 +105,7 @@ export function projectFileActions({
 
   const doRecent = async (i: number) => {
     const r = recent[i];
-    if (!r || !confirmDiscard()) return;
+    if (!r || !(await confirmDiscard())) return;
     // el archivo en disco si se puede leer (puede haber cambiado); si no, la copia guardada
     const bytes = r.unsaved ? null : r.driveId && google.account ? await drive.download(r.driveId).catch(() => null) : await readHandle(r.handle);
     const driveVersion =
@@ -129,17 +136,20 @@ export function projectFileActions({
   };
 
   /** Proyecto nuevo, vacío (false: el usuario no quiso descartar los cambios) */
-  const doNew = () => {
-    if (!confirmDiscard()) return false;
+  const doNew = async () => {
+    if (!(await confirmDiscard())) return false;
     loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
     return true;
   };
 
   /** Abre un proyecto de public/examples, opcionalmente en una de sus variantes */
   const doExample = async (name: string, variant?: string) => {
-    if (!confirmDiscard()) return;
-    const b = await (await fetch(`${BASE}examples/${encodeURIComponent(name)}`)).arrayBuffer();
-    return openBytes(new Uint8Array(b), name, {}, variant);
+    if (!(await confirmDiscard())) return;
+    try {
+      return await openBytes(await fetchExample(name), name, {}, variant);
+    } catch (e) {
+      setMessage(t('Could not open the example: {p0}', { p0: (e as Error).message }));
+    }
   };
 
   return { doImportLtspice, doRemoveLtspice, ascName, doShare, doExport, exportName, doRecent, doNew, doExample };

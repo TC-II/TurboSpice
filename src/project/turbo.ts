@@ -137,8 +137,7 @@ export function newProject(name: string, benchName?: string): Project {
  */
 export function asBenches(p: Project): Project {
   const v0 = p.variants[0];
-  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.every((s) => !s.name || !isDefaultBenchName(s.name)) && v0.sims.some((s) => s.id === v0.activeSim) && p.groups)
-    return p;
+  if (p.variants.length === 1 && v0.id === BENCHES && v0.sims.length && v0.sims.some((s) => s.id === v0.activeSim) && p.groups) return p;
   const groups = [...(p.groups ?? [])];
   const several = p.variants.length > 1;
   const sims: Sim[] = [];
@@ -163,9 +162,10 @@ export function asBenches(p: Project): Project {
         if (!g) groups.push((g = { id: `g_${v.id}`, name: v.name }));
         group = g.id;
       }
-      // sin nombre propio (o con el «Testbench N» que se ponía antes) queda sin `name`: lleva el
-      // automático, que sigue a su análisis (analysisLabel)
-      const own = s.name && !isDefaultBenchName(s.name) ? s.name : undefined;
+      // sin nombre propio (o, al migrar una variante, con el «Testbench N» que se ponía antes) queda
+      // sin `name`: lleva el automático, que sigue a su análisis (analysisLabel). Los testbenches
+      // actuales (v.id === BENCHES) conservan su nombre aunque sea «Testbench 2»: lo puso el usuario
+      const own = s.name && (v.id === BENCHES || !isDefaultBenchName(s.name)) ? s.name : undefined;
       const fixed = v.id === BENCHES || group || (v.sims.length && !several) ? own : v.name;
       const { name: _, ...rest } = s;
       sims.push({ ...rest, ...(fixed ? { name: unique(fixed) } : {}), ...(group ? { group } : {}) });

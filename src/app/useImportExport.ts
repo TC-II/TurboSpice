@@ -24,7 +24,7 @@ export interface ImportExportDeps {
   markDirty(): void;
   leave(): Project;
   enter(p: Project, refit?: boolean): void;
-  confirmDiscard(): boolean;
+  confirmDiscard(): Promise<boolean>;
   openBytes(bytes: Uint8Array, name: string, at?: Pick<FileState, 'handle' | 'driveId' | 'driveVersion'>): Promise<void>;
   /** qué hacer con un archivo que ya está en el proyecto */
   askConflict(name: string): Promise<FileConflict>;
@@ -57,7 +57,7 @@ export function useImportExport({
     // un .turbo es un proyecto entero: se abre (Abrir lleva a Importar)
     const turbo = list.find((f) => /\.turbo$/i.test(f.name));
     if (turbo) {
-      if (!confirmDiscard()) return;
+      if (!(await confirmDiscard())) return;
       try {
         return void (await openBytes(new Uint8Array(await turbo.arrayBuffer()), turbo.name, {}));
       } catch (e) {

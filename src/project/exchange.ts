@@ -281,9 +281,10 @@ export function exportSubcktNetlist(p: Project, name: string, lib: SymbolSource)
 export function subcktFilesFrom(entries: ZipEntry[], existing: ProjectFile[], makeSym: (name: string, asc: string) => ProjectFile): ProjectFile[] {
   const out: ProjectFile[] = [];
   for (const e of entries) {
-    const name = baseName(e.path.replace(/\\/g, '/'));
+    // el último tramo de la ruta; baseName() de asc/model quita el «.asy» y el símbolo se perdía
+    const name = e.path.replace(/\\/g, '/').split('/').pop()!;
     if (!name || name.startsWith('.')) continue;
-    const text = decode(e.data).text;
+    const text = decodeText(e.data);
     if (/\.asc$/i.test(name)) out.push({ name, kind: 'schematic', text });
     else {
       const kind = projectFileKind(name);

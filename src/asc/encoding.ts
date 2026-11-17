@@ -12,6 +12,15 @@ export function detectEncoding(bytes: Uint8Array): AscEncoding {
 export function decode(bytes: Uint8Array): { text: string; encoding: AscEncoding } {
   const encoding = detectEncoding(bytes);
   // TextDecoder descarta el BOM por defecto
+  if (encoding === 'windows-1252' && bytes.some((b) => b >= 0x80)) {
+    // UTF-8 (con o sin BOM) válido: se lee así. Se guarda luego como windows-1252 (o UTF-16LE si
+    // no entra), que es lo que lee LTspice; la ida y vuelta conserva el texto.
+    try {
+      return { text: new TextDecoder('utf-8', { fatal: true }).decode(bytes), encoding };
+    } catch {
+      // no es UTF-8
+    }
+  }
   return { text: new TextDecoder(encoding).decode(bytes), encoding };
 }
 
@@ -22,13 +31,6 @@ export function decode(bytes: Uint8Array): { text: string; encoding: AscEncoding
  * nunca es UTF-8 válido.
  */
 export function decodeText(bytes: Uint8Array): string {
-  if (detectEncoding(bytes) === 'windows-1252' && bytes.some((b) => b >= 0x80)) {
-    try {
-      return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    } catch {
-      // no es UTF-8
-    }
-  }
   return decode(bytes).text;
 }
 

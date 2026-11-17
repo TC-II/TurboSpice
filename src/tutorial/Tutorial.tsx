@@ -281,6 +281,21 @@ export function Tutorial({
   // el mapa de misiones es modal; la tarjeta de una misión no (se trabaja en la app con ella abierta)
   const hub = useRef<HTMLDivElement>(null);
   useDialogFocus(hub, view.kind === 'hub');
+  // «Reiniciar el progreso» pide confirmación en el mismo lugar (no con el confirm del navegador)
+  const [resetAsk, setResetAsk] = useState(false);
+  // Escape cierra el mapa, como cualquier otro diálogo (o sólo la pregunta de reinicio, si está)
+  const isHub = view.kind === 'hub';
+  useEffect(() => {
+    if (!isHub) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      if (resetAsk) setResetAsk(false);
+      else onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isHub, resetAsk, onClose]);
 
   // ── tarjeta arrastrable ──
   const card = useRef<HTMLDivElement>(null);
@@ -395,12 +410,27 @@ export function Tutorial({
                 .map((l) => l.name)
                 .join(' → ')}
             </span>
-            <button
-              className="link"
-              onClick={() => window.confirm(t('Erase all your progress in the Academy?')) && save((p) => ({ xp: 0, ch: {}, sound: p.sound, epoch: (p.epoch ?? 0) + 1, pos: p.pos }))}
-            >
-              {t('Reset progress')}
-            </button>
+            {resetAsk ? (
+              <span className="tut-reset-ask" role="alert">
+                {t('Erase all your progress in the Academy?')}{' '}
+                <button
+                  className="link danger"
+                  onClick={() => {
+                    setResetAsk(false);
+                    save((p) => ({ xp: 0, ch: {}, sound: p.sound, epoch: (p.epoch ?? 0) + 1, pos: p.pos }));
+                  }}
+                >
+                  {t('Erase it')}
+                </button>{' '}
+                <button className="link" onClick={() => setResetAsk(false)} autoFocus>
+                  {t('Cancel')}
+                </button>
+              </span>
+            ) : (
+              <button className="link" onClick={() => setResetAsk(true)}>
+                {t('Reset progress')}
+              </button>
+            )}
           </footer>
         </div>
       </div>,

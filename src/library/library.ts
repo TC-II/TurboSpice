@@ -97,6 +97,8 @@ export class Library implements SymbolSource {
    * modelos por nombre de archivo.
    */
   private ltSymbols = new Map<string, string>();
+  /** ruta que dio el símbolo guardado bajo cada nombre base en ltSymbols */
+  private ltNameOwner = new Map<string, string>();
   private ltModels = new Map<string, { name: string; text: string; subckts: string[]; models: string[] }>();
 
   readonly bundle: LibraryBundle;
@@ -171,8 +173,16 @@ export class Library implements SymbolSource {
   /** Símbolo de la librería de LTspice del usuario, por su ruta relativa a lib/sym (sin .asy) */
   addLtspiceSymbol(path: string, asyText: string): void {
     const p = path.toLowerCase();
+    const name = baseName(p);
     this.ltSymbols.set(p, asyText);
-    if (!this.ltSymbols.has(baseName(p))) this.ltSymbols.set(baseName(p), asyText);
+    // el nombre base apunta al primero que lo trajo; recargar ese mismo .asy lo actualiza
+    if (!this.ltSymbols.has(name) || this.ltNameOwner.get(name) === p) {
+      this.ltSymbols.set(name, asyText);
+      this.ltNameOwner.set(name, p);
+    }
+    // el símbolo parseado queda en caché por clave: sin esto, recargar un .asy devuelve el viejo
+    this.cache.delete(`ltspice:${p}`);
+    this.cache.delete(`ltspice:${name}`);
     this.symbolsChanged();
   }
 

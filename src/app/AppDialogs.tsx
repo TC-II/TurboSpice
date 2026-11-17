@@ -98,6 +98,9 @@ export interface AppDialogsProps {
   resolveDriveConflict(how: 'reload' | 'copy' | 'overwrite'): Promise<void>;
   conflict: FileConflictAsk | null;
   setConflict(c: FileConflictAsk | null): void;
+  /** pregunta pendiente de descartar los cambios sin guardar */
+  discardAsk: { resolve(ok: boolean): void } | null;
+  setDiscardAsk(a: { resolve(ok: boolean): void } | null): void;
   schFont: string;
   setSchFont(id: string): void;
   schLw: number;
@@ -134,6 +137,8 @@ export function AppDialogs(props: AppDialogsProps) {
     resolveDriveConflict,
     conflict,
     setConflict,
+    discardAsk,
+    setDiscardAsk,
     schFont,
     setSchFont,
     schLw,
@@ -149,6 +154,10 @@ export function AppDialogs(props: AppDialogsProps) {
     saveDriveAs,
   } = props;
   const { curSim, sims, deleteSim, deleteVariant, exportName, slots, opAnnotations, lvNow, simScope } = props;
+  const answerDiscard = (ok: boolean) => {
+    setDiscardAsk(null);
+    discardAsk?.resolve(ok);
+  };
   return (
     <>
       {dialog?.kind === 'picker' && (
@@ -553,6 +562,20 @@ export function AppDialogs(props: AppDialogsProps) {
             else setTool({ kind: 'flag', name, ioPin: io || undefined });
           }}
         />
+      )}
+      {/* al final: va encima del diálogo desde el que se pidió abrir otro proyecto */}
+      {discardAsk && (
+        <Modal title={t('Unsaved changes')} onClose={() => answerDiscard(false)}>
+          <p>{t('This project has changes that are not saved. If you continue, they are lost.')}</p>
+          <div className="buttons">
+            <button onClick={() => answerDiscard(false)} autoFocus>
+              {t('Keep editing')}
+            </button>
+            <button className="danger" onClick={() => answerDiscard(true)}>
+              {t('Discard changes')}
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   );

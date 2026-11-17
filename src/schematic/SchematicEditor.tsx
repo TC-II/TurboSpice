@@ -51,6 +51,7 @@ import {
   type Box,
   type ItemRef,
 } from './geometry.ts';
+import { isTyping } from '../app/helpers.ts';
 import { AnnotationLayer, NetNamesLayer, pairedPoints, type Annotation, type NetName } from './NetNames.tsx';
 import type { BiasInfo } from '../sim/bias.ts';
 import { CurrentArrowsLayer, type CurrentArrow } from './currentArrows.tsx';
@@ -165,6 +166,9 @@ interface Props {
   /** cambios contra la corrida anterior (historial, #153) */
   diff?: CircuitDiff;
 }
+
+/** Espacio no es «mano» si se escribe en un campo o hay un diálogo abierto (el que espera un click del esquema no cuenta) */
+const spaceBlocked = (e: KeyboardEvent) => isTyping(e) || !!document.querySelector('.modal-backdrop:not(.picking)');
 
 export function SchematicEditor(props: Props) {
   const {
@@ -390,17 +394,21 @@ export function SchematicEditor(props: Props) {
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+      if (e.code === 'Space' && !e.repeat && !spaceBlocked(e)) {
         spaceDown.current = true;
         spaceUsed.current = false;
       }
     };
     const up = (e: KeyboardEvent) => e.code === 'Space' && (spaceDown.current = false);
     window.addEventListener('keydown', down);
+    // soltar Espacio fuera de la ventana (Alt+Tab) no manda keyup: sin esto queda pegado
+    const off = () => (spaceDown.current = false);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', off);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', off);
     };
   }, []);
 
@@ -1028,19 +1036,34 @@ export function SchematicEditor(props: Props) {
     window.addEventListener('blur', off);
     return () => window.removeEventListener('blur', off);
   }, []);
-  const onPointerUp = (e: React.PointerEvent) => {
+  /** Un dedo se levanta o se cancela: true si era parte de un pellizco (no hay más que hacer) */
+  const touchEnd = (e: React.PointerEvent) => {
     if (e.pointerType !== 'mouse') setHoverNet(undefined);
-    if (e.pointerType === 'touch') {
-      touches.current.delete(e.pointerId);
-      clearTimeout(longPress.current);
-      if (pinch.current) {
-        if (touches.current.size < 2) {
-          pinch.current = null;
-          commitView();
-        }
-        return;
-      }
+    if (e.pointerType !== 'touch') return false;
+    touches.current.delete(e.pointerId);
+    clearTimeout(longPress.current);
+    if (!pinch.current) return false;
+    if (touches.current.size < 2) {
+      pinch.current = null;
+      commitView();
     }
+    return true;
+  };
+  /** (tras un cancel la captura ya puede no existir: soltarla sin captura tira NotFoundError) */
+  const releaseCapture = (id: number) => {
+    if (svgRef.current?.hasPointerCapture(id)) svgRef.current.releasePointerCapture(id);
+  };
+  /** El sistema cancela el gesto (Alt+Tab, gesto táctil): se descarta lo arrastrado, sin confirmar nada */
+  const onPointerCancel = (e: React.PointerEvent) => {
+    if (touchEnd(e) || !drag) return;
+    if (drag.mode === 'pan') commitView();
+    setDrag(null);
+    setPreview(null);
+    setBoxEnd(null);
+    releaseCapture(e.pointerId);
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (touchEnd(e)) return;
     if (!drag) return;
     if (drag.mode === 'pencil' && drag.pts.length > 1) {
       const style = newStrokeStyle(penPrefs(), tool.kind === 'pencil' ? tool.style : undefined);
@@ -1106,7 +1129,7 @@ export function SchematicEditor(props: Props) {
       if (tool.kind === 'move') {
         setSelection(found);
         if (found.length) setTool({ ...tool, refs: found, start: snapPoint(boxEnd) });
-      } else if (!drag.erase) setSelection(drag.additive ? [...selection, ...found] : found);
+      } else if (!drag.erase) setSelection(drag.additive ? [...selection, ...found.filter((r) => !selection.some((q) => sameRef(q, r)))] : found);
     }
     if (drag.mode === 'probe') {
       const to = boxEnd && probeTarget(boxEnd, true);
@@ -1132,7 +1155,7 @@ export function SchematicEditor(props: Props) {
     setDrag(null);
     setPreview(null);
     setBoxEnd(null);
-    svgRef.current!.releasePointerCapture(e.pointerId);
+    releaseCapture(e.pointerId);
   };
 
   /**
@@ -1285,6 +1308,13 @@ export function SchematicEditor(props: Props) {
 
   return (
     <>
+      {/* lienzo vacío: por dónde empezar (no recibe el puntero, y se va al elegir una herramienta) */}
+      {tool.kind === 'select' && !doc.symbols.length && !doc.wires.length && !doc.flags.length && !doc.texts.length && !doc.shapes.length && (
+        <div className="canvas-empty">
+          <strong>{t('This schematic is empty')}</strong>
+          <span>{t('Press P to pick a component, W to draw wires and G for ground, or open an example from the menu.')}</span>
+        </div>
+      )}
       <svg
         ref={svgRef}
         className={`editor tool-${cursorClass}${lod ? ` lod-${lod}` : ''}`}
@@ -1308,7 +1338,7 @@ export function SchematicEditor(props: Props) {
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
+        onPointerCancel={onPointerCancel}
         onPointerLeave={() => {
           setTip(null);
           setHoverNet(undefined);

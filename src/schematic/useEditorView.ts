@@ -6,6 +6,7 @@ import type { Point } from '../asc/model.ts';
 import type { Box } from './geometry.ts';
 import type { View } from './editorTypes.ts';
 import { HEAVY_NODES } from './editorDoc.ts';
+import { wheelZoom } from '../waveform/scales.ts';
 
 export function useEditorView(svgRef: RefObject<SVGSVGElement | null>) {
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -98,10 +99,11 @@ export function useEditorView(svgRef: RefObject<SVGSVGElement | null>) {
     return { x: v.cx - size.w / 2 / v.scale + (e.clientX - r.left) / v.scale, y: v.cy - size.h / 2 / v.scale + (e.clientY - r.top) / v.scale };
   };
 
-  const onWheel = (e: { clientX: number; clientY: number; deltaY: number; timeStamp: number }) => {
+  const onWheel = (e: { clientX: number; clientY: number; deltaY: number; deltaMode?: number; timeStamp: number }) => {
     const p = toDoc(e);
     const v = liveView();
-    const k = Math.exp(-e.deltaY * 0.0015);
+    // (Firefox con rueda de mouse da el delta en líneas, no en píxeles: wheelZoom lo pasa a píxeles)
+    const k = 1 / wheelZoom({ deltaY: e.deltaY, deltaMode: e.deltaMode ?? 0 });
     const scale = Math.min(8, Math.max(0.03, v.scale * k));
     if (e.timeStamp - lastWheel.current > 500) pushView();
     lastWheel.current = e.timeStamp;

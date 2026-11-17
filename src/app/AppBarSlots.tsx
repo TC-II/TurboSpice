@@ -22,18 +22,25 @@ export function AppBarRight({
   exporting: boolean;
   doShare(): void;
 }) {
+  // el estado actual va también en el nombre accesible (el title solo no lo lee un lector de pantalla)
+  const themeName = theme === 'auto' ? t('automatic (system)') : theme === 'light' ? t('light') : t('dark');
   return createPortal(
     <>
       <button
         className="theme-btn"
-        aria-label={t('Change theme')}
-        title={t('Theme: {p0}', { p0: theme === 'auto' ? t('automatic (system)') : theme === 'light' ? t('light') : t('dark') })}
+        aria-label={`${t('Change theme')} — ${themeName}`}
+        title={t('Theme: {p0}', { p0: themeName })}
         onClick={() => setTheme(theme === 'auto' ? 'light' : theme === 'light' ? 'dark' : 'auto')}
       >
         <Icon name={theme === 'dark' ? 'moon' : 'sun'} />
         {theme === 'auto' && <span className="auto">A</span>}
       </button>
-      <button className="lang-btn" aria-label={t('Change language')} title={t('Language: English · Spanish (the page reloads; your work is kept)')} onClick={switchLang}>
+      <button
+        className="lang-btn"
+        aria-label={`${t('Change language')} — ${getLang() === 'en' ? t('English') : t('Spanish')}`}
+        title={t('Language: English · Spanish (the page reloads; your work is kept)')}
+        onClick={switchLang}
+      >
         <span className={getLang() === 'en' ? 'on' : ''}>EN</span>
         <span className={getLang() === 'es' ? 'on' : ''}>ES</span>
       </button>

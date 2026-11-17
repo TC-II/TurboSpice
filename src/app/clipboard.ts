@@ -41,15 +41,22 @@ export function clipboardActions({ doc, lib, selection, setSelection, setTool, c
     if (!selection.length) return;
     const text = serializeAsc(extractItems(doc, selection));
     clipboardFallback = text;
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // sin permiso: queda la copia interna
-    }
+    // la copia se pide ya (dentro del gesto del usuario) pero no se espera: durante el await el
+    // esquema puede cambiar y `doc`/`selection` quedarían viejos al borrar
+    const written = (async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        // sin permiso: queda la copia interna
+      }
+    })();
+    // cortar borra antes del await: la copia interna ya está guardada, así que aunque el portapapeles
+    // falle no se pierde nada (y Ctrl+Z lo deshace)
     if (cut) {
       commit(deleteItems(doc, selection, lib));
       setSelection([]);
     }
+    await written;
   };
   /** Ciclos (#199): un subcircuito no se puede colocar adentro de sí mismo, ni indirectamente */
   const makesCycle = (types: string[]): boolean => {

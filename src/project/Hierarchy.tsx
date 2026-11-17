@@ -7,6 +7,7 @@ import { Icon } from '../ui/icons.tsx';
 import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { NameInput } from '../ui/EditableName.tsx';
 import { t } from '../i18n/i18n.ts';
+import { treeRoots } from './treeRoots.ts';
 
 /** Un nivel de la jerarquía abierta: el subcircuito y la instancia por la que se bajó (si se bajó) */
 export interface Level {
@@ -365,9 +366,8 @@ export function ProjectTree({
   };
   const [usesOf, setUsesOf] = useState('');
   const byName = new Map(subs.map((s) => [s.name.toLowerCase(), s]));
-  // raíces: los que no usa ningún otro subcircuito
-  const nested = new Set(subs.flatMap((s) => s.children.map((c) => c.toLowerCase())));
-  const roots = subs.filter((s) => !nested.has(s.name.toLowerCase()));
+  // raíces: los que no usa ningún otro subcircuito (y uno por cada ciclo que quedaría fuera)
+  const roots = treeRoots(subs);
   const node = (s: TreeSub, depth: number, seen: string[]): JSX.Element => (
     <li key={`${seen.join('/')}/${s.name}`}>
       <div className={`tree-row${current.toLowerCase() === s.name.toLowerCase() ? ' active' : ''}`} style={{ paddingLeft: 8 + depth * 14 }}>

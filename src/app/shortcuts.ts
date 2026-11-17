@@ -199,7 +199,8 @@ export function useShortcuts(a: ShortcutActions) {
       if (ctrl) return;
       if (lk === 'z') return handled(), e.shiftKey ? editor.current?.zoomPrev() : zoomBox();
       if (lk === 'h') return handled(), setNetHover((v) => !v);
-      switch (k) {
+      // (lk: con Bloq Mayús las letras llegan en mayúscula y tienen que andar igual)
+      switch (lk) {
         case 'Escape':
           plotPanel.current?.action('cancel');
           setTool({ kind: 'select' });
@@ -229,7 +230,6 @@ export function useShortcuts(a: ShortcutActions) {
         case 'w':
           return handled(), setTool({ kind: 'wire', start: null });
         case 'f':
-        case 'F':
           // lápiz; con Shift, la goma
           return handled(), pencilTool(e.shiftKey);
         case 'n':

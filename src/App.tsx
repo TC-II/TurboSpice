@@ -35,7 +35,7 @@ import { EXT, newProject, type Project } from './project/turbo.ts';
 import type { Probe as TutorialProbe } from './tutorial/lessons.ts';
 import { diffCircuits } from './project/diff.ts';
 import { effectiveAttrs } from './asc/resolve.ts';
-import { allItems, transformItems } from './schematic/edit.ts';
+import { allItems, transformSelection } from './schematic/edit.ts';
 import type { ItemRef } from './schematic/geometry.ts';
 import { type EditorHandle, type Tool, type View as EditorView } from './schematic/SchematicEditor.tsx';
 import { type TreeSub } from './project/Hierarchy.tsx';
@@ -549,11 +549,15 @@ function SchematicMode({
     warnMissing: (d) => warnMissing(d),
   });
 
+  // «¿Descartar los cambios sin guardar?»: aparte de `dialog`, porque se pregunta con otro diálogo
+  // abierto (Mis proyectos) y cancelar tiene que volver a él
+  const [discardAsk, setDiscardAsk] = useState<{ resolve(ok: boolean): void } | null>(null);
   const { confirmDiscard, doOpen, doImport, snapshot, turboBytes, turboName, savedAs, doSaveLocal } = savingActions({
     ...{ dirty, setDirty, file, setFile, projectRef, setProjectState, pathRef, docRef, sims, remember, setDialog, setMessage },
     // (declaradas más abajo)
     liveView: () => liveView(),
     openDriveFile: (d) => openDriveFile(d),
+    askDiscard: () => new Promise<boolean>((resolve) => setDiscardAsk({ resolve })),
   });
 
   const { driveConflict, setDriveConflict, setAutoDrive, resolveDriveConflict, doSaveDrive, saveDriveAs, openDriveFile, sync, syncNow, reconnectDrive } = useDrive({
@@ -585,7 +589,7 @@ function SchematicMode({
     warnMissing: (d) => warnMissing(d), // (declarada más abajo)
   });
   // un proyecto nuevo se ve con su panel abierto (para agregarle testbenches y módulos)
-  const doNew = () => newFile() && setTreeOpen(true);
+  const doNew = () => void newFile().then((ok) => ok && setTreeOpen(true));
   const exporting = dialog?.kind === 'export';
 
   /** Expresiones de todas las trazas (las que se ven y las recordadas por análisis), para pedir
@@ -829,9 +833,16 @@ function SchematicMode({
   const rotateOrMirror = (op: 'rotate' | 'mirror') => {
     if (op === 'rotate' && editor.current?.rotateLabel()) return;
     // lo pegado que sigue al cursor (Ctrl+V) gira dentro de su documento todavía sin confirmar
-    if (tool.kind === 'move' && tool.base && tool.refs) setTool({ ...tool, base: transformItems(tool.base, tool.refs, op, lib) });
-    else if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
-    else if (selection.length) commit(transformItems(doc, selection, op, lib));
+    // (rotar parte y funde cables: la selección se reubica sobre el documento nuevo, como al mover)
+    if (tool.kind === 'move' && tool.base && tool.refs) {
+      const r = transformSelection(tool.base, tool.refs, op, lib);
+      setTool({ ...tool, base: r.doc, refs: r.refs });
+    } else if (tool.kind === 'place') setTool({ ...tool, orient: op === 'rotate' ? rotateCW(tool.orient) : mirrorX(tool.orient) });
+    else if (selection.length) {
+      const r = transformSelection(doc, selection, op, lib);
+      commit(r.doc);
+      setSelection(r.refs);
+    }
   };
 
   /** Listas de library/cmp de las que se elige el valor de un componente (vacío si no tiene) */
@@ -932,7 +943,7 @@ function SchematicMode({
       const f = all[0];
       if (!f) return;
       if (f.name.toLowerCase().endsWith('.plt')) return importPlt(new Uint8Array(await f.arrayBuffer()));
-      if (all.length === 1 && /\.turbo$/i.test(f.name)) return confirmDiscard() && openBytes(new Uint8Array(await f.arrayBuffer()), f.name);
+      // un .turbo se abre (importFiles: con su aviso si está dañado o es de una versión más nueva);
       // lo demás (.asc, varios archivos, un .zip, símbolos y modelos) se suma al proyecto abierto:
       // cada .asc, un workbench nuevo (#316)
       return importFiles(all);
@@ -944,6 +955,12 @@ function SchematicMode({
       window.removeEventListener('drop', drop);
     };
   });
+
+  // El título de la pestaña dice qué proyecto es (con varias pestañas, cada una tiene el suyo) y si
+  // tiene cambios sin guardar en un archivo
+  useEffect(() => {
+    document.title = `${dirty ? '• ' : ''}${file.name.replace(/\.(turbo|asc)$/i, '')} — TurboSpice`;
+  }, [dirty, file.name]);
 
   const running = status.kind === 'running';
   // Vistas (#36): esquemático y resultados prendidos = pantalla partida; con uno solo, ése a toda
@@ -1228,7 +1245,7 @@ function SchematicMode({
         />
 
         <div className="work-row">
-          <div className={`workspace${resultsSide ? ' side' : ''}${resultsWin ? ' expand-schematic' : sim && expanded ? ` expand-${expanded}` : ''}`}>
+          <div role="main" className={`workspace${resultsSide ? ' side' : ''}${resultsWin ? ' expand-schematic' : sim && expanded ? ` expand-${expanded}` : ''}`}>
             <div
               onMouseMove={(e) => {
                 // acercar el mouse al borde izquierdo muestra el panel (si se tildó, en modo selección)
@@ -1380,6 +1397,8 @@ function SchematicMode({
             resolveDriveConflict,
             conflict,
             setConflict,
+            discardAsk,
+            setDiscardAsk,
             schFont,
             setSchFont,
             schLw,

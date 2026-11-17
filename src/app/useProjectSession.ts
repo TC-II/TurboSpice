@@ -70,7 +70,7 @@ export interface ProjectSessionDeps {
   setCurModel(name: string): void;
   setMessage(m?: string): void;
   snapshot(): Project;
-  confirmDiscard(): boolean;
+  confirmDiscard(): Promise<boolean>;
   warnMissing(d: AscDoc): void;
 }
 
@@ -171,7 +171,9 @@ export function useProjectSession(d: ProjectSessionDeps) {
   const remember = useCallback((p: Project, f: FileState, unsaved = false) => {
     serializeTurbo(p)
       .then((turbo) => addRecent({ name: f.name, asc: turbo, turbo: true, handle: f.handle, driveId: f.driveId, time: Date.now(), unsaved }))
-      .then(setRecent);
+      .then(setRecent)
+      // (recientes es una comodidad: si no se puede anotar, el proyecto se abre igual)
+      .catch((e) => console.error(e));
   }, []);
 
   /** Abre los bytes de un .turbo o de un .asc (`at`: dónde está el archivo, si es un .turbo) */
@@ -236,37 +238,51 @@ export function useProjectSession(d: ProjectSessionDeps) {
       const keepSession = () => {
         if (session?.dirty) addRecent({ name: session.name, asc: session.turbo, turbo: true, time: session.time, unsaved: true }).then(setRecent);
       };
-      if (await openShared()) return keepSession();
+      // Un link o un ejemplo que no se puede abrir (un .turbo de una versión más nueva, sin red) no
+      // corta acá: se sigue con la sesión guardada. Si no, la pestaña quedaba con un proyecto vacío
+      // y el autoguardado pisaba el trabajo recuperado.
+      let failed: string | undefined;
+      try {
+        if (await openShared()) return keepSession();
+      } catch (e) {
+        failed = t("The link couldn't be opened: {error}", { error: (e as Error).message });
+      }
       const example = new URLSearchParams(location.search).get('example');
       if (example && EXAMPLE_NAME.test(example)) {
         window.history.replaceState(null, '', location.pathname + location.hash);
-        const r = await fetch(`${BASE}examples/${encodeURIComponent(example)}`);
-        if (r.ok) {
+        try {
+          const r = await fetch(`${BASE}examples/${encodeURIComponent(example)}`);
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
           // sin pasar por recientes: es lo que se ve al entrar, no algo que abrió el usuario
           const { project: p } = await parseTurbo(new TextDecoder().decode(await r.arrayBuffer()));
           if (touched.current) return;
           loadProject(p, { name: example });
           return keepSession();
+        } catch (e) {
+          failed = t("The example {name} couldn't be loaded: {error}", { name: example, error: (e as Error).message });
         }
       }
-      if (touched.current) return;
+      if (touched.current) return failed && setMessage(failed);
       if (session) {
         try {
           const { project: p, warnings } = await parseTurbo(session.turbo);
           if (touched.current) return;
           loadProject(p, { name: session.name, handle: session.handle as FileState['handle'], driveId: session.driveId, driveVersion: session.driveVersion });
           setDirty(session.dirty);
-          const notes = [...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: dateTime(session.time) })] : []), ...warnings];
+          const notes = [...(failed ? [failed] : []), ...(session.dirty ? [t('Recovered unsaved work ({p0})', { p0: dateTime(session.time) })] : []), ...warnings];
           if (notes.length) setMessage(notes.join(' · '));
           return;
         } catch {
-          // sesión ilegible: seguir con un proyecto vacío
+          // sesión ilegible: queda en recientes tal cual (por si se puede rescatar) y se sigue con un proyecto vacío
+          keepSession();
+          failed ??= t("The project you were working on couldn't be restored: it's in Recent as unsaved work.");
         }
       }
       loadProject(newProject(DEFAULT_PROJECT), { name: `${DEFAULT_PROJECT}${EXT}` });
-      if (elsewhere) setMessage(t('The project you were working on is open in another tab: this one starts a new project.'));
+      if (failed) setMessage(failed);
+      else if (elsewhere) setMessage(t('The project you were working on is open in another tab: this one starts a new project.'));
     })()
-      .catch(() => {})
+      .catch((e) => setMessage(t("The project couldn't be restored: {error}", { error: (e as Error).message })))
       .finally(() => setRestored(true));
   });
   // sólo al montar (restore es estable)
@@ -304,7 +320,10 @@ export function useProjectSession(d: ProjectSessionDeps) {
   // Un link compartido abierto con la app ya cargada
   useEffect(() => {
     const h = () => {
-      if (/[#&]c=/.test(location.hash) && confirmDiscard()) openShared();
+      if (!/[#&]c=/.test(location.hash)) return;
+      confirmDiscard()
+        .then((ok) => ok && openShared())
+        .catch((e) => setMessage(t("The link couldn't be opened: {error}", { error: (e as Error).message })));
     };
     window.addEventListener('hashchange', h);
     return () => window.removeEventListener('hashchange', h);

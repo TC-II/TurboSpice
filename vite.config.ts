@@ -30,6 +30,9 @@ export default defineConfig({
   // los tests unitarios corren con la interfaz en español (sus mensajes esperados están en español)
   test: {
     setupFiles: ['tests/setup-i18n.ts'],
+    // los worktrees de los agentes (.claude/worktrees) traen su propia copia de los tests, de otra
+    // versión del código: sin esto vitest los corre también y fallan contra este árbol
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.claude/**', '**/.git/**'],
     // npm run coverage: cobertura de src/ (resumen en la consola, detalle en coverage/index.html)
     coverage: { provider: 'v8', include: ['src/**/*.{ts,tsx}'], exclude: ['src/i18n/es.ts', 'src/schematic/roughPen.js'], reporter: ['text-summary', 'json-summary', 'html'] },
   },

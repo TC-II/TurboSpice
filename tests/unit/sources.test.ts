@@ -188,6 +188,25 @@ describe('traducción a ngspice e importación de puntos', () => {
       ['2e-3', '0.5'],
     ]);
   });
+
+  it('CSV: coma decimal con ; o tab, y coma separadora si no hay otro separador', () => {
+    expect(csvPoints('0;0\n0,001;0,5\n0,002\t1,5')).toEqual([
+      ['0', '0'],
+      ['0.001', '0.5'],
+      ['0.002', '1.5'],
+    ]);
+    expect(csvPoints('0,001 0,5')).toEqual([['0.001', '0.5']]);
+    expect(csvPoints('1m, 2')).toEqual([['1m', '2']]);
+  });
+
+  it('CSV: sale ordenado por tiempo; sin pares válidos sale vacío', () => {
+    expect(csvPoints('2m,1\n0,0\n1m,5')).toEqual([
+      ['0', '0'],
+      ['1m', '5'],
+      ['2m', '1'],
+    ]);
+    expect(csvPoints('tiempo;valor\nnada')).toEqual([]);
+  });
 });
 
 describe('parámetros posicionales con huecos (#233)', () => {

@@ -126,6 +126,8 @@ Tests unitarios: **1739**, todos en verde (los arreglos sumaron unos 100 casos).
 - **Subcircuitos en ciclo** (A→B→A, por un `.turbo` o un zip) desaparecían del árbol y no se
   podían abrir para arreglar el ciclo.
 - Soltar un **`.turbo` dañado** sobre la ventana: ahora avisa.
+- **`?example=` en el servidor de desarrollo** abría un proyecto vacío: StrictMode corría dos veces
+  la restauración inicial y la segunda pisaba el ejemplo. En la versión compilada no pasaba.
 
 ### Interfaz y consistencia
 

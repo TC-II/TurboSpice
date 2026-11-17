@@ -285,8 +285,15 @@ export function useProjectSession(d: ProjectSessionDeps) {
       .catch((e) => setMessage(t("The project couldn't be restored: {error}", { error: (e as Error).message })))
       .finally(() => setRestored(true));
   });
-  // sólo al montar (restore es estable)
-  useEffect(() => restore(), [restore]);
+  // Sólo una vez al montar. restore no se puede repetir: saca ?example= de la URL y reclama la sesión,
+  // así que la segunda pasada que hace StrictMode en desarrollo abría un proyecto vacío encima del
+  // ejemplo pedido.
+  const restoring = useRef(false);
+  useEffect(() => {
+    if (restoring.current) return;
+    restoring.current = true;
+    restore();
+  }, [restore]);
 
   // Autoguardado del proyecto entero en el navegador, un momento después de cada cambio (las
   // pilas de deshacer no se guardan, #154)

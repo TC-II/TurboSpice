@@ -1676,6 +1676,8 @@ svg.editor.tool-eraser { cursor: none; }
 .sim-row > .group.fixed + .group { padding-left: 10px; }
 .tree-row.tree-new-group .tree-name { font-weight: 400; color: var(--fg-muted); }
 .tree-row.tree-new-group .tree-name:hover { color: var(--accent); }
+.tree-row.tree-new-bench .tree-name { color: var(--fg-muted); }
+.tree-row.tree-new-bench .tree-name:hover { color: var(--accent); }
 /* camino hasta el testbench activo: ramas en el color de acento */
 .tree-branch > li.path-above::after { border-left-color: var(--accent); }
 .tree-branch > li.on-path::before { border-top-color: var(--accent); }

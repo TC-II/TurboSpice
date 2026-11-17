@@ -523,11 +523,25 @@ export function ProjectTree({
                     <Icon name="trash" size={13} />
                   </button>
                 </span>
-                <button className="tree-add" onClick={() => onNewBench(g.id)} title={t('New testbench in this workbench')} aria-label={t('New testbench in {name}', { name: g.name })}>
-                  + {t('Testbench')}
-                </button>
               </div>
-              {!fold && <ul className="tree-branch">{inGroup.length ? inGroup.map((b, i) => bench(b, i)) : <li className="tree-meta tree-empty">{t('Empty: create or drag a Testbench')}</li>}</ul>}
+              {!fold && (
+                <ul className="tree-branch">
+                  {inGroup.map((b, i) => bench(b, i))}
+                  {/* la última rama del workbench termina en el botón para agregarle un testbench, como «+ Workbench» al final del proyecto */}
+                  <li>
+                    <div className="tree-row tree-new-bench">
+                      <button
+                        className="tree-name"
+                        onClick={() => onNewBench(g.id)}
+                        title={inGroup.length ? t('New testbench in this workbench') : t('Empty: create or drag a Testbench')}
+                        aria-label={t('New testbench in {name}', { name: g.name })}
+                      >
+                        + {t('Testbench')}
+                      </button>
+                    </div>
+                  </li>
+                </ul>
+              )}
             </li>
           );
         })}

@@ -279,7 +279,7 @@ check(/fuente V o I/.test(await page.locator('.hint-bar .hint-text').innerText()
 await page.keyboard.press('Escape');
 // un testbench nuevo está vacío y sin simulación: Simular despliega el menú para elegir el tipo
 await openPanel();
-await page.locator('.project-tree .tree-group .tree-add').first().click();
+await page.locator('.project-tree .tree-new-bench .tree-name').first().click();
 check(
   (await page.locator('svg.editor .symbols > g').count()) === 0 && (await page.locator('.texts .directive', { hasText: /^\.(tran|ac|dc)\b/ }).count()) === 0,
   'el testbench nuevo arranca vacío y sin simulación',

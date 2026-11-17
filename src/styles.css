@@ -291,17 +291,17 @@ svg.editor.lod-8 .schematic text:is(.fs0,.fs1,.fs2,.fs3,.fs4,.fs5,.fs6,.fs7) { d
 .sym .body text, .sym .symtext text { fill: currentColor; stroke: none; }
 /* grosor de las líneas del esquemático en pantalla (Configuración › Grosor de líneas): --sch-lw multiplica
    el ancho de cables, figuras y símbolos; los skins traen su ancho en línea (casi todos 1.5 px) */
-svg.editor .wires line { stroke-width: calc(1.6px * var(--sch-lw, 1)); }
-svg.editor .wires line.sel { stroke-width: calc(2.4px * var(--sch-lw, 1)); }
-svg.editor .wires line.bus { stroke-width: calc(4.5px * var(--sch-lw, 1)); }
-svg.editor .wires line.bus.sel { stroke-width: calc(5.5px * var(--sch-lw, 1)); }
-svg.editor .buspin line { stroke-width: calc(1.6px * var(--sch-lw, 1)); }
-svg.editor .shapes > * { stroke-width: calc(1.4px * var(--sch-lw, 1)); }
-svg.editor .shapes > .sel { stroke-width: calc(2.2px * var(--sch-lw, 1)); }
-svg.editor .sym .body { stroke-width: calc(1.4px * var(--sch-lw, 1)); }
-svg.editor .flag { stroke-width: calc(1px * var(--sch-lw, 1)); }
-svg.editor .sym .body .wave-icon { stroke-width: calc(2px * var(--sch-lw, 1)); }
-:root[data-sch-lw] svg.editor .skin [style*='stroke-width'] { stroke-width: calc(1.5px * var(--sch-lw, 1)) !important; }
+svg.editor .wires line { stroke-width: calc(1.6px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .wires line.sel { stroke-width: calc(2.4px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .wires line.bus { stroke-width: calc(4.5px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .wires line.bus.sel { stroke-width: calc(5.5px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .buspin line { stroke-width: calc(1.6px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .shapes > * { stroke-width: calc(1.4px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .shapes > .sel { stroke-width: calc(2.2px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .sym .body { stroke-width: calc(1.4px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .flag { stroke-width: calc(1px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+svg.editor .sym .body .wave-icon { stroke-width: calc(2px * var(--sch-lw, 1) * var(--sch-zk, 1)); }
+:root[data-sch-lw] svg.editor .skin [style*='stroke-width'], svg.editor.zk .skin [style*='stroke-width'] { stroke-width: calc(1.5px * var(--sch-lw, 1) * var(--sch-zk, 1)) !important; }
 /* skins (SVG de ASC-Parser): los valores por defecto de SVG, como los dibuja ASC-Parser: lo que no
    dice fill va relleno (flechas, signos) y lo que no dice stroke va sin trazo; en currentColor (#76) */
 .schematic .skin { fill: currentColor; stroke: none; }

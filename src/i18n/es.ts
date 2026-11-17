@@ -1942,6 +1942,7 @@ export const es: Record<string, string> = {
   'TurboSpice ran into an unexpected error': 'TurboSpice tuvo un error inesperado',
   'Your work is autosaved in this browser: reloading the page brings it back.': 'Tu trabajo se autoguarda en este navegador: al recargar la página vuelve.',
   'Reload': 'Recargar',
+  'a new version of TurboSpice was published: reload the page': 'se publicó una versión nueva de TurboSpice: recargá la página',
   'This could not be shown: {message}': 'Esto no se pudo mostrar: {message}',
   'Retry': 'Reintentar',
   'unexpected "{v}"': '"{v}" inesperado',

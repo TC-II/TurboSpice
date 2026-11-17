@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { loadTranslations } from './i18n/i18n.ts';
+import { loadTranslations, t } from './i18n/i18n.ts';
 import { ErrorBoundary } from './ui/ErrorBoundary.tsx';
 import '@fontsource-variable/ibm-plex-sans/wght.css';
 import '@fontsource/ibm-plex-mono/latin-400.css';
@@ -30,9 +30,17 @@ function failed(err: unknown) {
   boot?.fail(err);
 }
 
+let booted = false;
 window.addEventListener('vite:preloadError', (ev) => {
+  const err = (ev as Event & { payload?: unknown }).payload;
+  // Ya arrancada, el error sigue hasta quien pidió el módulo (Exportar, TikZ, Yosys…): con
+  // preventDefault el import() se resolvería con undefined (y una recarga perdería el trabajo)
+  if (booted) {
+    if (err instanceof Error) err.message = `${t('a new version of TurboSpice was published: reload the page')} (${err.message})`;
+    return;
+  }
   ev.preventDefault();
-  failed((ev as Event & { payload?: unknown }).payload);
+  failed(err);
 });
 
 loadTranslations()
@@ -46,6 +54,7 @@ loadTranslations()
       </StrictMode>,
     );
     boot?.ok();
+    booted = true;
     try {
       sessionStorage.removeItem(RELOADED);
     } catch {}

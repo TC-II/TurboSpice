@@ -29,7 +29,7 @@ deje de sentirse hecha «a parches» y se comporte como un producto terminado. C
 | Proyecto e importación   | 10        | 8          | 2                        |
 | Interfaz y consistencia  | 13        | 9          | 4                        |
 
-Tests unitarios: **1739**, todos en verde (los arreglos sumaron unos 100 casos).
+Tests unitarios: **1755**, todos en verde (los arreglos sumaron unos 115 casos).
 
 ## 1. Lo más grave que se encontró
 
@@ -145,62 +145,72 @@ Tests unitarios: **1739**, todos en verde (los arreglos sumaron unos 100 casos).
   landmark `main` (C4); el tema y el idioma actuales en el nombre accesible de sus botones (C3).
 - Un texto en castellano fijo en la interfaz en inglés (`Activar …` del panel de Estudio).
 
-## 3. Pendiente
+## 3. Segunda tanda (después de la revisión)
+
+Arreglos de la lista de pendientes y pedidos nuevos, en commits aparte.
+
+- **Correr no marca el proyecto como modificado.** El historial de corridas se guarda en el
+  proyecto (y en el autoguardado) sin pedir «Cambios sin guardar» al abrir otro.
+- **Verilog:** la pastilla de estado pasa a «Falló» si Yosys o Icarus no llegan a correr, y el
+  aviso dice cuál motor falló (o que no está instalado en el servidor).
+- **Escape con diálogos apilados** cierra sólo el de arriba.
+- **Autoguardado:** si el almacenamiento está lleno o bloqueado, avisa una vez (y
+  `data-autosave` queda en `failed`).
+- **Motor:** manifest, `spinit`, codemodels y el wasm compilado se cargan una vez por Worker; una
+  corrida tras otra ya no va a la red. Al desmontar la app el Worker se termina sin crear otro.
+- **Visor:** el CSV de polos y ceros sigue el idioma; las tablas de cursores y estadísticas dicen
+  cuántas trazas no muestran.
+- **Eje logarítmico con zoom:** marcas propias (`logTicks`): décadas, 1-2-5, 1-2-3-5 o 1…9 según el
+  lugar, y pasos lineales cuando lo visible es menos de una década. Antes, con mucho zoom el eje se
+  quedaba sin números (uPlot arrancaba las marcas en el mínimo exacto, de a una década).
+- **Menú del botón derecho de un panel:** exportar como PDF con estilo LaTeX (como pgfplots:
+  Latin Modern, marcas hacia adentro, leyenda arriba, el eje derecho si lo hay), como `.tex` con
+  pgfplots, los datos en CSV (todo o lo que se ve), PNG o al portapapeles; ajustar la vista o Y,
+  eje Y log, grilla, agregar, mover o quitar el panel. En modo cursores el botón derecho sigue
+  poniendo el cursor B.
+- **«+ Testbench»** al final de cada workbench, como una rama más (igual que «+ Workbench» al final
+  del proyecto).
+- **Grosor de las líneas según el zoom (prueba):** cuatro variantes para elegir con `?lw=` en la
+  URL (`fixed`, la de siempre; `prop`, `steps`, `soft`). Sin el parámetro no cambia nada.
+
+## 4. Pendiente
 
 Lo que se encontró y **no** se tocó, con el motivo. Ordenado por lo que más conviene encarar.
 
 ### Bugs
 
-1. **El autoguardado falla en silencio si se llena la cuota** (`src/schematic/autosave.ts`,
-   `quiet()`): un proyecto con mucho historial deja de autoguardarse sin avisar. Probable, no
-   reproducido. Propuesta: que `saveProjectSession` propague el error y avisar una vez.
-2. **Los archivos borrados de «Mis símbolos y modelos» reaparecen** si el borrado no llegó a
+1. **Los archivos borrados de «Mis símbolos y modelos» reaparecen** si el borrado no llegó a
    Drive (`mergeUserFiles` une por nombre, sin registro de borrados). Necesita una decisión de
    formato (lista de borrados o lista completa con fecha).
-3. **Casi toda simulación recrea el motor dentro del Worker** (`src/engine/worker.ts`: tras una
-   corrida punto a punto, que es la de siempre salvo con `.control`, `.meas` o `.four`, queda
-   `ng = null`). Medido en local: 10 a 20 ms por corrida, así que el costo no es el tiempo. Lo que
-   pesa: `manifest.json` y `spinit` se vuelven a pedir a la red en cada corrida (si se corta la red
-   a mitad de la sesión, la corrida siguiente falla) y cada instancia vieja de wasm queda en
-   memoria hasta el recolector. El cleanup de `App.tsx` además crea un Worker nuevo al desmontar
-   (`abort()` reinicia). Propuesta: manifest y `spinit` una vez por Worker, y un `dispose()` que
-   no reinicie.
-4. **`1A` fuera de los valores de componentes:** `.param i=1A`, valores dentro de bibliotecas
+2. **`1A` fuera de los valores de componentes:** `.param i=1A`, valores dentro de bibliotecas
    `.lib` y directivas de texto siguen llegando al motor tal cual (atto).
-5. **El estado del módulo Verilog no muestra las fallas del motor** (`src/hdl/VerilogModule.tsx`):
-   si Yosys o Icarus no llegan a correr (p. ej. falta `public/engine/icarus/`), el error aparece
-   abajo como «Yosys no pudo correr» (aunque sea Icarus) y la pastilla de estado sigue en «Cambios
-   sin sintetizar», nunca en «Falló». Por eso el e2e `verilog` espera 120 s en una máquina sin
-   Icarus. El cliente sí rechaza enseguida (verificado: 18 ms).
-6. **Menores del visor:** el PNG omite los paneles digitales; el encabezado del CSV de polos y
-   ceros no sigue el cambio de idioma; las tablas recortan filas sin avisar.
+3. **El PNG del visor omite los paneles digitales** (se dibujan aparte de uPlot). El menú del
+   panel tampoco exporta un panel digital como PDF o PNG; sí como CSV.
 
 ### Consistencia (lo que todavía se nota «a parches»)
 
-7. **Validación despareja entre diálogos:** Simulación deshabilita Aceptar con errores;
+4. **Validación despareja entre diálogos:** Simulación deshabilita Aceptar con errores;
    Propiedades y Fuente sólo avisan y aceptan `4,7k` o `abc`. Falta una política única, y que
    Propiedades rechace nombres con espacios o paréntesis al escribirlos (hoy lo frena la
    simulación).
-8. **Enter para confirmar:** unos diálogos son `<form>`, otros no, otros piden Ctrl+Enter.
+5. **Enter para confirmar:** unos diálogos son `<form>`, otros no, otros piden Ctrl+Enter.
    Propuesta: resolverlo una vez en el `Modal` compartido.
-9. **Escape o click afuera descartan sin preguntar** en los diálogos con mucho contenido
-   (bloque `.control`, Fuente). Y con dos diálogos apilados Escape cierra los dos (cada `Modal`
-   escucha en `window`): «Cambios sin guardar» sobre «Proyectos en Drive» cancela y además cierra
-   el de Drive.
-10. **Etiquetas distintas para lo mismo** (OK / Apply / Close / Add) y terminología en español
+6. **Escape o click afuera descartan sin preguntar** en los diálogos con mucho contenido
+   (bloque `.control`, Fuente).
+7. **Etiquetas distintas para lo mismo** (OK / Apply / Close / Add) y terminología en español
    (Borrar / Quitar; Traza / Señal / Curva). Es una decisión de redacción: no se tocó para no
    cambiar textos que el tutorial y los e2e citan.
-11. **Estilos sin escala:** 40 `z-index`, 204 `font-size` y 159 colores hex sueltos en
-    `styles.css`; cinco clases distintas para el botón de cerrar. Refactor grande y de riesgo
-    visual: conviene hacerlo con capturas de comparación.
-12. **Accesibilidad:** el árbol del proyecto sigue siendo decenas de paradas de Tab (A3) y el
-    esquemático no se puede usar con teclado (A4); el buscador rápido no tiene etiqueta ni
-    `listbox` (B6); controles de 16 px (B7); nombres recortados en el árbol (B5).
+8. **Estilos sin escala:** 40 `z-index`, 204 `font-size` y 159 colores hex sueltos en
+   `styles.css`; cinco clases distintas para el botón de cerrar. Refactor grande y de riesgo
+   visual: conviene hacerlo con capturas de comparación.
+9. **Accesibilidad:** el árbol del proyecto sigue siendo decenas de paradas de Tab (A3) y el
+   esquemático no se puede usar con teclado (A4); el buscador rápido no tiene etiqueta ni
+   `listbox` (B6); controles de 16 px (B7); nombres recortados en el árbol (B5).
 
-## 4. Verificación
+## 5. Verificación
 
 - `npm run typecheck`, `npm run lint` (0 avisos), `npm run format:check`,
-  `node scripts/i18n/check.mjs` y `npm test` (1739 tests): en verde.
+  `node scripts/i18n/check.mjs` y `npm test` (1755 tests): en verde.
 - `npm run build`: compila.
 - e2e (16 suites en verde, `verilog` incompleta por falta del motor Icarus local) y pruebas a mano:
   ver [`dev2-como-probar.md`](dev2-como-probar.md).

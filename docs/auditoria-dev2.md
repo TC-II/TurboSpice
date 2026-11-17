@@ -157,16 +157,21 @@ Lo que se encontró y **no** se tocó, con el motivo. Ordenado por lo que más c
 2. **Los archivos borrados de «Mis símbolos y modelos» reaparecen** si el borrado no llegó a
    Drive (`mergeUserFiles` une por nombre, sin registro de borrados). Necesita una decisión de
    formato (lista de borrados o lista completa con fecha).
-3. **Cada transitorio recrea el motor sin terminar el Worker** (`src/engine/worker.ts` /
-   `client.ts`): memoria que no se libera hasta el recolector, y `manifest.json` se vuelve a pedir
-   en cada corrida (la segunda corrida sin red falla). El cleanup de `App.tsx` además crea un
-   Worker nuevo al desmontar. Es un cambio en el ciclo de vida del motor: conviene hacerlo con
-   medición de memoria.
+3. **Casi toda simulación recrea el motor dentro del Worker** (`src/engine/worker.ts`: tras una
+   corrida punto a punto, que es la de siempre salvo con `.control`, `.meas` o `.four`, queda
+   `ng = null`). Medido en local: 10 a 20 ms por corrida, así que el costo no es el tiempo. Lo que
+   pesa: `manifest.json` y `spinit` se vuelven a pedir a la red en cada corrida (si se corta la red
+   a mitad de la sesión, la corrida siguiente falla) y cada instancia vieja de wasm queda en
+   memoria hasta el recolector. El cleanup de `App.tsx` además crea un Worker nuevo al desmontar
+   (`abort()` reinicia). Propuesta: manifest y `spinit` una vez por Worker, y un `dispose()` que
+   no reinicie.
 4. **`1A` fuera de los valores de componentes:** `.param i=1A`, valores dentro de bibliotecas
    `.lib` y directivas de texto siguen llegando al motor tal cual (atto).
-5. **Verilog de comportamiento sin el motor Icarus instalado:** si falta
-   `public/engine/icarus/`, «Sintetizar» se queda esperando en vez de decir que falló (visto al
-   correr el e2e `verilog` en una máquina sin ese motor).
+5. **El estado del módulo Verilog no muestra las fallas del motor** (`src/hdl/VerilogModule.tsx`):
+   si Yosys o Icarus no llegan a correr (p. ej. falta `public/engine/icarus/`), el error aparece
+   abajo como «Yosys no pudo correr» (aunque sea Icarus) y la pastilla de estado sigue en «Cambios
+   sin sintetizar», nunca en «Falló». Por eso el e2e `verilog` espera 120 s en una máquina sin
+   Icarus. El cliente sí rechaza enseguida (verificado: 18 ms).
 6. **Menores del visor:** el PNG omite los paneles digitales; el encabezado del CSV de polos y
    ceros no sigue el cambio de idioma; las tablas recortan filas sin avisar.
 
@@ -179,7 +184,9 @@ Lo que se encontró y **no** se tocó, con el motivo. Ordenado por lo que más c
 8. **Enter para confirmar:** unos diálogos son `<form>`, otros no, otros piden Ctrl+Enter.
    Propuesta: resolverlo una vez en el `Modal` compartido.
 9. **Escape o click afuera descartan sin preguntar** en los diálogos con mucho contenido
-   (bloque `.control`, Fuente).
+   (bloque `.control`, Fuente). Y con dos diálogos apilados Escape cierra los dos (cada `Modal`
+   escucha en `window`): «Cambios sin guardar» sobre «Proyectos en Drive» cancela y además cierra
+   el de Drive.
 10. **Etiquetas distintas para lo mismo** (OK / Apply / Close / Add) y terminología en español
    (Borrar / Quitar; Traza / Señal / Curva). Es una decisión de redacción: no se tocó para no
    cambiar textos que el tutorial y los e2e citan.

@@ -74,7 +74,19 @@ function tokenize(s: string): string[] {
 
 const unbrace = (s: string) => s.replace(/^\{(.*)\}$/, '$1');
 
+/** línea mal escrita: el mensaje (ya traducido) sale tal cual de parseMeas */
+class MeasSyntax extends Error {}
+
 export function parseMeas(line: string): MeasDef | string {
+  try {
+    return parseMeasLine(line);
+  } catch (e) {
+    if (e instanceof MeasSyntax) return e.message;
+    throw e;
+  }
+}
+
+function parseMeasLine(line: string): MeasDef | string {
   const tt = tokenize(line.trim().replace(/^\.meas(ure)?\s+/i, ''));
   const def: Partial<MeasDef> & { line: string } = { line: line.trim() };
   if (/^(tran|ac|dc|noise|op|tf)$/i.test(tt[0] ?? '')) def.analysis = tt.shift()!.toLowerCase() as MeasAnalysis;
@@ -84,35 +96,42 @@ export function parseMeas(line: string): MeasDef | string {
   const peek = () => tt[i]?.toLowerCase();
   const next = () => tt[i++];
   /** "clave=valor" o "clave valor" */
-  const value = () => {
+  const value = (key: string) => {
     if (tt[i] === '=') i++;
-    return unbrace(next() ?? '');
+    const v = unbrace(next() ?? '');
+    // (una clave sin valor, o seguida de otra palabra clave, se leería como la clave siguiente)
+    if (!v || /^(at|from|to|td|rise|fall|cross|when|trig|targ)$/i.test(v)) throw new MeasSyntax(t('{p0}= needs a value', { p0: key.toUpperCase() }));
+    return v;
   };
   /** lhs=rhs (o "VAL=rhs" con lhs implícito) seguido de TD=, RISE=… */
-  const crossing = (lhsDefault?: string): Crossing => {
+  const crossing = (what: string, lhsDefault?: string): Crossing => {
     let lhs = next();
+    if (lhs === undefined || lhs === '=') throw new MeasSyntax(t('the {p0} condition is incomplete', { p0: what }));
     let rhs: string;
     if (lhs.toLowerCase() === 'val') {
-      rhs = value();
+      rhs = value('val');
       lhs = lhsDefault ?? '';
     } else if (tt[i] === '=') {
       i++;
       if (peek() === 'val' && tt[i + 1] === '=') i += 2;
       rhs = unbrace(next() ?? '');
+      if (!rhs) throw new MeasSyntax(t('the {p0} condition is incomplete', { p0: what }));
     } else if (peek() === 'val') {
       i++;
-      rhs = value();
+      rhs = value('val');
     } else rhs = '0';
     const c: Crossing = { lhs, rhs, edge: 'cross', n: 1 };
     for (;;) {
       const k = peek();
       if (k === 'td') {
         i++;
-        c.td = value();
+        c.td = value('td');
       } else if (k === 'rise' || k === 'fall' || k === 'cross') {
         i++;
         c.edge = k;
-        const v = value();
+        const v = value(k);
+        // (el motor tampoco acepta un parámetro acá: tiene que ser un entero o LAST)
+        if (!/^last$/i.test(v) && !/^[1-9]\d*$/.test(v)) throw new MeasSyntax(t('{p0}= must be a whole number from 1 or LAST, not "{p1}"', { p0: k.toUpperCase(), p1: v }));
         c.n = /^last$/i.test(v) ? 'last' : Number(v);
       } else break;
     }
@@ -128,13 +147,13 @@ export function parseMeas(line: string): MeasDef | string {
   }
   while (i < tt.length) {
     const k = next().toLowerCase();
-    if (k === 'at') def.at = value();
-    else if (k === 'from') def.from = value();
-    else if (k === 'to') def.to = value();
-    else if (k === 'when') def.when = crossing();
-    else if (k === 'trig') def.trig = crossing();
-    else if (k === 'targ') def.targ = crossing(def.trig?.lhs);
-    else if (k === 'td' && def.when) def.when.td = value();
+    if (k === 'at') def.at = value('at');
+    else if (k === 'from') def.from = value('from');
+    else if (k === 'to') def.to = value('to');
+    else if (k === 'when') def.when = crossing('WHEN');
+    else if (k === 'trig') def.trig = crossing('TRIG');
+    else if (k === 'targ') def.targ = crossing('TARG', def.trig?.lhs);
+    else if (k === 'td' && def.when) def.when.td = value('td');
     else return t('"{p0}" isn\'t understood', { p0: tt[i - 1] });
   }
   if (!def.kind) {
@@ -194,25 +213,54 @@ function interp(x: Float64Array, y: Float64Array, at: number): number {
   return x[hi] === x[lo] ? y[lo] : y[lo] + ((y[hi] - y[lo]) * (at - x[lo])) / (x[hi] - x[lo]);
 }
 
-/** x del cruce pedido (lhs − rhs pasa por 0), o NaN si no ocurre */
+/**
+ * x del cruce pedido (lhs − rhs pasa por 0), o NaN si no ocurre. Un cruce es un cambio de signo
+ * de d = lhs − rhs, y d = 0 exacto no cuenta como signo: si llega a 0 y sigue del otro lado es
+ * UN cruce (en el primer punto en 0); si vuelve al mismo lado, ninguno; si arranca en 0 y se
+ * va hacia un lado (un pulso 0→1 con VAL=0), cuenta como flanco en el último punto en 0; y si
+ * llega a 0 y ahí se queda (muestras que caen justo en el umbral), cuenta como cruce al llegar.
+ */
 function cross(c: Crossing, ctx: Ctx): number {
   const a = realPart(wave(c.lhs, ctx));
   const b = realPart(wave(c.rhs, ctx));
   const td = c.td ? num(c.td, ctx) : -Infinity;
   const x = ctx.x;
   const found: number[] = [];
-  for (let k = 1; k < x.length; k++) {
-    if (x[k] < td) continue;
-    const d0 = a[k - 1] - b[k - 1];
-    const d1 = a[k] - b[k];
-    const up = d0 < 0 && d1 >= 0;
-    const down = d0 > 0 && d1 <= 0;
-    if (!(c.edge === 'rise' ? up : c.edge === 'fall' ? down : up || down)) continue;
-    const xc = d1 === d0 ? x[k] : x[k - 1] + ((x[k] - x[k - 1]) * -d0) / (d1 - d0);
-    if (xc < td) continue;
+  /** registra un cruce hacia el signo s en xc; true si ya es el pedido */
+  const take = (s: number, xc: number) => {
+    if (c.edge === 'rise' ? s < 0 : c.edge === 'fall' ? s > 0 : false) return false;
+    if (xc < td) return false;
     found.push(xc);
-    if (c.n !== 'last' && found.length === c.n) return xc;
+    return c.n !== 'last' && found.length === c.n;
+  };
+  let side = 0; // signo del último d ≠ 0
+  let zeroAt = NaN; // x donde d llegó a 0 viniendo de `side`
+  let startZero = false; // d arrancó en 0 y todavía no salió
+  let lastZero = NaN;
+  for (let k = 0; k < x.length; k++) {
+    const d = a[k] - b[k];
+    if (!Number.isFinite(d)) {
+      [side, zeroAt, startZero] = [0, NaN, false];
+      continue;
+    }
+    if (d === 0) {
+      if (k === 0) startZero = true;
+      else if (side !== 0 && Number.isNaN(zeroAt)) zeroAt = x[k];
+      lastZero = x[k];
+      continue;
+    }
+    const s = Math.sign(d);
+    if (side === 0) {
+      if (startZero && take(s, lastZero)) return found[found.length - 1];
+    } else if (s !== side) {
+      const d0 = a[k - 1] - b[k - 1];
+      const xc = Number.isNaN(zeroAt) ? x[k - 1] + ((x[k] - x[k - 1]) * -d0) / (d - d0) : zeroAt;
+      if (take(s, xc)) return xc;
+    }
+    [side, zeroAt, startZero] = [s, NaN, false];
   }
+  // llegó al umbral y terminó ahí
+  if (side !== 0 && !Number.isNaN(zeroAt) && take(-side, zeroAt)) return zeroAt;
   return c.n === 'last' && found.length ? found[found.length - 1] : NaN;
 }
 

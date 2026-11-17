@@ -62,7 +62,12 @@ const loadIcarus = () =>
 
 async function load(): Promise<Ngspice> {
   // el manifest se revalida siempre: dice qué versión de cada archivo va
-  manifest = (await (await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' })).json()) as Manifest;
+  // (tras un deploy un 404 llega como HTML: se dice cuál archivo falta en vez de un error de JSON o de wasm)
+  const ok = (r: Response, file: string) => {
+    if (!r.ok) throw new Error(`${file}: HTTP ${r.status}`);
+    return r;
+  };
+  manifest = (await ok(await fetch(`${ENGINE_URL}manifest.json`, { cache: 'no-cache' }), 'manifest.json').json()) as Manifest;
   const hash = (f: string) => manifest?.hashes?.[f];
   // (con el hash en la URL el .mjs siempre corresponde al .wasm de la caché)
   const v = hash('ngspice.mjs');
@@ -73,8 +78,8 @@ async function load(): Promise<Ngspice> {
     default: NgspiceFactory;
   };
   const [spinit, ...cms] = await Promise.all([
-    fetch(`${ENGINE_URL}spinit`).then((r) => r.text()),
-    ...manifest.codemodels.map((f) => engineFile(f, hash(f)).then((r) => r.arrayBuffer())),
+    fetch(`${ENGINE_URL}spinit`).then((r) => ok(r, 'spinit').text()),
+    ...manifest.codemodels.map((f) => engineFile(f, hash(f)).then((r) => ok(r, f).arrayBuffer())),
   ]);
   const codemodels = Object.fromEntries(manifest.codemodels.map((f, i) => [f, new Uint8Array(cms[i])]));
 

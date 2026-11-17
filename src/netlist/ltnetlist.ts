@@ -2,6 +2,7 @@
 // referencia para validar. La traducción a ngspice está en tongspice.ts.
 import { baseName, type AscDoc, type SymbolDef } from '../asc/model.ts';
 import { spiceName, spiceValue } from './spiceName.ts';
+import { stripAmpereUnit } from './spicenum.ts';
 import { effectiveAttrs, type SymbolSource } from '../asc/resolve.ts';
 import { connectivity, type Connectivity } from './connectivity.ts';
 import { busBits, busWidth, instArray, isBusName, pinNodes } from './bus.ts';
@@ -222,6 +223,8 @@ export function ltNetlist(doc: AscDoc, lib: SymbolSource, parents: string[] = []
       // LTspice escribe el prefijo micro como "u" en la netlist
       .replace(/[µμ]/g, 'u');
     value = renameV(spiceValue(value));
+    // "1A" son amperes para LTspice pero atto para ngspice: el motor recibe "1"
+    if ('RCLVI'.includes(P)) value = stripAmpereUnit(value);
     // Bloque jerárquico: el subcircuito es el .asc con el nombre del símbolo
     if (def.symbolType.toUpperCase() === 'BLOCK') {
       const name = baseName(s.type);

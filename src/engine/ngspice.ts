@@ -148,7 +148,9 @@ export type NgspiceFactory = (opts: Record<string, unknown>) => Promise<unknown>
 export const OUT_OF_MEMORY =
   t('Out of memory: the simulation produces more data than the browser can hold. Lower the number of points (fewer points per decade in .ac, a larger maximum step in .tran).');
 /** Mensajes de ngspice o de Emscripten cuando se queda sin memoria */
-export const OUT_OF_MEMORY_RE = /can't allocate|not enough memory|out of memory|cannot enlarge memory|\bOOM\b/i;
+/** Líneas que repiten el título del circuito ("Circuit: Error amp.asc"): ahí "error" no es un error */
+const ECHOES_TITLE_RE = /^\s*(Circuit|Title)\s*:/i;
+export const OUT_OF_MEMORY_RE =/can't allocate|not enough memory|out of memory|cannot enlarge memory|\bOOM\b/i;
 
 const SPINIT_PATH = '/usr/local/share/ngspice/scripts/spinit';
 const CM_DIR = '/usr/local/lib/ngspice';
@@ -321,7 +323,7 @@ export class Ngspice {
       if (/^\s*Reference value\s*:/.test(line)) return 0;
       if (OUT_OF_MEMORY_RE.test(line) && !this.errors.includes(OUT_OF_MEMORY)) this.errors.unshift(OUT_OF_MEMORY);
       this.log.push(line);
-      if (/\berror\b|\bfatal\b/i.test(line)) this.errors.push(line);
+      if (!ECHOES_TITLE_RE.test(line) && /\berror\b|\bfatal\b/i.test(line)) this.errors.push(line);
       this.opts.onOutput?.(line);
       return 0;
     }, 'iiii');

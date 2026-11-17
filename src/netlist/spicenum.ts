@@ -28,8 +28,24 @@ export function parseSpiceNumber(s: string): number {
   if (!rest) return base;
   const mult = spiceSuffix(rest);
   if (mult !== undefined) return base * mult;
-  // unidades sueltas (1V, 2A, 3Hz) se ignoran como en SPICE
+  // unidades sueltas (1V, 2A, 3Hz) se ignoran; "1A" son amperes como en LTspice (ngspice-47
+  // leería atto: por eso stripAmpereUnit las saca de la netlist que va al motor)
   return /^[a-z]+$/i.test(rest) ? base : NaN;
+}
+
+// número + "a…" sin otro prefijo ("1A", "2.5Amps"); "aF" queda (atto-faradio)
+const AMPERE_TOKEN = /(?<![\w.])([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)a(?!f)[a-z]*(?![\w.])/gi;
+
+/**
+ * Quita la unidad "A…" de los números de un valor ("1A" → "1", "PULSE(0 1A 0 1n)" → "PULSE(0 1 0 1n)"):
+ * ngspice-47 lee ese "a" como atto (1e-18) y LTspice como amperes. No toca "1mA" (el motor ya lo
+ * lee como mili), nombres de modelo, ni lo que va entre llaves, comillas simples o dobles.
+ */
+export function stripAmpereUnit(value: string): string {
+  return value
+    .split(/(\{[^}]*\}|'[^']*'|"[^"]*")/)
+    .map((part, i) => (i % 2 ? part : part.replace(AMPERE_TOKEN, '$1')))
+    .join('');
 }
 
 // --- prefijos SI ----------------------------------------------------------------------------

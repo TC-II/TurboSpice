@@ -9,7 +9,7 @@
 import { busBitNode } from './bus.ts';
 import { translateDigital } from './digital.ts';
 import { fixFloatingNodes } from './floating.ts';
-import { controlHooks, isControlBlock, isNgspiceComment } from './directives.ts';
+import { controlHooks, directiveLines, isControlBlock, isNgspiceComment } from './directives.ts';
 import { stbControl } from './stb.ts';
 import { parseAnalysis } from '../sim/analyses.ts';
 import { collectModels, replaceAko } from './ako.ts';
@@ -66,6 +66,8 @@ export interface NgspiceNetlist {
   missingValues: string[];
   /** nombres de instancia repetidos (dos R1): las corrientes y el historial no sabrían cuál es cuál */
   duplicateNames: string[];
+  /** nombres de instancia con espacios, paréntesis, «;», «,» o «=» ("R 1"): partirían la línea del elemento */
+  invalidNames: string[];
 }
 
 // Parámetros de L/C/V que ngspice no conoce y se expanden en elementos
@@ -120,6 +122,17 @@ export function repeatedNames(elements: readonly { name: string }[]): string[] {
     if (seen.has(k) && !out.some((n) => n.toLowerCase() === k)) out.push(e.name);
     seen.add(k);
   }
+  return out;
+}
+
+/**
+ * Los nombres de instancia que ngspice no leería como una sola palabra: bloquean la simulación
+ * (como los repetidos) en vez de renombrarlos en silencio, porque las trazas y los resultados
+ * se buscan por el nombre del esquemático
+ */
+export function invalidElementNames(elements: readonly { name: string }[]): string[] {
+  const out: string[] = [];
+  for (const e of elements) if (/[\s();,=]/.test(e.name) && !out.includes(e.name)) out.push(e.name);
   return out;
 }
 
@@ -579,7 +592,7 @@ function coupledInductors(lt: LtNetlist): Set<string> {
   const out = new Set<string>();
   for (const tt of lt.texts) {
     if (tt.kind !== 'directive') continue;
-    for (const l of tt.text.split(/\\n|\n/)) {
+    for (const l of directiveLines(tt.text)) {
       const k = /^\s*K\S*\s+(.*)$/i.exec(l.replace(/\s*;.*$/, ''));
       if (k) for (const n of k[1].trim().split(/\s+/).slice(0, -1)) out.add(n.toLowerCase().replace(/^l§/, ''));
     }
@@ -593,7 +606,7 @@ const icValue = (ic: string) => (/^[A-Za-z_]\w*$/.test(ic) ? `{${ic}}` : ic);
 function tranHoldsIc(lt: LtNetlist): boolean {
   const tran = lt.texts
     .filter((tt) => tt.kind === 'directive')
-    .flatMap((tt) => tt.text.split(/\\n|\n/))
+    .flatMap((tt) => directiveLines(tt.text))
     .map((l) => l.replace(/\s*;.*$/, '').trim())
     .filter((l) => /^\.tran\b/i.test(l));
   return tran.length > 0 && !tran.some((l) => /\suic\b/i.test(l));
@@ -633,7 +646,7 @@ export function startupRamp(value: string): string {
 }
 
 function hasStartup(lt: LtNetlist): boolean {
-  return lt.texts.some((tt) => tt.kind === 'directive' && tt.text.split('\n').some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
+  return lt.texts.some((tt) => tt.kind === 'directive' && directiveLines(tt.text).some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
 }
 
 function convertElements(
@@ -762,6 +775,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   const blockNames = new Map<string, Map<string, string>>();
   const missingValues: string[] = [];
   const duplicateNames = repeatedNames(lt.elements);
+  const invalidNames = invalidElementNames(lt.elements);
   const out: string[] = [
     `* ${title}`,
     // Constante predefinida en las expresiones de LTspice que ngspice no tiene en .param
@@ -791,7 +805,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
   // corrientes de inductor de los .ic (ver splitIc); el texto restante se vuelve a procesar abajo
   const inductorIcs = new Map<string, string>();
   for (const tt of lt.texts) {
-    if (tt.kind === 'directive') for (const l of tt.text.split('\n')) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
+    if (tt.kind === 'directive') for (const l of directiveLines(tt.text)) splitIc(l.replace(/\s*;.*$/, '').trim(), inductorIcs);
   }
   const holdIc = tranHoldsIc(lt);
   for (const [l, v] of inductorIcs) if (!holdIc && parseSpiceNumber(v) !== 0) warnings.push(t(".ic I({l})={v}: ngspice uses the inductor's initial current only with .tran uic", { l, v }));
@@ -974,6 +988,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     const inner = new Map<string, string>();
     blockNames.set(b.name.toLowerCase(), inner);
     for (const n of repeatedNames(b.lt.elements)) if (!duplicateNames.includes(n)) duplicateNames.push(n);
+    for (const n of invalidElementNames(b.lt.elements)) if (!invalidNames.includes(n)) invalidNames.push(n);
     out.push(...convertElements(b.lt, new Set(), inner, warnings, subcktParams, undefined, false, false, undefined, missingValues));
     for (const tt of b.lt.texts) {
       if (tt.kind !== 'directive') continue;
@@ -1001,6 +1016,7 @@ export function toNgspice(ltOrig: LtNetlist, title: string, models: ModelResolve
     warnings,
     missingValues,
     duplicateNames,
+    invalidNames,
     subcktParams,
     steps: stepRuns,
     measures,
@@ -1201,6 +1217,11 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
   for (const w of lapWarnings) if (!warnings.includes(w)) warnings.push(w);
   const main = replaceIdealDiodes(ako.text, external);
   warnings.push(...ako.warnings, ...main.warnings);
+  // los diodos ideales quedaron como BD1: I(D1) y @d1[…] deben buscar ese vector, no uno que no existe
+  for (const [scope, set] of main.renamed) {
+    const map = scope ? net.blockNames.get(scope) : net.names;
+    if (map) for (const [k, v] of map) if (set.has(v.toLowerCase())) map.set(k, `B${v}`);
+  }
   // delay() con retardo variable usa dly_tstop (ver expandStateFunctions): el tstop del .tran
   let text = main.text;
   if (/dly_tstop/.test(text) || Object.values(files).some((f) => /dly_tstop/.test(f))) {

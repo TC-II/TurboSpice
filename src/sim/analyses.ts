@@ -318,14 +318,28 @@ export function sweepRange(s: Sweep): { start?: string; stop?: string; points?: 
   return out;
 }
 
-/** Lo mismo en un transitorio: el tiempo final y desde cuándo se guarda */
-export function tranRange(a: { tstop: string; tstart: string }): { tstop?: string; tstart?: string } {
+/**
+ * Lo mismo en un transitorio: el tiempo final y desde cuándo se guarda. Los pasos en 0 son
+ * válidos (".tran 0 1m", "… 0 0 uic": ngspice elige solo), sólo los negativos no.
+ */
+export function tranRange(a: { tstop: string; tstart: string; tstep?: string; tmax?: string }): { tstop?: string; tstart?: string; tstep?: string; tmax?: string } {
   const tstop = valueOf(a.tstop);
   const tstart = valueOf(a.tstart);
-  const out: { tstop?: string; tstart?: string } = {};
+  const out: { tstop?: string; tstart?: string; tstep?: string; tmax?: string } = {};
   if (tstop <= 0) out.tstop = t('the stop time must be greater than 0');
   if (tstart >= tstop) out.tstart = t('the start time must be less than the stop time');
+  if (valueOf(a.tstep ?? '') < 0) out.tstep = t("the output step can't be negative");
+  if (valueOf(a.tmax ?? '') < 0) out.tmax = t("the maximum step can't be negative");
   return out;
+}
+
+/**
+ * Lo mismo en un .dc: con incremento 0 el barrido no avanza (ngspice responde "Error on line N").
+ * El signo respecto de inicio y fin no se valida: el manual no dice qué hace ngspice con un
+ * barrido descendente y no se bloquea lo que quizás funciona.
+ */
+export function dcRange(s: { start: string; stop: string; step: string }): { step?: string } {
+  return valueOf(s.step) === 0 ? { step: t("the increment can't be 0") } : {};
 }
 
 /** Errores del formulario (vacío = se puede aceptar) */
@@ -365,6 +379,7 @@ export function validateAnalysis(a: Analysis): string[] {
         num(s.start, t('the start'));
         num(s.stop, t('the stop'));
         num(s.step, t('the increment'));
+        errs.push(...Object.values(dcRange(s)));
       });
       break;
     case 'noise':

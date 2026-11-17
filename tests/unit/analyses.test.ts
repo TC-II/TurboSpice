@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
@@ -104,5 +106,37 @@ describe('directivas de ngspice guardadas como comentario', () => {
     expect(findControl(doc)).toBe(1);
     expect(controlBody(doc.texts[1].text.split('\\n').join('\n'))).toBe('run');
     expect(controlBlock('run\nlet x = 1')).toBe('.control\nrun\nlet x = 1\n.endc');
+  });
+});
+
+describe('validateAnalysis: pasos del .dc y del .tran', () => {
+  it('.dc con incremento 0 y .tran con pasos negativos se avisan; 0 en el .tran es válido', () => {
+    const dc = parseAnalysis('.dc V1 0 5 0')!;
+    expect(validateAnalysis(dc)).toEqual(['el incremento no puede ser 0']);
+    expect(validateAnalysis(parseAnalysis('.dc V1 0 5 0.1')!)).toEqual([]);
+    expect(validateAnalysis(parseAnalysis('.dc V1 5 0 -0.1')!)).toEqual([]);
+    expect(validateAnalysis(parseAnalysis('.dc V1 0 5 {step}')!)).toEqual([]);
+    expect(validateAnalysis(parseAnalysis('.tran -1u 10m')!)).toContain('el paso de salida no puede ser negativo');
+    expect(validateAnalysis(parseAnalysis('.tran 1u 10m 0 -1u')!)).toContain('el paso máximo no puede ser negativo');
+    expect(validateAnalysis(parseAnalysis('.tran 0 10m 0 0 uic')!)).toEqual([]);
+    expect(tranRange({ tstop: '1m', tstart: '', tstep: '-1u' }).tstep).toBeTruthy();
+  });
+
+  it('ninguna línea de análisis de los ejemplos queda bloqueada', () => {
+    const files = [...readdirSync('examples', { recursive: true }).map((f) => join('examples', String(f))), ...readdirSync('public/examples').map((f) => join('public/examples', f))].filter((f) =>
+      /\.(asc|turbo)$/.test(f),
+    );
+    expect(files.length).toBeGreaterThan(10);
+    let n = 0;
+    for (const f of files) {
+      const raw = readFileSync(f, 'latin1');
+      for (const m of raw.matchAll(/(?<=!|\\n)\.(?:tran|dc|ac|noise|tf)\s[^\\\n"]*/gi)) {
+        const a = parseAnalysis(m[0].trim().replace(/\s*;.*$/, ''));
+        if (!a) continue;
+        n++;
+        expect([f, m[0], validateAnalysis(a)]).toEqual([f, m[0], []]);
+      }
+    }
+    expect(n).toBeGreaterThan(20);
   });
 });

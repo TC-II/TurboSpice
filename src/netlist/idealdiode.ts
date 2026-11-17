@@ -65,7 +65,7 @@ export interface IdealDiodeResult {
  * Reemplaza en un texto SPICE (netlist o archivo de modelos) los diodos que usan un modelo
  * ideal definido en ese mismo texto, o en `external` (modelos ideales de otros archivos).
  */
-export function replaceIdealDiodes(text: string, external = new Map<string, IdealModel>()): IdealDiodeResult & { found: Map<string, IdealModel> } {
+export function replaceIdealDiodes(text: string, external = new Map<string, IdealModel>()): IdealDiodeResult & { found: Map<string, IdealModel>; renamed: Map<string, Set<string>> } {
   const lines = joinContinuations(text);
   const found = new Map<string, IdealModel>();
   const warnings: string[] = [];
@@ -90,9 +90,16 @@ export function replaceIdealDiodes(text: string, external = new Map<string, Idea
     });
   }
   const all = new Map([...external, ...found]);
-  if (!all.size) return { text, models: [], warnings, found };
+  if (!all.size) return { text, models: [], warnings, found, renamed: new Map() };
 
+  // diodos que pasaron a ser fuentes B, por .subckt ('' = nivel superior): el elemento cambia de
+  // nombre (D1 → BD1) y quien busca sus vectores por el nombre de ngspice debe saberlo
+  const renamed = new Map<string, Set<string>>();
+  let scope = '';
   const out = lines.map((line) => {
+    const sub = /^\s*\.subckt\s+(\S+)/i.exec(line);
+    if (sub) scope = sub[1].toLowerCase();
+    else if (/^\s*\.ends\b/i.test(line)) scope = '';
     if (/^\s*\.model\s+(\S+)\s+D\b/i.test(line)) {
       const name = /^\s*\.model\s+(\S+)/i.exec(line)![1].toLowerCase();
       return found.has(name) ? `* (diodo ideal de LTspice → fuente B) ${line.trim()}` : line;
@@ -102,7 +109,8 @@ export function replaceIdealDiodes(text: string, external = new Map<string, Idea
     const model = all.get(d[5].toLowerCase());
     if (!model) return line;
     const [, indent, name, a, k] = d;
+    renamed.set(scope, (renamed.get(scope) ?? new Set()).add(name.toLowerCase()));
     return `${indent}B${name} ${a} ${k} I=${current(model, `V(${a},${k})`)}`;
   });
-  return { text: out.join('\n'), models: [...found.keys()], warnings, found };
+  return { text: out.join('\n'), models: [...found.keys()], warnings, found, renamed };
 }

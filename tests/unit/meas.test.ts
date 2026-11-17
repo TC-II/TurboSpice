@@ -96,3 +96,48 @@ describe('.meas', () => {
     expect(val(m, 'c')).toBeGreaterThan(0.99);
   });
 });
+
+describe('.meas: líneas incompletas', () => {
+  it.each(['.meas tran t1 when', '.meas tran t1 trig v(a) val=1 targ', '.meas tran t1 trig', '.meas tran t1 when v(a)='])('%s: error legible, sin excepción', (l) => {
+    const r = parseMeas(l);
+    expect(typeof r).toBe('string');
+    expect(r).toMatch(/incompleta/);
+  });
+  it('RISE={n} o FROM= vacío dan un mensaje claro', () => {
+    expect(parseMeas('.meas tran a when v(out)=0.5 rise={n}')).toMatch(/RISE= tiene que ser un entero/);
+    expect(parseMeas('.meas tran a when v(out)=0.5 rise=0')).toMatch(/entero/);
+    expect(parseMeas('.meas tran a max v(out) from= to=5m')).toMatch(/FROM= necesita un valor/);
+    expect(parseMeas('.meas tran a max v(out) from=')).toMatch(/FROM= necesita un valor/);
+    expect(parseMeas('.meas tran a when v(out)=0.5 rise=last')).toMatchObject({ when: { n: 'last' } });
+  });
+});
+
+describe('.meas: flancos que parten del umbral', () => {
+  const sq = (name: string, v: number[]): SimPlot => ({
+    name: 'tran1',
+    vectors: [
+      { name: 'time', type: 1, real: Float64Array.from(v, (_, k) => k) },
+      { name, type: 3, real: Float64Array.from(v) },
+    ],
+  });
+  const at = (l: string, p: SimPlot) => val(run([l], p), 'm');
+  it('pulso que arranca en 0: VAL=0 RISE=1 cuenta, y un solo cruce no se repite', () => {
+    const p = sq('a', [0, 0, 1, 1, 0]);
+    expect(at('.meas tran m when v(a)=0 rise=1', p)).toBe(1);
+    expect(at('.meas tran m when v(a)=0.5 rise=1', p)).toBe(1.5);
+    // 0 → 1 → 0: la bajada llega a 0 al final
+    expect(at('.meas tran m when v(a)=0 fall=1', p)).toBe(4);
+  });
+  it('meseta en 1 que baja: VAL=1 FALL=1', () => {
+    const p = sq('a', [1, 1, 1, 0, 0]);
+    expect(at('.meas tran m when v(a)=1 fall=1', p)).toBe(2);
+    expect(at('.meas tran m when v(a)=1 cross=1', p)).toBe(2);
+  });
+  it('tocar el umbral y volver al mismo lado no es un cruce; atravesarlo con un punto exacto cuenta una vez', () => {
+    expect(typeof (run(['.meas tran m when v(a)=1'], sq('a', [0, 1, 0, 0.5])).get('m') as { error?: string }).error).toBe('string');
+    const p = sq('a', [0, 1, 2, 3, 1, 0]);
+    expect(at('.meas tran m when v(a)=1 rise=1', p)).toBe(1);
+    expect(at('.meas tran m when v(a)=2 cross=2', p)).toBeCloseTo(3.5, 9);
+    expect((run(['.meas tran m when v(a)=1 rise=2'], p).get('m') as { error?: string }).error).toBeTruthy();
+  });
+});

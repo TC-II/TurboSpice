@@ -343,6 +343,9 @@ export function pzProblem(line: string): string | undefined {
   return undefined;
 }
 
+/** El aviso de matriz singular de ngspice ("singular matrix: check nodes a and b", "matrix is nearly singular") */
+export const isSingularLine = (l: string) => /\bsingular\b.{0,20}\bmatrix\b|\bmatrix\b.{0,20}\bsingular\b/i.test(l);
+
 /**
  * Qué le falta a un análisis para poder correr (la fuente, un nodo, un valor), dicho para el
  * usuario; sin esto ngspice sólo diría "Error on line N"
@@ -356,6 +359,27 @@ export function analysisProblem(line: string): string | undefined {
   if (!errs.length) return undefined;
   const label = ANALYSES.find((x) => x.kind === a.kind)!.label;
   return t('{analysis}: {problems}. Complete the boxes marked in red in the simulation bar.', { analysis: label, problems: errs.join('; ') });
+}
+
+/**
+ * Las fuentes que nombra un .dc, .noise o .tf y no existen en el circuito (sin esto ngspice dice
+ * "Error on line N or its substitute / circuit not parsed"). `names`: los elementos del circuito
+ * (cualquier mayúscula, con o sin «§»). El .dc también barre una resistencia, `temp` o un
+ * parámetro (".dc param x …", de otra forma): sólo se miran los nombres que son una V, I o R.
+ */
+export function missingSources(line: string, names: Iterable<string>): string[] {
+  const a = parseAnalysis(line);
+  if (!a) return [];
+  const srcs = a.kind === 'dc' ? a.sweeps.map((s) => s.src) : a.kind === 'noise' || a.kind === 'tf' ? [a.src] : [];
+  const have = new Set<string>();
+  for (const n of names) have.add(n.toLowerCase()), have.add(n.toLowerCase().replace(/§/g, ''));
+  const out: string[] = [];
+  for (const s of srcs) {
+    // (llaves, comillas, @… y demás: una expresión o un parámetro, no el nombre de un elemento)
+    if (!/^[vir][^\s{}'"@$()=]*$/i.test(s) || have.has(s.toLowerCase()) || out.includes(s)) continue;
+    out.push(s);
+  }
+  return out;
 }
 
 /** Lo que ngspice escribe en el log de un .pz que falla, explicado */

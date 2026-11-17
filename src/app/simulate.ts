@@ -14,7 +14,7 @@ import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog } from '../sim/measResults.ts';
 import { buildSimulation, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
-import { analysisProblem, pzLogErrors } from '../sim/simList.ts';
+import { analysisProblem, isSingularLine, missingSources, pzLogErrors } from '../sim/simList.ts';
 import { pzBodePlots } from '../waveform/pz.ts';
 import { stepLabels, stepSweepPlots } from '../waveform/series.ts';
 
@@ -50,11 +50,16 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   // un componente sin valor tampoco se simula (#256): el error va a Problemas con el link
   // un análisis incompleto (sin fuente, nodo o valor) tampoco: ngspice sólo diría "Error on line N"
   const incomplete = analysisProblem(lineOf(simAsc) ?? '');
+  // la fuente de un .dc/.noise/.tf que no existe (también cuenta lo que se escribió como línea de la netlist)
+  const inNetlist = [...built.netlist.matchAll(/^\s*([^\s.*+;][^\s]*)\s/gm)].map((m) => m[1]);
+  const noSource = missingSources(lineOf(simAsc) ?? '', [...built.ng.names.values(), ...built.lt.elements.map((e) => e.name), ...inNetlist]);
   const blocking = [
     ...built.tooBig.map((p) => p.text),
     ...built.ng.missingValues.map((name) => t('{name} has no value assigned', { name })),
     ...built.ng.duplicateNames.map((name) => t('{name} is the name of more than one component: rename one of them', { name })),
+    ...built.ng.invalidNames.map((name) => t('"{name}" is not a valid component name: it can\'t contain spaces, parentheses, ";", "," or "="', { name })),
     ...(incomplete ? [incomplete] : []),
+    ...noSource.map((name) => t("The source {name} doesn't exist in the circuit", { name })),
   ];
   // (un transitorio que al ritmo que va no entra en memoria se corta mientras simula)
   // (punto a punto los datos no se duplican en el motor: entra más, ver simLimits)
@@ -99,11 +104,11 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
   // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
   // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas
-  if (!blocking.length && !result.aborted && [...result.errors, ...result.log].some((l) => /singular/i.test(l))) {
+  if (!blocking.length && !result.aborted && [...result.errors, ...result.log].some(isSingularLine)) {
     const plain = await prepare(false);
     if (plain.netlist !== built.netlist) {
       const again = await run(plain);
-      if (!again.result.errors.some((l) => /singular/i.test(l))) {
+      if (!again.result.errors.some(isSingularLine)) {
         built = plain;
         ({ result, ms } = again);
         built.warnings.push(t('Simulated without the subcircuit pin currents (Ix): with them the matrix was singular'));

@@ -129,7 +129,8 @@ function resolverOn(sim: BuiltSimulation | null, plot: SimPlot): Resolver {
       return wave((vec ? findVector(plot, vec) : undefined) ?? findVector(plot, `${ng}#branch`) ?? findVector(plot, `@${ng}[i]`));
     }
     const term = TERMINAL[f];
-    return term ? wave(findVector(plot, `@${ng}[${term}]`)) : null;
+    // (el diodo ideal va al motor como fuente B: su corriente es @bd1[i], no tiene [id])
+    return term ? wave(findVector(plot, `@${ng}[${term}]`) ?? (f === 'id' && ng?.startsWith('b') ? findVector(plot, `@${ng}[i]`) : undefined)) : null;
   };
 }
 

@@ -17,6 +17,9 @@ export const isNgspiceComment = (text: string) => NGSPICE_ONLY.test(text) || tex
 /** ¿El texto (directiva o comentario) es un bloque .control? */
 export const isControlBlock = (text: string) => /^\s*\.control\b/i.test(text);
 
+/** Líneas de un texto del esquemático: el .asc las separa con "\n" literal (barra + n); acepta también un salto real */
+export const directiveLines = (text: string): string[] => text.split(/\\n|\n/);
+
 /** Marcas de sección de un .control combinable con los barridos (paso personalizado) */
 export const HOOK_MARKS = { before: '* antes de cada corrida', after: '* después de cada corrida', final: '* al final' } as const;
 

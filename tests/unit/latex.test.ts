@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasLatex, labelPlain, labelTex, latexSpans, loadMathJax, mathSvg, plainText } from '../../src/schematic/latex.ts';
+import { hasLatex, labelPlain, labelTex, latexSpans, loadMathJax, mathSvg, plainText, unsafeSvg } from '../../src/schematic/latex.ts';
 
 describe('LaTeX en rótulos (#328), con las reglas de ASC-Parser', () => {
   it('separa en los $ sin escapar', () => {
@@ -37,5 +37,16 @@ describe('LaTeX en rótulos (#328), con las reglas de ASC-Parser', () => {
     expect(m!.body).toContain('<path');
     expect(m!.body).not.toContain('currentColor');
     expect(mathSvg('$\\notacommand x$')).toBeNull();
+  });
+
+  it('un rótulo no puede meter un enlace ni código: \\href no se compone y el filtro rechaza lo ajeno a una fórmula', async () => {
+    await loadMathJax();
+    // (sin el paquete html, \href es un comando desconocido: queda el texto crudo)
+    expect(mathSvg('$\\href{javascript:alert(1)}{ver}$')).toBeNull();
+    expect(mathSvg('$\\style{color:red}{x}$')).toBeNull();
+    expect(unsafeSvg('<g><a href="javascript:alert(1)"><path d="M0 0"/></a></g>')).toBe(true);
+    expect(unsafeSvg('<g onclick="x()"><path d="M0 0"/></g>')).toBe(true);
+    expect(unsafeSvg('<g><script>x()</script></g>')).toBe(true);
+    expect(unsafeSvg('<g stroke="currentColor"><path d="M0 0"/></g>')).toBe(false);
   });
 });

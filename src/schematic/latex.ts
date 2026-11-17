@@ -114,7 +114,9 @@ export function loadMathJax(): Promise<void> {
     // igual en el SVG, el PNG y el PDF de la hoja
     // sin noundefined ni noerrors: un comando mal escrito es un error (y queda el texto crudo),
     // no la palabra en rojo dentro del dibujo
-    const packages = AllPackages.filter((p) => !['bussproofs', 'noundefined', 'noerrors'].includes(p));
+    // sin html: \href{javascript:…}, \style y \class meten atributos propios en el dibujo, y el
+    // rótulo puede venir de un link compartido o de un .asc ajeno (se inyecta como HTML)
+    const packages = AllPackages.filter((p) => !['bussproofs', 'noundefined', 'noerrors', 'html'].includes(p));
     const doc = mathjax.document('', { InputJax: new TeX({ packages }), OutputJax: new SVG({ fontCache: 'none' }) });
     convert = (tex) => adaptor.innerHTML(doc.convert(tex, { display: false }) as never);
     version++;
@@ -125,6 +127,12 @@ export function loadMathJax(): Promise<void> {
   });
   return loading;
 }
+
+/**
+ * Segunda barrera (la primera es no cargar el paquete html): el dibujo de una fórmula son caminos y
+ * grupos; con un enlace, un script, un manejador de eventos o contenido ajeno no se inyecta
+ */
+export const unsafeSvg = (svg: string) => /<\s*(a|script|foreignObject|iframe|image|use|style)\b|\son\w+\s*=|\bhref\s*=|javascript:/i.test(svg);
 
 const cache = new Map<string, MathSvg | null>();
 
@@ -141,7 +149,7 @@ export function mathSvg(str: string): MathSvg | null | undefined {
       const svg = convert(labelTex(str));
       const vb = /viewBox="([^"]+)"/.exec(svg)?.[1].split(/\s+/).map(Number);
       // un error de TeX (comando que no existe): MathJax lo marca en rojo; se deja el texto crudo
-      if (vb?.length === 4 && !svg.includes('data-mjx-error') && !svg.includes('merror')) {
+      if (vb?.length === 4 && !svg.includes('data-mjx-error') && !svg.includes('merror') && !unsafeSvg(svg)) {
         const body = svg
           .replace(/^<svg[^>]*>/, '')
           .replace(/<\/svg>\s*$/, '')

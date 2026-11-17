@@ -97,7 +97,14 @@ function plainTicks(tt: (number | null)[]): { labels: string[]; sig: number } {
     const d = Math.abs(v[i] - v[i - 1]);
     if (d > 0) step = Math.min(step, d);
   }
-  const decimals = (ee: number) => (Number.isFinite(step) ? Math.min(9, Math.max(0, -Math.floor(Math.log10(step / 10 ** (3 * ee)) + 1e-9))) : 0);
+  // Decimales del paso, y uno más si las marcas no caen en ese redondeo (pasos 2,5·10ⁿ: 0, 2.5, 5…)
+  const decimals = (ee: number) => {
+    if (!Number.isFinite(step)) return 0;
+    const u = 10 ** (3 * ee);
+    const d0 = Math.min(9, Math.max(0, -Math.floor(Math.log10(step / u) + 1e-9)));
+    const exact = v.every((x) => Math.abs(x / u - Math.round((x / u) * 10 ** d0) / 10 ** d0) <= (step / u) * 1e-4);
+    return exact ? d0 : Math.min(9, d0 + 1);
+  };
   // 999.97m con 2 decimales redondea a 1000.00m: sube de prefijo
   if (e < 4 && Math.round((max / 10 ** (3 * e)) * 10 ** decimals(e)) / 10 ** decimals(e) >= 1000) e++;
   const dec = decimals(e);

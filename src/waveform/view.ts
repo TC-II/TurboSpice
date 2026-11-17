@@ -3,7 +3,7 @@
 // .plt de LTspice.
 import { readData, writeData } from '../asc/dataText.ts';
 import type { AscDoc } from '../asc/model.ts';
-import { isDigitalExpr, type Radix } from './digital.ts';
+import { isDigitalExpr, RADIXES, type Radix } from './digital.ts';
 import type { Marker } from './markers.ts';
 
 export interface Trace {
@@ -232,8 +232,13 @@ export function asPlotView(v: unknown): PlotView | null {
           .map((t) => {
             // (antes de la DFT se guardaba como `fft`)
             const dft = asDft(t.dft) ?? asDft((t as { fft?: unknown }).fft) ?? paneDft;
-            return { expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}), ...(dft ? { dft } : {}) };
+            const radix = RADIXES.find((r) => r === t.radix);
+            return { expr: t.expr, ...(typeof t.color === 'string' ? { color: t.color } : {}), ...(t.hidden ? { hidden: true } : {}), ...(radix ? { radix } : {}), ...(dft ? { dft } : {}) };
           }),
+        // (lo que withView escribe y se perdía al leer: panel digital, alto elegido y eje Y log)
+        ...(p?.digital === true ? { digital: true } : {}),
+        ...(typeof p?.size === 'number' && Number.isFinite(p.size) && p.size > 0 ? { size: p.size } : {}),
+        ...(p?.logY === true ? { logY: true } : {}),
       };
     });
   }

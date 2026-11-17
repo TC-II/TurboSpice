@@ -173,7 +173,7 @@ export function drawMarkers(
   const pointOf = (m: Marker) => {
     const c = curveOf(m);
     if (!c || m.x === undefined) return null;
-    const y = valueAt(data.x, c.y, m.x);
+    const y = valueAt(data.x, c.y, m.x, data.log);
     return { c, y, px: u.valToPos(m.x, 'x', true), py: u.valToPos(y, c.axis, true) };
   };
   for (const m of list) {
@@ -184,7 +184,7 @@ export function drawMarkers(
       if (!inX(px)) continue;
       stroke(px, top, px, top + height, color, sel ? 2 : 1.25, [6, 3]);
       label([`${markerName(m)}  ${fmt(m.x!, xu)}`], px, top, color, { value: m.x!, commit: (x) => L.onMoveMarker(m, { x }) });
-      for (const cut of verticalCuts(m.x!, data.x, data.curves)) {
+      for (const cut of verticalCuts(m.x!, data.x, data.curves, data.log)) {
         const c = data.curves.find((o) => o.label === cut.label)!;
         const py = u.valToPos(cut.y, cut.axis, true);
         dot(px, py, c.color);
@@ -272,9 +272,9 @@ export function drawCursors(
     const curve = tr !== undefined ? data.curves.find((k) => k.label === tr && !k.hidden) : undefined;
     let boxY = top + 4 * dpr;
     if (curve) {
-      const y = valueAt(data.x, curve.y, v);
+      const y = valueAt(data.x, curve.y, v, data.log);
       const ph = phaseOf(data, curve);
-      lines.push(`${curve.label}: ${fmt(y, unitOf(curve))}${ph ? `  ${fmt(valueAt(data.x, ph.y, v), '°')}` : ''}`);
+      lines.push(`${curve.label}: ${fmt(y, unitOf(curve))}${ph ? `  ${fmt(valueAt(data.x, ph.y, v, data.log), '°')}` : ''}`);
       const py = u.valToPos(y, curve.axis, true);
       if (Number.isFinite(py) && py >= top && py <= top + height) {
         ctx.strokeStyle = curve.color;

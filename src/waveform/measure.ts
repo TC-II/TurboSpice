@@ -1,7 +1,10 @@
 // Medidas rápidas sobre una traza (en el rango visible) y lectura en los cursores.
 
-/** y(x) por interpolación lineal (x creciente); NaN fuera de rango */
-export function valueAt(xs: ArrayLike<number>, ys: ArrayLike<number | null>, x: number): number {
+/**
+ * y(x) por interpolación lineal (x creciente); NaN fuera de rango. Con `log` (eje X logarítmico)
+ * interpola lineal en log x, como se dibuja la línea entre dos puntos.
+ */
+export function valueAt(xs: ArrayLike<number>, ys: ArrayLike<number | null>, x: number, log = false): number {
   const n = xs.length;
   if (!n || x < xs[0] || x > xs[n - 1]) return NaN;
   let lo = 0;
@@ -13,7 +16,9 @@ export function valueAt(xs: ArrayLike<number>, ys: ArrayLike<number | null>, x: 
   }
   const y0 = ys[lo] ?? NaN;
   const y1 = ys[hi] ?? NaN;
-  return xs[hi] === xs[lo] ? y0 : y0 + ((y1 - y0) * (x - xs[lo])) / (xs[hi] - xs[lo]);
+  if (xs[hi] === xs[lo]) return y0;
+  const f = log && xs[lo] > 0 && x > 0 ? Math.log(x / xs[lo]) / Math.log(xs[hi] / xs[lo]) : (x - xs[lo]) / (xs[hi] - xs[lo]);
+  return y0 + (y1 - y0) * f;
 }
 
 /** Índice del punto de xs (creciente) más cercano a x */
@@ -99,7 +104,12 @@ export function stats(xs: ArrayLike<number>, ys: ArrayLike<number | null>, from 
 }
 
 /** Frecuencia de corte a −3 dB respecto del máximo (traza en dB), buscando desde el pico */
-export function bandwidth3dB(xs: ArrayLike<number>, db: ArrayLike<number | null>): { low: number; high: number } {
+export function bandwidth3dB(xs0: ArrayLike<number>, db0: ArrayLike<number | null>, from = -Infinity, to = Infinity): { low: number; high: number } {
+  // sólo el rango visible, como las demás columnas
+  const keep = Array.from({ length: xs0.length }, (_, k) => k).filter((k) => xs0[k] >= from && xs0[k] <= to);
+  const xs = keep.map((k) => xs0[k]);
+  const db = keep.map((k) => db0[k]);
+  if (!xs.length) return { low: NaN, high: NaN };
   let kMax = 0;
   for (let k = 1; k < xs.length; k++) if ((db[k] ?? -Infinity) > (db[kMax] ?? -Infinity)) kMax = k;
   const target = (db[kMax] as number) - 3;

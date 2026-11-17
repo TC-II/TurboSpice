@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { siFixed } from '../../src/waveform/series.ts';
 import { bandwidth3dB, cursorDiff, nearestIndex, stats, stepPoint, toCsv, valueAt } from '../../src/waveform/measure.ts';
-import { addTraceTo, cursorForClick, colorize, controlPlots, PALETTE_LIGHT as PALETTE, parsePlt, reorderTrace, serializePlt, traceColor, type Pane } from '../../src/waveform/view.ts';
+import { addTraceTo, asPlotView, cursorForClick, colorize, controlPlots, PALETTE_LIGHT as PALETTE, parsePlt, reorderTrace, serializePlt, traceColor, type Pane } from '../../src/waveform/view.ts';
 
 describe('medidas', () => {
   it('seno: pico a pico, eficaz, frecuencia', () => {
@@ -171,5 +171,34 @@ describe('orden de las trazas de un panel', () => {
     expect(r.traces[1].color).toBe(traceColor(p.traces[2], 2));
     expect(reorderTrace(p, 1, 1)).toBe(p);
     expect(reorderTrace(p, 0, 5)).toBe(p);
+  });
+});
+
+describe('vista: ida y vuelta de los paneles', () => {
+  it('asPlotView conserva digital, size, logY y radix', () => {
+    const view = {
+      tran: [
+        { traces: [{ expr: 'Dig(q[3:0])', radix: 'bin' as const }], digital: true, size: 180 },
+        { traces: [{ expr: 'V(a)' }], logY: true },
+      ],
+    };
+    expect(asPlotView(JSON.parse(JSON.stringify(view)))).toEqual(view);
+    // valores de otro tipo se descartan
+    expect(asPlotView({ tran: [{ traces: [{ expr: 'V(a)', radix: 'xx' }], digital: 1, size: -3, logY: 'sí' }] })).toEqual({ tran: [{ traces: [{ expr: 'V(a)' }] }] });
+  });
+});
+
+describe('medidas: eje X logarítmico y rango', () => {
+  it('valueAt interpola en log x si el eje es log', () => {
+    const f = Float64Array.from([1, 100]);
+    const y = Float64Array.from([0, 2]);
+    expect(valueAt(f, y, 10)).toBeCloseTo(0.1818, 3);
+    expect(valueAt(f, y, 10, true)).toBeCloseTo(1, 9);
+  });
+  it('bandwidth3dB sólo mira el rango visible', () => {
+    const f = Float64Array.from([1, 10, 100, 1000, 10000]);
+    const db = Float64Array.from([0, 0, -1, -10, -20]);
+    expect(bandwidth3dB(f, db).high).toBeGreaterThan(100);
+    expect(bandwidth3dB(f, db, 1, 100).high).toBeNaN();
   });
 });

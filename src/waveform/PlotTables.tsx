@@ -1,5 +1,5 @@
 // Tablas debajo (o al costado) de los paneles: lecturas de los cursores y medidas rápidas.
-import type { Curve, PaneData } from './curves.ts';
+import { curveOn, type Curve, type PaneData } from './curves.ts';
 import { bandwidth3dB, cursorDiff, stats, valueAt } from './measure.ts';
 import type { Cursors } from './view.ts';
 import { t } from '../i18n/i18n.ts';
@@ -51,8 +51,10 @@ export function CursorTable({ data, cursors, preview, setCursors }: { data: Pane
         </thead>
         <tbody>
           {rows.map(({ d, c }, i) => {
-            const ya = a !== undefined ? valueAt(d.x, c.y, a) : NaN;
-            const yb = b !== undefined ? valueAt(d.x, c.y, b) : NaN;
+            // (una digital trae sólo sus cambios: se lleva a la grilla del eje, como el CSV)
+            const cy = curveOn(c, d.x);
+            const ya = a !== undefined ? valueAt(d.x, cy, a, d.log) : NaN;
+            const yb = b !== undefined ? valueAt(d.x, cy, b, d.log) : NaN;
             const followed = c.label === cursors.ta || c.label === cursors.tb;
             return (
               <tr key={i} className={followed ? 'followed' : undefined}>
@@ -97,9 +99,11 @@ export function StatsTable({ data, range }: { data: PaneData[]; range: Range | n
       </thead>
       <tbody>
         {rows.map(({ d, c }, i) => {
-          const s = stats(d.x, c.y, range?.[0], range?.[1]);
+          const cy = curveOn(c, d.x);
+          const s = stats(d.x, cy, range?.[0], range?.[1]);
           if (!s) return null;
-          const bw = db(d, c) ? bandwidth3dB(d.x, c.y) : null;
+          // (el −3 dB no tiene sentido en un espectro de DFT)
+          const bw = db(d, c) && !d.dft ? bandwidth3dB(d.x, cy, range?.[0], range?.[1]) : null;
           return (
             <tr key={i}>
               <td style={{ color: c.color }}>{c.label}</td>

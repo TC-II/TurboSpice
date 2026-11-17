@@ -1,5 +1,5 @@
 import { t } from '../i18n/i18n.ts';
-import { sampleEvents } from './series.ts';
+import { resample, sampleEvents } from './series.ts';
 import { spiceSuffix } from '../netlist/spicenum.ts';
 // Expresiones de trazas al estilo LTspice: V(out), V(a,b), I(R1), Ic(Q1), V(out)/V(in),
 // db(V(out)), d(V(c)), 2*I(L1)… Se evalúan punto a punto sobre vectores reales o complejos.
@@ -280,6 +280,10 @@ const cpow = (ar: number, ai: number, br: number, bi: number): [number, number] 
   return [mr * Math.cos(ang), mr * Math.sin(ang)];
 };
 
+/** Potencia de reales: base negativa con exponente no entero no existe (NaN: hueco en el gráfico) */
+const rpow = (ar: number, _ai: number, br: number): [number, number] => [ar >= 0 || Number.isInteger(br) ? ar ** br : NaN, 0];
+const power = (a: C, b: C): C => map2(a, b, a.im || b.im ? cpow : rpow);
+
 /** Fase desenrollada en grados (como la muestra LTspice) */
 export function unwrapDeg(re: Float64Array, im: Float64Array): Float64Array {
   const out = new Float64Array(re.length);
@@ -318,6 +322,25 @@ export function evaluate(n: Node, ctx: EvalContext): Wave {
   return r.im ? { re: r.re, im: r.im } : { re: r.re };
 }
 
+const ascending = (x: ArrayLike<number>) => {
+  for (let k = 1; k < x.length; k++) if (!(x[k] >= x[k - 1])) return false;
+  return true;
+};
+
+/**
+ * El vector de otra corrida (V(out)@2) llevado al eje X de la corrida que se evalúa: con .step las
+ * corridas pueden tener otro largo o instantes distintos, y operar índice a índice las desalinea.
+ * El eje de esa corrida se pide al resolvedor como el nodo que se llama igual que el eje.
+ */
+function onScale(w: Wave, run: number | undefined, ctx: EvalContext): C {
+  const same: C = { re: w.re, im: w.im ?? null };
+  if (run === undefined || w.re.length <= 1) return same;
+  const sc = ctx.resolve('V', [ctx.scaleName], run);
+  if (!sc || sc.re.length !== w.re.length || !ascending(sc.re) || !ascending(ctx.scale)) return same;
+  if (sc.re.length === ctx.scale.length && sc.re.every((v, k) => v === ctx.scale[k])) return same;
+  return { re: resample(sc.re, w.re, ctx.scale), im: w.im ? resample(sc.re, w.im, ctx.scale) : null };
+}
+
 function ev(n: Node, ctx: EvalContext): C {
   const len = ctx.scale.length;
   switch (n.t) {
@@ -333,7 +356,7 @@ function ev(n: Node, ctx: EvalContext): C {
       // un nombre suelto es un nodo, como en LTspice ("out" = V(out))
       const w = ctx.resolve('V', [n.name], n.run);
       if (!w) throw new ExprError(t("{name}{p1} doesn't exist", { name: n.name, p1: n.run ? `@${n.run}` : '' }));
-      return { re: w.re, im: w.im ?? null };
+      return onScale(w, n.run, ctx);
     }
     case 'ref': {
       const w = ctx.resolve(n.fn, n.args, n.run);
@@ -341,7 +364,7 @@ function ev(n: Node, ctx: EvalContext): C {
       if (!w) throw new ExprError(t("{fn}({p1}){p2} doesn't exist", { fn: n.fn, p1: n.args.join(','), p2: n.run ? `@${n.run}` : '' }));
       // un nodo digital dentro de una cuenta: en escalones sobre el eje X
       if (w.x) return { re: sampleEvents(w.x, w.re, ctx.scale), im: null };
-      return { re: w.re, im: w.im ?? null };
+      return onScale(w, n.run, ctx);
     }
     case 'un': {
       const a = ev(n.a, ctx);
@@ -360,7 +383,7 @@ function ev(n: Node, ctx: EvalContext): C {
         case '/':
           return map2(a, b, cdiv);
         default:
-          return map2(a, b, cpow);
+          return power(a, b);
       }
     }
     case 'call': {
@@ -383,14 +406,15 @@ function ev(n: Node, ctx: EvalContext): C {
         case 'imag':
           return map1(a, (_r, j) => [j, 0], true);
         case 'sqrt':
-          return map1(a, (r, j) => cpow(r, j, 0.5, 0));
+          // (real negativo: NaN, un hueco; con entrada compleja, la raíz compleja)
+          return map1(a, a.im ? (r, j) => cpow(r, j, 0.5, 0) : (r) => [r < 0 ? NaN : Math.sqrt(r), 0]);
         case 'exp':
           return map1(a, (r, j) => [Math.exp(r) * Math.cos(j), Math.exp(r) * Math.sin(j)]);
         case 'ln':
         case 'log':
-          return map1(a, (r, j) => [Math.log(Math.hypot(r, j)), Math.atan2(j, r)]);
+          return map1(a, a.im ? (r, j) => [Math.log(Math.hypot(r, j)), Math.atan2(j, r)] : (r) => [r < 0 ? NaN : Math.log(r), 0]);
         case 'log10':
-          return map1(a, (r, j) => [Math.log10(Math.hypot(r, j)), Math.atan2(j, r) / Math.LN10]);
+          return map1(a, a.im ? (r, j) => [Math.log10(Math.hypot(r, j)), Math.atan2(j, r) / Math.LN10] : (r) => [r < 0 ? NaN : Math.log10(r), 0]);
         case 'sin':
           return map1(a, (r) => [Math.sin(r), 0], true);
         case 'cos':
@@ -403,7 +427,7 @@ function ev(n: Node, ctx: EvalContext): C {
           return map1(a, (r) => [Math.sign(r), 0], true);
         case 'pow':
           if (!args[1]) throw new ExprError(t('pow(x, y) needs two arguments'));
-          return map2(a, args[1], cpow);
+          return power(a, args[1]);
         case 'min':
         case 'max': {
           if (!args[1]) throw new ExprError(t('{fn}(a, b) needs two arguments', { fn: n.fn }));

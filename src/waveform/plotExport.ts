@@ -51,14 +51,15 @@ export function markerReadings(markers: Marker[], data: PaneData[]): string[] {
     if (!d) continue;
     const xu = xUnit(d.xName);
     if (m.kind === 'v')
-      for (const c of verticalCuts(m.x!, d.x, d.curves)) rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(m.x!, xu), y: fix(c.y, unitOf(d, c.axis)) });
+      for (const c of verticalCuts(m.x!, d.x, d.curves, d.log))
+        rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(m.x!, xu), y: fix(c.y, unitOf(d, c.axis)) });
     else if (m.kind === 'h') {
       const cuts = horizontalCuts(m.y!, m.axis ?? 'y', d.x, d.curves, 8);
       if (!cuts.length) rows.push({ m, trace: '—', x: '—', y: fix(m.y!, unitOf(d, m.axis ?? 'y')) });
       for (const c of cuts) rows.push({ m, trace: c.label, color: d.curves.find((o) => o.label === c.label)?.color, x: fix(c.x, xu), y: fix(m.y!, unitOf(d, m.axis ?? 'y')) });
     } else {
       const c = d.curves.find((o) => o.label === m.trace);
-      const y = markerValue(m, d.x, d.curves);
+      const y = markerValue(m, d.x, d.curves, d.log);
       rows.push({ m, trace: m.trace ?? '', color: c?.color, x: fix(m.x!, xu), y: fix(y, c ? unitOf(d, c.axis) : '') });
       if (c && (m.kind === 'a' || m.kind === 'd')) m.kind === 'a' ? (a = { x: m.x!, y, d, axis: c.axis }) : (dm = { x: m.x!, y, d, axis: c.axis });
     }

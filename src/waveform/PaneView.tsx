@@ -453,7 +453,7 @@ export function PaneView(props: {
         else {
           const c = data.curves.find((o) => o.label === m.trace && !o.hidden);
           if (!c) continue;
-          d = Math.hypot(u.valToPos(m.x!, 'x') - px, u.valToPos(valueAt(data.x, c.y, m.x!), c.axis) - py);
+          d = Math.hypot(u.valToPos(m.x!, 'x') - px, u.valToPos(valueAt(data.x, c.y, m.x!, data.log), c.axis) - py);
         }
         if (d <= dist) [best, dist] = [m, d];
       }
@@ -577,7 +577,7 @@ export function PaneView(props: {
         live.current.onWheelZoom(toX(lo, hi));
       }
       if (r.height > 0 && dy && axis !== 'bottom') {
-        const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height);
+        const [lo, hi] = panBy(pan.sy[0], pan.sy[1], dy / r.height, !!data.logY && pan.sy[0] > 0);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
         // sobre el gráfico (no sobre el eje izquierdo) el eje derecho acompaña
         if (!axis && pan.sr) {
@@ -684,7 +684,8 @@ export function PaneView(props: {
       if (onYAxis || e.shiftKey) {
         const cur = now('y');
         if (!cur) return;
-        const [lo, hi] = zoomAt(cur, fy, k);
+        // (eje Y logarítmico: en décadas, así el mínimo no llega a ≤ 0)
+        const [lo, hi] = zoomAt(cur, fy, k, !!data.logY && cur[0] > 0);
         if (Number.isFinite(lo) && Number.isFinite(hi) && hi > lo) live.current.onWheelY([lo, hi]);
         return;
       }

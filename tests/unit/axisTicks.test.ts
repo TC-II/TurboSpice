@@ -16,6 +16,10 @@ describe('marcas de los ejes (#193)', () => {
   it('enteros', () => expect(axisTicks([0, 1, 2, 3, 4, 5])).toEqual(['0', '1', '2', '3', '4', '5']));
   it('simétrico con prefijo único', () => expect(axisTicks([-1e-3, -5e-4, 0, 5e-4, 1e-3])).toEqual(['-1.0m', '-0.5m', '0', '0.5m', '1.0m']));
   it('redondeo a 1000 sube de prefijo', () => expect(axisTicks([0, 0.99999])).toEqual(['0', '1.0']));
+  it('pasos 2,5·10ⁿ: no redondean las marcas', () => {
+    expect(axisTicks([0, 2.5, 5, 7.5, 10])).toEqual(['0', '2.5', '5.0', '7.5', '10.0']);
+    expect(axisTicks([0, 0.25, 0.5, 0.75, 1])).toEqual(['0', '0.25', '0.50', '0.75', '1.00']);
+  });
   it('si() con redondeo a 1000', () => {
     expect(si(0.99997, 3)).toBe('1');
     expect(si(999.97e-6, 3)).toBe('1m');

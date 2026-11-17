@@ -52,6 +52,8 @@ export interface PaneData {
   home?: [number, number];
   /** eje Y izquierdo logarítmico (los valores ≤ 0 no se dibujan) */
   logY?: boolean;
+  /** panel de DFT: su eje es de frecuencias de un espectro, no un barrido AC (sin ancho de banda −3 dB) */
+  dft?: boolean;
 }
 
 export interface CurveContext {
@@ -139,12 +141,23 @@ export function placeTrace(panes: Pane[], active: number, expr: string): { panes
   return { panes: addTraceTo([...panes, { traces: [] }], panes.length, expr), index: panes.length };
 }
 
+/** Sentido de un barrido: el de su primer paso distinto de cero (1 sube, -1 baja, 0 sin pasos) */
+function sweepDir(x: Float64Array): number {
+  for (let k = 1; k < x.length; k++) {
+    const d = Math.sign(x[k] - x[k - 1]);
+    if (d) return d;
+  }
+  return 0;
+}
+
 /** Tramos de un eje X que retrocede (barrido .dc anidado): [inicio, fin) de cada uno */
 export function sweepSegments(x: Float64Array): [number, number][] {
   const segs: [number, number][] = [];
   let s = 0;
+  // el sentido del barrido es el de su primer paso: un .dc descendente (5 → 0) es un solo tramo
+  const dir = sweepDir(x);
   for (let k = 1; k < x.length; k++) {
-    if (x[k] < x[k - 1]) {
+    if ((x[k] - x[k - 1]) * (dir || 1) < 0) {
       segs.push([s, k]);
       s = k;
     }
@@ -196,7 +209,7 @@ function mergeGrids(grids: Float64Array[]): Float64Array {
 
 /** Curvas con la magnitud elegida en el eje X: cada corrida (o tramo de un .dc anidado) llevada a una grilla común */
 function customXCurves(pane: Pane, ctx: CurveContext, xExpr: string): PaneData {
-  const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
+  const all = ctx.runs.length ? ctx.runs : [ctx.plot];
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
   const empty = (msg: string): PaneData => {
@@ -253,10 +266,15 @@ function customXCurves(pane: Pane, ctx: CurveContext, xExpr: string): PaneData {
 }
 
 function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
-  const scale = scaleOf(ctx.plot)!;
-  const all = ctx.runs.length > 1 ? ctx.runs : [ctx.plot];
+  // (una sola corrida visible que no es `plot`: se dibuja ésa, no la oculta)
+  const all = ctx.runs.length ? ctx.runs : [ctx.plot];
+  const main = all.length === 1 ? all[0] : ctx.plot;
+  const scale = scaleOf(main)!;
   const segs = all.length === 1 ? sweepSegments(scale.real) : [[0, scale.real.length] as [number, number]];
-  const x = segs.length > 1 ? scale.real.slice(segs[0][0], segs[0][1]) : scale.real;
+  // un .dc descendente (5 → 0): el eje X se dibuja creciente, así que se da vuelta junto con las curvas
+  const desc = all.length === 1 && sweepDir(scale.real) < 0;
+  const flip = (a: Float64Array) => (desc ? a.slice().reverse() : a);
+  const x = flip(segs.length > 1 ? scale.real.slice(segs[0][0], segs[0][1]) : scale.real);
   const errors = new Map<number, string>();
   const curves: Curve[] = [];
   const visible = pane.traces.filter((tt) => !tt.hidden);
@@ -288,7 +306,7 @@ function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
       // un nodo digital (sus cambios): así en un panel digital; en uno analógico, en escalones sobre el eje
       const ex = w.x && pane.digital ? w.x : undefined;
       if (w.x && !ex) w = { re: sampleEvents(w.x, w.re, rs.real) };
-      const toX = (y: Float64Array) => (ex || r === ctx.plot ? y : resample(rs.real, y, scale.real));
+      const toX = (y: Float64Array) => (ex || r === main ? y : resample(rs.real, y, scale.real));
       const runLabel = all.length > 1 ? ` · ${ctx.labels.get(r.name) ?? r.name}` : '';
       const color = perRunColor ? palette()[ri % palette().length] : shade(base, ri, all.length);
       const parts: { y: Float64Array; axis: Curve['axis']; dash: boolean; suffix: string }[] = [];
@@ -311,7 +329,7 @@ function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
         const y = toX(p.y);
         if (segs.length > 1) {
           segs.forEach(([a, b], si) => {
-            const xs = scale.real.slice(a, b);
+            const xs = flip(scale.real.slice(a, b));
             curves.push({
               label: `${tt.expr}${p.suffix} #${si + 1}`,
               trace: ti,
@@ -319,7 +337,7 @@ function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
               color: shade(base, si, segs.length),
               dash: p.dash,
               axis: p.axis,
-              y: resample(xs, y.slice(a, b), x),
+              y: resample(xs, flip(y.slice(a, b)), x),
               hidden: !!tt.hidden,
               runLabel: `#${si + 1}`,
               ...digital,
@@ -333,7 +351,7 @@ function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
             color,
             dash: p.dash,
             axis: p.axis,
-            y,
+            y: flip(y),
             ...(ex ? { x: ex } : {}),
             hidden: !!tt.hidden,
             ...(runLabel ? { runLabel: runLabel.slice(3) } : {}),
@@ -345,7 +363,7 @@ function sweepCurves(pane: Pane, ctx: CurveContext): PaneData {
   });
 
   const yUnit = complex ? (ctx.mode === 'bode' || ctx.mode === 'db' ? 'dB' : ctx.mode === 'phase' ? '°' : '') : leftUnit;
-  return { x, xName: scale.name, log: isLogScale(ctx.plot), curves, errors, yUnit, iUnit: complex ? '°' : (rightUnit ?? 'A') };
+  return { x, xName: scale.name, log: isLogScale(main), curves, errors, yUnit, iUnit: complex ? '°' : (rightUnit ?? 'A') };
 }
 
 const WINDOW_LABEL = Object.fromEntries(WINDOWS.map(([w, , short]) => [w, short])) as Record<TraceDft['window'], string>;
@@ -389,7 +407,7 @@ export function dftCurves(pane: Pane, ctx: CurveContext): PaneData {
   let x = new Float64Array(0);
   if (scale?.name !== 'time') {
     pane.traces.forEach((_, ti) => errors.set(ti, t('The DFT needs a transient analysis')));
-    return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A' };
+    return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', dft: true };
   }
   const spectra: { ti: number; label: string; freq: Float64Array; db: Float64Array }[] = [];
   pane.traces.forEach((tt, ti) => {
@@ -432,7 +450,7 @@ export function dftCurves(pane: Pane, ctx: CurveContext): PaneData {
   }
   const fmax = Math.min(...grids.map((f) => f[f.length - 1]));
   const home: [number, number] | undefined = grids.length > 1 && fmax < x[x.length - 1] ? [x[0], fmax] : undefined;
-  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info, home };
+  return { x, xName: 'frequency', log: false, curves, errors, yUnit: 'dB', iUnit: 'A', info, home, dft: true };
 }
 
 /** Unión ordenada de grillas (sin repetir valores) */

@@ -1,6 +1,7 @@
 // Markers del visor, como en Cadence ViVA: puntos sobre una curva (M), líneas vertical (V) y
 // horizontal (H) que miden donde cortan las curvas, y el par A/D con sus diferencias.
 import { valueAt } from './measure.ts';
+import { remapList, type PaneOp } from './paneIndex.ts';
 
 export type MarkerKind = 'm' | 'v' | 'h' | 'a' | 'd';
 export type MarkerAxis = 'y' | 'i' | 'ph';
@@ -47,22 +48,20 @@ export const sameMarker = (a: Pick<Marker, 'kind' | 'id'>, b: Pick<Marker, 'kind
  * Markers después de sacar el panel `i` (los de ese panel se van, los de más abajo suben) o de
  * intercambiar dos paneles (`swap`).
  */
-export function remapPanes(list: Marker[], op: { remove: number } | { swap: [number, number] }): Marker[] {
-  if ('remove' in op) return list.filter((m) => m.pane !== op.remove).map((m) => (m.pane > op.remove ? { ...m, pane: m.pane - 1 } : m));
-  const [a, b] = op.swap;
-  return list.map((m) => (m.pane === a ? { ...m, pane: b } : m.pane === b ? { ...m, pane: a } : m));
+export function remapPanes(list: Marker[], op: PaneOp): Marker[] {
+  return remapList(list, op);
 }
 
 /**
  * Curva bajo el mouse: la más cercana en vertical a `py` (px) en la columna del mouse, si está a
  * menos de `max` px. `toPy` pasa un valor de su escala a px.
  */
-export function pickCurve(xs: ArrayLike<number>, curves: MarkCurve[], x: number, py: number, toPy: (v: number, axis: MarkerAxis) => number, max = 24): number {
+export function pickCurve(xs: ArrayLike<number>, curves: MarkCurve[], x: number, py: number, toPy: (v: number, axis: MarkerAxis) => number, max = 24, log = false): number {
   let best = -1;
   let dist = max;
   curves.forEach((c, k) => {
     if (c.hidden) return;
-    const v = valueAt(xs, c.y, x);
+    const v = valueAt(xs, c.y, x, log);
     if (!Number.isFinite(v)) return;
     const d = Math.abs(toPy(v, c.axis) - py);
     if (d <= dist) [best, dist] = [k, d];
@@ -88,13 +87,14 @@ export function crossings(xs: ArrayLike<number>, ys: ArrayLike<number | null>, l
 }
 
 /** Valor de un marker de punto (M, A, D) sobre su curva; NaN si la curva no está */
-export function markerValue(m: Marker, xs: ArrayLike<number>, curves: MarkCurve[]): number {
+export function markerValue(m: Marker, xs: ArrayLike<number>, curves: MarkCurve[], log = false): number {
   const c = curves.find((k) => k.label === m.trace);
-  return c && m.x !== undefined ? valueAt(xs, c.y, m.x) : NaN;
+  return c && m.x !== undefined ? valueAt(xs, c.y, m.x, log) : NaN;
 }
 
 /** Cortes de una línea vertical: el valor de cada curva visible en x */
-export const verticalCuts = (x: number, xs: ArrayLike<number>, curves: MarkCurve[]) => curves.filter((c) => !c.hidden).map((c) => ({ label: c.label, axis: c.axis, y: valueAt(xs, c.y, x) }));
+export const verticalCuts = (x: number, xs: ArrayLike<number>, curves: MarkCurve[], log = false) =>
+  curves.filter((c) => !c.hidden).map((c) => ({ label: c.label, axis: c.axis, y: valueAt(xs, c.y, x, log) }));
 
 /** Cortes de una línea horizontal: dónde la cruza cada curva visible de su misma escala */
 export const horizontalCuts = (level: number, axis: MarkerAxis, xs: ArrayLike<number>, curves: MarkCurve[], limit = 64) =>

@@ -38,6 +38,34 @@ describe('expresiones de trazas', () => {
     expect(ev('max(V(out), 3)')).toEqual([3, 3, 4, 6]);
   });
 
+  it('real negativo en ln, log, sqrt y potencia no entera: NaN (hueco)', () => {
+    const neg = { ...ctx, resolve: () => ({ re: Float64Array.from([-4, -1, 0, 4]) }) };
+    const e = (s: string) => Array.from(evalTrace(s, neg).re);
+    expect(e('ln(V(a))')[0]).toBeNaN();
+    expect(e('log10(V(a))')[1]).toBeNaN();
+    expect(e('sqrt(V(a))').map((v) => (Number.isNaN(v) ? 'n' : v))).toEqual(['n', 'n', 0, 2]);
+    expect(e('V(a)^0.5')[0]).toBeNaN();
+    expect(e('V(a)^2')).toEqual([16, 1, 0, 16]);
+    // con entrada compleja se mantiene la rama compleja
+    const ac = { scale: Float64Array.from([1]), scaleName: 'frequency', resolve: () => ({ re: Float64Array.from([-4]), im: Float64Array.from([0]) }) };
+    const w = evalTrace('sqrt(V(a))', ac);
+    expect(w.re[0]).toBeCloseTo(0, 9);
+    expect(w.im![0]).toBeCloseTo(2, 9);
+  });
+
+  it('V(out)@2 con otra base de tiempo se remuestrea al eje actual', () => {
+    const other = { re: Float64Array.from([0, 4, 8, 12]) };
+    const c2 = {
+      ...ctx,
+      resolve: (fn: string, args: string[], run?: number) => {
+        if (run === 2) return args[0] === 'time' ? { re: Float64Array.from([0, 2, 4, 6]) } : other;
+        return ctx.resolve(fn, args);
+      },
+    };
+    expect(Array.from(evalTrace('V(out)@2', c2).re)).toEqual([0, 2, 4, 6]);
+    expect(Array.from(evalTrace('V(out)@2 - V(out)', c2).re)).toEqual([0, 0, 0, 0]);
+  });
+
   it('complejos: db, fase, módulo', () => {
     const ac = {
       scale: Float64Array.from([1, 10]),

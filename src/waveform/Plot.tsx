@@ -49,7 +49,8 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
         });
       }
     });
-    const data: uPlot.AlignedData = [scale.real, ...curves.map((c) => c.y)];
+    // (-Infinity, el dB de 0, no va a uPlot: se convierte en hueco, como en PaneView)
+    const data: uPlot.AlignedData = [scale.real, ...curves.map((c) => (c.y.every(Number.isFinite) ? c.y : Array.from(c.y, (v) => (Number.isFinite(v) ? v : null))))];
     // Como LTspice: tensiones en el eje izquierdo y corrientes en el derecho
     const isCurrent = (v: SimVector) => displayName(v).startsWith('I');
     const hasV = vectors.some((v) => !isCurrent(v));

@@ -12,7 +12,8 @@ import type { Resolver } from './expr.ts';
 import { toCsv } from './measure.ts';
 import { extent } from './scales.ts';
 import { scaleOf, si } from './series.ts';
-import { palette, acceptsTrace, colorFor, sameDft, isDftPane, reorderTrace, sameTrace, traceColor, type Cursors, type Pane, type PlotState, type TraceDft } from './view.ts';
+import { isDarkTheme, palette, acceptsTrace, colorFor, sameDft, isDftPane, reorderTrace, sameTrace, traceColor, type Cursors, type Pane, type PlotState, type TraceDft } from './view.ts';
+import { remapRecord, type PaneOp } from './paneIndex.ts';
 import { addMarker, asMarkers, pickCurve, remapPanes, sameMarker, type Marker, type MarkerAxis, type MarkerKind } from './markers.ts';
 import { MAX_SAMPLES, parseSi, sampleCount, WINDOWS, type DftWindow } from './dft.ts';
 import { Icon } from '../ui/icons.tsx';
@@ -164,8 +165,18 @@ export function PlotPanel({
   // las curvas de cada panel, recordadas por panel: cambiar uno (una traza, un color, ocultar) no
   // recalcula los demás ni recrea sus gráficos
   const curveCache = useRef<{ key: unknown[]; byPane: WeakMap<Pane, PaneData> }>({ key: [], byPane: new WeakMap() });
+  // el tema claro/oscuro: de él salen los colores de la paleta, que las curvas y la leyenda deben compartir
+  const [dark, setDark] = useState(isDarkTheme);
+  useEffect(() => {
+    const sync = () => setDark(isDarkTheme());
+    const mo = new MutationObserver(sync);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    const mq = matchMedia('(prefers-color-scheme: dark)');
+    mq.addEventListener('change', sync);
+    return () => (mo.disconnect(), mq.removeEventListener('change', sync));
+  }, []);
   const data = useMemo(() => {
-    const key = [plot, runs, labels, resolver, mode, xExpr, logX];
+    const key = [plot, runs, labels, resolver, mode, xExpr, logX, dark];
     if (key.some((k, i) => k !== curveCache.current.key[i])) curveCache.current = { key, byPane: new WeakMap() };
     const m = curveCache.current.byPane;
     return panes.map((p) => {
@@ -173,7 +184,7 @@ export function PlotPanel({
       if (!d) m.set(p, (d = paneCurves(p, { plot, runs, labels, resolver, mode, xExpr, logX })));
       return d;
     });
-  }, [panes, plot, runs, labels, resolver, mode, xExpr, logX]);
+  }, [panes, plot, runs, labels, resolver, mode, xExpr, logX, dark]);
 
   // Otro tipo de análisis (otro eje X): volver al rango completo y sin cursores. Al volver
   // a simular el mismo análisis se mantienen el zoom y los cursores.
@@ -270,6 +281,15 @@ export function PlotPanel({
     if (active >= panes.length) setActive(Math.max(0, panes.length - 1));
   }, [panes.length, active, setActive]);
 
+  /** Paneles que se insertan, quitan o intercambian: todo lo guardado por número de panel se corre igual */
+  const reindex = (op: PaneOp) => {
+    dropWheel();
+    setYRanges((old) => remapRecord(old, op));
+    setRRanges((old) => remapRecord(old, op));
+    setFRanges((old) => remapRecord(old, op));
+    setMarkers((old) => remapPanes(old, op));
+    zoomHistory.current = zoomHistory.current.map((h) => ({ ...h, y: remapRecord(h.y, op) }));
+  };
   const update = (i: number, f: (p: Pane) => Pane) => setPanes(panes.map((p, k) => (k === i ? { ...p, ...f(p) } : p)));
   const moveTrace = (from: number, ti: number, to: number) => {
     // (entre un panel de tiempo y uno de DFT no: la traza cambiaría de significado; a uno vacío sí, #260;
@@ -294,6 +314,7 @@ export function PlotPanel({
       return where === 'above' ? [fresh, q] : [q, fresh];
     });
     setPanes(next);
+    reindex({ insert: where === 'above' ? at : at + 1 });
     setActive(where === 'above' ? at : at + 1);
   };
   // Divisor entre paneles: arrastrarlo cambia la altura de los dos de al lado. Durante el
@@ -429,11 +450,11 @@ export function PlotPanel({
     if (kind === 'v') m = { kind, pane: p.pane, x };
     else if (kind === 'h') {
       // la escala de la curva más cercana (corrientes o fase van en el eje derecho)
-      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity);
+      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity, d.log);
       const axis = k >= 0 ? d.curves[k].axis : 'y';
       m = { kind, pane: p.pane, y: u.posToVal(p.py, axis), axis };
     } else {
-      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity);
+      const k = pickCurve(d.x, d.curves, x, p.py, toPy, Infinity, d.log);
       if (k < 0) return;
       m = { kind, pane: p.pane, x, trace: d.curves[k].label };
     }
@@ -489,7 +510,8 @@ export function PlotPanel({
   useImperativeHandle(handle, () => ({
     addDft,
     csv: () => {
-      const d = data[0];
+      // el eje X, del primer panel que no es de DFT (las columnas son las de esos paneles)
+      const d = data.find((_, k) => !isF(k));
       if (!d) return '';
       const cols = data.filter((_, k) => !isF(k)).flatMap((pd) => pd.curves.filter((c) => !c.hidden).map((c) => ({ name: c.label, ys: curveOn(c, pd.x) })));
       return toCsv(d.xName, d.x, cols);
@@ -541,6 +563,7 @@ export function PlotPanel({
           return setActive(panes.length);
         case 'addPaneBelow':
           setPanes([...panes.slice(0, i + 1), { traces: [] }, ...panes.slice(i + 1)]);
+          reindex({ insert: i + 1 });
           return setActive(i + 1);
         case 'paneUp':
         case 'paneDown': {
@@ -549,7 +572,7 @@ export function PlotPanel({
           const next = [...panes];
           [next[i], next[j]] = [next[j], next[i]];
           setPanes(next);
-          setMarkers(remapPanes(markers, { swap: [i, j] }));
+          reindex({ swap: [i, j] });
           return setActive(j);
         }
         case 'removeTraces':
@@ -855,9 +878,8 @@ export function PlotPanel({
                 canRemove={panes.length > 1 || p.traces.length > 0}
                 onRemove={() => {
                   setPanes(panes.length > 1 ? panes.filter((_, k) => k !== i) : [{ traces: [] }]);
-                  setMarkers((old) => remapPanes(old, { remove: i }));
-                  // (el zoom de los paneles de DFT que siguen se corre con ellos)
-                  setFRanges((old) => Object.fromEntries(Object.entries(old).flatMap(([k, v]) => (+k === i ? [] : [[+k > i ? +k - 1 : +k, v]]))));
+                  // (el zoom y los markers de los paneles que siguen se corren con ellos)
+                  reindex({ remove: i });
                 }}
                 onChange={(f) => update(i, f)}
                 onDropTrace={(from, ti, where) => (where === 'in' ? moveTrace(from, ti, i) : moveTraceToNewPane(from, ti, i, where))}

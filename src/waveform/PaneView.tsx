@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import uPlot from 'uplot';
-import { curveOn, exprUnit, type Curve, type PaneData } from './curves.ts';
+import { curveOn, type Curve, type PaneData } from './curves.ts';
 import { nearestIndex, stepPoint, valueAt } from './measure.ts';
-import { alignScales, exactRange, extent, logLabeled, mapTicks, niceTicks, panBy, wheelZoom, zoomAt, type Aligned } from './scales.ts';
+import { alignScales, exactRange, extent, mapTicks, niceTicks, panBy, wheelZoom, zoomAt, type Aligned } from './scales.ts';
+import { logAxis } from './logAxis.ts';
 import { decimator } from './decimate.ts';
 import { axisSpace, axisTicks, sampleEvents, si } from './series.ts';
 import { DigitalLanes } from './DigitalLanes.tsx';
@@ -16,7 +17,7 @@ import { useTraceWidth } from './lineWidth.ts';
 import { ContextMenu, type ContextItem } from '../ui/ContextMenu.tsx';
 import { useHostWindow, winOf } from '../ui/hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
-import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, mountIn, xUnit, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
+import { type PzMark, type Range, GRAB, PAN_SLOP, DECIMATE_FROM, safeRange, fix, allFinite, mountIn, xUnit, xAxisLabel, AXIS_X_BAND, AXIS_Y_BAND } from './plotShared.ts';
 import { drawAxisHover, drawSamples, drawPzMarks, drawMarkers, drawCursors, type LabelHit } from './paneDraw.ts';
 
 // Arrastre de una traza entre paneles: el dato lleva el id de esta página, para no mover otra
@@ -42,13 +43,6 @@ function dropWhere(e: React.DragEvent<HTMLElement>): DropWhere {
   const r = e.currentTarget.getBoundingClientRect();
   const edge = Math.min(EDGE_PX, r.height / 4);
   return e.clientY - r.top < edge ? 'above' : r.bottom - e.clientY < edge ? 'below' : 'in';
-}
-
-/** Nombre del eje X con su unidad: "time (s)", "v-sweep (V)", "V(g) (V)" */
-function xAxisLabel(name: string): string {
-  const n = name.toLowerCase();
-  const unit = xUnit(name) || (n === 'v-sweep' ? 'V' : n === 'i-sweep' ? 'A' : n === 'temp-sweep' ? '°C' : n === 'res-sweep' ? 'Ω' : exprUnit(name));
-  return unit ? `${name} (${unit})` : name;
 }
 
 export function PaneView(props: {
@@ -82,6 +76,8 @@ export function PaneView(props: {
   labelOf(tt: Trace): string;
   /** acciones de la traza para su menú del botón derecho (DFT, cursores, mover de panel) */
   traceActions(ti: number): ContextItem[];
+  /** menú del botón derecho del panel (exportar, ejes, mover, quitar) */
+  paneActions(): ContextItem[];
   /** modo ⌖ de la DFT: un click en la cápsula elige la traza */
   onPickTrace?(expr: string): void;
   /** muestreo de la DFT que se está armando: se marcan el rango y, si se distinguen, las muestras */
@@ -140,6 +136,8 @@ export function PaneView(props: {
   const [dragOver, setDragOver] = useState<DropWhere | null>(null);
   // menú del botón derecho sobre una traza de la leyenda
   const [menu, setMenu] = useState<{ at: { x: number; y: number }; ti: number; colorOnly?: boolean } | null>(null);
+  // menú del botón derecho del panel (sobre el gráfico o el fondo de la leyenda)
+  const [paneMenu, setPaneMenu] = useState<{ x: number; y: number } | null>(null);
   /** cápsula bajo el mouse (muestra la información de su DFT) */
   const [chipHover, setChipHover] = useState<number | null>(null);
   // los colores se leen del CSS al crear el gráfico: al cambiar de tema hay que recrearlo (si no,
@@ -265,12 +263,8 @@ export function PaneView(props: {
       },
       axes: [
         {
-          space: (_u, _i, min, max) => (data.log ? 50 : axisSpace(min, max)),
-          values: (_u, tt) => {
-            if (!data.log) return axisTicks(tt);
-            const lab = logLabeled(tt);
-            return tt.map((v, i) => (lab[i] ? si(v!, 3) : ''));
-          },
+          // (log: marcas propias, que no se quedan sin números con mucho zoom)
+          ...(data.log ? logAxis('x', 'X') : { space: (_u: uPlot, _i: number, min: number, max: number) => axisSpace(min, max), values: (_u: uPlot, tt: number[]) => axisTicks(tt) }),
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
@@ -279,15 +273,7 @@ export function PaneView(props: {
         },
         {
           scale: 'y',
-          ...(data.logY
-            ? {
-                space: 30,
-                values: (_u: uPlot, tt: number[]) => {
-                  const lab = logLabeled(tt);
-                  return tt.map((v, i) => (lab[i] ? si(v, 3) : ''));
-                },
-              }
-            : { values: ticks('Y'), ...(hasRight ? { splits: leftSplits } : {}) }),
+          ...(data.logY ? logAxis('y', 'Y') : { values: ticks('Y'), ...(hasRight ? { splits: leftSplits } : {}) }),
           stroke: muted,
           grid: { stroke: grid, width: 1, show: showGrid },
           ticks: { stroke: grid, width: 1 },
@@ -827,6 +813,13 @@ export function PaneView(props: {
       // con un tamaño elegido (divisor entre paneles), la altura es proporcional a él
       style={pane.size ? { flex: `${pane.size} 1 0` } : undefined}
       onPointerDown={props.onActivate}
+      // botón derecho: el menú del panel, salvo donde ya hace otra cosa (una traza tiene el suyo; en
+      // modo cursores pone el B; tras un paneo con el derecho, o al cancelar un recuadro, nada)
+      onContextMenu={(e) => {
+        if (e.defaultPrevented || (e.target as HTMLElement).closest('input, select, textarea')) return;
+        e.preventDefault();
+        setPaneMenu({ x: e.clientX, y: e.clientY });
+      }}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes(TRACE_DRAG)) {
           e.preventDefault();
@@ -1018,6 +1011,7 @@ export function PaneView(props: {
           <ContextMenu at={menu.at} onClose={() => setMenu(null)} items={menu.colorOnly ? [colorItem(menu.ti, pane.traces[menu.ti], true)] : traceMenu(menu.ti, pane.traces[menu.ti])} />,
           win.document.body,
         )}
+      {paneMenu && createPortal(<ContextMenu at={paneMenu} onClose={() => setPaneMenu(null)} items={props.paneActions()} />, win.document.body)}
       {props.onAddBelow && (
         <div className="pane-add">
           <button aria-label={t('Add pane')} title={t('Add a pane below (P)')} onPointerDown={(e) => e.stopPropagation()} onClick={props.onAddBelow}>

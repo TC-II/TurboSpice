@@ -24,6 +24,8 @@ import { type PzMark, type Range, safeRange } from './plotShared.ts';
 import { PaneView } from './PaneView.tsx';
 import { CursorTable, StatsTable } from './PlotTables.tsx';
 import { exportPng, markerReadings } from './plotExport.ts';
+import type { PaneFrame } from './paneExport.ts';
+import { download } from '../schematic/exportSchematic.ts';
 
 /** Atajos del visor (con el mouse sobre los gráficos), como en LTspice */
 export type PlotAction =
@@ -88,6 +90,10 @@ interface Props {
   marks?: PzMark[];
   /** zoom y cursores con los que arranca (los de la simulación elegida, #39) */
   initial?: PlotState;
+  /** nombre de los archivos que se exportan desde un panel (sin extensión) */
+  name?: string;
+  /** avisos (lo exportado, un error al exportar) */
+  onMessage?(text: string): void;
   /** avisa cada cambio de zoom o cursores (para guardarlos con la simulación) */
   onState?(s: PlotState): void;
 }
@@ -111,6 +117,8 @@ export function PlotPanel({
   onDftPicking,
   side,
   toolsHost,
+  name,
+  onMessage,
 }: Props) {
   const win = useHostWindow();
   const [dftOpen, setDftOpen] = useState(false);
@@ -507,6 +515,172 @@ export function PlotPanel({
     return items;
   };
 
+  /** Lo que se ve de un panel, para exportarlo: los rangos del gráfico en pantalla y su proporción */
+  const frameOf = (i: number): PaneFrame | null => {
+    const u = charts.current.get(i);
+    const d = data[i];
+    if (!u || !d) return null;
+    const { min: x0, max: x1 } = u.scales.x;
+    const { min: y0, max: y1 } = u.scales.y;
+    if (x0 == null || x1 == null || y0 == null || y1 == null) return null;
+    const r = u.scales[d.curves.some((c) => c.axis === 'ph') ? 'ph' : 'i'];
+    const hasRight = d.curves.some((c) => !c.hidden && c.axis !== 'y');
+    return { x: [x0, x1], y: [y0, y1], r: hasRight && r?.min != null && r.max != null ? [r.min, r.max] : null, grid: showGrid, aspect: u.bbox.height / u.bbox.width };
+  };
+  /** Exporta el panel `i` (su menú del botón derecho); el PDF, el .tex y el CSV se bajan recién ahora */
+  const exportPane = async (i: number, what: 'pdf' | 'tex' | 'csv' | 'visible' | 'png' | 'copy') => {
+    const d = data[i];
+    if (!d) return;
+    const base = `${name || 'plot'}${panes.length > 1 ? ` - ${t('pane {n}', { n: i + 1 })}` : ''}`;
+    try {
+      if (what === 'png' || what === 'copy') {
+        const u = charts.current.get(i);
+        const png = u ? await exportPng([panes[i]], [d], new Map([[0, u]])) : null;
+        if (!png) return;
+        if (what === 'png') return download(`${base}.png`, png);
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+        return onMessage?.(t('Image copied to the clipboard'));
+      }
+      const m = await import('./paneExport.ts');
+      if (what === 'csv' || what === 'visible') return download(`${base}.csv`, new Blob([m.paneCsv(d, what === 'visible' ? (isF(i) ? fRanges[i] : xRange) : null)], { type: 'text/csv' }));
+      const f = frameOf(i);
+      if (!f) return;
+      if (what === 'tex') download(`${base}.tex`, new Blob([m.panePgfplots(d, f, base)], { type: 'application/x-tex' }));
+      else download(`${base}.pdf`, await m.panePdf(d, f, base));
+    } catch (e) {
+      onMessage?.(t('Could not export: {p0}', { p0: (e as Error).message }));
+    }
+  };
+  /** Menú del botón derecho de un panel: exportarlo y lo que se hace con él */
+  const paneMenu = (i: number): ContextItem[] => {
+    const p = panes[i];
+    const d = data[i];
+    if (!p || !d) return [];
+    const plotted = d.curves.some((c) => !c.hidden);
+    const chart = plotted && charts.current.has(i);
+    const zoomed = !!(isF(i) ? fRanges[i] : xRange);
+    const run = (what: Parameters<typeof exportPane>[1]) => () => void exportPane(i, what);
+    const noChart = p.digital ? t('Digital panes are exported as CSV') : t('Nothing plotted in this pane');
+    return [
+      {
+        label: t('Export as PDF (LaTeX style)'),
+        title: chart ? t('Vector figure like a LaTeX plot (pgfplots): Latin Modern, ticks inside, legend on top') : noChart,
+        disabled: !chart,
+        onClick: run('pdf'),
+      },
+      { label: t('Export as LaTeX (pgfplots)'), title: chart ? t('Standalone .tex with the plot in pgfplots: compiles on its own and can be edited') : noChart, disabled: !chart, onClick: run('tex') },
+      { label: t('Export data as CSV'), title: t('All the points of the visible traces'), disabled: !plotted, onClick: run('csv') },
+      ...(zoomed ? [{ label: t('Export the visible range as CSV'), disabled: !plotted, onClick: run('visible') }] : []),
+      { label: t('Export as PNG'), disabled: !chart, onClick: run('png') },
+      { label: t('Copy as image'), disabled: !chart, onClick: run('copy') },
+      { sep: true, label: t('Fit to view'), title: t('Space'), onClick: () => runAction('fit', i) },
+      { label: t('Fit Y to the visible range'), title: 'Ctrl+Y', disabled: !zoomed, onClick: () => runAction('autoY', i) },
+      { label: p.logY ? t('Linear Y axis') : t('Logarithmic Y axis'), disabled: !!p.digital, onClick: () => update(i, (q) => ({ ...q, logY: q.logY ? undefined : true })) },
+      { label: showGrid ? t('Hide the grid') : t('Show the grid'), title: 'Ctrl+G', onClick: () => runAction('grid', i) },
+      { sep: true, label: t('Add a pane below'), title: 'B', onClick: () => runAction('addPaneBelow', i) },
+      { label: t('Move the pane up'), title: 'U', disabled: i === 0, onClick: () => runAction('paneUp', i) },
+      { label: t('Move the pane down'), title: 'Shift+U', disabled: i === panes.length - 1, onClick: () => runAction('paneDown', i) },
+      {
+        label: t('Remove pane'),
+        disabled: panes.length <= 1 && !p.traces.length,
+        onClick: () => {
+          setPanes(panes.length > 1 ? panes.filter((_, k) => k !== i) : [{ traces: [] }]);
+          reindex({ remove: i });
+        },
+      },
+    ];
+  };
+
+  /** Atajos del visor y acciones del menú de un panel: sobre el panel `at` (el activo, si no se dice) */
+  const runAction = (a: PlotAction, at = active) => {
+    const i = Math.min(at, panes.length - 1);
+    switch (a) {
+      case 'fit':
+        setFRanges({});
+        setRRanges({});
+        return zoomTo(null, {});
+      case 'zoomBox':
+        setRemoving(false);
+        return setZoomMode(true);
+      case 'zoomPrev': {
+        const prev = zoomHistory.current.pop();
+        dropWheel();
+        if (prev) {
+          zoomNow.current = prev;
+          setXRange(prev.x);
+          setYRanges(prev.y);
+        }
+        return;
+      }
+      case 'autoY': {
+        // Y a lo que se ve ahora (con el zoom en X), fijo hasta el próximo cambio
+        if (!xRange && !Object.keys(fRanges).length) return zoomTo(null, {});
+        const ys: Record<number, Range> = {};
+        charts.current.forEach((u, k) => {
+          const xr = isF(k) ? (fRanges[k] ?? null) : xRange;
+          if (!xr) return;
+          const e = extent(
+            data[k].x,
+            data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => curveOn(c, data[k].x)),
+            xr[0],
+            xr[1],
+          );
+          if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
+        });
+        return zoomTo(xRange, ys);
+      }
+      case 'grid':
+        return setShowGrid((v) => !v);
+      case 'addTrace':
+        return onFocusTrace?.();
+      case 'addPane':
+        setPanes([...panes, { traces: [] }]);
+        return setActive(panes.length);
+      case 'addPaneBelow':
+        setPanes([...panes.slice(0, i + 1), { traces: [] }, ...panes.slice(i + 1)]);
+        reindex({ insert: i + 1 });
+        return setActive(i + 1);
+      case 'paneUp':
+      case 'paneDown': {
+        const j = a === 'paneUp' ? i - 1 : i + 1;
+        if (j < 0 || j >= panes.length) return;
+        const next = [...panes];
+        [next[i], next[j]] = [next[j], next[i]];
+        setPanes(next);
+        reindex({ swap: [i, j] });
+        return setActive(j);
+      }
+      case 'removeTraces':
+        setZoomMode(false);
+        return setRemoving(true);
+      case 'cursor':
+        return startCursors();
+      case 'clearCursors':
+        setFCursors({});
+        setCursors({});
+        return setCursorMode(false);
+      case 'markPoint':
+        return placeMarker('m');
+      case 'markV':
+        return placeMarker('v');
+      case 'markH':
+        return placeMarker('h');
+      case 'markA':
+        return placeMarker('a');
+      case 'markD':
+        return placeMarker('d');
+      case 'clearMarkers':
+        return setMarkers([]);
+      case 'deleteMarker':
+        if (selMarker) setMarkers(markers.filter((m) => !sameMarker(m, selMarker)));
+        return setSelMarker(null);
+      case 'cancel':
+        setSelMarker(null);
+        setZoomMode(false);
+        return setRemoving(false);
+    }
+  };
+
   useImperativeHandle(handle, () => ({
     addDft,
     csv: () => {
@@ -517,94 +691,7 @@ export function PlotPanel({
       return toCsv(d.xName, d.x, cols);
     },
     png: () => exportPng(panes, data, charts.current),
-    action: (a) => {
-      const i = Math.min(active, panes.length - 1);
-      switch (a) {
-        case 'fit':
-          setFRanges({});
-          setRRanges({});
-          return zoomTo(null, {});
-        case 'zoomBox':
-          setRemoving(false);
-          return setZoomMode(true);
-        case 'zoomPrev': {
-          const prev = zoomHistory.current.pop();
-          dropWheel();
-          if (prev) {
-            zoomNow.current = prev;
-            setXRange(prev.x);
-            setYRanges(prev.y);
-          }
-          return;
-        }
-        case 'autoY': {
-          // Y a lo que se ve ahora (con el zoom en X), fijo hasta el próximo cambio
-          if (!xRange && !Object.keys(fRanges).length) return zoomTo(null, {});
-          const ys: Record<number, Range> = {};
-          charts.current.forEach((u, k) => {
-            const xr = isF(k) ? (fRanges[k] ?? null) : xRange;
-            if (!xr) return;
-            const e = extent(
-              data[k].x,
-              data[k].curves.filter((c) => !c.hidden && c.axis === 'y').map((c) => curveOn(c, data[k].x)),
-              xr[0],
-              xr[1],
-            );
-            if (e) ys[k] = safeRange(u, e[0], e[1], 'y') as Range;
-          });
-          return zoomTo(xRange, ys);
-        }
-        case 'grid':
-          return setShowGrid((v) => !v);
-        case 'addTrace':
-          return onFocusTrace?.();
-        case 'addPane':
-          setPanes([...panes, { traces: [] }]);
-          return setActive(panes.length);
-        case 'addPaneBelow':
-          setPanes([...panes.slice(0, i + 1), { traces: [] }, ...panes.slice(i + 1)]);
-          reindex({ insert: i + 1 });
-          return setActive(i + 1);
-        case 'paneUp':
-        case 'paneDown': {
-          const j = a === 'paneUp' ? i - 1 : i + 1;
-          if (j < 0 || j >= panes.length) return;
-          const next = [...panes];
-          [next[i], next[j]] = [next[j], next[i]];
-          setPanes(next);
-          reindex({ swap: [i, j] });
-          return setActive(j);
-        }
-        case 'removeTraces':
-          setZoomMode(false);
-          return setRemoving(true);
-        case 'cursor':
-          return startCursors();
-        case 'clearCursors':
-          setFCursors({});
-          setCursors({});
-          return setCursorMode(false);
-        case 'markPoint':
-          return placeMarker('m');
-        case 'markV':
-          return placeMarker('v');
-        case 'markH':
-          return placeMarker('h');
-        case 'markA':
-          return placeMarker('a');
-        case 'markD':
-          return placeMarker('d');
-        case 'clearMarkers':
-          return setMarkers([]);
-        case 'deleteMarker':
-          if (selMarker) setMarkers(markers.filter((m) => !sameMarker(m, selMarker)));
-          return setSelMarker(null);
-        case 'cancel':
-          setSelMarker(null);
-          setZoomMode(false);
-          return setRemoving(false);
-      }
-    },
+    action: (a) => runAction(a),
     markerMode: () => markerMode,
     markerSelected: () => !!selMarker,
   }));
@@ -906,6 +993,7 @@ export function PlotPanel({
                 samples={dftPreview && !dftError && !isF(i) && !p.digital ? { ...dftPreview, n: dftN } : undefined}
                 labelOf={(tt) => traceLabel(tt, allTraces)}
                 traceActions={(ti) => traceActions(i, ti)}
+                paneActions={() => paneMenu(i)}
                 showGrid={showGrid}
                 cursorMode={cursorMode}
                 cursors={isF(i) ? fCursors : cursors}

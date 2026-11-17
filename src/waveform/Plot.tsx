@@ -4,7 +4,8 @@ import uPlot from 'uplot';
 import { mountIn } from './plotShared.ts';
 import 'uplot/dist/uPlot.min.css';
 import type { SimPlot, SimVector } from '../engine/ngspice.ts';
-import { exactRange, logLabeled } from './scales.ts';
+import { exactRange } from './scales.ts';
+import { logAxis } from './logAxis.ts';
 import { axisSpace, axisTicks, displayName, isLogScale, project, resample, scaleOf, si, type ComplexView } from './series.ts';
 
 const PALETTE = ['#2f6fdb', '#d9480f', '#2b8a3e', '#ae3ec9', '#e67700', '#0b7285', '#c2255c', '#5c940d'];
@@ -63,13 +64,8 @@ export function Plot({ plot, vectors, view, runs, labels }: Props) {
       scales: { x: { time: false, distr: log ? 3 : 1, range: (_u, min, max) => exactRange(min, max, log) as uPlot.Range.MinMax } },
       axes: [
         {
-          space: (_u, _i, min, max) => (log ? 50 : axisSpace(min, max)),
-          // en escala log uPlot pasa null en las marcas sin etiqueta; etiquetamos las décadas
-          values: (_u, ticks) => {
-            if (!log) return axisTicks(ticks);
-            const lab = logLabeled(ticks);
-            return ticks.map((t, i) => (lab[i] ? si(t!, 3) : ''));
-          },
+          // (log: marcas propias, que no se quedan sin números con mucho zoom)
+          ...(log ? logAxis('x') : { space: (_u: uPlot, _i: number, min: number, max: number) => axisSpace(min, max), values: (_u: uPlot, tt: number[]) => axisTicks(tt) }),
           stroke: muted,
           grid: { stroke: grid },
         },

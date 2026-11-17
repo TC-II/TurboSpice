@@ -1,6 +1,6 @@
 // Constantes y formatos que comparten el visor, sus paneles y sus tablas.
 import uPlot from 'uplot';
-import type { Curve, PaneData } from './curves.ts';
+import { exprUnit, type Curve, type PaneData } from './curves.ts';
 import { si, siFixed } from './series.ts';
 
 /** frecuencia de un polo o un cero (.pz) para marcar en el eje de frecuencia */
@@ -33,6 +33,16 @@ export const allFinite = (y: Float64Array) => {
   return true;
 };
 export const xUnit = (xName: string | undefined) => (xName === 'time' ? 's' : xName === 'frequency' ? 'Hz' : '');
+/** Unidad del eje X: la del análisis, la del barrido o la de la expresión elegida («V(g)» → V) */
+export function xAxisUnit(name: string): string {
+  const n = name.toLowerCase();
+  return xUnit(name) || (n === 'v-sweep' ? 'V' : n === 'i-sweep' ? 'A' : n === 'temp-sweep' ? '°C' : n === 'res-sweep' ? 'Ω' : exprUnit(name));
+}
+/** Nombre del eje X con su unidad: "time (s)", "v-sweep (V)", "V(g) (V)" */
+export function xAxisLabel(name: string): string {
+  const unit = xAxisUnit(name);
+  return unit ? `${name} (${unit})` : name;
+}
 /** fase de la misma traza y corrida (Bode), para la lectura de un cursor en magnitud */
 export const phaseOf = (d: PaneData, c: Curve) => (c.axis === 'ph' ? undefined : d.curves.find((o) => o.axis === 'ph' && o.trace === c.trace && o.run === c.run));
 /** franjas de los ejes que responden a la rueda y al arrastre (px): sólo las marcas y los números

@@ -1478,6 +1478,7 @@ button.hier-tab { padding-right: 10px; }
 .ctx-menu button { text-align: left; border: 0; border-radius: var(--r); background: transparent; color: var(--fg); font: inherit; font-size: 13px; padding: 6px 10px; }
 .ctx-menu button:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .ctx-menu button:disabled { color: var(--fg-muted); }
+.ctx-menu .ctx-sep { border: 0; border-top: 1px solid var(--border); margin: 4px 2px; }
 .ctx-menu button.ctx-primary { margin-top: 4px; text-align: center; background: var(--accent-fill); color: #fff; font-weight: 600; }
 .ctx-menu button.ctx-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-fill), #000 12%); }
 .ctx-menu button.ctx-primary:disabled { background: var(--bg-alt); color: var(--fg-muted); }

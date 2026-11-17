@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alignScales, mapTicks, niceStepAbove, niceTicks, exactRange, extent, logLabeled, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
+import { alignScales, mapTicks, niceStepAbove, niceTicks, exactRange, extent, logTicks, panBy, zoomAbout, zoomAt } from '../../src/waveform/scales.ts';
 
 describe('escalas del visor', () => {
   it('extent: sólo valores finitos dentro del rango de X', () => {
@@ -40,10 +40,45 @@ describe('escalas del visor', () => {
     expect(exactRange(3, 3)).toEqual([2, 4]);
   });
 
-  it('logLabeled: décadas; con menos de dos, también 2 y 5', () => {
-    expect(logLabeled([10, 20, 50, 100, 200, 1000])).toEqual([true, false, false, true, false, true]);
-    expect(logLabeled([2000, 3000, 5000, 10000, 20000])).toEqual([true, false, true, true, true]);
-    expect(logLabeled([3000, 4000, null])).toEqual([true, true, false]);
+  it('logTicks: varias décadas, números en las décadas y grilla en 1-2-5 (o 1…9 si entra)', () => {
+    const r = logTicks(10, 1e6, 800);
+    expect(r.linear).toBe(false);
+    expect(r.ticks.filter((_, i) => r.labeled[i])).toEqual([10, 100, 1e3, 1e4, 1e5, 1e6]);
+    expect(r.ticks).toHaveLength(5 * 3 + 1);
+    expect(r.ticks).toContain(5000);
+    // con más lugar, 1-2-3-5 con número y la grilla en todas
+    const wide = logTicks(10, 1e6, 1500);
+    expect(wide.ticks).toHaveLength(5 * 9 + 1);
+    expect(wide.ticks.filter((_, i) => wide.labeled[i]).slice(0, 5)).toEqual([10, 20, 30, 50, 100]);
+  });
+
+  it('logTicks: con muchas décadas en poco lugar, una década de cada dos (y la grilla en todas)', () => {
+    const r = logTicks(10, 1e15, 400);
+    expect(r.ticks.filter((_, i) => r.labeled[i])).toEqual([1e2, 1e4, 1e6, 1e8, 1e10, 1e12, 1e14]);
+    expect(r.ticks).toContain(1e3);
+  });
+
+  it('logTicks: menos de una década con lugar, 1-2-3-5 (lineal sólo si da más números)', () => {
+    const r = logTicks(1000, 9000, 800);
+    expect(r.linear).toBe(false);
+    expect(r.ticks.filter((_, i) => r.labeled[i])).toEqual([1000, 2000, 3000, 5000]);
+  });
+
+  it('logTicks: con mucho zoom (sin ninguna mantisa adentro) no se queda sin números: pasos lineales', () => {
+    const r = logTicks(1003, 1010, 800, 50, 72);
+    expect(r.linear).toBe(true);
+    expect(r.ticks).toEqual([1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010]);
+    expect(r.labeled.every(Boolean)).toBe(true);
+    const near = logTicks(990, 1010, 800, 50, 65);
+    expect(near.linear).toBe(true);
+    expect(near.ticks.length).toBeGreaterThanOrEqual(6);
+    expect(logTicks(1.0001e6, 1.0002e6, 800, 50, 90).ticks.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('logTicks: rangos inválidos, sin marcas', () => {
+    expect(logTicks(0, 10, 800).ticks).toEqual([]);
+    expect(logTicks(10, 10, 800).ticks).toEqual([]);
+    expect(logTicks(10, 100, 0).ticks).toEqual([]);
   });
 
   it('zoomAt: en escala log el punto bajo el mouse queda fijo y el factor es uniforme (#299)', () => {

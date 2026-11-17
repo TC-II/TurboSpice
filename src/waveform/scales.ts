@@ -74,21 +74,71 @@ export function exactRange(min: number | null, max: number | null, log = false):
   return log ? [min / Math.sqrt(10), max * Math.sqrt(10)] : [min - 1, max + 1];
 }
 
+export interface LogTicks {
+  /** todas las marcas (las que no llevan número son sólo grilla) */
+  ticks: number[];
+  /** cuáles llevan número */
+  labeled: boolean[];
+  /** marcas lineales (lo visible es menos que una década): los números van con axisTicks */
+  linear: boolean;
+}
+
 /**
- * Qué marcas de un eje log llevan número: las décadas; si en lo visible hay menos de dos,
- * también las de 2 y 5 (y si aun así hay menos de dos, todas), para que un zoom dentro de una
- * década no quede sin números.
+ * Marcas de un eje logarítmico en [min, max] para un eje de `px` píxeles, con los números a no
+ * menos de `gap` px entre sí (`linGap` con marcas lineales, que suelen ser más largas).
+ *
+ * uPlot las pone a partir del mínimo exacto en pasos de una década (1003, 2003…): con mucho zoom
+ * quedaba una sola, o ninguna, y el eje se quedaba sin números. Acá, de lo más denso a lo menos:
+ * - varias décadas: 1…9 de cada década, o 1-2-3-5, 1-2-5, sólo las décadas o una de cada 2, 3, 5…
+ *   (la grilla, con lo más denso que no se amontone);
+ * - menos de una década: pasos lineales lindos (1,0002k; 1,0004k…), que en un tramo tan corto
+ *   se ven casi parejos, cuando dan más números que las mantisas.
  */
-export function logLabeled(ticks: (number | null)[]): boolean[] {
-  const mant = (t: number) => Math.round(t / 10 ** Math.floor(Math.log10(t) + 1e-9));
-  const valid = (t: number | null): t is number => t != null && t > 0 && Number.isFinite(t);
-  const isDec = (t: number) => Math.abs(Math.log10(t) - Math.round(Math.log10(t))) < 1e-9;
-  const pick = (f: (t: number) => boolean) => ticks.map((t) => valid(t) && f(t));
-  const count = (b: boolean[]) => b.filter(Boolean).length;
-  const dec = pick(isDec);
-  if (count(dec) >= 2) return dec;
-  const d125 = pick((t) => isDec(t) || [2, 5].includes(mant(t)));
-  return count(d125) >= 2 ? d125 : pick(() => true);
+export function logTicks(min: number, max: number, px: number, gap = 50, linGap = gap): LogTicks {
+  if (!(min > 0) || !(max > min) || !Number.isFinite(max) || !(px > 0)) return { ticks: [], labeled: [], linear: false };
+  const l0 = Math.log10(min);
+  const span = Math.log10(max) - l0;
+  const pos = (v: number) => ((Math.log10(v) - l0) / span) * px;
+  const minGap = (vs: number[]) => vs.slice(1).reduce((g, v, i) => Math.min(g, pos(v) - pos(vs[i])), Infinity);
+  const inside = (v: number) => v >= min * (1 - 1e-12) && v <= max * (1 + 1e-12);
+  const d0 = Math.floor(l0);
+  const d1 = Math.ceil(Math.log10(max));
+  /** mantisas `ms` de cada década (de una cada `every`) dentro del rango */
+  const mantissas = (ms: number[], every = 1) => {
+    const out: number[] = [];
+    for (let d = d0; d <= d1; d++) if (((d % every) + every) % every === 0) for (const m of ms) if (inside(clean(m * 10 ** d))) out.push(clean(m * 10 ** d));
+    return out;
+  };
+  const ALL = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const sets: number[][] = [ALL, [1, 2, 3, 5], [1, 2, 5]];
+  let labels: number[] = [];
+  for (const ms of sets) {
+    const v = mantissas(ms);
+    if (v.length >= 2 && minGap(v) >= gap) {
+      labels = v;
+      break;
+    }
+  }
+  let every = 1;
+  if (!labels.length) {
+    // sólo décadas; si se amontonan, una de cada 2, 3, 5, 10… (alineadas a múltiplos)
+    for (every of [1, 2, 3, 5, 10, 20, 50, 100]) {
+      labels = mantissas([1], every);
+      if (labels.length < 2 || minGap(labels) >= gap) break;
+    }
+  }
+  // grilla: lo más denso que deje al menos 8 px entre líneas, y siempre las que llevan número
+  const grid = [ALL, [1, 2, 5], [1]].map((ms) => mantissas(ms)).find((v) => minGap(v) >= 8) ?? labels;
+  const all = [...new Set([...grid, ...labels])].sort((a, b) => a - b);
+  const set = new Set(labels);
+  const log: LogTicks = { ticks: all, labeled: all.map((v) => set.has(v)), linear: false };
+  if (labels.length >= 3 && span >= 1) return log;
+  // menos de una década (o casi sin números): pasos lineales, de lo más denso que no se amontone
+  for (let n = Math.max(2, Math.floor(px / linGap)); n >= 1; n--) {
+    const lin = niceTicks(min, max, n);
+    if (lin.length >= 2 && minGap(lin) >= linGap) return lin.length > labels.length ? { ticks: lin, labeled: lin.map(() => true), linear: true } : log;
+  }
+  return log;
 }
 
 /** Paso «lindo» (1, 2, 2,5 o 5 por una potencia de 10) mayor o igual que `raw` */

@@ -1,5 +1,5 @@
 // Menú flotante del botón derecho (#180): unas pocas acciones en el lugar del clic.
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from './icons.tsx';
 import { useHostWindow } from './hostWindow.ts';
 import { t } from '../i18n/i18n.ts';
@@ -13,6 +13,8 @@ export interface ContextItem {
   disabled?: boolean;
   /** se dibuja como botón (p. ej. «Propagar») */
   primary?: boolean;
+  /** una línea antes, que lo separa del grupo anterior */
+  sep?: boolean;
   /** recibe el valor escrito en la fila editable, aún sin aplicar */
   onClick(edited?: string): void;
   /** campo editable en el propio menú («R1 = [valor]»): Enter o el tick lo aplican */
@@ -154,19 +156,21 @@ export function ContextMenu({ at, items, onClose }: { at: { x: number; y: number
         ) : it.swatches ? (
           <SwatchRow key={i} it={it} onClose={onClose} />
         ) : (
-          <button
-            key={i}
-            role="menuitem"
-            disabled={it.disabled}
-            title={it.short ? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined) : it.title}
-            className={it.primary ? 'ctx-primary' : undefined}
-            onClick={() => {
-              onClose();
-              it.onClick(editItem ? edited : undefined);
-            }}
-          >
-            {it.short ?? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined)}
-          </button>
+          <Fragment key={i}>
+            {it.sep && i > 0 && <hr className="ctx-sep" />}
+            <button
+              role="menuitem"
+              disabled={it.disabled}
+              title={it.short ? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined) : it.title}
+              className={it.primary ? 'ctx-primary' : undefined}
+              onClick={() => {
+                onClose();
+                it.onClick(editItem ? edited : undefined);
+              }}
+            >
+              {it.short ?? text(it, editItem ? edited.trim() || editItem.edit!.value : undefined)}
+            </button>
+          </Fragment>
         ),
       )}
     </div>

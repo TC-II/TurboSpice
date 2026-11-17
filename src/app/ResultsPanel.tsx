@@ -249,6 +249,8 @@ export function ResultsPanel(props: ResultsPanelProps) {
                   side={resultsSide}
                   toolsHost={viewerTools}
                   marks={withPz && pzSide ? marks : undefined}
+                  name={projectName}
+                  onMessage={setMessage}
                   onHoverExpr={(e) => {
                     const net = e && /^\s*V\(([^,()]+)\)\s*$/i.exec(e)?.[1];
                     setTraceNet(net ? conn.nets.find((n) => n.name.toLowerCase() === net.toLowerCase())?.name : undefined);

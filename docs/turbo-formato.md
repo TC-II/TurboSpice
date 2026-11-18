@@ -171,7 +171,8 @@ deshacer (§5).
   `"kind": "model"` con `"module": "model"` (`NOMBRE.lib`, la netlist con un `.subckt` o un `.model`)
   más su símbolo `NOMBRE.asy` (`"kind": "symbol"`), que lo usa con `SYMATTR ModelFile NOMBRE.lib` y
   lleva `Prefix`, `Value`, `SpiceModel`, `SpiceLine`… y los pines con `PinName`/`SpiceOrder`, como
-  un par `.sub` + `.asy` de TCLib. Sin `"module"` es un archivo de modelos común. Ejemplo:
+  un par `.sub` + `.asy` de TCLib. Sin `"module"` es un archivo de modelos común. Recién creado, el
+  texto puede estar vacío (el editor ofrece cómo empezar; ver `docs/editor-de-modelos.md`). Ejemplo:
 
   ```json
   { "name": "MYAMP.lib", "kind": "model", "module": "model", "text": ".subckt MYAMP in out\n…\n.ends MYAMP\n" },

@@ -5,13 +5,8 @@ import { parseAsc } from '../../src/asc/parse.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import {
   addModelModule,
-  libForPins,
-  subcktForPins,
   setAttrSize,
-  subcktAfterPins,
   adoptModelSymbol,
-  pinsMismatch,
-  updateModelPins,
   attrVisible,
   modelParams,
   setAttrVisible,
@@ -32,7 +27,9 @@ import {
   setPinAttr,
   setSymAttr,
   symAttr,
+  removePinKeepOrder,
 } from '../../src/project/modelModule.ts';
+import { subcktPins } from '../../src/library/makeSymbol.ts';
 import { symPins } from '../../src/project/symbolEdit.ts';
 import { newProject, serializeTurbo, parseTurbo } from '../../src/project/turbo.ts';
 import { subcktFilesFor } from '../../src/project/exchange.ts';
@@ -149,13 +146,10 @@ describe('rótulos y parámetros del símbolo de un modelo', () => {
 });
 
 describe('símbolo y netlist de un modelo', () => {
-  it('los pines van a los nodos por SpiceOrder, no por nombre (como OA_Ideal: 1 2 5)', () => {
+  it('sacar un pin no corre los SpiceOrder de los otros (como OA_Ideal: 1 2 5)', () => {
     const sym =
       'SymbolType CELL\nPIN 0 0 NONE 0\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN 0 16 NONE 0\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN 0 32 NONE 0\nPINATTR PinName OUT\nPINATTR SpiceOrder 5\n';
-    expect(pinsMismatch(sym, ['1', '2', '3', '4', '5'])).toBe(false);
-    expect(pinsMismatch(sym, ['1', '2', '3', '4'])).toBe(true);
-    const up = updateModelPins(sym, ['a', 'b', 'c'], 16);
-    expect(symPins(up).map((p) => `${p.name}:${p.order}`)).toEqual(['In+:1', 'In-:2', 'c:3']);
+    expect(symPins(removePinKeepOrder(sym, 1)).map((p) => `${p.name}:${p.order}`)).toEqual(['In+:1', 'OUT:5']);
   });
 
   it('importar un .asy trae todo, salvo SpiceModel y ModelFile', () => {
@@ -167,6 +161,9 @@ describe('símbolo y netlist de un modelo', () => {
     expect(symAttr(s, 'ModelFile')).toBe('M1.lib');
     expect(s).toMatch(/^SymbolType CELL/m);
     expect(s).toMatch(/^WINDOW 0 8 -8 Left 2/m);
+    // la descripción es la del modelo (la del otro describe a otro componente en el selector)
+    const d = adoptModelSymbol(`${asy}SYMATTR Description Opamp ideal\n`, 'SYMATTR SpiceModel M1\nSYMATTR Description Mi LM358\n', 'M1');
+    expect(symAttr(d, 'Description')).toBe('Mi LM358');
   });
 
   it('SpiceModel sigue al .subckt renombrado en el netlist', () => {
@@ -175,74 +172,7 @@ describe('símbolo y netlist de un modelo', () => {
   });
 });
 
-describe('pines del símbolo y nodos del .subckt', () => {
-  const sym = (ps: [string, number, number][]) => ps.map(([n, o, y]) => `PIN 0 ${y} LEFT 8\nPINATTR PinName ${n}\nPINATTR SpiceOrder ${o}`).join('\n') + '\n';
-  const net = '.subckt M a b\nR1 a b 1k\nC1 b 0 {a}\n.ends M\n';
-
-  it('agregar, sacar y renombrar un pin cambia el .subckt', () => {
-    const two = sym([
-      ['a', 1, 0],
-      ['b', 2, 16],
-    ]);
-    expect(
-      subcktAfterPins(
-        net,
-        'M',
-        two,
-        sym([
-          ['a', 1, 0],
-          ['b', 2, 16],
-          ['c', 3, 32],
-        ]),
-      ),
-    ).toMatch(/^\.subckt M a b c$/m);
-    expect(subcktAfterPins(net, 'M', two, sym([['b', 1, 16]]))).toMatch(/^\.subckt M b$/m);
-    const ren = subcktAfterPins(
-      net,
-      'M',
-      two,
-      sym([
-        ['in', 1, 0],
-        ['b', 2, 16],
-      ]),
-    );
-    expect(ren).toBe('.subckt M in b\nR1 in b 1k\nC1 b 0 {a}\n.ends M\n');
-  });
-
-  it('renombrar un pin renombra el nodo de su posición aunque se llamara distinto (sin tocar valores)', () => {
-    const t = '.subckt OA 1 2\nE1 1 2 0 0 1\n.ends OA\n';
-    expect(
-      subcktAfterPins(
-        t,
-        'OA',
-        sym([
-          ['In+', 1, 0],
-          ['In-', 2, 16],
-        ]),
-        sym([
-          ['Vp', 1, 0],
-          ['In-', 2, 16],
-        ]),
-      ),
-    ).toBe('.subckt OA Vp 2\nE1 Vp 2 0 0 1\n.ends OA\n');
-    // como en la foto: in+ out in- → A B C
-    const d = '.subckt Dif in+ out in-\nE1 out 0 in+ in- 1\n.ends Dif\n';
-    expect(
-      subcktAfterPins(
-        d,
-        'Dif',
-        sym([
-          ['in+', 1, 0],
-          ['out', 2, 16],
-        ]),
-        sym([
-          ['A', 1, 0],
-          ['out', 2, 16],
-        ]),
-      ),
-    ).toBe('.subckt Dif A out in-\nE1 out 0 A in- 1\n.ends Dif\n');
-  });
-
+describe('atributos que salen del netlist', () => {
   it('Prefix sale de lo que define el netlist', () => {
     expect(symAttr(syncModelAttrs('SYMATTR Prefix X\nSYMATTR SpiceModel DX\n', '.model DX D(Is=1)\n'), 'Prefix')).toBe('D');
     expect(symAttr(syncModelAttrs('SYMATTR Prefix U\nSYMATTR SpiceModel A\n', '.subckt A x\n.ends A\n'), 'Prefix')).toBe('X');
@@ -258,29 +188,26 @@ describe('pines del símbolo y nodos del .subckt', () => {
   });
 });
 
-describe('importar un símbolo actualiza el .subckt', () => {
-  it('los nodos pasan a llamarse como los pines (línea y cuerpo) y se agregan los que faltan', () => {
-    const net = '.subckt M a b\nR1 a b 1k\n.ends M\n';
-    const sym = 'PIN 0 0 LEFT 8\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN 0 16 LEFT 8\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN 0 32 LEFT 8\nPINATTR PinName OUT\nPINATTR SpiceOrder 5\n';
-    expect(subcktForPins(net, 'M', sym)).toBe('.subckt M In+ In- n3 n4 OUT\nR1 In+ In- 1k\n.ends M\n');
+describe('arreglos de lo que se escribe', () => {
+  it('un $ en un atributo no es un patrón de reemplazo', () => {
+    const s = setSymAttr('SYMATTR Value x\n', 'Value', 'a$&b $1');
+    expect(symAttr(s, 'Value')).toBe('a$&b $1');
+  });
+
+  it('«G = 1» en la línea .subckt es un parámetro, no tres nodos', () => {
+    expect(subcktPins('.subckt A in out G = 1\n.ends A\n', 'A')).toEqual(['in', 'out']);
+    expect(setSubcktPins('.subckt A in out G = 1\n', ['in', 'out', 'x'])).toBe('.subckt A in out x G=1\n');
+  });
+
+  it('un modelo vacío (recién creado) se guarda y vuelve en el .turbo', async () => {
+    const p = addModelModule(newProject('x'), 'NEW', '');
+    const back = (await parseTurbo(await serializeTurbo(p))).project;
+    expect(modelModuleFile(back, 'NEW')?.text).toBe('');
+    expect(symAttr(modelSymbolText(back, 'NEW')!, 'ModelFile')).toBe('NEW.lib');
   });
 });
 
-describe('renombrar nodos numéricos (OA_Ideal)', () => {
-  it('cambia los nodos, no los valores que valen lo mismo', () => {
-    const net = '.SUBCKT OA 1   2   3   4   5\nE1 N001 0 1 2 1\nRF1 N002 N001 1\nE3 5 0 N002 0 {Av}\nX1 1 5 sub G=1\n.ends OA\n';
-    const sym = 'PIN 0 0 LEFT 8\nPINATTR PinName In+\nPINATTR SpiceOrder 1\nPIN 0 16 LEFT 8\nPINATTR PinName In-\nPINATTR SpiceOrder 2\nPIN 0 32 LEFT 8\nPINATTR PinName OUT\nPINATTR SpiceOrder 5\n';
-    expect(subcktForPins(net, 'OA', sym)).toBe('.SUBCKT OA In+   In-   3   4   OUT\nE1 N001 0 In+ In- 1\nRF1 N002 N001 1\nE3 OUT 0 N002 0 {Av}\nX1 In+ OUT sub G=1\n.ends OA\n');
-  });
-});
-
-describe('Update pins in .lib y exportar un modelo', () => {
-  it('renombra los nodos como los pines y saca los que quedan después del último pin', () => {
-    const net = '.subckt M a b c\nR1 a b 1k\n.ends M\n';
-    const sym = 'PIN 0 0 LEFT 8\nPINATTR PinName in\nPINATTR SpiceOrder 1\nPIN 0 16 LEFT 8\nPINATTR PinName out\nPINATTR SpiceOrder 2\n';
-    expect(libForPins(net, 'M', sym)).toBe('.subckt M in out\nR1 in out 1k\n.ends M\n');
-  });
-
+describe('exportar un modelo', () => {
   it('el .zip de un modelo lleva su .lib y su .asy', () => {
     const p = addModelModule(newProject('x'), 'M1');
     expect(

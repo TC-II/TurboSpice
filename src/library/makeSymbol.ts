@@ -12,7 +12,11 @@ export function subcktPins(text: string, name: string): string[] | null {
     let rest = m[2];
     for (let k = i + 1; k < lines.length && /^\s*\+/.test(lines[k]); k++) rest += ' ' + lines[k].replace(/^\s*\+/, '');
     const pins: string[] = [];
-    for (const tok of rest.split(/\s+/).filter(Boolean)) {
+    // («G = 1» es un parámetro, no los nodos G, = y 1)
+    for (const tok of rest
+      .replace(/\s*=\s*/g, '=')
+      .split(/\s+/)
+      .filter(Boolean)) {
       if (/^params:?$/i.test(tok) || /=/.test(tok)) break;
       pins.push(tok);
     }

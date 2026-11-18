@@ -1309,7 +1309,7 @@ function SchematicMode({
                   importSubckts,
                 }}
               />
-              <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }} />
+              <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared, renameModel }} />
               {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
               <EditorArea
                 traceFocus={traceFocus}

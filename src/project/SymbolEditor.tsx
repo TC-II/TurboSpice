@@ -33,6 +33,7 @@ import {
   windowShown,
   type ShapeKind,
 } from './symbolEdit.ts';
+import { removePinKeepOrder, setPinAttr } from './modelModule.ts';
 import { t } from '../i18n/i18n.ts';
 
 type Tool = 'edit' | 'pin' | 'text' | ShapeKind;
@@ -67,6 +68,9 @@ let pastes = 0;
 const ALIGNS = ['Left', 'Center', 'Right', 'Top', 'Bottom', 'VLeft', 'VCenter', 'VRight', 'VTop', 'VBottom'];
 const SIZES = [8, 13, 20, 26, 32, 46, 65, 92];
 
+/** letra con la que se numeran las instancias (X → U, como LTspice; MN → M…) */
+const instLetter = (prefix: string) => (!prefix || prefix.toUpperCase() === 'X' ? 'U' : prefix[0].toUpperCase());
+
 /** el arrastre sigue aunque el mouse salga del dibujo (sin puntero real, p. ej. en tests, no hay captura) */
 const capture = (e: React.PointerEvent) => {
   try {
@@ -89,6 +93,12 @@ export function SymbolEditor({
   onPickSymbol,
   onWidth,
   onAddPort,
+  history,
+  showParams = true,
+  highlight,
+  onSelectPins,
+  modelPins,
+  pickLabel,
 }: {
   name: string;
   text: string;
@@ -110,6 +120,20 @@ export function SymbolEditor({
   onAddPort?(name: string): void;
   /** parámetros del símbolo (por defecto, los del SpiceLine) */
   params?: [string, string][];
+  /** deshacer y rehacer de quien lo usa (el editor de modelos: netlist y símbolo juntos), en vez
+   *  de los del dibujo */
+  history?: { undo(): void; redo(): void; canUndo: boolean };
+  /** la tabla de parámetros abajo del dibujo (el editor de modelos tiene la suya) */
+  showParams?: boolean;
+  /** pines resaltados (los que se señalan en la tabla de pines) */
+  highlight?: number[];
+  /** avisa qué pines quedaron seleccionados en el dibujo */
+  onSelectPins?(pins: number[]): void;
+  /** editor de modelos: el pin nuevo va al primer nodo sin pin (`free`, con su SpiceOrder) o, si no
+   *  queda ninguno, después de los `count` nodos; y sacar un pin no corre los SpiceOrder de los otros */
+  modelPins?: { free: { name: string; order: number }[]; count: number };
+  /** texto del botón de importar un símbolo existente */
+  pickLabel?: string;
 }) {
   // mientras se arrastra se dibuja una copia local; al soltar se guarda
   const [live, setLive] = useState(text);
@@ -153,7 +177,7 @@ export function SymbolEditor({
   const attr = (k: string) => new RegExp(`^SYMATTR ${k} (.*)$`, 'm').exec(live)?.[1]?.trim() ?? '';
   const wins = symWindows(live)
     .filter(windowShown)
-    .map((w) => ({ ...w, text: w.n === 0 ? attr('InstName') || `${attr('Prefix') || 'X'}1` : attr(WINDOW_ATTR[w.n] ?? '') }))
+    .map((w) => ({ ...w, text: w.n === 0 ? attr('InstName') || `${instLetter(attr('Prefix'))}1` : attr(WINDOW_ATTR[w.n] ?? '') }))
     .filter((w) => w.text);
   const ps = params ?? symParams(text);
   const bodyLine = shapes.find((s) => s.kind === 'RECTANGLE')?.line;
@@ -233,12 +257,20 @@ export function SymbolEditor({
   }, [name]);
   const change = (next: string) => {
     if (next === text) return;
+    if (history) return onChange(next);
     undo.current.push(text);
     if (undo.current.length > 200) undo.current.shift();
     redo.current = [];
     onChange(next);
   };
   const back = (from: React.MutableRefObject<string[]>, to: React.MutableRefObject<string[]>) => {
+    if (history) {
+      clearSel();
+      if (from === undo) history.undo();
+      else history.redo();
+      aside.current?.focus({ preventScroll: true });
+      return;
+    }
     const prev = from.current.pop();
     if (prev === undefined) return;
     to.current.push(text);
@@ -247,6 +279,13 @@ export function SymbolEditor({
     aside.current?.focus({ preventScroll: true });
   };
   const missing = ports.filter((n) => !pins.some((p) => p.name.toLowerCase() === n.toLowerCase()));
+  const notifySel = useEvent(() => onSelectPins?.(selPins));
+  useEffect(() => notifySel(), [selPins, notifySel]);
+  /** pin nuevo del editor de modelos, con su SpiceOrder */
+  const addModelPin = (tt: string, name: string, x: number, y: number, order: number) => {
+    const next = addPin(tt, name, x, y);
+    return setPinAttr(next, symPins(next).length - 1, 'SpiceOrder', String(order));
+  };
 
   const toDoc = (e: React.PointerEvent, g: number): Pt => {
     const m = svg.current?.getScreenCTM();
@@ -373,7 +412,11 @@ export function SymbolEditor({
     }
     if (tool === 'pin') {
       const p = toDoc(e, GRID);
-      if (missing[0]) change(addPin(live, missing[0], p.x, p.y));
+      const free = modelPins?.free[0];
+      if (modelPins) {
+        if (free) change(addModelPin(live, free.name, p.x, p.y, free.order));
+        else setAskPin({ ...p, name: '' });
+      } else if (missing[0]) change(addPin(live, missing[0], p.x, p.y));
       else setAskPin({ ...p, name: '' });
       return;
     }
@@ -385,6 +428,12 @@ export function SymbolEditor({
   const confirmPin = () => {
     if (!askPin) return;
     const n = askPin.name.trim();
+    if (modelPins) {
+      // sin nodo libre: el pin va después de los nodos (el editor ofrece agregarle uno al .subckt)
+      if (!n || pins.some((p) => p.name.toLowerCase() === n.toLowerCase())) return;
+      change(addModelPin(live, n, askPin.x, askPin.y, Math.max(modelPins.count, ...pins.map((p) => p.order)) + 1));
+      return setAskPin(null);
+    }
     if (!/^[A-Za-z_][\w+-]*$/.test(n) || pins.some((p) => p.name.toLowerCase() === n.toLowerCase())) return;
     if (ports.some((x) => x.toLowerCase() === n.toLowerCase()) || !onAddPort) change(addPin(live, n, askPin.x, askPin.y));
     else {
@@ -433,7 +482,7 @@ export function SymbolEditor({
     if (!hasSel) return;
     let tt = live;
     for (const l of [...sel].sort((a, b) => b - a)) tt = removeShape(tt, l);
-    for (const i of [...selPins].sort((a, b) => b - a)) tt = removePin(tt, i);
+    for (const i of [...selPins].sort((a, b) => b - a)) tt = modelPins ? removePinKeepOrder(tt, i) : removePin(tt, i);
     change(tt);
     clearSel();
     // el botón queda deshabilitado y suelta el foco: que los atajos (Ctrl+Z) sigan en el panel
@@ -515,9 +564,13 @@ export function SymbolEditor({
     tool === 'edit'
       ? t('drag on the background to select several; drag the pins, the corners and the shapes')
       : tool === 'pin'
-        ? missing.length
-          ? t('click to place the pin of {port}', { port: missing[0] })
-          : t('click to place a pin for a new port')
+        ? modelPins
+          ? modelPins.free.length
+            ? t('click to place the pin of {port}', { port: modelPins.free[0].name })
+            : t('click to place a new pin')
+          : missing.length
+            ? t('click to place the pin of {port}', { port: missing[0] })
+            : t('click to place a pin for a new port')
         : tool === 'text'
           ? t('click to place a text')
           : t('drag to draw');
@@ -529,12 +582,12 @@ export function SymbolEditor({
         <strong>{t('Symbol')}</strong>
         {onPickSymbol && (
           <button className="tree-add" onClick={onPickSymbol} title={t('Import the drawing and the pins of an existing symbol (an opamp, a transistor, a subcircuit…): the .asy')}>
-            {t('Import from existing…')}
+            {pickLabel ?? t('Import from existing…')}
           </button>
         )}
         {onReset && (
           <button className="tree-add" onClick={onReset} title={t('Back to the generated symbol: a rectangle with the ports on the sides')}>
-            {t('Redo')}
+            {t('Regenerate')}
           </button>
         )}
       </header>
@@ -559,7 +612,7 @@ export function SymbolEditor({
         <button aria-label={t('Delete the selection (Del)')} title={t('Delete the selection (Del)')} disabled={!hasSel} onClick={remove}>
           <Icon name="trash" size={16} />
         </button>
-        <button aria-label={t('Undo (Ctrl+Z)')} title={t('Undo (Ctrl+Z)')} disabled={!undo.current.length} onClick={() => back(undo, redo)}>
+        <button aria-label={t('Undo (Ctrl+Z)')} title={t('Undo (Ctrl+Z)')} disabled={history ? !history.canUndo : !undo.current.length} onClick={() => back(undo, redo)}>
           <Icon name="undo" size={16} />
         </button>
         <button
@@ -646,8 +699,9 @@ export function SymbolEditor({
             <path d={`M${GRID} 0H0V${GRID}`} className="sym-grid-major" />
           </pattern>
         </defs>
-        <rect x={box[0]} y={box[1]} width={box[2]} height={box[3]} fill="url(#sym-grid-fine)" />
-        <rect x={box[0]} y={box[1]} width={box[2]} height={box[3]} fill="url(#sym-grid)" />
+        {/* la grilla llena todo el panel (la vista guarda las proporciones del símbolo, no las del panel) */}
+        <rect x={box[0] - box[2] * 4} y={box[1] - box[3] * 4} width={box[2] * 9} height={box[3] * 9} fill="url(#sym-grid-fine)" />
+        <rect x={box[0] - box[2] * 4} y={box[1] - box[3] * 4} width={box[2] * 9} height={box[3] * 9} fill="url(#sym-grid)" />
         <g className="sym-shapes">
           {shapes.map((s) => shapeEl(s.kind, s.coords, s.line, { className: sel.includes(s.line) ? 'sel' : undefined }))}
           {/* banda ancha e invisible para agarrar las figuras sin apuntar al píxel */}
@@ -736,7 +790,7 @@ export function SymbolEditor({
           return (
             <g
               key={i}
-              className={`sym-pin${selPins.includes(i) ? ' sel' : ''}`}
+              className={`sym-pin${selPins.includes(i) ? ' sel' : ''}${highlight?.includes(i) ? ' hl' : ''}`}
               onPointerDown={(e) => {
                 if (tool !== 'edit' || e.button !== 0) return;
                 aside.current?.focus({ preventScroll: true });
@@ -795,7 +849,7 @@ export function SymbolEditor({
             </table>
           </details>
         )}
-        <ParamsEditor key={formatParamList(ps)} params={ps} onChange={onParams} />
+        {showParams && <ParamsEditor key={formatParamList(ps)} params={ps} onChange={onParams} />}
       </div>
     </aside>
   );

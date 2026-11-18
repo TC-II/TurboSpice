@@ -1,365 +1,518 @@
-// Editor de un módulo «Modelo»: a la izquierda el texto del modelo (.subckt / .model), los
-// atributos del símbolo (en el orden en que arman la línea de la instancia, como en TCLib) y sus
-// pines (nombre, SpiceOrder, de qué lado va el nombre y si se ve); a la derecha el dibujo del
-// símbolo (el mismo editor que el de los subcircuitos), mitad y mitad al entrar (el borde se arrastra).
-// El símbolo y el netlist son independientes salvo en esto: SpiceModel es el nombre del .subckt (se
-// cambia de cualquiera de los dos lados) y Prefix sale de lo que define (X o la letra del .model).
-// Los pines van, por SpiceOrder, a sus nodos; cambiarlos no toca el código: eso lo hace el botón
-// «Update pins in .lib».
+// Editor de un módulo «Modelo», pensado como el flujo de crear un componente:
+//  1. Netlist (arriba a la izquierda): se empieza pegando uno, abriendo un archivo, copiando el de
+//     un componente o con una plantilla; el texto se resalta y cada problema se marca en su línea,
+//     con su arreglo. Si el archivo define varios componentes, se elige cuál usa el símbolo.
+//  2. Pines: a qué nodo va cada pin del símbolo (un desplegable; el SpiceOrder no se escribe a mano).
+//  3. Símbolo (a la derecha): generado mientras no se lo toque; o uno existente, con sus pines.
+//  4. Parámetros y rótulos: lo que pasa cada instancia y qué se ve en el esquemático.
+//  5. Usarlo: el estado de cada paso, la línea que escribe cada instancia y «Colocar».
+// Netlist y símbolo cambian juntos (cada cambio pasa por normalizeModel, así los pines nunca quedan
+// en otro nodo sin aviso) y comparten un deshacer. El texto se guarda al rato de dejar de escribir.
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useEvent } from '../ui/useEvent.ts';
-import { GRID } from '../asc/model.ts';
-import { SymbolEditor } from './SymbolEditor.tsx';
-import { addFreePin, pinSide, removePin, setPinAlign, symPins, symWindows } from './symbolEdit.ts';
-import { subcktPins } from '../library/makeSymbol.ts';
-import {
-  ATTR_WINDOW,
-  attrSize,
-  libForPins,
-  setAttrSize,
-  MODEL_ATTRS,
-  attrVisible,
-  modelFileName,
-  modelInfo,
-  modelParams,
-  setModelParams,
-  setAttrVisible,
-  pinsMismatch,
-  renameModelIn,
-  renameSubcktIn,
-  setPinAttr,
-  setSymAttr,
-  symAttr,
-  syncModelAttrs,
-  updateModelPins,
-} from './modelModule.ts';
+import { decodeText } from '../asc/encoding.ts';
 import { t } from '../i18n/i18n.ts';
+import { Icon } from '../ui/icons.tsx';
+import { useEvent } from '../ui/useEvent.ts';
+import { analyzeModel, applyFix, chooseDefinition, fromTemplate, normalizeModel, rebuildSymbol, setParams, TEMPLATES, type Area, type ModelState } from './modelEdit.ts';
+import { DetailsPanel, LabelsPanel, ParamsPanel, PinsPanel, ProblemList, type Apply } from './ModelPanels.tsx';
+import { modelFileName } from './modelModule.ts';
+import { NetlistEditor, type NetlistEditorHandle } from './NetlistEditor.tsx';
+import { SymbolEditor } from './SymbolEditor.tsx';
+import { formatParamList, symPins } from './symbolEdit.ts';
 
-/** Qué hace cada atributo (según cómo los usan los símbolos de TCLib y el netlist) */
-const ATTR_HELP: Record<(typeof MODEL_ATTRS)[number], () => string> = {
-  InstName: () => t('Name of each instance on the schematic (X1, U1…); empty: the Prefix and a number'),
-  Prefix: () => t('From the netlist: X for a .subckt; D, Q, M, J… for a .model of that device'),
-  SpiceModel: () => t('The name of the .subckt or .model: changing it here renames it in the netlist, and vice versa'),
-  Value: () => t('Goes after SpiceModel and is shown on the schematic: e.g. parameters (G=1)'),
-  Value2: () => t('Goes after Value'),
-  SpiceLine: () => t('Parameters with their default value (the «Parameters» table of the symbol)'),
-  SpiceLine2: () => t('More text at the end of the line'),
-  ModelFile: () => t('The file of this netlist: it is named like the component'),
-  Description: () => t('Text shown in the component picker'),
+type Tab = 'pins' | 'params' | 'labels' | 'details';
+type Step = 'pending' | 'ok' | 'warning' | 'error';
+
+/** pausa al escribir después de la que el netlist se guarda; y lapso en que se junta en un solo deshacer */
+const SAVE_MS = 400;
+const MERGE_MS = 2000;
+const TAB_KEY = 'turbospice.modelTab';
+const SPLIT_KEY = 'turbospice.modelSplit';
+const load = (k: string) => {
+  try {
+    return localStorage.getItem(k);
+  } catch {
+    return null;
+  }
 };
-
-const SIDES = ['LEFT', 'RIGHT', 'TOP', 'BOTTOM'] as const;
-/** no se escriben a mano: Prefix sale del netlist y ModelFile es el archivo de este módulo */
-const READ_ONLY = new Set<string>(['Prefix', 'ModelFile']);
-/** tamaños de letra de LTspice (índice → pt, spec §7.1) */
-const SIZES = [8, 13, 20, 26, 32, 46, 65, 92];
+const store = (k: string, v: string) => {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* sin almacenamiento: no se recuerda */
+  }
+};
+const same = (a: ModelState, b: ModelState) => a.text === b.text && a.sym === b.sym;
+const isField = (el: EventTarget | null) => el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 
 export function ModelEditor({
   name,
   text,
   symText,
-  onText,
-  onSymbol: storeSymbol,
+  onChange,
   onPickSymbol,
   onPickNetlist,
+  onPlace,
+  onRename,
   onClose,
 }: {
   name: string;
   text: string;
   symText: string;
-  onText(text: string): void;
-  onSymbol(text: string): void;
+  /** netlist y símbolo nuevos (siempre los dos juntos) */
+  onChange(next: ModelState): void;
   /** el dibujo y los pines de un símbolo existente (su .asy) */
   onPickSymbol?(): void;
   /** el netlist de un componente existente (p. ej. un subcircuito del proyecto) */
   onPickNetlist?(): void;
+  /** cerrar el editor y colocar el componente en el esquemático */
+  onPlace?(): void;
+  /** renombrar el módulo (abre el diálogo con `to` propuesto) */
+  onRename?(to: string): void;
   onClose(): void;
 }) {
-  const [draft, setDraft] = useState(text);
-  useEffect(() => setDraft(text), [text, name]);
-  // se guarda al rato de dejar de escribir (y al salir del cuadro)
+  // lo que se abrió (tal cual está en el proyecto) y normalizado: SpiceModel, Prefix y ModelFile al
+  // día (un proyecto viejo puede no tenerlos)
+  const [init] = useState<ModelState>(() => ({ text, sym: symText }));
+  const [opened] = useState(() => normalizeModel(init, name));
+  /** lo último guardado (o recibido de afuera); `cur` lo tiene al instante, `base` para el render */
+  const cur = useRef<ModelState>(opened);
+  const [base, setBaseState] = useState<ModelState>(opened);
+  const setBase = (s: ModelState) => {
+    cur.current = s;
+    setBaseState(s);
+  };
+  const [draft, setDraftState] = useState(opened.text);
+  const draftRef = useRef(opened.text);
+  const setDraft = (v: string) => {
+    draftRef.current = v;
+    setDraftState(v);
+  };
+  const past = useRef<ModelState[]>([]);
+  const future = useRef<ModelState[]>([]);
+  const last = useRef<{ kind?: string; at: number }>({ at: 0 });
   const timer = useRef<ReturnType<typeof setTimeout>>();
-  const save = (raw: string) => {
+  const send = useRef(onChange);
+  send.current = onChange;
+
+  /** Guarda un cambio (normalizado) como un paso de deshacer; los de escribir seguido van juntos */
+  const commit = (next: ModelState, kind?: 'typing') => {
     clearTimeout(timer.current);
-    // borrado entero: arranca de nuevo con la línea .subckt (con los pines del símbolo) y su .ends
-    let v = raw;
-    if (!v.trim()) {
-      const sub = symAttr(symText, 'SpiceModel') || name;
-      // un nodo por SpiceOrder (el de cada pin con su nombre; los huecos, como el 3 y 4 de OA_Ideal, nK)
-      const ps = symPins(symText);
-      const ns = Array.from({ length: Math.max(0, ...ps.map((p) => p.order)) }, (_, k) => ps.find((p) => p.order === k + 1)?.name ?? `n${k + 1}`);
-      v = `.subckt ${[sub, ...ns].join(' ')}\n\n.ends ${sub}\n`;
-      setDraft(v);
+    const prev = cur.current;
+    const norm = normalizeModel(next, name, prev);
+    if (same(norm, prev)) return;
+    const now = Date.now();
+    if (!(kind === 'typing' && last.current.kind === 'typing' && now - last.current.at < MERGE_MS)) {
+      past.current.push(prev);
+      if (past.current.length > 200) past.current.shift();
     }
-    if (v !== text) onText(v);
+    future.current = [];
+    last.current = { kind, at: now };
+    setBase(norm);
+    if (norm.text !== draftRef.current) setDraft(norm.text);
+    send.current(norm);
   };
-  useEffect(() => () => clearTimeout(timer.current), []);
-  const info = useMemo(() => modelInfo(draft), [draft]);
-  // ancho del dibujo: la mitad al entrar; después, el que se arrastre
-  const [symW, setSymW] = useState<number | null>(null);
-  useEffect(() => setSymW(null), [name]);
-  // SpiceModel sigue al netlist guardado (y ModelFile es el archivo de este módulo)
-  const syncAttrs = useEvent(() => {
-    let next = syncModelAttrs(symText, text);
-    if (symAttr(next, 'ModelFile') !== modelFileName(name)) next = setSymAttr(next, 'ModelFile', modelFileName(name));
-    if (next !== symText) storeSymbol(next);
+  /** Lo escrito y no guardado todavía, guardado ya */
+  const flush = () => {
+    clearTimeout(timer.current);
+    if (draftRef.current !== cur.current.text) commit({ text: draftRef.current, sym: cur.current.sym }, 'typing');
+  };
+  const apply: Apply = (fn) => {
+    flush();
+    commit(fn(cur.current));
+  };
+  const travel = (from: ModelState[], to: ModelState[]) => {
+    flush();
+    const s = from.pop();
+    if (!s) return;
+    to.push(cur.current);
+    last.current = { at: 0 };
+    setBase(s);
+    setDraft(s.text);
+    send.current(s);
+  };
+  const undo = () => travel(past.current, future.current);
+  const redo = () => travel(future.current, past.current);
+
+  // al abrir: lo normalizado, si cambió algo (sin paso de deshacer); al cerrar (el editor se monta
+  // de nuevo para cada modelo), lo que quedó sin guardar
+  const opening = useEvent(() => {
+    if (!same(opened, init)) send.current(opened);
+    return () => {
+      clearTimeout(timer.current);
+      if (draftRef.current !== cur.current.text) send.current(normalizeModel({ text: draftRef.current, sym: cur.current.sym }, name, cur.current));
+    };
   });
-  useEffect(() => syncAttrs(), [text, symText, syncAttrs]);
-  const model = symAttr(symText, 'SpiceModel');
-  // los nodos del .subckt que usa el símbolo
-  const nodes = useMemo(() => (model ? subcktPins(draft, model) : null) ?? info.pins, [draft, model, info]);
-  /** cambia el netlist (y lo guarda ya) */
-  const editText = (v: string) => {
-    setDraft(v);
-    save(v);
+  useEffect(() => opening(), [opening]);
+  // un cambio de afuera (importar un netlist o un símbolo): se lo toma, normalizado, como un paso más
+  useEffect(() => {
+    const c = cur.current;
+    if ((text === c.text && symText === c.sym) || (text === init.text && symText === init.sym)) return;
+    const ext = { text, sym: symText };
+    const norm = normalizeModel(ext, name, c);
+    past.current.push(c);
+    future.current = [];
+    last.current = { at: 0 };
+    setBase(norm);
+    setDraft(norm.text);
+    if (!same(norm, ext)) send.current(norm);
+  }, [text, symText, name, init]);
+
+  // lo que se ve: con el texto que se está escribiendo (los pines y problemas siguen al teclear)
+  const view = useMemo<ModelState>(() => (draft === base.text ? base : normalizeModel({ text: draft, sym: base.sym }, name, base)), [draft, base, name]);
+  const a = useMemo(() => analyzeModel(view), [view]);
+  const marks = useMemo(() => {
+    const m = new Map<number, 'error' | 'warning'>();
+    for (const d of a.diagnostics) if (d.line !== undefined && m.get(d.line) !== 'error') m.set(d.line, d.severity);
+    return m;
+  }, [a]);
+  const of = (area: Area) => a.diagnostics.filter((d) => d.area === area);
+  const stepOf = (area: Area, todo: boolean): Step => (todo ? 'pending' : of(area).some((d) => d.severity === 'error') ? 'error' : of(area).length ? 'warning' : 'ok');
+  const steps: { id: Area; label: string; state: Step }[] = [
+    { id: 'netlist', label: t('Netlist'), state: stepOf('netlist', a.empty) },
+    { id: 'pins', label: t('Pins'), state: stepOf('pins', !a.used) },
+    { id: 'params', label: t('Parameters'), state: stepOf('params', !a.used) },
+  ];
+  const ready = !!a.used && !a.diagnostics.some((d) => d.severity === 'error');
+
+  const [tab, setTabState] = useState<Tab>(() => (['pins', 'params', 'labels', 'details'].includes(load(TAB_KEY) ?? '') ? (load(TAB_KEY) as Tab) : 'pins'));
+  const setTab = (x: Tab) => {
+    setTabState(x);
+    store(TAB_KEY, x);
   };
-  const onSymbol = storeSymbol;
-  // «Update pins in .lib»: la línea .subckt (y el cuerpo) con los pines del símbolo
-  const pinsLib = model && subcktPins(draft, model) ? libForPins(draft, model, symText) : draft;
-  // la alineación de cada rótulo al ocultarlo (el archivo no la guarda), para volver a mostrarlo igual
+  const [hover, setHover] = useState<number | null>(null);
+  const [selPins, setSelPins] = useState<number[]>([]);
+  const [symW, setSymW] = useState<number | null>(null);
+  const [writing, setWriting] = useState(false);
   const aligns = useRef(new Map<string, string>());
-  const toggleAttr = (k: string, on: boolean) => {
-    const w = symWindows(symText).find((x) => x.n === ATTR_WINDOW[k]);
-    if (!on && w) aligns.current.set(k, w.align);
-    onSymbol(setAttrVisible(symText, k, on, aligns.current.get(k)));
+  const editor = useRef<NetlistEditorHandle>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const reveal = (line: number) => editor.current?.reveal(line);
+  const fix: Parameters<typeof ProblemList>[0]['onFix'] = (f) => apply((s) => applyFix(s, f));
+  const goStep = (id: Area) => {
+    if (id === 'pins') return setTab('pins');
+    if (id === 'params') return setTab('params');
+    const first = of('netlist').find((d) => d.line !== undefined);
+    if (first) reveal(first.line!);
+    else editor.current?.focus();
   };
-  /** SpiceModel escrito a mano: renombra el .subckt (o .model) en el netlist */
-  const renameModel = (to: string) => {
-    if (!to || to === model) return;
-    storeSymbol(setSymAttr(symText, 'SpiceModel', to));
-    if (model) editText(renameModelIn(renameSubcktIn(draft, model, to), model, to));
+  // al empezar a escribir a mano, el foco va al editor (después de sacar la tarjeta de inicio)
+  useEffect(() => {
+    if (writing) editor.current?.focus();
+  }, [writing]);
+
+  // alto del netlist (se arrastra el borde con los paneles de abajo)
+  const left = useRef<HTMLElement>(null);
+  const [split, setSplit] = useState<number | null>(() => Number(load(SPLIT_KEY)) || null);
+  const dragSplit = (e: React.PointerEvent) => {
+    const box = left.current?.getBoundingClientRect();
+    if (!box) return;
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    let h = split ?? box.height / 2;
+    const mv = (ev: PointerEvent) => {
+      h = Math.min(Math.max(ev.clientY - box.top, 140), box.height - 160);
+      setSplit(h);
+    };
+    const done = () => {
+      el.removeEventListener('pointermove', mv);
+      el.removeEventListener('pointerup', done);
+      store(SPLIT_KEY, String(Math.round(h)));
+    };
+    el.addEventListener('pointermove', mv);
+    el.addEventListener('pointerup', done);
   };
-  const pins = useMemo(() => symPins(symText), [symText]);
-  const names = pins.map((p) => p.name.toLowerCase());
-  const mismatch = pinsMismatch(symText, nodes);
-  const newPin = () => {
-    let n = pins.length + 1;
-    while (names.includes(`p${n}`)) n++;
-    onSymbol(addFreePin(symText, `p${n}`, GRID));
+  const splitKey = (e: React.KeyboardEvent) => {
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    e.preventDefault();
+    const box = left.current?.getBoundingClientRect();
+    if (!box) return;
+    const h = Math.min(Math.max((split ?? box.height / 2) + (e.key === 'ArrowUp' ? -24 : 24), 140), box.height - 160);
+    setSplit(h);
+    store(SPLIT_KEY, String(Math.round(h)));
   };
 
+  const openFile = async (f: File) => {
+    const v = decodeText(new Uint8Array(await f.arrayBuffer()));
+    apply((s) => ({ ...s, text: v.endsWith('\n') ? v : `${v}\n` }));
+  };
+  const startWith = (id: string) => apply((s) => fromTemplate(s, id, name));
+  const def = a.used;
+  const freeNodes = a.free.map((i) => ({ name: a.nodes[i], order: i + 1 }));
+  const showStart = a.empty && !writing;
+
   return (
-    <div className="model-editor" style={{ '--sym-wc': symW ? `min(${symW}px, 75%)` : '50%' } as React.CSSProperties}>
-      <div className="sub-hint model-hint" role="status">
-        <strong>{t('Model Editor')}</strong>
-        <span className="sub-hint-name">{name}</span>
-        <span className="sub-hint-text">{t('write the .subckt or .model on the left and draw its symbol on the right')}</span>
-        <button onClick={onClose} title={t('Back to the testbench')}>
-          {t('Return')}
+    <div
+      className="model-editor"
+      style={{ '--sym-wc': symW ? `min(${symW}px, 75%)` : '46%' } as React.CSSProperties}
+      onKeyDown={(e) => {
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (ctrl && !isField(e.target) && /^[zy]$/i.test(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.key.toLowerCase() === 'y' || e.shiftKey) redo();
+          else undo();
+          return;
+        }
+        // las teclas no llegan al esquemático de abajo (salvo guardar, abrir y buscar)
+        if (!(ctrl && /^[sop]$/i.test(e.key))) e.stopPropagation();
+      }}
+      onPaste={(e) => {
+        e.stopPropagation();
+        // pegar un netlist con el modelo vacío (sin estar en un campo): va al netlist
+        const v = e.clipboardData.getData('text');
+        if (!isField(e.target) && a.empty && v.trim()) {
+          e.preventDefault();
+          apply((s) => ({ ...s, text: v.endsWith('\n') ? v : `${v}\n` }));
+        }
+      }}
+    >
+      <header className="mdl-bar">
+        <span className="mdl-title">{t('Model Editor')}</span>
+        <strong className="mdl-name">{name}</strong>
+        <span className="mdl-kind">
+          {def
+            ? def.kind === 'subckt'
+              ? a.nodes.length === 1
+                ? t('.subckt · 1 node')
+                : t('.subckt · {n} nodes', { n: a.nodes.length })
+              : t('.model {type}', { type: def.type ?? '' })
+            : a.empty
+              ? t('empty')
+              : t('no definition')}
+        </span>
+        <ol className="mdl-steps" aria-label={t('Steps')}>
+          {steps.map((s, i) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                className={`mdl-step ${s.state}`}
+                onClick={() => goStep(s.id)}
+                title={s.state === 'ok' ? t('{step}: ready', { step: s.label }) : s.state === 'pending' ? t('{step}: to do', { step: s.label }) : t('{step}: see the problems', { step: s.label })}
+              >
+                <span className="mdl-step-n">{s.state === 'ok' ? <Icon name="check" size={12} /> : s.state === 'error' ? '!' : s.state === 'warning' ? '!' : i + 1}</span>
+                <span className="mdl-step-label">{s.label}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
+        <span className="mdl-bar-sep" />
+        <button type="button" className="icon-btn" onClick={undo} disabled={!past.current.length && draft === base.text} aria-label={t('Undo (Ctrl+Z)')} title={t('Undo (Ctrl+Z)')}>
+          <Icon name="undo" size={16} />
         </button>
-      </div>
-      <section className="model-left">
-        <div className="model-label-row">
-          <label className="model-label" htmlFor="model-netlist">
-            {t('Netlist ({file})', { file: `${name}.lib` })}
-          </label>
-          {onPickNetlist && (
-            <button
-              className="tree-add"
-              onClick={onPickNetlist}
-              title={t('Import the netlist of an existing component (a subcircuit of the project, a TCLib model…): the .subckt, renamed to this model')}
-            >
-              {t('Import from existing…')}
-            </button>
-          )}
-        </div>
-        <textarea
-          id="model-netlist"
-          className="model-text"
-          spellCheck={false}
-          value={draft}
-          onChange={(e) => {
-            const v = e.target.value;
-            setDraft(v);
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => save(v), 500);
-          }}
-          onBlur={() => save(draft)}
-          onKeyDown={(e) => e.stopPropagation()}
-        />
-        {info.kind === 'none' && <p className="tree-meta">{t('No .subckt or .model found yet')}</p>}
-        {mismatch && (
-          <p className="tree-warn">
-            {t('The pins of the symbol do not match the nodes of the netlist ({pins}) by SpiceOrder.', { pins: nodes.join(' ') })}{' '}
-            <button className="link" onClick={() => storeSymbol(updateModelPins(symText, nodes, GRID))}>
-              {t('Update pins in the symbol')}
-            </button>
-          </p>
-        )}
-        <details className="model-attrs" open>
-          <summary>{t('Symbol attributes')}</summary>
-          <table className="model-attr-table">
-            <thead>
-              <tr>
-                <th />
-                <th />
-                <th>{t('Visible')}</th>
-                <th>{t('Size')}</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {MODEL_ATTRS.map((k) => (
-                <tr key={k}>
-                  <td>
-                    <label htmlFor={`model-attr-${k}`}>{k}</label>
-                  </td>
-                  <td>
-                    <AttrInput
-                      id={`model-attr-${k}`}
-                      value={symAttr(symText, k)}
-                      placeholder={k === 'InstName' ? `${symAttr(symText, 'Prefix') || 'X'}1` : undefined}
-                      readOnly={READ_ONLY.has(k)}
-                      onCommit={(v) => (k === 'SpiceModel' ? renameModel(v.replace(/\s/g, '')) : onSymbol(setSymAttr(symText, k, v)))}
-                    />
-                  </td>
-                  <td>
-                    {ATTR_WINDOW[k] !== undefined && (
-                      <input type="checkbox" aria-label={t('Show {attr} on the schematic', { attr: k })} checked={attrVisible(symText, k)} onChange={(e) => toggleAttr(k, e.target.checked)} />
-                    )}
-                  </td>
-                  <td>
-                    {attrSize(symText, k) !== undefined && (
-                      <select aria-label={t('Text size of {attr}', { attr: k })} value={attrSize(symText, k)} onChange={(e) => onSymbol(setAttrSize(symText, k, Number(e.target.value)))}>
-                        {SIZES.map((pt, i) => (
-                          <option key={i} value={i}>
-                            {pt} pt
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </td>
-                  <td className="tree-meta">{ATTR_HELP[k]()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
-        <details className="model-attrs" open>
-          <summary>
-            {t('Pins')}
-            <button className="tree-add" onClick={newPin}>
-              + {t('Add pin')}
-            </button>
-          </summary>
-          <p className="tree-meta">{t('The name is the node of the .subckt; SpiceOrder is its position in the .subckt line. Drag the pins on the drawing to place them.')}</p>
-          {pins.length ? (
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>{t('Name (PinName)')}</th>
-                  <th>{t('Order (SpiceOrder)')}</th>
-                  <th>{t('Align')}</th>
-                  <th>{t('Visible')}</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {pins.map((p, i) => (
-                  <tr key={i}>
-                    <td className="tree-meta">{i + 1}</td>
-                    <td>
-                      <AttrInput
-                        id={`model-pin-${i}`}
-                        label={t('Name of pin {n}', { n: i + 1 })}
-                        value={p.name}
-                        onCommit={(v) => v && onSymbol(setPinAttr(symText, i, 'PinName', v.replace(/\s/g, '')))}
-                      />
-                    </td>
-                    <td>
-                      <AttrInput
-                        id={`model-ord-${i}`}
-                        label={t('SpiceOrder of pin {n}', { n: i + 1 })}
-                        value={String(p.order)}
-                        onCommit={(v) => /^\d+$/.test(v) && onSymbol(setPinAttr(symText, i, 'SpiceOrder', v))}
-                      />
-                    </td>
-                    <td>
-                      <select
-                        aria-label={t('Alignment of the name of pin {n}', { n: i + 1 })}
-                        value={p.align === 'NONE' ? pinSide(symText, i) : p.align}
-                        disabled={p.align === 'NONE'}
-                        onChange={(e) => onSymbol(setPinAlign(symText, i, e.target.value))}
-                      >
-                        {SIDES.map((s) => (
-                          <option key={s} value={s}>
-                            {{ LEFT: t('Left'), RIGHT: t('Right'), TOP: t('Top'), BOTTOM: t('Bottom') }[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        aria-label={t('Show the name of pin {n}', { n: i + 1 })}
-                        checked={p.align !== 'NONE'}
-                        onChange={(e) => onSymbol(setPinAlign(symText, i, e.target.checked ? pinSide(symText, i) : 'NONE'))}
-                      />
-                    </td>
-                    <td>
-                      <button className="icon-x" aria-label={t('Remove {name}', { name: p.name })} onClick={() => onSymbol(removePin(symText, i))}>
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p className="tree-meta">{t('No pins yet.')}</p>
-          )}
+        <button type="button" className="icon-btn" onClick={redo} disabled={!future.current.length} aria-label={t('Redo (Ctrl+Y)')} title={t('Redo (Ctrl+Y)')}>
+          <Icon name="redo" size={16} />
+        </button>
+        {onPlace && (
           <button
-            className="tree-add model-pins-lib"
-            disabled={pinsLib === draft}
-            onClick={() => editText(pinsLib)}
-            title={pinsLib === draft ? t('The .subckt line already has these pins') : t('Rename the nodes of the .subckt line (and inside the circuit) after the pins, by SpiceOrder')}
+            type="button"
+            className={ready ? 'primary' : undefined}
+            disabled={!def}
+            onClick={() => {
+              flush();
+              onPlace();
+            }}
+            title={ready ? t('Close the editor and place {name} on the schematic', { name }) : t('There are problems to solve, but it can be placed already')}
           >
-            {t('Update pins in .lib')}
+            {t('Place on the schematic')}
           </button>
-        </details>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            flush();
+            onClose();
+          }}
+          title={t('Back to the testbench')}
+        >
+          {t('Close')}
+        </button>
+      </header>
+      <section className="mdl-left" ref={left}>
+        <div className="mdl-netlist" style={split ? { flex: `0 0 ${split}px` } : undefined}>
+          <div className="mdl-pane-head">
+            <label className="mdl-label" htmlFor="mdl-netlist">
+              {t('Netlist')} <code>{modelFileName(name)}</code>
+            </label>
+            {a.defs.length > 1 && (
+              <label className="mdl-def">
+                {t('The symbol uses')}
+                <select value={def?.name} onChange={(e) => apply((s) => chooseDefinition(s, e.target.value))}>
+                  {a.defs.map((d) => (
+                    <option key={d.name} value={d.name}>
+                      {d.kind === 'subckt' ? `${d.name} (.subckt, ${d.nodes.length})` : `${d.name} (.model ${d.type ?? ''})`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <span className="mdl-grow" />
+            <button type="button" className="tree-add" onClick={() => fileInput.current?.click()} title={t('Replace the netlist with a model file (.lib, .sub, .mod, .cir…)')}>
+              {t('Open a file…')}
+            </button>
+            {onPickNetlist && (
+              <button
+                type="button"
+                className="tree-add"
+                onClick={() => {
+                  flush();
+                  onPickNetlist();
+                }}
+                title={t('Copy the netlist of an existing component (a subcircuit of the project, a library model…)')}
+              >
+                {t('Copy from a component…')}
+              </button>
+            )}
+            <input
+              ref={fileInput}
+              type="file"
+              hidden
+              accept=".lib,.sub,.mod,.cir,.inc,.sp,.spi,.spice,.txt,.ckt,.net"
+              aria-label={t('Model file')}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = '';
+                if (f) void openFile(f);
+              }}
+            />
+          </div>
+          <div className="mdl-code">
+            <NetlistEditor
+              ref={editor}
+              id="mdl-netlist"
+              value={draft}
+              marks={marks}
+              label={t('Netlist of {name}', { name })}
+              onChange={(v) => {
+                setDraft(v);
+                clearTimeout(timer.current);
+                timer.current = setTimeout(() => commit({ text: draftRef.current, sym: cur.current.sym }, 'typing'), SAVE_MS);
+              }}
+              onBlur={flush}
+            />
+            {showStart && (
+              <div className="mdl-start" role="group" aria-label={t('How to start')}>
+                <h3>{t('Start your component')}</h3>
+                <p className="tree-meta">{t('A component is a netlist (a .subckt or a .model) and the symbol that places it on the schematic. Start from:')}</p>
+                <div className="mdl-start-actions">
+                  <button type="button" onClick={() => setWriting(true)}>
+                    <Icon name="edit" size={16} />
+                    <span>
+                      <strong>{t('Paste or write it')}</strong>
+                      <small>{t('Ctrl+V pastes it here')}</small>
+                    </span>
+                  </button>
+                  <button type="button" onClick={() => fileInput.current?.click()}>
+                    <Icon name="folder" size={16} />
+                    <span>
+                      <strong>{t('Open a file…')}</strong>
+                      <small>{t('A manufacturer model: .lib, .sub, .mod')}</small>
+                    </span>
+                  </button>
+                  {onPickNetlist && (
+                    <button type="button" onClick={onPickNetlist}>
+                      <Icon name="component" size={16} />
+                      <span>
+                        <strong>{t('Copy from a component…')}</strong>
+                        <small>{t('A subcircuit of the project or a library model')}</small>
+                      </span>
+                    </button>
+                  )}
+                </div>
+                <p className="mdl-start-sub">{t('Or a template:')}</p>
+                <div className="mdl-templates">
+                  {TEMPLATES.map((x) => (
+                    <button key={x.id} type="button" className="mdl-chip" onClick={() => startWith(x.id)}>
+                      {x.label()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <ProblemList items={of('netlist')} onReveal={reveal} onFix={fix} />
+        </div>
+        <div
+          className="mdl-split"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label={t('Drag to change the height of the netlist')}
+          tabIndex={0}
+          onPointerDown={dragSplit}
+          onKeyDown={splitKey}
+          onDoubleClick={() => {
+            setSplit(null);
+            store(SPLIT_KEY, '');
+          }}
+        />
+        <div className="mdl-inspector">
+          <div className="mdl-tabs" role="tablist" aria-label={t('Component')}>
+            {(
+              [
+                ['pins', t('Pins'), 'pins'],
+                ['params', t('Parameters'), 'params'],
+                ['labels', t('Labels'), null],
+                ['details', t('Details'), null],
+              ] as [Tab, string, Area | null][]
+            ).map(([id, label, area]) => {
+              const n = area ? of(area).length : 0;
+              const bad = area ? of(area).some((d) => d.severity === 'error') : false;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`mdl-tab-${id}`}
+                  aria-selected={tab === id}
+                  aria-controls="mdl-tabpanel"
+                  className={tab === id ? 'active' : undefined}
+                  onClick={() => setTab(id)}
+                >
+                  {label}
+                  {n > 0 && <span className={`mdl-badge ${bad ? 'error' : 'warning'}`}>{n}</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mdl-tabpanel" id="mdl-tabpanel" role="tabpanel" aria-labelledby={`mdl-tab-${tab}`}>
+            {tab === 'pins' && <PinsPanel a={a} apply={apply} hover={hover} setHover={setHover} selected={selPins} problems={<ProblemList items={of('pins')} onFix={fix} />} />}
+            {tab === 'params' && <ParamsPanel key={formatParamList(a.params)} a={a} apply={apply} problems={<ProblemList items={of('params')} onFix={fix} />} />}
+            {tab === 'labels' && <LabelsPanel state={view} apply={apply} aligns={aligns} />}
+            {tab === 'details' && <DetailsPanel name={name} a={a} state={view} apply={apply} onRename={onRename} />}
+          </div>
+          <footer className="mdl-instance" title={t('The line that each instance adds to the netlist (with the names of the pins as nodes)')}>
+            <span>{t('Each instance writes')}</span>
+            <code>{def ? a.instance : '—'}</code>
+          </footer>
+        </div>
       </section>
       <SymbolEditor
         name={name}
-        text={symText}
-        ports={info.pins}
+        text={view.sym}
+        ports={a.nodes}
         assign={false}
         keepAlign
+        showParams={false}
         onWidth={setSymW}
-        onChange={onSymbol}
-        params={modelParams(symText)}
-        onParams={(ps) => onSymbol(setModelParams(symText, ps))}
-        onPickSymbol={onPickSymbol}
+        onChange={(sym) => apply((s) => ({ ...s, sym }))}
+        params={a.params}
+        onParams={(ps) => apply((s) => setParams(s, ps))}
+        onReset={() => apply((s) => ({ ...s, sym: rebuildSymbol(name, s) }))}
+        onPickSymbol={
+          onPickSymbol &&
+          (() => {
+            flush();
+            onPickSymbol();
+          })
+        }
+        pickLabel={t('Use an existing symbol…')}
+        history={{ undo, redo, canUndo: past.current.length > 0 }}
+        highlight={hover === null ? undefined : [hover]}
+        onSelectPins={setSelPins}
+        modelPins={{ free: freeNodes, count: a.nodes.length }}
       />
+      {symPins(view.sym).length === 0 && def && <span className="mdl-sym-empty">{t('The symbol has no pins: add them in Pins')}</span>}
     </div>
-  );
-}
-
-/** Campo que guarda al salir o con Enter */
-function AttrInput({ id, label, value, placeholder, readOnly, onCommit }: { id: string; label?: string; value: string; placeholder?: string; readOnly?: boolean; onCommit(v: string): void }) {
-  const [v, setV] = useState(value);
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    setV(value);
-    // un texto largo que llega de afuera se ve desde el principio (se recorta el final)
-    if (ref.current && document.activeElement !== ref.current) ref.current.scrollLeft = 0;
-  }, [value]);
-  const commit = () => v.trim() !== value && onCommit(v.trim());
-  return (
-    <input
-      ref={ref}
-      id={id}
-      aria-label={label}
-      value={v}
-      placeholder={placeholder}
-      readOnly={readOnly}
-      spellCheck={false}
-      onChange={(e) => setV(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        e.stopPropagation();
-        if (e.key === 'Enter') commit();
-      }}
-    />
   );
 }

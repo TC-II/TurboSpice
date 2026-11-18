@@ -130,15 +130,17 @@ export function moduleActions({
   // --- Módulos «Modelo»: netlist (.subckt/.model) + símbolo ---------------------------------
   const newModel = () =>
     askSubName(t('New model'), freeSubcktName(projectRef.current, 'MODEL'), (name) => {
-      const p = addModelModule(projectRef.current, name);
+      // vacío: el editor ofrece cómo empezar (pegar, abrir un archivo, copiar o una plantilla)
+      const p = addModelModule(projectRef.current, name, '');
       projectRef.current = p;
       editProject(p);
       setCurModel(name);
     });
-  const renameModel = (from: string) =>
+  /** renombrar el modelo `from` (el diálogo propone `initial`: p. ej. el nombre de su .subckt) */
+  const renameModel = (from: string, initial = from) =>
     askSubName(
       t('Rename model'),
-      from,
+      initial,
       (to) => {
         if (to === from) return;
         const retype = (asc: string) => {

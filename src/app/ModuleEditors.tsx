@@ -29,10 +29,12 @@ export interface ModuleEditorsProps {
   synthModule(name: string, text?: string): Promise<SynthResult>;
   /** avisa si el subcircuito se usa en otros testbenches */
   warnShared(): void;
+  /** renombrar un módulo «Modelo» (el diálogo, con `initial` propuesto) */
+  renameModel(name: string, initial?: string): void;
 }
 
-export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared }: ModuleEditorsProps) {
-  const { projectRef, editProject, curSub, setDialog } = useSchematic();
+export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared, renameModel }: ModuleEditorsProps) {
+  const { projectRef, editProject, curSub, setDialog, setTool } = useSchematic();
   return (
     <>
       {curSub && symText && (
@@ -55,21 +57,24 @@ export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symT
       {curModel && modelModuleFile(project, curModel) && (
         <Suspense fallback={null}>
           <ModelEditor
+            // (uno por modelo: al cambiar de modelo se guarda lo que quedó escrito en el anterior)
+            key={curModel.toLowerCase()}
             name={curModel}
             text={modelModuleFile(project, curModel)!.text}
             symText={modelSymbolText(project, curModel) ?? ''}
-            onText={(text) => {
-              const p = storeModelText(projectRef.current, curModel, text);
-              projectRef.current = p;
-              editProject(p);
-            }}
-            onSymbol={(text) => {
-              const p = storeModelSymbol(projectRef.current, curModel, text);
+            onChange={({ text, sym }) => {
+              const p = storeModelSymbol(storeModelText(projectRef.current, curModel, text), curModel, sym);
+              if (p === projectRef.current) return;
               projectRef.current = p;
               editProject(p);
             }}
             onPickSymbol={() => setDialog({ kind: 'picker', forSymbol: true })}
             onPickNetlist={() => setDialog({ kind: 'picker', forNetlist: true })}
+            onPlace={() => {
+              setCurModel('');
+              setTool({ kind: 'place', type: curModel, orient: 'R0' });
+            }}
+            onRename={(to) => renameModel(curModel, to)}
             onClose={() => setCurModel('')}
           />
         </Suspense>

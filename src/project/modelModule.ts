@@ -5,7 +5,7 @@
 import { makeSymbol, subcktPins } from '../library/makeSymbol.ts';
 import { baseName, WINDOW_ATTR } from '../asc/model.ts';
 import type { Project, ProjectFile } from './turbo.ts';
-import { addFreePin, formatParamList, parseParamList, symPins, symShapes, symWindows, windowShown } from './symbolEdit.ts';
+import { formatParamList, parseParamList, symPins, symShapes, symWindows, windowShown } from './symbolEdit.ts';
 
 const key = (n: string) =>
   baseName(n)
@@ -21,7 +21,7 @@ const symFile = (p: Project, name: string) => p.files.find((f) => f.kind === 'sy
 export const modelSymbolText = (p: Project, name: string) => symFile(p, name)?.text;
 
 /** Pines y prefijo por omisión de cada tipo de .model (como los símbolos de LTspice) */
-const MODEL_TYPES: Record<string, { prefix: string; pins: string[] }> = {
+export const MODEL_TYPES: Record<string, { prefix: string; pins: string[] }> = {
   D: { prefix: 'D', pins: ['A', 'K'] },
   NPN: { prefix: 'Q', pins: ['C', 'B', 'E'] },
   PNP: { prefix: 'Q', pins: ['C', 'B', 'E'] },
@@ -78,7 +78,8 @@ export function setSymAttr(text: string, k: string, value: string): string {
   // el nombre entero (Value no es Value2)
   const re = new RegExp(`^SYMATTR ${k}(?:[ \\t][^\\r\\n]*)?(?:\\r?\\n|$)`, 'm');
   const v = value.trim();
-  if (re.test(text)) return text.replace(re, v ? `SYMATTR ${k} ${v}\n` : '');
+  // (con una función: un «$&» o «$1» del valor no es un patrón de reemplazo)
+  if (re.test(text)) return text.replace(re, () => (v ? `SYMATTR ${k} ${v}\n` : ''));
   if (!v) return text;
   const ls = text.split(/\r?\n/);
   // antes del primer PIN (como en los .asy de LTspice)
@@ -86,10 +87,6 @@ export function setSymAttr(text: string, k: string, value: string): string {
   ls.splice(at < 0 ? ls.length - (ls[ls.length - 1] === '' ? 1 : 0) : at, 0, `SYMATTR ${k} ${v}`);
   return ls.join('\n');
 }
-
-/** Atributos de un símbolo de modelo que se editan a mano, en el orden en que arman la línea de la
- *  instancia (Prefix+nombre, nodos, SpiceModel, Value, Value2, SpiceLine, SpiceLine2), como en TCLib */
-export const MODEL_ATTRS = ['InstName', 'Prefix', 'SpiceModel', 'Value', 'Value2', 'SpiceLine', 'SpiceLine2', 'ModelFile', 'Description'] as const;
 
 /** Símbolo generado para el texto del modelo */
 export function modelModuleSymbol(name: string, text: string): string {
@@ -134,6 +131,8 @@ export function setSubcktPins(text: string, pins: string[], name?: string): stri
   if (!m) return text;
   const toks = m[2]
     .replace(/\r?\n[ \t]*\+/g, ' ')
+    // «G = 1» es un parámetro, no los nodos G, = y 1
+    .replace(/\s*=\s*/g, '=')
     .trim()
     .split(/\s+/)
     .filter(Boolean);
@@ -237,45 +236,17 @@ export function renameModelModule(p: Project, from: string, to: string, retype: 
  *  (Prefix, SpiceModel, Value…) y su SymbolType */
 export function adoptModelSymbol(asy: string, current: string, name: string): string {
   // el .asy entero: dibujo, pines (con sus nombres y SpiceOrder), rótulos, Prefix y parámetros.
-  // Sólo SpiceModel (el enlace con el netlist) y ModelFile (el archivo de este módulo) son del modelo;
-  // un BLOCK (el símbolo de un subcircuito del proyecto) pasa a CELL: acá no hay esquemático abajo
+  // Son del modelo SpiceModel (el enlace con el netlist), ModelFile (el archivo de este módulo) y la
+  // descripción (la del otro símbolo describe a otro componente en el selector); un BLOCK (el símbolo
+  // de un subcircuito del proyecto) pasa a CELL: acá no hay esquemático abajo
   let text = asy.replace(/^SymbolType BLOCK\b/im, 'SymbolType CELL');
   text = setSymAttr(text, 'SpiceModel', symAttr(current, 'SpiceModel'));
+  if (symAttr(current, 'Description')) text = setSymAttr(text, 'Description', symAttr(current, 'Description'));
   return setSymAttr(text, 'ModelFile', modelFileName(name));
 }
 
-/** ¿Los pines del símbolo no se corresponden con los nodos del .subckt? El enlace es el SpiceOrder
- *  (el pin de orden n va al n-ésimo nodo), no el nombre: como en TCLib, In+ / In- / OUT van a
- *  1 2 5. Faltar pines se permite (esos nodos quedan sin conectar); sobran si su orden pasa la
- *  cantidad de nodos o se repite */
-export function pinsMismatch(sym: string, nodes: string[]): boolean {
-  if (!nodes.length) return false;
-  const orders = symPins(sym).map((p) => p.order);
-  return orders.some((o) => o < 1 || o > nodes.length) || new Set(orders).size !== orders.length;
-}
-
-/** Un pin por nodo del .subckt: agrega (a la izquierda del dibujo, sin tocarlo) los de los nodos sin
- *  pin y saca los que sobran; los que ya están quedan como están */
-export function updateModelPins(sym: string, nodes: string[], grid: number): string {
-  let s = sym;
-  const seen = new Set<number>();
-  // sacar los de orden fuera de rango o repetido (de atrás para adelante)
-  const drop = symPins(s).flatMap((p, i) => {
-    const bad = p.order < 1 || p.order > nodes.length || seen.has(p.order);
-    seen.add(p.order);
-    return bad ? [i] : [];
-  });
-  for (const i of drop.reverse()) s = removePinKeepOrder(s, i);
-  nodes.forEach((n, k) => {
-    if (symPins(s).some((p) => p.order === k + 1)) return;
-    s = addFreePin(s, n, grid);
-    s = setPinAttr(s, symPins(s).length - 1, 'SpiceOrder', String(k + 1));
-  });
-  return s;
-}
-
-/** Saca el pin `index` sin renumerar los SpiceOrder de los otros */
-function removePinKeepOrder(sym: string, index: number): string {
+/** Saca el pin `index` sin renumerar los SpiceOrder de los otros (cada uno sigue en su nodo) */
+export function removePinKeepOrder(sym: string, index: number): string {
   const p = symPins(sym)[index];
   if (!p) return sym;
   const ls = sym.split(/\r?\n/);
@@ -297,8 +268,8 @@ export function attrVisible(sym: string, k: string): boolean {
 
 /** Muestra u oculta el rótulo de un atributo. Oculto es «Invisible» (como LTspice), en su lugar y con
  *  su tamaño, así al volver a mostrarlo no pierde la posición; la alineación no queda en el archivo:
- *  vuelve con `align` (la que tenía, si se la recordó) o Left. Si no tenía rótulo, se agrega a la
- *  derecha del dibujo, debajo de los otros */
+ *  vuelve con `align` (la que tenía, si se la recordó) o Left. Si no tenía rótulo, se agrega debajo
+ *  del dibujo (y de los rótulos que ya están debajo), centrado: así no tapa los pines de los costados */
 export function setAttrVisible(sym: string, k: string, on: boolean, align = 'Left'): string {
   const n = ATTR_WINDOW[k];
   if (n === undefined || attrVisible(sym, k) === on) return sym;
@@ -311,14 +282,17 @@ export function setAttrVisible(sym: string, k: string, on: boolean, align = 'Lef
   }
   const xs = [...symShapes(sym).flatMap((s) => [s.coords[0], s.coords[2]]), ...symPins(sym).map((p) => p.x)];
   const ys = [...symShapes(sym).flatMap((s) => [s.coords[1], s.coords[3]]), ...symPins(sym).map((p) => p.y)];
-  const wins = ls.filter((l) => l.startsWith('WINDOW ')).length;
-  const x = (xs.length ? Math.max(...xs) : 0) + 8;
-  const y = (ys.length ? Math.min(...ys) : 0) + 16 * wins;
+  const x = xs.length ? Math.round((Math.min(...xs) + Math.max(...xs)) / 16) * 8 : 0;
+  const bottom = ys.length ? Math.max(...ys) : 0;
+  const below = symWindows(sym)
+    .filter((w) => w.y > bottom)
+    .map((w) => w.y);
+  const y = below.length ? Math.max(...below) + 24 : bottom + 8;
   const last = ls.reduce(
     (a, l, j) => (l.startsWith('WINDOW ') ? j : a),
     ls.findIndex((l) => l.startsWith('SymbolType ')),
   );
-  ls.splice(last + 1, 0, `WINDOW ${n} ${x} ${y} Left 2`);
+  ls.splice(last + 1, 0, `WINDOW ${n} ${x} ${y} Top 2`);
   return ls.join('\n');
 }
 
@@ -362,122 +336,4 @@ export function setAttrSize(sym: string, k: string, size: number): string {
       return `WINDOW ${n} ${w.x} ${w.y} ${w.align} ${size}`;
     })
     .join('\n');
-}
-
-/** Cuántos nodos tiene un elemento según su letra (después vienen valores, que pueden ser números
- *  iguales a un nodo: «RF1 N002 N001 1» es 1 Ω, no el nodo 1) */
-const NODE_COUNT: Record<string, number> = { R: 2, C: 2, L: 2, D: 2, V: 2, I: 2, B: 2, F: 2, H: 2, W: 2, E: 4, G: 4, S: 4, T: 4, M: 4, J: 3, Q: 3, Z: 3 };
-
-/** Los nodos de una línea de elemento: [desde, hasta) en sus palabras (la 0 es el nombre). Para un
- *  X, todas hasta el nombre del subcircuito (la última que no es parámetro) */
-function nodeSpan(words: string[]): [number, number] {
-  const letter = words[0]?.[0]?.toUpperCase() ?? '';
-  if (letter === 'X') {
-    const end = words.findIndex((w, i) => i > 0 && (/^params:/i.test(w) || w.includes('=')));
-    return [1, (end < 0 ? words.length : end) - 1];
-  }
-  const n = NODE_COUNT[letter] ?? 0;
-  return [1, Math.min(1 + n, words.length)];
-}
-
-/** Renombra un nodo dentro del .subckt `name`: en su línea y en los nodos de cada elemento (no en
- *  nombres ni valores) */
-export function renameNodeIn(text: string, name: string, from: string, to: string): string {
-  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const block = new RegExp(`^[ \\t]*\\.subckt[ \\t]+${esc(name)}\\s[\\s\\S]*?^[ \\t]*\\.ends\\b[^\\r\\n]*`, 'im');
-  const swap = (line: string, from0: number, to0: number) => {
-    // palabras con sus espacios (para no tocar el formato)
-    const parts = line.split(/(\s+)/);
-    let w = -1;
-    return parts
-      .map((p) => {
-        if (!p || /^\s+$/.test(p)) return p;
-        w++;
-        return w >= from0 && w < to0 && p === from ? to : p;
-      })
-      .join('');
-  };
-  return text.replace(block, (b) => {
-    const [head, ...rest] = b.split('\n');
-    // en la línea .subckt: después del nombre, hasta los parámetros
-    const hw = head.trim().split(/\s+/);
-    const pend = hw.findIndex((x, i) => i > 1 && (/^params:/i.test(x) || x.includes('=')));
-    const h = swap(head, 2, pend < 0 ? hw.length : pend);
-    return [
-      h,
-      ...rest.map((l) => {
-        if (/^\s*[.*+;]/.test(l) || !l.trim()) return l;
-        const [a, z] = nodeSpan(l.trim().split(/\s+/));
-        return swap(l, a, z);
-      }),
-    ].join('\n');
-  });
-}
-
-/** El netlist después de un cambio de pines del símbolo (`before` → `after`), con el .subckt `name`:
- *  un pin nuevo después del último nodo suma su nodo; uno que se saca (y corre los SpiceOrder de los
- *  siguientes) saca el suyo; uno renombrado renombra el nodo de su posición (sólo en los lugares que
- *  son nodos: no toca valores), salvo que el nombre nuevo ya sea otro nodo de la línea */
-export function subcktAfterPins(text: string, name: string, before: string, after: string): string {
-  const nodes = subcktPins(text, name);
-  if (!nodes) return text;
-  const a = symPins(before);
-  const b = symPins(after);
-  if (b.length > a.length) {
-    const added = b.filter((p) => p.order > nodes.length).sort((x, y) => x.order - y.order);
-    return added.length ? setSubcktPins(text, [...nodes, ...added.map((p) => p.name)], name) : text;
-  }
-  if (b.length < a.length) {
-    const gone = a.find((p) => !b.some((q) => q.name === p.name && q.x === p.x && q.y === p.y));
-    if (!gone || gone.order < 1 || gone.order > nodes.length) return text;
-    return setSubcktPins(
-      text,
-      nodes.filter((_, i) => i !== gone.order - 1),
-      name,
-    );
-  }
-  let out = text;
-  const now = [...nodes];
-  a.forEach((p, i) => {
-    const q = b[i];
-    const node = now[p.order - 1];
-    if (!q || q.name === p.name || q.order !== p.order || node === undefined) return;
-    const to = q.name.replace(/\s/g, '');
-    if (!to || now.includes(to)) return;
-    out = renameNodeIn(out, name, node, to);
-    now[p.order - 1] = to;
-  });
-  return out;
-}
-
-/** El .subckt `name` con los pines de un símbolo (por SpiceOrder): el nodo de cada posición pasa a
- *  llamarse como su pin (en la línea y en el cuerpo, así el circuito sigue igual); las posiciones que
- *  faltan se agregan (las sin pin, nK) y las que no tienen pin quedan como estaban */
-export function subcktForPins(text: string, name: string, sym: string): string {
-  const nodes = name ? subcktPins(text, name) : null;
-  if (!nodes) return text;
-  const pins = symPins(sym);
-  const max = Math.max(nodes.length, ...pins.map((p) => p.order));
-  let out = text;
-  const now = [...nodes];
-  for (let k = 1; k <= max; k++) {
-    const pin = pins.find((p) => p.order === k)?.name.replace(/\s/g, '');
-    const old = now[k - 1];
-    if (old === undefined) now.push(pin && !now.includes(pin) ? pin : `n${k}`);
-    // renombrar sólo si el nombre nuevo no es ya otro nodo de la línea
-    else if (pin && pin !== old && !now.includes(pin)) {
-      out = renameNodeIn(out, name, old, pin);
-      now[k - 1] = pin;
-    }
-  }
-  return now.length > nodes.length ? setSubcktPins(out, now, name) : out;
-}
-
-/** «Update pins in .lib»: el .subckt `name` con los pines del símbolo (subcktForPins) y sin los nodos
- *  después del último pin (ningún pin va ahí; adentro quedan como nodos internos) */
-export function libForPins(text: string, name: string, sym: string): string {
-  const out = subcktForPins(text, name, sym);
-  const nodes = subcktPins(out, name);
-  const max = Math.max(0, ...symPins(sym).map((p) => p.order));
-  return nodes && max && nodes.length > max ? setSubcktPins(out, nodes.slice(0, max), name) : out;
 }

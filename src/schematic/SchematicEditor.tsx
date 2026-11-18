@@ -1,7 +1,7 @@
 // Editor de esquemáticos: vista SVG con zoom/paneo y las herramientas de edición con el mouse.
 // Los atajos de teclado y los diálogos los maneja App (necesitan estado de toda la app).
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from 'react';
-import { strokeZoom, strokeZoomMode } from './strokeZoom.ts';
+import { strokeZoom } from './strokeZoom.ts';
 import type { CircuitDiff } from '../project/diff.ts';
 import { GRID, type AscDoc, type Point, type Wire } from '../asc/model.ts';
 import type { Library } from '../library/library.ts';
@@ -422,9 +422,8 @@ export function SchematicEditor(props: Props) {
   const tol = 6 / view.scale;
   /** tamaños de letra que no se dibujan por ilegibles (lod-N) */
   const lod = illegibleSizes(view.scale);
-  // grosor de las líneas según el zoom (prueba: ?lw=fixed|prop|steps|soft)
-  const [strokeMode] = useState(strokeZoomMode);
-  const zk = strokeZoom(strokeMode, view.scale);
+  /** factor del grosor de las líneas según el zoom */
+  const zk = strokeZoom(view.scale);
 
   /**
    * Qué mide la punta de prueba en p: como en LTspice, un cable o un pin mide la tensión
@@ -1323,7 +1322,6 @@ export function SchematicEditor(props: Props) {
         ref={svgRef}
         className={`editor tool-${cursorClass}${lod ? ` lod-${lod}` : ''}${zk !== 1 ? ' zk' : ''}`}
         style={zk !== 1 ? ({ '--sch-zk': String(zk) } as CSSProperties) : undefined}
-        data-stroke-zoom={strokeMode}
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         onWheel={onWheel}
         onDragOver={(e) => {

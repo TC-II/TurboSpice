@@ -170,8 +170,12 @@ Arreglos de la lista de pendientes y pedidos nuevos, en commits aparte.
   poniendo el cursor B.
 - **«+ Testbench»** al final de cada workbench, como una rama más (igual que «+ Workbench» al final
   del proyecto).
-- **Grosor de las líneas según el zoom (prueba):** cuatro variantes para elegir con `?lw=` en la
-  URL (`fixed`, la de siempre; `prop`, `steps`, `soft`). Sin el parámetro no cambia nada.
+- **Grosor de las líneas según el zoom:** antes era el mismo en pantalla con cualquier zoom (de
+  cerca, finas al lado de los símbolos; de lejos, gruesas). Ahora crece con la raíz del zoom, en
+  escalones: cambia cada vez que el zoom crece o baja √2 (de a 2^¼ ≈ 1,19), con el grosor de la
+  Configuración en la relación de referencia (cuerpo de una R de ~84 px, grosor medio) y nunca
+  menos de la mitad. Se eligió entre cuatro variantes probadas (fija, proporcional, escalones
+  proporcionales y raíz).
 
 ## 4. Pendiente
 

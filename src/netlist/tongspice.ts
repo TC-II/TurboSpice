@@ -593,6 +593,16 @@ function capacitorIcs(lt: LtNetlist, names: Map<string, string>, hold: boolean):
     if (!node || node === '0' || done.has(node)) continue;
     done.add(node);
     out.push(`.ic V(${node})=${val}`);
+    // si el punto de operación no converge (un VCO de relajación no tiene solución de continua),
+    // ngspice pasa al "transient op", que arranca los capacitores en 0 y no mira el .ic: la fuente
+    // B mantiene el IC también ahí (cuando el .op converge no cambia nada: su corriente es 0).
+    // La ganancia crece con C para que τ = C/G no pase de 100 ns (el transient op dura 10 µs)
+    if (hold) {
+      const c = parseSpiceNumber(splitParams(e.value).main.trim());
+      const g = Number.isFinite(c) && c * 1e7 > 1e6 ? formatSpiceNumber(c * 1e7) : '1e6';
+      const target = b === '0' ? icValue(ic) : `-(${v})`;
+      out.push(`B__${names.get(e.name) ?? e.name}_ic ${node} 0 I=${holdAtOp(`V(${node})-(${target})`, g)}`);
+    }
   }
   return out;
 }
@@ -606,7 +616,7 @@ function capacitorIcs(lt: LtNetlist, names: Map<string, string>, hold: boolean):
  * con el capacitor una conductancia grande hacia V=IC, en serie con el inductor una tensión que
  * lleva su corriente a IC. Los capacitores a tierra usan .ic, que hace lo mismo.
  */
-const holdAtOp = (err: string) => `(time > 0) ? 0 : 1e6*(${err})`;
+const holdAtOp = (err: string, gain = '1e6') => `(time > 0) ? 0 : ${gain}*(${err})`;
 
 /**
  * Inductores nombrados en un acoplamiento K: con K LTspice no fuerza su corriente inicial de

@@ -101,3 +101,29 @@ describe('PULSE con flancos en 0 (ngspice usaría TSTEP)', () => {
     expect(t).toContain('PULSE(0 5 0 5e-7 5e-7 500u 1m)');
   });
 });
+
+describe('IC= de un capacitor a tierra sin uic', () => {
+  const capAsc = (rot: string, value: string, tran: string) =>
+    [
+      'Version 4',
+      'SHEET 1 880 680',
+      'FLAG 0 0 a',
+      'FLAG 0 64 0',
+      `SYMBOL cap -16 0 ${rot}`,
+      'SYMATTR InstName C1',
+      `SYMATTR Value ${value}`,
+      'SYMATTR SpiceLine IC=2.5',
+      `TEXT 0 120 Left 2 !${tran}`,
+      '',
+    ].join('\n');
+  it('.ic y además una fuente B que lo sostiene si el .op no converge (transient op)', () => {
+    const t = gen(capAsc('R0', '1', '.tran 0 300m 0 1u')).text;
+    expect(t).toMatch(/^\.ic V\(a\)=2\.5$/m);
+    // con 1 F la ganancia sube para que τ = C/G sea de 100 ns
+    expect(t).toMatch(/^B__C1_ic a 0 I=\(time > 0\) \? 0 : 10000000\*\(V\(a\)-\(2\.5\)\)$/m);
+    expect(gen(capAsc('R0', '1n', '.tran 1m')).text).toMatch(/^B__C1_ic a 0 I=\(time > 0\) \? 0 : 1e6\*\(V\(a\)-\(2\.5\)\)$/m);
+  });
+  it('con uic no hace falta (ngspice usa el IC= del capacitor)', () => {
+    expect(gen(capAsc('R0', '1n', '.tran 1m uic')).text).not.toMatch(/B__C1_ic/);
+  });
+});

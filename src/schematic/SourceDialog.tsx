@@ -535,6 +535,29 @@ function Level({ y, label, to, on, x = 56 }: { y: number; label: string; to: num
   );
 }
 
+/** Crece con x y tiende a 1 sin pasarse (0 en 0, 1/2 en x = c) */
+const soft = (x: number, c: number) => (x > 0 && isFinite(x) ? x / (x + c) : 0);
+
+/**
+ * Anchos (px) del dibujo de PULSE: Td delante y dos pulsos que terminan en bajo, en 430 px desde
+ * x0 = 66 menos 18 de cola. No va a escala: cada tramo tiene un mínimo para que se lea su cota y
+ * Td, Tr y Tf crecen de forma asintótica respecto del período, así que un Td de cien períodos o
+ * un flanco del orden de T no se comen el dibujo. Ton y el tiempo en bajo reparten el resto.
+ */
+export function pulseWidths(td: number, tr: number, tf: number, ton: number, T: number) {
+  const tdw = 48 + 62 * soft(td / T, 0.5);
+  const off = Math.max(0, T - tr - ton - tf);
+  // pesos dentro del período: los flancos saturan (un flanco = T/4 ya pesa la mitad del máximo)
+  const w = [0.5 * soft(tr / T, 0.25), Math.max(0, ton / T), 0.5 * soft(tf / T, 0.25), off / T];
+  const sum = w.reduce((s, x) => s + x, 0) || 1;
+  const f = w.map((x) => x / sum);
+  const min = [26, 34, 26, 34];
+  // tdw + período + (período sin el tiempo en bajo) = 412
+  const extra = (412 - tdw - 2 * (min[0] + min[1] + min[2] + min[3]) + min[3]) / (2 - f[3]);
+  const [trw, onw, tfw, offw] = min.map((m, i) => m + extra * f[i]);
+  return { tdw, trw, onw, tfw, offw };
+}
+
 function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
   const a = Array.from(spec.args, (s) => spiceNumber(s ?? ''));
   const z = (i: number) => (isFinite(a[i]) ? a[i] : 0);
@@ -546,17 +569,7 @@ function WaveDrawing({ spec, focus }: { spec: SourceSpec; focus: string }) {
     const x0 = 66;
     const yl = 104;
     const yh = 40;
-    const tdw = Math.max(48, (td / T) * 150);
-    const trw = Math.max(30, (tr / T) * 200);
-    const tfw = Math.max(30, (tf / T) * 200);
-    let onw = Math.max(50, (ton / T) * 200);
-    let offw = Math.max(60, ((T - tr - ton - tf) / T) * 200);
-    // dos pulsos completos y que la señal baje al final: Ton y el tiempo apagado se achican
-    // para que entre (las rampas y el Td conservan su ancho mínimo para que se lean las cotas)
-    const room = 430 - tdw - 2 * (trw + tfw) - 18;
-    const k = Math.min(1, room / (2 * onw + offw));
-    onw *= k;
-    offw *= k;
+    const { tdw, trw, onw, tfw, offw } = pulseWidths(td, tr, tf, ton, T);
     const xa = x0 + tdw;
     const xb = xa + trw;
     const xc = xb + onw;

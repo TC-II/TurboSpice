@@ -3,7 +3,7 @@ import { buildBundle } from '../../scripts/build-library.mjs';
 import { parseAsc } from '../../src/asc/parse.ts';
 import { Library } from '../../src/library/library.ts';
 import { ltNetlist } from '../../src/netlist/ltnetlist.ts';
-import { prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
+import { prepareSimulation, pulseEdges, toNgspice } from '../../src/netlist/tongspice.ts';
 
 const lib = new Library(buildBundle());
 const resolver = { resolve: (p: string) => lib.resolveModelFile(p), defines: (m: string) => lib.definesModel(m) };
@@ -67,5 +67,37 @@ SYMATTR Value 1k
     expect(gen(named('R 1')).invalidNames).toEqual(['R 1']);
     expect(gen(named('R(2)')).invalidNames).toEqual(['R(2)']);
     expect(gen(named('R1')).invalidNames).toEqual([]);
+  });
+});
+
+describe('PULSE con flancos en 0 (ngspice usaría TSTEP)', () => {
+  it('flancos en 0 → 1/1000 de la fase más corta', () => {
+    expect(pulseEdges('PULSE(0 5 0 0 0 500u 1m)')).toBe('PULSE(0 5 0 5e-7 5e-7 500u 1m)');
+    expect(pulseEdges('PULSE(0 5 0.2m 0 0 454.545454545u 909.090909091u)')).toBe('PULSE(0 5 0.2m 4.54545454545e-7 4.54545454545e-7 454.545454545u 909.090909091u)');
+    // sólo el que vale 0; el tiempo en bajo descuenta los flancos dados
+    expect(pulseEdges('PULSE(0 1 0 1u 0 5m 10m)')).toBe('PULSE(0 1 0 1u 0.000004999 5m 10m)');
+  });
+  it('flancos dados, parámetros o sin PW: no cambia', () => {
+    for (const v of ['PULSE(0 1 0 1n 1n 5u 10u)', 'PULSE(0 {V} 0 0 0 {ton} {tp})', 'PULSE(0 1 0 0 0)', 'PULSE(0 1)', '5', 'SINE(0 1 1k)']) expect(pulseEdges(v)).toBe(v);
+  });
+  it('en la netlist: .tran 0 300m no le da 300 µs de flanco a una cuadrada de 1 ms', () => {
+    const t = gen(
+      [
+        'Version 4',
+        'SHEET 1 880 680',
+        'FLAG 0 64 0',
+        'FLAG 0 -16 a',
+        'SYMBOL voltage 0 -32 R0',
+        'SYMATTR InstName V1',
+        'SYMATTR Value PULSE(0 5 0 0 0 500u 1m)',
+        'SYMBOL res 96 -32 R0',
+        'SYMATTR InstName R1',
+        'SYMATTR Value 1k',
+        'TEXT 0 120 Left 2 !.tran 0 300m 0 1u',
+        '',
+      ].join('\n'),
+    ).text;
+    expect(t).toMatch(/^\.tran 0\.0003 300m 0 1u$/m);
+    expect(t).toContain('PULSE(0 5 0 5e-7 5e-7 500u 1m)');
   });
 });

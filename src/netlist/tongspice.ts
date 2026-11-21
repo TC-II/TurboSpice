@@ -515,6 +515,30 @@ function ltspiceTmax(tstop: number, sines: { period: number; delay: number }[]):
   return h;
 }
 
+/**
+ * "PULSE(0 5 0 0 0 500u 1m)": con TR o TF en 0, ngspice usa TSTEP como flanco, y el paso que se
+ * inventa para ".tran 0 300m" (tstop/1000 = 300 µs) convierte la cuadrada de 1 ms en un trapecio;
+ * en LTspice el flanco es prácticamente instantáneo. Los que valen 0 pasan a 1/1000 de la fase
+ * más corta del pulso (ancho o tiempo en bajo); con PW o PER paramétricos no se tocan.
+ */
+export function pulseEdges(value: string): string {
+  return value.replace(/\bPULSE\s*\(([^()]*)\)/i, (whole, body: string) => {
+    const a = body.trim().split(/[\s,]+/);
+    if (a.length < 6) return whole;
+    const n = a.map(parseSpiceNumber);
+    const [tr, tf, pw] = [n[3], n[4], n[5]];
+    if (tr !== 0 && tf !== 0) return whole;
+    const per = a.length > 6 ? n[6] : NaN;
+    if (!Number.isFinite(pw) || (a.length > 6 && !Number.isFinite(per))) return whole;
+    const phases = [pw, per - pw - (tr || 0) - (tf || 0)].filter((x) => Number.isFinite(x) && x > 0);
+    if (!phases.length) return whole;
+    const edge = formatSpiceNumber(Math.min(...phases) / 1000);
+    if (tr === 0) a[3] = edge;
+    if (tf === 0) a[4] = edge;
+    return `PULSE(${a.join(' ')})`;
+  });
+}
+
 /** ".tran tstop" o ".tran 0 tstop ..." → ".tran paso tstop ..." (ngspice exige paso > 0) */
 function fixTran(line: string, warnings: string[], sines: { period: number; delay: number }[] = []): string {
   const m = /^\.tran\s+(.*)$/i.exec(line.trim());
@@ -722,6 +746,7 @@ function convertElements(
     // corriente inicial de .ic I(L1)=… (se busca por nombre o por InstName sin el prefijo L§)
     const icur = letter === 'L' ? (inductorIcs.get(e.name.toLowerCase()) ?? inductorIcs.get(e.name.toLowerCase().replace(/^l§/, ''))) : undefined;
     if (icur !== undefined && !splitParams(value).params.has('ic')) value += ` ic=${icur}`;
+    if (letter === 'V' || letter === 'I') value = pulseEdges(value);
     if (startup && (letter === 'V' || letter === 'I')) value = startupRamp(value);
     // corriente inicial del inductor como restricción del punto de operación (ver holdAtOp):
     // la fuente B va en serie con L sola, adentro de Rpar (LTspice fuerza el flujo L·IC)

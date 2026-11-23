@@ -1,20 +1,18 @@
 Version 4
 SymbolType CELL
-RECTANGLE Normal 64 -64 -64 65
-ARC Normal -66 -24 30 72 -18 -24 23 0
-ARC Normal -66 -72 30 24 23 0 -18 24
-ARC Normal -108 -48 -11 49 -18 -24 -18 24
-ARC Normal -114 -48 -17 49 -24 -24 -24 24
 LINE Normal -64 0 -48 0
 LINE Normal -48 0 -48 -12
-LINE Normal -48 -12 -19 -12
-LINE Normal 0 64 0 40
-LINE Normal 0 40 -36 40
-LINE Normal -36 40 -36 12
-LINE Normal -36 12 -19 12
-LINE Normal 23 0 64 0
-TEXT -92 21 Left 2 Vi
-TEXT -23 94 Bottom 2 Vf
+LINE Normal -48 -12 12 -12
+LINE Normal 0 64 0 12
+LINE Normal 0 12 12 12
+LINE Normal 54 0 64 0
+RECTANGLE Normal 64 -64 -64 64
+ARC Normal -35 -24 61 72 54 0 13 -24
+ARC Normal -35 -72 61 24 13 24 54 0
+ARC Normal -77 -48 20 49 13 24 13 -24
+ARC Normal -83 -48 14 49 7 24 7 -24
+TEXT -61 16 Left 1 Vi
+TEXT -16 64 Bottom 1 Vf
 TEXT 98 20 Right 2 Vo
 TEXT 0 -76 Center 1 Phase Comparator
 WINDOW 3 21 76 Left 0

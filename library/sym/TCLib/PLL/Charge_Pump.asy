@@ -14,8 +14,8 @@ RECTANGLE Normal 64 -64 -64 65
 CIRCLE Normal 36 -45 28 -53
 CIRCLE Normal 35 -30 29 -36
 CIRCLE Normal 35 36 29 30
-TEXT -92 21 Left 2 Vi
-TEXT -23 94 Bottom 2 Vf
+TEXT -51 19 Left 1 Vi
+TEXT -20 63 Bottom 1 Vf
 TEXT 98 20 Right 2 Vo
 TEXT -5 51 Left 2 -
 TEXT -54 -2 Left 2 +

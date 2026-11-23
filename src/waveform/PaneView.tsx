@@ -305,6 +305,9 @@ export function PaneView(props: {
         // cursores activos no hay zoom por arrastre (Z lo fuerza). Se cambia en vivo, sin recrear el gráfico.
         drag: { x: live.current.zoomMode || !(live.current.cursorMode || live.current.markerMode), y: live.current.zoomMode || !(live.current.cursorMode || live.current.markerMode), setScale: false },
         points: { size: 6 },
+        // mientras se arrastra el recuadro (con el puntero capturado, ver selStart) el mouse puede
+        // salir del área del gráfico: la esquina se queda en el borde y sigue al mouse por ese borde
+        move: (u, l, t) => (pressed.current ? [Math.min(Math.max(l, 0), u.over.clientWidth), Math.min(Math.max(t, 0), u.over.clientHeight)] : [l, t]),
         bind: {
           // doble click = ver todo, salvo con los cursores (dos clicks rápidos no deben reiniciar el zoom)
           dblclick: (_u, _t, handler) => (e) => {
@@ -617,7 +620,7 @@ export function PaneView(props: {
       if (pan) return panMove(e);
       if (dragging) live.current.onCursor({ [dragging]: valX(e) });
       else if (!onMark) over.style.cursor = live.current.cursorMode && grabbed(e) ? 'ew-resize' : live.current.markerMode ? 'crosshair' : '';
-      if (!dragging) hoverAxis(axisAt(e));
+      if (!dragging && !pressed.current) hoverAxis(axisAt(e));
     };
     const leave = () => (hoverAxis(null), live.current.onPointer(null));
     const up = (e: PointerEvent) => {
@@ -686,6 +689,9 @@ export function PaneView(props: {
       if (e.button === 0 && (!live.current.cursorMode || live.current.zoomMode) && !axisAt(e)) {
         el.classList.add('selecting');
         pressed.current = true;
+        // el área del gráfico captura el puntero: uPlot sigue recibiendo los mousemove (y no un
+        // mouseleave) aunque el mouse salga del área, así el recuadro llega hasta el borde y lo sigue
+        if (e.target === over && !over.hasPointerCapture(e.pointerId)) over.setPointerCapture(e.pointerId);
       }
     };
     const selEnd = () => {

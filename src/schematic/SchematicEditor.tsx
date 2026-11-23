@@ -1402,8 +1402,9 @@ export function SchematicEditor(props: Props) {
         )}
         {tool.kind === 'eraser' && <circle className="eraser-cursor" cx={cursor.x} cy={cursor.y} r={pen.eraser / view.scale} />}
         {tool.kind === 'wire' && tool.start && (
-          // el cable que se está trazando, igual a como va a quedar (horizontal/vertical, o recto con Ctrl)
-          <g className="wires drawing">
+          // el cable que se está trazando, igual a como va a quedar (horizontal/vertical, o recto con Ctrl);
+          // va en .schematic como los cables puestos: grosor que no escala con el zoom y puntas redondas
+          <g className="schematic wires drawing">
             {(() => {
               const end = ctrlHeld ? g : orthoEnd(tool.start, g);
               return <line x1={tool.start.x} y1={tool.start.y} x2={end.x} y2={end.y} />;

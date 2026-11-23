@@ -182,12 +182,12 @@ const GATE_IN: Pt[] = [
 function gate(kind: 'and' | 'or' | 'xor'): Drawing {
   const body =
     kind === 'and'
-      ? [...line([0, -32], [-32, -32], [-32, 32], [0, 32]), 'ARC Normal -32 -32 32 32 0 -32 0 32']
+      ? [...line([0, -32], [-32, -32], [-32, 32], [0, 32]), 'ARC Normal -32 -32 32 32 0 32 0 -32']
       : [
-          'ARC Normal -92 -32 36 96 -28 -32 27 0',
-          'ARC Normal -92 -96 36 32 27 0 -28 32',
-          'ARC Normal -148 -64 -19 65 -28 -32 -28 32',
-          ...(kind === 'xor' ? ['ARC Normal -156 -64 -27 65 -36 -32 -36 32'] : []),
+          'ARC Normal -92 -32 36 96 27 0 -28 -32',
+          'ARC Normal -92 -96 36 32 -28 32 27 0',
+          'ARC Normal -148 -64 -19 65 -28 32 -28 -32',
+          ...(kind === 'xor' ? ['ARC Normal -156 -64 -27 65 -36 32 -36 -32'] : []),
         ];
   const inEnd = kind === 'and' ? -32 : kind === 'or' ? -21 : -29;
   const outStart = kind === 'and' ? 32 : 27;

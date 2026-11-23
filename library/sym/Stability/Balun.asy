@@ -5,14 +5,14 @@ LINE Normal -48 -32 -32 -32
 LINE Normal -48 32 -32 32
 LINE Normal 32 -32 48 -32
 LINE Normal 32 32 48 32
-ARC Normal -14 -24 -2 -12 -8 -12 -8 -24
-ARC Normal -14 -12 -2 0 -8 0 -8 -12
-ARC Normal -14 0 -2 12 -8 12 -8 0
-ARC Normal -14 12 -2 24 -8 24 -8 12
-ARC Normal 2 -24 14 -12 8 -24 8 -12
-ARC Normal 2 -12 14 0 8 -12 8 0
-ARC Normal 2 0 14 12 8 0 8 12
-ARC Normal 2 12 14 24 8 12 8 24
+ARC Normal -14 -24 -2 -12 -8 -24 -8 -12
+ARC Normal -14 -12 -2 0 -8 -12 -8 0
+ARC Normal -14 0 -2 12 -8 0 -8 12
+ARC Normal -14 12 -2 24 -8 12 -8 24
+ARC Normal 2 -24 14 -12 8 -12 8 -24
+ARC Normal 2 -12 14 0 8 0 8 -12
+ARC Normal 2 0 14 12 8 12 8 0
+ARC Normal 2 12 14 24 8 24 8 12
 TEXT -28 -36 Left 0 p
 TEXT -28 36 Left 0 n
 TEXT 28 -36 Right 0 d

@@ -3,7 +3,7 @@ SymbolType CELL
 LINE Normal 0 -32 -32 -32
 LINE Normal -32 -32 -32 32
 LINE Normal -32 32 0 32
-ARC Normal -32 -32 32 32 0 -32 0 32
+ARC Normal -32 -32 32 32 0 32 0 -32
 LINE Normal -80 -16 -32 -16
 LINE Normal -80 16 -32 16
 LINE Normal 32 0 80 0

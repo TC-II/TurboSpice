@@ -112,8 +112,8 @@ export function shapeFromClicks(kind: DrawnShapeKind, pts: Point[], style?: stri
   const last = pts[pts.length - 1];
   if (pts.length > 2 && last.x === center.x && last.y === center.y) return 'invalid';
   if (!end) return 'more';
-  // en el archivo va primero el FINAL y después el INICIO
-  return withStyle({ kind, coords: [a.x, a.y, b.x, b.y, end.x, end.y, start.x, start.y] });
+  // en el archivo va primero el INICIO y después el FINAL (como en LTspice)
+  return withStyle({ kind, coords: [a.x, a.y, b.x, b.y, start.x, start.y, end.x, end.y] });
 }
 
 /**

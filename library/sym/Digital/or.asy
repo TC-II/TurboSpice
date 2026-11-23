@@ -1,8 +1,8 @@
 Version 4
 SymbolType CELL
-ARC Normal -96 32 32 160 -32 32 23 64
-ARC Normal -96 -32 32 96 23 64 -32 96
-ARC Normal -152 0 -23 129 -32 32 -32 96
+ARC Normal -96 32 32 160 23 64 -32 32
+ARC Normal -96 -32 32 96 -32 96 23 64
+ARC Normal -152 0 -23 129 -32 96 -32 32
 LINE Normal -16 94 -16 96
 LINE Normal -32 48 -25 48
 LINE Normal -32 64 -23 64

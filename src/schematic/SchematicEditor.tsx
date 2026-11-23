@@ -1262,7 +1262,7 @@ export function SchematicEditor(props: Props) {
         <>
           {box}
           <g className="shapes">
-            <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, end.x, end.y, pts[2].x, pts[2].y], style: newShapeStyle(penPrefs(), tool.style) }} />
+            <ShapeView s={{ kind: 'ARC', coords: [a.x, a.y, b.x, b.y, pts[2].x, pts[2].y, end.x, end.y], style: newShapeStyle(penPrefs(), tool.style) }} />
           </g>
         </>
       );

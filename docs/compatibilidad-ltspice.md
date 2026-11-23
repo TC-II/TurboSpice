@@ -19,7 +19,8 @@ acá van los agregados y las reglas de la netlist.
 - **`SYMATTR X ""`**: vacío explícito, gana al valor del `.asy`.
 - **Figuras** (`LINE`, `RECTANGLE`, `CIRCLE`, `ARC` `Normal … [estilo]`): estilo 1 guiones, 2 puntos,
   3 raya y punto, 4 raya y dos puntos; sin estilo = sólida. `CIRCLE` y `ARC` llevan la caja de la
-  elipse; en `ARC` siguen el punto **final** y después el de **inicio**, en sentido antihorario.
+  elipse; en `ARC` siguen el punto de **inicio** y después el **final**, en sentido antihorario en pantalla
+  (medido con el `xor.asy` de LTspice; hasta noviembre de 2026 TurboSpice los leía al revés).
   Se eligen, mueven, copian, rotan y espejan como el resto (al espejar un arco se intercambian
   inicio y fin para que siga antihorario).
 - Verificado: parse → serialize reproduce **4712/4712** archivos del corpus anterior línea por línea.

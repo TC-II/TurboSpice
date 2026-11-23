@@ -10,7 +10,7 @@ import { arcAngles, resizeShape, shapeDist, shapeHandles, shapeInBox } from '../
 
 const lib = new Library(buildBundle());
 
-const ASC = ['Version 4', 'SHEET 1 880 680', 'LINE Normal 0 0 64 0', 'RECTANGLE Normal 96 -32 192 32 2', 'CIRCLE Normal 224 -32 288 32', 'ARC Normal 320 -32 384 32 384 0 352 -32 1', ''].join('\r\n');
+const ASC = ['Version 4', 'SHEET 1 880 680', 'LINE Normal 0 0 64 0', 'RECTANGLE Normal 96 -32 192 32 2', 'CIRCLE Normal 224 -32 288 32', 'ARC Normal 320 -32 384 32 352 -32 384 0 1', ''].join('\r\n');
 
 const shapeRefs = (n: number): ItemRef[] => Array.from({ length: n }, (_, index) => ({ kind: 'shape', index }));
 
@@ -19,7 +19,7 @@ describe('figuras de LTspice', () => {
     const doc = parseAsc(ASC);
     expect(doc.shapes.map((s) => s.kind)).toEqual(['LINE', 'RECTANGLE', 'CIRCLE', 'ARC']);
     expect(doc.shapes[1].style).toBe('2');
-    expect(doc.shapes[3].coords).toEqual([320, -32, 384, 32, 384, 0, 352, -32]);
+    expect(doc.shapes[3].coords).toEqual([320, -32, 384, 32, 352, -32, 384, 0]);
     expect(serializeAsc(doc)).toBe(ASC);
   });
 
@@ -46,7 +46,7 @@ describe('figuras de LTspice', () => {
   it('mover, duplicar, borrar y copiar/pegar', () => {
     const doc = parseAsc(ASC);
     const moved = moveItems(doc, [{ kind: 'shape', index: 3 }], 16, -16, true, lib);
-    expect(moved.shapes[3].coords).toEqual([336, -48, 400, 16, 400, -16, 368, -48]);
+    expect(moved.shapes[3].coords).toEqual([336, -48, 400, 16, 368, -48, 400, -16]);
     expect(moved.shapes[3].style).toBe('1');
     expect(moved.shapes[0]).toBe(doc.shapes[0]);
     const dup = duplicateItems(doc, [{ kind: 'shape', index: 0 }], 0, 32, lib);
@@ -97,8 +97,8 @@ describe('figuras de LTspice', () => {
     expect(shapeFromClicks('ARC', [a, b])).toBe('more');
     expect(shapeFromClicks('ARC', [a, b, { x: 32, y: 16 }])).toBe('invalid');
     expect(shapeFromClicks('ARC', [a, b, { x: 64, y: 16 }])).toBe('more');
-    // inicio a la derecha, fin arriba: en el archivo, primero el fin
-    expect(shapeFromClicks('ARC', [a, b, { x: 64, y: 16 }, { x: 32, y: 0 }])).toEqual({ kind: 'ARC', coords: [0, 0, 64, 32, 32, 0, 64, 16] });
+    // inicio a la derecha, fin arriba: en el archivo, primero el inicio (como en LTspice)
+    expect(shapeFromClicks('ARC', [a, b, { x: 64, y: 16 }, { x: 32, y: 0 }])).toEqual({ kind: 'ARC', coords: [0, 0, 64, 32, 64, 16, 32, 0] });
   });
 });
 
@@ -119,5 +119,20 @@ describe('cambiar el tamaño de una figura (#318)', () => {
   });
   it('arco: los puntos de inicio y fin se escalan con la caja', () => {
     expect(resizeShape({ kind: 'ARC', coords: [0, 0, 64, 32, 32, 0, 64, 16] }, 2, { x: 128, y: 64 })?.coords).toEqual([0, 0, 128, 64, 64, 0, 128, 32]);
+  });
+});
+
+describe('sentido de los arcos como en LTspice', () => {
+  it('los arcos del xor.asy de LTspice son los tramos cortos que cierran la compuerta', () => {
+    // lib/sym/Digital/xor.asy de LTspice: antihorario del primer punto al segundo
+    const arcs = [
+      [-148, 8, -36, 120, -48, 96, -48, 32],
+      [-136, 8, -24, 120, -36, 96, -36, 32],
+      [-80, -12, 28, 96, -28, 96, 24, 64],
+      [-80, 32, 28, 140, 24, 64, -28, 32],
+    ];
+    for (const c of arcs) expect(arcAngles(c).span).toBeLessThan(Math.PI / 2);
+    // la espalda de la compuerta se curva hacia la derecha: pasa por x = -36 (el borde derecho de su caja)
+    expect(shapeDist({ kind: 'ARC', coords: arcs[0] }, { x: -36, y: 64 })).toBeLessThan(1);
   });
 });

@@ -1,7 +1,8 @@
 // Figuras decorativas del esquemático (LINE, RECTANGLE, CIRCLE, ARC): contorno, cercanía al
 // cursor y transformaciones. Un arco se define por la caja de su elipse y dos puntos que dan
-// los ángulos; en el archivo (xs,ys) es el FINAL y (xe,ye) el INICIO, y va en sentido
-// antihorario (spec §12 de ASC-Parser).
+// los ángulos; como en LTspice, en el archivo (xs,ys) es el INICIO y (xe,ye) el FINAL, y va en
+// sentido antihorario en pantalla (medido con el xor.asy de LTspice: sus tres arcos sólo cierran
+// la compuerta así).
 import type { Point, Shape } from '../asc/model.ts';
 import type { Box } from './geometry.ts';
 import { t } from '../i18n/i18n.ts';
@@ -21,7 +22,7 @@ export const lineDash = (style?: string) => LINE_STYLES.find((s) => s.value === 
 
 /** Ángulos (paramétricos) de inicio y el recorrido antihorario de un arco */
 export function arcAngles(c: number[]) {
-  const [x1, y1, x2, y2, xEnd, yEnd, xStart, yStart] = c;
+  const [x1, y1, x2, y2, xStart, yStart, xEnd, yEnd] = c;
   const cx = (x1 + x2) / 2;
   const cy = (y1 + y2) / 2;
   const a0 = Math.atan2(yStart - cy, xStart - cx);

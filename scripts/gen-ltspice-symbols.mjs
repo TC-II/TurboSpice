@@ -45,9 +45,9 @@ function toAsy(g) {
     case 'R':
       return [`RECTANGLE Normal ${g.x1} ${g.y1} ${g.x2} ${g.y2}`];
     case 'A': {
-      // en ARC de LTspice (xs, ys) es el final y (xe, ye) el inicio, recorrido antihorario
-      const [sx, sy] = pt(g.cx, g.cy, g.r, g.a1).map(Math.round),
-        [ex, ey] = pt(g.cx, g.cy, g.r, g.a0).map(Math.round);
+      // en ARC de LTspice (xs, ys) es el inicio y (xe, ye) el final, recorrido antihorario
+      const [sx, sy] = pt(g.cx, g.cy, g.r, g.a0).map(Math.round),
+        [ex, ey] = pt(g.cx, g.cy, g.r, g.a1).map(Math.round);
       const b = [g.cx - g.r, g.cy - g.r, g.cx + g.r, g.cy + g.r].map(Math.round).join(' ');
       return [`ARC Normal ${b} ${sx} ${sy} ${ex} ${ey}`];
     }
@@ -387,7 +387,7 @@ const SYMBOLS = {
       [64, 96, 'E', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 68, 'Left'] },
-    'Transistor bipolar NPN (con cápsula)',
+    'NPN bipolar transistor (with package outline)',
     [...bjt(false), C(53, 48, 43)],
   ],
   npn3: [
@@ -399,7 +399,7 @@ const SYMBOLS = {
       [64, 96, 'E', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 68, 'Left'] },
-    'Transistor bipolar NPN (variante)',
+    'NPN bipolar transistor (alternate symbol)',
     bjt(false),
   ],
   npn4: [
@@ -412,7 +412,7 @@ const SYMBOLS = {
       [64, 48, 'S', 4],
     ],
     { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
-    'Transistor bipolar NPN con sustrato',
+    'NPN bipolar transistor with substrate',
     [...bjt(false), ...substrate],
   ],
   pnp2: [
@@ -424,7 +424,7 @@ const SYMBOLS = {
       [64, 96, 'E', 3],
     ],
     { 0: [84, 32, 'Left'], 3: [84, 68, 'Left'] },
-    'Transistor bipolar PNP (con cápsula)',
+    'PNP bipolar transistor (with package outline)',
     [...bjt(true), C(53, 48, 43)],
   ],
   pnp4: [
@@ -437,7 +437,7 @@ const SYMBOLS = {
       [64, 48, 'S', 4],
     ],
     { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
-    'Transistor bipolar PNP con sustrato',
+    'PNP bipolar transistor with substrate',
     [...bjt(true), ...substrate],
   ],
   lpnp: [
@@ -450,7 +450,7 @@ const SYMBOLS = {
       [64, 48, 'S', 4],
     ],
     { 0: [72, 32, 'Left'], 3: [72, 68, 'Left'] },
-    'Transistor bipolar PNP lateral con sustrato',
+    'Lateral PNP bipolar transistor with substrate',
     [...bjt(true), ...substrate],
   ],
   res2: [
@@ -461,7 +461,7 @@ const SYMBOLS = {
       [16, 64, 'B', 2],
     ],
     { 0: [36, 16, 'Left'], 3: [36, 56, 'Left'] },
-    'Resistencia (corta)',
+    'Resistor (short)',
     [L(16, 0, 16, 12), L(16, 52, 16, 64), R(5, 12, 27, 52)],
   ],
   load: [
@@ -472,7 +472,7 @@ const SYMBOLS = {
       [16, 64, 'B', 2],
     ],
     { 0: [48, 8, 'Left'], 3: [48, 56, 'Left'] },
-    'Carga: fuente de corriente (consume I de A a B)',
+    'Load: current source (draws I from A to B)',
     [L(16, 0, 16, 12), L(16, 52, 16, 64), R(2, 12, 30, 52), ...downArrow(16, 18, 46)],
   ],
   load2: [
@@ -483,7 +483,7 @@ const SYMBOLS = {
       [0, 80, '-', 2],
     ],
     { 0: [17, -16, 'Left'], 3: [25, 84, 'Left'] },
-    'Carga: fuente de corriente (consume I de + a -)',
+    'Load: current source (draws I from + to -)',
     [...srcCircle(0, 0, 80), ...downArrow(0, 24, 56), L(-20, 60, 20, 20)],
   ],
   varactor: [
@@ -494,7 +494,7 @@ const SYMBOLS = {
       [16, 64, '-', 2],
     ],
     { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] },
-    'Varactor (diodo de capacidad variable)',
+    'Varactor (variable-capacitance diode)',
     [L(16, 0, 16, 18), ...diode(16, 18, 44), L(0, 52, 32, 52), L(16, 52, 16, 64)],
   ],
   TVSdiode: [
@@ -505,7 +505,7 @@ const SYMBOLS = {
       [16, 64, '-', 2],
     ],
     { 0: [24, -2, 'Left'], 3: [24, 65, 'Left'] },
-    'Diodo supresor de transitorios (bidireccional)',
+    'Transient voltage suppressor diode (bidirectional)',
     [L(16, 0, 16, 8), ...diode(16, 8, 32), ...diodeUp(16, 32, 56), L(16, 56, 16, 64), L(0, 32, -4, 28), L(32, 32, 36, 36)],
   ],
   ltline: [
@@ -518,7 +518,7 @@ const SYMBOLS = {
       [48, 16, 'R2', 4],
     ],
     { 0: [0, -16, 'Bottom'], 3: [0, 16, 'Top'] },
-    'Línea de transmisión con pérdidas (LTRA)',
+    'Lossy transmission line (LTRA)',
     [
       L(-48, -16, -32, -16),
       L(32, -16, 48, -16),
@@ -540,7 +540,7 @@ const SYMBOLS = {
       [48, 96, 'S', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'MESFET canal N',
+    'N-channel MESFET',
     [L(0, 80, 26, 80), L(26, 18, 26, 86), L(26, 26, 48, 26), L(48, 26, 48, 0), L(26, 70, 48, 70), L(48, 70, 48, 96)],
   ],
 
@@ -552,7 +552,7 @@ const SYMBOLS = {
       [0, 96, '-', 2],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 104, 'Left'] },
-    'Batería: fuente de tensión DC, AC, PULSE, SINE, PWL, EXP o SFFM',
+    'Battery: DC, AC, PULSE, SINE, PWL, EXP or SFFM voltage source',
     [L(0, 16, 0, 36), L(-24, 36, 24, 36), L(-12, 44, 12, 44), L(0, 44, 0, 52, true), L(0, 52, 0, 60, true), L(-24, 60, 24, 60), L(-12, 68, 12, 68), L(0, 68, 0, 96), ...plus(-20, 26)],
   ],
   'Misc/Epoly': [
@@ -563,7 +563,7 @@ const SYMBOLS = {
       [0, 96, '-', 2],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 104, 'Left'] },
-    'Fuente de tensión controlada por un polinomio',
+    'Polynomial voltage-controlled voltage source',
     [...diamond(0, 16, 96), ...plus(0, 42), ...minus(0, 72)],
   ],
   'Misc/Gpoly': [
@@ -574,7 +574,7 @@ const SYMBOLS = {
       [0, 16, '-', 2],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 104, 'Left'] },
-    'Fuente de corriente controlada por un polinomio',
+    'Polynomial voltage-controlled current source',
     [...diamond(0, 16, 96), ...downArrow(0, 38, 74)],
   ],
   'Misc/fixedind': [
@@ -585,7 +585,7 @@ const SYMBOLS = {
       [16, 96, 'B', 2],
     ],
     { 0: [36, 40, 'Left'], 3: [36, 80, 'Left'] },
-    'Inductor de valor fijo',
+    'Fixed-value inductor',
     [L(16, 16, 16, 24), L(16, 88, 16, 96), ...[24, 40, 56, 72].map((y) => A(16, y + 8, 8, -90, 90)), L(32, 24, 32, 88)],
   ],
   'Misc/neonbulb': [
@@ -596,7 +596,7 @@ const SYMBOLS = {
       [0, 48, 'V-', 2],
     ],
     { 0: [16, -48, 'Left'] },
-    'Lámpara de neón',
+    'Neon bulb',
     [L(0, -48, 0, -30), L(0, 30, 0, 48), C(0, 0, 30), L(0, -30, 0, -8), L(-14, -8, 14, -8), L(0, 30, 0, 8), L(-14, 8, 14, 8), F([16, 0], [12, -2], [12, 2])],
     ['Value2 Vstrike=100 Vhold=50', 'ModelFile neonbulb.sub', 'SpiceModel neonbulb', 'SpiceLine Zon=2K Ihold=200u', 'SpiceLine2 Tau=100u'],
   ],
@@ -609,7 +609,7 @@ const SYMBOLS = {
       [48, 96, 'E', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'IGBT canal N',
+    'N-channel IGBT',
     igbt(false),
   ],
   'Misc/PIGBT': [
@@ -621,7 +621,7 @@ const SYMBOLS = {
       [48, 96, 'E', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'IGBT canal P',
+    'P-channel IGBT',
     igbt(true),
   ],
   'Misc/SCR': [
@@ -633,7 +633,7 @@ const SYMBOLS = {
       [16, 64, 'K', 3],
     ],
     { 0: [24, 0, 'Left'], 3: [24, 72, 'Left'] },
-    'Tiristor (SCR): el modelo lo provee el usuario',
+    'Thyristor (SCR): user-supplied model',
     [L(16, 0, 16, 18), ...diode(16, 18, 46), L(16, 46, 16, 64), ...polyline([8, 46], [-12, 64], [-32, 64])],
   ],
   'Misc/TRIAC': [
@@ -645,7 +645,7 @@ const SYMBOLS = {
       [32, 64, 'MT1', 3],
     ],
     { 0: [48, 0, 'Left'], 3: [48, 72, 'Left'] },
-    'TRIAC: el modelo lo provee el usuario',
+    'TRIAC: user-supplied model',
     [L(32, 0, 32, 20), L(32, 44, 32, 64), L(8, 20, 56, 20), L(8, 44, 56, 44), L(8, 20, 20, 44), L(32, 20, 20, 44), L(32, 44, 44, 20), L(56, 44, 44, 20), ...polyline([16, 44], [0, 64], [-16, 64])],
   ],
   'Misc/DIAC': [
@@ -656,7 +656,7 @@ const SYMBOLS = {
       [32, 64, '-', 2],
     ],
     { 0: [48, 0, 'Left'], 3: [48, 72, 'Left'] },
-    'DIAC: el modelo lo provee el usuario',
+    'DIAC: user-supplied model',
     [L(32, 0, 32, 20), L(32, 44, 32, 64), L(8, 20, 56, 20), L(8, 44, 56, 44), L(8, 20, 20, 44), L(32, 20, 20, 44), L(32, 44, 44, 20), L(56, 44, 44, 20)],
   ],
   'Misc/triode': [
@@ -668,7 +668,7 @@ const SYMBOLS = {
       [-32, 48, 'Cathode', 3],
     ],
     { 0: [8, -64, 'Left'], 3: [-24, 64, 'Left'] },
-    'Triodo: el modelo lo provee el usuario',
+    'Triode: user-supplied model',
     [C(0, 0, 40), ...plate(-20, -48), ...grid(0, -1), ...cathode(22, [-32, 48])],
   ],
   'Misc/tetrode': [
@@ -681,7 +681,7 @@ const SYMBOLS = {
       [-32, 64, 'Cathode', 4],
     ],
     { 0: [8, -64, 'Left'], 3: [-24, 80, 'Left'] },
-    'Tetrodo: el modelo lo provee el usuario',
+    'Tetrode: user-supplied model',
     [C(0, 8, 46), ...plate(-22, -48), ...grid(0, 1), ...grid(16, -1), ...cathode(34, [-32, 64])],
   ],
   'Misc/pentode': [
@@ -695,7 +695,7 @@ const SYMBOLS = {
       [0, -64, 'Anode', 5],
     ],
     { 0: [8, -80, 'Left'], 3: [-24, 80, 'Left'] },
-    'Pentodo: el modelo lo provee el usuario',
+    'Pentode: user-supplied model',
     [C(0, 0, 50), ...plate(-30, -64), ...grid(-16, -1), ...grid(0, 1), ...grid(16, -1), ...cathode(32, [-32, 64])],
   ],
   'Misc/urc2': [
@@ -707,7 +707,7 @@ const SYMBOLS = {
       [-16, 32, 'C', 3],
     ],
     { 0: [36, 16, 'Left'], 3: [36, 56, 'Left'] },
-    'Línea RC distribuida (URC)',
+    'Uniform distributed RC line (URC)',
     [L(16, 0, 16, 8), L(16, 56, 16, 64), R(10, 8, 22, 56), L(2, 12, 2, 52), L(-16, 32, 2, 32)],
   ],
   'Misc/xvaristor': [
@@ -718,7 +718,7 @@ const SYMBOLS = {
       [16, 96, 'B', 2],
     ],
     { 0: [36, 40, 'Left'], 3: [36, 76, 'Left'] },
-    'Varistor: el modelo lo provee el usuario',
+    'Varistor: user-supplied model',
     [L(16, 16, 16, 27), L(16, 85, 16, 96), R(5, 27, 27, 85), ...polyline([-4, 84], [2, 84], [30, 28])],
   ],
   // amplificadores operacionales: los modelos propios están en library/sub (opamp.sub,
@@ -732,7 +732,7 @@ const SYMBOLS = {
       [32, 64, 'out', 3],
     ],
     { 0: [0, 32, 'Left'] },
-    'Amp. op. de un polo (Aol, GBW); requiere .lib opamp.sub',
+    'Single-pole op amp (Aol, GBW); needs .lib opamp.sub',
     opamp(32, true, false),
     ['SpiceLine Aol=100K', 'SpiceLine2 GBW=10Meg'],
   ],
@@ -747,7 +747,7 @@ const SYMBOLS = {
       [32, 64, 'OUT', 5],
     ],
     { 0: [16, 32, 'Left'], 3: [16, 96, 'Left'] },
-    'Amp. op. con alimentación; Value es el nombre del modelo',
+    'Op amp with supply pins; Value is the model name',
     opamp(32, true, true),
   ],
   'OpAmps/UniversalOpamp2': [
@@ -761,7 +761,7 @@ const SYMBOLS = {
       [32, 0, 'OUT', 5],
     ],
     { 0: [16, -32, 'Left'] },
-    'Amp. op. universal: Avol, GBW, slew, límites de salida y de corriente',
+    'Universal op amp: Avol, GBW, slew rate, output voltage and current limits',
     opamp(-32, true, true),
     ['SpiceModel level2', 'Value2 Avol=1Meg GBW=10Meg Slew=10Meg', 'SpiceLine Ilimit=25m Rail=0 Vos=0', 'SpiceLine2 En=0 Enk=0 In=0 Ink=0 Rin=500Meg', 'ModelFile UniversalOpAmp2.lib'],
   ],
@@ -776,7 +776,7 @@ const SYMBOLS = {
       [32, 0, 'OUT', 5],
     ],
     { 0: [16, -32, 'Left'] },
-    'Amp. op. universal de un polo (Avol, GBW, Vos), salida sin límites',
+    'Universal single-pole op amp (Avol, GBW, Vos), unlimited output',
     opamp(-32, true, true),
     ['SpiceModel level1', 'Value2 Avol=1Meg GBW=10Meg Vos=0', 'SpiceLine En=0 Enk=0 In=0 Ink=0 Rin=500Meg', 'ModelFile UniversalOpAmp1.lib'],
   ],
@@ -788,7 +788,7 @@ const SYMBOLS = {
       [16, 64, 'B', 2],
     ],
     { 0: [24, 4, 'Left'], 3: [24, 64, 'Left'] },
-    'Capacitor polarizado (gráfico europeo)',
+    'Polarized capacitor (European symbol)',
     [L(16, 0, 16, 28), L(16, 36, 16, 64), L(0, 28, 32, 28), F([0, 36], [32, 36], [32, 41], [0, 41]), ...plus(4, 16, 3)],
   ],
   // compuertas digitales: Vhigh, Vlow, Ref, Td, Trise, Tfall, Tau, Rout, Cout en SpiceLine
@@ -809,7 +809,7 @@ const SYMBOLS = {
     a[2],
     andGate,
     a[3],
-  ])(gate('AND', 'Compuerta AND (hasta 5 entradas) con salida complementaria')),
+  ])(gate('AND', 'AND gate (up to 5 inputs) with complementary output')),
   'Digital/or': ((a) => [
     a[0],
     a[1],
@@ -827,7 +827,7 @@ const SYMBOLS = {
     a[2],
     orGate,
     a[3],
-  ])(gate('OR', 'Compuerta OR (hasta 5 entradas) con salida complementaria')),
+  ])(gate('OR', 'OR gate (up to 5 inputs) with complementary output')),
   'Digital/xor': ((a) => [
     a[0],
     a[1],
@@ -845,7 +845,7 @@ const SYMBOLS = {
     a[2],
     xorGate,
     a[3],
-  ])(gate('XOR', 'Compuerta XOR: alta si exactamente una entrada está alta')),
+  ])(gate('XOR', 'XOR gate: high when exactly one input is high')),
   'Digital/buf': ((a) => [
     a[0],
     a[1],
@@ -859,7 +859,7 @@ const SYMBOLS = {
     a[2],
     [...bufTri(24, 104, 56), L(36.8, 48, 64, 48), ...notQ(36.8, 80, 64), L(0, 96, 8, 96)],
     a[3],
-  ])(gate('BUF', 'Buffer digital con salida complementaria')),
+  ])(gate('BUF', 'Digital buffer with complementary output')),
   'Digital/buf1': ((a) => [
     a[0],
     a[1],
@@ -872,7 +872,7 @@ const SYMBOLS = {
     a[2],
     [...bufTri(40, 88, 56), L(56, 64, 64, 64), L(0, 80, 8, 80)],
     a[3],
-  ])(gate('BUF', 'Buffer digital')),
+  ])(gate('BUF', 'Digital buffer')),
   'Digital/inv': ((a) => [
     a[0],
     a[1],
@@ -885,7 +885,7 @@ const SYMBOLS = {
     a[2],
     [...bufTri(40, 88, 52), C(56, 64, 4), L(60, 64, 64, 64), L(0, 80, 8, 80)],
     a[3],
-  ])(gate('BUF', 'Inversor digital (salida _Q de un BUF)')),
+  ])(gate('BUF', 'Digital inverter (the _Q output of a BUF)')),
   'Digital/schmitt': [
     'A',
     '',

@@ -29,7 +29,7 @@ const ASC = [
   'LINE Normal 0 0 128 0',
   'RECTANGLE Normal 160 -64 288 64 2',
   'CIRCLE Normal 320 -64 448 64',
-  'ARC Normal 480 -64 608 64 608 0 544 -64 1',
+  'ARC Normal 480 -64 608 64 544 -64 608 0 1',
   '',
 ].join('\r\n');
 

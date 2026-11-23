@@ -22,10 +22,10 @@ const P2V = (top, bot, a = 'A', b = 'B', x = 16) => [
 const stub = (x, y1, y2) => `LINE Normal ${x} ${y1} ${x} ${y2}`;
 const circle = (cx, cy, r) => `CIRCLE Normal ${cx - r} ${cy - r} ${cx + r} ${cy + r}`;
 // Semicírculo hacia la derecha entre (x, y1) arriba e (x, y2) abajo. En ARC el par
-// (xs,ys) es el punto final y (xe,ye) el inicial, recorrido antihorario.
+// (xs,ys) es el punto inicial y (xe,ye) el final, recorrido antihorario (como en LTspice).
 const bumpRight = (x, y1, y2) => {
   const r = (y2 - y1) / 2;
-  return `ARC Normal ${x - r} ${y1} ${x + r} ${y2} ${x} ${y1} ${x} ${y2}`;
+  return `ARC Normal ${x - r} ${y1} ${x + r} ${y2} ${x} ${y2} ${x} ${y1}`;
 };
 const diodeBody = (extra = []) => [stub(16, 0, 24), stub(16, 40, 64), 'LINE Normal 0 24 32 24', 'LINE Normal 0 24 16 40', 'LINE Normal 32 24 16 40', 'LINE Normal 0 40 32 40', ...extra];
 const sourceCircle = (top, bot, extra = []) => {
@@ -65,17 +65,24 @@ const SYMBOLS = {
     'C',
     P2V(0, 64),
     { 0: [24, 8, 'Left'], 3: [24, 57, 'Left'] },
-    'Capacitor polarizado',
+    'Polarized capacitor',
     [stub(16, 0, 28), stub(16, 36, 64), 'LINE Normal 0 28 32 28', 'RECTANGLE Normal 0 36 32 40', 'LINE Normal 2 16 10 16', 'LINE Normal 6 12 6 20'],
   ],
   ind: ['L', 'L', P2V(16, 96), { 3: [-2, 72, 'Center'], 0: [-2, 40, 'Right'] }, 'Inductor', [stub(16, 16, 24), stub(16, 88, 96), ...[24, 40, 56, 72].map((y) => bumpRight(16, y, y + 16))]],
-  ind2: ['L', 'L', P2V(16, 96), { 0: [36, 40, 'Left'], 3: [36, 80, 'Left'] }, 'Inductor (variante)', [stub(16, 16, 24), stub(16, 88, 96), ...[24, 40, 56, 72].map((y) => bumpRight(16, y, y + 16))]],
+  ind2: [
+    'L',
+    'L',
+    P2V(16, 96),
+    { 0: [36, 40, 'Left'], 3: [36, 80, 'Left'] },
+    'Inductor (alternate symbol)',
+    [stub(16, 16, 24), stub(16, 88, 96), ...[24, 40, 56, 72].map((y) => bumpRight(16, y, y + 16))],
+  ],
   voltage: [
     'V',
     'V',
     P2V(16, 96, '+', '-', 0),
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de tensión: DC, AC, PULSE, SINE, PWL, EXP o SFFM',
+    'Voltage source: DC, AC, PULSE, SINE, PWL, EXP or SFFM',
     sourceCircle(16, 96, ['LINE Normal -8 44 8 44', 'LINE Normal 0 36 0 52', 'LINE Normal -8 68 8 68']),
   ],
   // de la carpeta Misc de LTspice (Misc\signal, Misc\cell, Misc\xtal)
@@ -84,15 +91,15 @@ const SYMBOLS = {
     'SINE(0 1 1K)',
     P2V(16, 96, '+', '-', 0),
     { 0: [24, 16, 'Left'], 3: [24, 104, 'Left'] },
-    'Fuente de señal: DC, AC, PULSE, SINE, PWL, EXP o SFFM',
-    sourceCircle(16, 96, ['ARC Normal -16 48 0 64 -16 56 0 56', 'ARC Normal 0 48 16 64 16 56 0 56']),
+    'Signal source: DC, AC, PULSE, SINE, PWL, EXP or SFFM',
+    sourceCircle(16, 96, ['ARC Normal -16 48 0 64 0 56 -16 56', 'ARC Normal 0 48 16 64 0 56 16 56']),
   ],
   cell: [
     'V',
     'V',
     P2V(0, 64, '+', '-', 0),
     { 0: [24, 8, 'Left'], 3: [24, 56, 'Left'] },
-    'Pila: fuente de tensión DC, AC, PULSE, SINE, PWL, EXP o SFFM',
+    'Cell: DC, AC, PULSE, SINE, PWL, EXP or SFFM voltage source',
     [stub(0, 0, 24), stub(0, 40, 64), 'LINE Normal -16 24 16 24', 'LINE Normal -8 40 8 40', 'LINE Normal -6 12 -6 20', 'LINE Normal -10 16 -2 16'],
   ],
   xtal: [
@@ -100,7 +107,7 @@ const SYMBOLS = {
     'C',
     P2V(0, 64),
     { 0: [24, 0, 'Left'], 3: [24, 72, 'Left'] },
-    'Cristal piezoeléctrico: C, Lser y Cpar fijan las resonancias serie y paralelo (es un capacitor)',
+    'Piezoelectric crystal: C, Lser and Cpar set the series and parallel resonances (it is a capacitor)',
     [stub(16, 0, 20), stub(16, 44, 64), 'LINE Normal 0 20 32 20', 'LINE Normal 0 44 32 44', box(4, 26, 28, 38)],
   ],
   current: [
@@ -108,12 +115,12 @@ const SYMBOLS = {
     'I',
     P2V(0, 80, '+', '-', 0),
     { 0: [24, 0, 'Left'], 3: [24, 80, 'Left'] },
-    'Fuente de corriente: DC, AC, PULSE, SINE, PWL, EXP o SFFM',
+    'Current source: DC, AC, PULSE, SINE, PWL, EXP or SFFM',
     sourceCircle(0, 80, ['LINE Normal 0 26 0 54', 'LINE Normal -6 46 0 54', 'LINE Normal 6 46 0 54']),
   ],
-  diode: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Diodo', diodeBody()],
-  zener: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Diodo Zener', diodeBody(['LINE Normal 0 40 -4 36', 'LINE Normal 32 40 36 44'])],
-  schottky: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Diodo Schottky', diodeBody(['LINE Normal 0 40 0 36', 'LINE Normal 32 40 32 44'])],
+  diode: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Diode', diodeBody()],
+  zener: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Zener diode', diodeBody(['LINE Normal 0 40 -4 36', 'LINE Normal 32 40 36 44'])],
+  schottky: ['D', 'D', P2V(0, 64, '+', '-'), { 0: [24, 0, 'Left'], 3: [24, 64, 'Left'] }, 'Schottky diode', diodeBody(['LINE Normal 0 40 0 36', 'LINE Normal 32 40 32 44'])],
   LED: [
     'D',
     'D',
@@ -131,7 +138,7 @@ const SYMBOLS = {
       [64, 96, 'E', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 68, 'Left'] },
-    'Transistor bipolar NPN',
+    'NPN bipolar transistor',
     BJT(false),
   ],
   pnp: [
@@ -143,7 +150,7 @@ const SYMBOLS = {
       [64, 96, 'E', 3],
     ],
     { 0: [84, 32, 'Left'], 3: [84, 68, 'Left'] },
-    'Transistor bipolar PNP',
+    'PNP bipolar transistor',
     BJT(true),
   ],
   nmos: [
@@ -155,7 +162,7 @@ const SYMBOLS = {
       [48, 96, 'S', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'MOSFET canal N',
+    'N-channel MOSFET',
     FET(false),
   ],
   pmos: [
@@ -167,7 +174,7 @@ const SYMBOLS = {
       [48, 96, 'S', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'MOSFET canal P',
+    'P-channel MOSFET',
     FET(false),
   ],
   nmos4: [
@@ -180,7 +187,7 @@ const SYMBOLS = {
       [48, 48, 'B', 4],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'MOSFET canal N con sustrato explícito',
+    'N-channel MOSFET with explicit substrate (bulk) connection',
     FET(true),
   ],
   pmos4: [
@@ -193,7 +200,7 @@ const SYMBOLS = {
       [48, 48, 'B', 4],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'MOSFET canal P con sustrato explícito',
+    'P-channel MOSFET with explicit substrate (bulk) connection',
     FET(true),
   ],
   njf: [
@@ -205,7 +212,7 @@ const SYMBOLS = {
       [48, 96, 'S', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'JFET canal N',
+    'N-channel JFET',
     JFET,
   ],
   pjf: [
@@ -217,7 +224,7 @@ const SYMBOLS = {
       [48, 96, 'S', 3],
     ],
     { 0: [56, 32, 'Left'], 3: [56, 72, 'Left'] },
-    'JFET canal P',
+    'P-channel JFET',
     JFET,
   ],
   e: [
@@ -230,7 +237,7 @@ const SYMBOLS = {
       [-48, 80, 'N', 4],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de tensión controlada por tensión',
+    'Voltage-controlled voltage source',
     null,
   ],
   e2: [
@@ -243,7 +250,7 @@ const SYMBOLS = {
       [-48, 32, 'N', 4],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de tensión controlada por tensión',
+    'Voltage-controlled voltage source',
     null,
   ],
   f: [
@@ -251,7 +258,7 @@ const SYMBOLS = {
     'F',
     P2V(0, 80, '+', '-', 0),
     { 0: [24, 0, 'Left'], 3: [24, 80, 'Left'] },
-    'Fuente de corriente controlada por corriente',
+    'Current-controlled current source',
     sourceCircle(0, 80, ['LINE Normal 0 26 0 54', 'LINE Normal -6 46 0 54', 'LINE Normal 6 46 0 54']),
   ],
   g: [
@@ -264,7 +271,7 @@ const SYMBOLS = {
       [-48, 80, 'NC-', 4],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de corriente controlada por tensión',
+    'Voltage-controlled current source',
     null,
   ],
   g2: [
@@ -277,7 +284,7 @@ const SYMBOLS = {
       [-48, 32, 'NC-', 4],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de corriente controlada por tensión',
+    'Voltage-controlled current source',
     null,
   ],
   h: [
@@ -285,11 +292,11 @@ const SYMBOLS = {
     'H',
     P2V(16, 96, '+', '-', 0),
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Fuente de tensión controlada por corriente',
+    'Current-controlled voltage source',
     sourceCircle(16, 96, ['LINE Normal -8 44 8 44', 'LINE Normal 0 36 0 52', 'LINE Normal -8 68 8 68']),
   ],
-  bv: ['B', 'V=F(...)', P2V(16, 96, '+', '-', 0), { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] }, 'Fuente de tensión comportamental', null],
-  bi: ['B', 'I=F(...)', P2V(0, 80, '+', '-', 0), { 0: [24, 0, 'Left'], 3: [24, 80, 'Left'] }, 'Fuente de corriente comportamental', null],
+  bv: ['B', 'V=F(...)', P2V(16, 96, '+', '-', 0), { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] }, 'Behavioral voltage source', null],
+  bi: ['B', 'I=F(...)', P2V(0, 80, '+', '-', 0), { 0: [24, 0, 'Left'], 3: [24, 80, 'Left'] }, 'Behavioral current source', null],
   // misma fuente que bi pero con + abajo y - arriba (lib/sym/bi2)
   bi2: [
     'B',
@@ -299,11 +306,11 @@ const SYMBOLS = {
       [0, 0, '-', 2],
     ],
     { 0: [24, 0, 'Left'], 3: [24, 81, 'Left'] },
-    'Fuente de corriente comportamental (polaridad invertida)',
+    'Behavioral current source (reversed polarity)',
     [stub(0, 0, 8), stub(0, 72, 80), circle(0, 40, 32), stub(0, 24, 56), 'LINE Normal -4 36 0 24', 'LINE Normal 4 36 0 24'],
   ],
   // resistencia estilo europeo (Misc\EuropeanResistor): carpeta Misc, como en LTspice
-  'Misc/EuropeanResistor': ['R', 'R', P2V(16, 96), { 0: [31, 40, 'Left'], 3: [31, 76, 'Left'] }, 'Resistencia (gráfico europeo)', [stub(16, 16, 24), stub(16, 88, 96), box(5, 24, 27, 88)]],
+  'Misc/EuropeanResistor': ['R', 'R', P2V(16, 96), { 0: [31, 40, 'Left'], 3: [31, 76, 'Left'] }, 'Resistor (European symbol)', [stub(16, 16, 24), stub(16, 88, 96), box(5, 24, 27, 88)]],
   sw: [
     'S',
     'SW',
@@ -314,7 +321,7 @@ const SYMBOLS = {
       [-48, 32, 'NC-', 4],
     ],
     { 0: [24, 16, 'Left'], 3: [24, 96, 'Left'] },
-    'Llave controlada por tensión',
+    'Voltage-controlled switch',
     [stub(0, 16, 40), stub(0, 72, 96), 'LINE Normal 0 72 16 44', box(-24, 24, 8, 88)],
   ],
   csw: [
@@ -322,7 +329,7 @@ const SYMBOLS = {
     'CSW',
     P2V(0, 80, '+', '-', 0),
     { 0: [24, 0, 'Left'], 3: [24, 88, 'Left'] },
-    'Llave controlada por corriente',
+    'Current-controlled switch',
     [stub(0, 0, 24), stub(0, 56, 80), 'LINE Normal 0 56 16 28', box(-16, 16, 24, 64)],
   ],
   tline: [
@@ -335,7 +342,7 @@ const SYMBOLS = {
       [48, 16, 'R2', 4],
     ],
     { 0: [0, -16, 'Bottom'], 3: [0, 16, 'Top'] },
-    'Línea de transmisión ideal sin pérdidas',
+    'Lossless ideal transmission line',
     [
       'LINE Normal -48 -16 -32 -16',
       'LINE Normal 32 -16 48 -16',
@@ -343,8 +350,8 @@ const SYMBOLS = {
       'LINE Normal 32 16 48 16',
       'LINE Normal -32 -8 32 -8',
       'LINE Normal -32 8 32 8',
-      'ARC Normal -40 -8 -24 8 -32 -8 -32 8',
-      'ARC Normal 24 -8 40 8 32 8 32 -8',
+      'ARC Normal -40 -8 -24 8 -32 8 -32 -8',
+      'ARC Normal 24 -8 40 8 32 -8 32 8',
     ],
   ],
 };

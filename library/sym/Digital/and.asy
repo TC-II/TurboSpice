@@ -3,7 +3,7 @@ SymbolType CELL
 LINE Normal -24 32 -24 96
 LINE Normal -24 32 -12 32
 LINE Normal -24 96 -12 96
-ARC Normal -44 32 20 96 -12 32 -12 96
+ARC Normal -44 32 20 96 -12 96 -12 32
 LINE Normal -32 32 -24 32
 LINE Normal -32 48 -24 48
 LINE Normal -32 64 -24 64

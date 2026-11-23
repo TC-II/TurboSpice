@@ -81,7 +81,7 @@ export function AlignedText({
   );
 }
 
-/** Arco de LTspice: caja de la elipse, (xs,ys) es el FINAL y (xe,ye) el INICIO, antihorario */
+/** Arco de LTspice: caja de la elipse, (xs,ys) es el INICIO y (xe,ye) el FINAL, antihorario */
 function arcPath(c: number[]): string {
   const { cx, cy, rx, ry, a0, span } = arcAngles(c);
   if (span >= 2 * Math.PI) return `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy}`;

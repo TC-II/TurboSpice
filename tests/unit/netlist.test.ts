@@ -1030,7 +1030,7 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
     expect(t).toMatch(/^B_A1__q q 0 /m);
     const w: string[] = [];
     expect(translateDigital('A1', ['a', '0', '0', '0', '0', '0', 'q', '0'], 'COUNTER', w)).toBeUndefined();
-    // parámetros sin "=" (como en TCLib/Charge_Pump.lib)
+    // parámetros sin "=" (como en TCLib/PLL/Charge_Pump.lib)
     const l = translateDigital('A4', ['u', '0', '0', '0', 'd', '0', 'c', '0'], 'AND Vhigh {Vcc} Trise 1n Tfall 2n', w)!;
     expect(l).toContain('.model A4__sm slew(rise_slope={1/(1n)} fall_slope={1/(2n)})');
     expect(l).toContain('B_A4__q c 0 V={0}+({Vcc}-{0})*min(max(V(A4__s),0),1)');

@@ -1,0 +1,10 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* XOR phase comparator
+* Vo = Vcc when exactly one of Vi and Vf is above Vcc/2, 0 otherwise (all referred to ground).
+.SUBCKT Phase_Comp_XOR Vi Vf Vo PARAMS: Vcc=5
+
+A1 Vi Vf 0 0 0 0 Vo 0 XOR Vhigh={Vcc}
+
+.ends Phase_Comp_XOR

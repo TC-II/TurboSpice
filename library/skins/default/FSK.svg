@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="96" viewBox="-32 -48 64 96">
+  <title>FSK.svg</title>
+  <g id="Layer_1">
+    <circle cx="0" cy="0" r="32" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M0 -48 L0 -32 M0 32 L0 48" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M-64 0 L-45.9 0" fill="none" stroke="#000000" stroke-width="1.5"/>
+    <path d="M-45.9 3.7 L-32 0 L-45.9 -3.7 Z" fill="#000000" stroke="#000000" stroke-width="0.5" stroke-linejoin="round"/>
+    <path d="M16 -37 L16 -47 M11 -42 L21 -42" fill="none" stroke="#000000" stroke-width="1"/>
+    <path d="M-24 10 H-20 V-10 H-10 V10 H0 V-10 H5 V10 H10 V-10 H15 V10 H24" fill="none" stroke="#000000" stroke-width="1.5" stroke-linejoin="round"/>
+    <text x="-11" y="21" font-size="9" text-anchor="middle" fill="#000000">f1</text>
+    <text x="11" y="21" font-size="9" text-anchor="middle" fill="#000000">f2</text>
+  </g>
+</svg>

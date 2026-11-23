@@ -1,0 +1,19 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* FSK modulator
+* Square wave from 0 to Vcc between V+ and V-, with frequency f1 while In < Vcc/2
+* and f2 while In > Vcc/2 (In referred to V-). Continuous phase: the frequency is
+* integrated into a phase (in cycles) on Ph, and the output is high during the first
+* half of each cycle, so switching never cuts a pulse and the frequency has no
+* accumulated error (the edges only move up to one time step).
+* B1 is zero at the operating point (time = 0): the phase starts at 0, output high.
+.SUBCKT FSK V+ V- In PARAMS: f1=1200 f2=2400 Vcc=5
+
+R1 In V- 1T
+B1 0 Ph I= (time > 0) * ( {f1} + ({f2} - {f1}) * u(V(In,V-) - {Vcc}/2) )
+C1 Ph 0 1
+R2 Ph 0 1T
+B2 V+ V- V= {Vcc} * u(0.5 - (V(Ph) - floor(V(Ph))))
+
+.ends FSK

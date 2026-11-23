@@ -1,0 +1,14 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* Random binary sequence
+* Between V+ and V-: a new random bit every 1/f, v1 for a 0 and v2 for a 1.
+* rand(x) depends only on the integer part of x, so the bit holds for a whole period.
+* Vbp only marks the bit boundaries as breakpoints, so the edges fall on them.
+.SUBCKT RBS V+ V- PARAMS: f=300 v1=0 v2=5
+
+B1 V+ V- V= {v1} + ({v2} - {v1}) * u(rand(time * {f}) - 0.5)
+Vbp bp 0 PULSE(0 1 0 {0.5/f} {0.5/f} 0 {1/f})
+Rbp bp 0 1k
+
+.ends RBS

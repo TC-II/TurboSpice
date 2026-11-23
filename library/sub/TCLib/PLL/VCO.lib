@@ -6,12 +6,12 @@
 
 C2 Vc 0 0.25 IC=0
 B1 0 Vc I= V(V_freq) * (2 * U( (2*U(I(B1))-1) - V(Vc)) - 1)
-R1 Vin_VCO 0 1Meg
+R1 Vin_VCO 0 1T
 B2 N001 0 V= Delta_F * ( V(V_off) / V(Vcc) )
 B3 Vo_Vco 0 V=V(Vcc) * U(V(Vc))
 V2 V_freq N001 {F_min}
 B6 V_off 0 V= ( ( V(Vin_VCO) - Vi_min ) * V(Vcc)/(V(Vcc)-Vi_min ) ) * U( V(Vin_VCO) - Vi_min )
-R2 Vcc 0 1Meg
+R2 Vcc 0 1T
 
 .ends VCO
 

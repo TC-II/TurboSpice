@@ -19,7 +19,7 @@ SYMATTR SpiceLine Delta_F=1k
 SYMATTR Prefix X
 SYMATTR SpiceModel VCO
 SYMATTR Description VCO
-SYMATTR ModelFile TCLib/VCO.lib
+SYMATTR ModelFile TCLib/PLL/VCO.lib
 PIN -64 0 NONE 8
 PINATTR PinName Vi
 PINATTR SpiceOrder 1

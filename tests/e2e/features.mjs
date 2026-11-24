@@ -1143,6 +1143,27 @@ const y1 = Number(await page.locator('svg.editor .sym text.win', { hasText: /^R1
 check(y1 === y0 - 32, `arrastrar el rótulo de un componente seleccionado lo mueve (${y0} → ${y1})`);
 check((await syms()) === nSyms, 'sin mover el componente');
 await page.keyboard.press('Control+z');
+// con más elementos seleccionados el rótulo es parte del componente: un click deja la selección
+// como está y arrastrarlo mueve todo lo seleccionado
+await page.keyboard.press('Control+a');
+const nSel = await page.locator('svg.editor .sel').count();
+const r1Body = () =>
+  page
+    .locator('svg.editor .sym', { has: page.locator('text.win', { hasText: /^R1$/ }) })
+    .locator('g.body')
+    .getAttribute('transform');
+const tb0 = await r1Body();
+const lb = await page.locator('svg.editor .sym text.win', { hasText: /^R1$/ }).boundingBox();
+const lc = { x: lb.x + lb.width / 2, y: lb.y + lb.height / 2 };
+await page.mouse.click(lc.x, lc.y);
+check((await page.locator('svg.editor .sel').count()) === nSel, `con varios seleccionados, un click en el rótulo no cambia la selección (${nSel})`);
+await page.mouse.move(lc.x, lc.y);
+await page.mouse.down();
+await page.mouse.move(lc.x + 80, lc.y + 80, { steps: 5 });
+await page.mouse.up();
+const tb1 = await r1Body();
+check(tb1 !== tb0 && (await page.locator('svg.editor .sel').count()) === nSel, `y arrastrarlo mueve el componente con toda la selección (${tb0} → ${tb1})`);
+await page.keyboard.press('Control+z');
 
 // valores amigables: 4k7
 await page.mouse.dblclick(r1.x, r1.y);

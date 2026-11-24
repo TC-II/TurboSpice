@@ -103,8 +103,9 @@ export type Drag =
   /** desplazar un tramo de cable en forma perpendicular */
   | { mode: 'segment'; start: Point; index: number }
   /**
-   * arrastrar un rótulo (InstName/Value) de un símbolo; si su componente está seleccionado junto
-   * con otros, el mismo rótulo de todos. `at` es el ancla de cada uno en el esquemático.
+   * arrastrar un rótulo (InstName/Value) de un símbolo, con su componente como única selección
+   * (con más elementos seleccionados el rótulo es parte del componente). `at` es el ancla en el
+   * esquemático.
    */
   | { mode: 'label'; start: Point; sym: number; shift: boolean; items: { sym: number; win: number; w: TextWindow; at: Point }[]; moved: boolean };
 

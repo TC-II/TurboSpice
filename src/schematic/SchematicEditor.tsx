@@ -32,7 +32,6 @@ import {
   wiresOn,
 } from './edit.ts';
 import { inverseOffset, toWorld } from '../asc/transform.ts';
-import { effectiveWindows } from '../asc/resolve.ts';
 import {
   hitTest,
   hitTestAll,
@@ -265,6 +264,8 @@ export function SchematicEditor(props: Props) {
   const hoverSymOut = useRef<number | undefined>(undefined);
   const hoverTargetOut = useRef('');
   const [grabLabel, setGrabLabel] = useState<{ sym: number; win: number } | undefined>();
+  // el rótulo se toma por separado sólo si su componente es lo único seleccionado
+  const labelGrabbable = (sym: number) => selection.length === 1 && selection[0].kind === 'symbol' && selection[0].index === sym;
   // componente bajo el puntero (cuerpo o rótulo): se pinta mientras el puntero está encima
   const [hoverSym, setHoverSym] = useState<number | undefined>();
   const [hoverFlag, setHoverFlag] = useState<number | undefined>();
@@ -599,17 +600,13 @@ export function SchematicEditor(props: Props) {
             }
           }
         }
-        // un rótulo se arrastra sólo con su componente ya seleccionado; si hay otros seleccionados,
-        // se mueve el mismo rótulo de todos (si no se mueve, es un click sobre el componente)
+        // un rótulo se arrastra sólo con su componente seleccionado y solo (si no se mueve, es un
+        // click sobre el componente); con más elementos seleccionados el rótulo es parte del
+        // componente, como el cuerpo: click y arrastre actúan sobre la selección
         const label = labelAt(doc, p, lib, tol, lod);
-        const selSyms = selection.filter((r) => r.kind === 'symbol' && doc.symbols[r.index]).map((r) => r.index);
-        if (label && selSyms.includes(label.sym)) {
-          const syms = selSyms;
-          const items = syms.flatMap((si) => {
-            const inst = doc.symbols[si];
-            const w = si === label.sym ? label.w : effectiveWindows(inst, lib.symbol(inst.type), lib.windowDefaults).get(label.win);
-            return w && w.align !== 'Invisible' ? [{ sym: si, win: label.win, w, at: toWorld(inst, w.x, w.y) }] : [];
-          });
+        if (label && labelGrabbable(label.sym)) {
+          const inst = doc.symbols[label.sym];
+          const items = label.w.align !== 'Invisible' ? [{ sym: label.sym, win: label.win, w: label.w, at: toWorld(inst, label.w.x, label.w.y) }] : [];
           setDrag({ mode: 'label', start: p, sym: label.sym, shift: e.shiftKey, items, moved: false });
           return;
         }
@@ -895,13 +892,8 @@ export function SchematicEditor(props: Props) {
     const la = tool.kind === 'select' && !drag ? labelAt(doc, p, lib, tol, lod) : null;
     const lh = la ? la.sym : drag?.mode === 'label' ? drag.sym : undefined;
     if (lh !== hoverLabel) setHoverLabel(lh);
-    // (un rótulo se arrastra sólo con su componente ya seleccionado: entonces se pinta de verde)
-    const gl =
-      drag?.mode === 'label'
-        ? { sym: drag.sym, win: drag.items.find((it) => it.sym === drag.sym)?.win ?? -1 }
-        : la && selection.some((r) => r.kind === 'symbol' && r.index === la.sym)
-          ? { sym: la.sym, win: la.win }
-          : undefined;
+    // (un rótulo se arrastra sólo con su componente seleccionado y solo: entonces se pinta de verde)
+    const gl = drag?.mode === 'label' ? { sym: drag.sym, win: drag.items.find((it) => it.sym === drag.sym)?.win ?? -1 } : la && labelGrabbable(la.sym) ? { sym: la.sym, win: la.win } : undefined;
     if (gl?.sym !== grabLabel?.sym || gl?.win !== grabLabel?.win) setGrabLabel(gl);
     const body = tool.kind === 'select' && !drag && lh === undefined ? hitTest(doc, p, lib, tol, showSimCommand) : null;
     const hs = lh ?? (body?.kind === 'symbol' ? body.index : undefined);

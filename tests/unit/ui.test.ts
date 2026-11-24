@@ -118,3 +118,12 @@ describe('barra de herramientas (#38)', () => {
     expect(new Set(ANALYSES.map((a) => a.label)).size).toBe(ANALYSES.length);
   });
 });
+
+describe('avisos de la barra de estado', () => {
+  it('«ver la pestaña Errores» no pinta de rojo un aviso; un error sí', async () => {
+    const { isErrorMessage } = await import('../../src/app/helpers.ts');
+    expect(isErrorMessage('.tran 0 2 0 1u genera 2,0 M puntos: puede tardar en simular. — ver la pestaña Errores')).toBe(false);
+    expect(isErrorMessage('Error: R2 no tiene valor asignado — ver la pestaña Errores')).toBe(true);
+    expect(isErrorMessage('No se pudo abrir el archivo')).toBe(true);
+  });
+});

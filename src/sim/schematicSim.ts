@@ -84,6 +84,8 @@ export interface BuiltSimulation {
   controlPanes: Pane[];
   /** análisis que no entran en memoria: no se simula (#58) */
   tooBig: SizeProblem[];
+  /** análisis con muchos puntos que sí entran: se simula igual, con un aviso (también en `warnings`) */
+  slow: SizeProblem[];
   /** símbolos que no están en la librería: sus elementos se omiten y el circuito simulado es otro (#108) */
   missingSymbols: string[];
   /** redes entre bloques Verilog que se simulan digitales, sin puentes (nombres de ngspice; ver digitalLinks.ts) */
@@ -178,7 +180,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const controlPanes = control ? controlPlots(control.text.split('\\n').join('\n')) : [];
   // ¿Entra en memoria? (los análisis tal como están en el esquemático, para poder corregirlos)
   const size = checkSimSize(analyses, netlist, prep.files, ng.steps?.runs.length ?? 1, vectorCount);
-  const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text)];
+  const warnings = [...prep.warnings, ...size.warnings.map((w) => w.text), ...size.slow.map((w) => w.text)];
   // los modelos del PDK van después de medir el tamaño (son decenas de miles de líneas que no
   // agregan vectores) y no pasan por prepareSimulation (ya están traducidos para ngspice)
   const pdk = await pdkModels(ng, netlist, prep.files, fromSymbols, corner);
@@ -188,7 +190,7 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
     files = { ...files, ...pdk.files };
   }
   const missingSymbols = [...new Set(lt.warnings.flatMap((w) => missingSymbolIn(w) ?? []))];
-  return { netlist, files, warnings, lt, ng, controlPanes, tooBig: size.errors, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases, digitalSaves };
+  return { netlist, files, warnings, lt, ng, controlPanes, tooBig: size.errors, slow: size.slow, missingSymbols, digitalNets: new Set(links.nets), digitalAliases: links.aliases, digitalSaves };
 }
 
 /** Vectores de ngspice "@dev[param]" de los parámetros de dispositivo que usan unas trazas (#202) */

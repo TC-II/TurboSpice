@@ -35,9 +35,11 @@ export interface RunOptions {
   withVariants: Variants;
   /** llegó el punto de operación de la corrida */
   onBias(built: BuiltSimulation, bias: Bias): void;
+  /** se va a simular algo con muchos puntos: el aviso, mientras se espera */
+  onSlow?(text: string): void;
 }
 
-export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimited, ascName, allTraces, synthStale, withVariants, onBias }: RunOptions) {
+export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimited, ascName, allTraces, synthStale, withVariants, onBias, onSlow }: RunOptions) {
   if (ltIndex) await prefetchLtspice(doc, lib, ltIndex);
   // los módulos Verilog que cambiaron se sintetizan antes (#209)
   await synthStale();
@@ -101,6 +103,7 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
     }
     return { result: merged, ms };
   };
+  if (!blocking.length && built.slow.length) onSlow?.(built.slow[0].text);
   let { result, ms } = blocking.length ? { result: { plots: [], log: blocking, errors: blocking, aborted: false }, ms: 0 } : await run(built);
   // las fuentes de 0 V de los pines de los subcircuitos pueden dejar la matriz singular (un
   // modelo que une dos pines por dentro, en redes que afuera une una fuente): otra vez sin ellas

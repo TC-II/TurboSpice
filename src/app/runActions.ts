@@ -25,7 +25,7 @@ import { scaleOf } from '../waveform/series.ts';
 import { isStbPlot, stbMainTraces } from '../waveform/StbView.tsx';
 import { plotKind, type Pane, type PlotView } from '../waveform/view.ts';
 import { MAX_CACHED_BYTES } from './constants.ts';
-import { ascText } from './helpers.ts';
+import { ascText, isErrorMessage } from './helpers.ts';
 import type { ResultsView } from './ResultsPanel.tsx';
 import { runTestbench } from './simulate.ts';
 import type { HierLevel, SavesState, SimRun } from './types.ts';
@@ -129,6 +129,7 @@ export function runActions(d: RunDeps) {
       const { built, result, ms, meas, blk, xy } = await runTestbench({
         ...{ doc, simAsc, lib, ltIndex, engine, unlimited, ascName, allTraces, synthStale, withVariants },
         onBias: (built, bias) => setOpPoint({ doc, built, bias }),
+        onSlow: (text) => setMessage(text),
       });
       // los resultados de la última corrida quedan en el navegador (no van en el .turbo); los muy
       // grandes no: guardarlos los copia entera otra vez (y la base del navegador puede no admitirlos)
@@ -182,7 +183,8 @@ export function runActions(d: RunDeps) {
       const missing = built.missingSymbols;
       setMessage(
         errs.length && (!result.plots.length || result.sizeStop)
-          ? t('{p0} — see the Errors tab', { p0: errs[0] })
+          ? // (una simulación que no corrió: en rojo aunque el texto no diga «error»)
+            t('{p0} — see the Errors tab', { p0: isErrorMessage(errs[0]) ? errs[0] : t('Error: {p0}', { p0: errs[0] }) })
           : missing.length
             ? missing.length === 1
               ? t("Incomplete simulation: symbol {names} wasn't found and was left out of the circuit. The results don't match the schematic.", { names: missing[0] })

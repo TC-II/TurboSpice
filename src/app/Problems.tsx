@@ -20,8 +20,9 @@ export const simProblems = (sim: SimRun | null) =>
         const name = /^([^\s:]+)/.exec(p.text)?.[1]?.toLowerCase();
         const el = name ? sim.built.lt.elements.find((e) => e.name.toLowerCase() === name || e.name.replace(/§/g, '').toLowerCase() === name) : undefined;
         const big = sim.built.tooBig?.find((f) => f.text === p.text);
+        const slow = sim.built.slow?.find((f) => f.text === p.text);
         // demasiado grande con todo guardado: elegir qué guardar (#314)
-        return { ...p, sym: el?.sym, fix: big?.fix, size: big, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
+        return { ...p, sym: el?.sym, fix: big?.fix ?? slow?.fix, size: big, big: !!big && (!!big.chooseSignals || !saveSelection(sim.built.lt.texts)) };
       })
     : [];
 

@@ -22,7 +22,7 @@ export const FULL_SIM_BYTES = 1024 ** 3;
  * páginas que no se copian al crecer, así que entra el doble.
  */
 export const simLimits = (streamed: boolean) => (streamed ? { max: 2 * MAX_SIM_BYTES, full: 2 * FULL_SIM_BYTES } : { max: MAX_SIM_BYTES, full: FULL_SIM_BYTES });
-/** Puntos por corrida: más tardan minutos en simular y no se pueden graficar con fluidez */
+/** Puntos por corrida: con más puede tardar minutos en simular y graficarse con menos fluidez (sólo se avisa) */
 export const MAX_POINTS = 2_000_000;
 /** Más puntos por década casi nunca aportan resolución */
 const MAX_PER_DECADE = 10000;
@@ -189,6 +189,8 @@ export interface SizeCheck {
   /** no se simula */
   errors: SizeProblem[];
   warnings: SizeProblem[];
+  /** muchos puntos que sí entran en memoria: se simula igual, avisando que puede tardar */
+  slow: SizeProblem[];
 }
 
 /** Misma línea con menos puntos (para .ac/.noise: puntos por década; para .tran: paso máximo) */
@@ -287,7 +289,7 @@ export function measuredSizeProblem(line: string, m: MeasuredSize, maxBytes = MA
  * final (`savedVectors`: los que se guardan, si se eligieron; si no, todos): puntos × vectores × 8 bytes (16 en los complejos: AC), por cada corrida de .step.
  */
 export function checkSimSize(analysisLines: string[], netlist: string, files: Record<string, string>, runs = 1, savedVectors?: number): SizeCheck {
-  const out: SizeCheck = { errors: [], warnings: [] };
+  const out: SizeCheck = { errors: [], warnings: [], slow: [] };
   // con sólo las señales elegidas (#314), las que se guardan
   let vectors: number | undefined = savedVectors;
   for (const line of analysisLines) {
@@ -309,11 +311,14 @@ export function checkSimSize(analysisLines: string[], netlist: string, files: Re
     const bytes = points * vectors * (complex ? 16 : 8) * runs;
     if (bytes <= MAX_SIM_BYTES && points <= MAX_POINTS) continue;
     const to = fewerPoints(line, a, Math.min(TARGET_BYTES / bytes, TARGET_POINTS / points));
+    if (bytes <= MAX_SIM_BYTES) {
+      // entra en memoria: muchos puntos sólo hacen que tarde (y que el gráfico sea menos fluido)
+      const text = t('{line} produces {p1} points: it may take a while to simulate.', { line, p1: fmtCount(points) }) + (to ? t(' For a faster run, «{to}».', { to }) : '');
+      out.slow.push({ text, fix: to ? { from: line, to } : undefined });
+      continue;
+    }
     const per = runs > 1 ? t(' × {runs} runs', { runs }) : '';
-    const why =
-      bytes > MAX_SIM_BYTES
-        ? t('≈ {p0}: more than the browser can store and plot', { p0: fmtBytes(bytes) })
-        : t('≈ {p0}: too many points to simulate and plot in a reasonable time', { p0: fmtBytes(bytes) });
+    const why = t('≈ {p0}: more than the browser can store and plot', { p0: fmtBytes(bytes) });
     out.errors.push({
       text:
         t("{line} produces {p1} points × {vectors} vectors{per} {why}, so it isn't simulated.", { line, p1: fmtCount(points), vectors, per, why }) +

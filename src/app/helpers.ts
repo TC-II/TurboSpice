@@ -3,6 +3,7 @@ import type { AscDoc } from '../asc/model.ts';
 import { serializeAsc } from '../asc/serialize.ts';
 import type { Library } from '../library/library.ts';
 import type { UserFile } from '../schematic/autosave.ts';
+import { t } from '../i18n/i18n.ts';
 
 // Serialización cacheada por documento (el autoguardado y el cambio de simulación la usan seguido)
 const ascCache = new WeakMap<AscDoc, string>();
@@ -11,6 +12,12 @@ export const ascText = (d: AscDoc) => {
   if (tt === undefined) ascCache.set(d, (tt = serializeAsc(d)));
   return tt;
 };
+
+/**
+ * Un aviso de la barra de estado que es un error (se pinta en rojo y dura más). El «— ver la
+ * pestaña Errores» del final no cuenta: lo llevan también los avisos de una simulación que corrió
+ */
+export const isErrorMessage = (message: string) => /could not|couldn't|failed|error|no se pudo|falló/i.test(message.replace(t('{p0} — see the Errors tab', { p0: '' }), ''));
 
 export const isTyping = (e: KeyboardEvent) => e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement;
 

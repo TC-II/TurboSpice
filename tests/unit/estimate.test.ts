@@ -65,15 +65,22 @@ describe('chequeo de tamaño (#58)', () => {
     expect(r.errors[0].fix?.to).toBe('.ac dec 1000 100 100meg');
   });
 
-  it('demasiados puntos aunque entren en memoria', () => {
+  it('muchos puntos que entran en memoria: se simula igual, con un aviso y una propuesta', () => {
     const r = checkSimSize(['.tran 0 1 0 100n'], '* t\nR1 a 0 1\n.end', {});
-    expect(r.errors).toHaveLength(1);
-    expect(r.errors[0].text).toMatch(/demasiados puntos/);
-    expect(points(r.errors[0].fix!.to)).toBeLessThanOrEqual(MAX_POINTS);
+    expect(r.errors).toHaveLength(0);
+    expect(r.slow).toHaveLength(1);
+    expect(r.slow[0].text).toMatch(/genera 10 M puntos: puede tardar en simular/);
+    expect(points(r.slow[0].fix!.to)).toBeLessThanOrEqual(MAX_POINTS);
+  });
+
+  it('.tran 0 2 0 1u (2 M puntos, 46 MB) se simula', () => {
+    const r = checkSimSize(['.tran 0 2 0 1u'], net, {}, 1, 3);
+    expect(r.errors).toHaveLength(0);
+    expect(r.slow).toHaveLength(1);
   });
 
   it('lo razonable pasa sin avisos', () => {
-    expect(checkSimSize(['.ac dec 1000 10 100meg', '.tran 10m'], net, {})).toEqual({ errors: [], warnings: [] });
+    expect(checkSimSize(['.ac dec 1000 10 100meg', '.tran 10m'], net, {})).toEqual({ errors: [], warnings: [], slow: [] });
   });
 
   it('cuenta las corridas de .step', () => {

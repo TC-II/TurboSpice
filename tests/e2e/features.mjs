@@ -1129,7 +1129,8 @@ await page.keyboard.press('Control+a');
 check((await page.locator('svg.editor .sym.sel').count()) === nSyms + 1, 'Ctrl+A selecciona todo');
 await page.keyboard.press('Control+z');
 
-// mover un rótulo
+// mover un rótulo (con R1 como única selección: después de Ctrl+A puede quedar todo seleccionado)
+await page.keyboard.press('Escape');
 await page.mouse.click(r1.x, r1.y);
 const label = page.locator('svg.editor .sym.sel text.win', { hasText: /^R1$/ });
 const y0 = Number(await label.getAttribute('y'));

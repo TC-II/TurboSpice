@@ -183,7 +183,9 @@ export function deleteItems(doc: AscDoc, refs: ItemRef[], lib?: Library): AscDoc
  */
 export function moveItems(doc: AscDoc, refs: ItemRef[], dx: number, dy: number, drag: boolean, lib: Library, selOut?: Wire[]): AscDoc {
   if (!dx && !dy) return doc;
-  const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind).map((r) => r.index));
+  // (una selección que todavía apunta a algo que ya no está, recién deshecho, no se mueve)
+  const count = { symbol: doc.symbols.length, wire: doc.wires.length, flag: doc.flags.length, text: doc.texts.length, shape: doc.shapes.length };
+  const sel = (kind: ItemRef['kind']) => new Set(refs.filter((r) => r.kind === kind && r.index < count[kind]).map((r) => r.index));
   const [s, w, f, t, sh] = [sel('symbol'), sel('wire'), sel('flag'), sel('text'), sel('shape')];
   const key = (p: Point) => `${p.x},${p.y}`;
   const mv = (p: Point) => ({ x: p.x + dx, y: p.y + dy });

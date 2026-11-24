@@ -49,6 +49,19 @@ describe('figuras de LTspice', () => {
     expect(moved.shapes[3].coords).toEqual([336, -48, 400, 16, 368, -48, 400, -16]);
     expect(moved.shapes[3].style).toBe('1');
     expect(moved.shapes[0]).toBe(doc.shapes[0]);
+    // una selección con algo que ya no existe (recién deshecho) mueve lo que sí está
+    const stale = moveItems(
+      doc,
+      [
+        { kind: 'shape', index: 3 },
+        { kind: 'symbol', index: doc.symbols.length + 5 },
+      ],
+      16,
+      -16,
+      true,
+      lib,
+    );
+    expect(stale.shapes[3].coords).toEqual(moved.shapes[3].coords);
     const dup = duplicateItems(doc, [{ kind: 'shape', index: 0 }], 0, 32, lib);
     expect(dup.doc.shapes).toHaveLength(5);
     expect(dup.doc.shapes[4].coords).toEqual([0, 32, 64, 32]);

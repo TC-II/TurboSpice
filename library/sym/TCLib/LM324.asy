@@ -16,6 +16,7 @@ WINDOW 3 -113 7 Left 2
 SYMATTR Value LM324
 SYMATTR ModelFile TCLib/LM324.lib
 SYMATTR Prefix X
+SYMATTR Description LM324 quad general-purpose op amp (one section)
 PIN -192 80 NONE 0
 PINATTR PinName In+
 PINATTR SpiceOrder 1

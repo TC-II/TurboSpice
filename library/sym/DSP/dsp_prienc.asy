@@ -20,7 +20,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_prienc
 SYMATTR ModelFile dsp_prienc.sub
-SYMATTR Description Verilog module dsp_prienc
+SYMATTR Description 8 to 3 priority encoder
 PIN -80 0 NONE 0
 PINATTR PinName x[7:0]
 PINATTR SpiceOrder 1

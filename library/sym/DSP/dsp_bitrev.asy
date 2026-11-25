@@ -14,7 +14,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_bitrev
 SYMATTR ModelFile dsp_bitrev.sub
-SYMATTR Description Verilog module dsp_bitrev
+SYMATTR Description Bit reversal (bit 0 becomes bit W−1, as in an FFT reorder)
 PIN -64 0 NONE 0
 PINATTR PinName x[15:0]
 PINATTR SpiceOrder 1

@@ -29,7 +29,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_mac
 SYMATTR ModelFile dsp_mac.sub
-SYMATTR Description Verilog module dsp_mac
+SYMATTR Description Multiply-accumulate acc += a·b, with clear
 PIN -16 80 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

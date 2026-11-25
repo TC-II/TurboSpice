@@ -28,7 +28,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_debounce
 SYMATTR ModelFile dsp_debounce.sub
-SYMATTR Description Verilog module dsp_debounce
+SYMATTR Description Debouncer: q follows d after it stays the same for N cycles
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

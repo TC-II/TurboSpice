@@ -24,7 +24,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_minmax
 SYMATTR ModelFile dsp_minmax.sub
-SYMATTR Description Verilog module dsp_minmax
+SYMATTR Description Minimum and maximum of two signed words
 PIN -80 -16 NONE 0
 PINATTR PinName a[15:0]
 PINATTR SpiceOrder 1

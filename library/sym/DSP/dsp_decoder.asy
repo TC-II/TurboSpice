@@ -20,7 +20,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_decoder
 SYMATTR ModelFile dsp_decoder.sub
-SYMATTR Description Verilog module dsp_decoder
+SYMATTR Description 3 to 8 decoder with enable
 PIN -80 0 NONE 0
 PINATTR PinName sel[2:0]
 PINATTR SpiceOrder 1

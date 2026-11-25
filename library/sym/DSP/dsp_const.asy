@@ -11,7 +11,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_const
 SYMATTR ModelFile dsp_const.sub
-SYMATTR Description Verilog module dsp_const
+SYMATTR Description Two's complement constant (VALUE is the integer: 0.5 in Q1.15 is 16384)
 PIN 64 0 NONE 0
 PINATTR PinName y[15:0]
 PINATTR SpiceOrder 1

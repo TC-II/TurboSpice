@@ -15,6 +15,7 @@ WINDOW 0 -113 80 Left 2
 WINDOW 38 -113 7 Left 2
 SYMATTR ModelFile TCLib/TL082.lib
 SYMATTR Prefix X
+SYMATTR Description TL082 dual JFET-input op amp (one section)
 SYMATTR SpiceModel TL082
 PIN -192 80 NONE 0
 PINATTR PinName In+

@@ -46,7 +46,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_movavg
 SYMATTR ModelFile dsp_movavg.sub
-SYMATTR Description Verilog module dsp_movavg
+SYMATTR Description Moving average of 2^K samples
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

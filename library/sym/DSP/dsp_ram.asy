@@ -32,7 +32,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_ram
 SYMATTR ModelFile dsp_ram.sub
-SYMATTR Description Verilog module dsp_ram
+SYMATTR Description 16-word single-port RAM, asynchronous read
 PIN -16 80 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

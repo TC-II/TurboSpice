@@ -22,7 +22,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_split
 SYMATTR ModelFile dsp_split.sub
-SYMATTR Description Verilog module dsp_split
+SYMATTR Description Split a 16-bit word into its high and low bytes
 PIN -80 0 NONE 0
 PINATTR PinName x[15:0]
 PINATTR SpiceOrder 1

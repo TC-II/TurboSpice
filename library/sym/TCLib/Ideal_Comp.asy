@@ -12,6 +12,7 @@ LINE Normal -140 32 -157 32
 WINDOW 0 -113 80 Left 2
 SYMATTR ModelFile TCLib/Ideal_comp.lib
 SYMATTR Prefix X
+SYMATTR Description Ideal comparator: Out = amp*sgn(V(C+)-V(C-)) + offset, created by Agustin Gullino (ITBA)
 SYMATTR Value amp=1
 SYMATTR Value2 offset=0
 PIN -192 80 NONE 0

@@ -17,7 +17,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_clock
 SYMATTR ModelFile dsp_clock.sub
-SYMATTR Description Verilog module dsp_clock
+SYMATTR Description Clock: square wave of PERIOD ns, starting at 0
 PIN 64 0 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

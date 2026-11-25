@@ -93,7 +93,7 @@ await page.keyboard.press('Escape');
 
 // --- #63: la caja del buscador queda en el mismo lugar ---
 await page.keyboard.press('p');
-const input = page.locator('.picker input');
+const input = page.locator('.picker-search input');
 const tops = [];
 for (const q of ['', 'res', 'zzzzqq', 'npn']) {
   await input.fill(q);

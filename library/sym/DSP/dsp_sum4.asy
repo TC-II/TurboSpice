@@ -33,7 +33,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_sum4
 SYMATTR ModelFile dsp_sum4.sub
-SYMATTR Description Verilog module dsp_sum4
+SYMATTR Description Four-input adder, saturated
 PIN -80 -48 NONE 0
 PINATTR PinName a[15:0]
 PINATTR SpiceOrder 1

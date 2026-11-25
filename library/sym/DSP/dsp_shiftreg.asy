@@ -24,7 +24,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_shiftreg
 SYMATTR ModelFile dsp_shiftreg.sub
-SYMATTR Description Verilog module dsp_shiftreg
+SYMATTR Description Serial-in parallel-out shift register
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

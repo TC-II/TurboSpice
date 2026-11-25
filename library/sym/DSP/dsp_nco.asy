@@ -24,7 +24,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_nco
 SYMATTR ModelFile dsp_nco.sub
-SYMATTR Description Verilog module dsp_nco
+SYMATTR Description NCO: full-scale sine in Q1.15, f = FREQ / 65536 · f_clk
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

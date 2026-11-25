@@ -17,7 +17,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_div
 SYMATTR ModelFile dsp_div.sub
-SYMATTR Description Verilog module dsp_div
+SYMATTR Description Fixed-point divider y = a / b, F fractional bits, saturated
 PIN -64 0 NONE 0
 PINATTR PinName a[15:0]
 PINATTR SpiceOrder 1

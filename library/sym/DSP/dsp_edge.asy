@@ -30,7 +30,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_edge
 SYMATTR ModelFile dsp_edge.sub
-SYMATTR Description Verilog module dsp_edge
+SYMATTR Description Edge detector: rise and fall pulses one clock long
 PIN 0 80 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

@@ -382,36 +382,68 @@ svg.editor:not(:hover) .wire-crosshair { display: none; }
 .verilogdlg .err { color: var(--err); font-size: 13px; margin: 0; white-space: pre-wrap; }
 .verilogdlg .ok { color: var(--ok); font-size: 13px; margin: 0; }
 .verilogdlg pre.log { max-height: 160px; border: 1px solid var(--border); border-radius: var(--r); }
-.picker { display: grid; grid-template-columns: 1fr 260px; gap: 16px; min-height: 360px; }
-.picker-list { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-.picker-list ul { list-style: none; margin: 0; padding: 0; overflow: auto; height: 52vh; border: 1px solid var(--border); border-radius: var(--r); }
-.picker-list li { display: flex; gap: 10px; padding: 4px 8px; cursor: pointer; font-size: 13px; }
-.picker-list li.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.picker-list .path { font-family: var(--mono); white-space: nowrap; }
-.picker-list .desc { color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.picker-preview { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-muted); }
 .symbol-preview { width: 220px; height: 220px; background: var(--sch-bg); border: 1px solid var(--border); border-radius: var(--r); }
 .symbol-preview .schematic, .symbol-preview .sym { fill: none; }
 
 @media (max-width: 720px) {
   .netlist-main { grid-template-columns: 1fr; grid-template-rows: 45% 1fr; }
-  .picker { grid-template-columns: 1fr; }
-  .picker-preview { display: none; }
   .filename { display: none; }
 }
 
-/* ---------- Selector de componentes, simulación y .control ---------- */
-.picker { grid-template-columns: minmax(0, 1fr) 280px; }
-.picker-list li { align-items: center; content-visibility: auto; contain-intrinsic-size: auto 44px; }
+/* ---------- Selector de componentes (P): buscador, categorías, lista y vista previa ---------- */
+.modal.picker-modal { width: min(1000px, 100%); }
+.picker-search { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.picker-search input { flex: 1; min-width: 0; }
+.picker-narrow { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 2px 8px; border: 1px solid var(--accent); border-radius: var(--r); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 12px; white-space: nowrap; }
+.picker { display: grid; grid-template-columns: 170px minmax(0, 1fr) 250px; gap: 12px; min-height: 360px; }
+.picker-side { display: flex; flex-direction: column; gap: 1px; height: 52vh; overflow: auto; padding-right: 2px; }
+.picker-side hr { width: 100%; border: 0; border-top: 1px solid var(--border); margin: 6px 0; }
+.picker-cat-group { display: flex; flex-direction: column; gap: 1px; }
+.picker-cat, .picker-sub { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; padding: 4px 8px; border: 0; border-radius: var(--r); background: transparent; color: var(--fg); font-size: 13px; text-align: left; }
+.picker-cat span:first-child, .picker-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-cat.on, .picker-cat.on:hover { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+.picker-cat.dim { color: var(--fg-muted); }
+.picker-cat .n { flex: none; font-size: 11px; font-weight: 400; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.picker-sub { display: block; padding: 3px 8px 3px 20px; font-size: 12px; color: var(--fg-muted); }
+.picker-sub.on { color: var(--accent); box-shadow: inset 2px 0 0 var(--accent); border-radius: 0; }
+.picker-list { display: flex; flex-direction: column; gap: 6px; min-height: 0; min-width: 0; }
+.picker-list ul { position: relative; list-style: none; margin: 0; padding: 0; overflow: auto; height: 52vh; border: 1px solid var(--border); border-radius: var(--r); }
+.picker-list li { display: flex; align-items: center; gap: 10px; padding: 4px 8px; cursor: pointer; font-size: 13px; content-visibility: auto; contain-intrinsic-size: auto 44px; }
+/* con secciones (una categoría, a lo sumo ~110 filas) se dibujan todas: las alturas estimadas de
+   content-visibility correrían los encabezados al saltar a una subcategoría */
+.picker-list ul.sectioned li[role='option'] { scroll-margin-top: 24px; content-visibility: visible; }
+.picker-list li.active { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.picker-list li.picker-head { position: sticky; top: 0; z-index: 1; display: block; padding: 3px 8px; cursor: default; content-visibility: visible; background: var(--bg-alt); border-bottom: 1px solid var(--border); color: var(--fg-muted); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+.picker-list li.picker-empty { display: block; padding: 16px; cursor: default; color: var(--fg-muted); }
 .picker-list .thumb { width: 36px; height: 36px; flex: none; }
 .picker-list .folder-icon { display: flex; align-items: center; justify-content: center; color: var(--fg-muted); }
 .picker-list li.folder .path { font-weight: 600; }
+.picker-list .path { font-family: var(--mono); white-space: nowrap; min-width: 9ch; flex: none; }
+.picker-list .path mark { background: color-mix(in srgb, #f2c94c 45%, transparent); color: inherit; border-radius: var(--r-sm); }
+.picker-list .desc { flex: 1; min-width: 0; color: var(--fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.picker-chip { flex: none; max-width: 45%; padding: 1px 6px; border: 1px solid var(--border); border-radius: var(--r); background: var(--bg-alt); color: var(--fg-muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-dir { font: 12px var(--mono); color: var(--fg-muted); }
-.picker-list .path { min-width: 9ch; flex: none; }
-.picker-list .desc { min-width: 0; }
-.picker-preview .big { width: 260px; height: 260px; background: var(--sch-bg); border: 1px solid var(--border); border-radius: var(--r); }
-.picker-preview strong { font: 13px var(--mono); color: var(--fg); }
+.picker-dir button.link { font: inherit; }
+.picker-preview { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: var(--fg-muted); }
+.picker-preview .big { width: 250px; height: 250px; background: var(--sch-bg); border: 1px solid var(--border); border-radius: var(--r); }
+.picker-preview strong { font: 13px var(--mono); color: var(--fg); overflow-wrap: anywhere; text-align: center; }
 .picker-preview p { margin: 0; text-align: center; }
+.picker-places { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.picker-places .picker-chip { max-width: 100%; cursor: pointer; }
+.picker-places .picker-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-alt); }
+.picker-folder { font-family: var(--mono); font-size: 11px; overflow-wrap: anywhere; text-align: center; }
+.picker-hint { margin-top: 8px; font-size: 11px; color: var(--fg-muted); }
+@media (max-width: 720px) {
+  .picker { grid-template-columns: minmax(0, 1fr); }
+  .picker-side { flex-direction: row; flex-wrap: nowrap; height: auto; overflow-x: auto; padding-bottom: 4px; }
+  .picker-side hr, .picker-sub { display: none; }
+  .picker-cat-group { flex: none; }
+  .picker-cat { width: auto; white-space: nowrap; }
+  .picker-preview, .picker-hint { display: none; }
+  .picker-chip { display: none; }
+}
+
+/* ---------- Selector de componentes, simulación y .control ---------- */
 .schematic-mini { color: var(--sch-sym); }
 .schematic-mini .pin-dot { fill: var(--sch-wire); stroke: none; }
 .texts .ngspice text { fill: var(--kind-hdl); }

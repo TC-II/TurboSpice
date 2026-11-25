@@ -22,7 +22,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_upsample
 SYMATTR ModelFile dsp_upsample.sub
-SYMATTR Description Verilog module dsp_upsample
+SYMATTR Description Interpolator ↑L by zero insertion
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

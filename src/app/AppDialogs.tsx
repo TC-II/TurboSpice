@@ -18,10 +18,10 @@ import { freeSubcktName } from '../project/subckt.ts';
 import { projectName, type Project } from '../project/turbo.ts';
 import { benchParams, benchVariables, setBenchParams } from '../schematic/benchParams.ts';
 import { currentArrows } from '../schematic/currentArrows.tsx';
+import { ComponentPicker } from '../schematic/ComponentPicker.tsx';
 import {
   AboutDialog,
   AttributeDialog,
-  ComponentPicker,
   FlagDialog,
   HelpDialog,
   ImportInfoDialog,

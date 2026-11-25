@@ -28,7 +28,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_piso
 SYMATTR ModelFile dsp_piso.sub
-SYMATTR Description Verilog module dsp_piso
+SYMATTR Description Parallel-in serial-out shift register (MSB first)
 PIN -16 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

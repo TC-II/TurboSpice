@@ -15,6 +15,7 @@ WINDOW 0 -113 80 Left 2
 WINDOW 3 -113 7 Left 2
 SYMATTR Value LM833
 SYMATTR Prefix X
+SYMATTR Description LM833 dual low-noise audio op amp (one section)
 SYMATTR ModelFile TCLib/LM833.lib
 PIN -192 80 NONE 0
 PINATTR PinName In+

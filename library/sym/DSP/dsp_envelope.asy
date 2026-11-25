@@ -33,7 +33,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_envelope
 SYMATTR ModelFile dsp_envelope.sub
-SYMATTR Description Verilog module dsp_envelope
+SYMATTR Description Envelope detector: |x| through a first-order lowpass
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

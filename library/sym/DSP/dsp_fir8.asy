@@ -46,7 +46,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_fir8
 SYMATTR ModelFile dsp_fir8.sub
-SYMATTR Description Verilog module dsp_fir8
+SYMATTR Description 8-tap FIR filter with configurable coefficients
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

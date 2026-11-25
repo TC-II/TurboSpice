@@ -50,7 +50,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_cic
 SYMATTR ModelFile dsp_cic.sub
-SYMATTR Description Verilog module dsp_cic
+SYMATTR Description CIC decimator: N stages, ↓R, unity DC gain
 PIN 0 80 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

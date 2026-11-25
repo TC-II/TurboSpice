@@ -30,7 +30,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_integrator
 SYMATTR ModelFile dsp_integrator.sub
-SYMATTR Description Verilog module dsp_integrator
+SYMATTR Description Integrator (accumulator) y[n] = y[n−1] + x[n], with clear
 PIN -16 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

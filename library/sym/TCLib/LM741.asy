@@ -16,6 +16,7 @@ WINDOW 3 -113 7 Left 2
 SYMATTR Value LM741
 SYMATTR ModelFile TCLib/LM741.lib
 SYMATTR Prefix X
+SYMATTR Description LM741 general-purpose op amp
 PIN -192 80 NONE 0
 PINATTR PinName In+
 PINATTR SpiceOrder 1

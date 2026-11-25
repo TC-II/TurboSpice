@@ -40,7 +40,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_cordic
 SYMATTR ModelFile dsp_cordic.sub
-SYMATTR Description Verilog module dsp_cordic
+SYMATTR Description CORDIC, rotation mode: phase → cos and sin in Q1.15
 PIN -80 0 NONE 0
 PINATTR PinName phase[15:0]
 PINATTR SpiceOrder 1

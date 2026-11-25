@@ -21,7 +21,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_sync
 SYMATTR ModelFile dsp_sync.sub
-SYMATTR Description Verilog module dsp_sync
+SYMATTR Description Two flip-flop synchronizer for asynchronous inputs
 PIN 0 64 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

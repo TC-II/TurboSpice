@@ -34,7 +34,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_mux4
 SYMATTR ModelFile dsp_mux4.sub
-SYMATTR Description Verilog module dsp_mux4
+SYMATTR Description 4 to 1 multiplexer
 PIN -64 -48 NONE 0
 PINATTR PinName a[15:0]
 PINATTR SpiceOrder 1

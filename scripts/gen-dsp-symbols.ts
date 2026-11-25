@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { runYosys } from '@yowasp/yosys';
 import { synthesize } from '../src/hdl/yosys.ts';
 import { verilogSymbol } from '../src/hdl/project.ts';
+import { DSP_DESCRIPTIONS } from './dsp/descriptions.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'library', 'verilog', 'DSP');
@@ -355,13 +356,23 @@ function drawn(name: string, generated: string, inputs: Set<string>): string {
   return out.join('\n') + '\n';
 }
 
+/** La descripción del bloque (scripts/dsp/descriptions.ts) en lugar de «Verilog module …» */
+const describe = (name: string, sym: string) => {
+  const d = DSP_DESCRIPTIONS[name];
+  if (!d) throw new Error(`${name}: falta su descripción en scripts/dsp/descriptions.ts`);
+  return sym.replace(/^SYMATTR Description .*$/m, `SYMATTR Description ${d}`);
+};
+
 mkdirSync(OUT, { recursive: true });
 // (--analog: sólo el ADC y el DAC, sin sintetizar los módulos)
 for (const f of process.argv.includes('--analog') ? [] : readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
   const name = f.replace(/\.v$/, '');
   const r = await synthesize(runYosys, { [f]: readFileSync(join(SRC, f), 'utf8') }, f, name);
   if (!r.block) throw new Error(`${f}: ${r.error}`);
-  writeFileSync(join(OUT, `${name}.asy`), drawn(name, verilogSymbol(name, r.block), new Set(r.block.pins.filter((p) => p.dir === 'in').flatMap((p) => [p.name, p.name.replace(/_\d+$/, '')]))));
+  writeFileSync(
+    join(OUT, `${name}.asy`),
+    drawn(name, describe(name, verilogSymbol(name, r.block)), new Set(r.block.pins.filter((p) => p.dir === 'in').flatMap((p) => [p.name, p.name.replace(/_\d+$/, '')]))),
+  );
   console.log(`${name}: ${r.block.pins.length} pines`);
 }
 

@@ -16,6 +16,7 @@ WINDOW 3 -113 7 Left 2
 SYMATTR Value LMX24_LM2902
 SYMATTR ModelFile TCLib/LMX24_TI.lib
 SYMATTR Prefix X
+SYMATTR Description LM324/LM2902 quad op amp, TI model (one section)
 PIN -192 80 NONE 0
 PINATTR PinName In+
 PINATTR SpiceOrder 1

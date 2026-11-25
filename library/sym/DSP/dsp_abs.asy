@@ -16,7 +16,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_abs
 SYMATTR ModelFile dsp_abs.sub
-SYMATTR Description Verilog module dsp_abs
+SYMATTR Description Absolute value |x| (saturates −2^(W−1) to the maximum with SAT = 1)
 PIN -64 0 NONE 0
 PINATTR PinName x[15:0]
 PINATTR SpiceOrder 1

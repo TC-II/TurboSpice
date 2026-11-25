@@ -1,12 +1,10 @@
-// Diálogos del editor: buscador de componentes, atributos, textos y etiquetas.
+// Diálogos del editor: atributos, textos y etiquetas (el buscador de componentes está en ComponentPicker.tsx).
 import { formatParamList, parseParamList } from '../project/symbolEdit.ts';
-import { SlideConfirm } from '../ui/SlideConfirm.tsx';
-import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, memo, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
 import { useDialogFocus } from '../ui/useDialogFocus.ts';
 import { isTopModal, pushModal } from '../ui/modalStack.ts';
 import { Logo } from '../ui/Logo.tsx';
-import { Icon } from '../ui/icons.tsx';
 import { PartTable, type PartGroup } from './PartTable.tsx';
 import { cmpApply, getInstParam, isDefaultMosSize, MOS_GEOMETRY, setInstParam, type CmpPart } from '../library/cmp.ts';
 import { baseName, WINDOW_ATTR, type SymbolDef, type SymbolInst, type TextWindow } from '../asc/model.ts';
@@ -58,6 +56,7 @@ export function Modal({
   wide,
   large,
   hidden,
+  className,
 }: {
   title: string;
   children: ReactNode;
@@ -67,6 +66,8 @@ export function Modal({
   large?: boolean;
   /** oculto mientras se elige algo en el esquemático (conserva su estado) */
   hidden?: boolean;
+  /** clase de más en la caja (su ancho) */
+  className?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useDialogFocus(box, !hidden);
@@ -107,7 +108,7 @@ export function Modal({
   }, [onClose, hidden]);
   return (
     <div className={`modal-backdrop${hidden ? ' picking' : ''}`} style={top !== null ? { paddingTop: top } : undefined} onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+      <div ref={box} className={`modal${wide ? ' wide' : ''}${large ? ' large' : ''}${className ? ` ${className}` : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <h2>{title}</h2>
         {children}
       </div>
@@ -116,7 +117,7 @@ export function Modal({
 }
 
 /** Dibujo del símbolo (cuerpo, sin rótulos salvo `labels`), ajustado a su caja */
-const SymbolPreview = memo(function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Library; className: string; labels?: boolean }) {
+export const SymbolPreview = memo(function SymbolPreview({ path, lib, className, labels }: { path: string; lib: Library; className: string; labels?: boolean }) {
   const def = lib.symbol(path);
   if (!def) return <svg className={className} />;
   const b = localBox(def, lib.skin(path)?.viewBox);
@@ -133,220 +134,6 @@ const SymbolPreview = memo(function SymbolPreview({ path, lib, className, labels
     </svg>
   );
 });
-
-/** Carpetas que no aparecen en la búsqueda ni en el listado (sólo entrando a mano); van al fondo */
-const HIDDEN_DIRS = ['TCLib/Special/Characters', 'OpAmps'];
-/** OpAmps de SPICE sin modelo (#309): están por compatibilidad; para diseños nuevos, los de la TCLib */
-export const LEGACY_OPAMPS = 'OpAmps';
-const LEGACY_ALT = 'TCLib/OA_Ideal';
-export const isLegacyOpAmp = (path: string) => path.startsWith(`${LEGACY_OPAMPS}/`);
-const hiddenIn = (path: string, dir: string) => HIDDEN_DIRS.some((h) => (path === h || path.startsWith(`${h}/`)) && !(dir === h || dir.startsWith(`${h}/`)));
-
-/**
- * Qué tan bien coincide un componente con la búsqueda (menor = mejor; Infinity = no coincide).
- * Manda el nombre: igual, empieza con, contiene; después la carpeta y por último la descripción.
- * Con varias palabras, todas tienen que aparecer y se suman.
- */
-export function searchRank(path: string, desc: string, words: string[]): number {
-  const name = (path.split('/').pop() ?? path).toLowerCase();
-  const dir = path.toLowerCase().slice(0, -name.length);
-  const d = desc.toLowerCase();
-  let rank = 0;
-  for (const w of words) {
-    if (name === w) rank += 0;
-    else if (name.startsWith(w)) rank += 1;
-    else if (name.includes(w)) rank += 2;
-    else if (dir.includes(w)) rank += 3;
-    else if (d.includes(w)) rank += 4;
-    else return Infinity;
-  }
-  return rank;
-}
-
-export type PickerItem = { kind: 'up' } | { kind: 'dir'; path: string } | { kind: 'sym'; path: string; desc: string };
-
-/**
- * Lo que muestra el explorador de componentes (P) en la carpeta `dir` ('' = la raíz). Sin
- * búsqueda: las subcarpetas primero (se abren), después los componentes sueltos de la carpeta y,
- * más abajo, todo el contenido de sus subcarpetas. Con búsqueda: los componentes de toda la
- * librería que coinciden. Las carpetas ocultas (Characters) sólo se ven entrando a ellas.
- */
-export function pickerItems(paths: string[], dir: string, query: string, descOf: (path: string) => string): PickerItem[] {
-  const prefix = dir ? `${dir}/` : '';
-  const visible = paths.filter((p) => !hiddenIn(p, dir));
-  const sym = (p: string): PickerItem => ({ kind: 'sym', path: p, desc: descOf(p) });
-  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (words.length)
-    return visible
-      .map((p, i) => ({ p, i, rank: searchRank(p, descOf(p), words) }))
-      .filter((x) => Number.isFinite(x.rank))
-      .sort((a, b) => a.rank - b.rank || a.i - b.i)
-      .map((x) => sym(x.p));
-  const inside = paths.filter((p) => p.startsWith(prefix));
-  const dirs = [
-    ...new Set(
-      inside
-        .map((p) => p.slice(prefix.length))
-        .filter((r) => r.includes('/'))
-        .map((r) => prefix + r.split('/')[0]),
-    ),
-  ];
-  const loose = inside.filter((p) => !p.slice(prefix.length).includes('/'));
-  const nested = visible.filter((p) => p.startsWith(prefix) && p.slice(prefix.length).includes('/'));
-  // las carpetas ocultas van al fondo de la lista
-  const folder = (d: string): PickerItem => ({ kind: 'dir', path: d });
-  const hid = (d: string) => HIDDEN_DIRS.includes(d);
-  return [...(dir ? [{ kind: 'up' } as const] : []), ...dirs.filter((d) => !hid(d)).map(folder), ...loose.map(sym), ...nested.map(sym), ...dirs.filter(hid).map(folder)];
-}
-
-/** Una fila del explorador; memo: al mover el mouse sólo se redibujan las dos que cambian */
-const PickerRow = memo(function PickerRow({
-  it,
-  index,
-  active,
-  dir,
-  lib,
-  onEnter,
-  onChoose,
-}: {
-  it: PickerItem;
-  index: number;
-  active: boolean;
-  dir: string;
-  lib: Library;
-  onEnter(i: number): void;
-  onChoose(it: PickerItem): void;
-}) {
-  const name = (p: string) => p.split('/').pop() ?? p;
-  // carpeta relativa a la que se está viendo (para los que están más abajo)
-  const sub =
-    it.kind === 'sym'
-      ? it.path
-          .slice(dir ? dir.length + 1 : 0)
-          .split('/')
-          .slice(0, -1)
-          .join('/')
-      : '';
-  return (
-    <li className={`${active ? 'active' : ''}${it.kind !== 'sym' ? ' folder' : ''}`} onPointerEnter={() => onEnter(index)} onClick={() => onChoose(it)}>
-      {it.kind === 'sym' ? (
-        <>
-          <SymbolPreview path={it.path} lib={lib} className="thumb" />
-          <span className="path">{name(it.path)}</span>
-          <span className="desc">
-            {sub ? `${sub} · ` : ''}
-            {it.desc}
-          </span>
-        </>
-      ) : (
-        <>
-          <span className="thumb folder-icon">
-            <Icon name="open" size={22} />
-          </span>
-          <span className="path">{it.kind === 'up' ? '..' : name(it.path)}</span>
-          <span className="desc">{it.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
-        </>
-      )}
-    </li>
-  );
-});
-
-/** P: buscar y elegir un componente de la librería, o recorrerla por carpetas */
-export function ComponentPicker({ lib, onPick, onClose }: { lib: Library; onPick(path: string): void; onClose(): void }) {
-  const [q, setQ] = useState('');
-  const [dir, setDir] = useState('');
-  const [sel, setSel] = useState(0);
-  const input = useRef<HTMLInputElement>(null);
-  const list = useRef<HTMLUListElement>(null);
-  useEffect(() => input.current?.focus(), []);
-  // rutas y descripciones se leen una vez; al tipear sólo se filtra y ordena
-  const all = useMemo(() => {
-    const paths = lib.symbolPaths();
-    return { paths, desc: new Map(paths.map((p) => [p, lib.symbol(p)?.attrs.get('Description') ?? ''])) };
-  }, [lib]);
-  const items = useMemo(() => pickerItems(all.paths, dir, q, (p) => all.desc.get(p) ?? '').slice(0, 500), [q, dir, all]);
-  const current = items[Math.min(sel, items.length - 1)];
-  const go = (d: string) => {
-    setDir(d);
-    setSel(0);
-    list.current?.scrollTo(0, 0);
-    input.current?.focus();
-  };
-  const up = () => go(dir.split('/').slice(0, -1).join('/'));
-  // estable entre renders: las filas (memo) no se redibujan al mover el mouse
-  const chooseRef = useRef<(it: PickerItem) => void>(() => {});
-  // un OpAmp sin modelo se pide confirmar arrastrando (#309)
-  const [legacy, setLegacy] = useState<string | null>(null);
-  chooseRef.current = (it) => (it.kind === 'up' ? up() : it.kind === 'dir' ? go(it.path) : isLegacyOpAmp(it.path) ? setLegacy(it.path) : onPick(it.path));
-  const choose = useCallback((it: PickerItem) => chooseRef.current(it), []);
-  return (
-    // la lista tiene alto fijo: la caja de búsqueda no se mueve mientras se escribe
-    <>
-      <Modal title={t('Component')} onClose={onClose} wide hidden={!!legacy}>
-        {(dir === LEGACY_OPAMPS || dir.startsWith(`${LEGACY_OPAMPS}/`)) && (
-          <p className="hint warn picker-legacy">
-            {t('These are the SPICE default OpAmps, kept for compatibility: they have no model. For new designs use the TCLib OpAmps (OA_Ideal, OA_param, LM741, TL072…).')}{' '}
-            <button type="button" className="link" onClick={() => onPick(LEGACY_ALT)}>
-              {t('Use OA_Ideal')}
-            </button>
-          </p>
-        )}
-        <div className="picker">
-          <div className="picker-list">
-            <input
-              ref={input}
-              placeholder={t('Search (e.g. res, cap, OA_Ideal, npn)…')}
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setSel(0);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowDown') setSel((s) => Math.min(s + 1, items.length - 1));
-                if (e.key === 'ArrowUp') setSel((s) => Math.max(s - 1, 0));
-                if (e.key === 'Enter' && current) choose(current);
-                if (e.key === 'Backspace' && !q && dir) up();
-              }}
-            />
-            {dir && !q && <div className="picker-dir">{dir}</div>}
-            <ul ref={list}>
-              {items.map((it, i) => (
-                <PickerRow key={it.kind === 'up' ? '..' : `${it.kind}:${it.path}`} it={it} index={i} active={it === current} dir={dir} lib={lib} onEnter={setSel} onChoose={choose} />
-              ))}
-            </ul>
-          </div>
-          <div className="picker-preview">
-            {current?.kind !== 'sym' && <div className="big" />}
-            {current?.kind === 'sym' && (
-              <>
-                <SymbolPreview path={current.path} lib={lib} className="big" />
-                <strong>{current.path}</strong>
-                <p>{current.desc}</p>
-              </>
-            )}
-          </div>
-        </div>
-      </Modal>
-      {legacy && (
-        <SlideConfirm
-          title={t('{name} has no model', { name: legacy.split('/').pop() ?? legacy })}
-          message={t(
-            'This OpAmp is only for compatibility with old LTspice schematics: it has no model, so the simulation fails unless you import or write one. For new designs use the TCLib OpAmps.',
-          )}
-          action={t('Slide to use it anyway')}
-          releaseLabel={t('Release to use it')}
-          extra={
-            <button className="primary" onClick={() => onPick(LEGACY_ALT)}>
-              {t('Use OA_Ideal')}
-            </button>
-          }
-          onConfirm={() => onPick(legacy)}
-          onClose={() => setLegacy(null)}
-        />
-      )}
-    </>
-  );
-}
 
 /** Atributos de un componente (InstName, Value, SpiceLine…) */
 interface LabelRow {

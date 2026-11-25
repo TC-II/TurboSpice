@@ -39,7 +39,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_cmul
 SYMATTR ModelFile dsp_cmul.sub
-SYMATTR Description Verilog module dsp_cmul
+SYMATTR Description Complex multiplier (ar + j·ai)(br + j·bi), rounded and saturated
 PIN -80 -48 NONE 0
 PINATTR PinName ar[15:0]
 PINATTR SpiceOrder 1

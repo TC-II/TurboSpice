@@ -32,7 +32,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_lfsr
 SYMATTR ModelFile dsp_lfsr.sub
-SYMATTR Description Verilog module dsp_lfsr
+SYMATTR Description 16-bit LFSR: maximal-length pseudo-random sequence
 PIN 0 80 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

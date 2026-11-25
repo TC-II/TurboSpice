@@ -41,7 +41,7 @@ SYMATTR SpiceLine vcc=5 vil={vcc/2} vih={vcc/2} vol=0 voh={vcc} iol=20m ioh=20m 
 SYMATTR Prefix X
 SYMATTR Value dsp_fifo
 SYMATTR ModelFile dsp_fifo.sub
-SYMATTR Description Verilog module dsp_fifo
+SYMATTR Description 16-word FIFO with full and empty flags
 PIN -32 96 NONE 0
 PINATTR PinName clk
 PINATTR SpiceOrder 1

@@ -2353,8 +2353,8 @@ export const es: Record<string, string> = {
   'The **PDF** button of the toolbar (or **File › Export to PDF…**) shows the sheet full-screen to export it: vector PDF, SVG, PNG, the clipboard or **TikZ** for LaTeX. Nothing travels to a server.':
     'El botón **PDF** de la barra (o **Archivo › Exportar a PDF…**) muestra la hoja a pantalla completa para exportarla: PDF vectorial, SVG, PNG, el portapapeles o **TikZ** para LaTeX. Nada viaja a un servidor.',
   'Its look': 'Su aspecto',
-  'In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs), the font, the zoom and the area to crop. Tremor draws it as if by hand.':
-    'En esa vista elegís el **skin** de los símbolos (Default, Tremor, Boca Jrs), la letra, el zoom y el área a recortar. Tremor lo dibuja como a mano.',
+  'In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs, Outlined Transistors), the font, the zoom and the area to crop. Tremor draws it as if by hand.':
+    'En esa vista elegís el **skin** de los símbolos (Default, Tremor, Boca Jrs, Outlined Transistors), la letra, el zoom y el área a recortar. Tremor lo dibuja como a mano.',
   'Your preferences': 'Tus preferencias',
   '**☰ › Settings…** keeps the skin and the font of the schematic, the thickness of the traces and the rest of your preferences. Open it.':
     '**☰ › Configuración…** guarda el skin y la letra del esquemático, el grosor de las trazas y el resto de tus preferencias. Abrila.',

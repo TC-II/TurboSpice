@@ -32,7 +32,7 @@ describe('skins para elegir (#329)', () => {
   const lib = new Library(bundle);
 
   it('Boca Jrs viene de library/skins y conserva sus colores', () => {
-    expect(lib.skinNames()).toEqual(['Default', 'Boca Jrs']);
+    expect(lib.skinNames()).toEqual(['Default', 'Boca Jrs', 'Outlined Transistors']);
     const res = bundle.skinSets['Boca Jrs'].res.body;
     expect(res).toContain('#103f79');
     expect(res).toContain('#f3b229');
@@ -47,6 +47,20 @@ describe('skins para elegir (#329)', () => {
     expect(lib.skin('res')).toBe(bundle.skins.res);
     expect(boca.withSkin('Default').skin('res')).toBe(bundle.skins.res);
     expect(lib.withSkin('no existe').skinName).toBe('Default');
+  });
+
+  it('Outlined Transistors: sólo transistores, con el círculo de ASC-Parser; lo demás es el Default', () => {
+    const set = bundle.skinSets['Outlined Transistors'];
+    expect(Object.keys(set).sort()).toEqual(['NPN_ideal', 'PNP_ideal', 'agnostic_mos_ic', 'njf', 'nm_ic', 'nm_ic_4', 'nmos', 'nmos4', 'npn', 'pjf', 'pm_ic', 'pm_ic_4', 'pmos', 'pmos4', 'pnp']);
+    const circ = lib.withSkin('Outlined Transistors');
+    for (const t of Object.keys(set)) {
+      expect(circ.skin(t), t).toBe(set[t]);
+      expect(set[t].body, t).toMatch(/<circle\b[^>]*\br="43\.4"/);
+    }
+    // nm_nobulk (el nombre de ASC-Parser) es nm_ic
+    expect(circ.skin('nm_nobulk')).toBe(set.nm_ic);
+    expect(circ.skin('npn4')).toBe(bundle.skins.npn4);
+    expect(circ.skin('res')).toBe(bundle.skins.res);
   });
 
   it('comparte símbolos y la cuenta de cambios con la librería original', () => {

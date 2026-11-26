@@ -855,7 +855,7 @@ export function chapters(): Chapter[] {
         {
           id: 'skins',
           title: t('Its look'),
-          body: t('In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs), the font, the zoom and the area to crop. Tremor draws it as if by hand.'),
+          body: t('In that view you choose the **skin** of the symbols (Default, Tremor, Boca Jrs, Outlined Transistors), the font, the zoom and the area to crop. Tremor draws it as if by hand.'),
         },
         {
           id: 'settings',

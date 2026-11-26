@@ -313,18 +313,25 @@ export function SchematicEditor(props: Props) {
   useEffect(() => dropStale(), [doc, dropStale]);
 
   // hasta cuándo un cambio de tamaño del lienzo rehace el último ajuste: se ajusta justo al abrir o
-  // cerrar un panel (con un setTimeout) y, en una máquina lenta, el tamaño nuevo puede llegar después
-  const refitUntil = useRef(0);
+  // cerrar un panel (con un setTimeout) y, en una máquina lenta, el tamaño nuevo puede llegar después.
+  // Sólo si la vista sigue siendo la del ajuste: una vista restaurada (al subir de un subcircuito) o
+  // un zoom posterior quedan como están.
+  const lastFit = useRef<{ view: View; until: number } | null>(null);
   const fit = useCallback(() => {
     const b = docBox(doc, lib, showSimCommand);
     viewHistory.current.push(viewRef.current);
-    setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
-    refitUntil.current = performance.now() + 600;
+    const v = b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 };
+    setView(v);
+    lastFit.current = { view: v, until: performance.now() + 600 };
   }, [doc, lib, showSimCommand, viewOf, setView, viewHistory, viewRef]);
   const refitAfterResize = useEvent(() => {
-    if (performance.now() > refitUntil.current) return;
+    const f = lastFit.current;
+    if (!f || performance.now() > f.until || viewRef.current !== f.view) return;
     const b = docBox(doc, lib, showSimCommand);
-    if (b) setView(viewOf(b, 48));
+    if (!b) return;
+    const v = viewOf(b, 48);
+    f.view = v;
+    setView(v);
   });
   useEffect(() => refitAfterResize(), [size.w, size.h, refitAfterResize]);
   /** Ajusta sólo si algo del circuito queda afuera de la vista (no sólo cuando no se ve nada) */

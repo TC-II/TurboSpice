@@ -312,11 +312,21 @@ export function SchematicEditor(props: Props) {
   });
   useEffect(() => dropStale(), [doc, dropStale]);
 
+  // hasta cuándo un cambio de tamaño del lienzo rehace el último ajuste: se ajusta justo al abrir o
+  // cerrar un panel (con un setTimeout) y, en una máquina lenta, el tamaño nuevo puede llegar después
+  const refitUntil = useRef(0);
   const fit = useCallback(() => {
     const b = docBox(doc, lib, showSimCommand);
     viewHistory.current.push(viewRef.current);
     setView(b ? viewOf(b, 48) : { cx: 0, cy: 0, scale: 1 });
+    refitUntil.current = performance.now() + 600;
   }, [doc, lib, showSimCommand, viewOf, setView, viewHistory, viewRef]);
+  const refitAfterResize = useEvent(() => {
+    if (performance.now() > refitUntil.current) return;
+    const b = docBox(doc, lib, showSimCommand);
+    if (b) setView(viewOf(b, 48));
+  });
+  useEffect(() => refitAfterResize(), [size.w, size.h, refitAfterResize]);
   /** Ajusta sólo si algo del circuito queda afuera de la vista (no sólo cuando no se ve nada) */
   const fitIfLost = useCallback(() => {
     const b = docBox(doc, lib, showSimCommand);

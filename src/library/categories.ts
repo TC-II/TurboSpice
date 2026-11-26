@@ -3,7 +3,7 @@
 // Un símbolo puede estar en más de una; su categoría principal (el chip de los resultados de la
 // búsqueda) es la primera en la que aparece, sin contar Básicos. Un patrón con * (sky130/nfet_*)
 // toma todos los que coinciden, en orden alfabético. Las carpetas ocultas (OpAmps sin modelo,
-// Characters) no van en ninguna: se ven sólo en «Todos». Los símbolos del proyecto y los del
+// Characters) y los símbolos de HIDDEN_SYMBOLS no van en ninguna: se ven sólo en «Todos». Los símbolos del proyecto y los del
 // usuario van solos a «Mis componentes». tests/unit/categories.test.ts avisa si un símbolo de la
 // biblioteca queda sin categoría.
 import { t } from '../i18n/i18n.ts';
@@ -26,6 +26,9 @@ const SP = 'TCLib/Special/';
 const sub = (id: string, label: string, items: string[]): Subcategory => ({ id, label, items });
 const dsp = (names: string) => names.split(' ').map((n) => `DSP/dsp_${n}`);
 const pdk = (pdkName: string, subs: [string, string, string[]][]) => subs.map(([id, kind, items]) => sub(`${pdkName}-${id}`, `${pdkName} · ${kind}`, items.map((i) => `${pdkName}/${i}`)));
+
+/** Símbolos sueltos que no van en ninguna categoría ni salen al buscar: se ven sólo recorriendo «Todos» */
+export const HIDDEN_SYMBOLS = ['npn2', 'npn3', 'pnp2'];
 
 export const BASICS = 'basics';
 export const MINE = 'mine';
@@ -60,7 +63,7 @@ export const CATEGORIES: Category[] = [
     label: t('Semiconductors'),
     subs: [
       sub('diodes', t('Diodes'), ['diode', 'zener', 'schottky', 'LED', 'TVSdiode', 'varactor', `${SP}diode_45`]),
-      sub('bjt', t('BJT'), ['npn', 'npn2', 'npn3', 'npn4', 'pnp', 'pnp2', 'pnp4', 'lpnp', `${TC}NPN_ideal`, `${TC}PNP_ideal`]),
+      sub('bjt', t('BJT'), ['npn', 'npn4', 'pnp', 'pnp4', 'lpnp', `${TC}NPN_ideal`, `${TC}PNP_ideal`]),
       sub('mosfet', t('MOSFET'), ['nmos', 'pmos', 'nmos4', 'pmos4', 'nm_ic', 'nm_ic_4', 'pm_ic', 'pm_ic_4', 'agnostic_mos_ic']),
       sub('jfet', t('JFET and MESFET'), ['njf', 'pjf', 'mesfet']),
       sub('power', t('Power'), [`${TC}PowerElectronics/BUZ80A`, `${TC}Darlington_Triac/TIP110`, `${TC}Darlington_Triac/TIP115`, `${TC}Darlington_Triac/Dnpn`, `${TC}Darlington_Triac/Dpnp`, 'Misc/NIGBT', 'Misc/PIGBT']),

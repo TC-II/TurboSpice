@@ -1,6 +1,6 @@
 // Lo que muestra el buscador de componentes (P), sin React: la búsqueda en toda la biblioteca, el
 // recorrido por carpetas de «Todos» y el orden de los resultados.
-import { PDK, type Classification } from '../library/categories.ts';
+import { HIDDEN_SYMBOLS, PDK, type Classification } from '../library/categories.ts';
 
 /** Carpetas que no aparecen en la búsqueda ni en las categorías (sólo entrando a mano); van al fondo */
 const HIDDEN_DIRS = ['TCLib/Special/Characters', 'OpAmps'];
@@ -52,7 +52,7 @@ export interface SearchResult {
 }
 
 /**
- * Busca en toda la biblioteca (salvo las carpetas ocultas, a menos que se esté mirando una en
+ * Busca en toda la biblioteca (salvo HIDDEN_SYMBOLS y las carpetas ocultas, a menos que se esté mirando una en
  * «Todos», `dir`). Con `narrow`, sólo los de esa categoría; los del PDK van al final salvo que se
  * haya acotado al PDK. Los empates, en el orden curado de las categorías (Básicos primero).
  */
@@ -62,7 +62,7 @@ export function searchLibrary(paths: string[], query: string, descOf: (path: str
   if (!words.length) return { paths: [], counts };
   const found: { p: string; i: number; rank: number; order: number }[] = [];
   paths.forEach((p, i) => {
-    if (hiddenIn(p, dir)) return;
+    if (hiddenIn(p, dir) || HIDDEN_SYMBOLS.includes(p)) return;
     const where = cls.placements(p);
     const rank = searchRank(p, descOf(p), words, where.map((w) => `${w.cat.label} ${w.sub.label}`).join(' '));
     if (!Number.isFinite(rank)) return;

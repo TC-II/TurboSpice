@@ -23,19 +23,19 @@ describe('«Todos»: por carpetas', () => {
 const CATS: Category[] = [
   { id: 'basics', label: 'Basics', subs: [{ id: 'b', label: 'Passives', items: ['res', 'zener'] }] },
   { id: 'passives', label: 'Passives', subs: [{ id: 'r', label: 'Resistors', items: ['res', 'res2', 'EuropeanResistor'] }] },
-  { id: 'semis', label: 'Semiconductors', subs: [{ id: 'd', label: 'Diodes', items: ['zener', 'pnp', 'pnp2', 'lpnp'] }] },
+  { id: 'semis', label: 'Semiconductors', subs: [{ id: 'd', label: 'Diodes', items: ['zener', 'pnp', 'pnp4', 'lpnp'] }] },
   { id: 'regs', label: 'Analog', subs: [{ id: 'g', label: 'Regulators', items: ['TCLib/Regulators/7805'] }] },
   { id: 'pdk', label: 'PDK', subs: [{ id: 's', label: 'sky130 · Resistors', items: ['sky130/res_*'] }] },
 ];
 
 describe('búsqueda', () => {
-  const lib = ['EuropeanResistor', 'Misc/DIAC', 'OpAmps/opamp', 'TCLib/Regulators/7805', 'TCLib/Special/Characters/Goku', 'lpnp', 'pnp', 'pnp2', 'res', 'res2', 'sky130/res_high_po', 'zener'];
+  const lib = ['EuropeanResistor', 'Misc/DIAC', 'OpAmps/opamp', 'TCLib/Regulators/7805', 'TCLib/Special/Characters/Goku', 'lpnp', 'pnp', 'pnp4', 'res', 'res2', 'sky130/res_high_po', 'zener'];
   const cls = classify(lib, CATS);
   const desc = (p: string) => (p === 'res' ? 'Resistor' : p === 'TCLib/Special/Characters/Goku' ? 'Goku' : p === 'zener' ? 'Zener diode' : '');
   const find = (q: string, narrow: string | null = null, dir = '') => searchLibrary(lib, q, desc, cls, narrow, dir).paths;
 
   it('ordena por nombre: igual, empieza con, contiene; después carpeta, categoría y descripción', () => {
-    expect(find('pnp')).toEqual(['pnp', 'pnp2', 'lpnp']);
+    expect(find('pnp')).toEqual(['pnp', 'pnp4', 'lpnp']);
     expect(searchRank('Misc/DIAC', '', ['misc'])).toBe(3);
     expect(searchRank('7805', '', ['regul'], 'Analog Regulators')).toBe(4);
     expect(searchRank('zener', 'Zener diode', ['diode'])).toBe(5);
@@ -44,7 +44,7 @@ describe('búsqueda', () => {
 
   it('encuentra por el nombre de la categoría (en el idioma de la interfaz)', () => {
     expect(find('regulators')).toEqual(['TCLib/Regulators/7805']);
-    expect(find('diodes')).toEqual(['zener', 'pnp', 'pnp2', 'lpnp']);
+    expect(find('diodes')).toEqual(['zener', 'pnp', 'pnp4', 'lpnp']);
   });
 
   it('los empates van en el orden curado (Básicos primero) y el PDK al final', () => {
@@ -66,6 +66,12 @@ describe('búsqueda', () => {
     expect(find('goku')).toEqual([]);
     expect(find('opamp')).toEqual([]);
     expect(find('goku', null, 'TCLib/Special/Characters')).toEqual(['TCLib/Special/Characters/Goku']);
+  });
+
+  it('npn2, npn3 y pnp2 no salen al buscar (sí en «Todos»)', () => {
+    const all = [...lib, 'npn', 'npn2', 'npn3'];
+    expect(searchLibrary(all, 'np', desc, classify(all, CATS)).paths).toEqual(['npn', 'pnp', 'pnp4', 'lpnp']);
+    expect(show(folderItems(['npn', 'npn2'], ''))).toEqual(['npn', 'npn2']);
   });
 });
 

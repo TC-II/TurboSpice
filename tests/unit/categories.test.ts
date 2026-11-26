@@ -2,12 +2,12 @@
 // carpetas ocultas) y lo que nombra la clasificación existe.
 import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
-import { BASICS, CATEGORIES, MINE, classify } from '../../src/library/categories.ts';
+import { BASICS, CATEGORIES, HIDDEN_SYMBOLS, MINE, classify } from '../../src/library/categories.ts';
 import { Library, PROJECT_DIR, USER_DIR } from '../../src/library/library.ts';
 
 const paths = new Library(buildBundle()).symbolPaths();
 const cls = classify(paths);
-const HIDDEN = /^(OpAmps|TCLib\/Special\/Characters)\//;
+const HIDDEN = { test: (p: string) => /^(OpAmps|TCLib\/Special\/Characters)\//.test(p) || HIDDEN_SYMBOLS.includes(p) };
 
 describe('categorías del buscador', () => {
   it('todo símbolo de la biblioteca está en alguna categoría (salvo las carpetas ocultas)', () => {

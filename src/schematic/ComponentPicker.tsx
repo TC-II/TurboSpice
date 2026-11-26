@@ -88,7 +88,7 @@ const PickerRow = memo(function PickerRow({
             <Icon name="open" size={22} />
           </span>
           <span className="path">{row.kind === 'up' ? '..' : baseOf(row.path)}</span>
-          <span className="desc">{row.kind === 'up' ? t('Up one folder') : t('Folder')}</span>
+          <span className="desc">{row.kind === 'up' ? t('Up one folder') : ''}</span>
         </>
       )}
     </li>

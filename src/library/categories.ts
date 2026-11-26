@@ -36,10 +36,10 @@ export const CATEGORIES: Category[] = [
     id: BASICS,
     label: t('Basics'),
     subs: [
-      sub('passives', t('Passives'), ['res', 'cap', 'polcap', 'ind', `${TC}pot`]),
-      sub('semis', t('Semiconductors'), ['diode', 'zener', 'LED', 'npn', 'pnp', 'nmos', 'pmos']),
-      sub('sources', t('Sources'), ['voltage', 'current', 'signal', `${TC}square`, `${TC}triangular`, `${TC}Vcc`, `${TC}supply`]),
-      sub('amps', t('Amplifiers and switches'), [`${TC}OA_Ideal`, `${TC}switch`]),
+      sub('passives', t('Passives'), ['res', 'cap', 'ind', `${TC}pot`]),
+      sub('semis', t('Semiconductors'), ['diode', 'zener', 'npn', 'pnp', 'nmos', 'pmos', 'nm_ic', 'pm_ic', 'njf', 'pjf']),
+      sub('sources', t('Sources'), ['voltage', 'current', 'signal', `${TC}square`, `${TC}triangular`, `${TC}Vcc`, `${TC}supply`, 'cell']),
+      sub('amps', t('Amplifiers and switches'), [`${TC}OA_Ideal`, `${TC}switch`, `${SP}bypass`]),
     ],
   },
   {

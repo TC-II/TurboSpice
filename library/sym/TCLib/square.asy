@@ -19,7 +19,7 @@ SYMATTR SpiceModel Square
 SYMATTR Value Vpp=1 Freq=1k Voff=0 DC=0.5
 SYMATTR Prefix X
 SYMATTR Description Easy to use square wave source, created by Agustin Gullino and Javier Petrucci (ITBA)
-SYMATTR Value2 trise=1n tfall=1n Nper=1k
+SYMATTR Value2 trise=1n tfall=1n Nper=0
 SYMATTR ModelFile TCLib/square.lib
 PIN 0 -48 NONE 8
 PINATTR PinName V+

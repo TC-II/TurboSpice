@@ -16,7 +16,7 @@ CIRCLE Normal 44 -12 20 -36
 CIRCLE Normal 44 36 20 12
 CIRCLE Normal 35 -45 29 -51
 CIRCLE Normal 29 45 35 51
-TEXT -52 17 Left 1 Vi
+TEXT -52 18 Left 1 Vi
 TEXT -20 63 Bottom 1 Vf
 TEXT 98 20 Right 2 Vo
 TEXT -5 51 Left 2 -

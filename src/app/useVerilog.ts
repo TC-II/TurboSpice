@@ -5,7 +5,7 @@ import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/c
 import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
 import { stateNames } from '../hdl/states.ts';
 import type { EngineClient } from '../engine/client.ts';
-import { applySynth, isStale, isTestbench, moduleOf, verilogData, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
+import { applySynth, isStale, moduleOf, verilogData, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
 import { cosimLines, hdlOfLine, mergeableFor, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import { engineErrorText } from '../hdl/engineError.ts';
@@ -75,7 +75,7 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
   };
   /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */
   const synthStale = async () => {
-    for (const f of verilogModules(projectRef.current).filter((x) => isStale(x) && !isTestbench(x))) {
+    for (const f of verilogModules(projectRef.current).filter(isStale)) {
       setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: f.name }) });
       const r = await synthModule(moduleOf(f));
       if (r.error) throw new Error(`${f.name}: ${r.error}`);

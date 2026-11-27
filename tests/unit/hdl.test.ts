@@ -74,6 +74,8 @@ describe('módulos Verilog del proyecto (#209)', () => {
     expect(asy).not.toMatch(/^WINDOW 39 /m);
     // cambiar a comportamiento la deja desactualizada (hay que compilar con Icarus)
     expect(isStale(verilogFile(setHdlMode(p, 'm', 'behavioral'), 'm')!)).toBe(true);
+    // un testbench no se sintetiza: nunca queda desactualizado
+    expect(isStale(verilogFile(addVerilogModule(p, 'm_tb', 'module m_tb; endmodule'), 'm_tb')!)).toBe(false);
   });
   it('los fuentes de una compilación: los módulos y los .vh, sin los testbenches; los .hex van al motor', () => {
     let p = addVerilogModule(newProject('P'), 'm', 'module m(); endmodule');

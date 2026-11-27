@@ -22,7 +22,8 @@
 - [ISSUE] CD4046B: ModelFile en la línea X (TS emite TCLib\CD4046B.lib CD4046B CD4046B)
 - [ISSUE?] nodos P001 (pines que se tocan sin cable)
 - [FIX 8002f20] SpiceModel como archivo .lib sin ModelFile (CD4046B)
-- [ISSUE] CD4046B.lib: params no declarados en subckt anidados + scoping dinámico de .param (td1, cval) → ngspice falla. Probado: agregar params de instancias anidadas al header + ponerlos ANTES de los defaults (vdd1={vdd}) resuelve 'vdd', quedan td1/cval/trise1 (scope dinámico)
+- [ISSUE, ya no falla: el CD4046B simula] CD4046B.lib: params no declarados en subckt anidados + scoping dinámico de .param (td1, cval) → ngspice falla. Probado: agregar params de instancias anidadas al header + ponerlos ANTES de los defaults (vdd1={vdd}) resuelve 'vdd', quedan td1/cval/trise1 (scope dinámico)
+- [FIX] CD4046B: el VCO (SRFLOP + SCHMITT) no tiene punto de operación en ngspice (alternancias analógico/digital); reintento con ts_ophold=1 (digital.ts, simulate.ts). Con PC2 sin carga el transitorio se traba en x_u1.n023 (salida tri-state sin capacitancia)
 - [TCLIB] VCO.lib usa Vi_min sin declararlo (LTspice también falla si el usuario pisa Value)
 - [ISSUE baja] redes sin cables: LTspice P### con contador compartido con N### y orden de encuentro; TS N### al final (repro-P001.asc). Sólo nombres.
 - [FIX 6becfc3] continuación + en directivas (.meas)

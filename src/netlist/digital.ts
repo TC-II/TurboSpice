@@ -28,6 +28,12 @@ import { t } from '../i18n/i18n.ts';
 // En ngspice: las entradas normalizadas pasan por un adc_bridge a un d_dff de XSPICE (el SR es un
 // d_dff sin reloj que sólo usa set y reset) y un dac_bridge vuelve a 0…1; de ahí en adelante
 // (Td, rampas, Tau, salidas) es igual que en las compuertas.
+// Un oscilador hecho con un flip-flop o un Schmitt (el VCO del CD4046B de TCLib) no tiene punto de
+// operación: ngspice alterna sin fin entre la parte analógica y la digital ("Too many
+// analog/event-driven solution alternations"). LTspice lo resuelve igual. Por eso las entradas del
+// d_dff se multiplican por OP_HOLD_GATE: con OP_HOLD_PARAM=0 (lo normal) no cambia nada; si el
+// punto de operación falla así, la simulación se repite con 1 (ver withOpHold) y en t=0 el
+// flip-flop no recibe set, reset ni reloj (Q arranca en Vlow), desde el primer paso sí.
 //
 // COUNTER (in1=CLK, _Q=Phi2, Q=Phi1, com; medido con LTspice -b, 24.1.10): con n = flancos de
 // subida de CLK contados desde t=0, Phi1 está en alto si (n mod cycles) < round(duty·cycles);
@@ -43,6 +49,21 @@ import { t } from '../i18n/i18n.ts';
 // MODULATOR (in1=FM, in2=AM, _Q=COS, Q=SIN, com): V(AM)·sin(2π∫f dt) (y cos en _Q), con f = space + V(FM)·(mark−space);
 // mark es obligatorio (space = mark si falta). En ngspice: el integrador int de XSPICE.
 // VARISTOR (in1, in2, Q=out, com): recorta |V(out)| a |V(in1,in2)| a través de rclamp (1 Ω).
+
+/** Parámetro que bloquea las entradas de los flip-flops en el punto de operación (0 o 1) */
+export const OP_HOLD_PARAM = 'ts_ophold';
+const OP_HOLD_GATE = `(time>0 ? 1 : 1-${OP_HOLD_PARAM})`;
+const OP_HOLD_RE = /^(\.param ts_ophold)=0$/im;
+
+/** La línea .param que necesita una netlist que usa OP_HOLD_PARAM (si no lo usa, nada) */
+export function opHoldParam(texts: string[]): string | null {
+  return texts.some((x) => x.includes(OP_HOLD_PARAM)) ? `.param ${OP_HOLD_PARAM}=0` : null;
+}
+
+/** La netlist con los flip-flops bloqueados en el punto de operación, o null si no tiene ninguno */
+export function withOpHold(netlist: string): string | null {
+  return OP_HOLD_RE.test(netlist) ? netlist.replace(OP_HOLD_RE, '$1=1') : null;
+}
 
 const GATES = new Set(['and', 'or', 'xor', 'buf']);
 const FLOPS = new Set(['dflop', 'srflop', 'schmitt', 'counter']);
@@ -228,7 +249,7 @@ export function translateDigital(name: string, nodes: string[], value: string, w
           : []),
       ];
     }
-    sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=${e}`));
+    sig.forEach(([k, e]) => lines.push(`B_${n}${k} ${n}${k} 0 V=(${e})*${OP_HOLD_GATE}`));
     anchor(dff ? [i1, i3, set, rst] : model === 'schmitt' ? [i1, i2] : [set, rst]);
     const dig = (k: string) => `${n}${k}_d`;
     lines.push(
@@ -259,6 +280,8 @@ export function translateDigital(name: string, nodes: string[], value: string, w
       `T_${n}d ${y} 0 ${n}d 0 Z0=1 TD=${num('td', '0')}`,
       `R_${n}d ${n}d 0 1`,
       `C_${n}h ${n}h 0 {(${p.get('td')})/100}`,
+      // (mientras retiene, el nodo sólo tiene el capacitor: en continua quedaría flotando)
+      `R_${n}hr ${n}h 0 1e12`,
       `B_${n}h 0 ${n}h I=(abs(V(${y})-V(${n}d))<0.5) ? (V(${y})-V(${n}h)) : 0`,
     );
     y = `${n}h`;

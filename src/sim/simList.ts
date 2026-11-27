@@ -346,6 +346,9 @@ export function pzProblem(line: string): string | undefined {
 /** El aviso de matriz singular de ngspice ("singular matrix: check nodes a and b", "matrix is nearly singular") */
 export const isSingularLine = (l: string) => /\bsingular\b.{0,20}\bmatrix\b|\bmatrix\b.{0,20}\bsingular\b/i.test(l);
 
+/** ngspice no encontró el punto de operación porque la parte analógica y la digital (XSPICE) no se ponen de acuerdo */
+export const isEventAlternationLine = (l: string) => /too many analog\/event-driven solution alternations/i.test(l);
+
 /**
  * Qué le falta a un análisis para poder correr (la fuente, un nodo, un valor), dicho para el
  * usuario; sin esto ngspice sólo diría "Error on line N"

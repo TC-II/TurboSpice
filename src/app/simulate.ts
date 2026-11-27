@@ -8,13 +8,14 @@ import { streamPlan } from '../engine/ngspice.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Library } from '../library/library.ts';
 import { prefetchLtspice, type LtspiceIndex } from '../library/ltspiceLib.ts';
+import { withOpHold } from '../netlist/digital.ts';
 import { splitStepRuns } from '../netlist/step.ts';
 import { lineOf } from '../project/project.ts';
 import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog } from '../sim/measResults.ts';
 import { buildSimulation, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
-import { analysisProblem, isSingularLine, missingSources, pzLogErrors } from '../sim/simList.ts';
+import { analysisProblem, isEventAlternationLine, isSingularLine, missingSources, pzLogErrors } from '../sim/simList.ts';
 import { pzBodePlots } from '../waveform/pz.ts';
 import { stepLabels, stepSweepPlots } from '../waveform/series.ts';
 
@@ -116,6 +117,17 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
         ({ result, ms } = again);
         built.warnings.push(t('Simulated without the subcircuit pin currents (Ix): with them the matrix was singular'));
       }
+    }
+  }
+  // un oscilador con flip-flops o Schmitt de LTspice (el VCO del CD4046B) no tiene punto de
+  // operación: otra vez con los flip-flops quietos en t=0, como hace LTspice (ver digital.ts)
+  const held = !blocking.length && !result.aborted && result.errors.length && result.log.some(isEventAlternationLine) ? withOpHold(built.netlist) : null;
+  if (held) {
+    const again = await run({ ...built, netlist: held });
+    if (!again.result.log.some(isEventAlternationLine)) {
+      built = { ...built, netlist: held };
+      ({ result, ms } = again);
+      built.warnings.push(t('Simulated with the LTspice flip-flops held at t=0: without that the operating point did not converge (an oscillator)'));
     }
   }
   // cortado porque no iba a entrar: cuánto iba a guardar y qué hacer; los plots traen lo simulado

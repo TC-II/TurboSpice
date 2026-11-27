@@ -9,7 +9,7 @@ import { replaceIdealDiodes } from '../../src/netlist/idealdiode.ts';
 import { ltNetlist, ltNetlistText } from '../../src/netlist/ltnetlist.ts';
 import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
-import { translateDigital } from '../../src/netlist/digital.ts';
+import { opHoldParam, translateDigital, withOpHold } from '../../src/netlist/digital.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
 import { ngNodeName, patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
@@ -224,6 +224,11 @@ SYMATTR Value V=delay(V(in),V(td))
     expect(t).not.toMatch(/^\+/m);
     expect(t).toMatch(/d_dff/);
     expect(t).toMatch(/\.ends cp$/);
+    // el flip-flop del archivo usa ts_ophold: la netlist principal lo define (en 0)
+    const net = toNgspice(netFromAsc('Version 4\nSHEET 1 880 680\n'), 't', resolver);
+    const prep = prepareSimulation({ ...net, text: '* t\nX1 a b o cp\n.include cp.lib\n.end', includes: ['cp.lib'] }, () => lib);
+    expect(prep.netlist).toMatch(/^\.param ts_ophold=0$/m);
+    expect(prepareSimulation({ ...net, text: '* t\nR1 a 0 1\n.end', includes: [] }, () => '').netlist).not.toContain('ts_ophold');
   });
 
   it('fuente B: rand/random/white → hash pseudoaleatorio de floor(x)', () => {
@@ -1038,11 +1043,13 @@ ${spiceLine ? `SYMATTR SpiceLine ${spiceLine}` : ''}
 });
 
 describe('flip-flops y Schmitt de LTspice (A: DFLOP, SRFLOP, SCHMITT; #133)', () => {
+  // las entradas del d_dff se pueden bloquear en el punto de operación (osciladores: VCO del CD4046B)
+  const HOLD = '*(time>0 ? 1 : 1-ts_ophold)';
   it('DFLOP: D=in1, CLK=in3, PRE=in4, CLR=in5 por un d_dff; CLR tiene prioridad sobre PRE', () => {
     const w: string[] = [];
     const l = translateDigital('A1', ['d', '0', 'clk', 'pre', 'clr', 'qb', 'q', '0'], 'DFLOP Td=10n', w)!;
-    expect(l).toContain('B_A1__fd A1__fd 0 V=min(max((V(d,0)-({1}+{0})/2)*1e4+0.5,0),1)');
-    expect(l).toContain('B_A1__fc A1__fc 0 V=min(max((V(clk,0)-({1}+{0})/2)*1e4+0.5,0),1)');
+    expect(l).toContain(`B_A1__fd A1__fd 0 V=(min(max((V(d,0)-({1}+{0})/2)*1e4+0.5,0),1))${HOLD}`);
+    expect(l).toContain(`B_A1__fc A1__fc 0 V=(min(max((V(clk,0)-({1}+{0})/2)*1e4+0.5,0),1))${HOLD}`);
     expect(l.find((x) => x.startsWith('B_A1__fs'))).toMatch(/V\(pre,0\).*\*\(1-min\(max\(\(V\(clr,0\)/);
     expect(l).toContain('A_A1__ff A1__fd_d A1__fc_d A1__fs_d A1__fr_d A1__fq_d NULL A1__ffm');
     expect(l).toContain('A_A1__dac [A1__fq_d] [A1__x] A1__dacm');
@@ -1084,22 +1091,34 @@ SYMATTR InstName J1
     expect(l.find((x) => x.startsWith('B_A2__fs'))).toMatch(/V\(s,0\).*\*\(1-min\(max\(\(V\(r,0\)/);
     expect(l.some((x) => x.startsWith('B_A2__qb'))).toBe(false);
     const d = translateDigital('A3', ['d', '0', 'clk', '0', '0', '0', 'q', '0'], 'DFLOP', [])!;
-    expect(d).toContain('B_A3__fs A3__fs 0 V=0*(1-0)');
-    expect(d).toContain('B_A3__fr A3__fr 0 V=0');
+    expect(d).toContain(`B_A3__fs A3__fs 0 V=(0*(1-0))${HOLD}`);
+    expect(d).toContain(`B_A3__fr A3__fr 0 V=(0)${HOLD}`);
   });
 
   it('SCHMITT: SR con set = in > Vt+Vh y reset = in < Vt−Vh; Vt = Ref y Vh = 5 % de |Vt| por omisión', () => {
     const w: string[] = [];
     const l = translateDigital('A4', ['in', '0', '0', '0', '0', 'qb', 'q', '0'], 'SCHMITT Vt=0.6 Vh=0.1', w)!;
     expect(w).toEqual([]);
-    expect(l).toContain('B_A4__fs A4__fs 0 V=min(max((V(in)-{0.6}-{0.1})*1e4+0.5,0),1)');
-    expect(l).toContain('B_A4__fr A4__fr 0 V=min(max(({0.6}-{0.1}-V(in))*1e4+0.5,0),1)');
+    expect(l).toContain(`B_A4__fs A4__fs 0 V=(min(max((V(in)-{0.6}-{0.1})*1e4+0.5,0),1))${HOLD}`);
+    expect(l).toContain(`B_A4__fr A4__fr 0 V=(min(max(({0.6}-{0.1}-V(in))*1e4+0.5,0),1))${HOLD}`);
     expect(l).toContain('A_A4__ff A4__fr_d A4__fz_d A4__fs_d A4__fr_d A4__fq_d NULL A4__ffm');
     expect(l.some((x) => x.startsWith('B_A4__qb qb 0'))).toBe(true);
     const d = translateDigital('A5', ['in', '0', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
     expect(d.find((x) => x.startsWith('B_A5__fs'))).toContain('V(in)-({1}+{0})/2-0.05*abs(({1}+{0})/2)');
     const f = translateDigital('A6', ['p', 'm', '0', '0', '0', '0', 'q', '0'], 'SCHMITT', [])!;
     expect(f.find((x) => x.startsWith('B_A6__fs'))).toContain('(V(p,m)-');
+  });
+
+  it('oscilador (VCO del CD4046B): ts_ophold=0 en la netlist; withOpHold la pasa a 1 para el reintento', () => {
+    const l = translateDigital('A1', ['s', 'r', '0', '0', '0', '0', 'q', '0'], 'SRFLOP Td=10n', [])!;
+    // el nodo que retiene tiene camino de continua (si no, la matriz queda singular en el punto de operación)
+    expect(l).toContain('R_A1__hr A1__h 0 1e12');
+    expect(opHoldParam(['* nada'])).toBeNull();
+    expect(opHoldParam(['* x', l.join('\n')])).toBe('.param ts_ophold=0');
+    expect(withOpHold('* t\nV1 a 0 1\n.end')).toBeNull();
+    expect(withOpHold('* t\n.param ts_ophold=0\n.end')).toBe('* t\n.param ts_ophold=1\n.end');
+    // las compuertas no se bloquean: sólo lo que tiene estado
+    expect(translateDigital('A2', ['a', 'b', '0', '0', '0', '0', 'q', '0'], 'AND', [])!.join('\n')).not.toContain('ts_ophold');
   });
 });
 

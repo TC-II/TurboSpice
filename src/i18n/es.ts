@@ -1245,6 +1245,8 @@ export const es: Record<string, string> = {
   'Use it in a value as {nombre}': 'Usalo en un valor como {nombre}',
   'Using the remembered view instead of the .control "plot" commands': 'Se usa la vista recordada en lugar de los "plot" del .control',
   'Simulated without the subcircuit pin currents (Ix): with them the matrix was singular': 'Se simuló sin las corrientes de los pines de los subcircuitos (Ix): con ellas la matriz era singular',
+  'Simulated with the LTspice flip-flops held at t=0: without that the operating point did not converge (an oscillator)':
+    'Se simuló con los flip-flops de LTspice quietos en t=0: sin eso el punto de operación no convergía (un oscilador)',
   'V1 (initial)': 'V1 (inicial)',
   'V2 (pulse)': 'V2 (pulso)',
   'value': 'valor',

@@ -7,7 +7,7 @@
 //  - ".tran tstop" → ".tran paso tstop" (ngspice exige el paso);
 //  - ".step" → bucles en un bloque .control (step.ts).
 import { busBitNode } from './bus.ts';
-import { translateDigital } from './digital.ts';
+import { opHoldParam, translateDigital } from './digital.ts';
 import { fixFloatingNodes } from './floating.ts';
 import { controlHooks, directiveLines, isControlBlock, isNgspiceComment } from './directives.ts';
 import { stbControl } from './stb.ts';
@@ -1263,6 +1263,9 @@ export function prepareSimulation(net: NgspiceNetlist, readFile: (rel: string) =
     const tstop = /^\.tran\s+\S+\s+(\S+)/im.exec(text)?.[1];
     text = text.replace(/^(\s*\.end\s*)$/im, `.param dly_tstop=${tstop ?? '1'}\n$1`);
   }
+  // flip-flops de LTspice: el parámetro que los bloquea en el punto de operación (ver digital.ts)
+  const hold = opHoldParam([text, ...Object.values(files)]);
+  if (hold) text = text.replace(/^(\s*\.end\s*)$/im, `${hold}\n$1`);
   // nodos sin camino de continua a tierra: como LTspice (ver floating.ts)
   return { netlist: fixFloatingNodes(text, files).text, files, warnings };
 }

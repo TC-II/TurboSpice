@@ -286,7 +286,7 @@ export function VerilogModule({
           )}
         </aside>
       </div>
-      {tb?.vcd && <TbWaves vcd={tb.vcd} />}
+      {tb?.vcd && <TbWaves vcd={tb.vcd} states={tb.states} />}
     </div>
   );
 }

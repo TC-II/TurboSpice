@@ -36,7 +36,7 @@ export function vcdValue(v: string, bits: number): number {
   return s.length > 52 ? Number(BigInt(`0b${s}`)) : parseInt(s, 2);
 }
 
-/** Lee un VCD; las variables real (y los event) no se leen */
+/** Lee un VCD; las variables real, los event y los parameter (constantes, como los localparam) no se leen */
 export function parseVcd(text: string): Vcd {
   const tokens = text.split(/\s+/);
   const scope: string[] = [];
@@ -76,7 +76,7 @@ export function parseVcd(text: string): Vcd {
       case '$var': {
         const [type, size, id, name] = tokens.slice(k + 1, k + 5);
         skipToEnd();
-        if (type === 'real' || type === 'event') break;
+        if (type === 'real' || type === 'event' || type === 'parameter') break;
         const sig: VcdSignal = { scope: [...scope], name, bits: Number(size), x: new Float64Array(), y: new Float64Array() };
         signals.push(sig);
         const d = vars.get(id) ?? vars.set(id, { bits: sig.bits, x: [], y: [], signals: [] }).get(id)!;

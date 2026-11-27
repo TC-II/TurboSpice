@@ -50,6 +50,8 @@ export interface TbOutcome {
   verdict?: TbVerdict;
   /** el .vcd que escribió ($dumpvars) */
   vcd?: string;
+  /** nombres de estado de las señales (states.ts) */
+  states?: Map<string, Map<number, string>>;
 }
 
 /** Un testbench nuevo (+ Nuevo › Verilog con un nombre *_tb) */

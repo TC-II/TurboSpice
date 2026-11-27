@@ -228,7 +228,7 @@ export function DigitalLanes({
                       const xa = px(a);
                       const xb = px(b);
                       const s = Math.min(3, (xb - xa) / 2);
-                      const label = formatRadix(v, bits, c.trace >= 0 ? (radix(c.trace) ?? 'hex') : 'hex');
+                      const label = c.states?.get(v) ?? formatRadix(v, bits, c.trace >= 0 ? (radix(c.trace) ?? 'hex') : 'hex');
                       const st = logicState(v);
                       return (
                         <g key={k} className={st === 'v' ? undefined : `dl-${st}`}>

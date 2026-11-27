@@ -18,8 +18,8 @@ export const LOGIC_Z = NaN;
 /** Estado de un valor digital: conocido, X o Z */
 export const logicState = (v: number): 'v' | 'x' | 'z' => (Number.isNaN(v) ? 'z' : Number.isInteger(v) ? 'v' : 'x');
 
-export type Radix = 'hex' | 'dec' | 'sdec' | 'oct' | 'bin';
-export const RADIXES: Radix[] = ['hex', 'dec', 'sdec', 'oct', 'bin'];
+export type Radix = 'hex' | 'dec' | 'sdec' | 'oct' | 'bin' | 'bcd';
+export const RADIXES: Radix[] = ['hex', 'dec', 'sdec', 'oct', 'bin', 'bcd'];
 
 /** ¿Es una traza digital? (Dig(…)) */
 export const isDigitalExpr = (e: string) => /^\s*Dig\([^)]*\)\s*$/i.test(e);
@@ -74,12 +74,15 @@ export function formatRadix(v: number, bits: number, radix: Radix = 'hex'): stri
       return `0b${v.toString(2).padStart(bits, '0')}`;
     case 'sdec':
       return String(v >= 2 ** (bits - 1) ? v - 2 ** bits : v);
+    case 'bcd':
+      // un dígito por nibble; uno que no es BCD (A–F) queda a la vista
+      return v.toString(16).toUpperCase().padStart(digits(16), '0');
     default:
       return String(v);
   }
 }
 
-export const radixLabel: Record<Radix, string> = { hex: 'Hex', dec: 'Dec', sdec: '±Dec', oct: 'Oct', bin: 'Bin' };
+export const radixLabel: Record<Radix, string> = { hex: 'Hex', dec: 'Dec', sdec: '±Dec', oct: 'Oct', bin: 'Bin', bcd: 'BCD' };
 
 /**
  * Buses que se pueden armar con los nodos digitales de una simulación: los nodos "base_N_d"

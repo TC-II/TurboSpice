@@ -3,6 +3,7 @@
 import { useRef, type MutableRefObject } from 'react';
 import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/client.ts';
 import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
+import { stateNames } from '../hdl/states.ts';
 import type { EngineClient } from '../engine/client.ts';
 import { applySynth, isStale, isTestbench, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
 import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
@@ -59,14 +60,15 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     const f = verilogFile(projectRef.current, name);
     const top = tbModule(text);
     if (!f || !top) return { error: t('There is no Verilog module {name}', { name }), compileLog: '' };
-    const r = await compileTestbench({ ...verilogSources(projectRef.current), [f.name]: text }, top);
+    const sources = { ...verilogSources(projectRef.current), [f.name]: text };
+    const r = await compileTestbench(sources, top);
     if (!r.vvp || !r.netlist) return { error: r.error, compileLog: r.log };
     // (el progreso de ngspice no va a la barra de la simulación: ésta no es la del esquemático)
     const progress = engine.onStatus;
     engine.onStatus = undefined;
     try {
       const { result } = await engine.simulate(r.netlist, { [TB_VVP]: r.vvp }, { vcd: true });
-      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd } : {}) };
+      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
     } finally {
       engine.onStatus = progress;
     }

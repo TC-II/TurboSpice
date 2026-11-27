@@ -12,6 +12,7 @@ $scope module cnt_tb $end
 $var reg 1 ! clk $end
 $var wire 4 " q [3:0] $end
 $var real 1 # v $end
+$var parameter 32 $ ESPERA $end
 $scope module dut $end
 $var wire 1 ! clk $end
 $upscope $end

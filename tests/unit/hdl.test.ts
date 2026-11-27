@@ -134,6 +134,8 @@ describe('señales digitales en el visor (#209)', () => {
     expect(formatRadix(58, 8, 'hex')).toBe('0x3A');
     expect(formatRadix(5, 4, 'bin')).toBe('0b0101');
     expect(formatRadix(14, 4, 'sdec')).toBe('-2');
+    expect(formatRadix(0x0927, 16, 'bcd')).toBe('0927');
+    expect(formatRadix(0x1a, 8, 'bcd')).toBe('1A');
     expect(formatRadix(LOGIC_X, 4, 'hex')).toBe('X');
     expect(busNames(['x1.q_3_d', 'x1.q_2_d', 'x1.q_1_d', 'x1.q_0_d', 'x1.clk_d'])).toEqual(['Dig(x1.q[3:0])']);
   });

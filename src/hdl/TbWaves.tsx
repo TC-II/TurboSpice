@@ -12,7 +12,7 @@ type Range = [number, number];
  * Las señales del .vcd de un testbench ($dumpvars), como en un panel digital: las del testbench,
  * o también las de los módulos de adentro
  */
-export function TbWaves({ vcd }: { vcd: string }) {
+export function TbWaves({ vcd, states }: { vcd: string; states?: Map<string, Map<number, string>> }) {
   const data = useMemo(() => parseVcd(vcd), [vcd]);
   const [radix, setRadix] = useState<Radix>('hex');
   const [inner, setInner] = useState(false);
@@ -36,9 +36,10 @@ export function TbWaves({ vcd }: { vcd: string }) {
           hidden: false,
           digital: true,
           bits: s.bits,
+          ...(s.bits > 1 && states?.has(s.name) ? { states: states.get(s.name) } : {}),
         }),
       );
-  }, [data, inner]);
+  }, [data, inner, states]);
   const x = useMemo(() => Float64Array.of(0, data.end), [data]);
   if (!data.signals.length) return null;
   return (

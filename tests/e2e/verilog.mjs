@@ -272,6 +272,8 @@ check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig(
 // --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
 const TB = (want) =>
   '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n  initial $dumpvars(0, bdiv_tb);\n' +
+  // (una máquina de estados mínima: la onda de fase muestra los nombres de sus localparam)
+  "  localparam ESPERA = 2'd0, CUENTA = 2'd1;\n  reg [1:0] fase;\n  initial fase = ESPERA;\n  always @(negedge rst) fase <= CUENTA;\n" +
   `  initial begin\n    #12 rst = 0;\n    @(posedge clk); @(posedge clk); #2;\n    if (q !== ${want}) $fatal(1, "FAIL: q=%d", q);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n`;
 await newModule('bdiv_tb', 'Verilog');
 check(
@@ -296,9 +298,14 @@ check((await runTb(TB(2))) === 'PASS' && (await page.locator('.vm-tb').textConte
 // las ondas del .vcd, abajo del código: las señales del testbench y, a pedido, las de adentro
 {
   const names = () => page.locator('.vm-waves .dl-name title').allTextContents();
-  check(JSON.stringify(await names()) === JSON.stringify(['q', 'clk', 'rst']), `las ondas de $dumpvars: las señales del testbench (${await names()})`);
+  check(JSON.stringify(await names()) === JSON.stringify(['q', 'clk', 'fase', 'rst']), `las ondas de $dumpvars: las señales del testbench (${await names()})`);
   const q = await page.locator('.vm-waves .dl-lane').nth(0).locator('.dl-value').allTextContents();
   check(q.join() === '0x0,0x1,0x2', `y el bus q cuenta (${q})`);
+  const fase = await page.locator('.vm-waves .dl-lane').nth(2).locator('.dl-value').allTextContents();
+  check(fase.join() === 'ESPERA,CUENTA', `fase, con los nombres de sus estados (${fase})`);
+  await page.getByLabel('Base de los buses').selectOption('bcd');
+  const bcd = await page.locator('.vm-waves .dl-lane').nth(0).locator('.dl-value').allTextContents();
+  check(bcd.join() === '0,1,2', `en BCD (${bcd})`);
   await page.getByLabel('Módulos de adentro').check();
   check((await names()).includes('u.q'), `con los módulos de adentro, también u.q (${await names()})`);
 }

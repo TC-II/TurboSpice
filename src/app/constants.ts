@@ -32,6 +32,8 @@ export const STABILITY = 'Loop stability.turbo';
 /** transistores del PDK sky130 en varias esquinas (scripts/make-examples.ts, docs/pdk.md) */
 export const SKY130 = 'sky130.turbo';
 export const GF180 = 'gf180.turbo';
+/** 74HC00 contra 74LS00 a transistores: transferencia, VOUT contra IOUT y tiempos (scripts/make-examples.ts) */
+export const LOGIC = 'Logic families.turbo';
 
 /** Nombre de cada vista del panel de resultados (en el botón Resultados) */
 export const PANEL_NAMES = { plot: t('Plot'), netlist: 'Netlist', log: 'Log', problems: t('Errors'), meas: t('Measurements') };

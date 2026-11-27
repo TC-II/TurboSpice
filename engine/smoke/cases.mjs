@@ -22,6 +22,31 @@ const RC = `V1 in 0 DC 0 AC 1 PULSE(0 1 0 1n 1n 1 2)
 R1 in out ${R}
 C1 out 0 ${C}`;
 
+// Compuertas NAND a transistores (library/sub/Logic) contra la hoja de datos: umbral de la curva de
+// transferencia (X1), salida en 1 entregando corriente (X2) y en 0 absorbiéndola (X3)
+const gate = (name, vcc, iout) => `* ${name}
+.include ${name}.lib
+VCC vcc 0 ${vcc}
+VA a 0 0
+X1 a vcc y1 vcc 0 ${name}
+X2 0 0 y2 vcc 0 ${name}
+I2 y2 0 ${iout.high}
+X3 vcc vcc y3 vcc 0 ${name}
+I3 0 y3 ${iout.low}
+.dc VA 0 ${vcc} 1m
+.end`;
+const gateCheck = (vth, voh, vol) => (res) => {
+  const p = plot(res, 'dc');
+  const x = vec(p, 'v-sweep').real;
+  const y1 = vec(p, 'y1').real;
+  const th = x[y1.findIndex((v) => v < y1[0] / 2)];
+  const out = (n) => vec(p, n).real[0];
+  if (!(th > vth[0] && th < vth[1])) return `umbral ${th} V fuera de [${vth}]`;
+  if (!(out('y2') >= voh)) return `VOH ${out('y2')} V < ${voh}`;
+  if (!(out('y3') <= vol)) return `VOL ${out('y3')} V > ${vol}`;
+  return null;
+};
+
 export const CASES = [
   {
     name: '.op divisor resistivo',
@@ -196,5 +221,17 @@ op
 .end`,
     // ngspice nativo con el mismo .va compilado por OpenVAF para x86_64: 0.6928910 V
     check: (res) => near(vec(plot(res, 'op'), 'a').real[0], 0.692891, 1e-6, 'V(a)'),
+  },
+  {
+    name: '74HC00 a transistores: umbral entre VIL y VIH, VOH y VOL a 4 mA (4,5 V)',
+    files: { '74HC00.lib': '../library/sub/Logic/74HC00.lib' },
+    netlist: gate('74HC00', 4.5, { high: '4m', low: '4m' }),
+    check: gateCheck([1.35, 3.15], 3.98, 0.26),
+  },
+  {
+    name: '74LS00 a transistores: umbral entre VIL y VIH, VOH a -0,4 mA y VOL a 8 mA (5 V)',
+    files: { '74LS00.lib': '../library/sub/Logic/74LS00.lib' },
+    netlist: gate('74LS00', 5, { high: '0.4m', low: '8m' }),
+    check: gateCheck([0.8, 2], 2.7, 0.5),
   },
 ];

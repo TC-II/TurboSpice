@@ -518,10 +518,10 @@ await resultsMenu(page, /^Mediciones/);
 
 // --- estímulos: un pulsador con rebote como reloj de div4 (cuenta cada rebote) ---
 await page.keyboard.press('p');
-await page.locator('.picker input').fill('button');
+await page.locator('.modal input').fill('button');
 await page
   .locator('.picker-list li')
-  .filter({ hasText: /buttonStimuli ·/ })
+  .filter({ has: page.locator('.path', { hasText: /^button$/ }) })
   .click();
 {
   const svg = await page.locator('svg.editor').boundingBox();

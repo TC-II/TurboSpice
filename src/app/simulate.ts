@@ -15,7 +15,8 @@ import { lineOf } from '../project/project.ts';
 import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog } from '../sim/measResults.ts';
-import { buildSimulation, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
+import { buildSimulation, netVector, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
+import { setupHoldProblems } from '../sim/setupHold.ts';
 import { analysisProblem, isEventAlternationLine, isSingularLine, isTimestepTooSmallLine, missingSources, pzLogErrors } from '../sim/simList.ts';
 import { pzBodePlots } from '../waveform/pz.ts';
 import { stepLabels, stepSweepPlots } from '../waveform/series.ts';
@@ -156,6 +157,16 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   const pzErrs = pzLogErrors(result.log).filter((e) => !result.errors.includes(e));
   if (pzErrs.length) result.errors.unshift(...pzErrs);
   if (result.bias) onBias(built, result.bias);
+  // setup y hold de los flip-flops que los declaran (SYMATTR SetupHold), en el transitorio
+  const tran = result.plots.find((p) => /^tran/i.test(p.name));
+  const time = tran?.vectors.find((v) => v.name === 'time')?.real;
+  if (tran && time)
+    built.warnings.push(
+      ...setupHoldProblems(built.lt.elements, (net) => {
+        const v = tran.vectors.find((x) => x.name.toLowerCase() === netVector(net));
+        return v ? { x: v.x ?? time, y: v.real, digital: !!v.x } : null;
+      }),
+    );
   result.plots.push(...stepSweepPlots(result.plots, built.ng.steps));
   // .pz sin otro análisis en frecuencia: su Bode normalizado, con el mapa al lado (#343)
   result.plots.push(...pzBodePlots(result.plots));

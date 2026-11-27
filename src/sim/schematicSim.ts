@@ -163,8 +163,21 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
       const bus = /^dig\((.*)\)$/i.exec(r) && busRange(r.slice(4, -1));
       return bus ? bus.bits.map((b) => netVector(`${bus.base}[${b}]`)).filter((n) => tokens.has(n) && !links.nets.includes(n)) : [];
     });
-    const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...analogBits, ...deviceSaves(traces, lt, ng), ...op])];
-    digitalSaves = [...new Set([...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)))];
+    // (las redes que mira el chequeo de setup y hold, sim/setupHold.ts)
+    const timing = lt.elements.flatMap((e) => {
+      const pins =
+        e.attrs
+          .get('SetupHold')
+          ?.trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((p) => p.toLowerCase()) ?? [];
+      return e.nodes.filter((_, k) => pins.includes(e.pinNames[k].toLowerCase())).map(netVector);
+    });
+    const vectors = [
+      ...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...analogBits, ...deviceSaves(traces, lt, ng), ...op, ...timing.filter((n) => !links.nets.includes(n))]),
+    ];
+    digitalSaves = [...new Set([...[...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)), ...timing.filter((n) => links.nets.includes(n))])];
     // (los nodos digitales que no existen no suman: se cuentan los que pueden ser, de más)
     vectorCount = vectors.length + 1 + digitalSaves.length;
     // el .save del usuario (con nombres de LTspice) se reemplaza por el traducido

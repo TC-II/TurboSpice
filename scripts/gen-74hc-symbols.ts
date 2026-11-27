@@ -108,6 +108,10 @@ const DRAW: Record<string, Drawing> = {
   hc4511: box('74HC4511', pins('A:7 B:1 C:2 D:6 LE:5 BI_n:4 LT_n:3'), pins('seg_a:13=a seg_b:12=b seg_c:11=c seg_d:10=d seg_e:9=e seg_f:15=f seg_g:14=g')),
 };
 
+// setup y hold (src/sim/setupHold.ts): dato, reloj, tsu y th a VCC = 4,5 V, los más exigentes de las
+// hojas de datos de TI y Nexperia
+const SETUP_HOLD: Record<string, string> = { hc74: 'D CLK 20n 3n' };
+
 // (como las de library/sym/Digital, en inglés)
 const DESC: Record<string, string> = {
   hc00: '74HC00: 2-input NAND gate (one of four)',
@@ -137,7 +141,15 @@ function drawn(name: string, generated: string, description: string): string {
     .map((l) => (/^SYMATTR SpiceLine /.test(l) ? `SYMATTR SpiceLine ${electricalLine(HC)} hdl=auto` : /^SYMATTR Description /.test(l) ? `SYMATTR Description ${description}` : l));
   const order = [...generated.matchAll(/^PINATTR PinName (\S+)\nPINATTR SpiceOrder (\d+)/gm)].map((m) => ({ name: m[1], order: m[2] }));
   const [nx, ny, nAlign] = d.name;
-  const out = ['Version 4', 'SymbolType CELL', ...d.shapes, `WINDOW 0 ${nx} ${ny} ${nAlign} 2`, 'WINDOW 3 0 0 Invisible 2', ...attrs];
+  const out = [
+    'Version 4',
+    'SymbolType CELL',
+    ...d.shapes,
+    `WINDOW 0 ${nx} ${ny} ${nAlign} 2`,
+    'WINDOW 3 0 0 Invisible 2',
+    ...attrs,
+    ...(SETUP_HOLD[name] ? [`SYMATTR SetupHold ${SETUP_HOLD[name]}`] : []),
+  ];
   // (los pines del .subckt van en minúsculas, como los nodos de ngspice)
   const at0 = new Map(Object.entries(d.pins).map(([k, v]) => [k.toLowerCase(), v]));
   for (const p of order) {

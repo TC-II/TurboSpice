@@ -25,6 +25,7 @@ SYMATTR Prefix X
 SYMATTR Value hc74
 SYMATTR ModelFile hc74.sub
 SYMATTR Description 74HC74: positive-edge D flip-flop with asynchronous preset and clear, active low (one of two)
+SYMATTR SetupHold D CLK 20n 3n
 PIN -96 -48 NONE 0
 PINATTR PinName d
 PINATTR SpiceOrder 1

@@ -858,6 +858,8 @@ export const es: Record<string, string> = {
   'Compiling {n} blocks into one Icarus module…': 'Compilando {n} bloques en un solo módulo de Icarus…',
   'Running the testbench…': 'Corriendo el testbench…',
   'Waveforms ($dumpvars)': 'Formas de onda ($dumpvars)',
+  '{name}: {d} changes {dt} before the clock edge at {tc} (setup {tsu}); {n} in total': '{name}: {d} cambia {dt} antes del flanco de reloj en {tc} (setup {tsu}); {n} en total',
+  '{name}: {d} changes {dt} after the clock edge at {tc} (hold {th}); {n} in total': '{name}: {d} cambia {dt} después del flanco de reloj en {tc} (hold {th}); {n} en total',
   '{net}: a 1 from {from} ({voh} V) does not reach VIH of {to} ({vih} V): it reads X': '{net}: un 1 de {from} ({voh} V) no llega al VIH de {to} ({vih} V): lee X',
   '{net}: a 0 from {from} ({vol} V) is above VIL of {to} ({vil} V): it reads X': '{net}: un 0 de {from} ({vol} V) queda por encima del VIL de {to} ({vil} V): lee X',
   'a testbench: it has no pins, it is run on its own': 'un testbench: no tiene pines, se corre solo',

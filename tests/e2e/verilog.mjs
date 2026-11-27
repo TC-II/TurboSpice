@@ -385,6 +385,60 @@ check(
   'su símbolo: los pines con su nombre y el número de patita (SRCLK, 11)',
 );
 
+// --- setup del 74HC74: D sube 5 ns antes del flanco de reloj (tsu = 20 ns) ---
+await page.keyboard.press('p');
+await page.locator('.picker input').fill('74HC74');
+await page.locator('.picker-list li').filter({ hasText: 'hc7474HC ·' }).click();
+{
+  const svg = await page.locator('svg.editor').boundingBox();
+  await page.mouse.click(svg.x + svg.width * 0.3, svg.y + svg.height * 0.3);
+}
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => /hc74: el símbolo está/.test(document.body.textContent ?? ''), null, { timeout: 120000 });
+// (el 74 en 400,400: D, CLK, PRE_n y CLR_n en x = 304, de y = 352 a 448)
+const FF = `Version 4
+SHEET 1 880 680
+FLAG 96 240 clk
+FLAG 96 320 0
+FLAG 304 240 d
+FLAG 304 320 0
+FLAG 560 240 hi
+FLAG 560 320 0
+FLAG 304 352 d
+FLAG 304 384 clk
+FLAG 304 416 hi
+FLAG 304 448 hi
+FLAG 496 352 q
+FLAG 496 384 qn
+SYMBOL voltage 96 224 R0
+SYMATTR InstName V1
+SYMATTR Value PULSE(0 5 100n 1n 1n 49n 100n)
+SYMBOL voltage 304 224 R0
+SYMATTR InstName V2
+SYMATTR Value PWL(0 0 95n 0 96n 5)
+SYMBOL voltage 560 224 R0
+SYMATTR InstName V3
+SYMATTR Value 5
+SYMBOL hc74 400 400 R0
+SYMATTR InstName U1
+TEXT 96 528 Left 2 !.tran 300n
+`;
+await page.evaluate((asc) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([asc], 'setup tb.asc'));
+  dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+}, FF);
+await page.locator('.project-tree .tree-name', { hasText: 'setup tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+check((await page.locator('svg.editor .loose rect').count()) === 0, 'el 74HC74 queda con todos sus pines conectados');
+await simulate();
+check(
+  await until(async () => /U1: D cambia [\d.]+ns antes del flanco de reloj en [\d.]+ns \(setup 20ns\)/.test((await page.locator('body').textContent()) ?? '')),
+  `avisa el setup del 74HC74 (${(await page.locator('.statusbar, .status-msg').allTextContents()).join(' | ')})`,
+);
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

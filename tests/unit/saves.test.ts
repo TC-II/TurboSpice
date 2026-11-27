@@ -92,6 +92,15 @@ describe('señales guardadas (#314)', () => {
     expect(b.netlist).not.toMatch(/\.save V\(a\)/i);
   });
 
+  it('con lo elegido, también las redes que mira el chequeo de setup y hold (SYMATTR SetupHold)', async () => {
+    const asc = TB('TEXT 0 140 Left 2 !.save I(V1)\n').replace('SYMATTR InstName U1', 'SYMATTR InstName U1\nSYMATTR SetupHold in out 20n 3n');
+    const b = await build(asc);
+    // (los pines in y out de U1, sueltos en este circuito: nc_01 y nc_02)
+    const nets = b.lt.elements.find((e) => /u1$/i.test(e.name))!.nodes.map((n) => n.toLowerCase());
+    expect(/^\.save (.*)$/m.exec(b.netlist)![1].split(' ')).toEqual(expect.arrayContaining(nets));
+    expect(/^\.save (.*)$/m.exec((await build(TB('TEXT 0 140 Left 2 !.save I(V1)\n'))).netlist)![1].split(' ')).toEqual(['v1#branch']);
+  });
+
   it('lista las señales por jerarquía, sin los puertos de las instancias', async () => {
     const b = await build(TB());
     const s = savableSignals(b);

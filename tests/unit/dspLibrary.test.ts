@@ -29,7 +29,7 @@ describe('bibliotecas Verilog (DSP, 74HC)', () => {
     expect(syms.length).toBe(15);
     for (const path of syms) {
       expect(mods, path).toContain(path.slice(5));
-      expect(b.symbols[path]).toMatch(/^SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 .*tpd=9n hdl=auto$/m);
+      expect(b.symbols[path]).toContain('SYMATTR SpiceLine vcc=5 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto\n');
     }
   });
 });

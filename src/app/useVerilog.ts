@@ -1,7 +1,9 @@
 // Módulos Verilog (#209): <nombre>.v + <nombre>.asy, como un subcircuito esquemático. Sintetizar
 // (Yosys) o compilar el comportamiento (Icarus), y las instancias con otros parameter (variantes)
 import { useRef, type MutableRefObject } from 'react';
-import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/client.ts';
+import { compileBehavioral, compileTestbench, compileTruthTable, synthesizeVerilog } from '../hdl/client.ts';
+import { parseTruthTable, type TruthTable } from '../hdl/truthTable.ts';
+import type { SimulateOptions } from '../engine/ngspice.ts';
 import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
 import { stateNames } from '../hdl/states.ts';
 import type { EngineClient } from '../engine/client.ts';
@@ -63,15 +65,19 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     const sources = { ...verilogSources(projectRef.current), [f.name]: text };
     const r = await compileTestbench(sources, top);
     if (!r.vvp || !r.netlist) return { error: r.error, compileLog: r.log };
-    // (el progreso de ngspice no va a la barra de la simulación: ésta no es la del esquemático)
-    const progress = engine.onStatus;
-    engine.onStatus = undefined;
-    try {
-      const { result } = await engine.simulate(r.netlist, { ...verilogData(projectRef.current), [TB_VVP]: r.vvp }, { vcd: true });
-      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
-    } finally {
-      engine.onStatus = progress;
-    }
+    const result = await quietly(r.netlist, r.vvp, { vcd: true });
+    return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
+  };
+  /** Un testbench en el motor, sin que su progreso vaya a la barra de la simulación (ésta no es la del esquemático) */
+  const quietly = async (netlist: string, vvp: string, opts: SimulateOptions = {}) =>
+    (await engine.simulate(netlist, { ...verilogData(projectRef.current), [TB_VVP]: vvp }, { ...opts, quiet: true })).result;
+  /** La tabla de verdad del módulo `name` con el código `text` (truthTable.ts) */
+  const truthTable = async (name: string, text: string): Promise<TruthTable | { error: string }> => {
+    const f = verilogFile(projectRef.current, name);
+    if (!f) return { error: t('There is no Verilog module {name}', { name }) };
+    const r = await compileTruthTable({ ...verilogSources(projectRef.current), [f.name]: text }, name);
+    if (!r.vvp || !r.netlist || !r.ports) return { error: r.error ?? 'Icarus' };
+    return parseTruthTable((await quietly(r.netlist, r.vvp)).log, r.ports);
   };
   /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */
   const synthStale = async () => {
@@ -188,5 +194,5 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
     return { netlist: withSubckts(v.netlist, inline), files, warnings: [...notes, ...v.warnings], ...(aliases ? { aliases } : {}) };
   };
-  return { synthModule, synthAndReport, synthStale, withVariants, runTb };
+  return { synthModule, synthAndReport, synthStale, withVariants, runTb, truthTable };
 }

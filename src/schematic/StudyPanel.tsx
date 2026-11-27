@@ -601,6 +601,7 @@ function TemplatePicker({ info, blocks, onInsert }: { info: StudyInfo; blocks: b
           {tpl.fields.includes('target') && field('target', t('What to vary'), 'study-components', 'R1')}
           {tpl.fields.includes('target2') && field('target2', t('Second one to vary'), 'study-components', 'C1')}
           {tpl.fields.includes('source') && field('source', t('Source'), 'study-sources', 'V1')}
+          {tpl.fields.includes('inputs') && field('inputs', t('Input sources (the first one, the most significant bit)'), undefined, 'VA VB')}
           {tpl.fields.includes('signal') && field('signal', t('Signal to measure'), 'sim-nets-v', 'V(out)')}
           {tpl.fields.includes('analysis') && (
             <Row label={t('Analysis')}>
@@ -619,6 +620,7 @@ function TemplatePicker({ info, blocks, onInsert }: { info: StudyInfo; blocks: b
           )}
           {tpl.fields.includes('goal') && field('goal', t('Target value of the measurement'), undefined, o.analysis === 'ac' ? '1k' : '1')}
           {tpl.fields.includes('freq') && field('freq', t('Fundamental frequency'), undefined, '1k')}
+          {tpl.fields.includes('high') && field('high', t('High level'), undefined, '5')}
           <div className="buttons">
             <button onClick={() => setId('')}>{t('Cancel')}</button>
             <button

@@ -4,7 +4,7 @@
 // (buses con radix); el modo comportamiento (Icarus) corre retardos y $display; todo sigue ahí
 // después de recargar.
 // Uso: node tests/e2e/verilog.mjs [url]   (con `npm run preview` corriendo)
-import { autosaved, frames, steady, skipWelcome, until, launchBrowser, sampleUrl } from './lib.mjs';
+import { autosaved, frames, steady, skipWelcome, until, launchBrowser, resultsMenu, sampleUrl } from './lib.mjs';
 
 const URL = process.argv[2] ?? 'http://localhost:4173/TurboSpice/';
 
@@ -107,7 +107,7 @@ check((await page.locator('.project-tree .tree-kind.verilog').count()) >= 1, 'ap
 // interfaz eléctrica: una familia lógica cambia los parámetros del símbolo
 await page.getByRole('combobox', { name: 'Familia lógica' }).selectOption({ label: '74HC (CMOS 5 V)' });
 await frames(page);
-check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' }).inputValue()) === '3.5', 'la familia 74HC pone VIH = 3,5 V');
+check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' }).inputValue()) === '{0.7*vcc}', 'la familia 74HC pone VIH = 0,7·VCC');
 // un error se marca en su línea
 await code.fill(VERILOG.replace('q <= q + 1;', 'q <= ;'));
 await synthesize();
@@ -227,6 +227,18 @@ check(triValues.slice(0, 3).join() === 'Z,0x0,0x1', `el bus en alta impedancia m
 check((await page.locator('.digital-lanes g.dl-z').count()) === 2 && (await page.locator('.digital-lanes g.dl-x').count()) === 0, 'los tramos Z del bus se dibujan como Z, no como X');
 check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await page.locator('.digital-lanes path.dl-x').count()) === 0, 'y los del bit también');
 
+// --- tabla de verdad de un módulo combinacional ---
+await newModule('mux2', 'Verilog');
+await code.fill('module mux2 (input S, input A, input B, output Y);\n  assign Y = S ? B : A;\nendmodule\n');
+await page.getByRole('button', { name: 'Tabla de verdad', exact: true }).click();
+await page.locator('.vm-tt tbody tr').first().waitFor({ timeout: 120000 });
+{
+  const head = await page.locator('.vm-tt th').allTextContents();
+  const rows = await page.locator('.vm-tt tbody tr').evaluateAll((trs) => trs.map((tr) => tr.textContent));
+  check(head.join() === 'S,A,B,Y' && rows.length === 8, `la tabla de verdad: las entradas en orden y las 8 filas (${head} | ${rows.length})`);
+  check(rows.join() === '0000,0010,0101,0111,1000,1011,1100,1111', `con los valores de un MUX 2:1 (${rows})`);
+}
+
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
 await code.fill(
@@ -267,6 +279,36 @@ check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig(
   const a = await lanes.nth(0).locator('.dl-value').allTextContents();
   const b = await lanes.nth(1).locator('.dl-value').allTextContents();
   check(a.slice(0, 4).join() === '0x0,0x1,0x2,0x3' && b.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `los dos cuentan (${a.slice(0, 4)} | ${b.slice(0, 4)})`);
+}
+
+// --- niveles entre familias: div4 (74HC) a 3,3 V maneja el reloj de otro div4 a 5 V (VIH = 3,5 V) ---
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'niveles tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMATTR InstName X1', 'SYMATTR InstName X1\nSYMATTR SpiceLine vcc=3.3 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto').replace(
+    'TEXT',
+    'WIRE 384 640 400 640\nWIRE 384 672 400 672\nWIRE 496 640 512 640\nFLAG 384 640 q[1]\nFLAG 384 672 rst\nFLAG 512 640 q2[1:0]\nSYMBOL div4 448 656 R0\nSYMATTR InstName X2\nTEXT',
+  ),
+);
+await page.locator('.project-tree .tree-name', { hasText: 'niveles tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+await simulate();
+check(
+  await until(async () => /q\[1\]: un 1 de X1 \(3\.3 V\) no llega al VIH de X2 \(3\.5 V\): lee X/.test((await page.locator('body').textContent()) ?? '')),
+  `avisa que un 1 de 3,3 V no llega al VIH de un 74HC a 5 V (${(await page.locator('.statusbar, .status-msg').allTextContents()).join(' | ')})`,
+);
+// (y esa red se simula analógica: el reloj, como lo lee X2, es X; sin flancos, X2 no cuenta)
+check(await addTrace('Dig(x2.clk_d)'), 'Dig(x2.clk_d): el reloj adentro de X2');
+check((await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('path.dl-x').count()) === 1, 'el reloj de X2 lee X, como en el circuito');
+check(await addTrace('Dig(q2[1:0])'), 'Dig(q2[1:0])');
+{
+  const vals = await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('.dl-value').allTextContents();
+  check(vals.join() === '0x0', `X2 no cuenta (${vals.slice(0, 4)})`);
 }
 
 // --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
@@ -354,6 +396,125 @@ check(
   (await page.locator('svg.editor .sym text', { hasText: /^SRCLK$/ }).count()) === 1 && (await page.locator('svg.editor .sym text', { hasText: /^11$/ }).count()) === 1,
   'su símbolo: los pines con su nombre y el número de patita (SRCLK, 11)',
 );
+
+// --- setup del 74HC74: D sube 5 ns antes del flanco de reloj (tsu = 20 ns) ---
+await page.keyboard.press('p');
+await page.locator('.modal input').fill('74HC74');
+await page
+  .locator('.picker-list li')
+  .filter({ has: page.locator('.path', { hasText: /^hc74$/ }) })
+  .click();
+{
+  const svg = await page.locator('svg.editor').boundingBox();
+  await page.mouse.click(svg.x + svg.width * 0.3, svg.y + svg.height * 0.3);
+}
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => /hc74: el símbolo está/.test(document.body.textContent ?? ''), null, { timeout: 120000 });
+// (el 74 en 400,400: D, CLK, PRE_n y CLR_n en x = 304, de y = 352 a 448)
+const FF = `Version 4
+SHEET 1 880 680
+FLAG 96 240 clk
+FLAG 96 320 0
+FLAG 304 240 d
+FLAG 304 320 0
+FLAG 560 240 hi
+FLAG 560 320 0
+FLAG 304 352 d
+FLAG 304 384 clk
+FLAG 304 416 hi
+FLAG 304 448 hi
+FLAG 496 352 q
+FLAG 496 384 qn
+SYMBOL voltage 96 224 R0
+SYMATTR InstName V1
+SYMATTR Value PULSE(0 5 100n 1n 1n 49n 100n)
+SYMBOL voltage 304 224 R0
+SYMATTR InstName V2
+SYMATTR Value PWL(0 0 95n 0 96n 5)
+SYMBOL voltage 560 224 R0
+SYMATTR InstName V3
+SYMATTR Value 5
+SYMBOL hc74 400 400 R0
+SYMATTR InstName U1
+TEXT 96 528 Left 2 !.tran 300n
+`;
+await page.evaluate((asc) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([asc], 'setup tb.asc'));
+  dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+}, FF);
+await page.locator('.project-tree .tree-name', { hasText: 'setup tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+check((await page.locator('svg.editor .loose rect').count()) === 0, 'el 74HC74 queda con todos sus pines conectados');
+await simulate();
+check(
+  await until(async () => /U1: D cambia [\d.]+ns antes del flanco de reloj en [\d.]+ns \(setup 20ns\)/.test((await page.locator('body').textContent()) ?? '')),
+  `avisa el setup del 74HC74 (${(await page.locator('.statusbar, .status-msg').allTextContents()).join(' | ')})`,
+);
+
+// --- tabla de verdad de un esquemático (plantilla del Estudio): una NAND 74HC00 con dos fuentes ---
+await page.keyboard.press('p');
+await page.locator('.modal input').fill('74HC00');
+await page
+  .locator('.picker-list li')
+  .filter({ has: page.locator('.path', { hasText: /^hc00$/ }) })
+  .click();
+{
+  const svg = await page.locator('svg.editor').boundingBox();
+  await page.mouse.click(svg.x + svg.width * 0.6, svg.y + svg.height * 0.7);
+}
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => /hc00: el símbolo está/.test(document.body.textContent ?? ''), null, { timeout: 120000 });
+// (la NAND en 400,400: A en 368,384, B en 368,416 e Y en 432,400)
+const NAND = `Version 4
+SHEET 1 880 680
+FLAG 96 240 a
+FLAG 96 320 0
+FLAG 304 240 b
+FLAG 304 320 0
+FLAG 368 384 a
+FLAG 368 416 b
+FLAG 432 400 y
+SYMBOL voltage 96 224 R0
+SYMATTR InstName VA
+SYMATTR Value 0
+SYMBOL voltage 304 224 R0
+SYMATTR InstName VB
+SYMATTR Value 0
+SYMBOL hc00 400 400 R0
+SYMATTR InstName U1
+`;
+await page.evaluate((asc) => {
+  const dt = new DataTransfer();
+  dt.items.add(new File([asc], 'nand tb.asc'));
+  dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+}, NAND);
+await page.locator('.project-tree .tree-name', { hasText: 'nand tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
+check((await page.locator('svg.editor .loose rect').count()) === 0, 'la NAND queda con todos sus pines conectados');
+await page.keyboard.press('Alt+e');
+await page.getByLabel('Plantillas', { exact: true }).selectOption({ label: 'Tabla de verdad' });
+check((await page.getByLabel('Fuentes de entrada (la primera, el bit más significativo)').inputValue()) === 'VA VB', 'la plantilla propone las fuentes VA y VB como entradas');
+await page.getByLabel('Señal a medir').fill('V(y)');
+await page.getByRole('button', { name: 'Insertar' }).click();
+await page.getByRole('button', { name: 'Aplicar', exact: true }).click();
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `la tabla de verdad simula (${await page.locator('.status').first().textContent()})`);
+await resultsMenu(page, /^Mediciones/);
+{
+  const head = await page.locator('.meas-table thead th').allTextContents();
+  const rows = await page.locator('.meas-table tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent.trim())));
+  const col = head.findIndex((h) => /y_logic/.test(h));
+  check(rows.length === 4 && col >= 0, `una fila por combinación (${head.join(' | ')} / ${rows.length})`);
+  // (la corrida va en un th: las celdas son y e y_logic)
+  check(rows.map((r) => r.at(-1)).join() === '1,1,1,0', `la columna y_logic es la de una NAND (${rows.map((r) => r.join(' ')).join(' | ')})`);
+  const runs = await page.locator('.meas-table tbody th').allTextContents();
+  check(runs.length === 4 && /VB=0/.test(runs[0]) && /VA=5/.test(runs[3]) && /VB=5/.test(runs[3]), `las corridas: todas las combinaciones de VA y VB (${runs.join(' | ')})`);
+}
 
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);

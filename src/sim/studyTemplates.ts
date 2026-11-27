@@ -19,7 +19,7 @@ export interface TemplateCircuit {
   analysis: MeasAnalysis;
 }
 
-export type TemplateField = 'target' | 'target2' | 'signal' | 'analysis' | 'spec' | 'goal' | 'freq' | 'source';
+export type TemplateField = 'target' | 'target2' | 'signal' | 'analysis' | 'spec' | 'goal' | 'freq' | 'source' | 'inputs' | 'high';
 
 /** Respuestas del asistente corto */
 export interface TemplateOptions {
@@ -38,6 +38,10 @@ export interface TemplateOptions {
   freq: string;
   /** fuente de excitación (impedancia) */
   source: string;
+  /** fuentes de entrada de la tabla de verdad, separadas por espacios (la primera, el bit más significativo) */
+  inputs: string;
+  /** nivel alto de la tabla de verdad */
+  high: string;
 }
 
 export interface StudyTemplate {
@@ -88,6 +92,12 @@ export function defaultOptions(c: TemplateCircuit): TemplateOptions {
     goal: '',
     freq: '1k',
     source: c.sources[0] ?? '',
+    // (las fuentes V con un valor fijo, salvo las que parecen la alimentación)
+    inputs: c.components
+      .filter((k) => k.prefix.toUpperCase() === 'V' && numeric(k.value) && !/^v(cc|dd|ee|ss)|supply|alim/i.test(k.name))
+      .map((k) => k.name)
+      .join(' '),
+    high: '5',
   };
 }
 
@@ -183,6 +193,38 @@ function tranStop(st: Study): string {
 // --- plantillas -----------------------------------------------------------------------------
 
 export const STUDY_TEMPLATES: StudyTemplate[] = [
+  {
+    id: 'truth',
+    label: t('Truth table'),
+    help: t(
+      'Each input source steps between 0 V and the high level (.step, every combination; the first source is the most significant bit) and each output, at the end of the transient: its voltage and its logic value (1 above 0.7 of the high level, 0 below 0.3, 0.5 = X in between). One row per combination in Measurements. Several outputs, separated by spaces.',
+    ),
+    fields: ['inputs', 'signal', 'high'],
+    build: (st, _c, o) => {
+      const name = namer(st);
+      // (un transitorio corto: la lógica se asienta en ns)
+      let out = (st.analyses ?? []).some((a) => a.enabled && /^\s*\.tran\b/i.test(a.line)) ? st : { ...st, analyses: [...(st.analyses ?? []), { enabled: true, line: '.tran 1u' }] };
+      // (el primer .step es el que varía más rápido: la última entrada)
+      const sources = o.inputs.split(/[\s,]+/).filter(Boolean);
+      out = addSweeps(
+        out,
+        [...sources].reverse().map((s): StudySweep => ({ target: { kind: 'source', name: s }, mode: 'list', list: `0 ${o.high}`, start: '', stop: '', step: '', enabled: true })),
+      );
+      const at = tranStop(out);
+      const h = parseSpiceNumber(plain(o.high));
+      const ms = o.signal
+        .split(/\s+/)
+        .filter(Boolean)
+        .flatMap((sig) => {
+          const v = name((/^v\((.+)\)$/i.exec(sig)?.[1] ?? sig).replace(/\W/g, '_'));
+          const l = name(`${v}_logic`);
+          // 1, 0 o 0,5 (X) con sgn, como el rendimiento del Monte Carlo
+          const logic = `((1+sgn(${v}-${engValue(0.7 * h)}))+(1+sgn(${v}-${engValue(0.3 * h)})))/4`;
+          return [{ enabled: true, name: v, analysis: 'tran' as const, kind: 'at' as const, signal: sig, at }, raw(l, 'tran', `.meas tran ${l} PARAM ${logic}`)];
+        });
+      return addMeasures(out, ms);
+    },
+  },
   {
     id: 'sweep',
     label: t('Parametric sweep'),

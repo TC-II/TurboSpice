@@ -20,11 +20,12 @@ LINE Normal 64 -16 96 -16
 TEXT 60 -16 Right 1 Q̅
 WINDOW 0 0 -88 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
+SYMATTR SpiceLine vcc=5 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
 SYMATTR Prefix X
 SYMATTR Value hc74
 SYMATTR ModelFile hc74.sub
 SYMATTR Description 74HC74: positive-edge D flip-flop with asynchronous preset and clear, active low (one of two)
+SYMATTR SetupHold D CLK 20n 3n
 PIN -96 -48 NONE 0
 PINATTR PinName d
 PINATTR SpiceOrder 1

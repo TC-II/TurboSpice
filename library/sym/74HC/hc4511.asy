@@ -48,7 +48,7 @@ TEXT 60 96 Right 1 g
 TEXT 84 88 Center 0 14
 WINDOW 0 0 -136 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
+SYMATTR SpiceLine vcc=5 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
 SYMATTR Prefix X
 SYMATTR Value hc4511
 SYMATTR ModelFile hc4511.sub

@@ -37,6 +37,35 @@ describe('Plantillas del Estudio (#178)', () => {
     }
   });
 
+  it('tabla de verdad: cada entrada en 0 y el nivel alto, la primera como bit más significativo; tensión y valor lógico', () => {
+    const MUX: TemplateCircuit = {
+      components: [
+        { name: 'VS', prefix: 'V', value: '0' },
+        { name: 'VA', prefix: 'V', value: '5' },
+        { name: 'VCC', prefix: 'V', value: '5' },
+        { name: 'U1', prefix: 'X', value: 'hc00' },
+      ],
+      sources: ['VS', 'VA', 'VCC'],
+      nets: ['0', 's', 'a', 'y'],
+      params: [],
+      analysis: 'tran',
+    };
+    const o = defaultOptions(MUX);
+    // (sin la alimentación)
+    expect(o.inputs).toBe('VS VA');
+    const st = applyTemplate({ ...emptyStudy(), analyses: [] }, 'truth', MUX, { ...o, signal: 'V(y) V(z)' });
+    const { on } = studyLines(st);
+    // (el primer .step varía más rápido: la última entrada)
+    expect(on.filter((l) => /^\.step/.test(l))).toEqual(['.step VA list 0 5', '.step VS list 0 5']);
+    expect(st.analyses!.map((a) => a.line)).toEqual(['.tran 1u']);
+    expect(st.measures.flatMap(measureLines)).toEqual([
+      '.meas tran y FIND V(y) AT=1u',
+      '.meas tran y_logic PARAM ((1+sgn(y-3.5))+(1+sgn(y-1.5)))/4',
+      '.meas tran z FIND V(z) AT=1u',
+      '.meas tran z_logic PARAM ((1+sgn(z-3.5))+(1+sgn(z-1.5)))/4',
+    ]);
+  });
+
   it('barrido paramétrico: R1 en 500 1k 2k, medición y gráfico', () => {
     const st = applyTemplate(base(), 'sweep', RC, defaultOptions(RC));
     expect(st.sweeps[0]).toMatchObject({ target: { kind: 'component', name: 'R1' }, list: '500 1k 2k', original: '1k' });

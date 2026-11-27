@@ -7,6 +7,7 @@ import { busNames, busRange, formatRadix, joinBits, LOGIC_X, LOGIC_Z, logicState
 import { addTraceTo } from '../../src/waveform/view.ts';
 import { newProject } from '../../src/project/turbo.ts';
 import { portsOf } from '../../src/hdl/project.ts';
+import { familyOf } from '../../src/hdl/electrical.ts';
 
 // Netlist de Yosys de: module m #(parameter W = 2) (input [1:0] a, input clk, output y, output reg q);
 //   assign y = a[1] & a[0]; always @(posedge clk) q <= y;
@@ -83,6 +84,28 @@ describe('módulos Verilog del proyecto (#209)', () => {
     p = { ...p, files: [...p.files, { name: 'defs.vh', kind: 'model', text: '`define W 4' }, { name: 'rom.hex', kind: 'model', text: 'A5' }] };
     expect(Object.keys(verilogSources(p)).sort()).toEqual(['defs.vh', 'm.v']);
     expect(verilogData(p)).toEqual({ 'rom.hex': 'A5' });
+  });
+});
+
+describe('familias lógicas', () => {
+  it('los umbrales CMOS siguen a vcc; los valores fijos de antes también son 74HC', () => {
+    const hc = (vil: string, vih: string) =>
+      new Map([
+        ['vcc', '5'],
+        ['vil', vil],
+        ['vih', vih],
+        ['vol', '0'],
+        ['voh', '{vcc}'],
+        ['iol', '4m'],
+        ['ioh', '4m'],
+        ['tr', '6n'],
+        ['tf', '6n'],
+        ['tpd', '9n'],
+      ]);
+    expect(familyOf(hc('{0.3*vcc}', '{0.7*vcc}'))?.name).toBe('74HC (CMOS 5 V)');
+    expect(familyOf(hc('1.5', '3.5'))?.name).toBe('74HC (CMOS 5 V)');
+    expect(familyOf(hc('1.5', '3.4'))).toBeUndefined();
+    expect(familyOf(new Map())?.name).toMatch(/^Ideal/);
   });
 });
 

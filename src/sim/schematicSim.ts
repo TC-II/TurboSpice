@@ -2,7 +2,7 @@
 // y nombres de vectores para las puntas de prueba.
 import { addPinCurrentSources } from '../netlist/pinCurrents.ts';
 import { stripHdl } from '../hdl/cosimMerge.ts';
-import { linkDigitalNets } from '../hdl/digitalLinks.ts';
+import { levelProblems, linkDigitalNets } from '../hdl/digitalLinks.ts';
 import { busRange } from '../waveform/digital.ts';
 import { decode } from '../asc/encoding.ts';
 import type { AscDoc } from '../asc/model.ts';
@@ -132,6 +132,8 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
   const joined = v ? { ...base, netlist: v.netlist, files: v.files, warnings: [...base.warnings, ...v.warnings] } : base;
   // (el atributo «Simulación» de las instancias Verilog no es un parámetro del .subckt)
   const prepared = { ...joined, netlist: stripHdl(joined.netlist), files: Object.fromEntries(Object.entries(joined.files).map(([k, f]) => [k, stripHdl(f)])) };
+  // niveles lógicos entre bloques de familias distintas (antes de que esas redes pasen a digitales)
+  prepared.warnings.push(...levelProblems(prepared.netlist, prepared.files));
   // las redes que unen sólo bloques Verilog, digitales (#209)
   const links = linkDigitalNets(prepared.netlist, prepared.files);
   // (los nombres de las redes que quedaron adentro del módulo DSP de Icarus, cosimMerge.ts)
@@ -161,8 +163,21 @@ export async function buildSimulation(doc: AscDoc, lib: Library, title: string, 
       const bus = /^dig\((.*)\)$/i.exec(r) && busRange(r.slice(4, -1));
       return bus ? bus.bits.map((b) => netVector(`${bus.base}[${b}]`)).filter((n) => tokens.has(n) && !links.nets.includes(n)) : [];
     });
-    const vectors = [...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...analogBits, ...deviceSaves(traces, lt, ng), ...op])];
-    digitalSaves = [...new Set([...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)))];
+    // (las redes que mira el chequeo de setup y hold, sim/setupHold.ts)
+    const timing = lt.elements.flatMap((e) => {
+      const pins =
+        e.attrs
+          .get('SetupHold')
+          ?.trim()
+          .split(/\s+/)
+          .slice(0, 2)
+          .map((p) => p.toLowerCase()) ?? [];
+      return e.nodes.filter((_, k) => pins.includes(e.pinNames[k].toLowerCase())).map(netVector);
+    });
+    const vectors = [
+      ...new Set([...[...selection, ...used].flatMap((r) => refVectors(r, lt, ng)), ...analogBits, ...deviceSaves(traces, lt, ng), ...op, ...timing.filter((n) => !links.nets.includes(n))]),
+    ];
+    digitalSaves = [...new Set([...[...selection, ...used].flatMap((r) => digitalNodes(r, links.aliases)), ...timing.filter((n) => links.nets.includes(n))])];
     // (los nodos digitales que no existen no suman: se cuentan los que pueden ser, de más)
     vectorCount = vectors.length + 1 + digitalSaves.length;
     // el .save del usuario (con nombres de LTspice) se reemplaza por el traducido

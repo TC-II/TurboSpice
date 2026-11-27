@@ -9,6 +9,8 @@ declare const self: DedicatedWorkerGlobalScope;
 const ENGINE_URL = `${import.meta.env.BASE_URL}engine/`;
 
 let ng: Promise<Ngspice> | null = null;
+/** La simulación en curso no avisa su progreso (SimulateOptions.quiet) */
+let quiet = false;
 
 const post = (msg: WorkerResponse, transfer: Transferable[] = []) => self.postMessage(msg, transfer);
 
@@ -137,7 +139,7 @@ async function load(): Promise<Ngspice> {
       // (la salida llega entera en result.log: una línea por mensaje inundaba el hilo principal)
       onStatus: (status, percent) => {
         const now = performance.now();
-        if (now - lastStatus > 100) {
+        if (!quiet && now - lastStatus > 100) {
           lastStatus = now;
           post({ type: 'status', status, percent });
         }
@@ -164,7 +166,9 @@ self.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
     if (icarus) engine.writeLibs(await loadIcarus());
     const t0 = performance.now();
     // (con Icarus, sin el «op» extra del punto de operación: sería otra inicialización de libvvp)
+    quiet = !!req.opts?.quiet;
     const result = engine.simulate(req.netlist, icarus ? { ...req.opts, bias: undefined } : req.opts);
+    quiet = false;
     const ms = performance.now() - t0;
     // Tras un error fatal ngspice queda en estado indefinido: instancia nueva para la próxima
     // (y tras simular punto a punto: `.save none` queda puesto en ngspice para siempre)

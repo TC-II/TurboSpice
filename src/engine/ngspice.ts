@@ -81,6 +81,8 @@ export interface SizeStop {
 export interface SimulateOptions {
   /** Devolver en `vcd` el .vcd que escribió un testbench de Verilog ($dumpvars) */
   vcd?: boolean;
+  /** Sin avisos de progreso (onStatus del EngineClient): una simulación que no es la del esquemático */
+  quiet?: boolean;
   /** Calcular además el punto de operación y leer estos parámetros de dispositivo */
   bias?: string[];
   /**

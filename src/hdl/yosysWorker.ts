@@ -4,6 +4,8 @@
 import { compileIcarus, vvpForEngine, type EmProgram, type IcarusLoader } from './icarus.ts';
 import { cosimSubckt, HdlError } from './synth.ts';
 import { TB_FILE, TB_TOP, TB_WRAP, tbNetlist } from './testbench.ts';
+import { TT_FILE, TT_MAX_BITS, TT_TOP, truthTableTb } from './truthTable.ts';
+import { t } from '../i18n/i18n.ts';
 import { splitFetch } from './splitFetch.ts';
 import { synthesize, type RunYosys, type SynthResult } from './yosys.ts';
 
@@ -16,7 +18,9 @@ export type YosysRequest =
   /** comportamiento: compilar con Icarus; `vvpFile` es el .vvp que nombra el .subckt */
   | { id: number; kind: 'icarus'; files: Record<string, string>; source: string; top: string; params?: Record<string, string>; vvpFile: string }
   /** un testbench: `top` es su módulo, sin puertos */
-  | { id: number; kind: 'testbench'; files: Record<string, string>; top: string };
+  | { id: number; kind: 'testbench'; files: Record<string, string>; top: string }
+  /** la tabla de verdad del módulo `top` (truthTable.ts): su testbench, compilado */
+  | { id: number; kind: 'truthTable'; files: Record<string, string>; top: string };
 export type YosysResponse = { id: number; result: SynthResult } | { id: number; failure: string };
 
 let run: Promise<RunYosys> | null = null;
@@ -50,7 +54,15 @@ self.onmessage = async (e: MessageEvent<YosysRequest>) => {
   const req = e.data;
   try {
     let result: SynthResult;
-    if (req.kind === 'testbench') {
+    if (req.kind === 'truthTable') {
+      // (los puertos como los declara el módulo, con su nombre: los de la síntesis van en minúsculas)
+      const mod = await compileIcarus(icarus, req.files, req.top);
+      const tb = mod.ports && truthTableTb(req.top, mod.ports);
+      const r = tb ? await compileIcarus(icarus, { ...req.files, [TT_FILE]: tb, [TB_FILE]: TB_WRAP }, TB_TOP, {}, { roots: [TT_TOP] }) : undefined;
+      result = r?.vvp
+        ? { vvp: vvpForEngine(r.vvp), netlist: tbNetlist(r), ports: mod.ports, log: r.log }
+        : { error: r?.error ?? mod.error ?? t('The truth table needs inputs and outputs, and at most {n} input bits', { n: TT_MAX_BITS }), log: r?.log ?? mod.log };
+    } else if (req.kind === 'testbench') {
       const r = await compileIcarus(icarus, { ...req.files, [TB_FILE]: TB_WRAP }, TB_TOP, {}, { roots: [req.top], wall: true });
       result = r.vvp ? { vvp: vvpForEngine(r.vvp), netlist: tbNetlist(r), log: r.log } : { error: r.error ?? 'Icarus', log: r.log };
     } else if (req.kind === 'icarus') {

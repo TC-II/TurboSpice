@@ -38,6 +38,9 @@ const request = (req: NoId<YosysRequest>): Promise<SynthResult> => {
 export const synthesizeVerilog = (files: Record<string, string>, source: string, top?: string, params?: Record<string, string>) =>
   request({ files, source, ...(top ? { top } : {}), ...(params ? { params } : {}) });
 
+/** Compila el testbench de la tabla de verdad del módulo `top` (truthTable.ts) */
+export const compileTruthTable = (files: Record<string, string>, top: string) => request({ kind: 'truthTable', files, top });
+
 /** Compila un testbench con Icarus: el .vvp y la netlist que lo corre */
 export const compileTestbench = (files: Record<string, string>, top: string) => request({ kind: 'testbench', files, top });
 

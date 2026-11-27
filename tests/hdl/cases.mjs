@@ -206,6 +206,20 @@ X1 a en b y c tri_io
     compare: ['b', [30e-9, 80e-9, 280e-9]],
   },
   {
+    // (2,4 V: un 1 con VIH = 0,7·3,3 = 2,31 V; con el umbral fijo de antes, 3,5 V, no llegaba)
+    name: '74HC: los umbrales siguen a vcc (un 74HC04 a 3,3 V lee 2,4 V como 1)',
+    file: 'hc04.v',
+    top: 'hc04',
+    verilog: HC('hc04'),
+    circuit: `Va a 0 PWL(0 0 100n 0 101n 2.4)
+X1 a y hc04 vcc=3.3 vil={0.3*vcc} vih={0.7*vcc} voh={vcc}
+.tran 1n 200n`,
+    check: (at) => {
+      if (at('y', 50e-9) < 3.2) return `con 0 V a la entrada, la salida en VCC (3,3 V): ${at('y', 50e-9)}`;
+      if (at('y', 180e-9) > 0.1) return `con 2,4 V a la entrada, la salida en 0: ${at('y', 180e-9)}`;
+    },
+  },
+  {
     name: '74HC: 595 (registros y salidas de tres estados), 74 (clear) y 4511 (latch), sintetizados',
     file: 'lib74.v',
     top: 'lib74',

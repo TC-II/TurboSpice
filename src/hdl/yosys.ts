@@ -1,5 +1,5 @@
 import { t } from '../i18n/i18n.ts';
-import { isVerilogHeader } from './icarus.ts';
+import { isVerilogHeader, type IcarusPort } from './icarus.ts';
 import { HdlError, yosysScript, yosysToSubckt, type HdlBlock, type YosysJson } from './synth.ts';
 // Corre Yosys (YoWASP, WebAssembly) sobre archivos Verilog y traduce el resultado (#209).
 // `run` es runYosys de @yowasp/yosys: en el navegador se carga en su propio Worker
@@ -18,6 +18,8 @@ export interface SynthResult {
   vvp?: string;
   /** testbench (testbench.ts): la netlist que lo corre, con `vvp` */
   netlist?: string;
+  /** tabla de verdad (truthTable.ts): los puertos del módulo, como los declara */
+  ports?: IcarusPort[];
   /** error de Yosys o de la traducción */
   error?: string;
   /** salida de Yosys (avisos) */

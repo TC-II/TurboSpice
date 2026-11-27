@@ -238,6 +238,8 @@ describe('archivos del proyecto', () => {
     expect(projectFileKind('x.ASY')).toBe('symbol');
     expect(projectFileKind('x.sub')).toBe('model');
     expect(projectFileKind('x.asc')).toBeNull();
+    // (Verilog: el código es un módulo; un .vh de `include y un .hex de $readmemh, archivos auxiliares)
+    expect([projectFileKind('a.v'), projectFileKind('rx.vh'), projectFileKind('rom.hex'), projectFileKind('m.mem')]).toEqual(['verilog', 'model', 'model', 'model']);
   });
 });
 

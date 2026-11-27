@@ -29,6 +29,8 @@ export interface Curve {
   digital?: boolean;
   /** ancho en bits de una traza digital (1: un bit; más: un bus) */
   bits?: number;
+  /** nombres de estado de un bus (valor → nombre, hdl/states.ts): van en lugar del número */
+  states?: Map<number, string>;
   /** corrida a la que pertenece ("R=2k", "#2") si hay varias */
   runLabel?: string;
 }

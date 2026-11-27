@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addVerilogModule, applySynth, isStale, looksBehavioral, setHdlMode, topModuleOf, verilogFile } from '../../src/hdl/project.ts';
+import { addVerilogModule, applySynth, isStale, looksBehavioral, setHdlMode, topModuleOf, verilogData, verilogFile, verilogSources } from '../../src/hdl/project.ts';
 import { parseVvp, vvpForEngine } from '../../src/hdl/icarus.ts';
 import { cosimSubckt, yosysToSubckt, type YosysJson } from '../../src/hdl/synth.ts';
 import { applyVariants, renameSubckt, withSubckts } from '../../src/hdl/variants.ts';
@@ -74,6 +74,15 @@ describe('módulos Verilog del proyecto (#209)', () => {
     expect(asy).not.toMatch(/^WINDOW 39 /m);
     // cambiar a comportamiento la deja desactualizada (hay que compilar con Icarus)
     expect(isStale(verilogFile(setHdlMode(p, 'm', 'behavioral'), 'm')!)).toBe(true);
+    // un testbench no se sintetiza: nunca queda desactualizado
+    expect(isStale(verilogFile(addVerilogModule(p, 'm_tb', 'module m_tb; endmodule'), 'm_tb')!)).toBe(false);
+  });
+  it('los fuentes de una compilación: los módulos y los .vh, sin los testbenches; los .hex van al motor', () => {
+    let p = addVerilogModule(newProject('P'), 'm', 'module m(); endmodule');
+    p = addVerilogModule(p, 'm_tb', 'module m_tb; m u(); endmodule');
+    p = { ...p, files: [...p.files, { name: 'defs.vh', kind: 'model', text: '`define W 4' }, { name: 'rom.hex', kind: 'model', text: 'A5' }] };
+    expect(Object.keys(verilogSources(p)).sort()).toEqual(['defs.vh', 'm.v']);
+    expect(verilogData(p)).toEqual({ 'rom.hex': 'A5' });
   });
 });
 
@@ -134,6 +143,8 @@ describe('señales digitales en el visor (#209)', () => {
     expect(formatRadix(58, 8, 'hex')).toBe('0x3A');
     expect(formatRadix(5, 4, 'bin')).toBe('0b0101');
     expect(formatRadix(14, 4, 'sdec')).toBe('-2');
+    expect(formatRadix(0x0927, 16, 'bcd')).toBe('0927');
+    expect(formatRadix(0x1a, 8, 'bcd')).toBe('1A');
     expect(formatRadix(LOGIC_X, 4, 'hex')).toBe('X');
     expect(busNames(['x1.q_3_d', 'x1.q_2_d', 'x1.q_1_d', 'x1.q_0_d', 'x1.clk_d'])).toEqual(['Dig(x1.q[3:0])']);
   });

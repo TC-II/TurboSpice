@@ -1,9 +1,12 @@
 // Módulos Verilog (#209): <nombre>.v + <nombre>.asy, como un subcircuito esquemático. Sintetizar
 // (Yosys) o compilar el comportamiento (Icarus), y las instancias con otros parameter (variantes)
 import { useRef, type MutableRefObject } from 'react';
-import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
-import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
-import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
+import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/client.ts';
+import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
+import { stateNames } from '../hdl/states.ts';
+import type { EngineClient } from '../engine/client.ts';
+import { applySynth, isStale, moduleOf, verilogData, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
+import { cosimLines, hdlOfLine, mergeableFor, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import { engineErrorText } from '../hdl/engineError.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
@@ -15,6 +18,7 @@ import type { Project } from '../project/turbo.ts';
 
 export interface VerilogDeps {
   lib: Library;
+  engine: EngineClient;
   projectRef: MutableRefObject<Project>;
   editProject(p: Project): void;
   setLibVersion(f: (v: number) => number): void;
@@ -22,7 +26,7 @@ export interface VerilogDeps {
   setMessage(m?: string): void;
 }
 
-export function useVerilog({ lib, projectRef, editProject, setLibVersion, setStatus, setMessage }: VerilogDeps) {
+export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion, setStatus, setMessage }: VerilogDeps) {
   /** Sintetiza el módulo `name` (con `text`, o el código que tiene el proyecto) y guarda el resultado y su símbolo */
   const synthModule = async (name: string, text?: string): Promise<SynthResult> => {
     const f = verilogFile(projectRef.current, name);
@@ -51,6 +55,24 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       setMessage(engineErrorText((e as Error).message, verilogFile(projectRef.current, name)?.hdl === 'behavioral'));
     }
   };
+  /** Corre el testbench `name` (*_tb.v) con el código `text`: compila con Icarus (con los demás .v del proyecto) y simula */
+  const runTb = async (name: string, text: string): Promise<TbOutcome> => {
+    const f = verilogFile(projectRef.current, name);
+    const top = tbModule(text);
+    if (!f || !top) return { error: t('There is no Verilog module {name}', { name }), compileLog: '' };
+    const sources = { ...verilogSources(projectRef.current), [f.name]: text };
+    const r = await compileTestbench(sources, top);
+    if (!r.vvp || !r.netlist) return { error: r.error, compileLog: r.log };
+    // (el progreso de ngspice no va a la barra de la simulación: ésta no es la del esquemático)
+    const progress = engine.onStatus;
+    engine.onStatus = undefined;
+    try {
+      const { result } = await engine.simulate(r.netlist, { ...verilogData(projectRef.current), [TB_VVP]: r.vvp }, { vcd: true });
+      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
+    } finally {
+      engine.onStatus = progress;
+    }
+  };
   /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */
   const synthStale = async () => {
     for (const f of verilogModules(projectRef.current).filter(isStale)) {
@@ -71,10 +93,10 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     let netlist = input;
     let aliases: Map<string, string> | undefined;
     const merged: string[] = [];
-    // los bloques de la biblioteca DSP, en un solo módulo de Icarus (#366, cosimMerge.ts); no si
-    // ya hay otro bloque de comportamiento (Icarus corre uno por simulación)
-    // (salvo que vaya al módulo único también: hdl=icarus, o un bloque DSP como el reloj)
-    const joins = (name: string, hdl: HdlMode) => hdl === 'icarus' || (hdl === 'auto' && /^dsp_/i.test(name));
+    // los bloques DSP y los de comportamiento, en un solo módulo de Icarus (#366, cosimMerge.ts):
+    // Icarus corre uno por simulación. No si queda afuera un bloque de comportamiento (un pin inout)
+    const cosimMods = mods.map((f) => ({ name: moduleOf(f), pins: f.synth!.pins, behavioral: !!f.synth!.vvp }));
+    const joins = mergeableFor(cosimMods);
     const behavioral = mods.some((f) => {
       if (!f.synth!.vvp) return false;
       const re = new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$).*$`, 'gim');
@@ -112,7 +134,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       const k = JSON.stringify(sources);
       let hit = mergeCache.current.get(k);
       if (!hit) {
-        setStatus({ kind: 'running', percent: 0, text: t('Compiling {n} DSP blocks into one Icarus module…', { n: m.instances.length }) });
+        setStatus({ kind: 'running', percent: 0, text: t('Compiling {n} blocks into one Icarus module…', { n: m.instances.length }) });
         const r = await compileBehavioral(sources, `${m.top}.v`, m.top, vvpFileOf(m.top));
         if (!r.block || !r.vvp) throw new Error(`${m.top}: ${r.error}`);
         hit = { subckt: r.block.subckt, vvp: r.vvp, pins: r.block.pins };
@@ -131,6 +153,8 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     );
     const files: Record<string, string> = { ...inFiles, ...(vvp ? { [vvpFileOf(MERGED_TOP)]: vvp } : {}) };
     for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
+    // (lo que lee un bloque de comportamiento con $readmemh)
+    if (vvp || mods.some((f) => f.synth!.vvp)) Object.assign(files, verilogData(p));
     const subs: string[] = [];
     /** .subckt de variantes que van al final de la netlist (su módulo no está en ningún archivo) */
     const inline: string[] = [...merged];
@@ -160,9 +184,9 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       if (hit.vvp) files[vvpFileOf(n.name)] = hit.vvp;
     }
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
-    const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
+    const cosims = cosimLines(withSubckts(v.netlist, subs), cosimMods);
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
     return { netlist: withSubckts(v.netlist, inline), files, warnings: [...notes, ...v.warnings], ...(aliases ? { aliases } : {}) };
   };
-  return { synthModule, synthAndReport, synthStale, withVariants };
+  return { synthModule, synthAndReport, synthStale, withVariants, runTb };
 }

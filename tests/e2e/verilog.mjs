@@ -237,6 +237,106 @@ await page.locator('.vm-suggest button').click();
 await synthesize();
 check((await status()) === 'Compilado (Icarus)', `compila con Icarus (${await status()})`);
 
+// --- dos bloques de comportamiento en la misma simulación (van juntos en un módulo de Icarus) ---
+await newModule('bdiv', 'Verilog');
+await code.fill('`timescale 1ns/1ps\n' + VERILOG.replace('div4', 'bdiv').replace('q <= q + 1;', 'q <= #1 q + 1;'));
+await until(async () => (await page.locator('.vm-suggest').count()) === 1);
+await page.locator('.vm-suggest button').click();
+await synthesize();
+// (bdiv tiene los pines de div4: la segunda instancia, 256 más abajo, a q2[1:0])
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'bdiv tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMBOL div4', 'SYMBOL bdiv').replace(
+    'TEXT',
+    'WIRE 384 640 400 640\nWIRE 384 672 400 672\nWIRE 496 640 512 640\nFLAG 384 640 clk\nFLAG 384 672 rst\nFLAG 512 640 q2[1:0]\nSYMBOL bdiv 448 656 R0\nSYMATTR InstName X2\nTEXT',
+  ),
+);
+await page.locator('.project-tree .tree-name', { hasText: 'bdiv tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `dos bloques Icarus en la misma simulación (${await page.locator('.status').first().textContent()})`);
+check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig() de las salidas de los dos bloques');
+{
+  const lanes = page.locator('.pane.digital .digital-lanes .dl-lane');
+  const a = await lanes.nth(0).locator('.dl-value').allTextContents();
+  const b = await lanes.nth(1).locator('.dl-value').allTextContents();
+  check(a.slice(0, 4).join() === '0x0,0x1,0x2,0x3' && b.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `los dos cuentan (${a.slice(0, 4)} | ${b.slice(0, 4)})`);
+}
+
+// --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
+const TB = (want) =>
+  '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n  initial $dumpvars(0, bdiv_tb);\n' +
+  // (una máquina de estados mínima: la onda de fase muestra los nombres de sus localparam)
+  "  localparam ESPERA = 2'd0, CUENTA = 2'd1;\n  reg [1:0] fase;\n  initial fase = ESPERA;\n  always @(negedge rst) fase <= CUENTA;\n" +
+  `  initial begin\n    #12 rst = 0;\n    @(posedge clk); @(posedge clk); #2;\n    if (q !== ${want}) $fatal(1, "FAIL: q=%d", q);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n`;
+await newModule('bdiv_tb', 'Verilog');
+check(
+  (await code.inputValue()).includes('module bdiv_tb;') && !(await page.locator('.project-tree').textContent()).includes('bdiv_tbverilog3 pines'),
+  'la plantilla de un *_tb es un testbench, sin síntesis',
+);
+check(
+  (await page.locator('.sub-simbar').textContent()).startsWith('Testbench bdiv_tb') && (await page.locator('.sub-hint-text').textContent()).startsWith('un testbench'),
+  `las barras dicen que es un testbench (${await page.locator('.sub-simbar').textContent()})`,
+);
+check(
+  (await page.locator('.vm-mode').count()) === 0 && (await page.locator('.vm-bar button.primary').textContent()) === 'Correr testbench',
+  'un *_tb.v se corre: «Correr testbench», sin modo de síntesis',
+);
+const runTb = async (text) => {
+  await code.fill(text);
+  await page.locator('.vm-bar button.primary').click();
+  await page.waitForFunction(() => /^(PASS|FAIL|Falló la compilación)$/.test(document.querySelector('.vm-status')?.textContent ?? ''), null, { timeout: 120000 });
+  return status();
+};
+check((await runTb(TB(2))) === 'PASS' && (await page.locator('.vm-tb').textContent()).includes('$finish called'), `el testbench pasa (${await status()})`);
+// las ondas del .vcd, abajo del código: las señales del testbench y, a pedido, las de adentro
+{
+  const names = () => page.locator('.vm-waves .dl-name title').allTextContents();
+  check(JSON.stringify(await names()) === JSON.stringify(['q', 'clk', 'fase', 'rst']), `las ondas de $dumpvars: las señales del testbench (${await names()})`);
+  const q = await page.locator('.vm-waves .dl-lane').nth(0).locator('.dl-value').allTextContents();
+  check(q.join() === '0x0,0x1,0x2', `y el bus q cuenta (${q})`);
+  const fase = await page.locator('.vm-waves .dl-lane').nth(2).locator('.dl-value').allTextContents();
+  check(fase.join() === 'ESPERA,CUENTA', `fase, con los nombres de sus estados (${fase})`);
+  await page.getByLabel('Base de los buses').selectOption('bcd');
+  const bcd = await page.locator('.vm-waves .dl-lane').nth(0).locator('.dl-value').allTextContents();
+  check(bcd.join() === '0,1,2', `en BCD (${bcd})`);
+  await page.getByLabel('Módulos de adentro').check();
+  check((await names()).includes('u.q'), `con los módulos de adentro, también u.q (${await names()})`);
+}
+check((await runTb(TB(3))) === 'FAIL' && (await page.locator('.vm-tb').textContent()).includes('FAIL: q='), `con otro valor esperado, $fatal da FAIL (${await status()})`);
+check((await runTb(TB(2).replace('.q(q)', '.q(q[0])'))) === 'FAIL', `un warning de compilación es FAIL (${await page.locator('.vm-tb').textContent()})`);
+check((await runTb(TB(2).replace('$finish;', '$finish'))) === 'Falló la compilación' && (await page.locator('.vm-gutter .err').count()) === 1, 'un error de sintaxis se marca en su línea');
+await runTb(TB(2));
+// un testbench con `include de un .vh y $readmemh de un .hex, soltados con él
+await page.evaluate(() => {
+  const dt = new DataTransfer();
+  const tb =
+    '`timescale 1ns/1ps\n`include "defs.vh"\nmodule rom_tb;\n  reg [`ANCHO-1:0] mem [0:3];\n  initial begin\n    $readmemh("datos.hex", mem);\n    #1;\n' +
+    '    if (mem[2] !== 8\'hC3) $fatal(1, "FAIL: mem[2]=%h", mem[2]);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n';
+  dt.items.add(new File([tb], 'rom_tb.v'));
+  dt.items.add(new File(['`define ANCHO 8\n'], 'defs.vh'));
+  dt.items.add(new File(['A5\n5A\nC3\n3C\n'], 'datos.hex'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+});
+await page.locator('.project-tree .tree-name', { hasText: /rom_tb$/ }).click();
+await page.locator('.verilog-module').waitFor();
+check((await runTb(await code.inputValue())) === 'PASS', `con un .vh (\`include) y un .hex ($readmemh) del proyecto (${await page.locator('.vm-tb').textContent()})`);
+await page.locator('.project-tree .tree-name', { hasText: /bdiv_tb$/ }).click();
+await page.waitForFunction(() => document.querySelector('.verilog-module strong')?.textContent === 'bdiv_tb.v');
+// el esquemático con bdiv sigue simulando (el testbench no se sintetiza antes)
+// (la simulación del último workbench, «bdiv tb»)
+await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'Tran 0 - 1µ' }).last().click();
+await page.waitForFunction(() => !document.querySelector('.verilog-module'));
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `con un testbench en el proyecto, el esquemático sigue simulando (${await page.locator('.status').first().textContent()})`);
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

@@ -60,6 +60,8 @@ export interface SimResult {
   sizeStop?: SizeStop;
   /** Se simuló punto a punto (`.save none`): el módulo queda así para siempre y hay que recrearlo */
   reload?: boolean;
+  /** el .vcd del testbench (opción `vcd`), si escribió uno */
+  vcd?: string;
 }
 
 /** Lo que se midió al cortar un transitorio que no iba a entrar en memoria */
@@ -77,6 +79,8 @@ export interface SizeStop {
 }
 
 export interface SimulateOptions {
+  /** Devolver en `vcd` el .vcd que escribió un testbench de Verilog ($dumpvars) */
+  vcd?: boolean;
   /** Calcular además el punto de operación y leer estos parámetros de dispositivo */
   bias?: string[];
   /**
@@ -125,6 +129,8 @@ interface EmModule {
   FS: {
     mkdirTree(path: string): void;
     writeFile(path: string, data: string | Uint8Array): void;
+    readdir(path: string): string[];
+    readFile(path: string, opts: { encoding: 'utf8' }): string;
   };
   addFunction(fn: (...args: number[]) => number, sig: string): number;
   UTF8ToString(ptr: number): string;
@@ -440,7 +446,23 @@ export class Ngspice {
     this.streams = null;
     this.stream = null;
 
-    return { plots, log: this.log, errors: this.errors, aborted: this.aborted, bias, ...(sizeStop ? { sizeStop } : {}), ...(plan ? { reload: true } : {}) };
+    // (el de $dumpfile, o dump.vcd; Icarus lo termina de escribir al cerrarse el d_cosim, con el circuito)
+    if (opts.vcd && this.hasCircuit) {
+      this.command('remcirc');
+      this.hasCircuit = false;
+    }
+    const vcdFile = opts.vcd ? this.m.FS.readdir(WORK_DIR).find((f) => /\.vcd$/i.test(f)) : undefined;
+    const vcd = vcdFile ? this.m.FS.readFile(`${WORK_DIR}/${vcdFile}`, { encoding: 'utf8' }) : undefined;
+    return {
+      plots,
+      log: this.log,
+      errors: this.errors,
+      aborted: this.aborted,
+      bias,
+      ...(sizeStop ? { sizeStop } : {}),
+      ...(plan ? { reload: true } : {}),
+      ...(vcd ? { vcd } : {}),
+    };
   }
 
   /** Plots recibidos punto a punto en esta simulación (null: los guarda ngspice) */

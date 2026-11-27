@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MERGED_LINE, hdlOfLine, internalOnly, mergeCosim, mergedLine, stripHdl, type MergeModule } from '../../src/hdl/cosimMerge.ts';
+import { MERGED_LINE, cosimLines, hdlOfLine, mergeableFor, internalOnly, mergeCosim, mergedLine, stripHdl, type MergeModule } from '../../src/hdl/cosimMerge.ts';
 
 // Los bloques DSP en un solo módulo de Icarus (#366)
 const bits = (n: string, w: number) => Array.from({ length: w }, (_, k) => `${n}_${w - 1 - k}`);
@@ -64,6 +64,33 @@ describe('cosimMerge', () => {
   });
   it('nada que juntar con menos de dos instancias o si `mergeable` no las quiere', () => {
     expect(mergeCosim(NET, MODS, (n) => n === 'dsp_neg')).toBeNull();
+  });
+  it('sólo junta las instancias con los mismos parámetros eléctricos (los del juego más repetido)', () => {
+    const x3 = 'X3 y__1__ y__0__ z__1__ z__0__ dsp_neg tpd=1n vcc=5 W=2';
+    const net = NET.replace('Vx1 ', `${x3}\nX4 z__1__ z__0__ u__1__ u__0__ dsp_neg vcc=3.3 tpd=1n W=2\nVx1 `);
+    const m = mergeCosim(net, MODS, () => true)!;
+    expect(m.instances).toEqual(['x1', 'x2', 'x3']);
+    expect(m.netlist).toMatch(/^X4 .* vcc=3\.3 /m);
+    expect(m.electrical).toEqual(['vcc=5', 'tpd=1n']);
+    // dos y dos: ninguno es más repetido, gana el primero
+    expect(mergeCosim(net.replace(x3, x3.replace('vcc=5', 'vcc=3.3')), MODS, () => true)!.instances).toEqual(['x1', 'x2']);
+  });
+  it('mergeableFor: un módulo con un pin inout no se junta (queda como su propio d_cosim)', () => {
+    const mods = [
+      { name: 'dsp_add', pins: [{ dir: 'in' as const }], behavioral: false },
+      { name: 'bus', pins: [{ dir: 'inout' as const }], behavioral: true },
+      { name: 'beh', pins: [{ dir: 'out' as const }], behavioral: true },
+      { name: 'comb', pins: [{ dir: 'out' as const }], behavioral: false },
+    ];
+    const j = mergeableFor(mods);
+    expect(j('dsp_add', 'auto')).toBe(true);
+    expect(j('beh', 'auto')).toBe(true);
+    expect(j('comb', 'auto')).toBe(false);
+    expect(j('comb', 'icarus')).toBe(true);
+    expect(j('bus', 'auto')).toBe(false);
+    expect(j('bus', 'icarus')).toBe(false);
+    // el módulo juntado también es un d_cosim: con otro bloque de comportamiento, son dos
+    expect(cosimLines(['xdsp a b dsp_cosim vcc=5', 'X3 c d bus vcc=5', 'X4 e comb__w4 vcc=5', 'X5 f beh__w8 vcc=5'].join('\n'), mods)).toHaveLength(3);
   });
   it('internalOnly: las salidas internas, sin dac_bridge ni pin del .subckt', () => {
     const sub = [

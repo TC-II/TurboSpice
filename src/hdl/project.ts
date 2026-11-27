@@ -8,6 +8,7 @@ import type { Project, ProjectFile, VerilogSynth } from '../project/turbo.ts';
 import { t } from '../i18n/i18n.ts';
 import { ELECTRICAL, ELECTRICAL_NAMES } from './electrical.ts';
 import type { HdlBlock, PinDir } from './synth.ts';
+import { isVerilogHeader } from './icarus.ts';
 
 const key = (s: string) => s.toLowerCase();
 
@@ -16,11 +17,20 @@ export const isVerilogName = (name: string) => /\.s?v$/i.test(name);
 export const moduleOf = (f: { name: string }) => f.name.replace(/\.s?v$/i, '');
 export const verilogModules = (p: Project): ProjectFile[] => p.files.filter((f) => f.kind === 'verilog');
 export const verilogFile = (p: Project, name: string): ProjectFile | undefined => verilogModules(p).find((f) => key(moduleOf(f)) === key(name));
-/** ¿Cambió el código (o el modo) desde la última síntesis, o nunca se sintetizó? */
-export const isStale = (f: ProjectFile) => !f.synth || f.synth.source !== f.text || !!f.synth.vvp !== (f.hdl === 'behavioral');
-/** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo) */
+/** Un testbench (*_tb.v): no se sintetiza ni lo usan los otros módulos; se corre (testbench.ts) */
+export const isTestbench = (f: { name: string }) => /_tb\.s?v$/i.test(f.name);
+/** ¿Cambió el código (o el modo) desde la última síntesis, o nunca se sintetizó? Un testbench no se sintetiza: nunca */
+export const isStale = (f: ProjectFile) => !isTestbench(f) && (!f.synth || f.synth.source !== f.text || !!f.synth.vvp !== (f.hdl === 'behavioral'));
+/** Archivos de datos de $readmemh (.hex, .mem): los lee el bloque de comportamiento, en el motor */
+export const verilogData = (p: Project): Record<string, string> => Object.fromEntries(p.files.filter((f) => /\.(hex|mem)$/i.test(f.name)).map((f) => [f.name, f.text]));
+/** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo), con los .vh */
 export const verilogSources = (p: Project, override?: { name: string; text: string }): Record<string, string> => ({
-  ...Object.fromEntries(verilogModules(p).map((f) => [f.name, f.text])),
+  ...Object.fromEntries(p.files.filter((f) => isVerilogHeader(f.name)).map((f) => [f.name, f.text])),
+  ...Object.fromEntries(
+    verilogModules(p)
+      .filter((f) => !isTestbench(f))
+      .map((f) => [f.name, f.text]),
+  ),
   ...(override ? { [override.name]: override.text } : {}),
 });
 

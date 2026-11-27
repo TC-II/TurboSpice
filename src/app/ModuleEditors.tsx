@@ -3,7 +3,8 @@
 import { Suspense } from 'react';
 import type { AscDoc } from '../asc/model.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
-import { isStale, looksBehavioral, setHdlMode, storeVerilog, verilogSymbol, withParams } from '../hdl/project.ts';
+import type { TbOutcome } from '../hdl/testbench.ts';
+import { isStale, isTestbench, looksBehavioral, setHdlMode, storeVerilog, verilogSymbol, withParams } from '../hdl/project.ts';
 import { VerilogModule } from '../hdl/VerilogModule.tsx';
 import { ModelEditor, SymbolEditor } from '../lazyViews.ts';
 import { modelModuleFile, modelSymbolText, storeModelSymbol, storeModelText } from '../project/modelModule.ts';
@@ -27,13 +28,29 @@ export interface ModuleEditorsProps {
   setSymW(w: number): void;
   liveDoc: AscDoc;
   synthModule(name: string, text?: string): Promise<SynthResult>;
+  runTb(name: string, text: string): Promise<TbOutcome>;
   /** avisa si el subcircuito se usa en otros testbenches */
   warnShared(): void;
   /** renombrar un módulo «Modelo» (el diálogo, con `initial` propuesto) */
   renameModel(name: string, initial?: string): void;
 }
 
-export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared, renameModel }: ModuleEditorsProps) {
+export function ModuleEditors({
+  project,
+  curVerilog,
+  curModel,
+  setCurModel,
+  symText,
+  subPorts,
+  editSymbol,
+  addPort,
+  setSymW,
+  liveDoc,
+  synthModule,
+  runTb,
+  warnShared,
+  renameModel,
+}: ModuleEditorsProps) {
   const { projectRef, editProject, curSub, setDialog, setTool } = useSchematic();
   return (
     <>
@@ -100,6 +117,7 @@ export function ModuleEditors({ project, curVerilog, curModel, setCurModel, symT
             warnShared();
           }}
           onSynthesize={(text) => synthModule(curSub, text)}
+          onTestbench={isTestbench(curVerilog) ? (text) => runTb(curSub, text) : undefined}
           onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
         />
       )}

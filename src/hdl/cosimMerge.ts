@@ -73,6 +73,33 @@ export const hdlOfLine = (line: string): HdlMode => hdlOf(tokens(line));
  */
 export const stripHdl = (text: string) => text.replace(/^(\s*(?:x\S*|\.subckt)\s.*)$/gim, (line) => line.replace(/\s+hdl=\S+/gi, '').replace(/\s+params:\s*$/i, ''));
 
+/** Un módulo Verilog del proyecto: sus pines y si es de comportamiento (tiene .vvp: su propio d_cosim) */
+export interface CosimModule {
+  name: string;
+  pins: { dir: PinDir }[];
+  behavioral: boolean;
+}
+
+/**
+ * El `mergeable` de mergeCosim para los módulos del proyecto: en auto, los DSP y los de comportamiento;
+ * en icarus, todos. Nunca uno con un pin inout, que mergeCosim deja afuera: así quien llama sabe que
+ * ese bloque queda como su propio d_cosim
+ */
+export function mergeableFor(mods: CosimModule[]) {
+  const byName = new Map(mods.map((m) => [m.name.toLowerCase(), m]));
+  return (name: string, hdl: HdlMode) => {
+    const m = byName.get(name.toLowerCase());
+    if (m?.pins.some((p) => p.dir === 'inout')) return false;
+    return hdl === 'icarus' || (hdl === 'auto' && (/^dsp_/i.test(name) || !!m?.behavioral));
+  };
+}
+
+/** Las líneas X de la netlist que son un d_cosim (Icarus): los bloques de comportamiento, sus variantes y el módulo juntado */
+export function cosimLines(netlist: string, mods: CosimModule[]): string[] {
+  const names = [MERGED_TOP, ...mods.filter((m) => m.behavioral).map((m) => m.name)].map((n) => new RegExp(`\\s${n}(__\\w+)?(\\s|$)`, 'i'));
+  return (netlist.match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => names.some((re) => re.test(l)));
+}
+
 /** Las palabras de una línea, sin cortar llaves ni paréntesis ({vcc/2}) */
 const tokens = (line: string) => line.trim().match(/(?:\{[^{}]*\}|\([^()]*\)|[^\s{}()])+/g) ?? [];
 
@@ -93,7 +120,7 @@ interface Inst {
 export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (module: string, hdl: HdlMode) => boolean, traces: string[] = []): CosimMerge | null {
   const byName = new Map(modules.map((m) => [m.name.toLowerCase(), m]));
   const lines = netlist.split('\n');
-  const insts: Inst[] = [];
+  let insts: Inst[] = [];
   let depth = 0;
   let control = false;
   lines.forEach((l, i) => {
@@ -119,6 +146,17 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
     }
     insts.push({ line: i, name: tt[0]!.toLowerCase(), mod, nodes: tt.slice(1, at), params, electrical });
   });
+  // la línea X nueva lleva un solo juego de parámetros eléctricos: se juntan las instancias del
+  // juego más repetido y las demás quedan como están
+  const key = (x: Inst) =>
+    x.electrical
+      .map((e) => e.toLowerCase())
+      .sort()
+      .join(' ');
+  const count = new Map<string, number>();
+  for (const x of insts) count.set(key(x), (count.get(key(x)) ?? 0) + 1);
+  const best = [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
+  insts = insts.filter((x) => key(x) === best);
   if (insts.length < 2) return null;
 
   // dónde más aparece cada nodo (fuera de los .subckt, de las instancias juntadas y de las R de gmin)

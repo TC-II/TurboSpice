@@ -38,6 +38,9 @@ const request = (req: NoId<YosysRequest>): Promise<SynthResult> => {
 export const synthesizeVerilog = (files: Record<string, string>, source: string, top?: string, params?: Record<string, string>) =>
   request({ files, source, ...(top ? { top } : {}), ...(params ? { params } : {}) });
 
+/** Compila un testbench con Icarus: el .vvp y la netlist que lo corre */
+export const compileTestbench = (files: Record<string, string>, top: string) => request({ kind: 'testbench', files, top });
+
 /** Compila Verilog de comportamiento con Icarus (la primera vez lo baja): .vvp y .subckt con d_cosim */
 export const compileBehavioral = (files: Record<string, string>, source: string, top: string, vvpFile: string, params?: Record<string, string>) =>
   request({ kind: 'icarus', files, source, top, vvpFile, ...(params ? { params } : {}) });

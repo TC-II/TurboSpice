@@ -2,6 +2,7 @@
 // las redes, el punto de operación y la barra de la simulación del testbench
 import type { ComponentProps, CSSProperties, Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { AscDoc } from '../asc/model.ts';
+import { isTestbench } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import type { Status } from '../NetlistMode.tsx';
 import { ProjectCapsule } from '../project/ProjectCapsule.tsx';
@@ -182,7 +183,11 @@ export function SimRow(props: SimRowProps) {
         </div>
         <div className="bar-after">
           {curSub ? (
-            <span className="sub-simbar">{t('Subcircuit {name}: it is simulated from the testbenches that use it', { name: curSub })}</span>
+            <span className="sub-simbar">
+              {isTestbench({ name: `${curSub}.v` })
+                ? t('Testbench {name}: it is run with «Run testbench»', { name: curSub })
+                : t('Subcircuit {name}: it is simulated from the testbenches that use it', { name: curSub })}
+            </span>
           ) : (
             <SimBar
               sim={curSim && { name: simName(curSim), custom: !!curSim.name, line: curSim.line }}

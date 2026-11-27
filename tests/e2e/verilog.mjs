@@ -399,8 +399,11 @@ check(
 
 // --- setup del 74HC74: D sube 5 ns antes del flanco de reloj (tsu = 20 ns) ---
 await page.keyboard.press('p');
-await page.locator('.picker input').fill('74HC74');
-await page.locator('.picker-list li').filter({ hasText: 'hc7474HC ·' }).click();
+await page.locator('.modal input').fill('74HC74');
+await page
+  .locator('.picker-list li')
+  .filter({ has: page.locator('.path', { hasText: /^hc74$/ }) })
+  .click();
 {
   const svg = await page.locator('svg.editor').boundingBox();
   await page.mouse.click(svg.x + svg.width * 0.3, svg.y + svg.height * 0.3);
@@ -453,8 +456,11 @@ check(
 
 // --- tabla de verdad de un esquemático (plantilla del Estudio): una NAND 74HC00 con dos fuentes ---
 await page.keyboard.press('p');
-await page.locator('.picker input').fill('74HC00');
-await page.locator('.picker-list li').filter({ hasText: 'hc0074HC ·' }).click();
+await page.locator('.modal input').fill('74HC00');
+await page
+  .locator('.picker-list li')
+  .filter({ has: page.locator('.path', { hasText: /^hc00$/ }) })
+  .click();
 {
   const svg = await page.locator('svg.editor').boundingBox();
   await page.mouse.click(svg.x + svg.width * 0.6, svg.y + svg.height * 0.7);

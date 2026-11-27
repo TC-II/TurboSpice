@@ -227,6 +227,18 @@ check(triValues.slice(0, 3).join() === 'Z,0x0,0x1', `el bus en alta impedancia m
 check((await page.locator('.digital-lanes g.dl-z').count()) === 2 && (await page.locator('.digital-lanes g.dl-x').count()) === 0, 'los tramos Z del bus se dibujan como Z, no como X');
 check((await page.locator('.digital-lanes path.dl-z').count()) === 1 && (await page.locator('.digital-lanes path.dl-x').count()) === 0, 'y los del bit también');
 
+// --- tabla de verdad de un módulo combinacional ---
+await newModule('mux2', 'Verilog');
+await code.fill('module mux2 (input S, input A, input B, output Y);\n  assign Y = S ? B : A;\nendmodule\n');
+await page.getByRole('button', { name: 'Tabla de verdad', exact: true }).click();
+await page.locator('.vm-tt tbody tr').first().waitFor({ timeout: 120000 });
+{
+  const head = await page.locator('.vm-tt th').allTextContents();
+  const rows = await page.locator('.vm-tt tbody tr').evaluateAll((trs) => trs.map((tr) => tr.textContent));
+  check(head.join() === 'S,A,B,Y' && rows.length === 8, `la tabla de verdad: las entradas en orden y las 8 filas (${head} | ${rows.length})`);
+  check(rows.join() === '0000,0010,0101,0111,1000,1011,1100,1111', `con los valores de un MUX 2:1 (${rows})`);
+}
+
 // --- comportamiento (Icarus): retardos y $display ---
 await newModule('pulso', 'Verilog');
 await code.fill(

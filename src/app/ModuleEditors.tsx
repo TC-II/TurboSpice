@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import type { AscDoc } from '../asc/model.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
 import type { TbOutcome } from '../hdl/testbench.ts';
+import type { TruthTable } from '../hdl/truthTable.ts';
 import { isStale, isTestbench, looksBehavioral, setHdlMode, storeVerilog, verilogSymbol, withParams } from '../hdl/project.ts';
 import { VerilogModule } from '../hdl/VerilogModule.tsx';
 import { ModelEditor, SymbolEditor } from '../lazyViews.ts';
@@ -29,6 +30,7 @@ export interface ModuleEditorsProps {
   liveDoc: AscDoc;
   synthModule(name: string, text?: string): Promise<SynthResult>;
   runTb(name: string, text: string): Promise<TbOutcome>;
+  truthTable(name: string, text: string): Promise<TruthTable | { error: string }>;
   /** avisa si el subcircuito se usa en otros testbenches */
   warnShared(): void;
   /** renombrar un módulo «Modelo» (el diálogo, con `initial` propuesto) */
@@ -48,6 +50,7 @@ export function ModuleEditors({
   liveDoc,
   synthModule,
   runTb,
+  truthTable,
   warnShared,
   renameModel,
 }: ModuleEditorsProps) {
@@ -118,6 +121,7 @@ export function ModuleEditors({
           }}
           onSynthesize={(text) => synthModule(curSub, text)}
           onTestbench={isTestbench(curVerilog) ? (text) => runTb(curSub, text) : undefined}
+          onTruthTable={isTestbench(curVerilog) ? undefined : (text) => truthTable(curSub, text)}
           onParams={(ps) => symText && editSymbol(withParams(symText, ps))}
         />
       )}

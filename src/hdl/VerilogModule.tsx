@@ -6,6 +6,7 @@ import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES, familyOf } from './electrical.t
 import type { SynthResult } from './yosys.ts';
 import { engineErrorText } from './engineError.ts';
 import type { TbOutcome } from './testbench.ts';
+import type { TruthTable } from './truthTable.ts';
 import { TbWaves } from './TbWaves.tsx';
 
 /**
@@ -26,6 +27,7 @@ export function VerilogModule({
   onText,
   onSynthesize,
   onTestbench,
+  onTruthTable,
   onParams,
 }: {
   name: string;
@@ -44,12 +46,15 @@ export function VerilogModule({
   onText(text: string): void;
   onSynthesize(text: string): Promise<SynthResult>;
   onTestbench?(text: string): Promise<TbOutcome>;
+  /** la tabla de verdad del módulo (truthTable.ts) */
+  onTruthTable?(text: string): Promise<TruthTable | { error: string }>;
   onParams(ps: [string, string][]): void;
 }) {
   const [code, setCode] = useState(text);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<SynthResult | null>(null);
   const [tb, setTb] = useState<TbOutcome | null>(null);
+  const [tt, setTt] = useState<TruthTable | { error: string } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
@@ -61,6 +66,7 @@ export function VerilogModule({
   useEffect(() => {
     setResult(null);
     setTb(null);
+    setTt(null);
     setFailure(null);
   }, [name]);
   // el código va al proyecto un momento después de dejar de escribir (y al sintetizar)
@@ -150,6 +156,25 @@ export function VerilogModule({
         >
           {onTestbench ? t('Run testbench') : mode === 'behavioral' ? t('Compile') : t('Synthesize')}
         </button>
+        {onTruthTable && (
+          <button
+            type="button"
+            disabled={busy}
+            title={t('All the input combinations and their outputs (Icarus), for a combinational module')}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                setTt(await onTruthTable(code));
+              } catch (e) {
+                setTt({ error: (e as Error).message });
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {t('Truth table')}
+          </button>
+        )}
       </div>
       <div className="vm-body">
         <div className="vm-code">
@@ -198,6 +223,37 @@ export function VerilogModule({
               {w}
             </p>
           ))}
+          {tt && (
+            <section>
+              <h4>{t('Truth table')}</h4>
+              {'error' in tt ? (
+                <p className="err">{tt.error}</p>
+              ) : (
+                <table className="vm-tt">
+                  <thead>
+                    <tr>
+                      {[...tt.inputs, ...tt.outputs].map((p, k) => (
+                        <th key={k} className={k === tt.inputs.length ? 'first-out' : undefined}>
+                          {p.bits > 1 ? `${p.name}[${p.bits - 1}:0]` : p.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tt.rows.map((r, i) => (
+                      <tr key={i}>
+                        {r.map((c, k) => (
+                          <td key={k} className={k === tt.inputs.length ? 'first-out' : undefined}>
+                            {c}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+          )}
           {onTestbench ? (
             <section>
               <h4>{t('Testbench output')}</h4>

@@ -1,6 +1,7 @@
 // Archivos VCD ($dumpvars de un testbench de Verilog) → señales digitales como las de los nodos de
 // XSPICE (digital.ts): los instantes de cada cambio y el valor desde ahí; 0/1 o el número de un bus,
 // X = 0,5 y Z = NaN (un bus es Z si todos sus bits lo son, y X si alguno es X o hay Z mezclados).
+import { parseSpiceNumber } from '../netlist/spicenum.ts';
 import { LOGIC_X, LOGIC_Z } from './digital.ts';
 
 export interface VcdSignal {
@@ -19,8 +20,6 @@ export interface Vcd {
   /** el último instante del archivo, en segundos */
   end: number;
 }
-
-const UNITS: Record<string, number> = { s: 1, ms: 1e-3, us: 1e-6, ns: 1e-9, ps: 1e-12, fs: 1e-15 };
 
 /** Valor de un bus ("b10x1" sin la b), extendido a `bits` como dice el formato */
 export function vcdValue(v: string, bits: number): number {
@@ -60,7 +59,7 @@ export function parseVcd(text: string): Vcd {
     switch (tok) {
       case '$timescale': {
         const m = /^(\d+)\s*([munpf]?s)$/.exec(`${tokens[k + 1]}${tokens[k + 2] === '$end' ? '' : tokens[k + 2]}`);
-        if (m) unit = Number(m[1]) * UNITS[m[2]];
+        if (m) unit = parseSpiceNumber(`${m[1]}${m[2]}`);
         skipToEnd();
         break;
       }

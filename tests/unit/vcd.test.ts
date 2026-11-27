@@ -52,6 +52,11 @@ describe('vcd', () => {
     expect([...q.y]).toEqual([0.5, 0, 10, NaN]);
     expect(dutClk.y).toBe(clk.y);
   });
+  it('la unidad de $timescale, junta o separada del número', () => {
+    expect(parseVcd(VCD.replace('1ps', '10 us')).signals[0].x[1]).toBeCloseTo(5000 * 10e-6);
+    expect(parseVcd(VCD.replace('1ps', '1s')).signals[0].x[1]).toBe(5000);
+    expect(parseVcd(VCD.replace('1ps', '100fs')).signals[0].x[1]).toBeCloseTo(5000 * 100e-15);
+  });
   it('un valor más corto que el bus se extiende como dice el formato', () => {
     expect(vcdValue('1', 4)).toBe(1);
     expect(vcdValue('z', 4)).toBeNaN();

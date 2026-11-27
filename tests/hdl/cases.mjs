@@ -252,6 +252,24 @@ X1 ser srclk rclk oe_n d clk clr_n b3 b2 b0 le qa qb qc qd qe qf qg qh qhs q q_n
     },
   },
   {
+    name: '74HC74 sintetizado: con preset y clear en bajo, al soltar clear manda preset',
+    file: 'hc74.v',
+    verilog: HC('hc74'),
+    // PRE_n y CLR_n en 0; se suelta CLR_n en 100 ns y PRE_n en 200 ns
+    circuit: `Vd d 0 0
+Vclk clk 0 0
+Vpre pre_n 0 ${pwl(0, 200)}
+Vclr clr_n 0 ${pwl(0, 100)}
+X1 d clk pre_n clr_n q q_n hc74
+.tran 1n 300n`,
+    check: (at) => {
+      const qq = (tt) => `${at('q', tt) > 2.5 ? 1 : 0}${at('q_n', tt) > 2.5 ? 1 : 0}`;
+      if (qq(50e-9) !== '11') return `los dos en bajo: Q y Q_n en 1, no ${qq(50e-9)}`;
+      if (qq(150e-9) !== '10') return `suelta clear: Q en 1, no ${qq(150e-9)}`;
+      if (qq(250e-9) !== '10') return `suelta preset: Q sigue en 1, no ${qq(250e-9)}`;
+    },
+  },
+  {
     name: 'memoria de 16×4 (Yosys la pasa a flip-flops)',
     file: 'ram.v',
     verilog: `module ram(input clk, input we, input [1:0] a, input [3:0] d, output [3:0] q);

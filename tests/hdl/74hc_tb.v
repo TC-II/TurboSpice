@@ -98,6 +98,11 @@ module lib74hc_tb;
     #1 check("74 preset", {q74, qn74}, 2'b10);
     clr_n = 0;
     #1 check("74 preset y clear", {q74, qn74}, 2'b11);
+    // se suelta clear con preset en bajo: manda preset, y Q sigue en 1 al soltarlo
+    clr_n = 1;
+    #1 check("74 suelta clear", {q74, qn74}, 2'b10);
+    pre_n = 1;
+    #1 check("74 suelta preset", {q74, qn74}, 2'b10);
     clr_n = 1; pre_n = 1; d = 0;
     `PULSO(clk)
     check("74 D=0", {q74, qn74}, 2'b01);

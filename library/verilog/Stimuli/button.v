@@ -6,11 +6,11 @@ module button #(parameter T_PRESS = 1000, parameter T_HOLD = 20000, parameter T_
                 parameter ACTIVE = 0, parameter SEED = 1) (output reg y);
   integer s = SEED;
   integer k;
-  // N_BOUNCE cambios hacia v y desde v, con intervalos al azar de 0 a 2·T_BOUNCE/N_BOUNCE (en ns)
+  // N_BOUNCE cambios hacia v y desde v, con intervalos al azar de 0 a T_BOUNCE/N_BOUNCE (en ns): unos T_BOUNCE en total
   task rebote(input v);
     for (k = 0; k < 2 * N_BOUNCE; k = k + 1) begin
       y = k % 2 ? !v : v;
-      #(({$random(s)} % (2000 * T_BOUNCE / N_BOUNCE)) / 1000.0);
+      #(({$random(s)} % (1000 * T_BOUNCE / N_BOUNCE)) / 1000.0);
     end
   endtask
   initial begin

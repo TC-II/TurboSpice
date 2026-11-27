@@ -8,7 +8,8 @@ module stimuli_tb;
   wire y;
   button #(.T_PRESS(10), .T_HOLD(100), .T_BOUNCE(2), .N_BOUNCE(4)) b (.y(y));
   integer flancos = 0;
-  always @(y) if ($realtime > 9) flancos = flancos + 1;
+  realtime ultimo = 0;
+  always @(y) if ($realtime > 9) begin flancos = flancos + 1; if ($realtime < 50) ultimo = $realtime; end
 
   // --- teclado: se barren las filas (una en 0 por vez, 1 µs cada una) ---
   reg [3:0] row = 4'b1111;
@@ -40,6 +41,7 @@ module stimuli_tb;
     #50;
     if (y !== 0) begin $display("FAIL pulsador apretado: %b", y); errores = errores + 1; end
     if (flancos < 5) begin $display("FAIL el pulsador no rebota: %0d flancos", flancos); errores = errores + 1; end
+    if (ultimo > 10 + 1.5 * 2) begin $display("FAIL el rebote dura %0.2f us (T_BOUNCE = 2)", ultimo - 10); errores = errores + 1; end
     #150;
     if (y !== 1) begin $display("FAIL pulsador suelto: %b", y); errores = errores + 1; end
     #300;

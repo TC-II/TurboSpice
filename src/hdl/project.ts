@@ -20,8 +20,13 @@ export const verilogFile = (p: Project, name: string): ProjectFile | undefined =
 export const isTestbench = (f: { name: string }) => /_tb\.s?v$/i.test(f.name);
 /** ¿Cambió el código (o el modo) desde la última síntesis, o nunca se sintetizó? */
 export const isStale = (f: ProjectFile) => !f.synth || f.synth.source !== f.text || !!f.synth.vvp !== (f.hdl === 'behavioral');
-/** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo) */
+/** Un archivo de `include (.vh): va con los fuentes, pero no se compila solo */
+export const isVerilogHeader = (name: string) => /\.s?vh$/i.test(name);
+/** Archivos de datos de $readmemh (.hex, .mem): los lee el bloque de comportamiento, en el motor */
+export const verilogData = (p: Project): Record<string, string> => Object.fromEntries(p.files.filter((f) => /\.(hex|mem)$/i.test(f.name)).map((f) => [f.name, f.text]));
+/** Todos los Verilog del proyecto (un módulo puede instanciar los de otro archivo), con los .vh */
 export const verilogSources = (p: Project, override?: { name: string; text: string }): Record<string, string> => ({
+  ...Object.fromEntries(p.files.filter((f) => isVerilogHeader(f.name)).map((f) => [f.name, f.text])),
   ...Object.fromEntries(
     verilogModules(p)
       .filter((f) => !isTestbench(f))

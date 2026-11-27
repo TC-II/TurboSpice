@@ -48,7 +48,9 @@ export async function synthesize(run: RunYosys, files: Record<string, string>, s
   const tree: Tree = Object.fromEntries(Object.values(files).map((text, i) => [names[i], text]));
   let out: Tree | undefined;
   try {
-    out = (await run(['-q', '-p', yosysScript(names, top, params)], tree, { stdout: sink, stderr: sink })) ?? undefined;
+    // (un .vh no se lee solo: está para los `include)
+    const sources = names.filter((n) => !/\.s?vh$/i.test(n));
+    out = (await run(['-q', '-p', yosysScript(sources, top, params)], tree, { stdout: sink, stderr: sink })) ?? undefined;
   } catch {
     // Exit: Yosys terminó con error; el motivo quedó en la salida ("fa.v:3: ERROR: …")
     log = plain(log);

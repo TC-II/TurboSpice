@@ -94,7 +94,14 @@ export async function compileIcarus(load: IcarusLoader, files: Record<string, st
   pp.FS.mkdirTree('/lib');
   for (const [n, text] of lib) pp.FS.writeFile(`/lib/${n}`, text);
   pp.FS.writeFile('/flags', 'D:__ICARUS__=1\nI:/src\nI:/lib\nrelative include:false\n');
-  pp.FS.writeFile('/files', names.map((n) => `/src/${n}`).join('\n') + '\n');
+  // (un .vh no se compila solo: está para los `include)
+  pp.FS.writeFile(
+    '/files',
+    names
+      .filter((n) => !/\.s?vh$/i.test(n))
+      .map((n) => `/src/${n}`)
+      .join('\n') + '\n',
+  );
   pp.FS.writeFile('/pdefs', '__ICARUS__:0:1:1\n');
   let rc: number;
   try {

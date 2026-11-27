@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addVerilogModule, applySynth, isStale, looksBehavioral, setHdlMode, topModuleOf, verilogFile } from '../../src/hdl/project.ts';
+import { addVerilogModule, applySynth, isStale, looksBehavioral, setHdlMode, topModuleOf, verilogData, verilogFile, verilogSources } from '../../src/hdl/project.ts';
 import { parseVvp, vvpForEngine } from '../../src/hdl/icarus.ts';
 import { cosimSubckt, yosysToSubckt, type YosysJson } from '../../src/hdl/synth.ts';
 import { applyVariants, renameSubckt, withSubckts } from '../../src/hdl/variants.ts';
@@ -74,6 +74,13 @@ describe('módulos Verilog del proyecto (#209)', () => {
     expect(asy).not.toMatch(/^WINDOW 39 /m);
     // cambiar a comportamiento la deja desactualizada (hay que compilar con Icarus)
     expect(isStale(verilogFile(setHdlMode(p, 'm', 'behavioral'), 'm')!)).toBe(true);
+  });
+  it('los fuentes de una compilación: los módulos y los .vh, sin los testbenches; los .hex van al motor', () => {
+    let p = addVerilogModule(newProject('P'), 'm', 'module m(); endmodule');
+    p = addVerilogModule(p, 'm_tb', 'module m_tb; m u(); endmodule');
+    p = { ...p, files: [...p.files, { name: 'defs.vh', kind: 'model', text: '`define W 4' }, { name: 'rom.hex', kind: 'model', text: 'A5' }] };
+    expect(Object.keys(verilogSources(p)).sort()).toEqual(['defs.vh', 'm.v']);
+    expect(verilogData(p)).toEqual({ 'rom.hex': 'A5' });
   });
 });
 

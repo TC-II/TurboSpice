@@ -5,7 +5,7 @@ import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/c
 import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
 import { stateNames } from '../hdl/states.ts';
 import type { EngineClient } from '../engine/client.ts';
-import { applySynth, isStale, isTestbench, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
+import { applySynth, isStale, isTestbench, moduleOf, verilogData, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
 import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import { engineErrorText } from '../hdl/engineError.ts';
@@ -67,7 +67,7 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     const progress = engine.onStatus;
     engine.onStatus = undefined;
     try {
-      const { result } = await engine.simulate(r.netlist, { [TB_VVP]: r.vvp }, { vcd: true });
+      const { result } = await engine.simulate(r.netlist, { ...verilogData(projectRef.current), [TB_VVP]: r.vvp }, { vcd: true });
       return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
     } finally {
       engine.onStatus = progress;
@@ -153,6 +153,8 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     );
     const files: Record<string, string> = { ...inFiles, ...(vvp ? { [vvpFileOf(MERGED_TOP)]: vvp } : {}) };
     for (const f of mods) if (f.synth!.vvp) files[vvpFileOf(moduleOf(f))] = f.synth!.vvp;
+    // (lo que lee un bloque de comportamiento con $readmemh)
+    if (vvp || mods.some((f) => f.synth!.vvp)) Object.assign(files, verilogData(p));
     const subs: string[] = [];
     /** .subckt de variantes que van al final de la netlist (su módulo no está en ningún archivo) */
     const inline: string[] = [...merged];

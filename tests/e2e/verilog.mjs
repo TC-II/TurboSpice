@@ -313,6 +313,23 @@ check((await runTb(TB(3))) === 'FAIL' && (await page.locator('.vm-tb').textConte
 check((await runTb(TB(2).replace('.q(q)', '.q(q[0])'))) === 'FAIL', `un warning de compilación es FAIL (${await page.locator('.vm-tb').textContent()})`);
 check((await runTb(TB(2).replace('$finish;', '$finish'))) === 'Falló la compilación' && (await page.locator('.vm-gutter .err').count()) === 1, 'un error de sintaxis se marca en su línea');
 await runTb(TB(2));
+// un testbench con `include de un .vh y $readmemh de un .hex, soltados con él
+await page.evaluate(() => {
+  const dt = new DataTransfer();
+  const tb =
+    '`timescale 1ns/1ps\n`include "defs.vh"\nmodule rom_tb;\n  reg [`ANCHO-1:0] mem [0:3];\n  initial begin\n    $readmemh("datos.hex", mem);\n    #1;\n' +
+    '    if (mem[2] !== 8\'hC3) $fatal(1, "FAIL: mem[2]=%h", mem[2]);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n';
+  dt.items.add(new File([tb], 'rom_tb.v'));
+  dt.items.add(new File(['`define ANCHO 8\n'], 'defs.vh'));
+  dt.items.add(new File(['A5\n5A\nC3\n3C\n'], 'datos.hex'));
+  window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+});
+await page.locator('.project-tree .tree-name', { hasText: /rom_tb$/ }).click();
+await page.locator('.verilog-module').waitFor();
+check((await runTb(await code.inputValue())) === 'PASS', `con un .vh (\`include) y un .hex ($readmemh) del proyecto (${await page.locator('.vm-tb').textContent()})`);
+await page.locator('.project-tree .tree-name', { hasText: /bdiv_tb$/ }).click();
+await page.waitForFunction(() => document.querySelector('.verilog-module strong')?.textContent === 'bdiv_tb.v');
 // el esquemático con bdiv sigue simulando (el testbench no se sintetiza antes)
 // (la simulación del último workbench, «bdiv tb»)
 await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'Tran 0 - 1µ' }).last().click();

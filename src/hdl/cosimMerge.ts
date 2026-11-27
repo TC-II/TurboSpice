@@ -120,7 +120,7 @@ interface Inst {
 export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (module: string, hdl: HdlMode) => boolean, traces: string[] = []): CosimMerge | null {
   const byName = new Map(modules.map((m) => [m.name.toLowerCase(), m]));
   const lines = netlist.split('\n');
-  const insts: Inst[] = [];
+  let insts: Inst[] = [];
   let depth = 0;
   let control = false;
   lines.forEach((l, i) => {
@@ -146,6 +146,17 @@ export function mergeCosim(netlist: string, modules: MergeModule[], mergeable: (
     }
     insts.push({ line: i, name: tt[0]!.toLowerCase(), mod, nodes: tt.slice(1, at), params, electrical });
   });
+  // la línea X nueva lleva un solo juego de parámetros eléctricos: se juntan las instancias del
+  // juego más repetido y las demás quedan como están
+  const key = (x: Inst) =>
+    x.electrical
+      .map((e) => e.toLowerCase())
+      .sort()
+      .join(' ');
+  const count = new Map<string, number>();
+  for (const x of insts) count.set(key(x), (count.get(key(x)) ?? 0) + 1);
+  const best = [...count].sort((a, b) => b[1] - a[1])[0]?.[0];
+  insts = insts.filter((x) => key(x) === best);
   if (insts.length < 2) return null;
 
   // dónde más aparece cada nodo (fuera de los .subckt, de las instancias juntadas y de las R de gmin)

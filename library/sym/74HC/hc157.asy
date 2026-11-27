@@ -47,7 +47,7 @@ TEXT 60 -48 Right 1 4Y
 TEXT 84 -56 Center 0 12
 WINDOW 0 0 -184 Bottom 2
 WINDOW 3 0 0 Invisible 2
-SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
+SYMATTR SpiceLine vcc=5 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
 SYMATTR Prefix X
 SYMATTR Value hc157
 SYMATTR ModelFile hc157.sub

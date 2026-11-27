@@ -30,15 +30,27 @@ export const ELECTRICAL: ElectricalParam[] = [
 
 export const ELECTRICAL_NAMES = new Set(ELECTRICAL.map((p) => p.name));
 
-/** Familias lógicas típicas (valores de hoja de datos redondeados) */
-export const FAMILIES: { name: string; values: Record<string, string> }[] = [
+/**
+ * Familias lógicas típicas (valores de hoja de datos redondeados). Los umbrales de las CMOS (74HC,
+ * CD4000) siguen a vcc, como en la hoja de datos; los de las de entradas TTL (74HCT, 74LS, LVCMOS),
+ * no. `old`: valores de antes que también son esa familia (umbrales fijos para 5 V o 10 V).
+ */
+export const FAMILIES: { name: string; values: Record<string, string>; old?: Record<string, string> }[] = [
   { name: t('Ideal (thresholds at VCC/2)'), values: Object.fromEntries(ELECTRICAL.map((p) => [p.name, p.value])) },
-  { name: '74HC (CMOS 5 V)', values: { vcc: '5', vil: '1.5', vih: '3.5', vol: '0', voh: '{vcc}', iol: '4m', ioh: '4m', tr: '6n', tf: '6n', tpd: '9n' } },
+  { name: '74HC (CMOS 5 V)', values: { vcc: '5', vil: '{0.3*vcc}', vih: '{0.7*vcc}', vol: '0', voh: '{vcc}', iol: '4m', ioh: '4m', tr: '6n', tf: '6n', tpd: '9n' }, old: { vil: '1.5', vih: '3.5' } },
   { name: '74HCT (CMOS, TTL inputs)', values: { vcc: '5', vil: '0.8', vih: '2', vol: '0', voh: '{vcc}', iol: '4m', ioh: '4m', tr: '6n', tf: '6n', tpd: '12n' } },
   { name: '74LS (TTL)', values: { vcc: '5', vil: '0.8', vih: '2', vol: '0.35', voh: '3.4', iol: '8m', ioh: '0.4m', tr: '10n', tf: '6n', tpd: '10n' } },
   { name: 'LVCMOS 3.3 V', values: { vcc: '3.3', vil: '0.8', vih: '2', vol: '0', voh: '{vcc}', iol: '8m', ioh: '8m', tr: '2n', tf: '2n', tpd: '3n' } },
-  { name: 'CD4000 (CMOS 10 V)', values: { vcc: '10', vil: '3', vih: '7', vol: '0', voh: '{vcc}', iol: '2m', ioh: '2m', tr: '50n', tf: '50n', tpd: '60n' } },
+  {
+    name: 'CD4000 (CMOS 10 V)',
+    values: { vcc: '10', vil: '{0.3*vcc}', vih: '{0.7*vcc}', vol: '0', voh: '{vcc}', iol: '2m', ioh: '2m', tr: '50n', tf: '50n', tpd: '60n' },
+    old: { vil: '3', vih: '7' },
+  },
 ];
+
+/** La familia de unos parámetros eléctricos (nombre → valor; los que faltan, por omisión), si es una */
+export const familyOf = (values: Map<string, string>) =>
+  FAMILIES.find((f) => [f.values, { ...f.values, ...f.old }].some((v) => ELECTRICAL.every((p) => (values.get(p.name) ?? p.value) === (v[p.name] ?? p.value))));
 
 /** "vcc=5 vil={vcc/2} …" con los valores dados (los que faltan, por omisión) */
 export const electricalLine = (values: Record<string, string> = {}) => ELECTRICAL.map((p) => `${p.name}=${values[p.name] ?? p.value}`).join(' ');

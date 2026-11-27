@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEvent } from '../ui/useEvent.ts';
 import { t } from '../i18n/i18n.ts';
 import { portsOf } from './project.ts';
-import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
+import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES, familyOf } from './electrical.ts';
 import type { SynthResult } from './yosys.ts';
 import { engineErrorText } from './engineError.ts';
 import type { TbOutcome } from './testbench.ts';
@@ -100,7 +100,7 @@ export function VerilogModule({
   const values = new Map(params.map(([k, v]) => [k.toLowerCase(), v]));
   const vparams = params.filter(([k]) => !ELECTRICAL_NAMES.has(k.toLowerCase()));
   const setParam = (k: string, v: string) => onParams(params.map(([pk, pv]) => [pk, pk.toLowerCase() === k.toLowerCase() ? v : pv]));
-  const family = FAMILIES.find((f) => ELECTRICAL.every((p) => (values.get(p.name) ?? p.value) === (f.values[p.name] ?? p.value)));
+  const family = familyOf(values);
 
   const beh = mode === 'behavioral';
   const v = tb?.verdict;

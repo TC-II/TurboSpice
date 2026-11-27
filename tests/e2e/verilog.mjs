@@ -107,7 +107,7 @@ check((await page.locator('.project-tree .tree-kind.verilog').count()) >= 1, 'ap
 // interfaz eléctrica: una familia lógica cambia los parámetros del símbolo
 await page.getByRole('combobox', { name: 'Familia lógica' }).selectOption({ label: '74HC (CMOS 5 V)' });
 await frames(page);
-check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' }).inputValue()) === '3.5', 'la familia 74HC pone VIH = 3,5 V');
+check((await page.getByRole('textbox', { name: 'Umbral de entrada alta (VIH)' }).inputValue()) === '{0.7*vcc}', 'la familia 74HC pone VIH = 0,7·VCC');
 // un error se marca en su línea
 await code.fill(VERILOG.replace('q <= q + 1;', 'q <= ;'));
 await synthesize();

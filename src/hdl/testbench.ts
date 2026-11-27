@@ -41,3 +41,14 @@ export function tbVerdict(compileLog: string, simLog: string[]): TbVerdict {
   const output = lines.join('\n');
   return { pass: /PASS/i.test(output) && !/FAIL/i.test(output), finished: /\$finish called|^FATAL:/m.test(output), output };
 }
+
+/** Lo que muestra la vista del testbench */
+export interface TbOutcome {
+  error?: string;
+  /** salida de Icarus al compilar (avisos) */
+  compileLog: string;
+  verdict?: TbVerdict;
+}
+
+/** Un testbench nuevo (+ Nuevo › Verilog con un nombre *_tb) */
+export const tbTemplate = (name: string) => `\`timescale 1ns/1ps\nmodule ${name};\n  initial begin\n    $display("PASS");\n    $finish;\n  end\nendmodule\n`;

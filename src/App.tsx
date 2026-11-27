@@ -416,7 +416,7 @@ function SchematicMode({
   });
 
   // Módulos Verilog (#209): síntesis, comportamiento y variantes
-  const { synthModule, synthAndReport, synthStale, withVariants } = useVerilog({ lib, projectRef, editProject, setLibVersion, setStatus, setMessage });
+  const { synthModule, synthAndReport, synthStale, withVariants, runTb } = useVerilog({ lib, engine, projectRef, editProject, setLibVersion, setStatus, setMessage });
 
   // librería de la instalación de LTspice del usuario, importada a este navegador (ltspiceLib.ts):
   // cada esquemático trae de ahí sólo los símbolos y modelos que le faltan
@@ -1309,7 +1309,7 @@ function SchematicMode({
                   importSubckts,
                 }}
               />
-              <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, warnShared, renameModel }} />
+              <ModuleEditors {...{ project, curVerilog, curModel, setCurModel, symText, subPorts, editSymbol, addPort, setSymW, liveDoc, synthModule, runTb, warnShared, renameModel }} />
               {ctxMenu && createPortal(<ContextMenu at={ctxMenu.at} items={ctxMenu.items} onClose={() => setCtxMenu(null)} />, document.body)}
               <EditorArea
                 traceFocus={traceFocus}

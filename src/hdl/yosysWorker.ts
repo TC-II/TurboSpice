@@ -3,6 +3,7 @@
 // traban la interfaz mientras corren.
 import { compileIcarus, vvpForEngine, type EmProgram, type IcarusLoader } from './icarus.ts';
 import { cosimSubckt, HdlError } from './synth.ts';
+import { TB_FILE, TB_TOP, TB_WRAP, tbNetlist } from './testbench.ts';
 import { splitFetch } from './splitFetch.ts';
 import { synthesize, type RunYosys, type SynthResult } from './yosys.ts';
 
@@ -13,7 +14,9 @@ globalThis.fetch = splitFetch(globalThis.fetch.bind(globalThis));
 export type YosysRequest =
   | { id: number; kind?: 'yosys'; files: Record<string, string>; source: string; top?: string; params?: Record<string, string> }
   /** comportamiento: compilar con Icarus; `vvpFile` es el .vvp que nombra el .subckt */
-  | { id: number; kind: 'icarus'; files: Record<string, string>; source: string; top: string; params?: Record<string, string>; vvpFile: string };
+  | { id: number; kind: 'icarus'; files: Record<string, string>; source: string; top: string; params?: Record<string, string>; vvpFile: string }
+  /** un testbench: `top` es su módulo, sin puertos */
+  | { id: number; kind: 'testbench'; files: Record<string, string>; top: string };
 export type YosysResponse = { id: number; result: SynthResult } | { id: number; failure: string };
 
 let run: Promise<RunYosys> | null = null;
@@ -47,7 +50,10 @@ self.onmessage = async (e: MessageEvent<YosysRequest>) => {
   const req = e.data;
   try {
     let result: SynthResult;
-    if (req.kind === 'icarus') {
+    if (req.kind === 'testbench') {
+      const r = await compileIcarus(icarus, { ...req.files, [TB_FILE]: TB_WRAP }, TB_TOP, {}, { roots: [req.top], wall: true });
+      result = r.vvp ? { vvp: vvpForEngine(r.vvp), netlist: tbNetlist(r), log: r.log } : { error: r.error ?? 'Icarus', log: r.log };
+    } else if (req.kind === 'icarus') {
       const r = await compileIcarus(icarus, req.files, req.top, req.params);
       if (!r.vvp || !r.ports) result = { error: r.error ?? 'Icarus', log: r.log };
       else {
@@ -64,7 +70,7 @@ self.onmessage = async (e: MessageEvent<YosysRequest>) => {
     }
     (self as unknown as Worker).postMessage({ id: req.id, result } satisfies YosysResponse);
   } catch (err) {
-    if (req.kind !== 'icarus') run = null;
+    if (!req.kind || req.kind === 'yosys') run = null;
     (self as unknown as Worker).postMessage({ id: req.id, failure: String((err as Error)?.message ?? err) } satisfies YosysResponse);
   }
 };

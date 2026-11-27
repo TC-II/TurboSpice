@@ -269,6 +269,37 @@ check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig(
   check(a.slice(0, 4).join() === '0x0,0x1,0x2,0x3' && b.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `los dos cuentan (${a.slice(0, 4)} | ${b.slice(0, 4)})`);
 }
 
+// --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
+const TB = (want) =>
+  '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n' +
+  `  initial begin\n    #12 rst = 0;\n    @(posedge clk); @(posedge clk); #2;\n    if (q !== ${want}) $fatal(1, "FAIL: q=%d", q);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n`;
+await newModule('bdiv_tb', 'Verilog');
+check(
+  (await code.inputValue()).includes('module bdiv_tb;') && !(await page.locator('.project-tree').textContent()).includes('bdiv_tbverilog3 pines'),
+  'la plantilla de un *_tb es un testbench, sin síntesis',
+);
+check(
+  (await page.locator('.vm-mode').count()) === 0 && (await page.locator('.vm-bar button.primary').textContent()) === 'Correr testbench',
+  'un *_tb.v se corre: «Correr testbench», sin modo de síntesis',
+);
+const runTb = async (text) => {
+  await code.fill(text);
+  await page.locator('.vm-bar button.primary').click();
+  await page.waitForFunction(() => /^(PASS|FAIL|Falló la compilación)$/.test(document.querySelector('.vm-status')?.textContent ?? ''), null, { timeout: 120000 });
+  return status();
+};
+check((await runTb(TB(2))) === 'PASS' && (await page.locator('.vm-tb').textContent()).includes('$finish called'), `el testbench pasa (${await status()})`);
+check((await runTb(TB(3))) === 'FAIL' && (await page.locator('.vm-tb').textContent()).includes('FAIL: q='), `con otro valor esperado, $fatal da FAIL (${await status()})`);
+check((await runTb(TB(2).replace('.q(q)', '.q(q[0])'))) === 'FAIL', `un warning de compilación es FAIL (${await page.locator('.vm-tb').textContent()})`);
+check((await runTb(TB(2).replace('$finish;', '$finish'))) === 'Falló la compilación' && (await page.locator('.vm-gutter .err').count()) === 1, 'un error de sintaxis se marca en su línea');
+await runTb(TB(2));
+// el esquemático con bdiv sigue simulando (el testbench no se sintetiza antes)
+// (la simulación del último workbench, «bdiv tb»)
+await page.locator('.project-tree .tree-row[data-bench] .tree-name', { hasText: 'Tran 0 - 1µ' }).last().click();
+await page.waitForFunction(() => !document.querySelector('.verilog-module'));
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `con un testbench en el proyecto, el esquemático sigue simulando (${await page.locator('.status').first().textContent()})`);
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

@@ -1,7 +1,7 @@
 // Los archivos del proyecto (símbolos, modelos y módulos que van en el .turbo): agregarlos (si uno
 // repetido cambió, se pregunta qué hacer), quitarlos y hacer el símbolo de un .subckt
 import { useState, type MutableRefObject } from 'react';
-import { moduleOf } from '../hdl/project.ts';
+import { isTestbench, moduleOf } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import { PROJECT_DIR } from '../library/library.ts';
 import { makeSymbol, subcktPins } from '../library/makeSymbol.ts';
@@ -36,7 +36,7 @@ export function useProjectFiles({ projectRef, editProject, synthAndReport, setMe
     }
     setMessage(r.added.length ? t('Added to the project: {p0}', { p0: r.added.join(', ') }) : t('Nothing was added (they were already there)'));
     // un .v agregado es un módulo: se sintetiza enseguida (así aparece su símbolo)
-    for (const name of r.added) if (projectFileKind(name) === 'verilog') await synthAndReport(moduleOf({ name }));
+    for (const name of r.added) if (projectFileKind(name) === 'verilog' && !isTestbench({ name })) await synthAndReport(moduleOf({ name }));
   };
   const removeProjectFile = (name: string) => editProject({ ...projectRef.current, files: projectRef.current.files.filter((f) => f.name !== name) });
   /** Símbolo para un .subckt de un archivo de modelos del proyecto */

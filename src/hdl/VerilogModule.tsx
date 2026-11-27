@@ -5,11 +5,13 @@ import { portsOf } from './project.ts';
 import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
 import type { SynthResult } from './yosys.ts';
 import { engineErrorText } from './engineError.ts';
+import type { TbOutcome } from './testbench.ts';
 
 /**
  * Vista de un módulo Verilog del proyecto (#209), en lugar del esquemático de un subcircuito:
  * el código, «Sintetizar» (Yosys) con sus errores y avisos, y la interfaz eléctrica y los
  * parameter por omisión de las instancias (los del símbolo; cada instancia los puede cambiar).
+ * Un testbench (*_tb.v, `onTestbench`) no tiene símbolo: se corre y muestra su salida y PASS/FAIL.
  */
 export function VerilogModule({
   name,
@@ -22,6 +24,7 @@ export function VerilogModule({
   params,
   onText,
   onSynthesize,
+  onTestbench,
   onParams,
 }: {
   name: string;
@@ -39,11 +42,13 @@ export function VerilogModule({
   params: [string, string][];
   onText(text: string): void;
   onSynthesize(text: string): Promise<SynthResult>;
+  onTestbench?(text: string): Promise<TbOutcome>;
   onParams(ps: [string, string][]): void;
 }) {
   const [code, setCode] = useState(text);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<SynthResult | null>(null);
+  const [tb, setTb] = useState<TbOutcome | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
   const gutter = useRef<HTMLDivElement>(null);
@@ -54,6 +59,7 @@ export function VerilogModule({
   }, [text]);
   useEffect(() => {
     setResult(null);
+    setTb(null);
     setFailure(null);
   }, [name]);
   // el código va al proyecto un momento después de dejar de escribir (y al sintetizar)
@@ -70,7 +76,12 @@ export function VerilogModule({
     setBusy(true);
     setFailure(null);
     try {
-      setResult(await onSynthesize(code));
+      if (onTestbench) {
+        const r = await onTestbench(code);
+        setTb(r);
+        // (el error de compilación, marcado en su línea como el de una síntesis)
+        setResult(r.error ? { error: r.error, log: r.compileLog } : null);
+      } else setResult(await onSynthesize(code));
     } catch (e) {
       setFailure((e as Error).message);
     } finally {
@@ -91,35 +102,52 @@ export function VerilogModule({
   const family = FAMILIES.find((f) => ELECTRICAL.every((p) => (values.get(p.name) ?? p.value) === (f.values[p.name] ?? p.value)));
 
   const beh = mode === 'behavioral';
+  const v = tb?.verdict;
   const status = busy
-    ? { cls: 'busy', text: beh ? t('Compiling…') : t('Synthesizing…') }
-    : result?.error || failure
-      ? { cls: 'err', text: beh ? t('Compilation failed') : t('Synthesis failed') }
-      : stale
-        ? { cls: 'stale', text: t('Changes not synthesized yet (it is synthesized before simulating)') }
-        : { cls: 'ok', text: beh ? t('Compiled (Icarus)') : t('Synthesized') };
+    ? { cls: 'busy', text: onTestbench ? t('Running the testbench…') : beh ? t('Compiling…') : t('Synthesizing…') }
+    : onTestbench
+      ? result?.error || failure
+        ? { cls: 'err', text: t('Compilation failed') }
+        : v
+          ? { cls: v.pass ? 'ok' : 'err', text: v.pass ? 'PASS' : 'FAIL' }
+          : { cls: 'stale', text: t('Testbench: not run yet') }
+      : result?.error || failure
+        ? { cls: 'err', text: beh ? t('Compilation failed') : t('Synthesis failed') }
+        : stale
+          ? { cls: 'stale', text: t('Changes not synthesized yet (it is synthesized before simulating)') }
+          : { cls: 'ok', text: beh ? t('Compiled (Icarus)') : t('Synthesized') };
 
   return (
     <div className="verilog-module">
       <div className="vm-bar">
         <strong>{name}.v</strong>
         <span className={`vm-status ${status.cls}`}>{status.text}</span>
-        <select
-          className="vm-mode"
-          value={mode}
-          aria-label={t('How it is simulated')}
-          title={t('Synthesis: gates and flip-flops (synthesizable Verilog). Behavioral: Icarus Verilog runs the code as is (# delays, initial, $display…); one behavioral block per simulation.')}
-          onChange={(e) => {
-            onMode(e.target.value as 'synth' | 'behavioral');
-            setResult(null);
-            setFailure(null);
-          }}
+        {!onTestbench && (
+          <select
+            className="vm-mode"
+            value={mode}
+            aria-label={t('How it is simulated')}
+            title={t(
+              'Synthesis: gates and flip-flops (synthesizable Verilog). Behavioral: Icarus Verilog runs the code as is (# delays, initial, $display…). A file named *_tb.v is a testbench: it is run on its own.',
+            )}
+            onChange={(e) => {
+              onMode(e.target.value as 'synth' | 'behavioral');
+              setResult(null);
+              setFailure(null);
+            }}
+          >
+            <option value="synth">{t('Synthesis (Yosys)')}</option>
+            <option value="behavioral">{t('Behavioral (Icarus)')}</option>
+          </select>
+        )}
+        <button
+          type="button"
+          className="primary"
+          onClick={synthesize}
+          disabled={busy}
+          title={onTestbench ? t('Compile and run with Icarus (Ctrl+Enter)') : t('Compile and update the symbol (Ctrl+Enter)')}
         >
-          <option value="synth">{t('Synthesis (Yosys)')}</option>
-          <option value="behavioral">{t('Behavioral (Icarus)')}</option>
-        </select>
-        <button type="button" className="primary" onClick={synthesize} disabled={busy} title={t('Compile and update the symbol (Ctrl+Enter)')}>
-          {mode === 'behavioral' ? t('Compile') : t('Synthesize')}
+          {onTestbench ? t('Run testbench') : mode === 'behavioral' ? t('Compile') : t('Synthesize')}
         </button>
       </div>
       <div className="vm-body">
@@ -154,7 +182,7 @@ export function VerilogModule({
           />
         </div>
         <aside className="vm-side">
-          {suggestBehavioral && (
+          {!onTestbench && suggestBehavioral && (
             <p className="vm-suggest">
               {t('This code uses # delays or system tasks ($display…), which synthesis ignores.')}{' '}
               <button type="button" className="link" onClick={() => onMode('behavioral')}>
@@ -169,79 +197,89 @@ export function VerilogModule({
               {w}
             </p>
           ))}
-          <section>
-            <h4>{t('Pins')}</h4>
-            {pins.length ? (
-              <dl className="vm-pins">
-                {(['in', 'out', 'inout'] as const).map((dir) => {
-                  const ps = portsOf(pins).filter((p) => p.dir === dir);
-                  return (
-                    ps.length > 0 && (
-                      <div key={dir}>
-                        <dt>{dir === 'in' ? t('Inputs') : dir === 'out' ? t('Outputs') : t('Bidirectional (inout)')}</dt>
-                        <dd>
-                          {ps.map((p) => (
-                            <code key={p.name} title={p.bits > 1 ? t('{n}-bit bus', { n: p.bits }) : undefined}>
-                              {p.name}
-                            </code>
-                          ))}
-                        </dd>
-                      </div>
-                    )
-                  );
-                })}
-              </dl>
-            ) : (
-              <p className="hint">{t('Synthesize to create the symbol with its pins.')}</p>
-            )}
-          </section>
-          <section>
-            <h4>{t('Electrical interface')}</h4>
-            <p className="hint">{t('Defaults of the instances (each one can change them, like any parameter).')}</p>
-            <label className="vm-field">
-              {t('Logic family')}
-              <select
-                value={family?.name ?? ''}
-                aria-label={t('Logic family')}
-                onChange={(e) => {
-                  const f = FAMILIES.find((x) => x.name === e.target.value);
-                  if (f) onParams(params.map(([k, v]) => [k, ELECTRICAL_NAMES.has(k.toLowerCase()) ? (f.values[k.toLowerCase()] ?? v) : v]));
-                }}
-              >
-                {!family && <option value="">{t('Custom')}</option>}
-                {FAMILIES.map((f) => (
-                  <option key={f.name} value={f.name}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {ELECTRICAL.map((p) => (
-              <ParamField
-                key={p.name}
-                // en comportamiento no hay compuertas: tpd es un retardo más de cada salida (#209)
-                label={beh && p.name === 'tpd' ? t('Extra output delay (tpd)') : p.label}
-                help={beh && p.name === 'tpd' ? t('Added to every output, on top of the # delays of the code. Usually 0 or small.') : undefined}
-                unit={p.unit}
-                name={p.name}
-                value={values.get(p.name) ?? p.value}
-                onChange={(v) => setParam(p.name, v)}
-              />
-            ))}
-            <p className="hint">{t('VIL above VIH gives hysteresis (Schmitt trigger). Values may depend on vcc: {vcc/2}.')}</p>
-          </section>
-          {vparams.length > 0 && (
+          {onTestbench ? (
             <section>
-              <h4>{t('Verilog parameters')}</h4>
-              <p className="hint">{t('An instance with another value uses its own synthesis (integers only).')}</p>
-              {vparams.map(([k, v]) => (
-                <ParamField key={k} label={k} unit="" name={k} value={v} onChange={(x) => setParam(k, x)} />
-              ))}
+              <h4>{t('Testbench output')}</h4>
+              {v ? <pre className="log vm-tb">{v.output}</pre> : <p className="hint">{t('PASS if the output says PASS and not FAIL ($fatal); a compiler warning is a FAIL.')}</p>}
+              {v && !v.finished && <p className="err">{t('It did not reach $finish in 1 s of simulated time')}</p>}
             </section>
+          ) : (
+            <>
+              <section>
+                <h4>{t('Pins')}</h4>
+                {pins.length ? (
+                  <dl className="vm-pins">
+                    {(['in', 'out', 'inout'] as const).map((dir) => {
+                      const ps = portsOf(pins).filter((p) => p.dir === dir);
+                      return (
+                        ps.length > 0 && (
+                          <div key={dir}>
+                            <dt>{dir === 'in' ? t('Inputs') : dir === 'out' ? t('Outputs') : t('Bidirectional (inout)')}</dt>
+                            <dd>
+                              {ps.map((p) => (
+                                <code key={p.name} title={p.bits > 1 ? t('{n}-bit bus', { n: p.bits }) : undefined}>
+                                  {p.name}
+                                </code>
+                              ))}
+                            </dd>
+                          </div>
+                        )
+                      );
+                    })}
+                  </dl>
+                ) : (
+                  <p className="hint">{t('Synthesize to create the symbol with its pins.')}</p>
+                )}
+              </section>
+              <section>
+                <h4>{t('Electrical interface')}</h4>
+                <p className="hint">{t('Defaults of the instances (each one can change them, like any parameter).')}</p>
+                <label className="vm-field">
+                  {t('Logic family')}
+                  <select
+                    value={family?.name ?? ''}
+                    aria-label={t('Logic family')}
+                    onChange={(e) => {
+                      const f = FAMILIES.find((x) => x.name === e.target.value);
+                      if (f) onParams(params.map(([k, v]) => [k, ELECTRICAL_NAMES.has(k.toLowerCase()) ? (f.values[k.toLowerCase()] ?? v) : v]));
+                    }}
+                  >
+                    {!family && <option value="">{t('Custom')}</option>}
+                    {FAMILIES.map((f) => (
+                      <option key={f.name} value={f.name}>
+                        {f.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {ELECTRICAL.map((p) => (
+                  <ParamField
+                    key={p.name}
+                    // en comportamiento no hay compuertas: tpd es un retardo más de cada salida (#209)
+                    label={beh && p.name === 'tpd' ? t('Extra output delay (tpd)') : p.label}
+                    help={beh && p.name === 'tpd' ? t('Added to every output, on top of the # delays of the code. Usually 0 or small.') : undefined}
+                    unit={p.unit}
+                    name={p.name}
+                    value={values.get(p.name) ?? p.value}
+                    onChange={(v) => setParam(p.name, v)}
+                  />
+                ))}
+                <p className="hint">{t('VIL above VIH gives hysteresis (Schmitt trigger). Values may depend on vcc: {vcc/2}.')}</p>
+              </section>
+              {vparams.length > 0 && (
+                <section>
+                  <h4>{t('Verilog parameters')}</h4>
+                  <p className="hint">{t('An instance with another value uses its own synthesis (integers only).')}</p>
+                  {vparams.map(([k, v]) => (
+                    <ParamField key={k} label={k} unit="" name={k} value={v} onChange={(x) => setParam(k, x)} />
+                  ))}
+                </section>
+              )}
+            </>
           )}
           {result?.log.trim() && (
             <details>
-              <summary>{mode === 'behavioral' ? t('Icarus output') : t('Yosys output')}</summary>
+              <summary>{mode === 'behavioral' || onTestbench ? t('Icarus output') : t('Yosys output')}</summary>
               <pre className="log">{result.log}</pre>
             </details>
           )}

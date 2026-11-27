@@ -1,8 +1,10 @@
 // Módulos Verilog (#209): <nombre>.v + <nombre>.asy, como un subcircuito esquemático. Sintetizar
 // (Yosys) o compilar el comportamiento (Icarus), y las instancias con otros parameter (variantes)
 import { useRef, type MutableRefObject } from 'react';
-import { compileBehavioral, synthesizeVerilog } from '../hdl/client.ts';
-import { applySynth, isStale, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
+import { compileBehavioral, compileTestbench, synthesizeVerilog } from '../hdl/client.ts';
+import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts';
+import type { EngineClient } from '../engine/client.ts';
+import { applySynth, isStale, isTestbench, moduleOf, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
 import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import { engineErrorText } from '../hdl/engineError.ts';
@@ -15,6 +17,7 @@ import type { Project } from '../project/turbo.ts';
 
 export interface VerilogDeps {
   lib: Library;
+  engine: EngineClient;
   projectRef: MutableRefObject<Project>;
   editProject(p: Project): void;
   setLibVersion(f: (v: number) => number): void;
@@ -22,7 +25,7 @@ export interface VerilogDeps {
   setMessage(m?: string): void;
 }
 
-export function useVerilog({ lib, projectRef, editProject, setLibVersion, setStatus, setMessage }: VerilogDeps) {
+export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion, setStatus, setMessage }: VerilogDeps) {
   /** Sintetiza el módulo `name` (con `text`, o el código que tiene el proyecto) y guarda el resultado y su símbolo */
   const synthModule = async (name: string, text?: string): Promise<SynthResult> => {
     const f = verilogFile(projectRef.current, name);
@@ -51,9 +54,26 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       setMessage(engineErrorText((e as Error).message, verilogFile(projectRef.current, name)?.hdl === 'behavioral'));
     }
   };
+  /** Corre el testbench `name` (*_tb.v) con el código `text`: compila con Icarus (con los demás .v del proyecto) y simula */
+  const runTb = async (name: string, text: string): Promise<TbOutcome> => {
+    const f = verilogFile(projectRef.current, name);
+    const top = tbModule(text);
+    if (!f || !top) return { error: t('There is no Verilog module {name}', { name }), compileLog: '' };
+    const r = await compileTestbench({ ...verilogSources(projectRef.current), [f.name]: text }, top);
+    if (!r.vvp || !r.netlist) return { error: r.error, compileLog: r.log };
+    // (el progreso de ngspice no va a la barra de la simulación: ésta no es la del esquemático)
+    const progress = engine.onStatus;
+    engine.onStatus = undefined;
+    try {
+      const { result } = await engine.simulate(r.netlist, { [TB_VVP]: r.vvp });
+      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log) };
+    } finally {
+      engine.onStatus = progress;
+    }
+  };
   /** Antes de simular: sintetiza los módulos Verilog que cambiaron desde la última vez */
   const synthStale = async () => {
-    for (const f of verilogModules(projectRef.current).filter(isStale)) {
+    for (const f of verilogModules(projectRef.current).filter((x) => isStale(x) && !isTestbench(x))) {
       setStatus({ kind: 'running', percent: 0, text: t('Synthesizing {name}…', { name: f.name }) });
       const r = await synthModule(moduleOf(f));
       if (r.error) throw new Error(`${f.name}: ${r.error}`);
@@ -164,5 +184,5 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
     return { netlist: withSubckts(v.netlist, inline), files, warnings: [...notes, ...v.warnings], ...(aliases ? { aliases } : {}) };
   };
-  return { synthModule, synthAndReport, synthStale, withVariants };
+  return { synthModule, synthAndReport, synthStale, withVariants, runTb };
 }

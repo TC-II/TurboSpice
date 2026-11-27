@@ -856,6 +856,13 @@ export const es: Record<string, string> = {
   'Poles only': 'Sólo polos',
   'Ports:': 'Puertos:',
   'Compiling {n} blocks into one Icarus module…': 'Compilando {n} bloques en un solo módulo de Icarus…',
+  'Running the testbench…': 'Corriendo el testbench…',
+  'Testbench: not run yet': 'Testbench: todavía no se corrió',
+  'Compile and run with Icarus (Ctrl+Enter)': 'Compilar y correr con Icarus (Ctrl+Enter)',
+  'Run testbench': 'Correr testbench',
+  'Testbench output': 'Salida del testbench',
+  'PASS if the output says PASS and not FAIL ($fatal); a compiler warning is a FAIL.': 'PASS si la salida dice PASS y no FAIL ($fatal); un warning del compilador es FAIL.',
+  'It did not reach $finish in 1 s of simulated time': 'No llegó a $finish en 1 s de tiempo simulado',
   'The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (several analyses or a .control that repeats)':
     'Los bloques DSP se simulan como compuertas: Icarus corre un solo análisis por simulación (varios análisis o un .control que repite)',
   '{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: several analyses or a .control that repeats need it synthesized (dsp_clock: a PULSE source instead)':
@@ -1883,8 +1890,8 @@ export const es: Record<string, string> = {
   'Compiled (Icarus)': 'Compilado (Icarus)',
   'Synthesized': 'Sintetizado',
   'How it is simulated': 'Cómo se simula',
-  'Synthesis: gates and flip-flops (synthesizable Verilog). Behavioral: Icarus Verilog runs the code as is (# delays, initial, $display…); one behavioral block per simulation.':
-    'Síntesis: compuertas y flip-flops (Verilog sintetizable). Comportamiento: Icarus Verilog corre el código tal cual (retardos #, initial, $display…); un bloque de comportamiento por simulación.',
+  'Synthesis: gates and flip-flops (synthesizable Verilog). Behavioral: Icarus Verilog runs the code as is (# delays, initial, $display…). A file named *_tb.v is a testbench: it is run on its own.':
+    'Síntesis: compuertas y flip-flops (Verilog sintetizable). Comportamiento: Icarus Verilog corre el código tal cual (retardos #, initial, $display…). Un archivo *_tb.v es un testbench: se corre solo.',
   'Synthesis (Yosys)': 'Síntesis (Yosys)',
   'Behavioral (Icarus)': 'Comportamiento (Icarus)',
   'Compile and update the symbol (Ctrl+Enter)': 'Compilar y actualizar el símbolo (Ctrl+Enter)',

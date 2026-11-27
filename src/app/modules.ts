@@ -4,7 +4,8 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import { baseName, type AscDoc } from '../asc/model.ts';
 import { parseAsc } from '../asc/parse.ts';
 import { serializeAsc } from '../asc/serialize.ts';
-import { addVerilogModule } from '../hdl/project.ts';
+import { addVerilogModule, isTestbench } from '../hdl/project.ts';
+import { tbTemplate } from '../hdl/testbench.ts';
 import { t } from '../i18n/i18n.ts';
 import { addModelModule, removeModelModule, renameModelModule } from '../project/modelModule.ts';
 import { lineOf } from '../project/project.ts';
@@ -81,11 +82,13 @@ export function moduleActions({
   const createModule = (name: string, kind: 'schematic' | 'verilog') => {
     setDialog(null);
     if (kind === 'schematic') return createSubckt(name);
-    projectRef.current = addVerilogModule(projectRef.current, name);
+    // (un testbench no tiene símbolo: se corre)
+    const tb = isTestbench({ name: `${name}.v` });
+    projectRef.current = addVerilogModule(projectRef.current, name, tb ? tbTemplate(name) : undefined);
     editProject(projectRef.current);
     openSub(name);
     // (sintetizar la plantilla: así el módulo ya tiene símbolo para colocarlo)
-    synthAndReport(name);
+    if (!tb) synthAndReport(name);
   };
   const createSubckt = (name: string) => {
     editProject(addSubckt(projectRef.current, name));

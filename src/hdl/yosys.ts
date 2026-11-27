@@ -15,6 +15,8 @@ export interface SynthResult {
   block?: HdlBlock;
   /** comportamiento (Icarus): el .vvp, listo para el motor */
   vvp?: string;
+  /** testbench (testbench.ts): la netlist que lo corre, con `vvp` */
+  netlist?: string;
   /** error de Yosys o de la traducción */
   error?: string;
   /** salida de Yosys (avisos) */

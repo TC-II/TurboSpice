@@ -339,8 +339,8 @@ check((await page.locator('.status.ok').count()) === 1, `con un testbench en el 
 
 // --- biblioteca 74HC: el buscador la encuentra; al colocar una parte, su .v va al proyecto y se sintetiza ---
 await page.keyboard.press('p');
-await page.locator('.picker input').fill('74HC595');
-const hc595 = page.locator('.picker-list li').filter({ hasText: 'hc59574HC ·' });
+await page.locator('.modal input').fill('74HC595');
+const hc595 = page.locator('.picker-list li').filter({ has: page.locator('.path', { hasText: /^hc595$/ }) });
 check((await hc595.count()) === 1, `el buscador encuentra el 74HC595 (${(await page.locator('.picker-list li').allTextContents()).slice(0, 2)})`);
 await hc595.click();
 {

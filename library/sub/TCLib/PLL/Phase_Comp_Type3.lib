@@ -1,0 +1,26 @@
+* Component Created by Javier Petrucci and Agustin Gullino
+* jpetrucc@itba.edu.ar / agullino@itba.edu.ar
+*
+* Phase comparator type 3 (PC3 of the 74HCT4046A): edge-triggered set-reset flip-flop.
+* Vo goes to Vcc on the rising edge of Vi and to 0 on the rising edge of Vf (threshold Vcc/2,
+* all referred to ground). Levels do not matter, only rising edges: average Vo = Vcc*phi/(2*pi),
+* phi = phase of Vf behind Vi (0 to 360 deg).
+* Ideal model, not the internal circuit: everything is XSPICE digital (event driven), so it adds
+* no analog equations besides the output bridge.
+.SUBCKT Phase_Comp_Type3 Vi Vf Vo PARAMS: Vcc=5
+
+* inputs to digital: Schmitt with 20 mV of hysteresis around Vcc/2 (only 0 or 1, never unknown)
+Ain [Vi Vf] [vi_d vf_d] pc3_in
+Aone one pc3_one
+* Q: set on the rising edge of Vi (D=1), cleared by rst
+Aq one vi_d null rst q nq pc3_ff
+* rst: pulse on the rising edge of Vf while Q is high (held cleared while Q is low)
+Ar one vf_d null nq rst null pc3_ff
+Aout [q] [Vo] pc3_out
+
+.model pc3_in adc_bridge(in_low={Vcc/2+10m} in_high={Vcc/2-10m})
+.model pc3_one d_pullup
+.model pc3_ff d_dff(clk_delay=1e-12 set_delay=1e-12 reset_delay=1e-12 rise_delay=1e-12 fall_delay=1e-12)
+.model pc3_out dac_bridge(out_low=0 out_high={Vcc} out_undef={Vcc/2} t_rise=1n t_fall=1n)
+
+.ends Phase_Comp_Type3

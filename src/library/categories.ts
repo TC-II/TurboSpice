@@ -104,7 +104,7 @@ export const CATEGORIES: Category[] = [
       sub('sh', t('Sample and hold'), [`${TC}LF398`, `${TC}ASSD/ASSD_LF398`, 'SpecialFunctions/sample']),
       sub('switches', t('Switches'), [`${TC}switch`, 'sw', 'csw', `${TC}ASSD/ASSD_CD4016B`]),
       sub('regulators', t('Regulators'), ['7805', '7812', '7815', '7905', 'LM317', 'LM337'].map((n) => `${TC}Regulators/${n}`)),
-      sub('pll', t('PLL'), [`${TC}PLL/CD4046B`, `${TC}PLL/VCO`, `${TC}PLL/Phase_Comp_XOR`, 'Digital/phidet', `${TC}PLL/Charge_Pump`, `${TC}PLL/Charge_Pump_Current`, `${TC}PLL/RBS`, `${TC}PLL/FSK`]),
+      sub('pll', t('PLL'), [`${TC}PLL/CD4046B`, `${TC}PLL/VCO`, `${TC}PLL/Phase_Comp_XOR`, `${TC}PLL/Phase_Comp_Type3`, 'Digital/phidet', `${TC}PLL/Charge_Pump`, `${TC}PLL/Charge_Pump_Current`, `${TC}PLL/RBS`, `${TC}PLL/FSK`]),
       sub('special', t('Modulators and special functions'), ['SpecialFunctions/modulate', 'SpecialFunctions/modulate2', 'SpecialFunctions/varistor']),
     ],
   },
@@ -115,7 +115,7 @@ export const CATEGORIES: Category[] = [
       sub('gates', t('Gates'), ['Digital/and', 'Digital/or', 'Digital/xor', 'Digital/inv', 'Digital/buf', 'Digital/buf1', `${SP}74HCU04 Not`]),
       sub('schmitt', t('Schmitt triggers'), ['Digital/schmitt', 'Digital/schmtbuf', 'Digital/schmtinv', 'Digital/diffschmitt', 'Digital/diffschmtbuf', 'Digital/diffschmtinv']),
       sub('flipflops', t('Flip-flops and counters'), ['Digital/dflop', 'Digital/srflop', 'Digital/counter']),
-      sub('phase', t('Phase detectors'), ['Digital/phidet', `${TC}PLL/Phase_Comp_XOR`]),
+      sub('phase', t('Phase detectors'), ['Digital/phidet', `${TC}PLL/Phase_Comp_XOR`, `${TC}PLL/Phase_Comp_Type3`]),
     ],
   },
   {

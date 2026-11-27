@@ -3,14 +3,14 @@ import { buildBundle } from '../../scripts/build-library.mjs';
 import { symParams } from '../../src/project/symbolEdit.ts';
 
 // Bibliotecas Verilog: cada módulo de library/verilog tiene su símbolo en la carpeta de library/sym
-// con el mismo nombre (DSP, #366: scripts/gen-dsp-symbols.ts; 74HC: scripts/gen-74hc-symbols.ts) y al revés
-describe('bibliotecas Verilog (DSP, 74HC)', () => {
+// con el mismo nombre (DSP, #366: scripts/gen-dsp-symbols.ts; 74HC y Stimuli: scripts/gen-logic-symbols.ts) y al revés
+describe('bibliotecas Verilog (DSP, 74HC, Stimuli)', () => {
   const b = buildBundle();
   const mods = Object.keys(b.verilog ?? {});
   it('tiene módulos', () => expect(mods.length).toBeGreaterThan(5));
   it('cada módulo tiene su símbolo con sus parameter', () => {
     for (const m of mods) {
-      const sym = b.symbols[`DSP/${m}`] ?? b.symbols[`74HC/${m}`];
+      const sym = b.symbols[`DSP/${m}`] ?? b.symbols[`74HC/${m}`] ?? b.symbols[`Stimuli/${m}`];
       expect(sym, m).toBeDefined();
       expect(sym).toMatch(new RegExp(`^SYMATTR Value ${m}$`, 'm'));
       const params = new Set(symParams(sym).map(([k]) => k));

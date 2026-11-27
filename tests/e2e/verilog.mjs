@@ -516,6 +516,45 @@ await resultsMenu(page, /^Mediciones/);
   check(runs.length === 4 && /VB=0/.test(runs[0]) && /VA=5/.test(runs[3]) && /VB=5/.test(runs[3]), `las corridas: todas las combinaciones de VA y VB (${runs.join(' | ')})`);
 }
 
+// --- estímulos: un pulsador con rebote como reloj de div4 (cuenta cada rebote) ---
+await page.keyboard.press('p');
+await page.locator('.picker input').fill('button');
+await page
+  .locator('.picker-list li')
+  .filter({ hasText: /buttonStimuli ·/ })
+  .click();
+{
+  const svg = await page.locator('svg.editor').boundingBox();
+  await page.mouse.click(svg.x + svg.width * 0.2, svg.y + svg.height * 0.8);
+}
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => /button: el símbolo está/.test(document.body.textContent ?? ''), null, { timeout: 120000 });
+check((await page.locator('.project-tree .tree-name', { hasText: /button$/ }).count()) === 1, 'el pulsador (comportamiento, Icarus) queda en el proyecto');
+// (el pulsador en 0,240: su salida y en 96,240, donde estaba el reloj V1; se aprieta en 1 ms y rebota)
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'rebote tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMBOL voltage 96 224 R0\nSYMATTR InstName V1\nSYMATTR Value PULSE(0 5 0 1n 1n 49n 100n)', 'SYMBOL button 0 240 R0\nSYMATTR InstName U9')
+    .replace('FLAG 96 320 0\n', '')
+    .replace('!.tran 1u', '!.tran 5m'),
+);
+await page.locator('.project-tree .tree-name', { hasText: 'rebote tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 3 && !document.querySelector('.verilog-module'));
+check((await page.locator('svg.editor .loose rect').count()) === 0, 'el pulsador queda conectado al reloj de div4');
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `el pulsador (Icarus) y div4 (compuertas) simulan juntos (${await page.locator('.status').first().textContent()})`);
+check(await addTrace('Dig(x1.q[1:0])'), 'Dig(x1.q[1:0])');
+{
+  const vals = await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('.dl-value').allTextContents();
+  // (un solo apretón: sin rebote contaría hasta 1; con rebote, cada flanco de subida suma)
+  check(vals.length > 3, `div4 cuenta los rebotes de un solo apretón (${vals.join(',')})`);
+}
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

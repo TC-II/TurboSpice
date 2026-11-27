@@ -1,21 +1,29 @@
-// Símbolos de la biblioteca 74HC: sintetiza cada módulo de library/verilog/74HC con Yosys (de ahí
-// salen el orden de los pines, como en verilogSymbol) y escribe su símbolo en library/sym/74HC, con
-// la familia 74HC como interfaz eléctrica. Las compuertas y el 74 van de a una por símbolo, con su
-// forma; los integrados MSI, como una caja con el número de patita de cada pin. Un pin activo en
-// bajo (…_n) lleva el círculo de negado y su nombre sin el _n.
-// Uso: node scripts/gen-74hc-symbols.ts (después de cambiar los pines de un módulo)
+// Símbolos de las bibliotecas lógicas: 74HC y los estímulos (Stimuli). De cada módulo de
+// library/verilog/<carpeta> salen el orden de los pines y los parameter (síntesis con Yosys; los de
+// comportamiento, como los estímulos, compilados con Icarus) y se escribe su símbolo en
+// library/sym/<carpeta>, con la familia 74HC como interfaz eléctrica. Las compuertas y el 74 van de
+// a una por símbolo, con su forma; los integrados MSI, como una caja con el número de patita de cada
+// pin. Un pin activo en bajo (…_n) lleva el círculo de negado y su nombre sin el _n.
+// Uso: node scripts/gen-logic-symbols.ts (después de cambiar los pines de un módulo)
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { runYosys } from '@yowasp/yosys';
 import { synthesize } from '../src/hdl/yosys.ts';
-import { verilogSymbol } from '../src/hdl/project.ts';
-import { electricalLine, FAMILIES } from '../src/hdl/electrical.ts';
+import { looksBehavioral, verilogSymbol } from '../src/hdl/project.ts';
+import { compileIcarus } from '../src/hdl/icarus.ts';
+import { cosimSubckt } from '../src/hdl/synth.ts';
+import { ELECTRICAL_NAMES, electricalLine, FAMILIES } from '../src/hdl/electrical.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SRC = join(ROOT, 'library', 'verilog', '74HC');
-const OUT = join(ROOT, 'library', 'sym', '74HC');
+const DIRS = ['74HC', 'Stimuli'];
 const HC = FAMILIES.find((f) => f.name.startsWith('74HC '))!.values;
+// Icarus en WebAssembly (engine/dist-engine, npm run engine:fetch), como en tests/hdl
+const ICARUS = join(ROOT, 'engine', 'dist-engine', 'icarus');
+const icarus = {
+  program: async (name: string, print: (l: string) => void) => (await import(pathToFileURL(join(ICARUS, `${name}.mjs`)).href)).default({ print, printErr: print }),
+  file: async (name: string) => new Uint8Array(readFileSync(join(ICARUS, name))),
+};
 
 type Pt = [number, number];
 interface Drawing {
@@ -106,6 +114,8 @@ const DRAW: Record<string, Drawing> = {
   hc163: box('74HC163', pins('A:3 B:4 C:5 D:6 ENP:7 ENT:10 LOAD_n:9 CLR_n:1 CLK:2^'), pins('QA:14 QB:13 QC:12 QD:11 RCO:15')),
   hc595: box('74HC595', pins('SER:14 SRCLK:11^ SRCLR_n:10 RCLK:12^ OE_n:13'), pins("QA:15 QB:1 QC:2 QD:3 QE:4 QF:5 QG:6 QH:7 QHs:9=QH'")),
   hc4511: box('74HC4511', pins('A:7 B:1 C:2 D:6 LE:5 BI_n:4 LT_n:3'), pins('seg_a:13=a seg_b:12=b seg_c:11=c seg_d:10=d seg_e:9=e seg_f:15=f seg_g:14=g')),
+  button: box('BUTTON', [], pins('y')),
+  keypad4x4: box('KEYPAD 4×4', pins('R1 R2 R3 R4'), pins('C1 C2 C3 C4')),
 };
 
 // setup y hold (src/sim/setupHold.ts): dato, reloj, tsu y th a VCC = 4,5 V, los más exigentes de las
@@ -129,16 +139,23 @@ const DESC: Record<string, string> = {
   hc163: '74HC163: 4-bit binary counter, synchronous load and clear',
   hc595: '74HC595: 8-bit shift register with output latch and 3-state outputs',
   hc4511: '74HC4511: BCD to 7-segment latch/decoder/driver (common cathode)',
+  button: 'Push button with contact bounce (press at T_PRESS µs, release T_HOLD µs later; N_BOUNCE bounces in about T_BOUNCE µs)',
+  keypad4x4: '4×4 matrix keypad: scan rows R1–R4 (active low), read columns C1–C4; presses the keys of KEYS in order (set in the code)',
 };
 
 /** El símbolo dibujado: el orden de los pines del generado, la familia 74HC y la geometría de DRAW */
 function drawn(name: string, generated: string, description: string): string {
   const d = DRAW[name];
   if (!d) throw new Error(`${name}: falta su dibujo en DRAW`);
+  // (la familia 74HC en lugar de la interfaz por omisión; los parameter del módulo quedan)
+  const spice = (line: string) => {
+    const params = line.split(/\s+/).filter((kv) => /=/.test(kv) && !ELECTRICAL_NAMES.has(kv.split('=')[0].toLowerCase()) && !/^hdl=/i.test(kv));
+    return ['SYMATTR SpiceLine', electricalLine(HC), ...params, 'hdl=auto'].join(' ');
+  };
   const attrs = generated
     .split('\n')
     .filter((l) => /^SYMATTR /.test(l))
-    .map((l) => (/^SYMATTR SpiceLine /.test(l) ? `SYMATTR SpiceLine ${electricalLine(HC)} hdl=auto` : /^SYMATTR Description /.test(l) ? `SYMATTR Description ${description}` : l));
+    .map((l) => (/^SYMATTR SpiceLine /.test(l) ? spice(l.slice(17)) : /^SYMATTR Description /.test(l) ? `SYMATTR Description ${description}` : l));
   const order = [...generated.matchAll(/^PINATTR PinName (\S+)\nPINATTR SpiceOrder (\d+)/gm)].map((m) => ({ name: m[1], order: m[2] }));
   const [nx, ny, nAlign] = d.name;
   const out = [
@@ -161,12 +178,24 @@ function drawn(name: string, generated: string, description: string): string {
   return out.join('\n') + '\n';
 }
 
-mkdirSync(OUT, { recursive: true });
-for (const f of readdirSync(SRC).filter((x) => x.endsWith('.v'))) {
-  const name = f.replace(/\.v$/, '');
-  const code = readFileSync(join(SRC, f), 'utf8');
-  const r = await synthesize(runYosys, { [f]: code }, f, name);
-  if (!r.block) throw new Error(`${f}: ${r.error}`);
-  writeFileSync(join(OUT, `${name}.asy`), drawn(name, verilogSymbol(name, r.block), DESC[name] ?? name));
-  console.log(`${name}: ${r.block.pins.length} pines`);
+for (const dir of DIRS) {
+  const src = join(ROOT, 'library', 'verilog', dir);
+  const out = join(ROOT, 'library', 'sym', dir);
+  mkdirSync(out, { recursive: true });
+  for (const f of readdirSync(src).filter((x) => x.endsWith('.v'))) {
+    const name = f.replace(/\.v$/, '');
+    const code = readFileSync(join(src, f), 'utf8');
+    let block;
+    if (looksBehavioral(code)) {
+      const r = await compileIcarus(icarus, { [f]: code }, name);
+      if (!r.ports) throw new Error(`${f}: ${r.error}`);
+      block = cosimSubckt(name, r.ports, r.params ?? {}, `${name}.vvp`, f);
+    } else {
+      const r = await synthesize(runYosys, { [f]: code }, f, name);
+      if (!r.block) throw new Error(`${f}: ${r.error}`);
+      block = r.block;
+    }
+    writeFileSync(join(out, `${name}.asy`), drawn(name, verilogSymbol(name, block), DESC[name] ?? name));
+    console.log(`${dir}/${name}: ${block.pins.length} pines`);
+  }
 }

@@ -121,6 +121,8 @@ export interface CircuitInfo {
   sources: string[];
   /** sondas de lazo del .stb (diff: la diferencial, que mide DM y CM) */
   probes?: { name: string; diff: boolean }[];
+  /** las fuentes V que parecen la alimentación (no son entradas) */
+  supplies?: string[];
 }
 
 export function AnalysisForm({ a, set, picker, info }: { a: Analysis; set(a: Analysis): void; picker?: Picker; info?: CircuitInfo }): ReactNode {

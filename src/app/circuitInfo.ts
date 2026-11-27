@@ -45,5 +45,21 @@ export function circuitInfoOf(conn: Connectivity, doc: AscDoc, lib: Library): Ci
       .filter((a) => /^(LoopProbe|LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? ''))
       .map((a) => ({ name: spiceName(a.get('InstName') ?? ''), diff: /^(LoopProbe_Dif|DiffLoopProbe)$/i.test(a.get('SpiceModel') ?? '') }))
       .filter((p, i, all) => p.name && all.findIndex((q) => q.name === p.name) === i),
+    supplies: supplySources(conn, doc, lib),
   };
+}
+
+const SUPPLY = /^(v(cc|dd|ee|ss)|supply|alim)/i;
+
+/** Las fuentes V que parecen la alimentación: por su nombre, por el de su red (vcc, vdd…) o porque llegan a un pin Vcc/Vdd de otro símbolo */
+function supplySources(conn: Connectivity, doc: AscDoc, lib: Library): string[] {
+  const pinName = (sym: number, pin: number) => lib.symbol(doc.symbols[sym].type)?.pins[pin]?.attrs.get('PinName') ?? '';
+  return doc.symbols.flatMap((s, i) => {
+    const a = effectiveAttrs(s, lib.symbol(s.type));
+    const name = spiceName(a.get('InstName') ?? '');
+    if (!/^V$/i.test(a.get('Prefix') ?? '') || !name) return [];
+    const nets = conn.nets.filter((n) => n.name !== '0' && n.pins.some((p) => p.sym === i));
+    const supply = SUPPLY.test(name) || nets.some((n) => SUPPLY.test(n.name) || n.pins.some((p) => p.sym !== i && SUPPLY.test(pinName(p.sym, p.pin))));
+    return supply ? [name] : [];
+  });
 }

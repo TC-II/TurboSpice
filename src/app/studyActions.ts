@@ -78,6 +78,7 @@ export function studyActions({ doc, docLine, curSub, lib, commit, circuitInfo, s
         .map((a) => ({ name: a.get('InstName') ?? '', prefix: (a.get('Prefix') ?? '')[0], value: a.get('Value') ?? '' }))
         .filter((c) => c.name),
       sources: circuitInfo().sources,
+      supplies: circuitInfo().supplies,
       nets: circuitInfo().nets,
       params: [...params],
       analysis,

@@ -33,6 +33,8 @@ export interface StudyInfo {
   /** componentes con nombre, prefijo y valor actual */
   components: { name: string; prefix: string; value: string }[];
   sources: string[];
+  /** las fuentes que parecen la alimentación */
+  supplies?: string[];
   nets: string[];
   params: string[];
   /** análisis del esquemático (para las mediciones nuevas) */

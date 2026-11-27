@@ -69,15 +69,8 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd, states: stateNames(Object.values(sources)) } : {}) };
   };
   /** Un testbench en el motor, sin que su progreso vaya a la barra de la simulación (ésta no es la del esquemático) */
-  const quietly = async (netlist: string, vvp: string, opts: SimulateOptions = {}) => {
-    const progress = engine.onStatus;
-    engine.onStatus = undefined;
-    try {
-      return (await engine.simulate(netlist, { ...verilogData(projectRef.current), [TB_VVP]: vvp }, opts)).result;
-    } finally {
-      engine.onStatus = progress;
-    }
-  };
+  const quietly = async (netlist: string, vvp: string, opts: SimulateOptions = {}) =>
+    (await engine.simulate(netlist, { ...verilogData(projectRef.current), [TB_VVP]: vvp }, { ...opts, quiet: true })).result;
   /** La tabla de verdad del módulo `name` con el código `text` (truthTable.ts) */
   const truthTable = async (name: string, text: string): Promise<TruthTable | { error: string }> => {
     const f = verilogFile(projectRef.current, name);

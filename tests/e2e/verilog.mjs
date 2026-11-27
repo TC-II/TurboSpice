@@ -237,6 +237,38 @@ await page.locator('.vm-suggest button').click();
 await synthesize();
 check((await status()) === 'Compilado (Icarus)', `compila con Icarus (${await status()})`);
 
+// --- dos bloques de comportamiento en la misma simulación (van juntos en un módulo de Icarus) ---
+await newModule('bdiv', 'Verilog');
+await code.fill('`timescale 1ns/1ps\n' + VERILOG.replace('div4', 'bdiv').replace('q <= q + 1;', 'q <= #1 q + 1;'));
+await until(async () => (await page.locator('.vm-suggest').count()) === 1);
+await page.locator('.vm-suggest button').click();
+await synthesize();
+// (bdiv tiene los pines de div4: la segunda instancia, 256 más abajo, a q2[1:0])
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'bdiv tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMBOL div4', 'SYMBOL bdiv').replace(
+    'TEXT',
+    'WIRE 384 640 400 640\nWIRE 384 672 400 672\nWIRE 496 640 512 640\nFLAG 384 640 clk\nFLAG 384 672 rst\nFLAG 512 640 q2[1:0]\nSYMBOL bdiv 448 656 R0\nSYMATTR InstName X2\nTEXT',
+  ),
+);
+await page.locator('.project-tree .tree-name', { hasText: 'bdiv tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+await simulate();
+check((await page.locator('.status.ok').count()) === 1, `dos bloques Icarus en la misma simulación (${await page.locator('.status').first().textContent()})`);
+check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig() de las salidas de los dos bloques');
+{
+  const lanes = page.locator('.pane.digital .digital-lanes .dl-lane');
+  const a = await lanes.nth(0).locator('.dl-value').allTextContents();
+  const b = await lanes.nth(1).locator('.dl-value').allTextContents();
+  check(a.slice(0, 4).join() === '0x0,0x1,0x2,0x3' && b.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `los dos cuentan (${a.slice(0, 4)} | ${b.slice(0, 4)})`);
+}
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

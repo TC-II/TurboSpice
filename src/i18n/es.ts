@@ -855,7 +855,7 @@ export const es: Record<string, string> = {
   'Poles and zeros of a transfer function (.pz).': 'Polos y ceros de una función de transferencia (.pz).',
   'Poles only': 'Sólo polos',
   'Ports:': 'Puertos:',
-  'Compiling {n} DSP blocks into one Icarus module…': 'Compilando {n} bloques DSP en un solo módulo de Icarus…',
+  'Compiling {n} blocks into one Icarus module…': 'Compilando {n} bloques en un solo módulo de Icarus…',
   'The DSP blocks are simulated as gates: Icarus runs a single analysis per simulation (several analyses or a .control that repeats)':
     'Los bloques DSP se simulan como compuertas: Icarus corre un solo análisis por simulación (varios análisis o un .control que repite)',
   '{name} is behavioral Verilog (Icarus), which runs a single analysis per simulation: several analyses or a .control that repeats need it synthesized (dsp_clock: a PULSE source instead)':

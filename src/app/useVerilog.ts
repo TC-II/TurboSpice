@@ -71,10 +71,10 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
     let netlist = input;
     let aliases: Map<string, string> | undefined;
     const merged: string[] = [];
-    // los bloques de la biblioteca DSP, en un solo módulo de Icarus (#366, cosimMerge.ts); no si
-    // ya hay otro bloque de comportamiento (Icarus corre uno por simulación)
-    // (salvo que vaya al módulo único también: hdl=icarus, o un bloque DSP como el reloj)
-    const joins = (name: string, hdl: HdlMode) => hdl === 'icarus' || (hdl === 'auto' && /^dsp_/i.test(name));
+    // los bloques DSP y los de comportamiento, en un solo módulo de Icarus (#366, cosimMerge.ts):
+    // Icarus corre uno por simulación. No si queda afuera un bloque de comportamiento (un pin inout)
+    const icarus = new Set(mods.filter((f) => f.synth!.vvp).map((f) => moduleOf(f).toLowerCase()));
+    const joins = (name: string, hdl: HdlMode) => hdl === 'icarus' || (hdl === 'auto' && (/^dsp_/i.test(name) || icarus.has(name.toLowerCase())));
     const behavioral = mods.some((f) => {
       if (!f.synth!.vvp) return false;
       const re = new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$).*$`, 'gim');
@@ -112,7 +112,7 @@ export function useVerilog({ lib, projectRef, editProject, setLibVersion, setSta
       const k = JSON.stringify(sources);
       let hit = mergeCache.current.get(k);
       if (!hit) {
-        setStatus({ kind: 'running', percent: 0, text: t('Compiling {n} DSP blocks into one Icarus module…', { n: m.instances.length }) });
+        setStatus({ kind: 'running', percent: 0, text: t('Compiling {n} blocks into one Icarus module…', { n: m.instances.length }) });
         const r = await compileBehavioral(sources, `${m.top}.v`, m.top, vvpFileOf(m.top));
         if (!r.block || !r.vvp) throw new Error(`${m.top}: ${r.error}`);
         hit = { subckt: r.block.subckt, vvp: r.vvp, pins: r.block.pins };

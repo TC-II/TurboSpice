@@ -337,6 +337,24 @@ await page.waitForFunction(() => !document.querySelector('.verilog-module'));
 await simulate();
 check((await page.locator('.status.ok').count()) === 1, `con un testbench en el proyecto, el esquemático sigue simulando (${await page.locator('.status').first().textContent()})`);
 
+// --- biblioteca 74HC: el buscador la encuentra; al colocar una parte, su .v va al proyecto y se sintetiza ---
+await page.keyboard.press('p');
+await page.locator('.picker input').fill('74HC595');
+const hc595 = page.locator('.picker-list li').filter({ hasText: 'hc59574HC ·' });
+check((await hc595.count()) === 1, `el buscador encuentra el 74HC595 (${(await page.locator('.picker-list li').allTextContents()).slice(0, 2)})`);
+await hc595.click();
+{
+  const svg = await page.locator('svg.editor').boundingBox();
+  await page.mouse.click(svg.x + svg.width * 0.75, svg.y + svg.height * 0.5);
+}
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => /hc595: el símbolo está/.test(document.body.textContent ?? ''), null, { timeout: 120000 });
+check((await page.locator('.project-tree .tree-name', { hasText: /hc595$/ }).count()) === 1, 'el 74HC595 queda en el proyecto, sintetizado');
+check(
+  (await page.locator('svg.editor .sym text', { hasText: /^SRCLK$/ }).count()) === 1 && (await page.locator('svg.editor .sym text', { hasText: /^11$/ }).count()) === 1,
+  'su símbolo: los pines con su nombre y el número de patita (SRCLK, 11)',
+);
+
 // --- después de recargar, el módulo sigue sintetizado y se puede abrir ---
 await autosaved(page);
 await page.reload();

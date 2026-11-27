@@ -1,0 +1,96 @@
+Version 4
+SymbolType CELL
+RECTANGLE Normal -64 -176 64 176
+TEXT 0 -164 Center 1 74HC157
+LINE Normal -64 -144 -96 -144
+TEXT -60 -144 Left 1 1A
+TEXT -84 -152 Center 0 2
+LINE Normal -64 -112 -96 -112
+TEXT -60 -112 Left 1 1B
+TEXT -84 -120 Center 0 3
+LINE Normal -64 -80 -96 -80
+TEXT -60 -80 Left 1 2A
+TEXT -84 -88 Center 0 5
+LINE Normal -64 -48 -96 -48
+TEXT -60 -48 Left 1 2B
+TEXT -84 -56 Center 0 6
+LINE Normal -64 -16 -96 -16
+TEXT -60 -16 Left 1 3A
+TEXT -84 -24 Center 0 11
+LINE Normal -64 16 -96 16
+TEXT -60 16 Left 1 3B
+TEXT -84 8 Center 0 10
+LINE Normal -64 48 -96 48
+TEXT -60 48 Left 1 4A
+TEXT -84 40 Center 0 14
+LINE Normal -64 80 -96 80
+TEXT -60 80 Left 1 4B
+TEXT -84 72 Center 0 13
+LINE Normal -64 112 -96 112
+TEXT -60 112 Left 1 S
+TEXT -84 104 Center 0 1
+CIRCLE Normal -72 140 -64 148
+LINE Normal -72 144 -96 144
+TEXT -60 144 Left 1 G
+TEXT -84 136 Center 0 15
+LINE Normal 64 -144 96 -144
+TEXT 60 -144 Right 1 1Y
+TEXT 84 -152 Center 0 4
+LINE Normal 64 -112 96 -112
+TEXT 60 -112 Right 1 2Y
+TEXT 84 -120 Center 0 7
+LINE Normal 64 -80 96 -80
+TEXT 60 -80 Right 1 3Y
+TEXT 84 -88 Center 0 9
+LINE Normal 64 -48 96 -48
+TEXT 60 -48 Right 1 4Y
+TEXT 84 -56 Center 0 12
+WINDOW 0 0 -184 Bottom 2
+WINDOW 3 0 0 Invisible 2
+SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
+SYMATTR Prefix X
+SYMATTR Value hc157
+SYMATTR ModelFile hc157.sub
+SYMATTR Description 74HC157: quad 2-to-1 multiplexer
+PIN -96 -144 NONE 0
+PINATTR PinName a1
+PINATTR SpiceOrder 1
+PIN -96 -112 NONE 0
+PINATTR PinName b1
+PINATTR SpiceOrder 2
+PIN -96 -80 NONE 0
+PINATTR PinName a2
+PINATTR SpiceOrder 3
+PIN -96 -48 NONE 0
+PINATTR PinName b2
+PINATTR SpiceOrder 4
+PIN -96 -16 NONE 0
+PINATTR PinName a3
+PINATTR SpiceOrder 5
+PIN -96 16 NONE 0
+PINATTR PinName b3
+PINATTR SpiceOrder 6
+PIN -96 48 NONE 0
+PINATTR PinName a4
+PINATTR SpiceOrder 7
+PIN -96 80 NONE 0
+PINATTR PinName b4
+PINATTR SpiceOrder 8
+PIN -96 112 NONE 0
+PINATTR PinName s
+PINATTR SpiceOrder 9
+PIN -96 144 NONE 0
+PINATTR PinName g_n
+PINATTR SpiceOrder 10
+PIN 96 -144 NONE 0
+PINATTR PinName y1
+PINATTR SpiceOrder 11
+PIN 96 -112 NONE 0
+PINATTR PinName y2
+PINATTR SpiceOrder 12
+PIN 96 -80 NONE 0
+PINATTR PinName y3
+PINATTR SpiceOrder 13
+PIN 96 -48 NONE 0
+PINATTR PinName y4
+PINATTR SpiceOrder 14

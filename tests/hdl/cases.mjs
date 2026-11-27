@@ -9,6 +9,19 @@ const DSP = readdirSync(DSP_DIR)
   .filter((f) => f.endsWith('.v'))
   .map((f) => readFileSync(new URL(f, DSP_DIR), 'utf8'))
   .join('\n');
+// la biblioteca 74HC: lo que la síntesis tiene que pasar bien a XSPICE (tres estados, preset y clear, latch)
+const HC = (...names) => names.map((n) => readFileSync(new URL(`../../library/verilog/74HC/${n}.v`, import.meta.url), 'utf8')).join('\n');
+/** PWL que arranca en `v0` (0 o 5 V) y cambia de nivel en cada instante de `ts` (en ns, con 1 ns de flanco) */
+const pwl = (v0, ...ts) => {
+  let v = v0;
+  const pts = [`0 ${v}`];
+  for (const t of ts) {
+    pts.push(`${t}n ${v}`);
+    v = 5 - v;
+    pts.push(`${t + 1}n ${v}`);
+  }
+  return `PWL(${pts.join(' ')})`;
+};
 /** Valor con signo de un bus de `w` bits leído como tensiones (nombre_7 … nombre_0) */
 const word = (at, name, w, tt) => {
   const u = Array.from({ length: w }, (_, k) => w - 1 - k).reduce((acc, b) => acc * 2 + (at(`${name}_${b}`, tt) > 2.5 ? 1 : 0), 0);
@@ -191,6 +204,52 @@ X1 a en b y c tri_io
       if (at('c', 280e-9) < 4.5) return `c lee el bus: ${at('c', 280e-9)}`;
     },
     compare: ['b', [30e-9, 80e-9, 280e-9]],
+  },
+  {
+    name: '74HC: 595 (registros y salidas de tres estados), 74 (clear) y 4511 (latch), sintetizados',
+    file: 'lib74.v',
+    top: 'lib74',
+    verilog: `${HC('hc595', 'hc74', 'hc4511')}
+module lib74(input ser, input srclk, input rclk, input oe_n, input d, input clk, input clr_n, input b3, input b2, input b0, input le,
+  output qa, output qb, output qc, output qd, output qe, output qf, output qg, output qh, output qhs, output q, output q_n, output [6:0] seg);
+  hc595 u1(.SER(ser), .SRCLK(srclk), .SRCLR_n(1'b1), .RCLK(rclk), .OE_n(oe_n),
+           .QA(qa), .QB(qb), .QC(qc), .QD(qd), .QE(qe), .QF(qf), .QG(qg), .QH(qh), .QHs(qhs));
+  hc74 u2(.D(d), .CLK(clk), .PRE_n(1'b1), .CLR_n(clr_n), .Q(q), .Q_n(q_n));
+  hc4511 u3(.A(b0), .B(1'b0), .C(b2), .D(b3), .LE(le), .BI_n(1'b1), .LT_n(1'b1),
+            .seg_a(seg[0]), .seg_b(seg[1]), .seg_c(seg[2]), .seg_d(seg[3]), .seg_e(seg[4]), .seg_f(seg[5]), .seg_g(seg[6]));
+endmodule`,
+    // 595: entra 1011_0001 en 8 flancos de srclk (100…800 ns), rclk en 950 ns, OE_n en 1 desde 1,2 µs.
+    // 74: flanco de clk en 300 ns con D = 1, clear de 500 a 600 ns. 4511: 5 (0101) hasta 700 ns, que
+    // pasa a 8, pero con LE en 1 desde 600 ns sigue mostrando el 5
+    circuit: `Vsrclk srclk 0 ${pwl(0, ...[100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850])}
+Vser ser 0 ${pwl(5, 150, 250, 450, 750)}
+Vrclk rclk 0 ${pwl(0, 950, 980)}
+Voe oe_n 0 ${pwl(0, 1200)}
+Rqa qa 0 100k
+Vd d 0 5
+Vclk clk 0 ${pwl(0, 300)}
+Vclr clr_n 0 ${pwl(5, 500, 600)}
+Vb3 b3 0 ${pwl(0, 700)}
+Vb2 b2 0 ${pwl(5, 700)}
+Vb0 b0 0 ${pwl(5, 700)}
+Vle le 0 ${pwl(0, 600)}
+X1 ser srclk rclk oe_n d clk clr_n b3 b2 b0 le qa qb qc qd qe qf qg qh qhs q q_n ${nodes('seg', 7)} lib74
+.tran 1n 1.4u`,
+    check: (at, block) => {
+      const order = block.pins.map((p) => p.name).join(' ');
+      if (order !== `ser srclk rclk oe_n d clk clr_n b3 b2 b0 le qa qb qc qd qe qf qg qh qhs q q_n ${nodes('seg', 7)}`) return `pines: ${order}`;
+      const hi = (n, tt) => at(n, tt) > 2.5;
+      const q8 = (tt) => ['qh', 'qg', 'qf', 'qe', 'qd', 'qc', 'qb', 'qa'].map((n) => (hi(n, tt) ? 1 : 0)).join('');
+      if (q8(900e-9) !== '00000000') return `595 antes de rclk: ${q8(900e-9)}`;
+      if (!hi('qhs', 900e-9)) return "595: QH' (el primer bit que entró)";
+      if (q8(1100e-9) !== '10110001') return `595 después de rclk: ${q8(1100e-9)}`;
+      if (at('qa', 1300e-9) > 0.5) return `595 con OE_n en 1, QA en Z (la R la lleva a 0): ${at('qa', 1300e-9)}`;
+      if (!hi('q', 400e-9) || hi('q_n', 400e-9)) return '74: Q después del flanco con D = 1';
+      if (hi('q', 550e-9) || !hi('q_n', 550e-9)) return '74: clear';
+      const seg = (tt) => Array.from({ length: 7 }, (_, k) => (hi(`seg_${6 - k}`, tt) ? 1 : 0)).join('');
+      if (seg(500e-9) !== '1101101') return `4511 con un 5: ${seg(500e-9)}`;
+      if (seg(800e-9) !== '1101101') return `4511 con LE en 1 retiene el 5: ${seg(800e-9)}`;
+    },
   },
   {
     name: 'memoria de 16×4 (Yosys la pasa a flip-flops)',

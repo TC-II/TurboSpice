@@ -2,15 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { buildBundle } from '../../scripts/build-library.mjs';
 import { symParams } from '../../src/project/symbolEdit.ts';
 
-// Biblioteca DSP (#366): cada módulo de library/verilog tiene su símbolo en library/sym/DSP
-// (scripts/gen-dsp-symbols.ts) y al revés
-describe('biblioteca DSP', () => {
+// Bibliotecas Verilog: cada módulo de library/verilog tiene su símbolo en la carpeta de library/sym
+// con el mismo nombre (DSP, #366: scripts/gen-dsp-symbols.ts; 74HC: scripts/gen-74hc-symbols.ts) y al revés
+describe('bibliotecas Verilog (DSP, 74HC)', () => {
   const b = buildBundle();
   const mods = Object.keys(b.verilog ?? {});
   it('tiene módulos', () => expect(mods.length).toBeGreaterThan(5));
   it('cada módulo tiene su símbolo con sus parameter', () => {
     for (const m of mods) {
-      const sym = b.symbols[`DSP/${m}`];
+      const sym = b.symbols[`DSP/${m}`] ?? b.symbols[`74HC/${m}`];
       expect(sym, m).toBeDefined();
       expect(sym).toMatch(new RegExp(`^SYMATTR Value ${m}$`, 'm'));
       const params = new Set(symParams(sym).map(([k]) => k));
@@ -22,6 +22,14 @@ describe('biblioteca DSP', () => {
     for (const path of Object.keys(b.symbols).filter((p) => p.startsWith('DSP/'))) {
       const name = path.slice(4);
       if (!mods.includes(name)) expect(b.subs[`DSP/${name}.sub`]?.subckts, name).toContain(name);
+    }
+  });
+  it('cada símbolo de 74HC tiene su módulo, con la familia 74HC', () => {
+    const syms = Object.keys(b.symbols).filter((p) => p.startsWith('74HC/'));
+    expect(syms.length).toBe(15);
+    for (const path of syms) {
+      expect(mods, path).toContain(path.slice(5));
+      expect(b.symbols[path]).toMatch(/^SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 .*tpd=9n hdl=auto$/m);
     }
   });
 });

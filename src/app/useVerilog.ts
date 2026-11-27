@@ -6,7 +6,7 @@ import { TB_VVP, tbModule, tbVerdict, type TbOutcome } from '../hdl/testbench.ts
 import { stateNames } from '../hdl/states.ts';
 import type { EngineClient } from '../engine/client.ts';
 import { applySynth, isStale, isTestbench, moduleOf, verilogData, verilogFile, verilogModules, verilogSources, vvpFileOf } from '../hdl/project.ts';
-import { hdlOfLine, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP, type HdlMode } from '../hdl/cosimMerge.ts';
+import { cosimLines, hdlOfLine, mergeableFor, mergeCosim, internalOnly, mergedLine, MERGED_LINE, MERGED_TOP } from '../hdl/cosimMerge.ts';
 import { applyVariants, renameSubckt as renameVariant, withSubckts } from '../hdl/variants.ts';
 import { engineErrorText } from '../hdl/engineError.ts';
 import type { SynthResult } from '../hdl/yosys.ts';
@@ -95,8 +95,8 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     const merged: string[] = [];
     // los bloques DSP y los de comportamiento, en un solo módulo de Icarus (#366, cosimMerge.ts):
     // Icarus corre uno por simulación. No si queda afuera un bloque de comportamiento (un pin inout)
-    const icarus = new Set(mods.filter((f) => f.synth!.vvp).map((f) => moduleOf(f).toLowerCase()));
-    const joins = (name: string, hdl: HdlMode) => hdl === 'icarus' || (hdl === 'auto' && (/^dsp_/i.test(name) || icarus.has(name.toLowerCase())));
+    const cosimMods = mods.map((f) => ({ name: moduleOf(f), pins: f.synth!.pins, behavioral: !!f.synth!.vvp }));
+    const joins = mergeableFor(cosimMods);
     const behavioral = mods.some((f) => {
       if (!f.synth!.vvp) return false;
       const re = new RegExp(`^\\s*x\\S*\\s.*\\s${moduleOf(f)}(\\s|$).*$`, 'gim');
@@ -184,7 +184,7 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
       if (hit.vvp) files[vvpFileOf(n.name)] = hit.vvp;
     }
     // Icarus (libvvp) corre una sola simulación por vez: un solo bloque de comportamiento
-    const cosims = (withSubckts(v.netlist, subs).match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => mods.some((f) => f.synth!.vvp && new RegExp(`\\s${moduleOf(f)}(__\\w+)?(\\s|$)`, 'i').test(l)));
+    const cosims = cosimLines(withSubckts(v.netlist, subs), cosimMods);
     if (cosims.length > 1) throw new Error(t('Only one behavioral Verilog block (Icarus) per simulation for now: there are {n}', { n: cosims.length }));
     return { netlist: withSubckts(v.netlist, inline), files, warnings: [...notes, ...v.warnings], ...(aliases ? { aliases } : {}) };
   };

@@ -73,6 +73,33 @@ export const hdlOfLine = (line: string): HdlMode => hdlOf(tokens(line));
  */
 export const stripHdl = (text: string) => text.replace(/^(\s*(?:x\S*|\.subckt)\s.*)$/gim, (line) => line.replace(/\s+hdl=\S+/gi, '').replace(/\s+params:\s*$/i, ''));
 
+/** Un módulo Verilog del proyecto: sus pines y si es de comportamiento (tiene .vvp: su propio d_cosim) */
+export interface CosimModule {
+  name: string;
+  pins: { dir: PinDir }[];
+  behavioral: boolean;
+}
+
+/**
+ * El `mergeable` de mergeCosim para los módulos del proyecto: en auto, los DSP y los de comportamiento;
+ * en icarus, todos. Nunca uno con un pin inout, que mergeCosim deja afuera: así quien llama sabe que
+ * ese bloque queda como su propio d_cosim
+ */
+export function mergeableFor(mods: CosimModule[]) {
+  const byName = new Map(mods.map((m) => [m.name.toLowerCase(), m]));
+  return (name: string, hdl: HdlMode) => {
+    const m = byName.get(name.toLowerCase());
+    if (m?.pins.some((p) => p.dir === 'inout')) return false;
+    return hdl === 'icarus' || (hdl === 'auto' && (/^dsp_/i.test(name) || !!m?.behavioral));
+  };
+}
+
+/** Las líneas X de la netlist que son un d_cosim (Icarus): los bloques de comportamiento, sus variantes y el módulo juntado */
+export function cosimLines(netlist: string, mods: CosimModule[]): string[] {
+  const names = [MERGED_TOP, ...mods.filter((m) => m.behavioral).map((m) => m.name)].map((n) => new RegExp(`\\s${n}(__\\w+)?(\\s|$)`, 'i'));
+  return (netlist.match(/^\s*x\S*\s.*$/gim) ?? []).filter((l) => names.some((re) => re.test(l)));
+}
+
 /** Las palabras de una línea, sin cortar llaves ni paréntesis ({vcc/2}) */
 const tokens = (line: string) => line.trim().match(/(?:\{[^{}]*\}|\([^()]*\)|[^\s{}()])+/g) ?? [];
 

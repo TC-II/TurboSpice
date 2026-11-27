@@ -860,6 +860,10 @@ export const es: Record<string, string> = {
   'Waveforms ($dumpvars)': 'Formas de onda ($dumpvars)',
   'All the input combinations and their outputs (Icarus), for a combinational module': 'Todas las combinaciones de las entradas y sus salidas (Icarus), para un módulo combinacional',
   'Truth table': 'Tabla de verdad',
+  'Input sources (the first one, the most significant bit)': 'Fuentes de entrada (la primera, el bit más significativo)',
+  'High level': 'Nivel alto',
+  'Each input source steps between 0 V and the high level (.step, every combination; the first source is the most significant bit) and each output, at the end of the transient: its voltage and its logic value (1 above 0.7 of the high level, 0 below 0.3, 0.5 = X in between). One row per combination in Measurements. Several outputs, separated by spaces.':
+    'Cada fuente de entrada pasa de 0 V al nivel alto (.step, todas las combinaciones; la primera fuente es el bit más significativo) y cada salida se mide al final del transitorio: su tensión y su valor lógico (1 por encima de 0,7 del nivel alto, 0 por debajo de 0,3, 0,5 = X en el medio). Una fila por combinación en Mediciones. Varias salidas, separadas por espacios.',
   'The truth table needs inputs and outputs, and at most {n} input bits': 'La tabla de verdad necesita entradas y salidas, y como mucho {n} bits de entrada',
   '{name}: {d} changes {dt} before the clock edge at {tc} (setup {tsu}); {n} in total': '{name}: {d} cambia {dt} antes del flanco de reloj en {tc} (setup {tsu}); {n} en total',
   '{name}: {d} changes {dt} after the clock edge at {tc} (hold {th}); {n} in total': '{name}: {d} cambia {dt} después del flanco de reloj en {tc} (hold {th}); {n} en total',

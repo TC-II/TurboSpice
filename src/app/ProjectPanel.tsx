@@ -2,6 +2,7 @@
 // workbenches y módulos, #180), Ctrl+P para ir a cualquiera, y el <input> para importar subcircuitos
 import type { ComponentProps, Dispatch, RefObject, SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
+import { isTestbench } from '../hdl/project.ts';
 import { t } from '../i18n/i18n.ts';
 import { ProjectTree, QuickOpen } from '../project/Hierarchy.tsx';
 import { modelModuleFile, modelModuleName, modelModules } from '../project/modelModule.ts';
@@ -86,7 +87,13 @@ export function ProjectPanel(props: ProjectPanelProps) {
         <div className={`sub-hint${curVerilog ? ' verilog' : ''}`} role="status">
           <strong>{curVerilog ? t('Verilog Editor') : t('Subcircuit Editor')}</strong>
           <span className="sub-hint-name">{curSub}</span>
-          <span className="sub-hint-text">{curVerilog ? t('write the module; its ports are the pins of the symbol') : t('draw the circuit between the ports (net labels with a port, N)')}</span>
+          <span className="sub-hint-text">
+            {curVerilog
+              ? isTestbench(curVerilog)
+                ? t('a testbench: it has no pins, it is run on its own')
+                : t('write the module; its ports are the pins of the symbol')
+              : t('draw the circuit between the ports (net labels with a port, N)')}
+          </span>
           <button onClick={() => go([])} title={t('Back to the testbench (Alt+↑ goes up one level)')}>
             {t('Return')}
           </button>

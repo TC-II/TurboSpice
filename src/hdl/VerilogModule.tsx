@@ -6,6 +6,7 @@ import { ELECTRICAL, ELECTRICAL_NAMES, FAMILIES } from './electrical.ts';
 import type { SynthResult } from './yosys.ts';
 import { engineErrorText } from './engineError.ts';
 import type { TbOutcome } from './testbench.ts';
+import { TbWaves } from './TbWaves.tsx';
 
 /**
  * Vista de un módulo Verilog del proyecto (#209), en lugar del esquemático de un subcircuito:
@@ -285,6 +286,7 @@ export function VerilogModule({
           )}
         </aside>
       </div>
+      {tb?.vcd && <TbWaves vcd={tb.vcd} />}
     </div>
   );
 }

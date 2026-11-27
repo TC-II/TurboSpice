@@ -271,12 +271,16 @@ check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig(
 
 // --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
 const TB = (want) =>
-  '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n' +
+  '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n  initial $dumpvars(0, bdiv_tb);\n' +
   `  initial begin\n    #12 rst = 0;\n    @(posedge clk); @(posedge clk); #2;\n    if (q !== ${want}) $fatal(1, "FAIL: q=%d", q);\n    $display("PASS");\n    $finish;\n  end\nendmodule\n`;
 await newModule('bdiv_tb', 'Verilog');
 check(
   (await code.inputValue()).includes('module bdiv_tb;') && !(await page.locator('.project-tree').textContent()).includes('bdiv_tbverilog3 pines'),
   'la plantilla de un *_tb es un testbench, sin síntesis',
+);
+check(
+  (await page.locator('.sub-simbar').textContent()).startsWith('Testbench bdiv_tb') && (await page.locator('.sub-hint-text').textContent()).startsWith('un testbench'),
+  `las barras dicen que es un testbench (${await page.locator('.sub-simbar').textContent()})`,
 );
 check(
   (await page.locator('.vm-mode').count()) === 0 && (await page.locator('.vm-bar button.primary').textContent()) === 'Correr testbench',
@@ -289,6 +293,15 @@ const runTb = async (text) => {
   return status();
 };
 check((await runTb(TB(2))) === 'PASS' && (await page.locator('.vm-tb').textContent()).includes('$finish called'), `el testbench pasa (${await status()})`);
+// las ondas del .vcd, abajo del código: las señales del testbench y, a pedido, las de adentro
+{
+  const names = () => page.locator('.vm-waves .dl-name title').allTextContents();
+  check(JSON.stringify(await names()) === JSON.stringify(['q', 'clk', 'rst']), `las ondas de $dumpvars: las señales del testbench (${await names()})`);
+  const q = await page.locator('.vm-waves .dl-lane').nth(0).locator('.dl-value').allTextContents();
+  check(q.join() === '0x0,0x1,0x2', `y el bus q cuenta (${q})`);
+  await page.getByLabel('Módulos de adentro').check();
+  check((await names()).includes('u.q'), `con los módulos de adentro, también u.q (${await names()})`);
+}
 check((await runTb(TB(3))) === 'FAIL' && (await page.locator('.vm-tb').textContent()).includes('FAIL: q='), `con otro valor esperado, $fatal da FAIL (${await status()})`);
 check((await runTb(TB(2).replace('.q(q)', '.q(q[0])'))) === 'FAIL', `un warning de compilación es FAIL (${await page.locator('.vm-tb').textContent()})`);
 check((await runTb(TB(2).replace('$finish;', '$finish'))) === 'Falló la compilación' && (await page.locator('.vm-gutter .err').count()) === 1, 'un error de sintaxis se marca en su línea');

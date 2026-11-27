@@ -65,8 +65,8 @@ export function useVerilog({ lib, engine, projectRef, editProject, setLibVersion
     const progress = engine.onStatus;
     engine.onStatus = undefined;
     try {
-      const { result } = await engine.simulate(r.netlist, { [TB_VVP]: r.vvp });
-      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log) };
+      const { result } = await engine.simulate(r.netlist, { [TB_VVP]: r.vvp }, { vcd: true });
+      return { compileLog: r.log, verdict: tbVerdict(r.log, result.log), ...(result.vcd ? { vcd: result.vcd } : {}) };
     } finally {
       engine.onStatus = progress;
     }

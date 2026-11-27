@@ -48,6 +48,8 @@ export interface TbOutcome {
   /** salida de Icarus al compilar (avisos) */
   compileLog: string;
   verdict?: TbVerdict;
+  /** el .vcd que escribió ($dumpvars) */
+  vcd?: string;
 }
 
 /** Un testbench nuevo (+ Nuevo › Verilog con un nombre *_tb) */

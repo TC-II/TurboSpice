@@ -94,8 +94,11 @@ describe('niveles lógicos entre bloques Verilog', () => {
   const fs = { 'project/a.sub': A2, 'project/b.sub': B2 };
   it('una salida de 3,3 V a una entrada 74HC de 5 V: un 1 no llega a VIH', () => {
     expect(levelProblems(net('X1 clk q t A vcc=3.3', 'XU2 q y B vcc=5'), fs)).toEqual(['q: un 1 de X1 (3.3 V) no llega al VIH de U2 (3.5 V): lee X']);
-    // a 3,3 V los dos, o el 74HC también a 3,3 V: bien
+    // esa red no pasa a digital: analógica, la entrada lee X como en el circuito
+    expect(linkDigitalNets(net('X1 clk q t A vcc=3.3', 'XU2 q y B vcc=5'), fs).nets).toEqual([]);
+    // a 3,3 V los dos, o el 74HC también a 3,3 V: bien (y digital)
     expect(levelProblems(net('X1 clk q t A vcc=3.3', 'XU2 q y B vcc=3.3'), fs)).toEqual([]);
+    expect(linkDigitalNets(net('X1 clk q t A vcc=3.3', 'XU2 q y B vcc=3.3'), fs).nets).toEqual(['q']);
     // un 0 de 74LS (0,35 V) a una entrada con VIL bajo
     expect(levelProblems(net('X1 clk q t A vol=0.35', 'XU2 q y B vil=0.3'), fs)).toEqual(['q: un 0 de X1 (0.35 V) queda por encima del VIL de U2 (0.3 V): lee X']);
   });

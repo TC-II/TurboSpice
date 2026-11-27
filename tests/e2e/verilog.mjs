@@ -290,6 +290,14 @@ check(
   await until(async () => /q\[1\]: un 1 de X1 \(3\.3 V\) no llega al VIH de X2 \(3\.5 V\): lee X/.test((await page.locator('body').textContent()) ?? '')),
   `avisa que un 1 de 3,3 V no llega al VIH de un 74HC a 5 V (${(await page.locator('.statusbar, .status-msg').allTextContents()).join(' | ')})`,
 );
+// (y esa red se simula analógica: el reloj, como lo lee X2, es X; sin flancos, X2 no cuenta)
+check(await addTrace('Dig(x2.clk_d)'), 'Dig(x2.clk_d): el reloj adentro de X2');
+check((await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('path.dl-x').count()) === 1, 'el reloj de X2 lee X, como en el circuito');
+check(await addTrace('Dig(q2[1:0])'), 'Dig(q2[1:0])');
+{
+  const vals = await page.locator('.pane.digital .digital-lanes .dl-lane').last().locator('.dl-value').allTextContents();
+  check(vals.join() === '0x0', `X2 no cuenta (${vals.slice(0, 4)})`);
+}
 
 // --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
 const TB = (want) =>

@@ -164,28 +164,30 @@ const kv = (words: string[]): Record<string, string> =>
 export function levelProblems(netlist: string, files: Record<string, string>): string[] {
   const subs = generatedSubckts(files);
   if (!subs.size) return [];
-  const insts = blockInstances(netlist.split('\n'), subs);
-  const level = (x: Inst, p: string) => paramNumber(p, { ...kv(tokens(x.sub.header).map((t) => t.text)), ...x.params });
-  const label = (x: Inst) => x.name.replace(/^x(?=[a-z])/i, '');
   const byNet = new Map<string, { inst: Inst; role: PinInfo['role'] }[]>();
-  for (const inst of insts)
+  for (const inst of blockInstances(netlist.split('\n'), subs))
     inst.nodes.forEach((n, k) => {
       if (!isGround(n)) byNet.set(n.toLowerCase(), [...(byNet.get(n.toLowerCase()) ?? []), { inst, role: inst.sub.info.get(inst.sub.pins[k])!.role }]);
     });
-  const out: string[] = [];
+  return [...new Set([...byNet].flatMap(([net, uses]) => netLevelIssues(net, uses)))];
+}
+
+/** Lo que no llega entre la salida y las entradas de una red (ver levelProblems) */
+function netLevelIssues(n: string, uses: { inst: Inst; role: PinInfo['role'] }[]): string[] {
+  const level = (x: Inst, p: string) => paramNumber(p, { ...kv(tokens(x.sub.header).map((t) => t.text)), ...x.params });
+  const label = (x: Inst) => x.name.replace(/^x(?=[a-z])/i, '');
   const v = (x: number) => String(+x.toFixed(2));
-  for (const [n, uses] of byNet) {
-    // (un bit de un bus, como lo nombra ngspice: q__1__ → q[1])
-    const net = n.replace(/^(.+)__(\d+)__$/, '$1[$2]');
-    for (const d of uses.filter((u) => u.role === 'out'))
-      for (const l of uses.filter((u) => u.role === 'in' && u.inst !== d.inst)) {
-        const [voh, vol, vih, vil] = [level(d.inst, 'voh'), level(d.inst, 'vol'), level(l.inst, 'vih'), level(l.inst, 'vil')];
-        const [from, to] = [label(d.inst), label(l.inst)];
-        if (voh < vih) out.push(t('{net}: a 1 from {from} ({voh} V) does not reach VIH of {to} ({vih} V): it reads X', { net, from, to, voh: v(voh), vih: v(vih) }));
-        if (vol > vil) out.push(t('{net}: a 0 from {from} ({vol} V) is above VIL of {to} ({vil} V): it reads X', { net, from, to, vol: v(vol), vil: v(vil) }));
-      }
-  }
-  return [...new Set(out)];
+  // (un bit de un bus, como lo nombra ngspice: q__1__ → q[1])
+  const net = n.replace(/^(.+)__(\d+)__$/, '$1[$2]');
+  const out: string[] = [];
+  for (const d of uses.filter((u) => u.role === 'out'))
+    for (const l of uses.filter((u) => u.role === 'in' && u.inst !== d.inst)) {
+      const [voh, vol, vih, vil] = [level(d.inst, 'voh'), level(d.inst, 'vol'), level(l.inst, 'vih'), level(l.inst, 'vil')];
+      const [from, to] = [label(d.inst), label(l.inst)];
+      if (voh < vih) out.push(t('{net}: a 1 from {from} ({voh} V) does not reach VIH of {to} ({vih} V): it reads X', { net, from, to, voh: v(voh), vih: v(vih) }));
+      if (vol > vil) out.push(t('{net}: a 0 from {from} ({vol} V) is above VIL of {to} ({vil} V): it reads X', { net, from, to, vol: v(vol), vil: v(vil) }));
+    }
+  return out;
 }
 
 /**
@@ -225,6 +227,8 @@ export function linkDigitalNets(netlist: string, files: Record<string, string>):
     if (elsewhere.has(net)) continue;
     if (uses.some((u) => u.role === 'other')) continue;
     if (uses.filter((u) => u.role === 'out').length !== 1 || !uses.some((u) => u.role === 'in')) continue;
+    // (con niveles que no llegan, analógica: la entrada lee X, como en el circuito)
+    if (netLevelIssues(net, uses).length) continue;
     nets.push(net);
     for (const u of uses) {
       digital.set(u.inst, (digital.get(u.inst) ?? new Set()).add(u.pin));

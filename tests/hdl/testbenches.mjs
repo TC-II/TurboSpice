@@ -61,10 +61,13 @@ const TABLES = {
   },
   // A1 B1 A2 B2 A3 B3 A4 B4 S G_n → Y1 … Y4
   hc157: (r) => [0, 1, 2, 3].map((k) => (bit(r[9]) ? '0' : r[2 * k + bit(r[8])])),
+  // una AND con retardo (5 µs): cada fila, con la salida ya asentada
+  slow: ([a, b]) => [String(bit(a) & bit(b))],
 };
+const SOURCES = { 'slow.v': '`timescale 1us/1ns\nmodule slow (input a, input b, output y);\n  assign #5 y = a & b;\nendmodule\n' };
 for (const [mod, f] of Object.entries(TABLES)) {
   const t0 = Date.now();
-  const files = { [`${mod}.v`]: lib[`${mod}.v`] };
+  const files = { [`${mod}.v`]: SOURCES[`${mod}.v`] ?? lib[`${mod}.v`] };
   const m = await compileIcarus(icarus, files, mod);
   const r = await compileIcarus(icarus, { ...files, [TT_FILE]: truthTableTb(mod, m.ports), [TB_FILE]: TB_WRAP }, TB_TOP, {}, { roots: [TT_TOP] });
   const ng = await Ngspice.create(factory, assets);

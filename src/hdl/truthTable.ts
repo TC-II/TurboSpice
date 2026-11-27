@@ -38,7 +38,10 @@ export function truthTableTb(module: string, ports: IcarusPort[]): string | null
     '  initial begin',
     `    for (k = 0; k < ${2 ** n}; k = k + 1) begin`,
     '      i = k;',
-    '      #1 $display("TT %b %b", i, o);',
+    // cada fila, justo antes del próximo cambio: 100 µs, para que se asiente un módulo con retardos
+    // (2^10 filas son 0,1 s, menos que el segundo de tbNetlist)
+    // (un retardo de más de 100 µs corre las filas: habría que esperar más y alargar el tstop)
+    '      #100000 $display("TT %b %b", i, o);',
     '    end',
     '    $finish;',
     '  end',

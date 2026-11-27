@@ -269,6 +269,28 @@ check((await addTrace('Dig(q[1:0])')) && (await addTrace('Dig(q2[1:0])')), 'Dig(
   check(a.slice(0, 4).join() === '0x0,0x1,0x2,0x3' && b.slice(0, 4).join() === '0x0,0x1,0x2,0x3', `los dos cuentan (${a.slice(0, 4)} | ${b.slice(0, 4)})`);
 }
 
+// --- niveles entre familias: div4 (74HC) a 3,3 V maneja el reloj de otro div4 a 5 V (VIH = 3,5 V) ---
+await page.evaluate(
+  (asc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([asc], 'niveles tb.asc'));
+    dt.items.add(new File(['* vacío\n'], 'vacio.lib'));
+    window.dispatchEvent(new DragEvent('dragover', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+  },
+  CIRCUIT.replace('SYMATTR InstName X1', 'SYMATTR InstName X1\nSYMATTR SpiceLine vcc=3.3 vil={0.3*vcc} vih={0.7*vcc} vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto').replace(
+    'TEXT',
+    'WIRE 384 640 400 640\nWIRE 384 672 400 672\nWIRE 496 640 512 640\nFLAG 384 640 q[1]\nFLAG 384 672 rst\nFLAG 512 640 q2[1:0]\nSYMBOL div4 448 656 R0\nSYMATTR InstName X2\nTEXT',
+  ),
+);
+await page.locator('.project-tree .tree-name', { hasText: 'niveles tb' }).waitFor();
+await page.waitForFunction(() => document.querySelectorAll('svg.editor .sym').length === 4 && !document.querySelector('.verilog-module'));
+await simulate();
+check(
+  await until(async () => /q\[1\]: un 1 de X1 \(3\.3 V\) no llega al VIH de X2 \(3\.5 V\): lee X/.test((await page.locator('body').textContent()) ?? '')),
+  `avisa que un 1 de 3,3 V no llega al VIH de un 74HC a 5 V (${(await page.locator('.statusbar, .status-msg').allTextContents()).join(' | ')})`,
+);
+
 // --- un testbench (*_tb.v): se corre solo, con PASS/FAIL ---
 const TB = (want) =>
   '`timescale 1ns/1ps\nmodule bdiv_tb;\n  reg clk = 0, rst = 1;\n  wire [1:0] q;\n  bdiv u (.clk(clk), .rst(rst), .q(q));\n  always #5 clk = ~clk;\n  initial $dumpvars(0, bdiv_tb);\n' +

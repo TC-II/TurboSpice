@@ -1,4 +1,5 @@
 import { t } from '../i18n/i18n.ts';
+import { parseSpiceNumber } from '../netlist/spicenum.ts';
 // Interfaz eléctrica de los bloques Verilog (#209): cómo se ven sus pines desde el circuito
 // analógico. Son parámetros del .subckt (y del símbolo, así cada instancia puede cambiarlos) que
 // usan los puentes de XSPICE de cada pin (ver synth.ts):
@@ -66,3 +67,37 @@ export const paramsLine = (values: Record<string, string>) =>
   Object.entries(values)
     .map(([k, v]) => `${k}=${v}`)
     .join(' ');
+
+/**
+ * Valor de un parámetro eléctrico: un número de SPICE (3.3, 20m) o una expresión entre llaves con
+ * + − × ÷, paréntesis y los otros parámetros ({0.7*vcc}). NaN si no se puede calcular.
+ */
+export function paramNumber(name: string, params: Record<string, string>, seen: string[] = []): number {
+  const key = name.toLowerCase();
+  const v = params[key];
+  if (v === undefined || seen.includes(key)) return NaN;
+  const toks = v.replace(/^\{|\}$/g, '').match(/\d*\.?\d+(?:e[+-]?\d+)?[a-z]*|[a-z_]\w*|[-+*/()]/gi) ?? [];
+  let i = 0;
+  const atom = (): number => {
+    const tk = toks[i++] ?? '';
+    if (tk === '(') {
+      const x = sum();
+      return toks[i++] === ')' ? x : NaN;
+    }
+    if (tk === '-') return -atom();
+    if (/^[a-z_]/i.test(tk)) return paramNumber(tk, params, [...seen, key]);
+    return parseSpiceNumber(tk);
+  };
+  const prod = (): number => {
+    let x = atom();
+    while (toks[i] === '*' || toks[i] === '/') x = toks[i++] === '*' ? x * atom() : x / atom();
+    return x;
+  };
+  const sum = (): number => {
+    let x = prod();
+    while (toks[i] === '+' || toks[i] === '-') x = toks[i++] === '+' ? x + prod() : x - prod();
+    return x;
+  };
+  const r = sum();
+  return i === toks.length ? r : NaN;
+}

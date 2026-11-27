@@ -33,6 +33,12 @@ describe('setup y hold', () => {
     expect(run(d(150))).toEqual([]);
     expect(run({ x: Float64Array.of(0, 90 * n), y: Float64Array.of(0, 1), digital: true })).toEqual(['U1: D cambia 10ns antes del flanco de reloj en 100ns (setup 20ns); 1 en total']);
   });
+  it('con vcc de un parámetro ({vdd}), el umbral es la mitad de la excursión de cada señal', () => {
+    const attrs = new Map([...ff.attrs, ['SpiceLine', 'vcc={vdd} vil={0.3*vcc} vih={0.7*vcc}']]);
+    expect(setupHoldProblems([{ ...ff, attrs }], (net) => (net === 'clk' ? clk : net === 'd' ? d(95) : null))).toEqual([
+      'U1: D cambia 5ns antes del flanco de reloj en 100ns (setup 20ns); 1 en total',
+    ]);
+  });
   it('sin el atributo, o sin las señales guardadas, nada', () => {
     expect(setupHoldProblems([{ ...ff, attrs: new Map() }], () => clk)).toEqual([]);
     expect(setupHoldProblems([ff], () => null)).toEqual([]);

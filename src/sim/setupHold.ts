@@ -41,10 +41,17 @@ export function setupHoldProblems(elements: Element[], vector: (net: string) => 
     const net = (pin: string) => e.nodes[e.pinNames.findIndex((p) => p.toLowerCase() === pin)];
     const [d, clk] = [net(dPin), net(cPin)].map((n) => (n ? vector(n) : null));
     if (!d || !clk) continue;
-    // (el umbral: entre VIL y VIH de la instancia)
+    // (el umbral: entre VIL y VIH de la instancia; si no son números, como vcc={vdd}, la mitad de la excursión de la señal)
     const ps = Object.fromEntries([...(e.attrs.get('SpiceLine') ?? '').matchAll(/(\w+)=(\S+)/g)].map((m) => [m[1].toLowerCase(), m[2]]));
     const mid = (paramNumber('vil', ps) + paramNumber('vih', ps)) / 2;
-    const level = (w: Wave) => (w.digital || !Number.isFinite(mid) ? 0.5 : mid);
+    const level = (w: Wave) => {
+      if (w.digital) return 0.5;
+      if (Number.isFinite(mid)) return mid;
+      // (sin Math.min(...y): un transitorio largo pasa el límite de argumentos)
+      const lo = w.y.reduce((a, v) => (v < a ? v : a), Infinity);
+      const hi = w.y.reduce((a, v) => (v > a ? v : a), -Infinity);
+      return (lo + hi) / 2;
+    };
     const edges = crossings(clk, level(clk), true);
     const changes = crossings(d, level(d), false);
     const bad = edges.flatMap((tc) => changes.filter((td) => td > tc - tsu && td < tc + th).map((td) => ({ tc, td })));

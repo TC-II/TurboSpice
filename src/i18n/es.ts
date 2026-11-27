@@ -3008,6 +3008,7 @@ export const es: Record<string, string> = {
   'Schmitt triggers': 'Schmitt triggers',
   'Flip-flops and counters': 'Flip-flops y contadores',
   'Phase detectors': 'Detectores de fase',
+  '74HC (Verilog)': '74HC (Verilog)',
   'DSP': 'DSP',
   'Generators': 'Generadores',
   'Conversion': 'Conversión',

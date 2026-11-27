@@ -117,6 +117,7 @@ export const CATEGORIES: Category[] = [
       sub('flipflops', t('Flip-flops and counters'), ['Digital/dflop', 'Digital/srflop', 'Digital/counter']),
       sub('phase', t('Phase detectors'), ['Digital/phidet', `${TC}PLL/Phase_Comp_XOR`, `${TC}PLL/Phase_Comp_Type3`]),
       sub('hc', t('74HC (Verilog)'), ['74HC/*']),
+      sub('stimuli', t('Stimuli (Verilog)'), ['Stimuli/*']),
     ],
   },
   {

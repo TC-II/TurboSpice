@@ -1,0 +1,105 @@
+Version 4
+SymbolType CELL
+RECTANGLE Normal -64 -144 64 144
+TEXT 0 -132 Center 1 74HC138
+LINE Normal -64 -112 -96 -112
+TEXT -60 -112 Left 1 A
+TEXT -84 -120 Center 0 1
+LINE Normal -64 -80 -96 -80
+TEXT -60 -80 Left 1 B
+TEXT -84 -88 Center 0 2
+LINE Normal -64 -48 -96 -48
+TEXT -60 -48 Left 1 C
+TEXT -84 -56 Center 0 3
+LINE Normal -64 -16 -96 -16
+TEXT -60 -16 Left 1 G1
+TEXT -84 -24 Center 0 6
+CIRCLE Normal -72 12 -64 20
+LINE Normal -72 16 -96 16
+TEXT -60 16 Left 1 G2A
+TEXT -84 8 Center 0 4
+CIRCLE Normal -72 44 -64 52
+LINE Normal -72 48 -96 48
+TEXT -60 48 Left 1 G2B
+TEXT -84 40 Center 0 5
+CIRCLE Normal 64 -116 72 -108
+LINE Normal 72 -112 96 -112
+TEXT 60 -112 Right 1 Y0
+TEXT 84 -120 Center 0 15
+CIRCLE Normal 64 -84 72 -76
+LINE Normal 72 -80 96 -80
+TEXT 60 -80 Right 1 Y1
+TEXT 84 -88 Center 0 14
+CIRCLE Normal 64 -52 72 -44
+LINE Normal 72 -48 96 -48
+TEXT 60 -48 Right 1 Y2
+TEXT 84 -56 Center 0 13
+CIRCLE Normal 64 -20 72 -12
+LINE Normal 72 -16 96 -16
+TEXT 60 -16 Right 1 Y3
+TEXT 84 -24 Center 0 12
+CIRCLE Normal 64 12 72 20
+LINE Normal 72 16 96 16
+TEXT 60 16 Right 1 Y4
+TEXT 84 8 Center 0 11
+CIRCLE Normal 64 44 72 52
+LINE Normal 72 48 96 48
+TEXT 60 48 Right 1 Y5
+TEXT 84 40 Center 0 10
+CIRCLE Normal 64 76 72 84
+LINE Normal 72 80 96 80
+TEXT 60 80 Right 1 Y6
+TEXT 84 72 Center 0 9
+CIRCLE Normal 64 108 72 116
+LINE Normal 72 112 96 112
+TEXT 60 112 Right 1 Y7
+TEXT 84 104 Center 0 7
+WINDOW 0 0 -152 Bottom 2
+WINDOW 3 0 0 Invisible 2
+SYMATTR SpiceLine vcc=5 vil=1.5 vih=3.5 vol=0 voh={vcc} iol=4m ioh=4m tr=6n tf=6n tpd=9n hdl=auto
+SYMATTR Prefix X
+SYMATTR Value hc138
+SYMATTR ModelFile hc138.sub
+SYMATTR Description 74HC138: 3-to-8 decoder, active-low outputs
+PIN -96 -112 NONE 0
+PINATTR PinName a
+PINATTR SpiceOrder 1
+PIN -96 -80 NONE 0
+PINATTR PinName b
+PINATTR SpiceOrder 2
+PIN -96 -48 NONE 0
+PINATTR PinName c
+PINATTR SpiceOrder 3
+PIN -96 -16 NONE 0
+PINATTR PinName g1
+PINATTR SpiceOrder 4
+PIN -96 16 NONE 0
+PINATTR PinName g2a_n
+PINATTR SpiceOrder 5
+PIN -96 48 NONE 0
+PINATTR PinName g2b_n
+PINATTR SpiceOrder 6
+PIN 96 -112 NONE 0
+PINATTR PinName y0_n
+PINATTR SpiceOrder 7
+PIN 96 -80 NONE 0
+PINATTR PinName y1_n
+PINATTR SpiceOrder 8
+PIN 96 -48 NONE 0
+PINATTR PinName y2_n
+PINATTR SpiceOrder 9
+PIN 96 -16 NONE 0
+PINATTR PinName y3_n
+PINATTR SpiceOrder 10
+PIN 96 16 NONE 0
+PINATTR PinName y4_n
+PINATTR SpiceOrder 11
+PIN 96 48 NONE 0
+PINATTR PinName y5_n
+PINATTR SpiceOrder 12
+PIN 96 80 NONE 0
+PINATTR PinName y6_n
+PINATTR SpiceOrder 13
+PIN 96 112 NONE 0
+PINATTR PinName y7_n
+PINATTR SpiceOrder 14

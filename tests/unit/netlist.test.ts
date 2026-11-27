@@ -11,7 +11,7 @@ import { parseSpiceNumber } from '../../src/netlist/spicenum.ts';
 import { replaceLaplaceLines } from '../../src/netlist/laplace.ts';
 import { opHoldParam, translateDigital, withOpHold } from '../../src/netlist/digital.ts';
 import { fixFloatingNodes, floatingNodes } from '../../src/netlist/floating.ts';
-import { ngNodeName, patchModelFile, prepareSimulation, toNgspice } from '../../src/netlist/tongspice.ts';
+import { ngNodeName, patchModelFile, prepareSimulation, toNgspice, withStartupRamp } from '../../src/netlist/tongspice.ts';
 import { compareNetlists, normalizeLtspice, readNet } from '../corpus/compare.mjs';
 
 const FIX = join(__dirname, '..', 'fixtures', 'asc');
@@ -1119,6 +1119,31 @@ SYMATTR InstName J1
     expect(withOpHold('* t\n.param ts_ophold=0\n.end')).toBe('* t\n.param ts_ophold=1\n.end');
     // las compuertas no se bloquean: sólo lo que tiene estado
     expect(translateDigital('A2', ['a', 'b', '0', '0', '0', '0', 'q', '0'], 'AND', [])!.join('\n')).not.toContain('ts_ophold');
+  });
+
+  it('reintento con rampa (el VCO del CD4046B a 15 V): sólo las fuentes DC del nivel superior', () => {
+    const net = [
+      '* t',
+      'VCC vcc 0 10',
+      'V1 sig 0 PULSE(0 5 0 1n 1n 5u 10u)',
+      'Vpin a b 0',
+      'I1 0 x DC 1m AC 1',
+      'V2 y 0 3',
+      '+ ',
+      '.subckt s a b',
+      'V100 vdd 0 5',
+      '.ends s',
+      '.control',
+      'V9 n 0 1',
+      '.endc',
+      '.end',
+    ].join('\n');
+    const r = withStartupRamp(net)!.split('\n');
+    expect(r).toContain('VCC vcc 0 DC 10 PWL(0 0 20u 10)');
+    expect(r).toContain('I1 0 x DC 1m AC 1 PWL(0 0 20u 1m)');
+    // las de forma, las de 0 (corriente de los pines), las que siguen con "+" y las de los .subckt no
+    for (const l of ['V1 sig 0 PULSE(0 5 0 1n 1n 5u 10u)', 'Vpin a b 0', 'V2 y 0 3', 'V100 vdd 0 5', 'V9 n 0 1']) expect(r).toContain(l);
+    expect(withStartupRamp('* t\nV1 a 0 SIN(0 1 1k)\n.end')).toBeNull();
   });
 });
 

@@ -10,12 +10,13 @@ import type { Library } from '../library/library.ts';
 import { prefetchLtspice, type LtspiceIndex } from '../library/ltspiceLib.ts';
 import { withOpHold } from '../netlist/digital.ts';
 import { splitStepRuns } from '../netlist/step.ts';
+import { withStartupRamp } from '../netlist/tongspice.ts';
 import { lineOf } from '../project/project.ts';
 import { biasCommand, biasParams, type Bias } from '../sim/bias.ts';
 import { measuredSizeProblem, simLimits } from '../sim/estimate.ts';
 import { blockResultsFromLog, measSweepPlot, measureResults, xyPlotsFromLog } from '../sim/measResults.ts';
 import { buildSimulation, type BuiltSimulation, type Variants } from '../sim/schematicSim.ts';
-import { analysisProblem, isEventAlternationLine, isSingularLine, missingSources, pzLogErrors } from '../sim/simList.ts';
+import { analysisProblem, isEventAlternationLine, isSingularLine, isTimestepTooSmallLine, missingSources, pzLogErrors } from '../sim/simList.ts';
 import { pzBodePlots } from '../waveform/pz.ts';
 import { stepLabels, stepSweepPlots } from '../waveform/series.ts';
 
@@ -123,11 +124,25 @@ export async function runTestbench({ doc, simAsc, lib, ltIndex, engine, unlimite
   // operación: otra vez con los flip-flops quietos en t=0, como hace LTspice (ver digital.ts)
   const held = !blocking.length && !result.aborted && result.errors.length && result.log.some(isEventAlternationLine) ? withOpHold(built.netlist) : null;
   if (held) {
-    const again = await run({ ...built, netlist: held });
+    let again = await run({ ...built, netlist: held });
+    let netlist = held;
+    let warning = t('Simulated with the LTspice flip-flops held at t=0: without that the operating point did not converge (an oscillator)');
+    // el punto de operación con los flip-flops quietos puede quedar lejos de la oscilación (el VCO
+    // del CD4046B a 10 V: un extremo del capacitor en 0) y el primer paso no converge: otra vez
+    // arrancando de 0, con las fuentes en rampa como .tran … startup
+    const ramped = !again.result.aborted && again.result.log.some(isTimestepTooSmallLine) ? withStartupRamp(held) : null;
+    if (ramped) {
+      const third = await run({ ...built, netlist: ramped });
+      if (!third.result.log.some(isTimestepTooSmallLine)) {
+        again = third;
+        netlist = ramped;
+        warning = t('Simulated with the LTspice flip-flops held at t=0 and the DC sources ramped up in 20 µs (as with startup): otherwise the oscillator did not start');
+      }
+    }
     if (!again.result.log.some(isEventAlternationLine)) {
-      built = { ...built, netlist: held };
+      built = { ...built, netlist };
       ({ result, ms } = again);
-      built.warnings.push(t('Simulated with the LTspice flip-flops held at t=0: without that the operating point did not converge (an oscillator)'));
+      built.warnings.push(warning);
     }
   }
   // cortado porque no iba a entrar: cuánto iba a guardar y qué hacer; los plots traen lo simulado

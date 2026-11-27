@@ -24,6 +24,8 @@
 - [FIX 8002f20] SpiceModel como archivo .lib sin ModelFile (CD4046B)
 - [ISSUE, ya no falla: el CD4046B simula] CD4046B.lib: params no declarados en subckt anidados + scoping dinámico de .param (td1, cval) → ngspice falla. Probado: agregar params de instancias anidadas al header + ponerlos ANTES de los defaults (vdd1={vdd}) resuelve 'vdd', quedan td1/cval/trise1 (scope dinámico)
 - [FIX] CD4046B: el VCO (SRFLOP + SCHMITT) no tiene punto de operación en ngspice (alternancias analógico/digital); reintento con ts_ophold=1 (digital.ts, simulate.ts). Con PC2 sin carga el transitorio se traba en x_u1.n023 (salida tri-state sin capacitancia)
+- [FIX] CD4046B a 15 V: con los flip-flops quietos el VCO no arranca (Timestep too small en t≈0); tercer intento con las fuentes DC en la rampa de startup
+- [TCLIB] CD4046B.lib sólo sirve a VDD=5 V en lazo cerrado: VCOout sale de una CD4071B con fuente interna fija de 5 V (V100), y VCC1 es a la vez el nivel alto que maneja el PMOS de PC2 y el umbral de COMP. Con VCC1=5 y VDD=10 el PMOS de PC2 queda siempre encendido; con VCC1=VDD, COMP (umbral VDD/2) no cruza con VCOout de 0–5 V. Además fmax casi no depende de VDD (0,71/0,75/0,76 MHz con R1=10k, C1=50p a 5/10/15 V; TI: 0,6/1,2/1,6 MHz) y sin las parásitas internas sobreestima con R1 o C1 chicos (R1=5k, 50p, 5 V: 1,44 MHz; TI 0,8)
 - [TCLIB] VCO.lib usa Vi_min sin declararlo (LTspice también falla si el usuario pisa Value)
 - [ISSUE baja] redes sin cables: LTspice P### con contador compartido con N### y orden de encuentro; TS N### al final (repro-P001.asc). Sólo nombres.
 - [FIX 6becfc3] continuación + en directivas (.meas)

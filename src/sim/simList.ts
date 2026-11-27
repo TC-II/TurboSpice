@@ -349,6 +349,9 @@ export const isSingularLine = (l: string) => /\bsingular\b.{0,20}\bmatrix\b|\bma
 /** ngspice no encontró el punto de operación porque la parte analógica y la digital (XSPICE) no se ponen de acuerdo */
 export const isEventAlternationLine = (l: string) => /too many analog\/event-driven solution alternations/i.test(l);
 
+/** ngspice cortó el transitorio porque el paso se achicó sin converger */
+export const isTimestepTooSmallLine = (l: string) => /timestep too small/i.test(l);
+
 /**
  * Qué le falta a un análisis para poder correr (la fuente, un nodo, un valor), dicho para el
  * usuario; sin esto ngspice sólo diría "Error on line N"

@@ -679,6 +679,32 @@ export function startupRamp(value: string): string {
   return [`DC ${m[1]}${m[2]} PWL(0 0 20u ${m[1]})`, ...rest].join(' ');
 }
 
+/**
+ * La netlist ya traducida con la rampa de startup en las fuentes V e I de valor DC del nivel
+ * superior (no las de adentro de .subckt ni las de 0, como las que miden la corriente de los
+ * pines), o null si no hay ninguna. Para el reintento de un oscilador que no arranca (simulate.ts).
+ */
+export function withStartupRamp(netlist: string): string | null {
+  let depth = 0;
+  let control = false;
+  let changed = false;
+  const lines = netlist.split('\n');
+  const out = lines.map((line, i) => {
+    if (/^\s*\.subckt\b/i.test(line)) depth++;
+    else if (/^\s*\.ends\b/i.test(line)) depth = Math.max(0, depth - 1);
+    else if (/^\s*\.control\b/i.test(line)) control = true;
+    else if (/^\s*\.endc\b/i.test(line)) control = false;
+    const m = /^(\s*[VI]\S*\s+\S+\s+\S+\s+)(\S.*?)\s*$/i.exec(line);
+    // (una línea que sigue en la de abajo con "+" queda como está)
+    if (!m || depth || control || /^\s*\+/.test(lines[i + 1] ?? '')) return line;
+    const ramped = startupRamp(m[2]);
+    if (ramped === m[2] || parseSpiceNumber(/^DC\s+(\S+)/i.exec(ramped)?.[1] ?? '') === 0) return line;
+    changed = true;
+    return m[1] + ramped;
+  });
+  return changed ? out.join('\n') : null;
+}
+
 function hasStartup(lt: LtNetlist): boolean {
   return lt.texts.some((tt) => tt.kind === 'directive' && directiveLines(tt.text).some((l) => /^\s*\.tran\b[^;]*\sstartup\b/i.test(l)));
 }

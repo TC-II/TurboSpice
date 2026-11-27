@@ -38,6 +38,9 @@ export interface IcarusResult {
 
 const VPI = ['system', 'v2005_math', 'va_math', 'v2009'];
 
+/** Un archivo de `include (.vh): va con los fuentes, pero no se compila solo */
+export const isVerilogHeader = (name: string) => /\.s?vh$/i.test(name);
+
 /** Lo que agrega un testbench (testbench.ts) a la compilación de un bloque */
 export interface IcarusOptions {
   /** biblioteca (-y): los módulos que falten se buscan en estos archivos, uno por módulo con su nombre */
@@ -94,11 +97,10 @@ export async function compileIcarus(load: IcarusLoader, files: Record<string, st
   pp.FS.mkdirTree('/lib');
   for (const [n, text] of lib) pp.FS.writeFile(`/lib/${n}`, text);
   pp.FS.writeFile('/flags', 'D:__ICARUS__=1\nI:/src\nI:/lib\nrelative include:false\n');
-  // (un .vh no se compila solo: está para los `include)
   pp.FS.writeFile(
     '/files',
     names
-      .filter((n) => !/\.s?vh$/i.test(n))
+      .filter((n) => !isVerilogHeader(n))
       .map((n) => `/src/${n}`)
       .join('\n') + '\n',
   );

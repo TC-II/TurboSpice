@@ -6,7 +6,6 @@ import { LOGIC_X, LOGIC_Z } from './digital.ts';
 export interface VcdSignal {
   /** módulo (instancia) donde está: ["contador_tb", "dut"] */
   scope: string[];
-  /** nombre de la señal ("q") */
   name: string;
   bits: number;
   /** instantes de cada cambio, en segundos */

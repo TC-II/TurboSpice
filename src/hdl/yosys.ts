@@ -1,4 +1,5 @@
 import { t } from '../i18n/i18n.ts';
+import { isVerilogHeader } from './icarus.ts';
 import { HdlError, yosysScript, yosysToSubckt, type HdlBlock, type YosysJson } from './synth.ts';
 // Corre Yosys (YoWASP, WebAssembly) sobre archivos Verilog y traduce el resultado (#209).
 // `run` es runYosys de @yowasp/yosys: en el navegador se carga en su propio Worker
@@ -48,9 +49,20 @@ export async function synthesize(run: RunYosys, files: Record<string, string>, s
   const tree: Tree = Object.fromEntries(Object.values(files).map((text, i) => [names[i], text]));
   let out: Tree | undefined;
   try {
-    // (un .vh no se lee solo: está para los `include)
-    const sources = names.filter((n) => !/\.s?vh$/i.test(n));
-    out = (await run(['-q', '-p', yosysScript(sources, top, params)], tree, { stdout: sink, stderr: sink })) ?? undefined;
+    out =
+      (await run(
+        [
+          '-q',
+          '-p',
+          yosysScript(
+            names.filter((n) => !isVerilogHeader(n)),
+            top,
+            params,
+          ),
+        ],
+        tree,
+        { stdout: sink, stderr: sink },
+      )) ?? undefined;
   } catch {
     // Exit: Yosys terminó con error; el motivo quedó en la salida ("fa.v:3: ERROR: …")
     log = plain(log);

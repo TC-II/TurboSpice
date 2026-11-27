@@ -45,10 +45,8 @@ export function tbVerdict(compileLog: string, simLog: string[]): TbVerdict {
 /** Lo que muestra la vista del testbench */
 export interface TbOutcome {
   error?: string;
-  /** salida de Icarus al compilar (avisos) */
   compileLog: string;
   verdict?: TbVerdict;
-  /** el .vcd que escribió ($dumpvars) */
   vcd?: string;
   /** nombres de estado de las señales (states.ts) */
   states?: Map<string, Map<number, string>>;

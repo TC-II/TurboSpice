@@ -38,12 +38,23 @@ export interface IcarusResult {
 
 const VPI = ['system', 'v2005_math', 'va_math', 'v2009'];
 
+/** Lo que agrega un testbench (testbench.ts) a la compilación de un bloque */
+export interface IcarusOptions {
+  /** biblioteca (-y): los módulos que falten se buscan en estos archivos, uno por módulo con su nombre */
+  lib?: Record<string, string>;
+  /** otros módulos de más arriba (el testbench, sin puertos, junto al módulo con el puerto que necesita d_cosim) */
+  roots?: string[];
+  /** los avisos de -Wall -Wno-timescale */
+  wall?: boolean;
+}
+
 /** Configuración de ivl como la escribe el driver iverilog (-g2005, como por omisión) */
-const iconfig = (top: string, defparams: Record<string, string>) =>
+const iconfig = (top: string, defparams: Record<string, string>, opts: IcarusOptions) =>
   [
     'basedir:/ivl',
     ...VPI.filter((m) => m !== 'v2009').map((m) => `module:/ivl/${m}.vpi`),
-    `root:${top}`,
+    ...[top, ...(opts.roots ?? [])].map((r) => `root:${r}`),
+    ...(opts.lib ? ['-y:/lib'] : []),
     ...Object.entries(defparams).map(([k, v]) => `defparam:${top}.${k}=${v}`),
     'generation:2005',
     'generation:no-specify',
@@ -59,7 +70,9 @@ const iconfig = (top: string, defparams: Record<string, string>) =>
     'generation:strict-net-var-declaration',
     'generation:strict-parameter-declaration',
     'generation:icarus-misc',
-    'warnings:nu',
+    // (-Wall sin timescale: anachronisms, implicit, implicit-dimensions, macro-replacement, portbind,
+    // select-range, sensitivity-entire-array)
+    opts.wall ? 'warnings:nuidrpsa' : 'warnings:nu',
     'ignore_missing_modules:false',
     'out:/design.vvp',
     'iwidth:32',
@@ -68,7 +81,7 @@ const iconfig = (top: string, defparams: Record<string, string>) =>
   ].join('\n');
 
 /** Compila los Verilog (nombre → texto) con `top` como módulo de más arriba */
-export async function compileIcarus(load: IcarusLoader, files: Record<string, string>, top: string, defparams: Record<string, string> = {}): Promise<IcarusResult> {
+export async function compileIcarus(load: IcarusLoader, files: Record<string, string>, top: string, defparams: Record<string, string> = {}, opts: IcarusOptions = {}): Promise<IcarusResult> {
   const lines: string[] = [];
   const print = (l: string) => lines.push(l);
   const names = Object.keys(files).map((n) => n.replace(/[^\w.-]/g, '_'));
@@ -76,7 +89,11 @@ export async function compileIcarus(load: IcarusLoader, files: Record<string, st
   const pp = await load.program('ivlpp', print);
   pp.FS.mkdirTree('/src');
   Object.values(files).forEach((text, i) => pp.FS.writeFile(`/src/${names[i]}`, text));
-  pp.FS.writeFile('/flags', 'D:__ICARUS__=1\nrelative include:false\n');
+  // (`include: los del proyecto y los de la biblioteca, como -I)
+  const lib = Object.entries(opts.lib ?? {});
+  pp.FS.mkdirTree('/lib');
+  for (const [n, text] of lib) pp.FS.writeFile(`/lib/${n}`, text);
+  pp.FS.writeFile('/flags', 'D:__ICARUS__=1\nI:/src\nI:/lib\nrelative include:false\n');
   pp.FS.writeFile('/files', names.map((n) => `/src/${n}`).join('\n') + '\n');
   pp.FS.writeFile('/pdefs', '__ICARUS__:0:1:1\n');
   let rc: number;
@@ -94,7 +111,9 @@ export async function compileIcarus(load: IcarusLoader, files: Record<string, st
   ivl.FS.writeFile('/ivl/vvp.tgt', await load.file('vvp.tgt'));
   ivl.FS.writeFile('/ivl/vvp.conf', 'functor:cprop\nfunctor:nodangle\nflag:DLL=vvp.tgt\nflag:VVP_EXECUTABLE=vvp\n');
   ivl.FS.writeFile('/design.pp', pre);
-  ivl.FS.writeFile('/iconfig', iconfig(top, defparams));
+  ivl.FS.mkdirTree('/lib');
+  for (const [n, text] of lib) ivl.FS.writeFile(`/lib/${n}`, text);
+  ivl.FS.writeFile('/iconfig', iconfig(top, defparams, opts));
   try {
     rc = ivl.callMain(['-C/iconfig', '-C/ivl/vvp.conf', '/design.pp']);
   } catch (e) {

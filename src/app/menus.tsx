@@ -12,7 +12,7 @@ import type { Bias } from '../sim/bias.ts';
 import { isComplexLine } from '../sim/complexSim.ts';
 import { AnalysisIcon } from '../ui/analysisIcons.tsx';
 import type { MenuDef, MenuItem } from '../ui/Menu.tsx';
-import { ADC, AMPS, DSP, GF180, REPO, SAMPLE, SKY130, STABILITY, TRANSFER } from './constants.ts';
+import { ADC, AMPS, DSP, GF180, LOGIC, REPO, SAMPLE, SKY130, STABILITY, TRANSFER } from './constants.ts';
 import type { Theme } from './storage.ts';
 import type { Dialog, SimRun } from './types.ts';
 
@@ -331,6 +331,11 @@ export function buildMenus(a: MenuActions): { menus: MenuDef[]; shapeItems: Menu
           label: 'Transistor amplifiers',
           title: t('Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point'),
           onClick: () => doExample(AMPS),
+        },
+        {
+          label: 'Logic families',
+          title: t('74HC00 (CMOS) and 74LS00 (TTL) NAND gates at transistor level, side by side: transfer curve, output voltage against output current and propagation delay'),
+          onClick: () => doExample(LOGIC),
         },
         {
           label: 'Loop stability',

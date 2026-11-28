@@ -1533,6 +1533,8 @@ export const es: Record<string, string> = {
   'Testbench of the «Examples» project': 'Testbench del proyecto «Examples»',
   'Common emitter, degenerated common emitter, common collector and common base, each with a BJT and a MOSFET side by side: waveforms, frequency response and bias point':
     'Emisor común, emisor común degenerado, colector común y base común, cada uno con un BJT y un MOSFET lado a lado: formas de onda, respuesta en frecuencia y punto de operación',
+  '74HC00 (CMOS) and 74LS00 (TTL) NAND gates at transistor level, side by side: transfer curve, output voltage against output current and propagation delay':
+    'Compuertas NAND 74HC00 (CMOS) y 74LS00 (TTL) a transistores, lado a lado: curva de transferencia, tensión de salida contra corriente de salida y tiempo de propagación',
   'RC and RLC: every first- and second-order transfer function, one workbench each with its step response, Bode plot and pole-zero map':
     'RC y RLC: todas las transferencias de primer y segundo orden, un workbench cada una con su respuesta al escalón, su Bode y su mapa de polos y ceros',
   'the best way to bring a whole LTspice project. Each': 'la mejor forma de traer un proyecto entero de LTspice. Cada',
@@ -3019,6 +3021,7 @@ export const es: Record<string, string> = {
   'Schmitt triggers': 'Schmitt triggers',
   'Flip-flops and counters': 'Flip-flops y contadores',
   'Phase detectors': 'Detectores de fase',
+  'Logic families (transistors)': 'Familias lógicas (a transistores)',
   'Stimuli (Verilog)': 'Estímulos (Verilog)',
   '74HC (Verilog)': '74HC (Verilog)',
   'DSP': 'DSP',

@@ -1,0 +1,40 @@
+* 74LS00: una compuerta NAND de 2 entradas (de las 4 del integrado), a transistores.
+* Esquema de la hoja de datos de TI (SN74LS00): entradas por diodos Schottky y 20 kΩ,
+* divisor de fase con 8 kΩ, darlington de salida (4 kΩ, 120 Ω) y pull-down activo (1,5 kΩ, 3 kΩ).
+* Los transistores con abrazadera Schottky son un NPN con un diodo Schottky base-colector.
+* Valores típicos a 25 °C (modelos propios, ajustados a la hoja de datos: umbral ~1,1 V,
+* VOH ~3,4 V a -0,4 mA, VOL ~0,4 V a 8 mA, IOS entre -20 y -100 mA, tpd ~10 ns con 15 pF).
+*
+*              A  B  Y  VCC GND
+.SUBCKT 74LS00 A  B  Y  VCC GND
+* clamp de las entradas
+DCA GND A DS_LS00
+DCB GND B DS_LS00
+* compuerta de entrada (diodos)
+R1 VCC n1 20k
+DA n1 A DS_LS00
+DB n1 B DS_LS00
+* divisor de fase
+R2 VCC n2 8k
+XQ1 n2 n1 n3 GND QS_LS00
+* pull-down activo
+R3 n3 n6 1.5k
+R4 n3 n7 3k
+XQ6 n7 n6 GND GND QS_LS00
+* salida baja
+XQ5 Y n3 GND GND QS_LS00
+* salida alta (darlington)
+R5 VCC n4 120
+XQ2 n4 n2 n5 GND QS_LS00
+Q4 n4 n5 Y GND Q_LS00
+R6 n5 Y 4k
+.ENDS
+
+* NPN con abrazadera Schottky: C B E sustrato
+.SUBCKT QS_LS00 C B E S
+Q1 C B E S Q_LS00
+D1 B C DS_LS00
+.ENDS
+
+.MODEL Q_LS00 NPN (IS=3e-17 BF=100 BR=0.5 VAF=50 RB=50 RC=20 RE=2 CJE=0.2p CJC=0.1p CJS=0.3p TF=0.7n TR=10n)
+.MODEL DS_LS00 D (IS=5e-12 N=1.05 RS=10 CJO=0.1p VJ=0.6 M=0.5)

@@ -14,6 +14,8 @@ import { t } from '../i18n/i18n.ts';
 export interface TemplateCircuit {
   components: { name: string; prefix: string; value: string }[];
   sources: string[];
+  /** las fuentes que parecen la alimentación (circuitInfo.ts) */
+  supplies?: string[];
   nets: string[];
   params: string[];
   analysis: MeasAnalysis;
@@ -94,7 +96,7 @@ export function defaultOptions(c: TemplateCircuit): TemplateOptions {
     source: c.sources[0] ?? '',
     // (las fuentes V con un valor fijo, salvo las que parecen la alimentación)
     inputs: c.components
-      .filter((k) => k.prefix.toUpperCase() === 'V' && numeric(k.value) && !/^v(cc|dd|ee|ss)|supply|alim/i.test(k.name))
+      .filter((k) => k.prefix.toUpperCase() === 'V' && numeric(k.value) && !/^v(cc|dd|ee|ss)|supply|alim/i.test(k.name) && !c.supplies?.some((s) => s.toLowerCase() === k.name.toLowerCase()))
       .map((k) => k.name)
       .join(' '),
     high: '5',

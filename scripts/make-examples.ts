@@ -14,6 +14,8 @@
 //   (examples/stability/): Tian, GFT, márgenes, lugar de raíces y el transitorio que los confirma.
 // - sky130.turbo y gf180.turbo: transistores de los PDK (examples/pdk/, docs/pdk.md): curvas del
 //   NMOS y el inversor en las esquinas tt, ff y ss, y su transitorio.
+// - Logic families.turbo: 74HC00 y 74LS00 a transistores (examples/logic/): transferencia, VOUT
+//   contra IOUT y tiempos.
 // (ADC.turbo, el de simulación mixta con Verilog, lo arma scripts/make-adc.ts)
 //   npx vite-node scripts/make-examples.ts
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -629,4 +631,38 @@ for (const pdk of [
   const text = await serializeTurbo(project);
   writeFileSync(`public/examples/${pdk.name}.turbo`, text);
   console.log(`${pdk.name}.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
+}
+
+// --- Logic families: 74HC00 y 74LS00 a transistores (library/sub/Logic), uno al lado del otro con la
+// misma entrada: curva de transferencia, VOUT contra IOUT (IOUT = V(iout), positiva entrando a la
+// salida) y tiempos de propagación con 15 pF
+{
+  const HC = { expr: 'V(out_hc)', color: '#1c7ed6' },
+    LS = { expr: 'V(out_ls)', color: '#e8590c' };
+  const groups = [{ id: newId('g'), name: '74HC00 vs 74LS00' }];
+  const base = parseAsc(readFileSync('examples/logic/nand_hc_ls.asc', 'utf8'));
+  const bench = (name: string, doc: AscDoc, view: SimView): Sim => ({ id: newId('s'), name, asc: serializeAsc(doc), view, runs: [], group: groups[0].id });
+  const dc: SimView = { panes: [{ traces: [HC, LS] }], active: 0, plot: 'dc1' };
+  const sims: Sim[] = [
+    bench('Transfer curve', base, dc),
+    bench('Output high against IOUT', setAnalysisLine(base, '.dc VIOUT -25m 0 0.1m'), dc),
+    bench('Output low against IOUT', setAnalysisLine(setVal(base, 'VIN', '5'), '.dc VIOUT 0 25m 0.1m'), dc),
+    bench('Propagation delay', setAnalysisLine(hideWaveValues(setVal(base, 'VIN', 'PULSE(0 5 10n 6n 6n 100n 200n)')), '.tran 200n'), {
+      panes: [{ traces: [{ expr: 'V(in)', color: '#2f9e44' }, HC, LS] }],
+      active: 0,
+      plot: 'tran1',
+    }),
+  ];
+  const project: Project = {
+    name: 'Logic families',
+    created: t0,
+    modified: t0,
+    groups,
+    files: [],
+    activeVariant: BENCHES,
+    variants: [{ id: BENCHES, name: 'Logic families', base: sims[0].asc, activeSim: sims[0].id, sims }],
+  };
+  const text = await serializeTurbo(project);
+  writeFileSync('public/examples/Logic families.turbo', text);
+  console.log(`Logic families.turbo: ${groups.length} workbenches, ${sims.length} testbenches (${(text.length / 1024).toFixed(1)} kB)`);
 }

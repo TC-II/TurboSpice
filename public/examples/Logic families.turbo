@@ -1,0 +1,127 @@
+{
+ "format": "turbospice",
+ "version": 2,
+ "name": "Logic families",
+ "created": "2026-10-22T17:00:00.000Z",
+ "modified": "2026-10-22T17:00:00.000Z",
+ "files": [],
+ "activeTestbench": "smwz9cabb3g",
+ "groups": [
+  {
+   "id": "gmwz9cabb3f",
+   "name": "74HC00 vs 74LS00"
+  }
+ ],
+ "testbenches": [
+  {
+   "id": "smwz9cabb3g",
+   "name": "Transfer curve",
+   "group": "gmwz9cabb3f",
+   "current": "sha256:225263ed1935f441d1fcda442d107a857844d1642f9cca75bc4668057f61b275",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out_hc)",
+        "color": "#1c7ed6"
+       },
+       {
+        "expr": "V(out_ls)",
+        "color": "#e8590c"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "dc1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smwz9cabb3h",
+   "name": "Output high against IOUT",
+   "group": "gmwz9cabb3f",
+   "current": "sha256:74b3be7cfd85b21aa2cf9fec23cc48ebc5255b4a2f34767eb165f71060781e91",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out_hc)",
+        "color": "#1c7ed6"
+       },
+       {
+        "expr": "V(out_ls)",
+        "color": "#e8590c"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "dc1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smwz9cabb3i",
+   "name": "Output low against IOUT",
+   "group": "gmwz9cabb3f",
+   "current": "sha256:c4d81cc2903e828561b151ff3d120fb8fdc7b48c63437ed1cf9fd563e439dc1b",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(out_hc)",
+        "color": "#1c7ed6"
+       },
+       {
+        "expr": "V(out_ls)",
+        "color": "#e8590c"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "dc1"
+   },
+   "runs": []
+  },
+  {
+   "id": "smwz9cabb3j",
+   "name": "Propagation delay",
+   "group": "gmwz9cabb3f",
+   "current": "sha256:2fc2fe81a0992cb98843104bb2dc99c465c2395c406a3fb51fa2dc94552731ad",
+   "view": {
+    "panes": [
+     {
+      "traces": [
+       {
+        "expr": "V(in)",
+        "color": "#2f9e44"
+       },
+       {
+        "expr": "V(out_hc)",
+        "color": "#1c7ed6"
+       },
+       {
+        "expr": "V(out_ls)",
+        "color": "#e8590c"
+       }
+      ]
+     }
+    ],
+    "active": 0,
+    "plot": "tran1"
+   },
+   "runs": []
+  }
+ ],
+ "blobs": {
+  "sha256:225263ed1935f441d1fcda442d107a857844d1642f9cca75bc4668057f61b275": "Version 4\r\nSHEET 1 880 400\r\nWIRE 400 80 448 80\r\nWIRE 400 112 448 112\r\nWIRE 512 96 544 96\r\nWIRE 544 96 608 96\r\nWIRE 608 96 704 96\r\nWIRE 464 48 464 32\r\nWIRE 464 144 464 160\r\nWIRE 400 272 448 272\r\nWIRE 400 304 448 304\r\nWIRE 512 288 544 288\r\nWIRE 544 288 608 288\r\nWIRE 608 288 704 288\r\nWIRE 464 240 464 224\r\nWIRE 464 336 464 352\r\nWIRE 32 48 32 16\r\nWIRE 144 48 144 16\r\nWIRE 256 48 256 16\r\nFLAG 400 80 in\r\nFLAG 400 112 vcc\r\nFLAG 464 32 vcc\r\nFLAG 464 160 0\r\nFLAG 544 96 out_hc\r\nFLAG 608 160 0\r\nFLAG 704 176 0\r\nFLAG 400 272 in\r\nFLAG 400 304 vcc\r\nFLAG 464 224 vcc\r\nFLAG 464 352 0\r\nFLAG 544 288 out_ls\r\nFLAG 608 352 0\r\nFLAG 704 368 0\r\nFLAG 32 16 vcc\r\nFLAG 32 128 0\r\nFLAG 144 16 in\r\nFLAG 144 128 0\r\nFLAG 256 16 iout\r\nFLAG 256 128 0\r\nSYMBOL voltage 32 32 R0\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 144 32 R0\r\nSYMATTR InstName VIN\r\nSYMATTR Value 0\r\nSYMBOL voltage 256 32 R0\r\nSYMATTR InstName VIOUT\r\nSYMATTR Value 0\r\nSYMBOL Logic\\74HC00 480 96 R0\r\nSYMATTR InstName XHC\r\nSYMBOL cap 592 96 R0\r\nSYMATTR InstName CHC\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 96 R0\r\nSYMATTR InstName BHC\r\nSYMATTR Value I=-V(iout)\r\nSYMBOL Logic\\74LS00 480 288 R0\r\nSYMATTR InstName XLS\r\nSYMBOL cap 592 288 R0\r\nSYMATTR InstName CLS\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 288 R0\r\nSYMATTR InstName BLS\r\nSYMATTR Value I=-V(iout)\r\nTEXT 16 224 Left 2 ;IOUT = V(iout) [A], positiva entrando a la salida\r\nTEXT 16 304 Left 2 !.dc VIN 0 5 1m\r\n",
+  "sha256:74b3be7cfd85b21aa2cf9fec23cc48ebc5255b4a2f34767eb165f71060781e91": "Version 4\r\nSHEET 1 880 400\r\nWIRE 400 80 448 80\r\nWIRE 400 112 448 112\r\nWIRE 512 96 544 96\r\nWIRE 544 96 608 96\r\nWIRE 608 96 704 96\r\nWIRE 464 48 464 32\r\nWIRE 464 144 464 160\r\nWIRE 400 272 448 272\r\nWIRE 400 304 448 304\r\nWIRE 512 288 544 288\r\nWIRE 544 288 608 288\r\nWIRE 608 288 704 288\r\nWIRE 464 240 464 224\r\nWIRE 464 336 464 352\r\nWIRE 32 48 32 16\r\nWIRE 144 48 144 16\r\nWIRE 256 48 256 16\r\nFLAG 400 80 in\r\nFLAG 400 112 vcc\r\nFLAG 464 32 vcc\r\nFLAG 464 160 0\r\nFLAG 544 96 out_hc\r\nFLAG 608 160 0\r\nFLAG 704 176 0\r\nFLAG 400 272 in\r\nFLAG 400 304 vcc\r\nFLAG 464 224 vcc\r\nFLAG 464 352 0\r\nFLAG 544 288 out_ls\r\nFLAG 608 352 0\r\nFLAG 704 368 0\r\nFLAG 32 16 vcc\r\nFLAG 32 128 0\r\nFLAG 144 16 in\r\nFLAG 144 128 0\r\nFLAG 256 16 iout\r\nFLAG 256 128 0\r\nSYMBOL voltage 32 32 R0\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 144 32 R0\r\nSYMATTR InstName VIN\r\nSYMATTR Value 0\r\nSYMBOL voltage 256 32 R0\r\nSYMATTR InstName VIOUT\r\nSYMATTR Value 0\r\nSYMBOL Logic\\74HC00 480 96 R0\r\nSYMATTR InstName XHC\r\nSYMBOL cap 592 96 R0\r\nSYMATTR InstName CHC\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 96 R0\r\nSYMATTR InstName BHC\r\nSYMATTR Value I=-V(iout)\r\nSYMBOL Logic\\74LS00 480 288 R0\r\nSYMATTR InstName XLS\r\nSYMBOL cap 592 288 R0\r\nSYMATTR InstName CLS\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 288 R0\r\nSYMATTR InstName BLS\r\nSYMATTR Value I=-V(iout)\r\nTEXT 16 224 Left 2 ;IOUT = V(iout) [A], positiva entrando a la salida\r\nTEXT 16 304 Left 2 !.dc VIOUT -25m 0 0.1m\r\n",
+  "sha256:c4d81cc2903e828561b151ff3d120fb8fdc7b48c63437ed1cf9fd563e439dc1b": "Version 4\r\nSHEET 1 880 400\r\nWIRE 400 80 448 80\r\nWIRE 400 112 448 112\r\nWIRE 512 96 544 96\r\nWIRE 544 96 608 96\r\nWIRE 608 96 704 96\r\nWIRE 464 48 464 32\r\nWIRE 464 144 464 160\r\nWIRE 400 272 448 272\r\nWIRE 400 304 448 304\r\nWIRE 512 288 544 288\r\nWIRE 544 288 608 288\r\nWIRE 608 288 704 288\r\nWIRE 464 240 464 224\r\nWIRE 464 336 464 352\r\nWIRE 32 48 32 16\r\nWIRE 144 48 144 16\r\nWIRE 256 48 256 16\r\nFLAG 400 80 in\r\nFLAG 400 112 vcc\r\nFLAG 464 32 vcc\r\nFLAG 464 160 0\r\nFLAG 544 96 out_hc\r\nFLAG 608 160 0\r\nFLAG 704 176 0\r\nFLAG 400 272 in\r\nFLAG 400 304 vcc\r\nFLAG 464 224 vcc\r\nFLAG 464 352 0\r\nFLAG 544 288 out_ls\r\nFLAG 608 352 0\r\nFLAG 704 368 0\r\nFLAG 32 16 vcc\r\nFLAG 32 128 0\r\nFLAG 144 16 in\r\nFLAG 144 128 0\r\nFLAG 256 16 iout\r\nFLAG 256 128 0\r\nSYMBOL voltage 32 32 R0\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 144 32 R0\r\nSYMATTR InstName VIN\r\nSYMATTR Value 5\r\nSYMBOL voltage 256 32 R0\r\nSYMATTR InstName VIOUT\r\nSYMATTR Value 0\r\nSYMBOL Logic\\74HC00 480 96 R0\r\nSYMATTR InstName XHC\r\nSYMBOL cap 592 96 R0\r\nSYMATTR InstName CHC\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 96 R0\r\nSYMATTR InstName BHC\r\nSYMATTR Value I=-V(iout)\r\nSYMBOL Logic\\74LS00 480 288 R0\r\nSYMATTR InstName XLS\r\nSYMBOL cap 592 288 R0\r\nSYMATTR InstName CLS\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 288 R0\r\nSYMATTR InstName BLS\r\nSYMATTR Value I=-V(iout)\r\nTEXT 16 224 Left 2 ;IOUT = V(iout) [A], positiva entrando a la salida\r\nTEXT 16 304 Left 2 !.dc VIOUT 0 25m 0.1m\r\n",
+  "sha256:2fc2fe81a0992cb98843104bb2dc99c465c2395c406a3fb51fa2dc94552731ad": "Version 4\r\nSHEET 1 880 400\r\nWIRE 400 80 448 80\r\nWIRE 400 112 448 112\r\nWIRE 512 96 544 96\r\nWIRE 544 96 608 96\r\nWIRE 608 96 704 96\r\nWIRE 464 48 464 32\r\nWIRE 464 144 464 160\r\nWIRE 400 272 448 272\r\nWIRE 400 304 448 304\r\nWIRE 512 288 544 288\r\nWIRE 544 288 608 288\r\nWIRE 608 288 704 288\r\nWIRE 464 240 464 224\r\nWIRE 464 336 464 352\r\nWIRE 32 48 32 16\r\nWIRE 144 48 144 16\r\nWIRE 256 48 256 16\r\nFLAG 400 80 in\r\nFLAG 400 112 vcc\r\nFLAG 464 32 vcc\r\nFLAG 464 160 0\r\nFLAG 544 96 out_hc\r\nFLAG 608 160 0\r\nFLAG 704 176 0\r\nFLAG 400 272 in\r\nFLAG 400 304 vcc\r\nFLAG 464 224 vcc\r\nFLAG 464 352 0\r\nFLAG 544 288 out_ls\r\nFLAG 608 352 0\r\nFLAG 704 368 0\r\nFLAG 32 16 vcc\r\nFLAG 32 128 0\r\nFLAG 144 16 in\r\nFLAG 144 128 0\r\nFLAG 256 16 iout\r\nFLAG 256 128 0\r\nSYMBOL voltage 32 32 R0\r\nSYMATTR InstName VCC\r\nSYMATTR Value 5\r\nSYMBOL voltage 144 32 R0\r\nWINDOW 3 24 96 Invisible 2\r\nSYMATTR InstName VIN\r\nSYMATTR Value PULSE(0 5 10n 6n 6n 100n 200n)\r\nSYMBOL voltage 256 32 R0\r\nSYMATTR InstName VIOUT\r\nSYMATTR Value 0\r\nSYMBOL Logic\\74HC00 480 96 R0\r\nSYMATTR InstName XHC\r\nSYMBOL cap 592 96 R0\r\nSYMATTR InstName CHC\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 96 R0\r\nSYMATTR InstName BHC\r\nSYMATTR Value I=-V(iout)\r\nSYMBOL Logic\\74LS00 480 288 R0\r\nSYMATTR InstName XLS\r\nSYMBOL cap 592 288 R0\r\nSYMATTR InstName CLS\r\nSYMATTR Value 15p\r\nSYMBOL bi 704 288 R0\r\nSYMATTR InstName BLS\r\nSYMATTR Value I=-V(iout)\r\nTEXT 16 224 Left 2 ;IOUT = V(iout) [A], positiva entrando a la salida\r\nTEXT 16 304 Left 2 !.tran 200n\r\n"
+ }
+}
